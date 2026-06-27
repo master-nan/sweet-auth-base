@@ -5,6 +5,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/utils"
 	"backend/model"
+	"reflect"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -241,6 +242,105 @@ func TestSeedSystemTableRelations(t *testing.T) {
 	if relation.ReferenceKey != "id" || relation.ForeignKey != "dict_id" || relation.RelationType != enum.OneToMany {
 		t.Fatalf("unexpected dict relation: %#v", relation)
 	}
+}
+
+func TestSystemColumnToTableFieldKeepsUnboundedTextLengthEmpty(t *testing.T) {
+	field := systemColumnToTableField("access_log", migrationTestColumn{
+		name:         "response",
+		databaseType: "text",
+		length:       9223372036854775807,
+		hasLength:    true,
+		nullable:     true,
+		hasNullable:  true,
+	}, 1)
+
+	if field.FieldType != enum.TextFieldType {
+		t.Fatalf("expected text field type, got %v", field.FieldType)
+	}
+	if field.FieldLength != 0 {
+		t.Fatalf("text fields should not store unbounded database length, got %d", field.FieldLength)
+	}
+	if field.InputType != enum.TextareaInputType {
+		t.Fatalf("expected textarea input type, got %v", field.InputType)
+	}
+}
+
+func TestSystemColumnToTableFieldKeepsVarcharLength(t *testing.T) {
+	field := systemColumnToTableField("application", migrationTestColumn{
+		name:         "name",
+		databaseType: "varchar",
+		length:       255,
+		hasLength:    true,
+		nullable:     false,
+		hasNullable:  true,
+	}, 1)
+
+	if field.FieldType != enum.VarcharFieldType || field.FieldLength != 255 {
+		t.Fatalf("unexpected varchar metadata: type=%v length=%d", field.FieldType, field.FieldLength)
+	}
+	if field.Binding != "required" {
+		t.Fatalf("not-null varchar should be required, got %q", field.Binding)
+	}
+}
+
+type migrationTestColumn struct {
+	name         string
+	databaseType string
+	length       int64
+	hasLength    bool
+	precision    int64
+	scale        int64
+	hasDecimal   bool
+	nullable     bool
+	hasNullable  bool
+}
+
+func (c migrationTestColumn) Name() string {
+	return c.name
+}
+
+func (c migrationTestColumn) DatabaseTypeName() string {
+	return c.databaseType
+}
+
+func (c migrationTestColumn) ColumnType() (string, bool) {
+	return c.databaseType, c.databaseType != ""
+}
+
+func (c migrationTestColumn) PrimaryKey() (bool, bool) {
+	return false, false
+}
+
+func (c migrationTestColumn) AutoIncrement() (bool, bool) {
+	return false, false
+}
+
+func (c migrationTestColumn) Length() (int64, bool) {
+	return c.length, c.hasLength
+}
+
+func (c migrationTestColumn) DecimalSize() (int64, int64, bool) {
+	return c.precision, c.scale, c.hasDecimal
+}
+
+func (c migrationTestColumn) Nullable() (bool, bool) {
+	return c.nullable, c.hasNullable
+}
+
+func (c migrationTestColumn) Unique() (bool, bool) {
+	return false, false
+}
+
+func (c migrationTestColumn) ScanType() reflect.Type {
+	return reflect.TypeOf("")
+}
+
+func (c migrationTestColumn) Comment() (string, bool) {
+	return "", false
+}
+
+func (c migrationTestColumn) DefaultValue() (string, bool) {
+	return "", false
 }
 
 func newMigrationTestSnowflake(t *testing.T) *utils.Snowflake {

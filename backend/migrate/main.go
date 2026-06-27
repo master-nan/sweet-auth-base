@@ -5,6 +5,7 @@ import (
 	"backend/enum"
 	"backend/initialize"
 	"backend/internal/cache"
+	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
 	"context"
@@ -50,6 +51,9 @@ func main() {
 			log.Fatal(err)
 		}
 		if err := seedBaseData(db, cfg, sf); err != nil {
+			log.Fatal(err)
+		}
+		if err := seedSystemTableMetadata(db, sf); err != nil {
 			log.Fatal(err)
 		}
 		if err := seedSystemTableRelations(db, sf); err != nil {
@@ -718,7 +722,7 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 	menus := []model.SysMenu{
 		menu(100, 0, "home", "home", "pages/dashboard/Dashboard.vue", "router.home", "home", 1),
 		directoryMenu(menu(200, 0, "system", "system", "src/components/Layout/Layout.vue", "router.system.default", "settings", 2)),
-		menuWithTable(menu(201, 200, "system_application", "application", "pages/system/application/Index.vue", "router.system.application", "apps", 1), "sys_application"),
+		menuWithTable(menu(201, 200, "system_application", "application", "pages/system/application/Index.vue", "router.system.application", "apps", 1), "application"),
 		menuWithTable(menu(202, 200, "system_sms", "sms", "pages/system/sms/Index.vue", "router.system.sms", "sms", 2), "sms_template"),
 		menuWithTable(menu(203, 200, "system_menu", "menu", "pages/system/menu/Index.vue", "router.system.menu", "menu", 3), "sys_menu"),
 		menuWithTable(menu(204, 200, "system_role", "role", "pages/system/role/Index.vue", "router.system.role", "admin_panel_settings", 4), "sys_role"),
@@ -1460,6 +1464,473 @@ func menuWithTable(menu model.SysMenu, tableCode string) model.SysMenu {
 func menuWithOption(menu model.SysMenu, option string) model.SysMenu {
 	menu.Option = option
 	return menu
+}
+
+type systemTableMetadataSeed struct {
+	code string
+	name string
+}
+
+func seedSystemTableMetadata(db *gorm.DB, sf *utils.Snowflake) error {
+	for _, seed := range systemTableMetadataSeeds() {
+		if !db.Migrator().HasTable(seed.code) {
+			continue
+		}
+		table, err := seedSystemTable(db, sf, seed)
+		if err != nil {
+			return err
+		}
+		if err := seedSystemTableFields(db, sf, table); err != nil {
+			return err
+		}
+		if err := seedSystemTableIndexes(db, sf, table); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func systemTableMetadataSeeds() []systemTableMetadataSeed {
+	return []systemTableMetadataSeed{
+		{code: "application", name: "应用"},
+		{code: "sms_template", name: "短信模板"},
+		{code: "sms_log", name: "短信日志"},
+		{code: "file", name: "文件"},
+		{code: "file_chunk", name: "文件分片"},
+		{code: "access_log", name: "访问日志"},
+		{code: "login_log", name: "登录日志"},
+		{code: "sys_configure", name: "系统配置"},
+		{code: "sys_dict", name: "字典"},
+		{code: "sys_dict_item", name: "字典项"},
+		{code: "sys_menu", name: "菜单"},
+		{code: "sys_menu_button", name: "菜单按钮"},
+		{code: "sys_menu_button_template", name: "菜单按钮模板"},
+		{code: "sys_role", name: "角色"},
+		{code: "sys_role_menu", name: "角色菜单"},
+		{code: "sys_role_menu_button", name: "角色按钮"},
+		{code: "sys_user", name: "用户"},
+		{code: "sys_user_role", name: "用户角色"},
+		{code: "sys_table", name: "数据表"},
+		{code: "sys_table_field", name: "数据字段"},
+		{code: "sys_table_index", name: "数据索引"},
+		{code: "sys_table_index_field", name: "数据索引字段"},
+		{code: "sys_table_relation", name: "数据关系"},
+		{code: "sys_data_dimension", name: "数据权限维度"},
+		{code: "sys_data_scope_binding", name: "数据权限绑定"},
+		{code: "sys_role_data_scope", name: "角色数据权限"},
+		{code: "sys_user_data_scope_override", name: "用户数据权限覆盖"},
+		{code: "casbin_rule", name: "接口权限规则"},
+	}
+}
+
+func seedSystemTable(db *gorm.DB, sf *utils.Snowflake, seed systemTableMetadataSeed) (model.SysTable, error) {
+	var table model.SysTable
+	err := db.Unscoped().Where("table_code = ?", seed.code).First(&table).Error
+	if err == nil {
+		updates := map[string]interface{}{
+			"table_name":  seed.name,
+			"table_type":  enum.System,
+			"state":       true,
+			"gmt_delete":  nil,
+			"delete_user": nil,
+			"delete_name": nil,
+		}
+		if err := db.Unscoped().Model(&model.SysTable{}).Where("id = ?", table.Id).Updates(updates).Error; err != nil {
+			return model.SysTable{}, err
+		}
+		table.TableName = seed.name
+		table.TableType = enum.System
+		table.State = true
+		table.GmtDelete.Valid = false
+		return table, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return model.SysTable{}, err
+	}
+	id, err := newMigrationID(sf)
+	if err != nil {
+		return model.SysTable{}, err
+	}
+	table = model.SysTable{
+		Basic: model.Basic{
+			Id:    id,
+			State: true,
+		},
+		TableName: seed.name,
+		TableCode: seed.code,
+		TableType: enum.System,
+	}
+	if err := db.Create(&table).Error; err != nil {
+		return model.SysTable{}, err
+	}
+	return table, nil
+}
+
+func seedSystemTableFields(db *gorm.DB, sf *utils.Snowflake, table model.SysTable) error {
+	columns, err := db.Migrator().ColumnTypes(table.TableCode)
+	if err != nil {
+		return err
+	}
+	for index, column := range columns {
+		field := systemColumnToTableField(table.TableCode, column, index+1)
+		if err := seedSystemTableField(db, sf, table.Id, field); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, tableID int, field model.SysTableField) error {
+	var existing model.SysTableField
+	err := db.Unscoped().Where("table_id = ? AND field_code = ?", tableID, field.FieldCode).First(&existing).Error
+	if err == nil {
+		updates := map[string]interface{}{
+			"field_type":           field.FieldType,
+			"field_length":         field.FieldLength,
+			"field_decimal_length": field.FieldDecimalLength,
+			"input_type":           field.InputType,
+			"is_primary_key":       field.IsPrimaryKey,
+			"is_index":             field.IsIndex,
+			"is_quick_search":      field.IsQuickSearch,
+			"is_advanced_search":   field.IsAdvancedSearch,
+			"is_sort":              field.IsSort,
+			"is_null":              field.IsNull,
+			"is_list_show":         field.IsListShow,
+			"is_insert_show":       field.IsInsertShow,
+			"is_update_show":       field.IsUpdateShow,
+			"sequence":             field.Sequence,
+			"binding":              field.Binding,
+			"field_category":       field.FieldCategory,
+			"state":                true,
+			"gmt_delete":           nil,
+			"delete_user":          nil,
+			"delete_name":          nil,
+		}
+		if strings.TrimSpace(existing.FieldName) == "" || existing.FieldName == existing.FieldCode {
+			updates["field_name"] = field.FieldName
+		}
+		if field.DictCode != nil {
+			updates["dict_code"] = *field.DictCode
+		}
+		return db.Unscoped().Model(&model.SysTableField{}).Where("id = ?", existing.Id).Updates(updates).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	id, err := newMigrationID(sf)
+	if err != nil {
+		return err
+	}
+	field.Id = id
+	field.TableId = tableID
+	return db.Create(&field).Error
+}
+
+func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence int) model.SysTableField {
+	length, hasLength := column.Length()
+	precision, scale, hasDecimal := column.DecimalSize()
+	nullable, hasNullable := column.Nullable()
+	if !hasNullable {
+		nullable = true
+	}
+	field := model.SysTableField{
+		Basic:              model.Basic{State: true},
+		FieldName:          systemFieldDisplayName(column.Name()),
+		FieldCode:          column.Name(),
+		FieldType:          systemFieldType(column.DatabaseTypeName()),
+		InputType:          enum.InputType,
+		IsPrimaryKey:       column.Name() == "id",
+		IsIndex:            false,
+		IsQuickSearch:      false,
+		IsAdvancedSearch:   false,
+		IsSort:             true,
+		IsNull:             nullable,
+		IsListShow:         true,
+		IsInsertShow:       !security.IsManagedMetadataField(column.Name()),
+		IsUpdateShow:       !security.IsManagedMetadataField(column.Name()),
+		Sequence:           uint8(sequence),
+		FieldCategory:      enum.NormalField,
+		FieldDecimalLength: 0,
+	}
+	if !nullable {
+		field.Binding = "required"
+	}
+	if hasLength && length > 0 && field.FieldType == enum.VarcharFieldType {
+		field.FieldLength = int(length)
+	}
+	if hasDecimal && field.FieldType == enum.FloatFieldType {
+		field.FieldLength = int(precision)
+		field.FieldDecimalLength = int(scale)
+	}
+	switch field.FieldType {
+	case enum.IntFieldType, enum.BigIntFieldType, enum.TinyintFieldType, enum.FloatFieldType:
+		field.InputType = enum.InputNumberInputType
+	case enum.TextFieldType:
+		field.InputType = enum.TextareaInputType
+	case enum.BooleanFieldType:
+		field.InputType = enum.BooleanInputType
+	case enum.DateFieldType:
+		field.InputType = enum.DatePickerInputType
+	case enum.DatetimeFieldType:
+		field.InputType = enum.DatetimePickerInputType
+	case enum.TimeFieldType:
+		field.InputType = enum.TimePickerInputType
+	case enum.JsonFieldType:
+		field.InputType = enum.JsonInputType
+	}
+	if systemSearchableField(field) {
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+	}
+	if dictCode := systemMetadataDictCode(tableCode, field.FieldCode, field.FieldType); dictCode != "" {
+		field.DictCode = utils.StringPtr(dictCode)
+		field.InputType = enum.SelectInputType
+	}
+	applyMigrationSensitiveFieldDefaults(&field)
+	applyMigrationManagedFieldDefaults(&field)
+	return field
+}
+
+func systemFieldType(databaseType string) enum.SysTableFieldType {
+	normalized := strings.ToLower(strings.TrimSpace(databaseType))
+	switch {
+	case normalized == "bigint" || normalized == "int8":
+		return enum.BigIntFieldType
+	case normalized == "integer" || normalized == "int" || normalized == "int4":
+		return enum.IntFieldType
+	case normalized == "smallint" || normalized == "int2" || normalized == "tinyint":
+		return enum.TinyintFieldType
+	case normalized == "numeric" || normalized == "decimal" || normalized == "double precision" || normalized == "float" || normalized == "float4" || normalized == "float8" || normalized == "real":
+		return enum.FloatFieldType
+	case normalized == "boolean" || normalized == "bool":
+		return enum.BooleanFieldType
+	case normalized == "date":
+		return enum.DateFieldType
+	case strings.HasPrefix(normalized, "timestamp") || normalized == "datetime" || normalized == "timestamptz":
+		return enum.DatetimeFieldType
+	case strings.HasPrefix(normalized, "time"):
+		return enum.TimeFieldType
+	case normalized == "text":
+		return enum.TextFieldType
+	case normalized == "json" || normalized == "jsonb":
+		return enum.JsonFieldType
+	default:
+		return enum.VarcharFieldType
+	}
+}
+
+func systemSearchableField(field model.SysTableField) bool {
+	if security.IsSensitiveFieldName(field.FieldCode) || security.IsManagedMetadataField(field.FieldCode) {
+		return false
+	}
+	switch field.FieldType {
+	case enum.VarcharFieldType, enum.TextFieldType:
+		return true
+	default:
+		return false
+	}
+}
+
+func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTableFieldType) string {
+	switch fieldCode {
+	case "master_detail_mode":
+		if tableCode == "sys_table" {
+			return "sys_master_detail_mode"
+		}
+	case "form_open_mode":
+		if tableCode == "sys_table" {
+			return "sys_form_open_mode"
+		}
+	case "detail_open_mode":
+		if tableCode == "sys_table" {
+			return "sys_detail_open_mode"
+		}
+	case "table_type":
+		return "sys_table_type"
+	case "field_type":
+		return "sys_table_field_type"
+	case "input_type":
+		return "sys_table_field_input_type"
+	case "field_category":
+		return "sys_table_field_category"
+	case "relation_type":
+		return "sys_table_relation_type"
+	case "position":
+		if tableCode == "sys_menu_button" {
+			return "sys_menu_button_position"
+		}
+	case "display_mode":
+		if tableCode == "sys_menu_button" {
+			return "sys_menu_button_display_mode"
+		}
+	case "event_action":
+		if tableCode == "sys_menu_button" {
+			return "sys_menu_button_event_action"
+		}
+	case "method", "http_method":
+		return "http_method"
+	case "state", "success", "is_hidden", "is_button", "is_disabled", "is_unfold", "required":
+		return "whether"
+	}
+	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
+		return "whether"
+	}
+	return ""
+}
+
+func applyMigrationSensitiveFieldDefaults(field *model.SysTableField) {
+	if !security.IsSensitiveFieldName(field.FieldCode) {
+		return
+	}
+	field.IsListShow = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+}
+
+func applyMigrationManagedFieldDefaults(field *model.SysTableField) {
+	if !security.IsManagedMetadataField(field.FieldCode) {
+		return
+	}
+	field.IsListShow = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+}
+
+func systemFieldDisplayName(fieldCode string) string {
+	names := map[string]string{
+		"id":           "ID",
+		"gmt_create":   "创建时间",
+		"create_user":  "创建人ID",
+		"create_name":  "创建人",
+		"gmt_modify":   "修改时间",
+		"modify_user":  "修改人ID",
+		"modify_name":  "修改人",
+		"gmt_delete":   "删除时间",
+		"delete_user":  "删除人ID",
+		"delete_name":  "删除人",
+		"state":        "状态",
+		"user_name":    "用户名",
+		"name":         "名称",
+		"memo":         "备注",
+		"remark":       "备注",
+		"email":        "邮箱",
+		"phone_number": "手机号",
+		"password":     "密码",
+		"language":     "语言",
+		"table_name":   "表名",
+		"table_code":   "表编码",
+		"field_name":   "字段名",
+		"field_code":   "字段编码",
+		"dict_name":    "字典名称",
+		"dict_code":    "字典编码",
+		"item_name":    "字典项名称",
+		"item_code":    "字典项编码",
+		"item_value":   "字典项值",
+		"menu_id":      "菜单ID",
+		"role_id":      "角色ID",
+		"user_id":      "用户ID",
+		"app_key":      "应用Key",
+		"app_secret":   "应用Secret",
+		"method":       "请求方法",
+		"url":          "路径",
+		"success":      "是否成功",
+		"duration_ms":  "耗时毫秒",
+	}
+	if name, ok := names[fieldCode]; ok {
+		return name
+	}
+	return strings.ReplaceAll(fieldCode, "_", " ")
+}
+
+func seedSystemTableIndexes(db *gorm.DB, sf *utils.Snowflake, table model.SysTable) error {
+	indexes, err := db.Migrator().GetIndexes(table.TableCode)
+	if err != nil {
+		return err
+	}
+	if len(indexes) == 0 {
+		return nil
+	}
+	var fields []model.SysTableField
+	if err := db.Unscoped().Where("table_id = ?", table.Id).Find(&fields).Error; err != nil {
+		return err
+	}
+	fieldIDs := make(map[string]int, len(fields))
+	for _, field := range fields {
+		fieldIDs[field.FieldCode] = field.Id
+	}
+	for _, index := range indexes {
+		if primary, ok := index.PrimaryKey(); ok && primary {
+			continue
+		}
+		if strings.TrimSpace(index.Name()) == "" {
+			continue
+		}
+		indexID, err := seedSystemTableIndex(db, sf, table.Id, index.Name(), index)
+		if err != nil {
+			return err
+		}
+		for _, column := range index.Columns() {
+			fieldID, ok := fieldIDs[column]
+			if !ok {
+				continue
+			}
+			if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.SysTableIndexField{
+				IndexId: indexID,
+				FieldId: fieldID,
+			}).Error; err != nil {
+				return err
+			}
+			if err := db.Model(&model.SysTableField{}).Where("id = ?", fieldID).Update("is_index", true).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func seedSystemTableIndex(db *gorm.DB, sf *utils.Snowflake, tableID int, indexName string, index gorm.Index) (int, error) {
+	unique, ok := index.Unique()
+	if !ok {
+		unique = false
+	}
+	var existing model.SysTableIndex
+	err := db.Unscoped().Where("table_id = ? AND index_name = ?", tableID, indexName).First(&existing).Error
+	if err == nil {
+		updates := map[string]interface{}{
+			"is_unique":   unique,
+			"state":       true,
+			"gmt_delete":  nil,
+			"delete_user": nil,
+			"delete_name": nil,
+		}
+		if err := db.Unscoped().Model(&model.SysTableIndex{}).Where("id = ?", existing.Id).Updates(updates).Error; err != nil {
+			return 0, err
+		}
+		return existing.Id, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return 0, err
+	}
+	id, err := newMigrationID(sf)
+	if err != nil {
+		return 0, err
+	}
+	if err := db.Create(&model.SysTableIndex{
+		Basic: model.Basic{
+			Id:    id,
+			State: true,
+		},
+		TableId:   tableID,
+		IndexName: indexName,
+		IsUnique:  unique,
+	}).Error; err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 type systemTableRelationSeed struct {

@@ -15,7 +15,6 @@ import (
 	"backend/repository"
 	"backend/repository/util"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -137,7 +136,7 @@ func detailSelectParts(table model.SysTable) []string {
 		if field.FieldCategory == enum.CalculatedField || field.FieldCategory == enum.VirtualField {
 			continue
 		}
-		result = append(result, fmt.Sprintf("`%s`", fieldCode))
+		result = append(result, util.QuoteIdentifier(fieldCode))
 	}
 	return result
 }

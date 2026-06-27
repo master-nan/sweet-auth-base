@@ -781,15 +781,15 @@ func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repo
 			if field.Expression != nil && strings.TrimSpace(*field.Expression) != "" {
 				if relTable, relField, ok := parseRelationExpression(*field.Expression); ok {
 					if alias, exists := joinAliasMap[relTable]; exists {
-						selectParts = append(selectParts, fmt.Sprintf("`%s`.`%s` AS `%s`", alias, relField, fieldCode))
+						selectParts = append(selectParts, fmt.Sprintf("%s.%s AS %s", QuoteIdentifier(alias), QuoteIdentifier(relField), QuoteIdentifier(fieldCode)))
 						continue
 					}
 				}
-				selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", *field.Expression, fieldCode))
+				selectParts = append(selectParts, fmt.Sprintf("%s AS %s", *field.Expression, QuoteIdentifier(fieldCode)))
 			}
 			continue
 		}
-		selectParts = append(selectParts, fmt.Sprintf("%s AS `%s`", qualifyField(fieldCode, table.TableCode), fieldCode))
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", qualifyField(fieldCode, table.TableCode), QuoteIdentifier(fieldCode)))
 	}
 	if len(selectParts) > 0 {
 		query = query.Select(strings.Join(selectParts, ","))
@@ -938,7 +938,7 @@ func buildRelationJoins(query **gorm.DB, db *gorm.DB, table model.SysTable) map[
 			alias = fmt.Sprintf("r%d", aliasIndex)
 			aliasIndex++
 			aliasMap[relatedCode] = alias
-			joinExpr := fmt.Sprintf("LEFT JOIN `%s` AS `%s` ON %s = `%s`.`%s`", relatedCode, alias, qualifyField(rel.ReferenceKey, table.TableCode), alias, rel.ForeignKey)
+			joinExpr := fmt.Sprintf("LEFT JOIN %s AS %s ON %s = %s.%s", QuoteIdentifier(relatedCode), QuoteIdentifier(alias), qualifyField(rel.ReferenceKey, table.TableCode), QuoteIdentifier(alias), QuoteIdentifier(rel.ForeignKey))
 			*query = (*query).Joins(joinExpr)
 		}
 	}
@@ -972,14 +972,18 @@ func qualifyField(field string, baseTable string) string {
 	if strings.Contains(field, ".") {
 		parts := strings.Split(field, ".")
 		for i := range parts {
-			parts[i] = fmt.Sprintf("`%s`", strings.TrimSpace(parts[i]))
+			parts[i] = QuoteIdentifier(parts[i])
 		}
 		return strings.Join(parts, ".")
 	}
 	if baseTable == "" {
-		return fmt.Sprintf("`%s`", field)
+		return QuoteIdentifier(field)
 	}
-	return fmt.Sprintf("`%s`.`%s`", baseTable, field)
+	return fmt.Sprintf("%s.%s", QuoteIdentifier(baseTable), QuoteIdentifier(field))
+}
+
+func QuoteIdentifier(identifier string) string {
+	return `"` + strings.ReplaceAll(strings.TrimSpace(identifier), `"`, `""`) + `"`
 }
 
 // hasDeleteField 检查表是否包含软删除字段
