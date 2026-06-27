@@ -155,7 +155,6 @@ import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
 import {
   type RoleDataPermissionSaveItem,
-  useDataPermissionApi,
 } from 'src/api/services/data-permission'
 
 // 加载状态
@@ -168,7 +167,6 @@ const { confirmDanger } = useConfirmDialog($q)
 const router = useRouter()
 const roleApi = useRoleApi()
 const tableApi = useTableApi()
-const dataPermissionApi = useDataPermissionApi()
 const rows = ref<Role[]>([])
 const total = ref(0)
 const selected = ref([])
@@ -436,16 +434,11 @@ const savePermission = async (permissionData: {
       permissionData.roleId,
       permissionData.menuIds,
       permissionData.buttonIds,
+      permissionData.dataPermissions || [],
     )
 
     if (result.success) {
-      const scopeResult = await dataPermissionApi.saveRoleDataPermissions(
-        permissionData.roleId,
-        permissionData.dataPermissions || [],
-      )
-      if (scopeResult.success) {
-        showPermissionDialog.value = false
-      }
+      showPermissionDialog.value = false
     }
   } catch (error) {
     console.error('权限分配失败', error)

@@ -9,6 +9,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -127,6 +128,10 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 	menuIDs := uniquePositiveInts(data.MenuIds)
 	buttonIDs := uniquePositiveInts(data.ButtonIds)
 	menuIDSet := intSet(menuIDs)
+	dataScopeRecords, err := s.assignedRoleDataScopeRecords(data.RoleId, menuIDSet, data.DataPermissions)
+	if err != nil {
+		return err
+	}
 	var assignableButtons []model.SysMenuButton
 	if len(buttonIDs) > 0 {
 		buttons, err := s.sysMenuButtonRepo.FindListByFieldIn("id", buttonIDs)
@@ -136,7 +141,7 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 		assignableButtons = filterAssignableRoleButtons(buttons, menuIDSet)
 	}
 
-	err := s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		// 删除旧的角色菜单
 		if err := s.sysRoleMenuRepo.DeleteByField(tx, "role_id", data.RoleId); err != nil {
 			return err
@@ -165,6 +170,9 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 			if err := s.sysRoleMenuButtonRepo.Create(tx, &roleMenuButton); err != nil {
 				return err
 			}
+		}
+		if data.DataPermissions != nil {
+			return s.dataPermissionService.ReplaceRoleDataScopes(tx, data.RoleId, dataScopeRecords)
 		}
 		return s.dataPermissionService.DeleteRoleScopesOutsideMenus(tx, data.RoleId, menuIDs)
 	})
@@ -217,6 +225,18 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 	}
 
 	return nil
+}
+
+func (s *SysRoleService) assignedRoleDataScopeRecords(roleId int, menuIDSet map[int]bool, permissions []request.RoleDataPermissionItemReq) ([]model.SysRoleDataScope, error) {
+	if permissions == nil {
+		return nil, nil
+	}
+	for _, permission := range permissions {
+		if !menuIDSet[permission.MenuId] {
+			return nil, myerrors.NewBadRequestError("数据权限必须属于已选择的菜单")
+		}
+	}
+	return s.dataPermissionService.BuildRoleDataScopeRecords(roleId, permissions)
 }
 
 type buttonAPIPolicy struct {

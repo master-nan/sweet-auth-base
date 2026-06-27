@@ -194,28 +194,43 @@ func (s *DataPermissionService) SaveRoleDataScopes(ctx *gin.Context, roleId int,
 	if req.RoleId > 0 && req.RoleId != roleId {
 		return myerrors.ErrParamInvalid
 	}
-	records := make([]model.SysRoleDataScope, 0, len(req.Permissions))
-	for _, item := range req.Permissions {
+	records, err := s.BuildRoleDataScopeRecords(roleId, req.Permissions)
+	if err != nil {
+		return err
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return s.ReplaceRoleDataScopes(tx, roleId, records)
+	})
+}
+
+func (s *DataPermissionService) BuildRoleDataScopeRecords(roleId int, permissions []request.RoleDataPermissionItemReq) ([]model.SysRoleDataScope, error) {
+	records := make([]model.SysRoleDataScope, 0, len(permissions))
+	for _, item := range permissions {
 		record, err := s.roleScopeFromReq(roleId, item)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		id, err := s.sf.GenerateUniqueID()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		record.Id = int(id)
 		records = append(records, record)
 	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("role_id = ?", roleId).Delete(&model.SysRoleDataScope{}).Error; err != nil {
-			return err
-		}
-		if len(records) == 0 {
-			return nil
-		}
-		return tx.Create(&records).Error
-	})
+	return records, nil
+}
+
+func (s *DataPermissionService) ReplaceRoleDataScopes(tx *gorm.DB, roleId int, records []model.SysRoleDataScope) error {
+	if tx == nil {
+		tx = s.db
+	}
+	if err := tx.Where("role_id = ?", roleId).Delete(&model.SysRoleDataScope{}).Error; err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	return tx.Create(&records).Error
 }
 
 func (s *DataPermissionService) DeleteRoleScopesByRoleId(tx *gorm.DB, roleId int) error {

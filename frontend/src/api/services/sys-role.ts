@@ -1,7 +1,8 @@
 import type { Basic, Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
-import  type  {MenuButton,Menu } from './sys-menu'
+import type { MenuButton, Menu } from './sys-menu'
 import type { User } from './sys-user'
+import type { RoleDataPermissionSaveItem } from './data-permission'
 
 export interface Role extends Basic {
   name: string
@@ -24,6 +25,7 @@ export interface RolePermissionReq {
   role_id: number
   menu_ids: Array<number>
   button_ids: Array<number>
+  data_permissions?: RoleDataPermissionSaveItem[]
 }
 
 export const useRoleApi = () => {
@@ -59,12 +61,18 @@ export const useRoleApi = () => {
     })
   }
 
-  const assignPermissions = async (roleId: number, menuIds: number[], buttonIds: number[]) => {
+  const assignPermissions = async (
+    roleId: number,
+    menuIds: number[],
+    buttonIds: number[],
+    dataPermissions?: RoleDataPermissionSaveItem[],
+  ) => {
     const req: RolePermissionReq = {
       role_id: roleId,
       menu_ids: menuIds,
-      button_ids: buttonIds
+      button_ids: buttonIds,
     }
+    if (dataPermissions) req.data_permissions = dataPermissions
     return instance.post<ResponseData<boolean>>('/admin/role/assign-permissions', req).then((res) => {
       return res.data
     })

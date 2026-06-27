@@ -2,6 +2,7 @@ package service
 
 import (
 	"backend/enum"
+	"backend/internal/utils"
 	"backend/model"
 	"reflect"
 	"testing"
@@ -125,7 +126,11 @@ func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, mode
 			{FieldCode: "name", FieldType: enum.VarcharFieldType},
 		},
 	}
-	return &DataPermissionService{db: db}, table
+	sf, err := utils.NewSnowflake(1)
+	if err != nil {
+		t.Fatalf("create snowflake: %v", err)
+	}
+	return &DataPermissionService{db: db, sf: sf}, table
 }
 
 func seedDataPermissionBinding(t *testing.T, db *gorm.DB, required bool) {
