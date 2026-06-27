@@ -1,0 +1,683 @@
+/**
+ * @Author: Nan
+ * @Date: 2024/6/13 下午11:32
+ */
+
+package service
+
+import (
+	"backend/dto/request"
+	"backend/enum"
+	error2 "backend/internal/errors"
+	"backend/internal/security"
+	"backend/internal/utils"
+	"backend/model"
+	"backend/repository"
+	"fmt"
+	"math"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+type GeneralizationService struct {
+	generalizationRepo repository.GeneralizationRepository
+	sf                 *utils.Snowflake
+}
+
+func NewGeneralizationService(generalizationRepo repository.GeneralizationRepository, sf *utils.Snowflake) *GeneralizationService {
+	return &GeneralizationService{
+		generalizationRepo: generalizationRepo,
+		sf:                 sf,
+	}
+}
+
+func (gs *GeneralizationService) Query(basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
+	result, err := gs.generalizationRepo.Query(basic, table)
+	if err != nil {
+		return repository.GeneralizationListResult{}, err
+	}
+	return result, nil
+}
+
+func (gs *GeneralizationService) GetById(table model.SysTable, id int) (map[string]interface{}, error) {
+	return gs.generalizationRepo.GetById(table, id)
+}
+
+// GetFieldById 获取指定行的指定字段值
+func (gs *GeneralizationService) GetFieldById(tableCode string, id int, fieldName string) (interface{}, error) {
+	return gs.generalizationRepo.GetFieldById(tableCode, id, fieldName)
+}
+
+func (gs *GeneralizationService) RowMatchesDataScope(table model.SysTable, id int, scope *request.DataScope) (bool, error) {
+	return gs.generalizationRepo.RowMatchesDataScope(table, id, scope)
+}
+
+func (gs *GeneralizationService) Create(ctx *gin.Context, table model.SysTable, data map[string]interface{}) error {
+	if isProtectedTable(table.TableCode) {
+		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+	}
+	filtered := filterDataByFields(table, data, true)
+	applyDefaultValues(table, filtered)
+	if err := validateDataByBindings(table, filtered, true); err != nil {
+		return err
+	}
+	normalizeDataByFieldTypes(table, filtered)
+	// 生成雪花ID
+	if utils.HasTableField(table, "id") {
+		id, err := gs.sf.GenerateUniqueID()
+		if err != nil {
+			return err
+		}
+		filtered["id"] = int(id)
+	}
+	// 填充审计字段
+	now := time.Now()
+	setIfFieldExists(table, filtered, "gmt_create", now)
+	setIfFieldExists(table, filtered, "gmt_modify", now)
+	user := ctx.MustGet("user").(model.SysUser)
+	setIfFieldExists(table, filtered, "gmt_create_user", user.Id)
+	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
+	return gs.generalizationRepo.Create(table, filtered)
+}
+
+func (gs *GeneralizationService) Update(ctx *gin.Context, table model.SysTable, id int, data map[string]interface{}) error {
+	if isProtectedTable(table.TableCode) {
+		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+	}
+	filtered := filterDataByFields(table, data, false)
+	delete(filtered, "id")
+	if err := validateDataByBindings(table, filtered, false); err != nil {
+		return err
+	}
+	if err := gs.ensureWritableRowExists(table, id); err != nil {
+		return err
+	}
+	normalizeDataByFieldTypes(table, filtered)
+	// 填充审计字段
+	setIfFieldExists(table, filtered, "gmt_modify", time.Now())
+	user := ctx.MustGet("user").(model.SysUser)
+	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
+	return gs.generalizationRepo.Update(table, id, filtered)
+}
+
+func (gs *GeneralizationService) Delete(ctx *gin.Context, table model.SysTable, id int) error {
+	if isProtectedTable(table.TableCode) {
+		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+	}
+	if err := gs.ensureWritableRowExists(table, id); err != nil {
+		return err
+	}
+	if !utils.HasTableField(table, "gmt_delete") {
+		// 表没有软删除字段，执行硬删除
+		return gs.generalizationRepo.HardDelete(table, id)
+	}
+	deleteData := map[string]interface{}{
+		"gmt_delete": time.Now(),
+	}
+	user := ctx.MustGet("user").(model.SysUser)
+	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
+	return gs.generalizationRepo.SoftDelete(table, id, deleteData)
+}
+
+func (gs *GeneralizationService) ensureWritableRowExists(table model.SysTable, id int) error {
+	if id <= 0 {
+		return error2.ErrDataNotFound
+	}
+	exists, err := gs.generalizationRepo.RowExists(table, id)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return error2.ErrDataNotFound
+	}
+	return nil
+}
+
+// setIfFieldExists 如果表中存在该字段则设置值
+func setIfFieldExists(table model.SysTable, data map[string]interface{}, fieldCode string, value interface{}) {
+	if utils.HasTableField(table, fieldCode) {
+		data[fieldCode] = value
+	}
+}
+
+// isProtectedTable 检查是否为受保护的系统表，防止通过通用接口操作核心数据
+func isProtectedTable(tableCode string) bool {
+	code := strings.ToLower(tableCode)
+	protectedPrefixes := []string{"sys_", "casbin_"}
+	for _, prefix := range protectedPrefixes {
+		if strings.HasPrefix(code, prefix) {
+			return true
+		}
+	}
+	protectedTables := []string{"application", "access_log", "login_log", "sms_log", "sms_template"}
+	for _, t := range protectedTables {
+		if code == t {
+			return true
+		}
+	}
+	return false
+}
+
+func filterDataByFields(table model.SysTable, data map[string]interface{}, isCreate bool) map[string]interface{} {
+	allowed := make(map[string]model.SysTableField)
+	for _, field := range table.TableFields {
+		if isManagedField(field.FieldCode) {
+			continue
+		}
+		if isCreate && !field.IsInsertShow {
+			continue
+		}
+		if !isCreate && !field.IsUpdateShow {
+			continue
+		}
+		allowed[field.FieldCode] = field
+	}
+	filtered := make(map[string]interface{})
+	for key, value := range data {
+		if _, ok := allowed[key]; ok {
+			filtered[key] = value
+		}
+	}
+	return filtered
+}
+
+func isManagedField(fieldCode string) bool {
+	return security.IsManagedMetadataField(fieldCode)
+}
+
+func applyDefaultValues(table model.SysTable, data map[string]interface{}) {
+	for _, field := range table.TableFields {
+		if field.DefaultValue == nil || *field.DefaultValue == "" || !field.IsInsertShow || isManagedField(field.FieldCode) {
+			continue
+		}
+		if !isEmptyValue(data[field.FieldCode], fieldValueExists(data, field.FieldCode)) {
+			continue
+		}
+		data[field.FieldCode] = parseDefaultValue(field, *field.DefaultValue)
+	}
+}
+
+func fieldValueExists(data map[string]interface{}, fieldCode string) bool {
+	_, exists := data[fieldCode]
+	return exists
+}
+
+func parseDefaultValue(field model.SysTableField, raw string) interface{} {
+	raw = strings.TrimSpace(raw)
+	switch field.FieldType {
+	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+		if val, err := parseInt(raw); err == nil {
+			return val
+		}
+	case enum.FloatFieldType:
+		if val, err := parseFloat(raw); err == nil {
+			return val
+		}
+	case enum.BooleanFieldType:
+		if val, err := strconv.ParseBool(strings.ToLower(raw)); err == nil {
+			return val
+		}
+		if raw == "1" {
+			return true
+		}
+		if raw == "0" {
+			return false
+		}
+	}
+	return raw
+}
+
+func normalizeDataByFieldTypes(table model.SysTable, data map[string]interface{}) {
+	for _, field := range table.TableFields {
+		value, exists := data[field.FieldCode]
+		if !exists {
+			continue
+		}
+		if isEmptyValue(value, true) {
+			if field.IsNull && shouldNormalizeEmptyValueToNil(field) {
+				data[field.FieldCode] = nil
+			}
+			continue
+		}
+		if normalized, ok := normalizeFieldValue(field, value); ok {
+			data[field.FieldCode] = normalized
+		}
+	}
+}
+
+func normalizeFieldValue(field model.SysTableField, value interface{}) (interface{}, bool) {
+	switch field.FieldType {
+	case enum.BigIntFieldType:
+		return toInt(value)
+	case enum.IntFieldType, enum.TinyintFieldType:
+		if val, ok := toInt(value); ok {
+			return int(val), true
+		}
+	case enum.FloatFieldType:
+		return toFloat(value)
+	case enum.BooleanFieldType:
+		return toBool(value)
+	case enum.DateFieldType:
+		return toDate(value)
+	case enum.DatetimeFieldType:
+		return toDateTime(value)
+	case enum.TimeFieldType:
+		return toTimeValue(value)
+	}
+	return value, false
+}
+
+func validateDataByBindings(table model.SysTable, data map[string]interface{}, isCreate bool) error {
+	if len(table.TableFields) == 0 {
+		return nil
+	}
+	fieldsMap := make(map[string]model.SysTableField, len(table.TableFields))
+	for _, field := range table.TableFields {
+		fieldsMap[field.FieldCode] = field
+	}
+
+	for _, field := range table.TableFields {
+		value, exists := data[field.FieldCode]
+		bindings := parseBindings(field.Binding)
+		isRequired := !field.IsNull && field.IsInsertShow && !isManagedField(field.FieldCode)
+		if isCreate && isRequired {
+			if isEmptyValue(value, exists) {
+				return error2.NewBadRequestError(fmt.Sprintf("%s不能为空", field.FieldName))
+			}
+		}
+		if !exists {
+			continue
+		}
+		if isEmptyValue(value, true) {
+			if !field.IsNull && !isManagedField(field.FieldCode) {
+				return error2.NewBadRequestError(fmt.Sprintf("%s不能为空", field.FieldName))
+			}
+			continue
+		}
+
+		if err := validateValueType(field, value); err != nil {
+			return err
+		}
+		if err := validateValueByBindings(field, value, bindings); err != nil {
+			return err
+		}
+	}
+
+	// 针对只传递部分字段的更新：若传入字段不在元数据中，直接跳过
+	for key := range data {
+		if _, ok := fieldsMap[key]; !ok {
+			continue
+		}
+	}
+	return nil
+}
+
+func validateValueType(field model.SysTableField, value interface{}) error {
+	switch field.FieldType {
+	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+		if _, ok := toInt(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是整数", field.FieldName))
+		}
+	case enum.FloatFieldType:
+		if _, ok := toFloat(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是数字", field.FieldName))
+		}
+	case enum.BooleanFieldType:
+		if _, ok := toBool(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是布尔值", field.FieldName))
+		}
+	case enum.DateFieldType:
+		if _, ok := toDate(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是日期", field.FieldName))
+		}
+	case enum.DatetimeFieldType:
+		if _, ok := toDateTime(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是日期时间", field.FieldName))
+		}
+	case enum.TimeFieldType:
+		if _, ok := toTimeValue(value); !ok {
+			return error2.NewBadRequestError(fmt.Sprintf("%s必须是时间", field.FieldName))
+		}
+	}
+	return nil
+}
+
+func validateValueByBindings(field model.SysTableField, value interface{}, bindings []string) error {
+	if hasBinding(bindings, "min") {
+		minVal := getBindingValue(bindings, "min")
+		if minVal != "" {
+			if err := validateMin(field, value, minVal); err != nil {
+				return err
+			}
+		}
+	}
+	if hasBinding(bindings, "max") {
+		maxVal := getBindingValue(bindings, "max")
+		if maxVal != "" {
+			if err := validateMax(field, value, maxVal); err != nil {
+				return err
+			}
+		}
+	}
+	if hasBinding(bindings, "email") {
+		if !matchRegex(`^[^\s@]+@[^\s@]+\.[^\s@]+$`, value) {
+			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+		}
+	}
+	if hasBinding(bindings, "url") {
+		if !isValidURL(value) {
+			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+		}
+	}
+	if hasBinding(bindings, "phone") || hasBinding(bindings, "mobile") {
+		if !matchRegex(`^1\d{10}$`, value) {
+			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+		}
+	}
+	if hasBinding(bindings, "regex") || hasBinding(bindings, "regexp") {
+		pattern := getBindingValue(bindings, "regex")
+		if pattern == "" {
+			pattern = getBindingValue(bindings, "regexp")
+		}
+		if pattern != "" {
+			if !matchRegex(pattern, value) {
+				return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+			}
+		}
+	}
+	return nil
+}
+
+func parseBindings(binding string) []string {
+	return strings.FieldsFunc(binding, func(r rune) bool {
+		return r == '|' || r == ','
+	})
+}
+
+func hasBinding(bindings []string, name string) bool {
+	for _, item := range bindings {
+		item = strings.TrimSpace(item)
+		if item == name || strings.HasPrefix(item, name+"=") {
+			return true
+		}
+	}
+	return false
+}
+
+func getBindingValue(bindings []string, name string) string {
+	for _, item := range bindings {
+		item = strings.TrimSpace(item)
+		if strings.HasPrefix(item, name+"=") {
+			return strings.TrimSpace(item[len(name)+1:])
+		}
+	}
+	return ""
+}
+
+func isEmptyValue(value interface{}, exists bool) bool {
+	if !exists {
+		return true
+	}
+	if value == nil {
+		return true
+	}
+	if str, ok := value.(string); ok {
+		return strings.TrimSpace(str) == ""
+	}
+	return false
+}
+
+func validateMin(field model.SysTableField, value interface{}, minStr string) error {
+	if isNumberField(field) {
+		minVal, err := parseFloat(minStr)
+		if err == nil {
+			val, ok := toFloat(value)
+			if ok && val < minVal {
+				return error2.NewBadRequestError(fmt.Sprintf("%s不能小于%v", field.FieldName, minVal))
+			}
+		}
+		return nil
+	}
+	minVal, err := parseInt(minStr)
+	if err == nil {
+		val := fmt.Sprintf("%v", value)
+		if len(val) < minVal {
+			return error2.NewBadRequestError(fmt.Sprintf("%s长度不能小于%d", field.FieldName, minVal))
+		}
+	}
+	return nil
+}
+
+func validateMax(field model.SysTableField, value interface{}, maxStr string) error {
+	if isNumberField(field) {
+		maxVal, err := parseFloat(maxStr)
+		if err == nil {
+			val, ok := toFloat(value)
+			if ok && val > maxVal {
+				return error2.NewBadRequestError(fmt.Sprintf("%s不能大于%v", field.FieldName, maxVal))
+			}
+		}
+		return nil
+	}
+	maxVal, err := parseInt(maxStr)
+	if err == nil {
+		val := fmt.Sprintf("%v", value)
+		if len(val) > maxVal {
+			return error2.NewBadRequestError(fmt.Sprintf("%s长度不能超过%d", field.FieldName, maxVal))
+		}
+	}
+	return nil
+}
+
+func isNumberField(field model.SysTableField) bool {
+	return field.FieldType == enum.BigIntFieldType ||
+		field.FieldType == enum.FloatFieldType ||
+		field.FieldType == enum.TinyintFieldType ||
+		field.FieldType == enum.IntFieldType
+}
+
+func toFloat(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case float64:
+		return v, isFiniteFloat(v)
+	case float32:
+		f := float64(v)
+		return f, isFiniteFloat(f)
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return 0, false
+		}
+		f, err := parseFloat(v)
+		if err == nil {
+			return f, true
+		}
+	}
+	return 0, false
+}
+
+func toInt(value interface{}) (int64, bool) {
+	switch v := value.(type) {
+	case int:
+		return int64(v), true
+	case int64:
+		return v, true
+	case int32:
+		return int64(v), true
+	case uint:
+		if uint64(v) > uint64(math.MaxInt64) {
+			return 0, false
+		}
+		return int64(v), true
+	case uint64:
+		if v > uint64(math.MaxInt64) {
+			return 0, false
+		}
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case float64:
+		if !isFiniteFloat(v) || math.Trunc(v) != v {
+			return 0, false
+		}
+		return int64(v), true
+	case float32:
+		f := float64(v)
+		if !isFiniteFloat(f) || math.Trunc(f) != f {
+			return 0, false
+		}
+		return int64(f), true
+	case string:
+		raw := strings.TrimSpace(v)
+		if raw == "" {
+			return 0, false
+		}
+		i, err := strconv.ParseInt(raw, 10, 64)
+		return i, err == nil
+	}
+	return 0, false
+}
+
+func toBool(value interface{}) (bool, bool) {
+	switch v := value.(type) {
+	case bool:
+		return v, true
+	case int:
+		if v == 0 || v == 1 {
+			return v == 1, true
+		}
+	case int64:
+		if v == 0 || v == 1 {
+			return v == 1, true
+		}
+	case int32:
+		if v == 0 || v == 1 {
+			return v == 1, true
+		}
+	case float64:
+		if v == 0 || v == 1 {
+			return v == 1, true
+		}
+	case float32:
+		if v == 0 || v == 1 {
+			return v == 1, true
+		}
+	case string:
+		raw := strings.ToLower(strings.TrimSpace(v))
+		switch raw {
+		case "true", "1":
+			return true, true
+		case "false", "0":
+			return false, true
+		}
+	}
+	return false, false
+}
+
+func shouldNormalizeEmptyValueToNil(field model.SysTableField) bool {
+	switch field.FieldType {
+	case enum.VarcharFieldType, enum.TextFieldType, enum.JsonFieldType:
+		return false
+	default:
+		return true
+	}
+}
+
+func toDate(value interface{}) (time.Time, bool) {
+	if t, ok := value.(time.Time); ok {
+		return t, true
+	}
+	raw, ok := value.(string)
+	if !ok {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(raw), time.Local)
+	return t, err == nil
+}
+
+func toDateTime(value interface{}) (time.Time, bool) {
+	if t, ok := value.(time.Time); ok {
+		return t, true
+	}
+	raw, ok := value.(string)
+	if !ok {
+		return time.Time{}, false
+	}
+	raw = strings.TrimSpace(raw)
+	for _, layout := range []string{time.DateTime, "2006-01-02T15:04", "2006-01-02T15:04:05", time.RFC3339, time.RFC3339Nano} {
+		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func toTimeValue(value interface{}) (string, bool) {
+	if t, ok := value.(time.Time); ok {
+		return t.Format(time.TimeOnly), true
+	}
+	raw, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+	raw = strings.TrimSpace(raw)
+	for _, layout := range []string{time.TimeOnly, "15:04"} {
+		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+			return t.Format(time.TimeOnly), true
+		}
+	}
+	return "", false
+}
+
+func isFiniteFloat(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func parseFloat(val string) (float64, error) {
+	f, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
+	if err != nil {
+		return 0, err
+	}
+	if !isFiniteFloat(f) {
+		return 0, fmt.Errorf("not a finite number")
+	}
+	return f, nil
+}
+
+func parseInt(val string) (int, error) {
+	return strconv.Atoi(strings.TrimSpace(val))
+}
+
+func matchRegex(pattern string, value interface{}) bool {
+	str := fmt.Sprintf("%v", value)
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
+	}
+	return re.MatchString(str)
+}
+
+func isValidURL(value interface{}) bool {
+	str := fmt.Sprintf("%v", value)
+	if strings.TrimSpace(str) == "" {
+		return true
+	}
+	_, err := url.ParseRequestURI(str)
+	return err == nil
+}

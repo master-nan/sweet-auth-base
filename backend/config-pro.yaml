@@ -1,0 +1,56 @@
+name: 'sweet_admin'
+version: '0.1'
+port: 9005
+worker_id: 1
+dbs:
+  primary:
+    host: 'replace-with-primary-postgres-host'
+    port: 5432
+    name: 'sweet_admin'
+    user: 'replace-with-primary-postgres-user'
+    password: 'replace-with-primary-postgres-password'
+    prefix: ''
+redis:
+  host: 'replace-with-redis-host'
+  port: 6379
+  db: 1
+  password: 'replace-with-redis-password'
+  pool_size: 10
+  min_idle_conns: 5
+  max_idle_conns: 5
+  conn_max_idle_time: 3600
+session:
+  secret: 'replace-with-at-least-32-random-characters'
+security:
+  enforce_casbin_policy_coverage: true
+  cors_allowed_origins: ['https://replace-with-admin-domain.example.com']
+  cors_allow_credentials: false
+audit:
+  access_log_retention_days: 180
+conf:
+  salt: 'replace-with-at-least-32-random-characters'
+  enable: true
+upload:
+  driver: 'local'
+  dir: '/data/uploads'
+  base_url: '/sweet_admin/files'
+  max_size: 50
+  chunk_size: 5
+  allowed_extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip']
+  allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip']
+  inline_preview_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv']
+  public_preview: false
+  access_ttl_minutes: 15
+  max_access_ttl_minutes: 60
+  oss:
+    endpoint: ''
+    access_key_id: ''
+    access_key_secret: ''
+    bucket_name: ''
+    base_url: ''
+    base_path: 'uploads/'
+aliyun:
+  sms:
+    access_key_id: ''
+    access_key_secret: ''
+    send_interval_seconds: 60

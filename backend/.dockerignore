@@ -1,0 +1,9 @@
+.git
+.idea
+uploads
+logs/
+auth_center
+*.log
+!bin/auth_center
+!bin/migrate
+!bin/container-entrypoint

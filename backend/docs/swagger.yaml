@@ -1,0 +1,4048 @@
+basePath: /sweet_admin
+definitions:
+  enum.ExpressionLogic:
+    enum:
+    - 1
+    - 2
+    type: integer
+    x-enum-varnames:
+    - And
+    - Or
+  enum.ExpressionType:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    type: integer
+    x-enum-comments:
+      Gt: Gt
+      Gte: Gte
+      Lt: Lt
+    x-enum-varnames:
+    - Gt
+    - Lt
+    - Gte
+    - Lte
+    - Eq
+    - Ne
+    - Like
+    - NotLike
+    - In
+    - NotIn
+    - IsNull
+    - IsNotNull
+    - Between
+    - NotBetween
+  enum.SysDetailOpenMode:
+    enum:
+    - auto
+    - dialog
+    - page
+    type: string
+    x-enum-varnames:
+    - DetailOpenAuto
+    - DetailOpenDialog
+    - DetailOpenPage
+  enum.SysFormOpenMode:
+    enum:
+    - auto
+    - dialog
+    - page
+    type: string
+    x-enum-varnames:
+    - FormOpenAuto
+    - FormOpenDialog
+    - FormOpenPage
+  enum.SysMasterDetailMode:
+    enum:
+    - auto
+    - summary
+    - table
+    - stacked
+    type: string
+    x-enum-varnames:
+    - MasterDetailAuto
+    - MasterDetailSummary
+    - MasterDetailTable
+    - MasterDetailStacked
+  enum.SysMenuButtonDisplayMode:
+    enum:
+    - auto
+    - icon
+    - text
+    - icon_text
+    type: string
+    x-enum-varnames:
+    - ButtonDisplayAuto
+    - ButtonDisplayIcon
+    - ButtonDisplayText
+    - ButtonDisplayIconText
+  enum.SysMenuButtonPosition:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type: integer
+    x-enum-comments:
+      Bottom: 表格底部
+      DetailBottom: 详情底部
+      DetailTop: 详情顶部
+      FormBottom: 表单底部
+      FormTop: 表单顶部
+      Line: 行按钮
+      Top: 表格顶部
+    x-enum-varnames:
+    - Line
+    - Top
+    - Bottom
+    - FormTop
+    - FormBottom
+    - DetailTop
+    - DetailBottom
+  enum.SysMenuPageType:
+    enum:
+    - directory
+    - fixed
+    - low_code
+    type: string
+    x-enum-varnames:
+    - MenuPageTypeDirectory
+    - MenuPageTypeFixed
+    - MenuPageTypeLowCode
+  enum.SysTableFieldCategory:
+    enum:
+    - normal_field
+    - virtual_field
+    - calculated_field
+    type: string
+    x-enum-comments:
+      CalculatedField: 计算字段
+      NormalField: 默认字段
+      VirtualField: 虚拟列
+    x-enum-varnames:
+    - NormalField
+    - VirtualField
+    - CalculatedField
+  enum.SysTableFieldInputType:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    type: integer
+    x-enum-varnames:
+    - InputType
+    - InputNumberInputType
+    - TextareaInputType
+    - SelectInputType
+    - DatePickerInputType
+    - DatetimePickerInputType
+    - TimePickerInputType
+    - YearPickerInputType
+    - YearMonthPickerInputType
+    - FilePickerInputType
+    - BooleanInputType
+    - JsonInputType
+    - ArrayInputType
+    - KeyValueInputType
+    - CascaderInputType
+    - RichTextInputType
+  enum.SysTableFieldType:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    type: integer
+    x-enum-varnames:
+    - BigIntFieldType
+    - FloatFieldType
+    - VarcharFieldType
+    - TextFieldType
+    - BooleanFieldType
+    - DateFieldType
+    - DatetimeFieldType
+    - TimeFieldType
+    - TinyintFieldType
+    - JsonFieldType
+    - IntFieldType
+  enum.SysTableRelationType:
+    enum:
+    - 1
+    - 2
+    - 3
+    - 4
+    type: integer
+    x-enum-varnames:
+    - OneToOne
+    - OneToMany
+    - ManyToOne
+    - ManyToMany
+  enum.SysTableType:
+    enum:
+    - 1
+    - 2
+    type: integer
+    x-enum-comments:
+      System: 系统表
+      View: 视图
+    x-enum-varnames:
+    - System
+    - View
+  request.AccessLogQueryReq:
+    properties:
+      action:
+        type: string
+      end_time:
+        type: string
+      expressions:
+        items:
+          $ref: '#/definitions/request.ExpressionGroup'
+        type: array
+      filters:
+        additionalProperties: {}
+        description: 额外过滤条件（联动/级联）
+        type: object
+      include_deleted:
+        description: 是否查询删除数据
+        type: boolean
+      ip:
+        type: string
+      menu_id:
+        description: 当前菜单ID（用于数据权限）
+        type: integer
+      method:
+        type: string
+      num:
+        example: 10
+        type: integer
+      order:
+        $ref: '#/definitions/request.Order'
+      page:
+        example: 1
+        type: integer
+      quick_query:
+        $ref: '#/definitions/request.QuickQuery'
+      resource_code:
+        type: string
+      start_time:
+        type: string
+      success:
+        type: boolean
+      table_code:
+        example: sys_dict
+        type: string
+      url:
+        type: string
+      user_name:
+        type: string
+    type: object
+  request.AppTokenReq:
+    properties:
+      app_key:
+        type: string
+      app_secret:
+        type: string
+    required:
+    - app_key
+    - app_secret
+    type: object
+  request.ApplicationCreateReq:
+    properties:
+      ding_app_id:
+        type: string
+      ding_key:
+        type: string
+      ding_secret:
+        type: string
+      expiration:
+        type: integer
+      name:
+        type: string
+      remark:
+        type: string
+    required:
+    - expiration
+    - name
+    type: object
+  request.ApplicationUpdateReq:
+    properties:
+      ding_app_id:
+        type: string
+      ding_key:
+        type: string
+      ding_secret:
+        type: string
+      expiration:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      remark:
+        type: string
+    required:
+    - expiration
+    - name
+    type: object
+  request.Basic:
+    properties:
+      expressions:
+        items:
+          $ref: '#/definitions/request.ExpressionGroup'
+        type: array
+      filters:
+        additionalProperties: {}
+        description: 额外过滤条件（联动/级联）
+        type: object
+      include_deleted:
+        description: 是否查询删除数据
+        type: boolean
+      menu_id:
+        description: 当前菜单ID（用于数据权限）
+        type: integer
+      num:
+        example: 10
+        type: integer
+      order:
+        $ref: '#/definitions/request.Order'
+      page:
+        example: 1
+        type: integer
+      quick_query:
+        $ref: '#/definitions/request.QuickQuery'
+      table_code:
+        example: sys_dict
+        type: string
+    type: object
+  request.ChunkUploadInitReq:
+    properties:
+      file_md5:
+        description: 完整文件MD5（用于秒传检测）
+        type: string
+      file_name:
+        description: 文件名
+        type: string
+      file_size:
+        description: 文件总大小（字节）
+        type: integer
+      file_type:
+        description: 文件MIME类型
+        type: string
+    required:
+    - file_name
+    - file_size
+    type: object
+  request.ConfigureTestEmailReq:
+    properties:
+      to:
+        type: string
+    required:
+    - to
+    type: object
+  request.ConfigureUpdateReq:
+    properties:
+      enable_captcha:
+        description: 安全配置
+        type: boolean
+      enable_email:
+        description: 邮件配置
+        type: boolean
+      id:
+        type: integer
+      password_complexity:
+        type: integer
+      password_error_count:
+        type: integer
+      password_expire_time:
+        type: integer
+      password_length:
+        type: integer
+      password_lock_minutes:
+        type: integer
+      password_policy:
+        type: string
+      sender_email:
+        type: string
+      sender_password:
+        type: string
+      smtp_port:
+        type: integer
+      smtp_server:
+        type: string
+      system_description:
+        type: string
+      system_logo:
+        type: string
+      system_name:
+        description: 系统基本信息
+        type: string
+      system_version:
+        type: string
+    required:
+    - enable_captcha
+    - password_complexity
+    - password_error_count
+    - password_expire_time
+    - password_length
+    - password_lock_minutes
+    - password_policy
+    type: object
+  request.DictCreateReq:
+    properties:
+      dict_code:
+        type: string
+      dict_name:
+        type: string
+    required:
+    - dict_code
+    - dict_name
+    type: object
+  request.DictItemCreateReq:
+    properties:
+      dict_id:
+        type: integer
+      item_code:
+        type: string
+      item_name:
+        type: string
+      item_value:
+        type: string
+    required:
+    - dict_id
+    - item_code
+    - item_name
+    - item_value
+    type: object
+  request.DingTalkMessageReq:
+    properties:
+      agent_id:
+        type: string
+      dept_id_list:
+        type: string
+      msg:
+        description: 消息内容，根据类型不同而不同
+        type: object
+      msg_type:
+        allOf:
+        - $ref: '#/definitions/request.MessageType'
+        description: 消息类型
+      to_all_user:
+        type: boolean
+      userid_list:
+        type: string
+    required:
+    - msg
+    - msg_type
+    type: object
+  request.ExpressionGroup:
+    properties:
+      logic:
+        allOf:
+        - $ref: '#/definitions/enum.ExpressionLogic'
+        description: '"and" 或 "or"'
+      nested:
+        description: 嵌套的表达式组
+        items:
+          $ref: '#/definitions/request.ExpressionGroup'
+        type: array
+      rules:
+        description: 基础查询规则
+        items:
+          $ref: '#/definitions/request.QueryRule'
+        type: array
+    type: object
+  request.MenuButtonCreateReq:
+    properties:
+      after_hooks:
+        type: string
+      api_path:
+        type: string
+      before_hooks:
+        type: string
+      code:
+        type: string
+      color:
+        type: string
+      confirm_text:
+        type: string
+      disable_when:
+        type: string
+      display_mode:
+        $ref: '#/definitions/enum.SysMenuButtonDisplayMode'
+      event_action:
+        type: string
+      event_type:
+        type: string
+      http_method:
+        type: string
+      icon:
+        type: string
+      is_button:
+        type: boolean
+      is_disabled:
+        type: boolean
+      is_hidden:
+        type: boolean
+      memo:
+        type: string
+      menu_id:
+        type: integer
+      name:
+        type: string
+      params_schema:
+        type: string
+      position:
+        $ref: '#/definitions/enum.SysMenuButtonPosition'
+      sequence:
+        type: integer
+    required:
+    - code
+    - menu_id
+    - name
+    - position
+    type: object
+  request.MenuButtonUpdateReq:
+    properties:
+      after_hooks:
+        type: string
+      api_path:
+        type: string
+      before_hooks:
+        type: string
+      code:
+        type: string
+      color:
+        type: string
+      confirm_text:
+        type: string
+      disable_when:
+        type: string
+      display_mode:
+        $ref: '#/definitions/enum.SysMenuButtonDisplayMode'
+      event_action:
+        type: string
+      event_type:
+        type: string
+      http_method:
+        type: string
+      icon:
+        type: string
+      id:
+        type: integer
+      is_button:
+        type: boolean
+      is_disabled:
+        type: boolean
+      is_hidden:
+        type: boolean
+      memo:
+        type: string
+      menu_id:
+        type: integer
+      name:
+        type: string
+      params_schema:
+        type: string
+      position:
+        $ref: '#/definitions/enum.SysMenuButtonPosition'
+      sequence:
+        type: integer
+    required:
+    - code
+    - id
+    - menu_id
+    - name
+    - position
+    type: object
+  request.MenuCreateReq:
+    properties:
+      component:
+        type: string
+      icon:
+        type: string
+      is_hidden:
+        type: boolean
+      name:
+        type: string
+      option:
+        type: string
+      page_type:
+        $ref: '#/definitions/enum.SysMenuPageType'
+      path:
+        type: string
+      pid:
+        type: integer
+      redirect:
+        type: string
+      sequence:
+        type: integer
+      table_code:
+        type: string
+      title:
+        type: string
+    required:
+    - component
+    - is_hidden
+    - name
+    - path
+    - pid
+    - sequence
+    - title
+    type: object
+  request.MenuOrderItemReq:
+    properties:
+      id:
+        type: integer
+      sequence:
+        type: integer
+    required:
+    - id
+    - sequence
+    type: object
+  request.MenuOrderUpdateReq:
+    properties:
+      menus:
+        items:
+          $ref: '#/definitions/request.MenuOrderItemReq'
+        type: array
+    required:
+    - menus
+    type: object
+  request.MenuUpdateReq:
+    properties:
+      component:
+        type: string
+      icon:
+        type: string
+      id:
+        type: integer
+      is_hidden:
+        type: boolean
+      name:
+        type: string
+      option:
+        type: string
+      page_type:
+        $ref: '#/definitions/enum.SysMenuPageType'
+      path:
+        type: string
+      pid:
+        type: integer
+      redirect:
+        type: string
+      sequence:
+        type: integer
+      table_code:
+        type: string
+      title:
+        type: string
+    required:
+    - component
+    - id
+    - is_hidden
+    - name
+    - path
+    - pid
+    - sequence
+    - title
+    type: object
+  request.MessageType:
+    enum:
+    - text
+    - image
+    - link
+    - file
+    - voice
+    - oa
+    - markdown
+    - action_card
+    type: string
+    x-enum-varnames:
+    - TextType
+    - ImageType
+    - LinkType
+    - FileType
+    - VoiceType
+    - OAType
+    - MarkdownType
+    - ActionCardType
+  request.Order:
+    properties:
+      field:
+        type: string
+      is_asc:
+        type: boolean
+    type: object
+  request.QueryRule:
+    properties:
+      expression_type:
+        allOf:
+        - $ref: '#/definitions/enum.ExpressionType'
+        description: 比较器类型，如EQ, LT等
+      field:
+        description: 字段
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldType'
+        description: 字段类型
+      value:
+        description: 值
+    type: object
+  request.QuickQuery:
+    properties:
+      keyword:
+        type: string
+    type: object
+  request.RoleAssignPermissionsReq:
+    properties:
+      button_ids:
+        items:
+          type: integer
+        type: array
+      menu_ids:
+        items:
+          type: integer
+        type: array
+      role_id:
+        type: integer
+    required:
+    - button_ids
+    - menu_ids
+    - role_id
+    type: object
+  request.RoleCreateReq:
+    properties:
+      memo:
+        type: string
+      name:
+        type: string
+    required:
+    - memo
+    - name
+    type: object
+  request.RoleUpdateReq:
+    properties:
+      id:
+        type: integer
+      memo:
+        type: string
+      name:
+        type: string
+    required:
+    - id
+    - memo
+    - name
+    type: object
+  request.SignInReq:
+    properties:
+      captcha:
+        type: string
+      captcha_id:
+        type: string
+      password:
+        type: string
+      user_name:
+        type: string
+    required:
+    - password
+    - user_name
+    type: object
+  request.SmsCodeLoginReq:
+    properties:
+      code:
+        type: string
+      mobile:
+        type: string
+    required:
+    - code
+    - mobile
+    type: object
+  request.SmsTemplateCreateReq:
+    type: object
+  request.SmsTemplateUpdateReq:
+    type: object
+  request.SysUserCreateReq:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      phone_number:
+        type: string
+      user_name:
+        type: string
+    required:
+    - email
+    - password
+    - phone_number
+    - user_name
+    type: object
+  request.SysUserUpdatePasswordReq:
+    properties:
+      id:
+        type: integer
+      is_reset:
+        type: boolean
+      password:
+        type: string
+      password_changed_at:
+        type: string
+    required:
+    - id
+    - password
+    type: object
+  request.SysUserUpdateReq:
+    properties:
+      access_tokens:
+        type: string
+      email:
+        type: string
+      gmt_delete:
+        type: string
+      gmt_last_login:
+        type: string
+      id:
+        type: integer
+      is_reset:
+        type: boolean
+      phone_number:
+        type: string
+      user_name:
+        type: string
+    required:
+    - email
+    - id
+    - phone_number
+    - user_name
+    type: object
+  request.TableCreateReq:
+    properties:
+      detail_open_mode:
+        $ref: '#/definitions/enum.SysDetailOpenMode'
+      form_open_mode:
+        $ref: '#/definitions/enum.SysFormOpenMode'
+      master_detail_mode:
+        $ref: '#/definitions/enum.SysMasterDetailMode'
+      parent_id:
+        type: integer
+      sql:
+        type: string
+      table_code:
+        type: string
+      table_name:
+        type: string
+      table_type:
+        $ref: '#/definitions/enum.SysTableType'
+    required:
+    - table_code
+    - table_name
+    - table_type
+    type: object
+  request.TableFieldCreateReq:
+    properties:
+      binding:
+        description: 校验规则
+        type: string
+      default_value:
+        description: 默认值
+        type: string
+      detail_span:
+        description: 详情占位列数，0为自动
+        type: integer
+      dict_code:
+        description: 所用字典
+        type: string
+      expression:
+        description: 计算字段表达式
+        type: string
+      field_category:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldCategory'
+        description: 字段类别
+      field_code:
+        description: 数据库中字段名
+        type: string
+      field_decimal_length:
+        description: 小数位数
+        type: integer
+      field_length:
+        description: 字段长度
+        type: integer
+      field_name:
+        description: 列名
+        type: string
+      form_span:
+        description: 表单占位列数，0为自动
+        type: integer
+      input_type:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldInputType'
+        description: 输入类型
+      is_advanced_search:
+        description: 是否高级搜索
+        type: boolean
+      is_index:
+        description: 是否索引
+        type: boolean
+      is_insert_show:
+        description: 是否新增显示
+        type: boolean
+      is_list_show:
+        description: 是否列表显示
+        type: boolean
+      is_null:
+        description: 是否可空
+        type: boolean
+      is_primary_key:
+        description: 是否主键
+        type: boolean
+      is_quick_search:
+        description: 是否快捷搜索
+        type: boolean
+      is_sort:
+        description: 是否可排序
+        type: boolean
+      is_update_show:
+        description: 是否更新显示
+        type: boolean
+      linkage_config:
+        description: 联动配置
+        type: string
+      original_field_id:
+        description: 原字段Id
+        type: integer
+      sequence:
+        description: 排序
+        type: integer
+      table_id:
+        type: integer
+      type:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldType'
+        description: 字段类型
+    required:
+    - field_code
+    - field_name
+    - input_type
+    - sequence
+    - table_id
+    - type
+    type: object
+  request.TableFieldUpdateReq:
+    properties:
+      binding:
+        description: 校验规则
+        type: string
+      default_value:
+        description: 默认值
+        type: string
+      detail_span:
+        description: 详情占位列数，0为自动
+        type: integer
+      dict_code:
+        description: 所用字典
+        type: string
+      expression:
+        description: 计算字段表达式
+        type: string
+      field_category:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldCategory'
+        description: 字段类别
+      field_code:
+        description: 数据库中字段名
+        type: string
+      field_decimal_length:
+        description: 小数位数
+        type: integer
+      field_length:
+        description: 字段长度
+        type: integer
+      field_name:
+        description: 列名
+        type: string
+      form_span:
+        description: 表单占位列数，0为自动
+        type: integer
+      id:
+        type: integer
+      input_type:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldInputType'
+        description: 输入类型
+      is_advanced_search:
+        description: 是否高级搜索
+        type: boolean
+      is_index:
+        description: 是否索引
+        type: boolean
+      is_insert_show:
+        description: 是否新增显示
+        type: boolean
+      is_list_show:
+        description: 是否列表显示
+        type: boolean
+      is_null:
+        description: 是否可空
+        type: boolean
+      is_primary_key:
+        description: 是否主键
+        type: boolean
+      is_quick_search:
+        description: 是否快捷搜索
+        type: boolean
+      is_sort:
+        description: 是否可排序
+        type: boolean
+      is_update_show:
+        description: 是否更新显示
+        type: boolean
+      linkage_config:
+        description: 联动配置
+        type: string
+      original_field_id:
+        description: 原字段Id
+        type: integer
+      sequence:
+        description: 排序
+        type: integer
+      table_id:
+        type: integer
+      type:
+        allOf:
+        - $ref: '#/definitions/enum.SysTableFieldType'
+        description: 字段类型
+    required:
+    - field_code
+    - field_name
+    - id
+    - input_type
+    - table_id
+    - type
+    type: object
+  request.TableIndexCreateReq:
+    properties:
+      index_fields:
+        items:
+          $ref: '#/definitions/request.TableIndexFieldReq'
+        minItems: 1
+        type: array
+      index_name:
+        type: string
+      is_unique:
+        type: boolean
+      table_id:
+        type: integer
+    required:
+    - index_fields
+    - index_name
+    - table_id
+    type: object
+  request.TableIndexFieldReq:
+    properties:
+      field_code:
+        type: string
+      field_id:
+        type: integer
+      table_id:
+        type: integer
+    required:
+    - field_code
+    - field_id
+    - table_id
+    type: object
+  request.TableIndexUpdateReq:
+    properties:
+      id:
+        type: integer
+      index_fields:
+        items:
+          $ref: '#/definitions/request.TableIndexFieldReq'
+        type: array
+      index_name:
+        type: string
+      is_unique:
+        type: boolean
+      table_id:
+        type: integer
+    required:
+    - id
+    - index_fields
+    - index_name
+    - table_id
+    type: object
+  request.TablePublishReq:
+    properties:
+      parent_id:
+        type: integer
+    type: object
+  request.TableRelationCreateReq:
+    properties:
+      foreign_key:
+        description: 关联表 字段
+        type: string
+      manyTableCode:
+        description: 多对多关系使用到的中间表
+        type: string
+      reference_key:
+        description: 主表对应字段
+        type: string
+      related_table_id:
+        description: 关联的表的Id
+        type: integer
+      relation_type:
+        $ref: '#/definitions/enum.SysTableRelationType'
+      table_id:
+        type: integer
+    required:
+    - foreign_key
+    - reference_key
+    - related_table_id
+    - relation_type
+    - table_id
+    type: object
+  request.TableRelationUpdateReq:
+    properties:
+      foreign_key:
+        description: 关联表 字段
+        type: string
+      id:
+        type: integer
+      manyTableCode:
+        description: 多对多关系使用到的中间表
+        type: string
+      reference_key:
+        description: 主表对应字段
+        type: string
+      related_table_id:
+        description: 关联的表的Id
+        type: integer
+      relation_type:
+        $ref: '#/definitions/enum.SysTableRelationType'
+      table_id:
+        type: integer
+    required:
+    - foreign_key
+    - id
+    - reference_key
+    - related_table_id
+    - relation_type
+    - table_id
+    type: object
+  request.TableUpdateReq:
+    properties:
+      detail_open_mode:
+        $ref: '#/definitions/enum.SysDetailOpenMode'
+      form_open_mode:
+        $ref: '#/definitions/enum.SysFormOpenMode'
+      id:
+        type: integer
+      master_detail_mode:
+        $ref: '#/definitions/enum.SysMasterDetailMode'
+      parent_id:
+        type: integer
+      sql:
+        type: string
+      table_code:
+        type: string
+      table_name:
+        type: string
+      table_type:
+        $ref: '#/definitions/enum.SysTableType'
+    required:
+    - id
+    - table_name
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+      success:
+        type: boolean
+      total:
+        type: integer
+    type: object
+info:
+  contact:
+    email: maxdwy@gmail.com
+    name: 南
+  description: 基于 Gin、Gorm 和 Quasar 的低代码管理底座
+  title: Sweet Admin
+  version: "0.1"
+paths:
+  /admin/application:
+    post:
+      description: 创建应用
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.ApplicationCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建应用
+      tags:
+      - 应用
+  /admin/application/{id}:
+    get:
+      description: 根据ID获取应用详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 应用ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 应用详情
+      tags:
+      - 应用
+  /admin/application/{id}/rotate-secret:
+    post:
+      description: 轮换应用 app_secret，响应仅本次返回新密钥
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 应用ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 轮换应用密钥
+      tags:
+      - 应用
+  /admin/application/delete/{id}:
+    delete:
+      description: 删除应用
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 应用ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除应用
+      tags:
+      - 应用
+  /admin/application/key/{appKey}:
+    get:
+      description: 根据appKey获取应用详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 应用Key
+        in: path
+        name: appKey
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 应用详情
+      tags:
+      - 应用
+  /admin/application/query:
+    post:
+      description: 获取应用列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 应用列表
+      tags:
+      - 应用
+  /admin/application/update/{id}:
+    put:
+      description: 更新应用
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 应用ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.ApplicationUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新应用
+      tags:
+      - 应用
+  /admin/captcha:
+    get:
+      description: 验证码
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 验证码
+      tags:
+      - 验证码
+  /admin/configure:
+    get:
+      description: 配置
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 配置
+      tags:
+      - 配置
+  /admin/configure/{id}:
+    put:
+      description: 更新配置
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.ConfigureUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新配置
+      tags:
+      - 配置
+  /admin/configure/detail:
+    get:
+      description: 获取后台配置详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 配置详情
+      tags:
+      - 配置
+  /admin/configure/test-email:
+    post:
+      description: 使用已保存的邮件配置发送一封测试邮件
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.ConfigureTestEmailReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 发送配置测试邮件
+      tags:
+      - 配置
+  /admin/file/{id}:
+    delete:
+      description: 根据ID删除文件（同时删除存储中的物理文件）
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除文件
+      tags:
+      - 文件
+    get:
+      description: 根据ID获取文件详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文件信息
+      tags:
+      - 文件
+  /admin/file/download-url/{uuid}:
+    get:
+      description: 为当前用户可访问的文件生成短期签名下载地址
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: 有效期秒数，最大3600秒
+        in: query
+        name: ttl
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文件签名下载地址
+      tags:
+      - 文件
+  /admin/file/download/{uuid}:
+    get:
+      description: 通过文件UUID下载文件（支持本地和OSS存储）
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 下载文件
+      tags:
+      - 文件
+  /admin/file/preview-url/{uuid}:
+    get:
+      description: 为当前用户可访问的文件生成短期签名预览地址，用于富文本预览等无法携带 Authorization 头的场景
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: 有效期秒数，最大3600秒
+        in: query
+        name: ttl
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取文件签名预览地址
+      tags:
+      - 文件
+  /admin/file/preview/{uuid}:
+    get:
+      description: 通过文件UUID预览文件（图片、PDF等），支持本地和OSS存储
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 预览文件
+      tags:
+      - 文件
+  /admin/file/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传文件，支持秒传（MD5去重）
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 上传文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 上传文件
+      tags:
+      - 文件
+  /admin/file/upload/chunk:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传单个文件分片，支持断点续传（幂等操作）
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 上传ID
+        in: formData
+        name: upload_id
+        required: true
+        type: string
+      - description: 分片索引（从0开始）
+        in: formData
+        name: chunk_index
+        required: true
+        type: integer
+      - description: 分片文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 上传分片
+      tags:
+      - 文件
+  /admin/file/upload/init:
+    post:
+      consumes:
+      - application/json
+      description: 初始化分片上传，返回uploadId和分片信息。支持秒传检测。
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 初始化参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.ChunkUploadInitReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 初始化分片上传
+      tags:
+      - 文件
+  /admin/file/upload/merge/{upload_id}:
+    post:
+      description: 所有分片上传完成后，调用此接口合并分片生成最终文件
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 上传ID
+        in: path
+        name: upload_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 合并分片
+      tags:
+      - 文件
+  /admin/file/upload/progress/{upload_id}:
+    get:
+      description: 获取分片上传进度，返回已上传的分片索引列表（用于断点续传）
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 上传ID
+        in: path
+        name: upload_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取上传进度
+      tags:
+      - 文件
+  /admin/log/access/{id}:
+    get:
+      description: 查询访问审计详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 日志ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 访问审计详情
+      tags:
+      - 日志
+  /admin/log/access/query:
+    post:
+      description: 查询访问审计日志
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: q
+        schema:
+          $ref: '#/definitions/request.AccessLogQueryReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 访问审计日志
+      tags:
+      - 日志
+  /admin/login:
+    post:
+      description: 登录
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 登录
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SignInReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 登录
+      tags:
+      - 登录
+  /admin/logout:
+    post:
+      description: 退出
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 退出
+      tags:
+      - 退出
+  /admin/menu:
+    post:
+      description: 创建菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.MenuCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建菜单
+      tags:
+      - 菜单
+  /admin/menu/{id}:
+    delete:
+      description: 根据ID删除菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除菜单
+      tags:
+      - 菜单
+    get:
+      description: 根据ID获取菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取菜单
+      tags:
+      - 菜单
+    put:
+      description: 更新菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.MenuUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新菜单
+      tags:
+      - 菜单
+  /admin/menu/button:
+    post:
+      description: 创建菜单按钮
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.MenuButtonCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建菜单按钮
+      tags:
+      - 菜单
+  /admin/menu/button/{id}:
+    delete:
+      description: 删除菜单按钮
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单按钮ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除菜单按钮
+      tags:
+      - 菜单
+    put:
+      description: 更新菜单按钮
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单按钮ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.MenuButtonUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新菜单按钮
+      tags:
+      - 菜单
+  /admin/menu/buttons/{menuId}:
+    get:
+      description: 获取菜单按钮列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 菜单ID
+        in: path
+        name: menuId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取菜单按钮列表
+      tags:
+      - 菜单
+  /admin/menu/my:
+    get:
+      description: 获取我的菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取我的菜单
+      tags:
+      - 菜单
+  /admin/menu/order:
+    put:
+      description: 批量更新菜单排序
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.MenuOrderUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新菜单排序
+      tags:
+      - 菜单
+  /admin/menu/query:
+    post:
+      description: 查询菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.Basic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 查询菜单
+      tags:
+      - 菜单
+  /admin/menu/refresh-cache:
+    post:
+      description: 当前菜单读取为实时数据库查询，此接口用于前端统一触发菜单刷新
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 刷新菜单缓存
+      tags:
+      - 菜单
+  /admin/menu/user/{id}:
+    get:
+      description: 获取用户菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取用户菜单
+      tags:
+      - 菜单
+  /admin/role:
+    post:
+      description: 创建角色
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.RoleCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建角色
+      tags:
+      - 角色
+  /admin/role/{id}:
+    delete:
+      description: 根据ID删除角色
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除角色
+      tags:
+      - 角色
+    get:
+      description: 根据ID获取角色
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取角色
+      tags:
+      - 角色
+    put:
+      description: 更新角色
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.RoleUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新角色
+      tags:
+      - 角色
+  /admin/role/{id}/menus:
+    get:
+      description: 获取角色菜单
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取角色菜单
+      tags:
+      - 角色
+  /admin/role/{roleId}/menu/{menuId}/buttons:
+    get:
+      description: 获取角色菜单按钮权限
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 角色ID
+        in: path
+        name: roleId
+        required: true
+        type: integer
+      - description: 菜单ID
+        in: path
+        name: menuId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取角色菜单按钮权限
+      tags:
+      - 角色
+  /admin/role/assign-permissions:
+    post:
+      description: 分配角色权限
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.RoleAssignPermissionsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 分配角色权限
+      tags:
+      - 角色
+  /admin/role/query:
+    post:
+      description: 查询角色列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.Basic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 查询角色列表
+      tags:
+      - 角色
+  /admin/sms/template:
+    post:
+      description: 创建短信模板
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.SmsTemplateCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建短信模板
+      tags:
+      - 短信
+  /admin/sms/template/{id}:
+    delete:
+      description: 删除短信模板
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模板ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除短信模板
+      tags:
+      - 短信
+    get:
+      description: 根据ID获取短信模板详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模板ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 短信模板详情
+      tags:
+      - 短信
+    put:
+      description: 更新短信模板
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模板ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.SmsTemplateUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新短信模板
+      tags:
+      - 短信
+  /admin/sms/template/query:
+    post:
+      description: 获取短信模板列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.Basic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 短信模板列表
+      tags:
+      - 短信
+  /admin/table:
+    post:
+      description: 创建表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建表
+      tags:
+      - 表
+  /admin/table/{id}:
+    delete:
+      description: 根据ID删除表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除表
+      tags:
+      - 表
+    get:
+      description: 根据ID获取表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取表
+      tags:
+      - 表
+    put:
+      description: 更新表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新表
+      tags:
+      - 表
+  /admin/table/code/{code}:
+    get:
+      description: 根据表编码获取表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据表编码获取表
+      tags:
+      - 表
+  /admin/table/field:
+    post:
+      description: 创建表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableFieldCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建表字段
+      tags:
+      - 表
+  /admin/table/field/{id}:
+    delete:
+      description: 根据ID删除表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表字段ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除表字段
+      tags:
+      - 表
+    get:
+      description: 根据ID获取表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表字段ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取表字段
+      tags:
+      - 表
+    put:
+      description: 更新表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表字段ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableFieldUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新表字段
+      tags:
+      - 表
+  /admin/table/fields/{id}:
+    get:
+      description: 根据表ID获取表字段
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据表ID获取表字段
+      tags:
+      - 表
+  /admin/table/index:
+    post:
+      description: 创建表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableIndexCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建表索引
+      tags:
+      - 表
+  /admin/table/index/{id}:
+    delete:
+      description: 根据ID删除表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表索引ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除表索引
+      tags:
+      - 表
+    get:
+      description: 根据ID获取表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表索引ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取表索引
+      tags:
+      - 表
+    put:
+      description: 更新表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表索引ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableIndexUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新表索引
+      tags:
+      - 表
+  /admin/table/index/table/{id}:
+    delete:
+      description: 根据表ID删除表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据表ID删除表索引
+      tags:
+      - 表
+  /admin/table/indexes/{id}:
+    get:
+      description: 根据表ID获取表索引
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据表ID获取表索引
+      tags:
+      - 表
+  /admin/table/init/{code}:
+    post:
+      description: 初始化表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 初始化表
+      tags:
+      - 表
+  /admin/table/publish/{code}:
+    post:
+      description: 为表配置生成侧边栏菜单和默认CRUD按钮
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 发布目录
+        in: body
+        name: data
+        schema:
+          $ref: '#/definitions/request.TablePublishReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 发布通用CRUD菜单
+      tags:
+      - 表
+  /admin/table/query:
+    post:
+      description: 查询表列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.Basic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 查询表列表
+      tags:
+      - 表
+  /admin/table/relation:
+    post:
+      description: 创建表关系
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableRelationCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建表关系
+      tags:
+      - 表
+  /admin/table/relation/{id}:
+    delete:
+      description: 根据ID删除表关系
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表关系ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID删除表关系
+      tags:
+      - 表
+    get:
+      description: 根据ID获取表关系
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表关系ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取表关系
+      tags:
+      - 表
+    put:
+      description: 更新表关系
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表关系ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.TableRelationUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新表关系
+      tags:
+      - 表
+  /admin/table/relations/{id}:
+    get:
+      description: 根据表ID获取表关系
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据表ID获取表关系
+      tags:
+      - 表
+  /admin/table/sync/{code}:
+    post:
+      description: 将数据库表结构差异同步到 sys_table_field
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 同步表字段元数据
+      tags:
+      - 表
+  /admin/table/sync/index/{code}:
+    post:
+      description: 将数据库表索引同步到 sys_table_index 与 sys_table_index_field
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 同步表索引元数据
+      tags:
+      - 表
+  /admin/table/unpublish/{code}:
+    post:
+      description: 隐藏表配置生成的低代码菜单并撤销角色授权
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 表编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 下线通用CRUD菜单
+      tags:
+      - 表
+  /admin/user:
+    post:
+      description: 创建用户
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建用户
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SysUserCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 创建用户
+      tags:
+      - 用户
+  /admin/user/{id}:
+    delete:
+      description: 删除用户
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除用户
+      tags:
+      - 用户
+    get:
+      description: 根据ID获取用户
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据ID获取用户
+      tags:
+      - 用户
+    put:
+      description: 更新用户
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新用户
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SysUserUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新用户
+      tags:
+      - 用户
+  /admin/user/{username}:
+    get:
+      description: 根据用户名获取用户
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户名
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 根据用户名获取用户
+      tags:
+      - 用户
+  /admin/user/me:
+    get:
+      description: 获取当前用户信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取当前用户信息
+      tags:
+      - 用户
+  /admin/user/password:
+    post:
+      description: 修改密码
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 修改密码
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SysUserUpdatePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 修改密码
+      tags:
+      - 用户
+  /admin/user/reset_password/{id}:
+    post:
+      description: 重置密码
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 重置密码
+      tags:
+      - 用户
+  /admin/user/unlock_login/{id}:
+    post:
+      description: 清除用户后台登录失败次数和锁定状态
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 解除登录锁定
+      tags:
+      - 用户
+  /api/app_token:
+    post:
+      description: 获取AppToken
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        type: string
+      - description: AppToken
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.AppTokenReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取AppToken
+      tags:
+      - 授权
+  /api/check_sms_status/{bizId}/{mobile}:
+    get:
+      description: 检查短信发送状态
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: bizId
+        in: path
+        name: bizId
+        required: true
+        type: string
+      - description: 手机号
+        in: path
+        name: mobile
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 检查短信发送状态
+      tags:
+      - 授权
+  /api/dingtalk/send_message:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: 消息内容
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.DingTalkMessageReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 发送消息
+      tags:
+      - 钉钉
+  /api/login:
+    post:
+      description: 登录
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: 登录信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SignInReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 登录
+      tags:
+      - 授权
+  /api/logout:
+    post:
+      description: 退出登录
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 退出登录
+      tags:
+      - 授权
+  /api/refresh_token:
+    get:
+      description: 刷新Token
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 刷新Token
+        in: query
+        name: refreshToken
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 刷新Token
+      tags:
+      - 授权
+  /api/send_sms/{mobile}/{templateCode}:
+    post:
+      description: 发送短信
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: 发送短信
+        in: body
+        name: data
+        schema:
+          additionalProperties: true
+          type: object
+      - description: 手机号
+        in: path
+        name: mobile
+        required: true
+        type: string
+      - description: 短信模板编号
+        in: path
+        name: templateCode
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 发送短信
+      tags:
+      - 授权
+  /api/sms_code_login:
+    post:
+      description: 短信验证码登录
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: 短信验证码登录
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SmsCodeLoginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 短信验证码登录
+      tags:
+      - 授权
+  /api/sso_login:
+    get:
+      description: 单点登录
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: code
+        in: query
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 单点登录
+      tags:
+      - 授权
+  /api/user/me:
+    get:
+      description: 获取当前用户信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取当前用户信息
+      tags:
+      - 用户
+  /api/user/password:
+    post:
+      description: 修改密码
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 自定义应用令牌
+        in: header
+        name: X-APP-TOKEN
+        required: true
+        type: string
+      - description: 修改密码
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SysUserUpdatePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 修改密码
+      tags:
+      - 用户
+  /dict:
+    post:
+      description: 新增字典主体
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.DictCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 新增字典
+      tags:
+      - 字典
+  /dict/{id}:
+    put:
+      description: 根据ID更新字典信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: 请求错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新字典
+      tags:
+      - 字典
+  /dict/code/{code}:
+    get:
+      description: 根据CODE获取字典详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典CODE
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 字典详情
+      tags:
+      - 字典
+  /dict/id/{id}:
+    get:
+      description: 根据ID获取字典详情
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 字典详情
+      tags:
+      - 字典
+  /dict/item:
+    post:
+      description: 新增字典项主体
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: b
+        required: true
+        schema:
+          $ref: '#/definitions/request.DictItemCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 新增字典项
+      tags:
+      - 字典
+  /dict/item/{id}:
+    delete:
+      description: 根据ID删除字典项
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典项ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除字典项
+      tags:
+      - 字典
+    get:
+      description: 根据字典ID获取字典项
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 字典项
+      tags:
+      - 字典
+    put:
+      description: 根据ID更新字典项信息
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典项ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新字典项
+      tags:
+      - 字典
+  /dict/item/id/{id}:
+    get:
+      description: 根据ID获取字典项
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 字典项ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 字典项
+      tags:
+      - 字典
+  /dict/query:
+    post:
+      description: 根据查询条件查询字段列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: q
+        schema:
+          $ref: '#/definitions/request.Basic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 请求成功
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: 内部错误
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 字典列表
+      tags:
+      - 字典
+  /files/{uuid}:
+    get:
+      description: 通过文件UUID公开预览文件，仅在 upload.public_preview 开启时可用
+      parameters:
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 公开预览文件
+      tags:
+      - 文件
+  /files/access/download/{uuid}:
+    get:
+      description: 通过短期签名 token 下载文件
+      parameters:
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: 签名 token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 签名下载文件
+      tags:
+      - 文件
+  /files/access/preview/{uuid}:
+    get:
+      description: 通过短期签名 token 预览文件
+      parameters:
+      - description: 文件UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: 签名 token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: 签名预览文件
+      tags:
+      - 文件
+swagger: "2.0"

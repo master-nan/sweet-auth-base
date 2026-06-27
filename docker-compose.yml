@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sweet_admin
+      POSTGRES_USER: sweet_admin
+      POSTGRES_PASSWORD: sweet_admin
+      TZ: Asia/Shanghai
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sweet_admin -d sweet_admin"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:6.2.7
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "9005:9005"
+    volumes:
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "/app/healthcheck", "http://127.0.0.1:9005/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      API_PROXY_TARGET: http://backend:9005
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "/app/healthcheck", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres_data:
+  backend_uploads:

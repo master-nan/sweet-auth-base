@@ -1,0 +1,56 @@
+name: 'sweet_admin'
+version: '0.1'
+port: 9005
+worker_id: 1
+dbs:
+  primary:
+    host: 'postgres'
+    port: 5432
+    name: 'sweet_admin'
+    user: 'sweet_admin'
+    password: 'sweet_admin'
+    prefix: ''
+redis:
+  host: 'redis'
+  port: 6379
+  db: 5
+  password:
+  pool_size: 10
+  min_idle_conns: 5
+  max_idle_conns: 5
+  conn_max_idle_time: 3600
+session:
+  secret: 'local-docker-session-secret-change-me'
+security:
+  enforce_casbin_policy_coverage: true
+  cors_allowed_origins: ['*']
+  cors_allow_credentials: false
+audit:
+  access_log_retention_days: 30
+conf:
+  salt: 'local-docker-sweet-admin-salt-change-me'
+  enable: false
+upload:
+  driver: 'local'
+  dir: '/app/uploads'
+  base_url: '/sweet_admin/files'
+  max_size: 500000
+  chunk_size: 5
+  allowed_extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx','.zip']
+  allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip']
+  inline_preview_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv']
+  public_preview: false
+  access_ttl_minutes: 15
+  max_access_ttl_minutes: 60
+  oss:
+    endpoint: ''
+    access_key_id: ''
+    access_key_secret: ''
+    bucket_name: ''
+    base_url: ''
+    base_path: 'uploads/'
+aliyun:
+  sms:
+    access_key_id: ''
+    access_key_secret: ''
+    send_interval_seconds: 60

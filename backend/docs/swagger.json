@@ -1,0 +1,5969 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "基于 Gin、Gorm 和 Quasar 的低代码管理底座",
+        "title": "Sweet Admin",
+        "contact": {
+            "name": "南",
+            "email": "maxdwy@gmail.com"
+        },
+        "version": "0.1"
+    },
+    "basePath": "/sweet_admin",
+    "paths": {
+        "/admin/application": {
+            "post": {
+                "description": "创建应用",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "创建应用",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ApplicationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/delete/{id}": {
+            "delete": {
+                "description": "删除应用",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "删除应用",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "应用ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/key/{appKey}": {
+            "get": {
+                "description": "根据appKey获取应用详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "应用详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "应用Key",
+                        "name": "appKey",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/query": {
+            "post": {
+                "description": "获取应用列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "应用列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/update/{id}": {
+            "put": {
+                "description": "更新应用",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "更新应用",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "应用ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ApplicationUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/{id}": {
+            "get": {
+                "description": "根据ID获取应用详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "应用详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "应用ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/application/{id}/rotate-secret": {
+            "post": {
+                "description": "轮换应用 app_secret，响应仅本次返回新密钥",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "应用"
+                ],
+                "summary": "轮换应用密钥",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "应用ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/captcha": {
+            "get": {
+                "description": "验证码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "验证码"
+                ],
+                "summary": "验证码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/configure": {
+            "get": {
+                "description": "配置",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "配置"
+                ],
+                "summary": "配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/configure/detail": {
+            "get": {
+                "description": "获取后台配置详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "配置"
+                ],
+                "summary": "配置详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/configure/test-email": {
+            "post": {
+                "description": "使用已保存的邮件配置发送一封测试邮件",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "配置"
+                ],
+                "summary": "发送配置测试邮件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ConfigureTestEmailReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/configure/{id}": {
+            "put": {
+                "description": "更新配置",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "配置"
+                ],
+                "summary": "更新配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ConfigureUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/download-url/{uuid}": {
+            "get": {
+                "description": "为当前用户可访问的文件生成短期签名下载地址",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "获取文件签名下载地址",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "有效期秒数，最大3600秒",
+                        "name": "ttl",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/download/{uuid}": {
+            "get": {
+                "description": "通过文件UUID下载文件（支持本地和OSS存储）",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "下载文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/preview-url/{uuid}": {
+            "get": {
+                "description": "为当前用户可访问的文件生成短期签名预览地址，用于富文本预览等无法携带 Authorization 头的场景",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "获取文件签名预览地址",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "有效期秒数，最大3600秒",
+                        "name": "ttl",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/preview/{uuid}": {
+            "get": {
+                "description": "通过文件UUID预览文件（图片、PDF等），支持本地和OSS存储",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "预览文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/upload": {
+            "post": {
+                "description": "上传文件，支持秒传（MD5去重）",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "上传文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "上传文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/upload/chunk": {
+            "post": {
+                "description": "上传单个文件分片，支持断点续传（幂等操作）",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "上传分片",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "上传ID",
+                        "name": "upload_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "分片索引（从0开始）",
+                        "name": "chunk_index",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "分片文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/upload/init": {
+            "post": {
+                "description": "初始化分片上传，返回uploadId和分片信息。支持秒传检测。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "初始化分片上传",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "初始化参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ChunkUploadInitReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/upload/merge/{upload_id}": {
+            "post": {
+                "description": "所有分片上传完成后，调用此接口合并分片生成最终文件",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "合并分片",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "上传ID",
+                        "name": "upload_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/upload/progress/{upload_id}": {
+            "get": {
+                "description": "获取分片上传进度，返回已上传的分片索引列表（用于断点续传）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "获取上传进度",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "上传ID",
+                        "name": "upload_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/file/{id}": {
+            "get": {
+                "description": "根据ID获取文件详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "获取文件信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "文件ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除文件（同时删除存储中的物理文件）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "删除文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "文件ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/log/access/query": {
+            "post": {
+                "description": "查询访问审计日志",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "日志"
+                ],
+                "summary": "访问审计日志",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "q",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/request.AccessLogQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/log/access/{id}": {
+            "get": {
+                "description": "查询访问审计详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "日志"
+                ],
+                "summary": "访问审计详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "日志ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/login": {
+            "post": {
+                "description": "登录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "登录"
+                ],
+                "summary": "登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "description": "登录",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SignInReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/logout": {
+            "post": {
+                "description": "退出",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "退出"
+                ],
+                "summary": "退出",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu": {
+            "post": {
+                "description": "创建菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "创建菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.MenuCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/button": {
+            "post": {
+                "description": "创建菜单按钮",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "创建菜单按钮",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.MenuButtonCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/button/{id}": {
+            "put": {
+                "description": "更新菜单按钮",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "更新菜单按钮",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单按钮ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.MenuButtonUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "删除菜单按钮",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "删除菜单按钮",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单按钮ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/buttons/{menuId}": {
+            "get": {
+                "description": "获取菜单按钮列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "获取菜单按钮列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "menuId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/my": {
+            "get": {
+                "description": "获取我的菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "获取我的菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/order": {
+            "put": {
+                "description": "批量更新菜单排序",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "更新菜单排序",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.MenuOrderUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/query": {
+            "post": {
+                "description": "查询菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "查询菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Basic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/refresh-cache": {
+            "post": {
+                "description": "当前菜单读取为实时数据库查询，此接口用于前端统一触发菜单刷新",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "刷新菜单缓存",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/user/{id}": {
+            "get": {
+                "description": "获取用户菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "获取用户菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/menu/{id}": {
+            "get": {
+                "description": "根据ID获取菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "根据ID获取菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "更新菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.MenuUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "菜单"
+                ],
+                "summary": "根据ID删除菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role": {
+            "post": {
+                "description": "创建角色",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "创建角色",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RoleCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role/assign-permissions": {
+            "post": {
+                "description": "分配角色权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "分配角色权限",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RoleAssignPermissionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role/query": {
+            "post": {
+                "description": "查询角色列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "查询角色列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Basic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role/{id}": {
+            "get": {
+                "description": "根据ID获取角色",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "根据ID获取角色",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新角色",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "更新角色",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RoleUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除角色",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "根据ID删除角色",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role/{id}/menus": {
+            "get": {
+                "description": "获取角色菜单",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "获取角色菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/role/{roleId}/menu/{menuId}/buttons": {
+            "get": {
+                "description": "获取角色菜单按钮权限",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "角色"
+                ],
+                "summary": "获取角色菜单按钮权限",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "角色ID",
+                        "name": "roleId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "菜单ID",
+                        "name": "menuId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/sms/template": {
+            "post": {
+                "description": "创建短信模板",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "短信"
+                ],
+                "summary": "创建短信模板",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SmsTemplateCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/sms/template/query": {
+            "post": {
+                "description": "获取短信模板列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "短信"
+                ],
+                "summary": "短信模板列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Basic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/sms/template/{id}": {
+            "get": {
+                "description": "根据ID获取短信模板详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "短信"
+                ],
+                "summary": "短信模板详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "模板ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新短信模板",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "短信"
+                ],
+                "summary": "更新短信模板",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "模板ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SmsTemplateUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "删除短信模板",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "短信"
+                ],
+                "summary": "删除短信模板",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "模板ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table": {
+            "post": {
+                "description": "创建表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "创建表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/code/{code}": {
+            "get": {
+                "description": "根据表编码获取表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据表编码获取表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/field": {
+            "post": {
+                "description": "创建表字段",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "创建表字段",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableFieldCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/field/{id}": {
+            "get": {
+                "description": "根据ID获取表字段",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID获取表字段",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表字段ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新表字段",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "更新表字段",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表字段ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableFieldUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除表字段",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID删除表字段",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表字段ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/fields/{id}": {
+            "get": {
+                "description": "根据表ID获取表字段",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据表ID获取表字段",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/index": {
+            "post": {
+                "description": "创建表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "创建表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableIndexCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/index/table/{id}": {
+            "delete": {
+                "description": "根据表ID删除表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据表ID删除表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/index/{id}": {
+            "get": {
+                "description": "根据ID获取表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID获取表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表索引ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "更新表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表索引ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableIndexUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID删除表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表索引ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/indexes/{id}": {
+            "get": {
+                "description": "根据表ID获取表索引",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据表ID获取表索引",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/init/{code}": {
+            "post": {
+                "description": "初始化表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "初始化表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/publish/{code}": {
+            "post": {
+                "description": "为表配置生成侧边栏菜单和默认CRUD按钮",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "发布通用CRUD菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "发布目录",
+                        "name": "data",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/request.TablePublishReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/query": {
+            "post": {
+                "description": "查询表列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "查询表列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.Basic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/relation": {
+            "post": {
+                "description": "创建表关系",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "创建表关系",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableRelationCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/relation/{id}": {
+            "get": {
+                "description": "根据ID获取表关系",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID获取表关系",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表关系ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新表关系",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "更新表关系",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表关系ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableRelationUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除表关系",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID删除表关系",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表关系ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/relations/{id}": {
+            "get": {
+                "description": "根据表ID获取表关系",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据表ID获取表关系",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/sync/index/{code}": {
+            "post": {
+                "description": "将数据库表索引同步到 sys_table_index 与 sys_table_index_field",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "同步表索引元数据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/sync/{code}": {
+            "post": {
+                "description": "将数据库表结构差异同步到 sys_table_field",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "同步表字段元数据",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/unpublish/{code}": {
+            "post": {
+                "description": "隐藏表配置生成的低代码菜单并撤销角色授权",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "下线通用CRUD菜单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "表编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/table/{id}": {
+            "get": {
+                "description": "根据ID获取表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID获取表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "更新表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.TableUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "表"
+                ],
+                "summary": "根据ID删除表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "表ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user": {
+            "post": {
+                "description": "创建用户",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "创建用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "创建用户",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SysUserCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/me": {
+            "get": {
+                "description": "获取当前用户信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "获取当前用户信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/password": {
+            "post": {
+                "description": "修改密码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "修改密码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "修改密码",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SysUserUpdatePasswordReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/reset_password/{id}": {
+            "post": {
+                "description": "重置密码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "重置密码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/unlock_login/{id}": {
+            "post": {
+                "description": "清除用户后台登录失败次数和锁定状态",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "解除登录锁定",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/{id}": {
+            "get": {
+                "description": "根据ID获取用户",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "根据ID获取用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "更新用户",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "更新用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新用户",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SysUserUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "删除用户",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "删除用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/user/{username}": {
+            "get": {
+                "description": "根据用户名获取用户",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "根据用户名获取用户",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "用户名",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/app_token": {
+            "post": {
+                "description": "获取AppToken",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "获取AppToken",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header"
+                    },
+                    {
+                        "description": "AppToken",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.AppTokenReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/check_sms_status/{bizId}/{mobile}": {
+            "get": {
+                "description": "检查短信发送状态",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "检查短信发送状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "bizId",
+                        "name": "bizId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "手机号",
+                        "name": "mobile",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/dingtalk/send_message": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "钉钉"
+                ],
+                "summary": "发送消息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "消息内容",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.DingTalkMessageReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/login": {
+            "post": {
+                "description": "登录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "登录信息",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SignInReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/logout": {
+            "post": {
+                "description": "退出登录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "退出登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/refresh_token": {
+            "get": {
+                "description": "刷新Token",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "刷新Token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "刷新Token",
+                        "name": "refreshToken",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/send_sms/{mobile}/{templateCode}": {
+            "post": {
+                "description": "发送短信",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "发送短信",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "发送短信",
+                        "name": "data",
+                        "in": "body",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "手机号",
+                        "name": "mobile",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "短信模板编号",
+                        "name": "templateCode",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sms_code_login": {
+            "post": {
+                "description": "短信验证码登录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "短信验证码登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "短信验证码登录",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SmsCodeLoginReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/sso_login": {
+            "get": {
+                "description": "单点登录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "授权"
+                ],
+                "summary": "单点登录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "code",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/me": {
+            "get": {
+                "description": "获取当前用户信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "获取当前用户信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/password": {
+            "post": {
+                "description": "修改密码",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "用户"
+                ],
+                "summary": "修改密码",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "自定义应用令牌",
+                        "name": "X-APP-TOKEN",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "修改密码",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.SysUserUpdatePasswordReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict": {
+            "post": {
+                "description": "新增字典主体",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "新增字典",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.DictCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/code/{code}": {
+            "get": {
+                "description": "根据CODE获取字典详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "字典详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "字典CODE",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/id/{id}": {
+            "get": {
+                "description": "根据ID获取字典详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "字典详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/item": {
+            "post": {
+                "description": "新增字典项主体",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "新增字典项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "b",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.DictItemCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/item/id/{id}": {
+            "get": {
+                "description": "根据ID获取字典项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "字典项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典项ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/item/{id}": {
+            "get": {
+                "description": "根据字典ID获取字典项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "字典项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "根据ID更新字典项信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "更新字典项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典项ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "根据ID删除字典项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "删除字典项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典项ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/query": {
+            "post": {
+                "description": "根据查询条件查询字段列表",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "字典列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "q",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/request.Basic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/dict/{id}": {
+            "put": {
+                "description": "根据ID更新字典信息",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "字典"
+                ],
+                "summary": "更新字典",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "字典ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "请求错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "内部错误",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/files/access/download/{uuid}": {
+            "get": {
+                "description": "通过短期签名 token 下载文件",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "签名下载文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "签名 token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/files/access/preview/{uuid}": {
+            "get": {
+                "description": "通过短期签名 token 预览文件",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "签名预览文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "签名 token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/files/{uuid}": {
+            "get": {
+                "description": "通过文件UUID公开预览文件，仅在 upload.public_preview 开启时可用",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "文件"
+                ],
+                "summary": "公开预览文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "文件UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "enum.ExpressionLogic": {
+            "type": "integer",
+            "enum": [
+                1,
+                2
+            ],
+            "x-enum-varnames": [
+                "And",
+                "Or"
+            ]
+        },
+        "enum.ExpressionType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14
+            ],
+            "x-enum-comments": {
+                "Gt": "Gt",
+                "Gte": "Gte",
+                "Lt": "Lt"
+            },
+            "x-enum-varnames": [
+                "Gt",
+                "Lt",
+                "Gte",
+                "Lte",
+                "Eq",
+                "Ne",
+                "Like",
+                "NotLike",
+                "In",
+                "NotIn",
+                "IsNull",
+                "IsNotNull",
+                "Between",
+                "NotBetween"
+            ]
+        },
+        "enum.SysDetailOpenMode": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "dialog",
+                "page"
+            ],
+            "x-enum-varnames": [
+                "DetailOpenAuto",
+                "DetailOpenDialog",
+                "DetailOpenPage"
+            ]
+        },
+        "enum.SysFormOpenMode": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "dialog",
+                "page"
+            ],
+            "x-enum-varnames": [
+                "FormOpenAuto",
+                "FormOpenDialog",
+                "FormOpenPage"
+            ]
+        },
+        "enum.SysMasterDetailMode": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "summary",
+                "table",
+                "stacked"
+            ],
+            "x-enum-varnames": [
+                "MasterDetailAuto",
+                "MasterDetailSummary",
+                "MasterDetailTable",
+                "MasterDetailStacked"
+            ]
+        },
+        "enum.SysMenuButtonDisplayMode": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "icon",
+                "text",
+                "icon_text"
+            ],
+            "x-enum-varnames": [
+                "ButtonDisplayAuto",
+                "ButtonDisplayIcon",
+                "ButtonDisplayText",
+                "ButtonDisplayIconText"
+            ]
+        },
+        "enum.SysMenuButtonPosition": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7
+            ],
+            "x-enum-comments": {
+                "Bottom": "表格底部",
+                "DetailBottom": "详情底部",
+                "DetailTop": "详情顶部",
+                "FormBottom": "表单底部",
+                "FormTop": "表单顶部",
+                "Line": "行按钮",
+                "Top": "表格顶部"
+            },
+            "x-enum-varnames": [
+                "Line",
+                "Top",
+                "Bottom",
+                "FormTop",
+                "FormBottom",
+                "DetailTop",
+                "DetailBottom"
+            ]
+        },
+        "enum.SysMenuPageType": {
+            "type": "string",
+            "enum": [
+                "directory",
+                "fixed",
+                "low_code"
+            ],
+            "x-enum-varnames": [
+                "MenuPageTypeDirectory",
+                "MenuPageTypeFixed",
+                "MenuPageTypeLowCode"
+            ]
+        },
+        "enum.SysTableFieldCategory": {
+            "type": "string",
+            "enum": [
+                "normal_field",
+                "virtual_field",
+                "calculated_field"
+            ],
+            "x-enum-comments": {
+                "CalculatedField": "计算字段",
+                "NormalField": "默认字段",
+                "VirtualField": "虚拟列"
+            },
+            "x-enum-varnames": [
+                "NormalField",
+                "VirtualField",
+                "CalculatedField"
+            ]
+        },
+        "enum.SysTableFieldInputType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16
+            ],
+            "x-enum-varnames": [
+                "InputType",
+                "InputNumberInputType",
+                "TextareaInputType",
+                "SelectInputType",
+                "DatePickerInputType",
+                "DatetimePickerInputType",
+                "TimePickerInputType",
+                "YearPickerInputType",
+                "YearMonthPickerInputType",
+                "FilePickerInputType",
+                "BooleanInputType",
+                "JsonInputType",
+                "ArrayInputType",
+                "KeyValueInputType",
+                "CascaderInputType",
+                "RichTextInputType"
+            ]
+        },
+        "enum.SysTableFieldType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11
+            ],
+            "x-enum-varnames": [
+                "BigIntFieldType",
+                "FloatFieldType",
+                "VarcharFieldType",
+                "TextFieldType",
+                "BooleanFieldType",
+                "DateFieldType",
+                "DatetimeFieldType",
+                "TimeFieldType",
+                "TinyintFieldType",
+                "JsonFieldType",
+                "IntFieldType"
+            ]
+        },
+        "enum.SysTableRelationType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2,
+                3,
+                4
+            ],
+            "x-enum-varnames": [
+                "OneToOne",
+                "OneToMany",
+                "ManyToOne",
+                "ManyToMany"
+            ]
+        },
+        "enum.SysTableType": {
+            "type": "integer",
+            "enum": [
+                1,
+                2
+            ],
+            "x-enum-comments": {
+                "System": "系统表",
+                "View": "视图"
+            },
+            "x-enum-varnames": [
+                "System",
+                "View"
+            ]
+        },
+        "request.AccessLogQueryReq": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于数据权限）",
+                    "type": "integer"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "resource_code": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.AppTokenReq": {
+            "type": "object",
+            "required": [
+                "app_key",
+                "app_secret"
+            ],
+            "properties": {
+                "app_key": {
+                    "type": "string"
+                },
+                "app_secret": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.ApplicationCreateReq": {
+            "type": "object",
+            "required": [
+                "expiration",
+                "name"
+            ],
+            "properties": {
+                "ding_app_id": {
+                    "type": "string"
+                },
+                "ding_key": {
+                    "type": "string"
+                },
+                "ding_secret": {
+                    "type": "string"
+                },
+                "expiration": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.ApplicationUpdateReq": {
+            "type": "object",
+            "required": [
+                "expiration",
+                "name"
+            ],
+            "properties": {
+                "ding_app_id": {
+                    "type": "string"
+                },
+                "ding_key": {
+                    "type": "string"
+                },
+                "ding_secret": {
+                    "type": "string"
+                },
+                "expiration": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.Basic": {
+            "type": "object",
+            "properties": {
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于数据权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                }
+            }
+        },
+        "request.ChunkUploadInitReq": {
+            "type": "object",
+            "required": [
+                "file_name",
+                "file_size"
+            ],
+            "properties": {
+                "file_md5": {
+                    "description": "完整文件MD5（用于秒传检测）",
+                    "type": "string"
+                },
+                "file_name": {
+                    "description": "文件名",
+                    "type": "string"
+                },
+                "file_size": {
+                    "description": "文件总大小（字节）",
+                    "type": "integer"
+                },
+                "file_type": {
+                    "description": "文件MIME类型",
+                    "type": "string"
+                }
+            }
+        },
+        "request.ConfigureTestEmailReq": {
+            "type": "object",
+            "required": [
+                "to"
+            ],
+            "properties": {
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.ConfigureUpdateReq": {
+            "type": "object",
+            "required": [
+                "enable_captcha",
+                "password_complexity",
+                "password_error_count",
+                "password_expire_time",
+                "password_length",
+                "password_lock_minutes",
+                "password_policy"
+            ],
+            "properties": {
+                "enable_captcha": {
+                    "description": "安全配置",
+                    "type": "boolean"
+                },
+                "enable_email": {
+                    "description": "邮件配置",
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "password_complexity": {
+                    "type": "integer"
+                },
+                "password_error_count": {
+                    "type": "integer"
+                },
+                "password_expire_time": {
+                    "type": "integer"
+                },
+                "password_length": {
+                    "type": "integer"
+                },
+                "password_lock_minutes": {
+                    "type": "integer"
+                },
+                "password_policy": {
+                    "type": "string"
+                },
+                "sender_email": {
+                    "type": "string"
+                },
+                "sender_password": {
+                    "type": "string"
+                },
+                "smtp_port": {
+                    "type": "integer"
+                },
+                "smtp_server": {
+                    "type": "string"
+                },
+                "system_description": {
+                    "type": "string"
+                },
+                "system_logo": {
+                    "type": "string"
+                },
+                "system_name": {
+                    "description": "系统基本信息",
+                    "type": "string"
+                },
+                "system_version": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.DictCreateReq": {
+            "type": "object",
+            "required": [
+                "dict_code",
+                "dict_name"
+            ],
+            "properties": {
+                "dict_code": {
+                    "type": "string"
+                },
+                "dict_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.DictItemCreateReq": {
+            "type": "object",
+            "required": [
+                "dict_id",
+                "item_code",
+                "item_name",
+                "item_value"
+            ],
+            "properties": {
+                "dict_id": {
+                    "type": "integer"
+                },
+                "item_code": {
+                    "type": "string"
+                },
+                "item_name": {
+                    "type": "string"
+                },
+                "item_value": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.DingTalkMessageReq": {
+            "type": "object",
+            "required": [
+                "msg",
+                "msg_type"
+            ],
+            "properties": {
+                "agent_id": {
+                    "type": "string"
+                },
+                "dept_id_list": {
+                    "type": "string"
+                },
+                "msg": {
+                    "description": "消息内容，根据类型不同而不同",
+                    "type": "object"
+                },
+                "msg_type": {
+                    "description": "消息类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/request.MessageType"
+                        }
+                    ]
+                },
+                "to_all_user": {
+                    "type": "boolean"
+                },
+                "userid_list": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.ExpressionGroup": {
+            "type": "object",
+            "properties": {
+                "logic": {
+                    "description": "\"and\" 或 \"or\"",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.ExpressionLogic"
+                        }
+                    ]
+                },
+                "nested": {
+                    "description": "嵌套的表达式组",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "rules": {
+                    "description": "基础查询规则",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.QueryRule"
+                    }
+                }
+            }
+        },
+        "request.MenuButtonCreateReq": {
+            "type": "object",
+            "required": [
+                "code",
+                "menu_id",
+                "name",
+                "position"
+            ],
+            "properties": {
+                "after_hooks": {
+                    "type": "string"
+                },
+                "api_path": {
+                    "type": "string"
+                },
+                "before_hooks": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "color": {
+                    "type": "string"
+                },
+                "confirm_text": {
+                    "type": "string"
+                },
+                "disable_when": {
+                    "type": "string"
+                },
+                "display_mode": {
+                    "$ref": "#/definitions/enum.SysMenuButtonDisplayMode"
+                },
+                "event_action": {
+                    "type": "string"
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "http_method": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "is_button": {
+                    "type": "boolean"
+                },
+                "is_disabled": {
+                    "type": "boolean"
+                },
+                "is_hidden": {
+                    "type": "boolean"
+                },
+                "memo": {
+                    "type": "string"
+                },
+                "menu_id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "params_schema": {
+                    "type": "string"
+                },
+                "position": {
+                    "$ref": "#/definitions/enum.SysMenuButtonPosition"
+                },
+                "sequence": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.MenuButtonUpdateReq": {
+            "type": "object",
+            "required": [
+                "code",
+                "id",
+                "menu_id",
+                "name",
+                "position"
+            ],
+            "properties": {
+                "after_hooks": {
+                    "type": "string"
+                },
+                "api_path": {
+                    "type": "string"
+                },
+                "before_hooks": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "color": {
+                    "type": "string"
+                },
+                "confirm_text": {
+                    "type": "string"
+                },
+                "disable_when": {
+                    "type": "string"
+                },
+                "display_mode": {
+                    "$ref": "#/definitions/enum.SysMenuButtonDisplayMode"
+                },
+                "event_action": {
+                    "type": "string"
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "http_method": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_button": {
+                    "type": "boolean"
+                },
+                "is_disabled": {
+                    "type": "boolean"
+                },
+                "is_hidden": {
+                    "type": "boolean"
+                },
+                "memo": {
+                    "type": "string"
+                },
+                "menu_id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "params_schema": {
+                    "type": "string"
+                },
+                "position": {
+                    "$ref": "#/definitions/enum.SysMenuButtonPosition"
+                },
+                "sequence": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.MenuCreateReq": {
+            "type": "object",
+            "required": [
+                "component",
+                "is_hidden",
+                "name",
+                "path",
+                "pid",
+                "sequence",
+                "title"
+            ],
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "is_hidden": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "option": {
+                    "type": "string"
+                },
+                "page_type": {
+                    "$ref": "#/definitions/enum.SysMenuPageType"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "pid": {
+                    "type": "integer"
+                },
+                "redirect": {
+                    "type": "string"
+                },
+                "sequence": {
+                    "type": "integer"
+                },
+                "table_code": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.MenuOrderItemReq": {
+            "type": "object",
+            "required": [
+                "id",
+                "sequence"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "sequence": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.MenuOrderUpdateReq": {
+            "type": "object",
+            "required": [
+                "menus"
+            ],
+            "properties": {
+                "menus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.MenuOrderItemReq"
+                    }
+                }
+            }
+        },
+        "request.MenuUpdateReq": {
+            "type": "object",
+            "required": [
+                "component",
+                "id",
+                "is_hidden",
+                "name",
+                "path",
+                "pid",
+                "sequence",
+                "title"
+            ],
+            "properties": {
+                "component": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_hidden": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "option": {
+                    "type": "string"
+                },
+                "page_type": {
+                    "$ref": "#/definitions/enum.SysMenuPageType"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "pid": {
+                    "type": "integer"
+                },
+                "redirect": {
+                    "type": "string"
+                },
+                "sequence": {
+                    "type": "integer"
+                },
+                "table_code": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.MessageType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "link",
+                "file",
+                "voice",
+                "oa",
+                "markdown",
+                "action_card"
+            ],
+            "x-enum-varnames": [
+                "TextType",
+                "ImageType",
+                "LinkType",
+                "FileType",
+                "VoiceType",
+                "OAType",
+                "MarkdownType",
+                "ActionCardType"
+            ]
+        },
+        "request.Order": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string"
+                },
+                "is_asc": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "request.QueryRule": {
+            "type": "object",
+            "properties": {
+                "expression_type": {
+                    "description": "比较器类型，如EQ, LT等",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.ExpressionType"
+                        }
+                    ]
+                },
+                "field": {
+                    "description": "字段",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "字段类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldType"
+                        }
+                    ]
+                },
+                "value": {
+                    "description": "值"
+                }
+            }
+        },
+        "request.QuickQuery": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.RoleAssignPermissionsReq": {
+            "type": "object",
+            "required": [
+                "button_ids",
+                "menu_ids",
+                "role_id"
+            ],
+            "properties": {
+                "button_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "menu_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "role_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.RoleCreateReq": {
+            "type": "object",
+            "required": [
+                "memo",
+                "name"
+            ],
+            "properties": {
+                "memo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.RoleUpdateReq": {
+            "type": "object",
+            "required": [
+                "id",
+                "memo",
+                "name"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "memo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.SignInReq": {
+            "type": "object",
+            "required": [
+                "password",
+                "user_name"
+            ],
+            "properties": {
+                "captcha": {
+                    "type": "string"
+                },
+                "captcha_id": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.SmsCodeLoginReq": {
+            "type": "object",
+            "required": [
+                "code",
+                "mobile"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.SmsTemplateCreateReq": {
+            "type": "object"
+        },
+        "request.SmsTemplateUpdateReq": {
+            "type": "object"
+        },
+        "request.SysUserCreateReq": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "phone_number",
+                "user_name"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.SysUserUpdatePasswordReq": {
+            "type": "object",
+            "required": [
+                "id",
+                "password"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "is_reset": {
+                    "type": "boolean"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "password_changed_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.SysUserUpdateReq": {
+            "type": "object",
+            "required": [
+                "email",
+                "id",
+                "phone_number",
+                "user_name"
+            ],
+            "properties": {
+                "access_tokens": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "gmt_delete": {
+                    "type": "string"
+                },
+                "gmt_last_login": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_reset": {
+                    "type": "boolean"
+                },
+                "phone_number": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.TableCreateReq": {
+            "type": "object",
+            "required": [
+                "table_code",
+                "table_name",
+                "table_type"
+            ],
+            "properties": {
+                "detail_open_mode": {
+                    "$ref": "#/definitions/enum.SysDetailOpenMode"
+                },
+                "form_open_mode": {
+                    "$ref": "#/definitions/enum.SysFormOpenMode"
+                },
+                "master_detail_mode": {
+                    "$ref": "#/definitions/enum.SysMasterDetailMode"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "sql": {
+                    "type": "string"
+                },
+                "table_code": {
+                    "type": "string"
+                },
+                "table_name": {
+                    "type": "string"
+                },
+                "table_type": {
+                    "$ref": "#/definitions/enum.SysTableType"
+                }
+            }
+        },
+        "request.TableFieldCreateReq": {
+            "type": "object",
+            "required": [
+                "field_code",
+                "field_name",
+                "input_type",
+                "sequence",
+                "table_id",
+                "type"
+            ],
+            "properties": {
+                "binding": {
+                    "description": "校验规则",
+                    "type": "string"
+                },
+                "default_value": {
+                    "description": "默认值",
+                    "type": "string"
+                },
+                "detail_span": {
+                    "description": "详情占位列数，0为自动",
+                    "type": "integer"
+                },
+                "dict_code": {
+                    "description": "所用字典",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "计算字段表达式",
+                    "type": "string"
+                },
+                "field_category": {
+                    "description": "字段类别",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldCategory"
+                        }
+                    ]
+                },
+                "field_code": {
+                    "description": "数据库中字段名",
+                    "type": "string"
+                },
+                "field_decimal_length": {
+                    "description": "小数位数",
+                    "type": "integer"
+                },
+                "field_length": {
+                    "description": "字段长度",
+                    "type": "integer"
+                },
+                "field_name": {
+                    "description": "列名",
+                    "type": "string"
+                },
+                "form_span": {
+                    "description": "表单占位列数，0为自动",
+                    "type": "integer"
+                },
+                "input_type": {
+                    "description": "输入类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldInputType"
+                        }
+                    ]
+                },
+                "is_advanced_search": {
+                    "description": "是否高级搜索",
+                    "type": "boolean"
+                },
+                "is_index": {
+                    "description": "是否索引",
+                    "type": "boolean"
+                },
+                "is_insert_show": {
+                    "description": "是否新增显示",
+                    "type": "boolean"
+                },
+                "is_list_show": {
+                    "description": "是否列表显示",
+                    "type": "boolean"
+                },
+                "is_null": {
+                    "description": "是否可空",
+                    "type": "boolean"
+                },
+                "is_primary_key": {
+                    "description": "是否主键",
+                    "type": "boolean"
+                },
+                "is_quick_search": {
+                    "description": "是否快捷搜索",
+                    "type": "boolean"
+                },
+                "is_sort": {
+                    "description": "是否可排序",
+                    "type": "boolean"
+                },
+                "is_update_show": {
+                    "description": "是否更新显示",
+                    "type": "boolean"
+                },
+                "linkage_config": {
+                    "description": "联动配置",
+                    "type": "string"
+                },
+                "original_field_id": {
+                    "description": "原字段Id",
+                    "type": "integer"
+                },
+                "sequence": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "table_id": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "字段类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldType"
+                        }
+                    ]
+                }
+            }
+        },
+        "request.TableFieldUpdateReq": {
+            "type": "object",
+            "required": [
+                "field_code",
+                "field_name",
+                "id",
+                "input_type",
+                "table_id",
+                "type"
+            ],
+            "properties": {
+                "binding": {
+                    "description": "校验规则",
+                    "type": "string"
+                },
+                "default_value": {
+                    "description": "默认值",
+                    "type": "string"
+                },
+                "detail_span": {
+                    "description": "详情占位列数，0为自动",
+                    "type": "integer"
+                },
+                "dict_code": {
+                    "description": "所用字典",
+                    "type": "string"
+                },
+                "expression": {
+                    "description": "计算字段表达式",
+                    "type": "string"
+                },
+                "field_category": {
+                    "description": "字段类别",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldCategory"
+                        }
+                    ]
+                },
+                "field_code": {
+                    "description": "数据库中字段名",
+                    "type": "string"
+                },
+                "field_decimal_length": {
+                    "description": "小数位数",
+                    "type": "integer"
+                },
+                "field_length": {
+                    "description": "字段长度",
+                    "type": "integer"
+                },
+                "field_name": {
+                    "description": "列名",
+                    "type": "string"
+                },
+                "form_span": {
+                    "description": "表单占位列数，0为自动",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "input_type": {
+                    "description": "输入类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldInputType"
+                        }
+                    ]
+                },
+                "is_advanced_search": {
+                    "description": "是否高级搜索",
+                    "type": "boolean"
+                },
+                "is_index": {
+                    "description": "是否索引",
+                    "type": "boolean"
+                },
+                "is_insert_show": {
+                    "description": "是否新增显示",
+                    "type": "boolean"
+                },
+                "is_list_show": {
+                    "description": "是否列表显示",
+                    "type": "boolean"
+                },
+                "is_null": {
+                    "description": "是否可空",
+                    "type": "boolean"
+                },
+                "is_primary_key": {
+                    "description": "是否主键",
+                    "type": "boolean"
+                },
+                "is_quick_search": {
+                    "description": "是否快捷搜索",
+                    "type": "boolean"
+                },
+                "is_sort": {
+                    "description": "是否可排序",
+                    "type": "boolean"
+                },
+                "is_update_show": {
+                    "description": "是否更新显示",
+                    "type": "boolean"
+                },
+                "linkage_config": {
+                    "description": "联动配置",
+                    "type": "string"
+                },
+                "original_field_id": {
+                    "description": "原字段Id",
+                    "type": "integer"
+                },
+                "sequence": {
+                    "description": "排序",
+                    "type": "integer"
+                },
+                "table_id": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "字段类型",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/enum.SysTableFieldType"
+                        }
+                    ]
+                }
+            }
+        },
+        "request.TableIndexCreateReq": {
+            "type": "object",
+            "required": [
+                "index_fields",
+                "index_name",
+                "table_id"
+            ],
+            "properties": {
+                "index_fields": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/request.TableIndexFieldReq"
+                    }
+                },
+                "index_name": {
+                    "type": "string"
+                },
+                "is_unique": {
+                    "type": "boolean"
+                },
+                "table_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TableIndexFieldReq": {
+            "type": "object",
+            "required": [
+                "field_code",
+                "field_id",
+                "table_id"
+            ],
+            "properties": {
+                "field_code": {
+                    "type": "string"
+                },
+                "field_id": {
+                    "type": "integer"
+                },
+                "table_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TableIndexUpdateReq": {
+            "type": "object",
+            "required": [
+                "id",
+                "index_fields",
+                "index_name",
+                "table_id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "index_fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.TableIndexFieldReq"
+                    }
+                },
+                "index_name": {
+                    "type": "string"
+                },
+                "is_unique": {
+                    "type": "boolean"
+                },
+                "table_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TablePublishReq": {
+            "type": "object",
+            "properties": {
+                "parent_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TableRelationCreateReq": {
+            "type": "object",
+            "required": [
+                "foreign_key",
+                "reference_key",
+                "related_table_id",
+                "relation_type",
+                "table_id"
+            ],
+            "properties": {
+                "foreign_key": {
+                    "description": "关联表 字段",
+                    "type": "string"
+                },
+                "manyTableCode": {
+                    "description": "多对多关系使用到的中间表",
+                    "type": "string"
+                },
+                "reference_key": {
+                    "description": "主表对应字段",
+                    "type": "string"
+                },
+                "related_table_id": {
+                    "description": "关联的表的Id",
+                    "type": "integer"
+                },
+                "relation_type": {
+                    "$ref": "#/definitions/enum.SysTableRelationType"
+                },
+                "table_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TableRelationUpdateReq": {
+            "type": "object",
+            "required": [
+                "foreign_key",
+                "id",
+                "reference_key",
+                "related_table_id",
+                "relation_type",
+                "table_id"
+            ],
+            "properties": {
+                "foreign_key": {
+                    "description": "关联表 字段",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "manyTableCode": {
+                    "description": "多对多关系使用到的中间表",
+                    "type": "string"
+                },
+                "reference_key": {
+                    "description": "主表对应字段",
+                    "type": "string"
+                },
+                "related_table_id": {
+                    "description": "关联的表的Id",
+                    "type": "integer"
+                },
+                "relation_type": {
+                    "$ref": "#/definitions/enum.SysTableRelationType"
+                },
+                "table_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.TableUpdateReq": {
+            "type": "object",
+            "required": [
+                "id",
+                "table_name"
+            ],
+            "properties": {
+                "detail_open_mode": {
+                    "$ref": "#/definitions/enum.SysDetailOpenMode"
+                },
+                "form_open_mode": {
+                    "$ref": "#/definitions/enum.SysFormOpenMode"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "master_detail_mode": {
+                    "$ref": "#/definitions/enum.SysMasterDetailMode"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "sql": {
+                    "type": "string"
+                },
+                "table_code": {
+                    "type": "string"
+                },
+                "table_name": {
+                    "type": "string"
+                },
+                "table_type": {
+                    "$ref": "#/definitions/enum.SysTableType"
+                }
+            }
+        },
+        "response.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

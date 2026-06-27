@@ -1,0 +1,1083 @@
+<template>
+  <base-content scrollable class="q-pa-sm record-detail-page">
+    <div class="record-detail">
+      <header class="record-detail-header">
+        <div class="record-detail-title-wrap">
+          <q-icon :name="sourceIcon" class="record-detail-icon" />
+          <div>
+            <div class="record-detail-title">{{ pageTitle }}</div>
+            <div class="record-detail-subtitle">
+              {{ sourceLabel }}
+              <q-chip dense square color="primary" text-color="white">{{ tableCode }}</q-chip>
+              <span v-if="recordId">#{{ recordId }}</span>
+            </div>
+          </div>
+        </div>
+        <q-space />
+        <div class="record-detail-actions">
+          <q-btn
+            v-for="button in detailTopButtons"
+            :key="button.id || button.code"
+            v-bind="menuButtonDisplayProps(button)"
+            unelevated
+            :color="button.color || 'primary'"
+            :loading="executingButtonCode === button.code"
+            :disable="isDetailButtonDisabled(button)"
+            @click="handleDetailButtonClick(button)"
+          />
+          <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="goBackToList" />
+          <q-btn
+            outline
+            color="primary"
+            icon="refresh"
+            label="刷新"
+            :loading="loading"
+            @click="loadDetail"
+          />
+        </div>
+      </header>
+
+      <q-inner-loading :showing="loading">
+        <q-spinner color="primary" size="42px" />
+      </q-inner-loading>
+
+      <q-banner v-if="loadError" rounded class="record-detail-error">
+        <template #avatar>
+          <q-icon name="error_outline" color="negative" />
+        </template>
+        {{ loadError }}
+      </q-banner>
+
+      <dynamic-form-dialog
+        v-model="showParamsDialog"
+        :edit-data="null"
+        :title="paramsDialogTitle"
+        :fields="paramsFields"
+        :menu-id="resolveDetailMenuId()"
+        :table-code="tableCode"
+        submit-btn-text="执行"
+        @submit="handleParamsSubmit"
+      />
+
+      <template v-if="record">
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head">
+            <div>
+              <h3>基础信息</h3>
+            </div>
+          </div>
+
+          <div class="record-detail-field-grid">
+            <article
+              v-for="field in compactFields"
+              :key="field.key"
+              class="record-detail-field"
+              :class="{
+                'record-detail-field--wide': field.span === 2 || field.wide,
+                'record-detail-field--full': (field.span || 1) >= 4,
+              }"
+            >
+              <div class="record-detail-field-label">
+                <span>{{ field.label }}</span>
+                <q-chip v-if="field.meta" dense square>{{ field.meta }}</q-chip>
+              </div>
+              <div class="record-detail-field-value">
+                <q-chip
+                  v-if="field.kind === 'boolean'"
+                  dense
+                  square
+                  :color="field.rawValue ? 'positive' : 'grey-5'"
+                  text-color="white"
+                >
+                  {{ field.rawValue ? '是' : '否' }}
+                </q-chip>
+                <file-display v-else-if="field.kind === 'file'" :model-value="field.rawValue" />
+                <div
+                  v-else-if="field.kind === 'rich-text'"
+                  class="record-detail-rich-text"
+                  v-html="richTextHtmlMap[field.key] || field.value"
+                />
+                <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
+                <span v-else>{{ field.value }}</span>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section v-if="longSections.length" class="record-detail-panel">
+          <div class="record-detail-panel-head">
+            <div>
+              <h3>{{ longPanelTitle }}</h3>
+            </div>
+          </div>
+          <q-list bordered separator class="record-detail-long-list">
+            <q-expansion-item
+              v-for="section in longSections"
+              :key="section.key"
+              :label="section.label"
+              :caption="section.caption"
+              default-opened
+            >
+              <pre class="record-detail-pre">{{ section.value }}</pre>
+            </q-expansion-item>
+          </q-list>
+        </section>
+
+        <section
+          v-if="detailBottomButtons.length"
+          class="record-detail-panel record-detail-action-panel"
+        >
+          <div class="record-detail-panel-head">
+            <div>
+              <h3>详情操作</h3>
+            </div>
+          </div>
+          <div class="record-detail-action-row">
+            <q-btn
+              v-for="button in detailBottomButtons"
+              :key="button.id || button.code"
+              v-bind="menuButtonDisplayProps(button)"
+              unelevated
+              :color="button.color || 'primary'"
+              :loading="executingButtonCode === button.code"
+              :disable="isDetailButtonDisabled(button)"
+              @click="handleDetailButtonClick(button)"
+            />
+          </div>
+        </section>
+      </template>
+    </div>
+  </base-content>
+</template>
+
+<script setup lang="ts">
+defineOptions({ name: 'record_detail_page' })
+
+import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
+import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
+import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
+import { instance } from 'boot/axios'
+import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
+import { useFileApi } from 'src/api/services/file'
+import { useGeneralizationApi } from 'src/api/services/generalization'
+import type { MenuButton } from 'src/api/services/sys-menu'
+import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
+import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useDictStore } from 'src/stores/dict'
+import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
+import { useTagViewStore } from 'src/stores/tagView'
+import { useUserStore } from 'src/stores/user'
+import { useLoadingStore } from 'src/stores/loading'
+import {
+  SysMenuButtonPosition,
+  SysTableFieldInputType,
+  SysTableFieldType,
+  SysTableFieldTypeMap,
+} from 'src/types/enum'
+import type { RouteData } from 'src/types'
+import {
+  findMenuByName,
+  findMenuByTableCode,
+  findMenuPathByTableCode,
+  findMenuTrailById,
+} from 'src/utils/menu-context'
+import { isPageButton } from 'src/utils/menu-button'
+import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import {
+  evaluateButtonDisabled,
+  executeButtonAction,
+  runAfterHooks,
+  runBeforeHooks,
+  type ButtonActionContext,
+} from 'src/utils/button-handlers'
+import {
+  buildColumnFormat,
+  buildRelationLookups,
+  hydrateRelationLookups,
+  type LookupMap,
+} from 'src/utils/column-format'
+import { hydrateRichTextFileUrls } from 'src/utils/rich-text-files'
+import { getFieldDetailSpan, normalizeFieldLabel } from 'src/utils/field-layout'
+import { parseParamsSchema } from 'src/utils/params-schema'
+
+interface DetailField {
+  key: string
+  label: string
+  value: string
+  rawValue: unknown
+  kind: 'text' | 'boolean' | 'code' | 'file' | 'rich-text'
+  meta?: string
+  wide?: boolean
+  span?: number
+}
+
+interface LongSection {
+  key: string
+  label: string
+  caption: string
+  value: string
+}
+
+const route = useRoute()
+const router = useRouter()
+const $q = useQuasar()
+const { confirmAction } = useConfirmDialog($q)
+const accessLogApi = useAccessLogApi()
+const fileApi = useFileApi()
+const generalizationApi = useGeneralizationApi()
+const tableApi = useTableApi()
+const dictStore = useDictStore()
+const breadcrumbsStore = useBreadcrumbsStore()
+const tagViewStore = useTagViewStore()
+const userStore = useUserStore()
+const loadingStore = useLoadingStore()
+const { loading } = storeToRefs(loadingStore)
+
+const loadError = ref('')
+const record = ref<Record<string, any> | null>(null)
+const table = ref<Table | null>(null)
+const tableFields = ref<TableField[]>([])
+const relationLookups = ref<Record<string, LookupMap>>({})
+const richTextHtmlMap = ref<Record<string, string>>({})
+const executingButtonCode = ref('')
+const showParamsDialog = ref(false)
+const paramsFields = ref<TableField[]>([])
+const pendingDetailButton = ref<MenuButton | null>(null)
+
+const source = computed(() => String(route.params.source || 'generalization'))
+const tableCode = computed(() => String(route.params.table_code || ''))
+const recordId = computed(() => Number(route.params.id || 0))
+
+const isAudit = computed(() => source.value === 'audit' || tableCode.value === 'access_log')
+const sourceIcon = computed(() => (isAudit.value ? 'manage_search' : 'article'))
+
+const currentMenu = computed(() => {
+  if (isAudit.value) return findMenuByName(userStore.menus, 'system_audit')
+  return findMenuByTableCode(userStore.menus, tableCode.value)
+})
+
+const tableName = computed(() => {
+  return (
+    table.value?.table_name ||
+    currentMenu.value?.title ||
+    currentMenu.value?.name ||
+    tableCode.value
+  )
+})
+
+const sourceLabel = computed(() => tableName.value || tableCode.value)
+
+const detailMenuButtons = computed(() =>
+  (currentMenu.value?.menu_buttons || [])
+    .filter(isPageButton)
+    .slice()
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
+)
+
+const detailTopButtons = computed(() =>
+  detailMenuButtons.value.filter((button) => button.position === SysMenuButtonPosition.DETAIL_TOP),
+)
+
+const detailBottomButtons = computed(() =>
+  detailMenuButtons.value.filter(
+    (button) => button.position === SysMenuButtonPosition.DETAIL_BOTTOM,
+  ),
+)
+
+const paramsDialogTitle = computed(() => pendingDetailButton.value?.name || '详情操作')
+
+const pageTitle = computed(() => {
+  const label = recordLabel.value
+  return label && label !== '-' ? `${tableName.value}详情：${label}` : `${tableName.value}详情`
+})
+
+const displayFields = computed(() => buildDisplayFields(record.value, tableFields.value))
+
+const compactFields = computed(() => displayFields.value.filter((field) => !isLongField(field)))
+
+const longPanelTitle = computed(() => (isAudit.value ? '请求与响应' : '扩展内容'))
+
+const longSections = computed<LongSection[]>(() =>
+  displayFields.value
+    .filter((field) => isLongField(field))
+    .map((field) => ({
+      key: field.key,
+      label: field.label,
+      caption: field.meta || field.key,
+      value: stringifyValue(field.rawValue),
+    })),
+)
+
+const titleField = computed(() => {
+  return (
+    displayFields.value.find((field) =>
+      /user_name|name|title|用户|名称|标题/i.test(field.key + field.label),
+    ) || displayFields.value.find((field) => field.key !== 'id')
+  )
+})
+
+const recordLabel = computed(() => {
+  const value = titleField.value?.value
+  return value && value !== '-' ? value : String(recordId.value || '')
+})
+
+const sourceListPath = computed(() => {
+  if (isAudit.value) return '/admin/system/audit'
+  return (
+    findMenuPathByTableCode(userStore.menus, tableCode.value) ||
+    `/admin/develop/generalization/${tableCode.value}`
+  )
+})
+
+function syncPageChromeTitle(title = pageTitle.value) {
+  if (!title) return
+  tagViewStore.updateTagViewTitle(route.fullPath, title)
+  breadcrumbsStore.setBreadcrumbItems(buildDetailBreadcrumbs(title))
+}
+
+function buildDetailBreadcrumbs(title: string): RouteData[] {
+  const detailCrumb: RouteData = {
+    title,
+    fullPath: route.fullPath,
+    name: route.name,
+    icon: sourceIcon.value,
+    keepAlive: false,
+  }
+
+  const menuId = currentMenu.value?.id || 0
+  const menuTrail = findMenuTrailById(userStore.menus, menuId)
+  const menuCrumbs = menuTrail.map<RouteData>(({ menu, fullPath }) => {
+    const crumb: RouteData = {
+      title: menu.title || menu.name || fullPath,
+      fullPath,
+      name: menu.name || fullPath,
+    }
+    if (menu.icon) {
+      crumb.icon = menu.icon
+    }
+    return crumb
+  })
+
+  if (menuCrumbs.length) return [...menuCrumbs, detailCrumb]
+  return [
+    {
+      title: sourceLabel.value,
+      fullPath: sourceListPath.value,
+      name: currentMenu.value?.name || sourceListPath.value,
+      icon: currentMenu.value?.icon || sourceIcon.value,
+    },
+    detailCrumb,
+  ]
+}
+
+function fieldTypeLabel(field?: TableField) {
+  if (!field) return ''
+  return SysTableFieldTypeMap[field.field_type] || ''
+}
+
+function formatByField(value: unknown, row: Record<string, any>, field?: TableField) {
+  if (!field) return defaultFormat(value)
+  const fmt = buildColumnFormat(field, {
+    getDictLabel: dictStore.getDictLabel,
+    relationLookups: relationLookups.value,
+  })
+  const nextValue = fmt ? fmt(value, row) : value
+  return defaultFormat(nextValue)
+}
+
+function defaultFormat(value: unknown) {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'object') return stringifyValue(value)
+  return String(value)
+}
+
+function stringifyValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2)
+      } catch {
+        return value
+      }
+    }
+    return value
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+function isCodeLike(key: string, value: unknown) {
+  if (typeof value !== 'string') return false
+  return /code|path|url|method|ip|编码|路径/i.test(key)
+}
+
+function toDetailField(key: string, row: Record<string, any>, field?: TableField): DetailField {
+  const rawValue = row[key]
+  const label = normalizeFieldLabel(field?.field_name || auditFieldLabels[key] || key)
+  const value = formatByField(rawValue, row, field)
+  const isFile = field?.input_type === SysTableFieldInputType.FILE_PICKER
+  const isRichText = field?.input_type === SysTableFieldInputType.RICH_TEXT
+  return {
+    key,
+    label,
+    value,
+    rawValue,
+    kind: isFile
+      ? 'file'
+      : isRichText
+        ? 'rich-text'
+        : typeof rawValue === 'boolean' || field?.field_type === SysTableFieldType.BOOLEAN
+          ? 'boolean'
+          : isCodeLike(key, rawValue)
+            ? 'code'
+            : 'text',
+    meta: fieldTypeLabel(field),
+    wide: !field && !isFile && value.length > 42,
+    span: field ? getFieldDetailSpan(field) : isRichText ? 4 : !isFile && value.length > 42 ? 2 : 1,
+  }
+}
+
+function buildDisplayFields(row: Record<string, any> | null, fields: TableField[]) {
+  if (!row) return []
+  const sortedFields = fields.slice().sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+  const keys = new Set<string>()
+  const result: DetailField[] = []
+
+  sortedFields.forEach((field) => {
+    const key = field.field_code
+    if (!key || !(key in row)) return
+    keys.add(key)
+    result.push(toDetailField(key, row, field))
+  })
+
+  preferredSystemKeys.forEach((key) => {
+    if (!(key in row) || keys.has(key)) return
+    keys.add(key)
+    result.push(toDetailField(key, row))
+  })
+
+  Object.keys(row).forEach((key) => {
+    if (keys.has(key)) return
+    result.push(toDetailField(key, row))
+  })
+
+  return result
+}
+
+function isLongField(field: DetailField) {
+  if (field.kind === 'file' || field.kind === 'rich-text') return false
+  const value = stringifyValue(field.rawValue)
+  const key = field.key.toLowerCase()
+  return (
+    key === 'body' ||
+    key === 'query' ||
+    key === 'response' ||
+    key.includes('json') ||
+    field.meta === 'JSON' ||
+    value.length > 180 ||
+    value.includes('\n')
+  )
+}
+
+async function hydrateDetailRichText() {
+  if (!record.value) {
+    richTextHtmlMap.value = {}
+    return
+  }
+
+  const next: Record<string, string> = {}
+  const richTextFields = tableFields.value.filter(
+    (field) => field.input_type === SysTableFieldInputType.RICH_TEXT,
+  )
+
+  await Promise.all(
+    richTextFields.map(async (field) => {
+      const key = field.field_code
+      const rawValue = record.value?.[key]
+      if (typeof rawValue !== 'string' || rawValue.trim() === '') return
+
+      next[key] = await hydrateRichTextFileUrls(rawValue, async (fileUuid, mode) => {
+        const response = await fileApi.getFileAccessUrl(fileUuid, mode)
+        return response.success ? response.data?.url : undefined
+      })
+    }),
+  )
+
+  richTextHtmlMap.value = next
+}
+
+async function loadAuditDetail() {
+  const response = await accessLogApi.getAccessLogById(recordId.value)
+  if (!response.success) {
+    throw new Error(response.message || '加载审计详情失败')
+  }
+  record.value = response.data as AccessLog
+  table.value = {
+    id: 0,
+    table_name: '审计日志',
+    table_code: 'access_log',
+    table_type: 1 as any,
+    master_detail_mode: 'auto' as any,
+    form_open_mode: 'auto' as any,
+    detail_open_mode: 'auto' as any,
+    parent_id: 0,
+    table_fields: [],
+    sql: '',
+    table_indexes: [],
+    table_relations: [],
+  }
+  tableFields.value = buildAuditFields()
+}
+
+async function loadGeneralizationDetail() {
+  const tableResponse = await tableApi.queryTableByCode(tableCode.value)
+  if (!tableResponse.success || !tableResponse.data) {
+    throw new Error(tableResponse.message || '加载表元数据失败')
+  }
+
+  table.value = tableResponse.data
+  tableFields.value = tableResponse.data.table_fields || []
+  const dictCodes = tableFields.value
+    .map((field) => field.dict_code)
+    .filter((code): code is string => !!code)
+  const [, initialLookups] = await Promise.all([
+    dictStore.loadDicts(dictCodes),
+    buildRelationLookups(tableFields.value),
+  ])
+  relationLookups.value = initialLookups
+
+  const response = await generalizationApi.getGeneralizationDetailByCode(
+    tableCode.value,
+    recordId.value,
+    resolveDetailMenuId(),
+  )
+  if (!response.success) {
+    throw new Error(response.message || '加载记录详情失败')
+  }
+  const row = response.data || null
+  if (!row) {
+    throw new Error('记录不存在或无权访问')
+  }
+  record.value = row
+  relationLookups.value = await hydrateRelationLookups(
+    tableFields.value,
+    [row],
+    relationLookups.value,
+    resolveDetailMenuId(),
+  )
+}
+
+function resolveDetailMenuId() {
+  return currentMenu.value?.id || 0
+}
+
+function readRecordValue(path: string) {
+  if (!record.value || !path) return undefined
+  return path
+    .replace(/^row\./, '')
+    .split('.')
+    .reduce<unknown>((current, key) => {
+      if (current && typeof current === 'object') return (current as Record<string, unknown>)[key]
+      return undefined
+    }, record.value)
+}
+
+function isDetailButtonDisabled(button: MenuButton) {
+  if (loading.value || executingButtonCode.value || button.is_disabled || !record.value) return true
+  return evaluateButtonDisabled(button, {
+    row: record.value,
+    selection: record.value ? [record.value] : [],
+    selectionCount: record.value ? 1 : 0,
+    query: {},
+    params: {},
+  })
+}
+
+function interpolateDetailActionPath(path: string) {
+  return path.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_match, key: string) => {
+    const value =
+      key === 'id'
+        ? recordId.value
+        : key === 'table_code' || key === 'tableCode' || key === 'code'
+          ? tableCode.value
+          : readRecordValue(key)
+    return encodeURIComponent(value === undefined || value === null ? '' : String(value))
+  })
+}
+
+async function executeDetailApi(button: MenuButton, params?: Record<string, any>) {
+  const method = (button.http_method || 'POST').toUpperCase()
+  const payload = {
+    table_code: tableCode.value,
+    menu_id: resolveDetailMenuId(),
+    id: recordId.value,
+    row: record.value,
+    params: params || {},
+  }
+  await instance.request({
+    url: interpolateDetailActionPath(button.api_path),
+    method,
+    ...(method === 'GET' ? { params: payload } : { data: payload }),
+  })
+}
+
+async function executeDetailButton(button: MenuButton, params?: Record<string, any>) {
+  if (!record.value) return
+  executingButtonCode.value = button.code
+  const actionName = button.event_action || 'custom'
+  const ctx: ButtonActionContext = {
+    table_code: tableCode.value,
+    row: record.value,
+    onRefresh: loadDetail,
+    onNavigate: async (path) => {
+      const target = interpolateDetailActionPath(button.api_path || path)
+      if (target) await router.push(target)
+    },
+    onCustom: async () => {
+      if (!button.api_path) {
+        $q.notify({
+          type: 'warning',
+          position: 'top-right',
+          message: '该详情按钮未配置执行接口或动作',
+        })
+        return
+      }
+      await executeDetailApi(button, params)
+      await loadDetail()
+    },
+  }
+  if (params) {
+    ctx.params = params
+  }
+
+  try {
+    const shouldProceed = await runBeforeHooks(button.before_hooks, ctx)
+    if (!shouldProceed) {
+      $q.notify({ type: 'warning', position: 'top-right', message: '按钮前置条件未通过' })
+      return
+    }
+    if (button.api_path && actionName !== 'navigate') {
+      await executeDetailApi(button, params)
+      await loadDetail()
+    } else {
+      await executeButtonAction(actionName, ctx)
+    }
+    await runAfterHooks(button.after_hooks, ctx)
+  } finally {
+    executingButtonCode.value = ''
+  }
+}
+
+function runDetailButtonWithConfirm(button: MenuButton, params?: Record<string, any>) {
+  const run = () => void executeDetailButton(button, params)
+  if (button.confirm_text) {
+    confirmAction({
+      title: '确认操作',
+      message: button.confirm_text,
+      okLabel: '确认',
+    }).onOk(run)
+    return
+  }
+  run()
+}
+
+function handleDetailButtonClick(button: MenuButton) {
+  if (isDetailButtonDisabled(button)) return
+  if (button.params_schema) {
+    const fields = parseParamsSchema(button.params_schema)
+    if (fields.length > 0) {
+      pendingDetailButton.value = button
+      paramsFields.value = fields
+      showParamsDialog.value = true
+      return
+    }
+  }
+  runDetailButtonWithConfirm(button)
+}
+
+function handleParamsSubmit(formPayload: { data: Record<string, any> }) {
+  const button = pendingDetailButton.value
+  if (!button) return
+  showParamsDialog.value = false
+  runDetailButtonWithConfirm(button, formPayload.data)
+  pendingDetailButton.value = null
+  paramsFields.value = []
+}
+
+async function loadDetail() {
+  if (!recordId.value || !tableCode.value) {
+    loadError.value = '详情路由缺少记录ID或表编码'
+    return
+  }
+  loadError.value = ''
+  richTextHtmlMap.value = {}
+  try {
+    if (isAudit.value) {
+      await loadAuditDetail()
+    } else {
+      await loadGeneralizationDetail()
+    }
+    await hydrateDetailRichText()
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '加载详情失败'
+    record.value = null
+  }
+}
+
+async function goBackToList() {
+  if (isAudit.value) {
+    await router.push('/admin/system/audit')
+    return
+  }
+  await router.push(sourceListPath.value)
+}
+
+const auditFieldLabels: Record<string, string> = {
+  id: 'ID',
+  gmt_create: '时间',
+  user_name: '用户',
+  action: '动作',
+  resource_type: '资源类型',
+  resource_code: '资源编码',
+  resource_id: '资源ID',
+  method: '方法',
+  url: '路径',
+  status_code: '状态码',
+  success: '结果',
+  duration_ms: '耗时',
+  ip: 'IP',
+  locality: '归属地',
+  body: '请求 Body',
+  query: '请求 Query',
+  response: '响应',
+}
+
+const preferredSystemKeys = [
+  'id',
+  'state',
+  'gmt_create',
+  'create_user',
+  'create_name',
+  'gmt_modify',
+  'modify_user',
+  'modify_name',
+  'gmt_delete',
+  'delete_user',
+  'delete_name',
+]
+
+function auditField(
+  name: string,
+  code: string,
+  type: SysTableFieldType,
+  inputType = SysTableFieldInputType.INPUT,
+): TableField {
+  return {
+    id: 0,
+    table_id: 0,
+    field_name: name,
+    field_code: code,
+    field_type: type,
+    field_length: 0,
+    field_decimal_length: 0,
+    input_type: inputType,
+    default_value: '',
+    dict_code: '',
+    is_primary_key: code === 'id',
+    is_index: false,
+    is_quick_search: false,
+    is_advanced_search: false,
+    is_sort: false,
+    is_null: true,
+    is_list_show: true,
+    is_insert_show: false,
+    is_update_show: false,
+    sequence: 0,
+    original_field_id: 0,
+    binding: '',
+  }
+}
+
+function buildAuditFields() {
+  return [
+    auditField('ID', 'id', SysTableFieldType.BIGINT),
+    auditField(
+      '时间',
+      'gmt_create',
+      SysTableFieldType.DATETIME,
+      SysTableFieldInputType.DATETIME_PICKER,
+    ),
+    auditField('用户', 'user_name', SysTableFieldType.VARCHAR),
+    auditField('动作', 'action', SysTableFieldType.VARCHAR),
+    auditField('资源类型', 'resource_type', SysTableFieldType.VARCHAR),
+    auditField('资源编码', 'resource_code', SysTableFieldType.VARCHAR),
+    auditField('资源ID', 'resource_id', SysTableFieldType.VARCHAR),
+    auditField('方法', 'method', SysTableFieldType.VARCHAR),
+    auditField('路径', 'url', SysTableFieldType.VARCHAR),
+    auditField('状态码', 'status_code', SysTableFieldType.INT),
+    auditField('结果', 'success', SysTableFieldType.BOOLEAN, SysTableFieldInputType.BOOLEAN),
+    auditField('耗时', 'duration_ms', SysTableFieldType.BIGINT),
+    auditField('IP', 'ip', SysTableFieldType.VARCHAR),
+    auditField('归属地', 'locality', SysTableFieldType.VARCHAR),
+    auditField('请求 Body', 'body', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
+    auditField('请求 Query', 'query', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
+    auditField('响应', 'response', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
+  ]
+}
+
+onMounted(loadDetail)
+
+watch(
+  () => route.fullPath,
+  () => {
+    void loadDetail()
+  },
+)
+
+watch(
+  pageTitle,
+  (title) => {
+    syncPageChromeTitle(title)
+  },
+  { immediate: true },
+)
+</script>
+
+<style scoped lang="scss">
+.record-detail-page {
+  background: #f7f8fc;
+}
+
+.record-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 1480px;
+  min-height: calc(100vh - 132px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.record-detail-header,
+.record-detail-panel {
+  border: 1px solid #dfe6f5;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.record-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 6px 18px rgba(26, 35, 58, 0.06);
+}
+
+.record-detail-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.record-detail-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: white;
+  background: $primary;
+}
+
+.record-detail-title {
+  color: #172033;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.record-detail-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: #75829b;
+}
+
+.record-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.record-detail-error {
+  color: $negative;
+  background: rgba($negative, 0.08);
+}
+
+.record-detail-panel {
+  padding: 20px 22px;
+}
+
+.record-detail-panel h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.record-detail-panel p {
+  margin: 6px 0 0;
+  color: #7a879e;
+}
+
+.record-detail-panel-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.record-detail-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.record-detail-field {
+  min-width: 0;
+  border: 1px solid #e3e9f5;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcff;
+}
+
+.record-detail-field--wide {
+  grid-column: span 2;
+}
+
+.record-detail-field--full {
+  grid-column: 1 / -1;
+}
+
+.record-detail-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7a879e;
+  font-size: 13px;
+}
+
+.record-detail-field-value {
+  margin-top: 8px;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 600;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-field-value code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: $primary;
+  background: rgba($primary, 0.1);
+  white-space: pre-wrap;
+}
+
+.record-detail-rich-text {
+  min-height: 28px;
+  color: #172033;
+  font-weight: 400;
+  line-height: 1.65;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-rich-text :deep(p) {
+  margin: 0 0 8px;
+}
+
+.record-detail-rich-text :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.record-detail-long-list {
+  border-color: #e3e9f5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.record-detail-action-panel {
+  padding-top: 16px;
+}
+
+.record-detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.record-detail-pre {
+  margin: 0;
+  padding: 14px;
+  min-height: 88px;
+  max-height: 420px;
+  overflow: auto;
+  color: #263248;
+  background: #f7f9fd;
+  border-top: 1px solid #e3e9f5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1180px) {
+  .record-detail-field-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .record-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .record-detail-actions {
+    justify-content: flex-end;
+  }
+
+  .record-detail-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-detail-field--wide {
+    grid-column: auto;
+  }
+}
+</style>

@@ -1,0 +1,98 @@
+/**
+ * @Author: Nan
+ * @Date: 2024/10/11 11:35
+ */
+
+package config
+
+type Server struct {
+	Name     string   `mapstructure:"name"`
+	Version  string   `mapstructure:"version"`
+	Port     int      `mapstructure:"port"`
+	DBS      DBS      `mapstructure:"dbs"`
+	Redis    Redis    `mapstructure:"redis"`
+	Session  Session  `mapstructure:"session"`
+	Security Security `mapstructure:"security"`
+	Audit    Audit    `mapstructure:"audit"`
+	WorkerID int64    `mapstructure:"worker_id"`
+	Conf     Conf     `mapstructure:"conf"`
+	ALiYun   ALiYun   `mapstructure:"aliyun"`
+	Upload   Upload   `mapstructure:"upload"`
+}
+
+type DBS struct {
+	Primary DB `mapstructure:"primary"`
+}
+
+type DB struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Name     string `mapstructure:"name"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	Prefix   string `mapstructure:"prefix"`
+}
+
+type Redis struct {
+	Host            string `mapstructure:"host"`
+	Port            int    `mapstructure:"port"`
+	DB              int    `mapstructure:"db"`
+	Password        string `mapstructure:"password"`
+	PoolSize        int    `mapstructure:"pool_size"`
+	MinIdleConns    int    `mapstructure:"min_idle_conns"`
+	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
+	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"`
+}
+
+type Session struct {
+	Secret string `mapstructure:"secret"`
+}
+
+type Security struct {
+	EnforceCasbinPolicyCoverage bool     `mapstructure:"enforce_casbin_policy_coverage"`
+	CORSAllowedOrigins          []string `mapstructure:"cors_allowed_origins"`
+	CORSAllowCredentials        bool     `mapstructure:"cors_allow_credentials"`
+}
+
+type Audit struct {
+	AccessLogRetentionDays int `mapstructure:"access_log_retention_days"`
+}
+
+type Conf struct {
+	Salt   string `mapstructure:"salt"`
+	Enable bool   `mapstructure:"enable"` //是否开启定时任务
+}
+
+type ALiYun struct {
+	SMS SMS `mapstructure:"sms"`
+}
+
+type Upload struct {
+	Driver              string    `mapstructure:"driver"`                    // 存储驱动: "local" 或 "oss"，默认 "local"
+	Dir                 string    `mapstructure:"dir"`                       // 本地存储目录（支持绝对路径，如 /data/uploads）
+	BaseURL             string    `mapstructure:"base_url"`                  // 文件访问URL前缀
+	MaxSize             int64     `mapstructure:"max_size"`                  // 最大文件大小（MB）
+	ChunkSize           int64     `mapstructure:"chunk_size"`                // 分片大小（MB），默认 5
+	AllowedExtensions   []string  `mapstructure:"allowed_extensions"`        // 允许上传的扩展名，如 .png/.pdf
+	AllowedMimeTypes    []string  `mapstructure:"allowed_mime_types"`        // 允许上传的 MIME 类型
+	InlinePreviewMimes  []string  `mapstructure:"inline_preview_mime_types"` // 允许浏览器内联预览的 MIME 类型
+	PublicPreview       bool      `mapstructure:"public_preview"`            // 是否允许通过 /files/:uuid 公开预览
+	AccessTTLMinutes    int64     `mapstructure:"access_ttl_minutes"`        // 文件签名访问默认有效期（分钟）
+	MaxAccessTTLMinutes int64     `mapstructure:"max_access_ttl_minutes"`    // 文件签名访问最大有效期（分钟）
+	OSS                 OSSConfig `mapstructure:"oss"`                       // 阿里云 OSS 配置
+}
+
+type OSSConfig struct {
+	Endpoint        string `mapstructure:"endpoint"`
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	AccessKeySecret string `mapstructure:"access_key_secret"`
+	BucketName      string `mapstructure:"bucket_name"`
+	BaseURL         string `mapstructure:"base_url"`  // CDN/自定义域名
+	BasePath        string `mapstructure:"base_path"` // OSS路径前缀，默认 "uploads/"
+}
+
+type SMS struct {
+	AccessKeyId         string `mapstructure:"access_key_id"`
+	AccessKeySecret     string `mapstructure:"access_key_secret"`
+	SendIntervalSeconds int    `mapstructure:"send_interval_seconds"`
+}

@@ -1,0 +1,16 @@
+backend/logs/
+.idea
+**/.DS_Store
+.env.external
+backups/
+reports/
+backend/auth_center
+backend/sweet_admin*
+backend/bin/
+frontend/bin/
+frontend/dist/
+frontend/node_modules/
+frontend/.quasar/
+node_modules/
+.DS_Store
+AGENTS.md

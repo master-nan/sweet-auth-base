@@ -1,0 +1,7 @@
+node_modules
+.quasar
+.git
+.idea
+*.log
+!dist/spa
+!bin/static-server
