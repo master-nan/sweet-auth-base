@@ -38,7 +38,7 @@ services:
       APP_UPLOAD_OSS_BASE_URL: ${APP_UPLOAD_OSS_BASE_URL:-}
       APP_UPLOAD_OSS_BASE_PATH: ${APP_UPLOAD_OSS_BASE_PATH:-uploads/}
     ports:
-      - "9005:9005"
+      - "${SWEET_ADMIN_BACKEND_PORT:-9005}:9005"
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
@@ -57,7 +57,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "${SWEET_ADMIN_FRONTEND_PORT:-8080}:80"
     healthcheck:
       test: ["CMD", "/app/healthcheck", "http://127.0.0.1/"]
       interval: 5s

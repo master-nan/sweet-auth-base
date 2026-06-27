@@ -171,7 +171,7 @@ export const useDataPermissionApi = () => {
 
   const getDimensionOptions = async (code: string) => {
     return instance
-      .get<ResponseData<DataPermissionOption[]>>(`/admin/data-permission/dimension/${code}/options`)
+      .get<ResponseData<DataPermissionOption[]>>(`/admin/data-permission/dimension-options/${code}`)
       .then((res) => res.data)
   }
 

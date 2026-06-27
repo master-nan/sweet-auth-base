@@ -44,7 +44,7 @@ type SysMenu struct {
 	Component   string               `gorm:"size:64;comment:路由主体" json:"component"`
 	Title       string               `gorm:"size:64;comment:显示标题" json:"title"`
 	IsHidden    bool                 `gorm:"default:false;comment:是否隐藏" json:"is_hidden"`
-	Sequence    uint8                `gorm:"comment:排序;type:tinyint" json:"sequence"`
+	Sequence    uint8                `gorm:"comment:排序;type:smallint" json:"sequence"`
 	PageType    enum.SysMenuPageType `gorm:"size:32;comment:页面类型" json:"page_type"`
 	TableCode   string               `gorm:"size:128;comment:绑定表编码" json:"table_code"`
 	Option      string               `gorm:"size:64;comment:扩展配置" json:"option"`
@@ -62,13 +62,13 @@ type SysMenuButton struct {
 	Name         string                        `gorm:"size:128;comment:按钮名称" json:"name" binding:"required"`
 	Code         string                        `gorm:"size:128;comment:按钮编码" json:"code" binding:"required"`
 	Memo         string                        `gorm:"size:128;comment:备注" json:"memo"`
-	Position     enum.SysMenuButtonPosition    `gorm:"type:tinyint;default:1;comment:位置" json:"position" binding:"required"`
+	Position     enum.SysMenuButtonPosition    `gorm:"type:smallint;default:1;comment:位置" json:"position" binding:"required"`
 	EventType    string                        `gorm:"size:64;comment:事件类型" json:"event_type"`
 	EventAction  string                        `gorm:"size:256;comment:事件动作" json:"event_action"`
 	Icon         string                        `gorm:"size:32;comment:图标" json:"icon"`
 	Color        string                        `gorm:"size:32;comment:颜色" json:"color"`
 	DisplayMode  enum.SysMenuButtonDisplayMode `gorm:"size:16;default:auto;comment:展示方式" json:"display_mode"`
-	Sequence     uint8                         `gorm:"comment:排序;type:tinyint" json:"sequence"`
+	Sequence     uint8                         `gorm:"comment:排序;type:smallint" json:"sequence"`
 	Path         string                        `gorm:"size:256;comment:接口路径" json:"api_path"`
 	Method       string                        `gorm:"size:16;comment:请求方法" json:"http_method"`
 	ParamsSchema string                        `gorm:"type:text;comment:参数Schema" json:"params_schema"`
@@ -93,13 +93,13 @@ type SysMenuButtonTemplate struct {
 	Name         string                        `gorm:"size:128;comment:按钮名称" json:"name"`
 	CodeSuffix   string                        `gorm:"size:64;uniqueIndex:uni_button_template_scene_code_suffix;comment:按钮编码后缀" json:"code_suffix"`
 	Memo         string                        `gorm:"size:128;comment:备注" json:"memo"`
-	Position     enum.SysMenuButtonPosition    `gorm:"type:tinyint;default:1;comment:位置" json:"position"`
+	Position     enum.SysMenuButtonPosition    `gorm:"type:smallint;default:1;comment:位置" json:"position"`
 	EventType    string                        `gorm:"size:64;comment:事件类型" json:"event_type"`
 	EventAction  string                        `gorm:"size:256;comment:事件动作" json:"event_action"`
 	Icon         string                        `gorm:"size:32;comment:图标" json:"icon"`
 	Color        string                        `gorm:"size:32;comment:颜色" json:"color"`
 	DisplayMode  enum.SysMenuButtonDisplayMode `gorm:"size:16;default:auto;comment:展示方式" json:"display_mode"`
-	Sequence     uint8                         `gorm:"comment:排序;type:tinyint" json:"sequence"`
+	Sequence     uint8                         `gorm:"comment:排序;type:smallint" json:"sequence"`
 	Path         string                        `gorm:"size:256;comment:接口路径" json:"api_path"`
 	Method       string                        `gorm:"size:16;comment:请求方法" json:"http_method"`
 	ParamsSchema string                        `gorm:"type:text;comment:参数Schema" json:"params_schema"`
@@ -117,8 +117,8 @@ type SysUser struct {
 	Password          string      `gorm:"size:128;comment:密码" json:"password"`
 	Email             string      `gorm:"size:128;index:index_email;comment:邮箱" json:"email"`
 	PhoneNumber       string      `gorm:"size:128;index:index_phone_number;comment:电话" json:"phone_number"`
-	GmtLastLogin      *CustomTime `gorm:"type:datetime;comment:最后登录时间" json:"gmt_last_login"`
-	PasswordChangedAt *CustomTime `gorm:"type:datetime;comment:密码最后修改时间" json:"password_changed_at"`
+	GmtLastLogin      *CustomTime `gorm:"type:timestamp;comment:最后登录时间" json:"gmt_last_login"`
+	PasswordChangedAt *CustomTime `gorm:"type:timestamp;comment:密码最后修改时间" json:"password_changed_at"`
 	Language          string      `gorm:"size:32;comment:语言包" json:"language"`
 	AccessTokens      string      `gorm:"type:text;comment:用户最近5次Token" json:"access_tokens"`
 	Roles             []SysRole   `gorm:"many2many:sys_user_role;foreignKey:Id;joinForeignKey:UserId;References:Id;joinReferences:RoleId" json:"roles"`
@@ -176,7 +176,7 @@ type SysUserDataScopeOverride struct {
 	ScopeValues    string           `gorm:"type:text;comment:范围值JSON" json:"-"`
 	ScopeValueList []string         `gorm:"-" json:"scope_values"`
 	OverrideMode   string           `gorm:"size:32;default:replace;comment:覆盖模式" json:"override_mode"`
-	ExpireAt       *CustomTime      `gorm:"type:datetime;comment:过期时间" json:"expire_at"`
+	ExpireAt       *CustomTime      `gorm:"type:timestamp;comment:过期时间" json:"expire_at"`
 	User           SysUser          `gorm:"foreignKey:UserId;references:Id" json:"user,omitempty"`
 	Menu           SysMenu          `gorm:"foreignKey:MenuId;references:Id" json:"menu,omitempty"`
 	Dimension      SysDataDimension `gorm:"foreignKey:DimensionCode;references:Code" json:"dimension,omitempty"`
@@ -211,7 +211,7 @@ type SysTable struct {
 	Basic
 	TableName        string                   `gorm:"size:128;comment:表名" json:"table_name"`
 	TableCode        string                   `gorm:"size:128;uniqueIndex:uni_table_code_index;comment:数据库中表名" json:"table_code"`
-	TableType        enum.SysTableType        `gorm:"type:tinyint;default:1;comment:表类型" json:"table_type"`
+	TableType        enum.SysTableType        `gorm:"type:smallint;default:1;comment:表类型" json:"table_type"`
 	MasterDetailMode enum.SysMasterDetailMode `gorm:"size:16;default:auto;comment:主子表展示模式" json:"master_detail_mode"`
 	FormOpenMode     enum.SysFormOpenMode     `gorm:"size:16;default:auto;comment:表单打开方式" json:"form_open_mode"`
 	DetailOpenMode   enum.SysDetailOpenMode   `gorm:"size:16;default:auto;comment:详情打开方式" json:"detail_open_mode"`
@@ -227,12 +227,12 @@ type SysTableField struct {
 	TableId            int                         `gorm:"comment:table_id;uniqueIndex:union_uni_table_id_field_code_index" json:"table_id" binding:"required"`
 	FieldName          string                      `gorm:"size:128;comment:列名" json:"field_name"`
 	FieldCode          string                      `gorm:"size:128;uniqueIndex:union_uni_table_id_field_code_index;comment:表字段名" json:"field_code"`
-	FieldType          enum.SysTableFieldType      `gorm:"type:tinyint;default:1;comment:字段类型" json:"field_type"`
+	FieldType          enum.SysTableFieldType      `gorm:"type:smallint;default:1;comment:字段类型" json:"field_type"`
 	FieldLength        int                         `gorm:"default:0;comment:字段长度" json:"field_length"`
 	FieldDecimalLength int                         `gorm:"default:0;comment:小数位数" json:"field_decimal_length"`
-	InputType          enum.SysTableFieldInputType `gorm:"type:tinyint;default:1;comment:输入类型" json:"input_type"`
-	FormSpan           uint8                       `gorm:"type:tinyint;default:0;comment:表单占位列数，0为自动" json:"form_span"`
-	DetailSpan         uint8                       `gorm:"type:tinyint;default:0;comment:详情占位列数，0为自动" json:"detail_span"`
+	InputType          enum.SysTableFieldInputType `gorm:"type:smallint;default:1;comment:输入类型" json:"input_type"`
+	FormSpan           uint8                       `gorm:"type:smallint;default:0;comment:表单占位列数，0为自动" json:"form_span"`
+	DetailSpan         uint8                       `gorm:"type:smallint;default:0;comment:详情占位列数，0为自动" json:"detail_span"`
 	DefaultValue       *string                     `gorm:"size:128;comment:默认值" json:"default_value,omitempty"`
 	DictCode           *string                     `gorm:"size:128;comment:所用字典" json:"dict_code"`
 	Dict               SysDict                     `gorm:"foreignKey:DictCode;references:DictCode" json:"dict,omitempty"`
@@ -245,7 +245,7 @@ type SysTableField struct {
 	IsListShow         bool                        `gorm:"default:true;comment:是否列表显示" json:"is_list_show"`
 	IsInsertShow       bool                        `gorm:"default:true;comment:是否新增显示" json:"is_insert_show"`
 	IsUpdateShow       bool                        `gorm:"default:true;comment:是否更新显示" json:"is_update_show"`
-	Sequence           uint8                       `gorm:"comment:排序;type:tinyint" binding:"required" json:"sequence"`
+	Sequence           uint8                       `gorm:"comment:排序;type:smallint" binding:"required" json:"sequence"`
 	OriginalFieldId    int                         `gorm:"comment:原字段Id" json:"original_field_id"`
 	Binding            string                      `gorm:"size:256;comment:验证器" json:"binding"`        // 用于存储绑定规则
 	FieldCategory      enum.SysTableFieldCategory  `gorm:"size:64;comment:字段类别" json:"field_category"` // 字段类别（普通字段、虚拟列、计算字段）

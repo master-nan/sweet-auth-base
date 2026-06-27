@@ -33,7 +33,7 @@ type SmsLog struct {
 	// 短信内容JSON
 	Content string `json:"content" gorm:"type:json;comment:短信内容JSON"`
 	// 发送状态 1:发送中, 2:发送成功, 3:发送失败
-	Status enum.SmsStatus `json:"status" gorm:"type:tinyint;comment:发送状态（1:发送中, 2:发送成功, 3:发送失败）"`
+	Status enum.SmsStatus `json:"status" gorm:"type:smallint;comment:发送状态（1:发送中, 2:发送成功, 3:发送失败）"`
 	// 发送回执ID
 	BizId string `json:"biz_id" gorm:"type:varchar(50);comment:发送回执ID"`
 	// 发送结果

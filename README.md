@@ -22,6 +22,16 @@ make docker-up
 - PostgreSQL：localhost:15432
 - Redis：localhost:16379
 
+如果本机已有服务占用默认端口，可以临时覆盖：
+
+```bash
+SWEET_ADMIN_FRONTEND_PORT=9301 \
+SWEET_ADMIN_BACKEND_PORT=9105 \
+SWEET_ADMIN_POSTGRES_PORT=15432 \
+SWEET_ADMIN_REDIS_PORT=16380 \
+make docker-up
+```
+
 默认账号：
 
 ```text

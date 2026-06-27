@@ -188,7 +188,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/data-permission/dimension", app.DataPermissionController.CreateDimension)
 		adminGroup.PUT("/data-permission/dimension/:id", app.DataPermissionController.UpdateDimension)
 		adminGroup.DELETE("/data-permission/dimension/:id", app.DataPermissionController.DeleteDimension)
-		adminGroup.GET("/data-permission/dimension/:code/options", app.DataPermissionController.GetDimensionOptions)
+		adminGroup.GET("/data-permission/dimension-options/:code", app.DataPermissionController.GetDimensionOptions)
 		adminGroup.GET("/data-permission/bindings/menu/:menuId", app.DataPermissionController.GetMenuBindings)
 		adminGroup.PUT("/data-permission/bindings/menu/:menuId", app.DataPermissionController.SaveMenuBindings)
 

@@ -90,13 +90,13 @@ func (s *StringSlice) Scan(value interface{}) error {
 
 type Basic struct {
 	Id         int            `gorm:"primaryKey;type:bigint;comment:ID" json:"id"`
-	GmtCreate  CustomTime     `gorm:"type:datetime;autoCreateTime;comment:创建时间" json:"gmt_create"`
+	GmtCreate  CustomTime     `gorm:"type:timestamp;autoCreateTime;comment:创建时间" json:"gmt_create"`
 	CreateUser *int           `gorm:"comment:创建人ID" json:"createUser"`
 	CreateName *string        `gorm:"size:128;comment:创建人" json:"createName"`
-	GmtModify  CustomTime     `gorm:"type:datetime;autoCreateTime;autoUpdateTime;comment:修改时间" json:"gmt_modify"`
+	GmtModify  CustomTime     `gorm:"type:timestamp;autoCreateTime;autoUpdateTime;comment:修改时间" json:"gmt_modify"`
 	ModifyUser *int           `gorm:"column:modify_user;comment:修改人ID" json:"modify_user"`
 	ModifyName *string        `gorm:"size:128;comment:修改人" json:"modify_name"`
-	GmtDelete  gorm.DeletedAt `gorm:"type:datetime;comment:删除时间" json:"-"`
+	GmtDelete  gorm.DeletedAt `gorm:"type:timestamp;comment:删除时间" json:"-"`
 	DeleteUser *int           `gorm:"column:delete_user;comment:删除人ID" json:"delete_user"`
 	DeleteName *string        `gorm:"size:128;comment:删除人" json:"-"`
 	State      bool           `gorm:"default:true;comment:状态" json:"state"`
