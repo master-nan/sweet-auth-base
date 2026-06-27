@@ -577,13 +577,15 @@ const buttonFields = computed(() =>
           input_type: SysTableFieldInputType.JSON_EDITOR,
         }
       }
-      if (field.field_code === 'is_hidden') {
+      if (field.field_code === 'is_button') {
         return {
           ...field,
-          field_code: 'is_button',
           field_name: '是否页面按钮',
           default_value: 'true',
         }
+      }
+      if (field.field_code === 'is_hidden') {
+        return { ...field, field_name: '是否隐藏' }
       }
       if (field.field_code === 'is_disabled') {
         return { ...field, field_name: '禁用按钮' }

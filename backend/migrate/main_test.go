@@ -161,6 +161,67 @@ func TestSeedAuditMenuButtonsIncludesDetailRefresh(t *testing.T) {
 	}
 }
 
+func TestSeedMenuButtonPersistsAPIPermissionAsNonPageButton(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.CasbinRule{}); err != nil {
+		t.Fatalf("migrate menu button tables: %v", err)
+	}
+
+	sf := newMigrationTestSnowflake(t)
+	button := apiPermissionWithAPI(10, 20, "列表查询", "system_user_query", enum.Top, "query", "search", "primary", 90, "/admin/user/query", "POST")
+	if err := seedMenuButton(db, sf, 1, "super_admin", button); err != nil {
+		t.Fatalf("seed api permission button: %v", err)
+	}
+
+	var got model.SysMenuButton
+	if err := db.Where("code = ?", "system_user_query").First(&got).Error; err != nil {
+		t.Fatalf("query seeded button: %v", err)
+	}
+	if got.IsButton || !got.IsHidden {
+		t.Fatalf("api permission should be hidden non-page button, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
+	}
+}
+
+func TestSeedSystemTableFieldRepairsGeneratedChineseName(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysTable{}, &model.SysTableField{}); err != nil {
+		t.Fatalf("migrate system table metadata: %v", err)
+	}
+	table := model.SysTable{Basic: model.Basic{Id: 10, State: true}, TableName: "菜单按钮", TableCode: "sys_menu_button"}
+	if err := db.Create(&table).Error; err != nil {
+		t.Fatalf("create system table: %v", err)
+	}
+	existing := model.SysTableField{
+		Basic:        model.Basic{Id: 11, State: true},
+		TableId:      table.Id,
+		FieldName:    "is button",
+		FieldCode:    "is_button",
+		FieldType:    enum.BooleanFieldType,
+		InputType:    enum.BooleanInputType,
+		IsListShow:   true,
+		IsInsertShow: true,
+		IsUpdateShow: true,
+		Sequence:     1,
+	}
+	if err := db.Select("*").Create(&existing).Error; err != nil {
+		t.Fatalf("create existing field: %v", err)
+	}
+
+	field := existing
+	field.FieldName = systemFieldDisplayName(table.TableCode, field.FieldCode)
+	if err := seedSystemTableField(db, newMigrationTestSnowflake(t), table, field); err != nil {
+		t.Fatalf("repair system table field: %v", err)
+	}
+
+	var got model.SysTableField
+	if err := db.First(&got, existing.Id).Error; err != nil {
+		t.Fatalf("query repaired field: %v", err)
+	}
+	if got.FieldName != "是否页面按钮" {
+		t.Fatalf("expected field name repaired, got %q", got.FieldName)
+	}
+}
+
 func TestMigrationCachePrefixesOnlyFlushRebuildableBusinessCaches(t *testing.T) {
 	prefixes := migrationCachePrefixes()
 	required := []string{

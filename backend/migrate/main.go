@@ -923,6 +923,127 @@ func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.S
 	return newMigrationID(sf)
 }
 
+func migrationTimestamps(createAt, modifyAt model.CustomTime) (model.CustomTime, model.CustomTime) {
+	now := model.CustomTime(time.Now())
+	if createAt.IsZero() {
+		createAt = now
+	}
+	if modifyAt.IsZero() {
+		modifyAt = now
+	}
+	return createAt, modifyAt
+}
+
+func migrationMenuButtonCreateMap(button model.SysMenuButton) map[string]interface{} {
+	gmtCreate, gmtModify := migrationTimestamps(button.GmtCreate, button.GmtModify)
+	return map[string]interface{}{
+		"id":            button.Id,
+		"gmt_create":    gmtCreate,
+		"create_user":   button.CreateUser,
+		"create_name":   button.CreateName,
+		"gmt_modify":    gmtModify,
+		"modify_user":   button.ModifyUser,
+		"modify_name":   button.ModifyName,
+		"state":         true,
+		"menu_id":       button.MenuId,
+		"name":          button.Name,
+		"code":          button.Code,
+		"memo":          button.Memo,
+		"position":      button.Position,
+		"event_type":    button.EventType,
+		"event_action":  button.EventAction,
+		"icon":          button.Icon,
+		"color":         button.Color,
+		"display_mode":  button.DisplayMode,
+		"sequence":      button.Sequence,
+		"path":          button.Path,
+		"method":        button.Method,
+		"params_schema": button.ParamsSchema,
+		"confirm_text":  button.ConfirmText,
+		"disable_when":  button.DisableWhen,
+		"is_button":     button.IsButton,
+		"is_hidden":     button.IsHidden,
+		"is_disabled":   button.IsDisabled,
+		"before_hooks":  button.BeforeHooks,
+		"after_hooks":   button.AfterHooks,
+	}
+}
+
+func migrationMenuButtonTemplateCreateMap(template model.SysMenuButtonTemplate) map[string]interface{} {
+	gmtCreate, gmtModify := migrationTimestamps(template.GmtCreate, template.GmtModify)
+	return map[string]interface{}{
+		"id":            template.Id,
+		"gmt_create":    gmtCreate,
+		"create_user":   template.CreateUser,
+		"create_name":   template.CreateName,
+		"gmt_modify":    gmtModify,
+		"modify_user":   template.ModifyUser,
+		"modify_name":   template.ModifyName,
+		"state":         true,
+		"scene":         template.Scene,
+		"name":          template.Name,
+		"code_suffix":   template.CodeSuffix,
+		"memo":          template.Memo,
+		"position":      template.Position,
+		"event_type":    template.EventType,
+		"event_action":  template.EventAction,
+		"icon":          template.Icon,
+		"color":         template.Color,
+		"display_mode":  template.DisplayMode,
+		"sequence":      template.Sequence,
+		"path":          template.Path,
+		"method":        template.Method,
+		"params_schema": template.ParamsSchema,
+		"confirm_text":  template.ConfirmText,
+		"disable_when":  template.DisableWhen,
+		"is_button":     template.IsButton,
+		"is_disabled":   template.IsDisabled,
+		"before_hooks":  template.BeforeHooks,
+		"after_hooks":   template.AfterHooks,
+	}
+}
+
+func migrationTableFieldCreateMap(field model.SysTableField) map[string]interface{} {
+	gmtCreate, gmtModify := migrationTimestamps(field.GmtCreate, field.GmtModify)
+	return map[string]interface{}{
+		"id":                   field.Id,
+		"gmt_create":           gmtCreate,
+		"create_user":          field.CreateUser,
+		"create_name":          field.CreateName,
+		"gmt_modify":           gmtModify,
+		"modify_user":          field.ModifyUser,
+		"modify_name":          field.ModifyName,
+		"state":                true,
+		"table_id":             field.TableId,
+		"field_name":           field.FieldName,
+		"field_code":           field.FieldCode,
+		"field_type":           field.FieldType,
+		"field_length":         field.FieldLength,
+		"field_decimal_length": field.FieldDecimalLength,
+		"input_type":           field.InputType,
+		"form_span":            field.FormSpan,
+		"detail_span":          field.DetailSpan,
+		"default_value":        field.DefaultValue,
+		"dict_code":            field.DictCode,
+		"is_primary_key":       field.IsPrimaryKey,
+		"is_index":             field.IsIndex,
+		"is_quick_search":      field.IsQuickSearch,
+		"is_advanced_search":   field.IsAdvancedSearch,
+		"is_sort":              field.IsSort,
+		"is_null":              field.IsNull,
+		"is_list_show":         field.IsListShow,
+		"is_insert_show":       field.IsInsertShow,
+		"is_update_show":       field.IsUpdateShow,
+		"sequence":             field.Sequence,
+		"original_field_id":    field.OriginalFieldId,
+		"binding":              field.Binding,
+		"field_category":       field.FieldCategory,
+		"expression":           field.Expression,
+		"tag":                  field.Tag,
+		"linkage_config":       field.LinkageConfig,
+	}
+}
+
 func seedConfigureMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
 		apiPermissionWithAPI(489, menuID, "配置详情", "develop_configure_detail", enum.Top, "detail", "visibility", "primary", 90, "/admin/configure/detail", "GET"),
@@ -1146,7 +1267,7 @@ func seedMenuButton(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName strin
 		}
 		button.Id = id
 		button.Method = strings.ToUpper(button.Method)
-		if err := db.Create(&button).Error; err != nil {
+		if err := db.Model(&model.SysMenuButton{}).Create(migrationMenuButtonCreateMap(button)).Error; err != nil {
 			return err
 		}
 	}
@@ -1238,7 +1359,7 @@ func seedLowCodeMenuButtonTemplate(db *gorm.DB, sf *utils.Snowflake, template mo
 	}
 	template.Id = id
 	template.Method = strings.ToUpper(template.Method)
-	return db.Create(&template).Error
+	return db.Model(&model.SysMenuButtonTemplate{}).Create(migrationMenuButtonTemplateCreateMap(template)).Error
 }
 
 func buttonTemplate(id int, name, codeSuffix string, position enum.SysMenuButtonPosition, action, icon, color string, sequence uint8) model.SysMenuButtonTemplate {
@@ -1573,16 +1694,16 @@ func seedSystemTableFields(db *gorm.DB, sf *utils.Snowflake, table model.SysTabl
 	}
 	for index, column := range columns {
 		field := systemColumnToTableField(table.TableCode, column, index+1)
-		if err := seedSystemTableField(db, sf, table.Id, field); err != nil {
+		if err := seedSystemTableField(db, sf, table, field); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, tableID int, field model.SysTableField) error {
+func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, table model.SysTable, field model.SysTableField) error {
 	var existing model.SysTableField
-	err := db.Unscoped().Where("table_id = ? AND field_code = ?", tableID, field.FieldCode).First(&existing).Error
+	err := db.Unscoped().Where("table_id = ? AND field_code = ?", table.Id, field.FieldCode).First(&existing).Error
 	if err == nil {
 		updates := map[string]interface{}{
 			"field_type":           field.FieldType,
@@ -1606,7 +1727,7 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, tableID int, field m
 			"delete_user":          nil,
 			"delete_name":          nil,
 		}
-		if strings.TrimSpace(existing.FieldName) == "" || existing.FieldName == existing.FieldCode {
+		if shouldUpdateSystemFieldName(existing.FieldName, table.TableCode, field.FieldCode) {
 			updates["field_name"] = field.FieldName
 		}
 		if field.DictCode != nil {
@@ -1622,8 +1743,8 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, tableID int, field m
 		return err
 	}
 	field.Id = id
-	field.TableId = tableID
-	return db.Create(&field).Error
+	field.TableId = table.Id
+	return db.Model(&model.SysTableField{}).Create(migrationTableFieldCreateMap(field)).Error
 }
 
 func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence int) model.SysTableField {
@@ -1635,7 +1756,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	}
 	field := model.SysTableField{
 		Basic:              model.Basic{State: true},
-		FieldName:          systemFieldDisplayName(column.Name()),
+		FieldName:          systemFieldDisplayName(tableCode, column.Name()),
 		FieldCode:          column.Name(),
 		FieldType:          systemFieldType(column.DatabaseTypeName()),
 		InputType:          enum.InputType,
@@ -1800,47 +1921,292 @@ func applyMigrationManagedFieldDefaults(field *model.SysTableField) {
 	field.IsAdvancedSearch = false
 }
 
-func systemFieldDisplayName(fieldCode string) string {
-	names := map[string]string{
-		"id":           "ID",
-		"gmt_create":   "创建时间",
-		"create_user":  "创建人ID",
-		"create_name":  "创建人",
-		"gmt_modify":   "修改时间",
-		"modify_user":  "修改人ID",
-		"modify_name":  "修改人",
-		"gmt_delete":   "删除时间",
-		"delete_user":  "删除人ID",
-		"delete_name":  "删除人",
-		"state":        "状态",
-		"user_name":    "用户名",
-		"name":         "名称",
-		"memo":         "备注",
-		"remark":       "备注",
-		"email":        "邮箱",
-		"phone_number": "手机号",
-		"password":     "密码",
-		"language":     "语言",
-		"table_name":   "表名",
-		"table_code":   "表编码",
-		"field_name":   "字段名",
-		"field_code":   "字段编码",
-		"dict_name":    "字典名称",
-		"dict_code":    "字典编码",
-		"item_name":    "字典项名称",
-		"item_code":    "字典项编码",
-		"item_value":   "字典项值",
-		"menu_id":      "菜单ID",
-		"role_id":      "角色ID",
-		"user_id":      "用户ID",
-		"app_key":      "应用Key",
-		"app_secret":   "应用Secret",
-		"method":       "请求方法",
-		"url":          "路径",
-		"success":      "是否成功",
-		"duration_ms":  "耗时毫秒",
+func shouldUpdateSystemFieldName(existingName, tableCode, fieldCode string) bool {
+	existing := strings.TrimSpace(existingName)
+	if existing == "" || existing == fieldCode || existing == strings.ReplaceAll(fieldCode, "_", " ") {
+		return true
 	}
-	if name, ok := names[fieldCode]; ok {
+	if tableNames, ok := systemTableFieldDisplayNameMap[tableCode]; ok {
+		_, known := tableNames[fieldCode]
+		if known {
+			return true
+		}
+	}
+	_, known := systemFieldDisplayNameMap[fieldCode]
+	return known
+}
+
+var systemTableFieldDisplayNameMap = map[string]map[string]string{
+	"access_log": {
+		"method":        "操作",
+		"locality":      "地域",
+		"body":          "请求数据",
+		"query":         "查询参数",
+		"response":      "响应数据",
+		"action":        "业务动作",
+		"resource_type": "资源类型",
+		"resource_code": "资源编码",
+		"resource_id":   "资源ID",
+		"status_code":   "HTTP状态码",
+	},
+	"application": {
+		"name":        "应用名称",
+		"app_key":     "应用Key",
+		"app_secret":  "应用Secret",
+		"expiration":  "过期时间",
+		"ding_key":    "钉钉Key",
+		"ding_secret": "钉钉Secret",
+		"ding_app_id": "钉钉AppID",
+	},
+	"sms_template": {
+		"sign_name":       "短信签名",
+		"template_code":   "模板编号",
+		"template_name":   "模板名称",
+		"template_params": "模板参数",
+	},
+	"sys_menu": {
+		"pid":        "父菜单ID",
+		"name":       "路由",
+		"path":       "路径",
+		"component":  "路由主体",
+		"title":      "显示标题",
+		"table_code": "绑定表编码",
+		"option":     "扩展配置",
+		"redirect":   "重定向地址",
+	},
+	"sys_menu_button": {
+		"name":          "按钮名称",
+		"code":          "按钮编码",
+		"path":          "接口路径",
+		"method":        "请求方法",
+		"params_schema": "参数Schema",
+		"confirm_text":  "确认提示",
+		"disable_when":  "禁用条件",
+		"is_hidden":     "是否隐藏(兼容旧字段)",
+		"is_disabled":   "是否禁用",
+	},
+	"sys_menu_button_template": {
+		"name":          "模板名称",
+		"code_suffix":   "编码后缀",
+		"path":          "接口路径",
+		"method":        "请求方法",
+		"params_schema": "参数Schema",
+		"confirm_text":  "确认提示",
+		"disable_when":  "禁用条件",
+		"is_disabled":   "是否禁用",
+	},
+	"sys_table": {
+		"table_code": "数据库中表名",
+		"parent_id":  "父节点ID",
+		"sql":        "视图定义SQL",
+	},
+	"sys_table_field": {
+		"table_id":             "表ID",
+		"field_name":           "列名",
+		"field_code":           "表字段名",
+		"field_decimal_length": "小数位数",
+		"dict_code":            "所用字典",
+		"original_field_id":    "原字段ID",
+		"binding":              "验证器",
+	},
+}
+
+var systemFieldDisplayNameMap = map[string]string{
+	"id":                    "ID",
+	"gmt_create":            "创建时间",
+	"create_user":           "创建人ID",
+	"create_name":           "创建人",
+	"gmt_modify":            "修改时间",
+	"modify_user":           "修改人ID",
+	"modify_name":           "修改人",
+	"gmt_delete":            "删除时间",
+	"delete_user":           "删除人ID",
+	"delete_name":           "删除人",
+	"state":                 "状态",
+	"user_name":             "用户名",
+	"name":                  "名称",
+	"memo":                  "备注",
+	"remark":                "备注",
+	"email":                 "邮箱",
+	"phone_number":          "手机号",
+	"password":              "密码",
+	"language":              "语言",
+	"access_tokens":         "用户最近5次Token",
+	"is_reset":              "是否重置密码",
+	"gmt_last_login":        "最后登录时间",
+	"password_changed_at":   "密码最后修改时间",
+	"table_name":            "表名",
+	"table_code":            "表编码",
+	"table_type":            "表类型",
+	"master_detail_mode":    "主子表展示模式",
+	"form_open_mode":        "表单打开方式",
+	"detail_open_mode":      "详情打开方式",
+	"field_name":            "字段名",
+	"field_code":            "字段编码",
+	"field_type":            "字段类型",
+	"field_length":          "字段长度",
+	"field_decimal_length":  "小数位数",
+	"input_type":            "输入类型",
+	"form_span":             "表单列宽",
+	"detail_span":           "详情列宽",
+	"default_value":         "默认值",
+	"dict_code":             "字典编码",
+	"is_primary_key":        "是否主键",
+	"is_index":              "是否索引",
+	"is_quick_search":       "是否快捷搜索",
+	"is_advanced_search":    "是否高级搜索",
+	"is_sort":               "是否可排序",
+	"is_null":               "是否可空",
+	"is_list_show":          "是否列表显示",
+	"is_insert_show":        "是否新增显示",
+	"is_update_show":        "是否更新显示",
+	"original_field_id":     "原字段ID",
+	"binding":               "验证器",
+	"field_category":        "字段类别",
+	"expression":            "计算字段表达式",
+	"tag":                   "标签",
+	"linkage_config":        "联动配置",
+	"dict_name":             "字典名称",
+	"dict_id":               "字典ID",
+	"item_name":             "字典项名称",
+	"item_code":             "字典项编码",
+	"item_value":            "字典项值",
+	"menu_id":               "菜单ID",
+	"role_id":               "角色ID",
+	"button_id":             "按钮ID",
+	"user_id":               "用户ID",
+	"table_id":              "表ID",
+	"app_key":               "应用Key",
+	"app_secret":            "应用Secret",
+	"application_id":        "应用ID",
+	"application_name":      "应用名称",
+	"expiration":            "过期时间",
+	"ding_key":              "钉钉Key",
+	"ding_secret":           "钉钉Secret",
+	"ding_app_id":           "钉钉AppID",
+	"method":                "请求方法",
+	"ip":                    "IP",
+	"url":                   "路径",
+	"body":                  "请求数据",
+	"query":                 "查询参数",
+	"response":              "响应数据",
+	"locality":              "地域",
+	"action":                "业务动作",
+	"resource_type":         "资源类型",
+	"resource_code":         "资源编码",
+	"resource_id":           "资源ID",
+	"status_code":           "HTTP状态码",
+	"success":               "是否成功",
+	"duration_ms":           "耗时毫秒",
+	"pid":                   "父菜单ID",
+	"path":                  "路径",
+	"component":             "路由主体",
+	"title":                 "显示标题",
+	"is_hidden":             "是否隐藏",
+	"sequence":              "排序",
+	"page_type":             "页面类型",
+	"option":                "扩展配置",
+	"icon":                  "图标",
+	"redirect":              "重定向地址",
+	"is_unfold":             "默认展开",
+	"code":                  "编码",
+	"position":              "位置",
+	"event_type":            "事件类型",
+	"event_action":          "事件动作",
+	"color":                 "颜色",
+	"display_mode":          "展示方式",
+	"params_schema":         "参数Schema",
+	"confirm_text":          "确认提示",
+	"disable_when":          "禁用条件",
+	"is_button":             "是否页面按钮",
+	"is_disabled":           "是否禁用",
+	"before_hooks":          "前置钩子JSON",
+	"after_hooks":           "后置钩子JSON",
+	"scene":                 "场景",
+	"code_suffix":           "编码后缀",
+	"index_id":              "索引ID",
+	"index_name":            "索引名称",
+	"is_unique":             "是否唯一",
+	"field_id":              "字段ID",
+	"related_table_id":      "关联表ID",
+	"reference_key":         "主表字段",
+	"foreign_key":           "关联字段",
+	"on_delete":             "删除策略",
+	"on_update":             "更新策略",
+	"relation_type":         "关系类型",
+	"many_table_code":       "中间表编码",
+	"enable_captcha":        "启用验证码",
+	"password_length":       "密码长度",
+	"password_complexity":   "密码复杂度",
+	"password_expire_time":  "密码过期天数",
+	"password_error_count":  "密码错误次数",
+	"password_lock_minutes": "密码锁定分钟数",
+	"password_policy":       "密码策略",
+	"system_name":           "系统名称",
+	"system_version":        "系统版本",
+	"system_logo":           "系统Logo",
+	"system_description":    "系统描述",
+	"enable_email":          "启用邮件",
+	"smtp_server":           "SMTP服务器",
+	"smtp_port":             "SMTP端口",
+	"sender_email":          "发件人邮箱",
+	"sender_password":       "发件人密码",
+	"sign_name":             "短信签名",
+	"template_code":         "模板编号",
+	"template_name":         "模板名称",
+	"template_params":       "模板参数",
+	"content":               "内容",
+	"mobile":                "手机号",
+	"biz_id":                "业务ID",
+	"result":                "结果",
+	"status":                "状态",
+	"file_name":             "文件名",
+	"file_ext":              "文件扩展名",
+	"file_size":             "文件大小",
+	"file_type":             "文件类型",
+	"file_md5":              "文件MD5",
+	"file_uuid":             "文件UUID",
+	"file_path":             "文件路径",
+	"file_url":              "文件URL",
+	"storage_type":          "存储类型",
+	"upload_id":             "上传ID",
+	"chunk_index":           "分片序号",
+	"chunk_size":            "分片大小",
+	"chunk_count":           "分片总数",
+	"chunk_md5":             "分片MD5",
+	"chunk_path":            "分片路径",
+	"uploaded":              "是否上传完成",
+	"merged":                "是否合并完成",
+	"dimension_code":        "维度编码",
+	"value_type":            "值类型",
+	"source_type":           "来源类型",
+	"source_code":           "来源编码",
+	"label_field":           "展示字段",
+	"value_field":           "值字段",
+	"parent_field":          "父级字段",
+	"match_type":            "匹配方式",
+	"required":              "是否必配授权",
+	"actions":               "生效动作",
+	"strategy":              "范围策略",
+	"scope_values":          "范围值",
+	"override_mode":         "覆盖模式",
+	"expire_at":             "过期时间",
+	"ptype":                 "策略类型",
+	"v0":                    "主体",
+	"v1":                    "资源",
+	"v2":                    "动作",
+	"v3":                    "扩展1",
+	"v4":                    "扩展2",
+	"v5":                    "扩展3",
+}
+
+func systemFieldDisplayName(tableCode, fieldCode string) string {
+	if tableNames, ok := systemTableFieldDisplayNameMap[tableCode]; ok {
+		if name, ok := tableNames[fieldCode]; ok {
+			return name
+		}
+	}
+	if name, ok := systemFieldDisplayNameMap[fieldCode]; ok {
 		return name
 	}
 	return strings.ReplaceAll(fieldCode, "_", " ")
