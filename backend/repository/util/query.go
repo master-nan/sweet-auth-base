@@ -1098,13 +1098,16 @@ func getSQLType(fieldType enum.SysTableFieldType, length int, decimal int) strin
 	case enum.BigIntFieldType:
 		return "bigint"
 	case enum.IntFieldType:
-		return "int"
+		return "integer"
 	case enum.FloatFieldType:
-		if decimal > 0 {
-			return fmt.Sprintf("decimal(%d,%d)", length, decimal)
+		if length > 0 && decimal > 0 {
+			return fmt.Sprintf("numeric(%d,%d)", length, decimal)
 		}
-		return "float"
+		return "numeric"
 	case enum.VarcharFieldType:
+		if length <= 0 {
+			length = 255
+		}
 		return fmt.Sprintf("varchar(%d)", length)
 	case enum.TextFieldType:
 		return "text"
@@ -1113,13 +1116,13 @@ func getSQLType(fieldType enum.SysTableFieldType, length int, decimal int) strin
 	case enum.DateFieldType:
 		return "date"
 	case enum.DatetimeFieldType:
-		return "datetime"
+		return "timestamp"
 	case enum.TimeFieldType:
 		return "time"
 	case enum.TinyintFieldType:
-		return "tinyint"
+		return "smallint"
 	case enum.JsonFieldType:
-		return "json"
+		return "jsonb"
 	default:
 		return "text"
 	}

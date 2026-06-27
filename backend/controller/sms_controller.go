@@ -17,15 +17,17 @@ import (
 )
 
 type SmsController struct {
-	smsService      *service.SmsService
-	sysTableService *service.SysTableService
-	translators     map[string]ut.Translator
+	smsService            *service.SmsService
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	translators           map[string]ut.Translator
 }
 
-func NewSmsController(smsService *service.SmsService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *SmsController {
+func NewSmsController(smsService *service.SmsService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *SmsController {
 	return &SmsController{
 		smsService,
 		sysTableService,
+		dataPermissionService,
 		translators,
 	}
 }
@@ -51,6 +53,10 @@ func (s *SmsController) QuerySmsTemplate(ctx *gin.Context) {
 	}
 	table, err := s.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, s.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

@@ -82,15 +82,6 @@ func (gc *GeneralizationController) checkMenuPermission(ctx *gin.Context, menuId
 	if !utils.MenuAllowsTableCode(menu, tableCode) {
 		return myerrors.ErrPermissionDenied
 	}
-	if strings.TrimSpace(menu.Option) == "" {
-		hasPublishedMenu, err := gc.sysMenuService.HasPublishedTableMenu(tableCode)
-		if err != nil {
-			return err
-		}
-		if hasPublishedMenu {
-			return myerrors.ErrPermissionDenied
-		}
-	}
 	return nil
 }
 

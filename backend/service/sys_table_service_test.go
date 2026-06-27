@@ -324,7 +324,7 @@ func TestCleanupLegacyLowCodeMenuButtonsRemovesSystemButtonsOnly(t *testing.T) {
 	buttons := []model.SysMenuButton{
 		{Basic: model.Basic{Id: 1, State: true}, MenuId: 900, Name: "旧查询", Code: "system_user_query", Position: enum.Top, EventAction: "query"},
 		{Basic: model.Basic{Id: 2, State: true}, MenuId: 900, Name: "新查询", Code: "sys_user_query", Position: enum.Top, EventAction: "query"},
-		{Basic: model.Basic{Id: 3, State: true}, MenuId: 900, Name: "自定义", Code: "dispatch_change_carrier", Position: enum.Line, EventAction: "custom"},
+		{Basic: model.Basic{Id: 3, State: true}, MenuId: 900, Name: "自定义", Code: "demo_ticket_mark_done", Position: enum.Line, EventAction: "custom"},
 	}
 	if err := db.Create(&buttons).Error; err != nil {
 		t.Fatalf("seed buttons: %v", err)
@@ -346,7 +346,7 @@ func TestCleanupLegacyLowCodeMenuButtonsRemovesSystemButtonsOnly(t *testing.T) {
 	if err := db.Order("id").Find(&remaining).Error; err != nil {
 		t.Fatalf("query remaining buttons: %v", err)
 	}
-	if len(remaining) != 2 || remaining[0].Code != "sys_user_query" || remaining[1].Code != "dispatch_change_carrier" {
+	if len(remaining) != 2 || remaining[0].Code != "sys_user_query" || remaining[1].Code != "demo_ticket_mark_done" {
 		t.Fatalf("remaining buttons = %#v, want new low-code and custom buttons", remaining)
 	}
 	var grantCount int64

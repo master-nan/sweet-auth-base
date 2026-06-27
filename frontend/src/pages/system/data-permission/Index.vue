@@ -325,6 +325,8 @@ const matchTypeOptions = [
   { label: '等于', value: 'eq' },
 ]
 
+const defaultBindingActions = dataPermissionActionOptions.map((option) => option.value)
+
 const dimensionColumns: QTableProps['columns'] = [
   { name: 'code', label: '编码', field: 'code', align: 'left', sortable: true },
   { name: 'name', label: '名称', field: 'name', align: 'left', sortable: true },
@@ -394,7 +396,7 @@ const flattenMenus = (menus: Menu[]): Menu[] =>
 
 const buildMenuOptions = (menus: Menu[]) =>
   flattenMenus(menus)
-    .filter((menu) => menu.page_type === 'low_code' && !!menu.table_code && !menu.is_hidden)
+    .filter((menu) => !!menu.table_code && !menu.is_hidden && menu.state !== false)
     .map<MenuOption>((menu) => ({
       label: displayMenuTitle(menu),
       value: menu.id,
@@ -466,7 +468,7 @@ const bindingToRow = (binding: DataPermissionBinding): BindingRow => ({
   field_code: binding.field_code,
   match_type: binding.match_type || 'in',
   required: binding.required !== false,
-  actions: binding.actions?.length ? binding.actions : ['query', 'detail', 'create', 'update', 'delete'],
+  actions: binding.actions?.length ? binding.actions : defaultBindingActions,
   state: binding.state !== false,
   table_code: binding.table_code,
 })
@@ -480,7 +482,7 @@ const addBindingRow = () => {
       field_code: tableFieldOptions.value[0]?.value || '',
       match_type: 'in',
       required: true,
-      actions: ['query', 'detail', 'create', 'update', 'delete'],
+      actions: defaultBindingActions,
       state: true,
       table_code: selectedMenu.value?.table_code || '',
     },
@@ -518,7 +520,7 @@ const saveBindings = async () => {
       field_code: row.field_code,
       match_type: row.match_type || 'in',
       required: row.required !== false,
-      actions: row.actions?.length ? row.actions : ['query', 'detail', 'create', 'update', 'delete'],
+      actions: row.actions?.length ? row.actions : defaultBindingActions,
       state: row.state !== false,
     }))
     const result = await dataPermissionApi.saveMenuBindings(selectedMenu.value.id, payload)

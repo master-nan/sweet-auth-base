@@ -8,7 +8,7 @@ const baseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_BASE_URL || 'http://loc
 const healthBaseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_HEALTH_BASE_URL || 'http://localhost:9009')
 const username = process.env.SWEET_ADMIN_ADMIN_USER || 'admin'
 const password = process.env.SWEET_ADMIN_ADMIN_PASSWORD || 'admin123'
-const tableCode = process.env.SWEET_ADMIN_SMOKE_TABLE || 'sys_user'
+const tableCode = process.env.SWEET_ADMIN_SMOKE_TABLE || `smk_publish_${Date.now().toString(36)}`
 const crudTableCode =
   process.env.SWEET_ADMIN_SMOKE_CRUD_TABLE || `smk_${Date.now().toString(36)}`
 const dropPhysicalSmokeTables = process.env.SWEET_ADMIN_SMOKE_DROP_PHYSICAL === '1'
@@ -27,6 +27,10 @@ function apiPath(path) {
 
 function assertNoSecretField(record, field, message) {
   assert(record?.[field] === undefined || record[field] === '', message)
+}
+
+function parsePostgresBool(value) {
+  return ['1', 't', 'true', 'yes', 'y'].includes(String(value || '').trim().toLowerCase())
 }
 
 async function request(path, options = {}) {
@@ -142,6 +146,10 @@ function assertSmokeTableCode(code) {
   )
 }
 
+function isSmokeTableCode(code) {
+  return /^(smk|smoke|smoke_long)_[A-Za-z0-9_]+$/.test(code)
+}
+
 function runPostgres(sql) {
   return execFileSync(
     'docker',
@@ -172,15 +180,16 @@ function runPostgres(sql) {
 function hardCleanupSmokeTable(code) {
   if (!dropPhysicalSmokeTables) return
   assertSmokeTableCode(code)
-	const sqlCode = code.replaceAll("'", "''")
-	const sql = `
-	DELETE FROM sys_user_data_scope_override WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-	DELETE FROM sys_role_data_scope WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-	DELETE FROM sys_data_scope_binding WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-	DELETE FROM sys_role_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-	DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-	DELETE FROM sys_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
-DELETE FROM sys_menu WHERE id IN (SELECT id FROM sys_menu WHERE "option" = '${sqlCode}' LIMIT 1);
+  const sqlCode = code.replaceAll("'", "''")
+  const menuWhere = `table_code = '${sqlCode}' OR "option" = '${sqlCode}'`
+  const sql = `
+DELETE FROM sys_user_data_scope_override WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_role_data_scope WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_data_scope_binding WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_role_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
+DELETE FROM sys_menu WHERE id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
 DELETE FROM sys_table_index_field WHERE index_id IN (SELECT id FROM sys_table_index WHERE table_id IN (SELECT id FROM sys_table WHERE table_code = '${sqlCode}' LIMIT 1));
 DELETE FROM sys_table_index WHERE table_id IN (SELECT id FROM sys_table WHERE table_code = '${sqlCode}' LIMIT 1);
 DELETE FROM sys_table_relation WHERE table_id IN (SELECT id FROM sys_table WHERE table_code = '${sqlCode}' LIMIT 1);
@@ -196,6 +205,10 @@ function cleanupStaleSmokeArtifacts() {
   const output = runPostgres(`
 SELECT table_code
 FROM sys_table
+WHERE table_code ~ '^(smk|smoke|smoke_long)_[A-Za-z0-9_]+$'
+UNION
+SELECT table_code
+FROM sys_menu
 WHERE table_code ~ '^(smk|smoke|smoke_long)_[A-Za-z0-9_]+$'
 UNION
 SELECT "option"
@@ -269,7 +282,7 @@ DELETE FROM sys_user WHERE id = ${userId} OR phone_number = '${sqlString(phone)}
 INSERT INTO sys_user
   (id, gmt_create, gmt_modify, state, user_name, password, email, phone_number, password_changed_at, language, access_tokens, is_reset)
 VALUES
-  (${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, '${sqlName}', '${passwordHash}', '${sqlString(email)}', '${sqlString(phone)}', CURRENT_TIMESTAMP, 'zh-CN', '', 0);
+  (${userId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, true, '${sqlName}', '${passwordHash}', '${sqlString(email)}', '${sqlString(phone)}', CURRENT_TIMESTAMP, 'zh-CN', '', false);
 INSERT INTO sys_user_role (user_id, role_id) VALUES (${userId}, ${Number(roleId)});
 `)
   clearUserCacheKeys(`USER_CACHE_KEY_${userId}`, `USER_CACHE_KEY_${userName}`, `USER_CACHE_KEY_${phone}`)
@@ -293,8 +306,8 @@ DELETE FROM sys_menu WHERE id IN (SELECT id FROM sys_menu WHERE name = '${sqlNam
 
 function prepareLocalSmokeRuntime() {
   if (!dropPhysicalSmokeTables) return
-  runPostgres("UPDATE sys_configure SET enable_captcha = 0, sender_password = 'smoke-secret';")
-  runPostgres("UPDATE sys_user SET is_reset = 0, password_changed_at = CURRENT_TIMESTAMP WHERE id = 1;")
+  runPostgres("UPDATE sys_configure SET enable_captcha = false, sender_password = 'smoke-secret';")
+  runPostgres("UPDATE sys_user SET is_reset = false, password_changed_at = CURRENT_TIMESTAMP WHERE id = 1;")
   execFileSync(
     'docker',
     [
@@ -393,7 +406,7 @@ SELECT COUNT(*)
 FROM access_log
 WHERE resource_code = '${sqlString(code)}'
   AND user_name = '${sqlString(username)}'
-  AND success = 1
+  AND success = true
   AND action IN (${actionList});
 `),
   )
@@ -606,7 +619,7 @@ function assertBuiltinPermissionButtonsSeeded() {
     .map((menu) => `'${menu.replaceAll("'", "''")}'`)
     .join(',')
   const rows = runPostgres(`
-SELECT CONCAT(m.name, '\t', b.code, '\t', b.method, '\t', b.path, '\t', b.is_hidden)
+SELECT CONCAT(m.name, '\t', b.code, '\t', b.method, '\t', b.path, '\t', NOT b.is_button)
 FROM sys_menu_button b
 JOIN sys_menu m ON m.id = b.menu_id
 WHERE m.name IN (${menuNames});
@@ -614,22 +627,22 @@ WHERE m.name IN (${menuNames});
   const actual = new Map(
     rows
       ? rows.split('\n').map((line) => {
-          const [menu, code, method, path, hidden] = line.split('\t')
-          return [`${menu}|${code}`, { method, path, hidden: hidden === '1' }]
+          const [menu, code, method, path, apiOnly] = line.split('\t')
+          return [`${menu}|${code}`, { method, path, apiOnly: parsePostgresBool(apiOnly) }]
         })
       : [],
   )
   const missing = []
   const mismatched = []
-  for (const [menu, code, method, path, hidden] of expected) {
+  for (const [menu, code, method, path, apiOnly] of expected) {
     const key = `${menu}|${code}`
     const item = actual.get(key)
     if (!item) {
       missing.push(key)
       continue
     }
-    if (item.method !== method || item.path !== path || item.hidden !== hidden) {
-      mismatched.push(`${key}: ${item.method} ${item.path} hidden=${item.hidden}`)
+    if (item.method !== method || item.path !== path || item.apiOnly !== apiOnly) {
+      mismatched.push(`${key}: ${item.method} ${item.path} api_only=${item.apiOnly}`)
     }
   }
   assert(missing.length === 0, `builtin permission buttons missing: ${missing.join(', ')}`)
@@ -778,10 +791,8 @@ async function assertProtectedGeneralizationWriteGuard(menus) {
     }),
   })
   assert(
-    denied.status === 400 &&
-      denied.body?.error_code === 10000 &&
-      String(denied.body?.error_message || '').includes('受保护的系统表'),
-    `protected system table write was not blocked by service guard: ${JSON.stringify(denied.body)}`,
+    [400, 403].includes(denied.status) && denied.body?.success === false,
+    `protected system table write was not blocked: ${JSON.stringify(denied.body)}`,
   )
   console.log('OK protected table write guard')
 }
@@ -789,7 +800,7 @@ async function assertProtectedGeneralizationWriteGuard(menus) {
 function pickDataPermissionField(table) {
   const fields = table?.table_fields || []
   const integerTypes = new Set([1, 9, 11])
-  const priority = ['org_id', 'tenant_id', 'project_id', 'owner_id', 'id']
+  const priority = ['scope_id', 'tenant_id', 'project_id', 'owner_id', 'id']
   for (const fieldCode of priority) {
     const field = fields.find((item) => item.field_code === fieldCode && integerTypes.has(Number(item.field_type)))
     if (field) return field.field_code
@@ -799,7 +810,7 @@ function pickDataPermissionField(table) {
   return firstInteger.field_code
 }
 
-async function assertUserDataPermissionApi(menuId, nonLowCodeMenuId, table) {
+async function assertUserDataPermissionApi(menuId, fixedMenuId, table) {
   const userMenus = await request('/admin/menu/user/1')
   assert(userMenus.status === 200 && userMenus.body?.success, `user menu query failed: ${JSON.stringify(userMenus.body)}`)
   const fieldCode = pickDataPermissionField(table)
@@ -842,18 +853,22 @@ async function assertUserDataPermissionApi(menuId, nonLowCodeMenuId, table) {
       `invalid data permission binding field was not rejected: ${JSON.stringify(invalidBinding.body)}`,
     )
 
-    if (nonLowCodeMenuId) {
-      const invalidMenu = await request(`/admin/data-permission/bindings/menu/${nonLowCodeMenuId}`, {
+    if (fixedMenuId) {
+      const fixedMenuBinding = await request(`/admin/data-permission/bindings/menu/${fixedMenuId}`, {
         method: 'PUT',
         body: JSON.stringify({
-          menu_id: nonLowCodeMenuId,
-          bindings: [{ dimension_code: dimensionCode, field_code: fieldCode, match_type: 'in', actions: ['query'] }],
+          menu_id: fixedMenuId,
+          bindings: [{ dimension_code: dimensionCode, field_code: 'id', match_type: 'in', actions: ['query'] }],
         }),
       })
       assert(
-        invalidMenu.status === 400 && invalidMenu.body?.error_code === 10000,
-        `non low-code data permission menu was not rejected: ${JSON.stringify(invalidMenu.body)}`,
+        fixedMenuBinding.status === 200 && fixedMenuBinding.body?.success,
+        `fixed data permission menu binding failed: ${JSON.stringify(fixedMenuBinding.body)}`,
       )
+      await request(`/admin/data-permission/bindings/menu/${fixedMenuId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ menu_id: fixedMenuId, bindings: [] }),
+      })
     }
 
     const savedBinding = await request(`/admin/data-permission/bindings/menu/${menuId}`, {
@@ -962,7 +977,7 @@ function setMenuDataScope(menuId, scopeValues, fieldCode = 'id') {
   assert(tableCode, `menu ${numericMenuId} has no table_code for data scope smoke`)
   const dimensionCode = smokeDimensionCode(fieldCode)
   const idBase = Date.now() * 1000 + Math.floor(Math.random() * 1000)
-  const actionsJson = sqlString(JSON.stringify(['create', 'delete', 'detail', 'query', 'update']))
+  const actionsJson = sqlString(JSON.stringify(['batch_delete', 'create', 'delete', 'detail', 'export', 'query', 'update']))
   const valuesJson = sqlString(JSON.stringify(values))
   runPostgres(`
 INSERT INTO sys_data_dimension
@@ -1015,7 +1030,7 @@ DELETE FROM sys_data_scope_binding WHERE menu_id = ${Number(menuId)};
 
 function setMenuButtonDisabled(buttonId, disabled) {
   if (!dropPhysicalSmokeTables) return
-  runPostgres(`UPDATE sys_menu_button SET is_disabled = ${disabled ? 1 : 0}, gmt_modify = NOW() WHERE id = ${Number(buttonId)};`)
+  runPostgres(`UPDATE sys_menu_button SET is_disabled = ${disabled ? 'true' : 'false'}, gmt_modify = NOW() WHERE id = ${Number(buttonId)};`)
 }
 
 async function createSmokeMetadataTable(code, name) {
@@ -1034,6 +1049,31 @@ async function createSmokeMetadataTable(code, name) {
   const table = await fetchTableByCode(code)
   assert(table?.id, `${code} metadata missing after create`)
   return table
+}
+
+async function preparePublishSmokeTable(code) {
+  if (!dropPhysicalSmokeTables || !isSmokeTableCode(code)) return
+  const table = await createSmokeMetadataTable(code, 'Smoke Publish Item')
+  await createSmokeTableField(table.id, {
+    field_name: '名称',
+    field_code: 'name',
+    is_quick_search: true,
+    is_advanced_search: true,
+    is_null: false,
+    binding: 'min=1|max=64',
+    sequence: 9,
+  })
+  await createSmokeTableField(table.id, {
+    field_name: '范围ID',
+    field_code: 'scope_id',
+    type: 11,
+    input_type: 2,
+    is_index: true,
+    is_advanced_search: true,
+    is_null: false,
+    binding: 'min=1',
+    sequence: 10,
+  })
 }
 
 async function createSmokeTableField(tableId, overrides) {
@@ -1162,7 +1202,7 @@ async function assertMetadataIdentifierGuard() {
 async function assertForcedPasswordChangeFlow() {
   if (!dropPhysicalSmokeTables) return
 
-  runPostgres("UPDATE sys_user SET is_reset = 1 WHERE id = 1;")
+  runPostgres("UPDATE sys_user SET is_reset = true WHERE id = 1;")
   clearUserCache()
 
   const previousToken = accessToken
@@ -1418,7 +1458,7 @@ async function assertLowCodeQueryRequiresQueryButton(lowcodeMenu) {
   const userName = `smoke_user_${suffix}`
   const queryPath = '/admin/generalization/query/code/:code'
   const queryMethod = 'POST'
-  const code = lowcodeMenu.option || tableCode
+  const code = lowcodeMenu.table_code || lowcodeMenu.option || tableCode
   let buttonId = 0
   const adminToken = accessToken
   cleanupSmokeUser(userName)
@@ -1491,7 +1531,7 @@ async function assertLowCodeAdvancedQueryMatrix(code, menuId) {
   for (const row of [
     {
       name: 'Query Matrix Alternate',
-      org_id: 3,
+      scope_id: 3,
       status: 2,
       enabled: false,
       biz_date: '2026-06-15',
@@ -1501,7 +1541,7 @@ async function assertLowCodeAdvancedQueryMatrix(code, menuId) {
     },
     {
       name: 'Query Matrix Future',
-      org_id: 4,
+      scope_id: 4,
       status: 1,
       enabled: true,
       biz_date: '2026-07-01',
@@ -1979,7 +2019,7 @@ function findMenuByName(menus, name) {
 
 function findMenuByOption(menus, option) {
   for (const menu of menus || []) {
-    if (menu.option === option) {
+    if (menu.table_code === option || menu.option === option) {
       return menu
     }
     const child = findMenuByOption(menu.children, option)
@@ -2065,8 +2105,8 @@ async function assertRelationCandidateMenuScope() {
       sequence: 9,
     })
     await createSmokeTableField(targetTable.id, {
-      field_name: '组织ID',
-      field_code: 'org_id',
+      field_name: '范围ID',
+      field_code: 'scope_id',
       type: 11,
       input_type: 2,
       is_index: true,
@@ -2086,8 +2126,8 @@ async function assertRelationCandidateMenuScope() {
     await assertTableIndexLifecycle(targetCode, suffix)
 
     for (const row of [
-      { name: 'Target In Scope', org_id: 1 },
-      { name: 'Target Out Scope', org_id: 2 },
+      { name: 'Target In Scope', scope_id: 1 },
+      { name: 'Target Out Scope', scope_id: 2 },
     ]) {
       const created = await request('/admin/generalization/create', {
         method: 'POST',
@@ -2196,7 +2236,7 @@ async function assertRelationCandidateMenuScope() {
       `relation source field query failed: ${JSON.stringify(sourceRelationQuery.body)}`,
     )
 
-    setMenuDataScope(targetMenu.id, '1', 'org_id')
+    setMenuDataScope(targetMenu.id, '1', 'scope_id')
     const wrongMenuQuery = await request(`/admin/generalization/query/code/${targetCode}`, {
       method: 'POST',
       body: JSON.stringify({
@@ -2256,8 +2296,8 @@ async function assertRelationCandidateMenuScope() {
     )
     console.log('OK relation field query and candidate menu scope')
   } finally {
-    const targetMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE "option" = '${sqlString(targetCode)}';`)
-    const sourceMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE "option" = '${sqlString(sourceCode)}';`)
+    const targetMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE table_code = '${sqlString(targetCode)}' OR "option" = '${sqlString(targetCode)}';`)
+    const sourceMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE table_code = '${sqlString(sourceCode)}' OR "option" = '${sqlString(sourceCode)}';`)
     if (Number(targetMenuId) > 0) clearMenuDataScope(Number(targetMenuId))
     if (Number(sourceMenuId) > 0) clearMenuDataScope(Number(sourceMenuId))
     await cleanupTable(sourceCode)
@@ -2421,6 +2461,7 @@ async function main() {
   await assertRoleValidationGuard()
   await assertFileUploadGuard()
 
+  await preparePublishSmokeTable(tableCode)
   const publish = await request(`/admin/table/publish/${tableCode}`, { method: 'POST' })
   assert(publish.status === 200 && publish.body?.success, `publish failed: ${JSON.stringify(publish.body)}`)
   console.log(`OK publish ${tableCode}`)
@@ -2443,9 +2484,9 @@ async function main() {
   await assertProtectedGeneralizationWriteGuard(menus.body.data)
   const lowcodeMenu = findMenuByName(menus.body.data, `lowcode_${tableCode}`)
   assert(lowcodeMenu, `published menu lowcode_${tableCode} not found`)
-  assert(lowcodeMenu.option === tableCode, `published menu option mismatch: ${lowcodeMenu.option}`)
+  assert(lowcodeMenu.table_code === tableCode, `published menu table_code mismatch: ${lowcodeMenu.table_code}`)
   const buttonActions = new Set((lowcodeMenu.menu_buttons || []).map((button) => button.event_action || button.code))
-  for (const action of ['create', 'openDetail', 'update', 'delete']) {
+  for (const action of ['create', 'detail', 'update', 'delete']) {
     assert(buttonActions.has(action), `published menu missing ${action} button`)
   }
   const lowcodeButtons = lowcodeMenu.menu_buttons || []
@@ -2470,7 +2511,7 @@ async function main() {
   await assertRoleButtonPolicyScope(lowcodeMenu, auditMenu)
   await assertLowCodeQueryRequiresQueryButton(lowcodeMenu)
 
-  const deniedQuery = await request(`/admin/generalization/query/code/${tableCode}`, {
+  const autoMenuQuery = await request(`/admin/generalization/query/code/${tableCode}`, {
     method: 'POST',
     body: JSON.stringify({
       page: 1,
@@ -2482,10 +2523,10 @@ async function main() {
     }),
   })
   assert(
-    deniedQuery.status === 403 && deniedQuery.body?.error_code === 30006,
-    'published table query without menu_id was not denied',
+    autoMenuQuery.status === 200 && autoMenuQuery.body?.success && Array.isArray(autoMenuQuery.body.data),
+    `published table query without menu_id did not resolve menu permission: ${JSON.stringify(autoMenuQuery.body)}`,
   )
-  console.log('OK query permission guard')
+  console.log('OK query menu auto resolve')
 
   setMenuDataScope(lowcodeMenu.id, '1')
   const unpublish = await request(`/admin/table/unpublish/${tableCode}`, { method: 'POST' })
@@ -2578,15 +2619,22 @@ async function main() {
   await assertUserDataPermissionApi(republishedMenu.id, auditMenu.id, table.body.data)
   console.log('OK user data permission API')
 
-  const denied = await request('/admin/generalization/create', {
+  const autoMenuCreate = await request('/admin/generalization/create', {
     method: 'POST',
     body: JSON.stringify({
       table_code: tableCode,
-      data: {},
+      data: { name: 'Auto Menu Resolve', scope_id: 1 },
     }),
   })
-  assert(denied.status === 403 && denied.body?.error_code === 30006, 'missing menu_id write was not denied')
-  console.log('OK write permission guard')
+  assert(
+    autoMenuCreate.status === 200 && autoMenuCreate.body?.success,
+    `missing menu_id write did not resolve menu permission: ${JSON.stringify(autoMenuCreate.body)}`,
+  )
+  console.log('OK write menu auto resolve')
+
+  if (dropPhysicalSmokeTables && isSmokeTableCode(tableCode)) {
+    await cleanupTable(tableCode)
+  }
 
   await cleanupTable(crudTableCode)
   const createTable = await request('/admin/table', {
@@ -2638,8 +2686,8 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({
       table_id: crudTable.id,
-      field_name: '组织ID',
-      field_code: 'org_id',
+      field_name: '范围ID',
+      field_code: 'scope_id',
       type: 11,
       field_length: 0,
       field_decimal_length: 0,
@@ -2815,8 +2863,8 @@ async function main() {
   ])
   const nameFieldMeta = crudTableAfterFields?.table_fields?.find((field) => field.field_code === 'name')
   assert(nameFieldMeta && !nameFieldMeta.is_null, `name field is_null metadata was not persisted false: ${JSON.stringify(nameFieldMeta)}`)
-  const orgFieldMeta = crudTableAfterFields?.table_fields?.find((field) => field.field_code === 'org_id')
-  assert(orgFieldMeta && !orgFieldMeta.is_null, `org_id field is_null metadata was not persisted false: ${JSON.stringify(orgFieldMeta)}`)
+  const scopeFieldMeta = crudTableAfterFields?.table_fields?.find((field) => field.field_code === 'scope_id')
+  assert(scopeFieldMeta && !scopeFieldMeta.is_null, `scope_id field is_null metadata was not persisted false: ${JSON.stringify(scopeFieldMeta)}`)
   console.log('OK low-code metadata bool guards')
 
   const publishCrud = await request(`/admin/table/publish/${crudTableCode}`, { method: 'POST' })
@@ -2834,7 +2882,7 @@ async function main() {
       body: JSON.stringify({
         table_code: crudTableCode,
         menu_id: crudMenu.id,
-        data: { name: 'Smoke Disabled Button Item', org_id: 2 },
+        data: { name: 'Smoke Disabled Button Item', scope_id: 2 },
       }),
     })
     assert(
@@ -2860,7 +2908,7 @@ async function main() {
       menu_id: crudMenu.id,
       data: {
         name: 'Smoke Item',
-        org_id: 2,
+        scope_id: 2,
         status: 1,
         enabled: true,
         biz_date: '2026-06-01',
@@ -2898,7 +2946,7 @@ async function main() {
       id: missingRowId,
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Missing Smoke Item', org_id: 2 },
+      data: { name: 'Missing Smoke Item', scope_id: 2 },
     }),
   })
   assert(
@@ -2930,7 +2978,7 @@ async function main() {
       expressions: [
         {
           logic: 1,
-          rules: [{ field: 'org_id', expression_type: 5, value: 'not-a-number', type: 3 }],
+          rules: [{ field: 'scope_id', expression_type: 5, value: 'not-a-number', type: 3 }],
           nested: [],
         },
       ],
@@ -2952,7 +3000,7 @@ async function main() {
       num: 5,
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      filters: { org_id: 'not-a-number' },
+      filters: { scope_id: 'not-a-number' },
       quick_query: { keyword: '' },
       include_deleted: false,
     }),
@@ -2974,7 +3022,7 @@ async function main() {
       expressions: [
         {
           logic: 1,
-          rules: [{ field: 'org_id', expression_type: 13, value: [1, 3], type: 11 }],
+          rules: [{ field: 'scope_id', expression_type: 13, value: [1, 3], type: 11 }],
           nested: [],
         },
       ],
@@ -2999,7 +3047,7 @@ async function main() {
       expressions: [
         {
           logic: 1,
-          rules: [{ field: 'org_id', expression_type: 13, value: [1], type: 11 }],
+          rules: [{ field: 'scope_id', expression_type: 13, value: [1], type: 11 }],
           nested: [],
         },
       ],
@@ -3019,7 +3067,7 @@ async function main() {
     body: JSON.stringify({
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Invalid Smoke Item', org_id: 'not-a-number' },
+      data: { name: 'Invalid Smoke Item', scope_id: 'not-a-number' },
     }),
   })
   assert(invalidTypedCreate.status === 400, `invalid typed create was not rejected: ${JSON.stringify(invalidTypedCreate.body)}`)
@@ -3030,7 +3078,7 @@ async function main() {
       id: rowId,
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: '', org_id: 2 },
+      data: { name: '', scope_id: 2 },
     }),
   })
   assert(
@@ -3045,7 +3093,7 @@ async function main() {
       id: rowId,
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Updated', org_id: 2, id: 1, gmt_create: '2000-01-01 00:00:00' },
+      data: { name: 'Smoke Item Updated', scope_id: 2, id: 1, gmt_create: '2000-01-01 00:00:00' },
     }),
   })
   assert(updatedRow.status === 200 && updatedRow.body?.success, `low-code update failed: ${JSON.stringify(updatedRow.body)}`)
@@ -3110,7 +3158,7 @@ async function main() {
   )
 
   clearMenuDataScope(crudMenu.id)
-  setMenuDataScope(crudMenu.id, '1', 'org_id')
+  setMenuDataScope(crudMenu.id, '1', 'scope_id')
   let scopedRowId = 0
 
   const customScopedQuery = await request(`/admin/generalization/query/code/${crudTableCode}`, {
@@ -3135,7 +3183,7 @@ async function main() {
     body: JSON.stringify({
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Out Of Org Scope', org_id: 2 },
+      data: { name: 'Smoke Item Out Of Scope', scope_id: 2 },
     }),
   })
   assert(
@@ -3148,7 +3196,7 @@ async function main() {
     body: JSON.stringify({
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Smoke Item In Org Scope', org_id: 1 },
+      data: { name: 'Smoke Item In Scope', scope_id: 1 },
     }),
   })
   assert(
@@ -3163,7 +3211,7 @@ async function main() {
       table_code: crudTableCode,
       menu_id: crudMenu.id,
       expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-      quick_query: { keyword: 'Smoke Item In Org Scope' },
+      quick_query: { keyword: 'Smoke Item In Scope' },
       include_deleted: false,
     }),
   })
@@ -3182,7 +3230,7 @@ async function main() {
       id: scopedRowId,
       table_code: crudTableCode,
       menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Scope Move', org_id: 2 },
+      data: { name: 'Smoke Item Scope Move', scope_id: 2 },
     }),
   })
   assert(

@@ -21,15 +21,17 @@ import (
 )
 
 type TableController struct {
-	sysTableService *service.SysTableService
-	sysMenuService  *service.SysMenuService
-	translators     map[string]ut.Translator
+	sysTableService       *service.SysTableService
+	sysMenuService        *service.SysMenuService
+	dataPermissionService *service.DataPermissionService
+	translators           map[string]ut.Translator
 }
 
-func NewTableController(sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
+func NewTableController(sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *TableController {
 	return &TableController{
 		sysTableService,
 		sysMenuService,
+		dataPermissionService,
 		translators,
 	}
 }
@@ -96,6 +98,15 @@ func (t *TableController) QueryTable(ctx *gin.Context) {
 	translator := t.translators["zh"]
 	err := utils.ValidatorBody[request.Basic](ctx, &data, translator)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := t.sysTableService.GetTableByTableCode(data.TableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, t.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

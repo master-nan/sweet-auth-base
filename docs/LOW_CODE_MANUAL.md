@@ -18,9 +18,9 @@
 | 场景 | 配置位置 | 作用 |
 | --- | --- | --- |
 | 普通低代码页面字段 | `sys_table_field` | 决定列表、查询、新增、编辑、详情如何渲染 |
-| 字段关联其他表 | `sys_table_field.linkage_config` | 例如用户表选择角色、订单选择客户 |
+| 字段关联其他表 | `sys_table_field.linkage_config` | 例如用户表选择角色、事项选择客户 |
 | 字段使用固定字典 | `sys_table_field.dict_code` | 例如状态、类型、等级 |
-| 按钮点击后弹参数表单 | `sys_menu_button.params_schema` | 例如调度、审核、修改承运商这类自定义动作 |
+| 按钮点击后弹参数表单 | `sys_menu_button.params_schema` | 例如标记完成、审核、修改业务范围这类自定义动作 |
 | 按钮本身做什么 | `sys_menu_button.event_action` | 前端按动作执行内置逻辑，例如 `detail`、`update`、`delete`、`custom` |
 
 普通新增/编辑页面的字段联动写在字段元数据里；按钮点击后弹出的参数表单写在按钮的 `params_schema` 里。
@@ -44,7 +44,7 @@
 
 ## 2. 字段关联表下拉
 
-适用场景：字段存的是另一张表的 ID，但页面上要显示可读文本。例如 `vehicle_id` 存车辆 ID，表单里显示车牌号。
+适用场景：字段存的是另一张表的 ID，但页面上要显示可读文本。例如 `project_id` 存项目 ID，表单里显示项目名称。
 
 ### 2.1 写在字段 `linkage_config`
 
@@ -53,8 +53,8 @@
   "linkage": {
     "enabled": true,
     "mode": "relation",
-    "tableCode": "base_vehicle",
-    "labelKey": "plate_no",
+    "tableCode": "demo_project",
+    "labelKey": "project_name",
     "valueKey": "id",
     "pageSize": 50
   }
@@ -66,7 +66,7 @@
 | `enabled` | 是否启用联动 |
 | `mode` | `relation` 表示普通关联下拉 |
 | `tableCode` | 关联表编码，优先用表编码，不建议写死表 ID |
-| `labelKey` | 下拉显示字段，例如车牌号 `plate_no` |
+| `labelKey` | 下拉显示字段，例如项目名称 `project_name` |
 | `valueKey` | 实际保存字段，一般是 `id` |
 | `pageSize` | 每页加载多少条，建议 50，最大不要超过 200 |
 
@@ -78,13 +78,13 @@
 {
   "fields": [
     {
-      "field_code": "vehicle_id",
-      "field_name": "车辆",
+      "field_code": "project_id",
+      "field_name": "项目",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_vehicle",
-        "label_field": "plate_no",
+        "table_code": "demo_project",
+        "label_field": "project_name",
         "value_field": "id",
         "page_size": 50
       }
@@ -121,45 +121,45 @@
 
 也就是说：左边是要查的目标表字段，右边是当前表单里取值的字段。
 
-### 4.1 车辆按承运商筛选
+### 4.1 项目按业务范围筛选
 
-当前表单有 `carrier_id`，车辆表也有 `carrier_id`：
+当前表单有 `scope_id`，项目表也有 `scope_id`：
 
 ```json
 {
-  "field_code": "vehicle_id",
-  "field_name": "车辆",
+  "field_code": "project_id",
+  "field_name": "项目",
   "input_type": "select",
   "required": true,
   "relation": {
-    "table_code": "base_vehicle",
-    "label_field": "plate_no",
+    "table_code": "demo_project",
+    "label_field": "project_name",
     "value_field": "id",
     "page_size": 50,
     "filter_mapping": {
-      "carrier_id": "carrier_id"
+      "scope_id": "scope_id"
     }
   }
 }
 ```
 
-当表单里 `carrier_id = 1001` 时，车辆下拉查询会附加：
+当表单里 `scope_id = 1001` 时，项目下拉查询会附加：
 
 ```json
 {
   "filters": {
-    "carrier_id": 1001
+    "scope_id": 1001
   }
 }
 ```
 
 ### 4.2 字段名不一样的情况
 
-当前表单字段叫 `selected_carrier`，车辆表字段叫 `carrier_id`：
+当前表单字段叫 `selected_scope`，项目表字段叫 `scope_id`：
 
 ```json
 "filter_mapping": {
-  "carrier_id": "selected_carrier"
+  "scope_id": "selected_scope"
 }
 ```
 
@@ -171,7 +171,7 @@
 | --- | --- | --- |
 | 固定少量选项 | `options` | 只服务当前按钮参数，例如普通/加急 |
 | 系统字典 | `dict_code` | 多个页面共用枚举，例如状态、类型 |
-| 关联表 | `relation` / `linkage_config` | 数据来自业务表，例如车辆、客户、员工 |
+| 关联表 | `relation` / `linkage_config` | 数据来自业务表，例如项目、客户、员工 |
 | 树形数据 | `cascader` / `mode=cascader` | 菜单、组织、区域、分类 |
 
 ### 5.1 静态选项
@@ -220,7 +220,7 @@
 
 ## 6. 按钮参数 Schema 完整例子
 
-例如“调度”按钮需要填写处理意见、优先级、是否通知、车辆：
+例如“标记完成”按钮需要填写处理意见、优先级、是否通知、项目：
 
 ```json
 {
@@ -251,17 +251,17 @@
       "default_value": true
     },
     {
-      "field_code": "vehicle_id",
-      "field_name": "车辆",
+      "field_code": "project_id",
+      "field_name": "项目",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_vehicle",
-        "label_field": "plate_no",
+        "table_code": "demo_project",
+        "label_field": "project_name",
         "value_field": "id",
         "page_size": 50,
         "filter_mapping": {
-          "carrier_id": "carrier_id"
+          "scope_id": "scope_id"
         }
       }
     }
@@ -350,12 +350,12 @@ POST /admin/generalization/query/code/{tableCode}
 | `navigate` | 任意位置 | 跳转到 `api_path` 配置的前端路由 |
 | `custom` | 任意位置 | 调用 `api_path` 配置的后端接口 |
 
-业务按钮建议使用 `custom`，例如调度、审核、驳回、修改承运商。自定义按钮一般需要同时配置：
+业务按钮建议使用 `custom`，例如标记完成、审核、驳回、修改业务范围。自定义按钮一般需要同时配置：
 
 | 字段 | 是否需要 | 说明 |
 | --- | --- | --- |
 | `event_action` | 必填 | 固定填 `custom` |
-| `api_path` | 必填 | 后端业务接口，例如 `/admin/tms/order/dispatch` |
+| `api_path` | 必填 | 后端业务接口，例如 `/admin/demo/ticket/mark-done` |
 | `http_method` | 必填 | `POST`、`PUT`、`DELETE`、`GET` |
 | `params_schema` | 按需 | 点击按钮后需要补充参数时填写 |
 | `confirm_text` | 按需 | 执行前二次确认 |
@@ -381,7 +381,7 @@ POST /admin/generalization/query/code/{tableCode}
     "remark": "处理意见",
     "priority": "normal",
     "notify": true,
-    "vehicle_id": 2001
+    "project_id": 2001
   }
 }
 ```
@@ -502,44 +502,44 @@ POST /admin/generalization/query/code/{tableCode}
 | `clearSelection` | 清空表格勾选 |
 | `closeDialog` | 关闭当前参数弹框 |
 
-如果后续有 TMS 场景，例如“调度成功后刷新轨迹”、“审核通过后跳转详情”，建议新增受控钩子，例如 `refreshTrack`、`openDetail`，不要直接在数据库里写 JS。
+如果后续有特殊业务场景，例如“标记完成后刷新看板”、“审核通过后跳转详情”，建议新增受控钩子，例如 `refreshBoard`、`openDetail`，不要直接在数据库里写 JS。
 
-## 15. 调度按钮完整例子
+## 15. 标记完成按钮完整例子
 
-场景：先选承运商，再按承运商筛选车辆，填写处理意见后提交调度。
+场景：先选业务范围，再按业务范围筛选项目，填写处理意见后提交标记完成。
 
-承运商字段先从 `base_carrier` 表选择：
+业务范围字段先从 `demo_scope` 表选择：
 
 ```json
 {
-  "field_code": "carrier_id",
-  "field_name": "承运商",
+  "field_code": "scope_id",
+  "field_name": "业务范围",
   "input_type": "select",
   "required": true,
   "relation": {
-    "table_code": "base_carrier",
-    "label_field": "carrier_name",
+    "table_code": "demo_scope",
+    "label_field": "scope_name",
     "value_field": "id",
     "page_size": 50
   }
 }
 ```
 
-车辆字段依赖 `carrier_id`：
+项目字段依赖 `scope_id`：
 
 ```json
 {
-  "field_code": "vehicle_id",
-  "field_name": "车辆",
+  "field_code": "project_id",
+  "field_name": "项目",
   "input_type": "select",
   "required": true,
   "relation": {
-    "table_code": "base_vehicle",
-    "label_field": "plate_no",
+    "table_code": "demo_project",
+    "label_field": "project_name",
     "value_field": "id",
     "page_size": 50,
     "filter_mapping": {
-      "carrier_id": "carrier_id"
+      "scope_id": "scope_id"
     }
   }
 }
@@ -549,11 +549,11 @@ POST /admin/generalization/query/code/{tableCode}
 
 | 字段 | 值 |
 | --- | --- |
-| 按钮名称 | 调度 |
-| 按钮编码 | `tms_order_dispatch` |
+| 按钮名称 | 标记完成 |
+| 按钮编码 | `demo_ticket_mark_done` |
 | 按钮位置 | 行按钮或详情顶部 |
 | 事件动作 | `custom` |
-| 接口路径 | `/admin/tms/order/dispatch` |
+| 接口路径 | `/admin/demo/ticket/mark-done` |
 | 请求方法 | `POST` |
 | 前置钩子 | `["requireRow"]` |
 | 后置钩子 | `["refresh"]` |
@@ -564,29 +564,29 @@ POST /admin/generalization/query/code/{tableCode}
 {
   "fields": [
     {
-      "field_code": "carrier_id",
-      "field_name": "承运商",
+      "field_code": "scope_id",
+      "field_name": "业务范围",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_carrier",
-        "label_field": "carrier_name",
+        "table_code": "demo_scope",
+        "label_field": "scope_name",
         "value_field": "id",
         "page_size": 50
       }
     },
     {
-      "field_code": "vehicle_id",
-      "field_name": "车辆",
+      "field_code": "project_id",
+      "field_name": "项目",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_vehicle",
-        "label_field": "plate_no",
+        "table_code": "demo_project",
+        "label_field": "project_name",
         "value_field": "id",
         "page_size": 50,
         "filter_mapping": {
-          "carrier_id": "carrier_id"
+          "scope_id": "scope_id"
         }
       }
     },
@@ -608,7 +608,7 @@ POST /admin/generalization/query/code/{tableCode}
 }
 ```
 
-禁用条件示例：已完成或已取消的订单不能调度。
+禁用条件示例：已完成或已取消的事项不能标记完成。
 
 ```json
 {
@@ -629,7 +629,7 @@ POST /admin/generalization/query/code/{tableCode}
 | 删除菜单 | 菜单不可访问；如果是低代码表，数据管理里的发布状态应以后端菜单状态为准 |
 | 刷新菜单缓存 | 菜单、按钮或权限变更后，让前端重新拿到最新菜单 |
 
-发布时父级菜单应该选择真实业务归属。例如文件演示属于开发管理，就发布到开发管理下；如果以后是 TMS 订单，就发布到运输管理或订单管理下。
+发布时父级菜单应该选择真实业务归属。例如文件演示属于开发管理，就发布到开发管理下；如果以后是 业务示例 事项，就发布到示例中心或事项管理下。
 
 ### 16.1 哪些页面不应该发布成低代码
 
@@ -641,7 +641,7 @@ POST /admin/generalization/query/code/{tableCode}
 | 开发工具页 | 数据管理、字典管理 | 本身负责维护低代码元数据 |
 | 复杂工作台 | 仪表盘、权限分配弹框、表结构工作台 | 需要定制布局或组合多个接口 |
 
-低代码更适合业务数据表，例如客户档案、车辆档案、订单、费用规则、公告、附件演示等。
+低代码更适合业务数据表，例如客户档案、项目档案、事项、费用规则、公告、附件演示等。
 
 ### 16.2 发布边界怎么判断
 
@@ -672,7 +672,7 @@ POST /admin/generalization/query/code/{tableCode}
 
 | 字段 | 作用 | 建议 |
 | --- | --- | --- |
-| `field_name` | 页面显示名称 | 用中文业务名，例如“车辆”“处理意见” |
+| `field_name` | 页面显示名称 | 用中文业务名，例如“项目”“处理意见” |
 | `field_code` | 字段编码 | 对应数据库字段名 |
 | `field_type` | 数据类型 | 用字段类型字典，例如字符串、文本、布尔、大数字 |
 | `input_type` | 输入控件 | 用输入类型字典，例如输入框、下拉选择、文件选择、富文本 |
@@ -826,12 +826,12 @@ POST /admin/generalization/query/code/{tableCode}
 
 ```json
 {
-  "field_code": "vehicle_id",
-  "field_name": "车辆",
+  "field_code": "project_id",
+  "field_name": "项目",
   "input_type": "select",
   "relation": {
-    "table_code": "base_vehicle",
-    "label_field": "plate_no",
+    "table_code": "demo_project",
+    "label_field": "project_name",
     "value_field": "id",
     "page_size": 50
   }
@@ -893,7 +893,7 @@ POST /admin/generalization/query/code/{tableCode}
 
 ### 19.2 自定义业务按钮怎么配
 
-例如“调度”“审核”“修改承运商”：
+例如“标记完成”“审核”“修改业务范围”：
 
 | 字段 | 值 |
 | --- | --- |
@@ -1044,35 +1044,35 @@ GET  /admin/generalization/detail/code/{tableCode}/{id}
 
 实际在数据库字段里保存时，`params_schema`、`before_hooks`、`after_hooks` 是字符串，需要填合法 JSON 文本。
 
-### 22.3 承运商和车辆联动
+### 22.3 业务范围和项目联动
 
 ```json
 {
   "fields": [
     {
-      "field_code": "carrier_id",
-      "field_name": "承运商",
+      "field_code": "scope_id",
+      "field_name": "业务范围",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_carrier",
-        "label_field": "carrier_name",
+        "table_code": "demo_scope",
+        "label_field": "scope_name",
         "value_field": "id",
         "page_size": 50
       }
     },
     {
-      "field_code": "vehicle_id",
-      "field_name": "车辆",
+      "field_code": "project_id",
+      "field_name": "项目",
       "input_type": "select",
       "required": true,
       "relation": {
-        "table_code": "base_vehicle",
-        "label_field": "plate_no",
+        "table_code": "demo_project",
+        "label_field": "project_name",
         "value_field": "id",
         "page_size": 50,
         "filter_mapping": {
-          "carrier_id": "carrier_id"
+          "scope_id": "scope_id"
         }
       }
     }
@@ -1080,7 +1080,7 @@ GET  /admin/generalization/detail/code/{tableCode}/{id}
 }
 ```
 
-用户先在参数弹框里选择承运商，车辆下拉会带着承运商 ID 查询车辆表。
+用户先在参数弹框里选择业务范围，项目下拉会带着业务范围 ID 查询项目表。
 
 ## 23. 配置入口和操作验收
 
@@ -1106,7 +1106,7 @@ GET  /admin/generalization/detail/code/{tableCode}/{id}
 | 类型 | 典型动作 | 说明 |
 | --- | --- | --- |
 | 页面能力按钮 | `query`、`create`、`update`、`delete`、`detail`、`refresh` | 由通用页面识别并执行，例如打开新增弹框、打开详情页 |
-| 业务动作按钮 | `custom` | 调后端业务接口，例如调度、审核、修改承运商、调整地点 |
+| 业务动作按钮 | `custom` | 调后端业务接口，例如标记完成、审核、修改业务范围、调整地点 |
 
 配置按钮时优先看这几个字段：
 

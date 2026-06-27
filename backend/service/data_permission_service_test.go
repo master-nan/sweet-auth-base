@@ -102,6 +102,73 @@ func TestResolveDataScopeUserDenyOverrideWins(t *testing.T) {
 	}
 }
 
+func TestResolveDataScopeForTableActionUsesUniqueBoundMenu(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysMenu{
+		Basic:     model.Basic{Id: 10, State: true},
+		Name:      "demo_order",
+		PageType:  enum.MenuPageTypeFixed,
+		TableCode: "demo_order",
+	})
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "specified",
+		ScopeValues:   `["8"]`,
+	})
+
+	scope, err := service.ResolveDataScopeForTableAction(model.SysUser{Basic: model.Basic{Id: 7}}, 0, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve data scope by table action: %v", err)
+	}
+	if scope == nil || scope.AllowAll || scope.DenyAll || len(scope.Conditions) != 1 {
+		t.Fatalf("expected scoped result from unique bound menu, got %#v", scope)
+	}
+	if got := scope.Conditions[0].Values; !reflect.DeepEqual(got, []string{"8"}) {
+		t.Fatalf("unexpected scope values: %#v", got)
+	}
+}
+
+func TestResolveDataScopeForTableActionDeniesAmbiguousBoundMenus(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysDataScopeBinding{
+		Basic:         model.Basic{Id: 11, State: true},
+		MenuId:        11,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		FieldCode:     "tenant_id",
+		MatchType:     "in",
+		Required:      true,
+		Actions:       `["query"]`,
+	})
+	mustCreate(t, service.db, &model.SysMenu{
+		Basic:     model.Basic{Id: 10, State: true},
+		Name:      "demo_order_a",
+		PageType:  enum.MenuPageTypeFixed,
+		TableCode: "demo_order",
+	})
+	mustCreate(t, service.db, &model.SysMenu{
+		Basic:     model.Basic{Id: 11, State: true},
+		Name:      "demo_order_b",
+		PageType:  enum.MenuPageTypeFixed,
+		TableCode: "demo_order",
+	})
+
+	scope, err := service.ResolveDataScopeForTableAction(model.SysUser{Basic: model.Basic{Id: 7}}, 0, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve data scope by table action: %v", err)
+	}
+	if scope == nil || !scope.DenyAll {
+		t.Fatalf("expected deny all for ambiguous bound menus, got %#v", scope)
+	}
+}
+
 func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, model.SysTable) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -114,6 +181,7 @@ func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, mode
 		&model.SysRoleDataScope{},
 		&model.SysUserDataScopeOverride{},
 		&model.SysUserRole{},
+		&model.SysMenu{},
 	); err != nil {
 		t.Fatalf("migrate data permission models: %v", err)
 	}

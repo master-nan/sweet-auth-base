@@ -906,11 +906,10 @@ func buildColumnSQLTypeFromField(field model.SysTableField) string {
 // typeAcceptsLength 判断字段类型是否接受长度参数
 func typeAcceptsLength(ft enum.SysTableFieldType) bool {
 	switch ft {
-	case enum.BooleanFieldType, enum.TextFieldType, enum.JsonFieldType,
-		enum.DateFieldType, enum.DatetimeFieldType, enum.TimeFieldType:
-		return false
-	default:
+	case enum.VarcharFieldType, enum.FloatFieldType:
 		return true
+	default:
+		return false
 	}
 }
 
@@ -1964,7 +1963,7 @@ func lowCodeMenuName(tableCode string) string {
 // ensureDefaultCrudButtons 补齐低代码通用页面的默认按钮和接口权限。
 // 发布低代码菜单时，页面至少需要查询、新增、详情、编辑、删除、刷新以及文件上传/预览相关接口权限。
 // 这个方法只负责“按模板保证存在并更新基础属性”，不负责判断业务按钮应该有哪些；
-// TMS 调度、修改承运商、调整运输地点这类业务动作应该由菜单按钮配置维护，不应该继续塞进默认模板。
+// 标记完成、审核、调整状态这类业务动作应该由菜单按钮配置维护，不应该继续塞进默认模板。
 // 所有数据库写入都委托给 SysMenuButtonRepository，service 层只做模板编排和事务流程控制。
 func (s *SysTableService) ensureDefaultCrudButtons(tx *gorm.DB, tableCode string, menuID int) ([]int, error) {
 	templates, err := s.sysMenuButtonTplRepo.FindEnabledByScene(lowCodeCrudButtonTemplateScene)

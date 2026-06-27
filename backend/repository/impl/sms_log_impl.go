@@ -30,6 +30,7 @@ func (s *SmsLogImpl) GetSmsLogList(basic *request.Basic) (response.ListResult[mo
 	var repo response.ListResult[model.SmsLog]
 	var table model.SysTable
 	query := util.ExecuteQuery(s.db, basic, table)
+	query = util.ApplyDataScope(query, basic.DataScope, table)
 	var smsLogList []model.SmsLog
 	var total int64 = 0
 	err := query.Find(&smsLogList).Limit(-1).Offset(-1).Count(&total).Error

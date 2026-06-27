@@ -25,12 +25,13 @@ import (
 )
 
 type UserController struct {
-	sysUserService      *service.SysUserService
-	sysConfigureService *service.SysConfigureService
-	translators         map[string]ut.Translator
-	serverConfig        *config.Server
-	sysTableService     *service.SysTableService
-	loginAttemptCache   *cache.LoginAttemptCache
+	sysUserService        *service.SysUserService
+	sysConfigureService   *service.SysConfigureService
+	translators           map[string]ut.Translator
+	serverConfig          *config.Server
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	loginAttemptCache     *cache.LoginAttemptCache
 }
 
 func NewUserController(
@@ -39,6 +40,7 @@ func NewUserController(
 	translators map[string]ut.Translator,
 	serverConfig *config.Server,
 	sysTableService *service.SysTableService,
+	dataPermissionService *service.DataPermissionService,
 	loginAttemptCache *cache.LoginAttemptCache,
 ) *UserController {
 	return &UserController{
@@ -47,6 +49,7 @@ func NewUserController(
 		translators,
 		serverConfig,
 		sysTableService,
+		dataPermissionService,
 		loginAttemptCache,
 	}
 }
@@ -63,6 +66,10 @@ func (u *UserController) QuerySysUser(ctx *gin.Context) {
 	}
 	table, err := u.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, u.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

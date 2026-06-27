@@ -150,7 +150,7 @@ func (s *DataPermissionService) SaveMenuBindings(ctx *gin.Context, menuId int, r
 	if req.MenuId > 0 && req.MenuId != menuId {
 		return myerrors.ErrParamInvalid
 	}
-	menu, table, err := s.lowCodeMenuTable(menuId)
+	menu, table, err := s.boundMenuTable(menuId)
 	if err != nil {
 		return err
 	}
@@ -416,6 +416,26 @@ func (s *DataPermissionService) ResolveDataScope(user model.SysUser, menuId int,
 	return &request.DataScope{Conditions: conditions}, nil
 }
 
+// ResolveDataScopeForTableAction resolves data scope for fixed/list pages that may not
+// post menu_id. If no active binding exists, data permission is not configured for
+// the table/action and the query stays unrestricted.
+func (s *DataPermissionService) ResolveDataScopeForTableAction(user model.SysUser, menuId int, table model.SysTable, action enum.SysMenuButtonEventAction) (*request.DataScope, error) {
+	if menuId > 0 {
+		return s.ResolveDataScope(user, menuId, table, action)
+	}
+	menuIds, err := s.activeBoundMenuIdsFor(table.TableCode, action)
+	if err != nil {
+		return nil, err
+	}
+	if len(menuIds) == 0 {
+		return &request.DataScope{AllowAll: true}, nil
+	}
+	if len(menuIds) > 1 {
+		return &request.DataScope{DenyAll: true}, nil
+	}
+	return s.ResolveDataScope(user, menuIds[0], table, action)
+}
+
 func (s *DataPermissionService) dimensionFromCreateReq(req request.DataPermissionDimensionCreateReq) (model.SysDataDimension, error) {
 	code, err := normalizeDataPermissionCode("维度编码", req.Code)
 	if err != nil {
@@ -574,7 +594,7 @@ func (s *DataPermissionService) userOverrideFromReq(userId int, req request.User
 	}, nil
 }
 
-func (s *DataPermissionService) lowCodeMenuTable(menuId int) (model.SysMenu, model.SysTable, error) {
+func (s *DataPermissionService) boundMenuTable(menuId int) (model.SysMenu, model.SysTable, error) {
 	var menu model.SysMenu
 	if err := s.db.First(&menu, menuId).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -582,8 +602,8 @@ func (s *DataPermissionService) lowCodeMenuTable(menuId int) (model.SysMenu, mod
 		}
 		return model.SysMenu{}, model.SysTable{}, err
 	}
-	if menu.PageType != enum.MenuPageTypeLowCode || strings.TrimSpace(menu.TableCode) == "" || menu.IsHidden || !menu.State {
-		return model.SysMenu{}, model.SysTable{}, myerrors.NewBadRequestError("只能为已发布的低代码菜单配置数据权限")
+	if strings.TrimSpace(menu.TableCode) == "" || menu.IsHidden || !menu.State {
+		return model.SysMenu{}, model.SysTable{}, myerrors.NewBadRequestError("只能为已绑定数据表的可用菜单配置数据权限")
 	}
 	var table model.SysTable
 	err := s.db.Preload("TableFields").Where("table_code = ?", menu.TableCode).First(&table).Error
@@ -591,6 +611,37 @@ func (s *DataPermissionService) lowCodeMenuTable(menuId int) (model.SysMenu, mod
 		return model.SysMenu{}, model.SysTable{}, myerrors.NewBadRequestError("菜单绑定的数据表不存在")
 	}
 	return menu, table, err
+}
+
+func (s *DataPermissionService) activeBoundMenuIdsFor(tableCode string, action enum.SysMenuButtonEventAction) ([]int, error) {
+	tableCode = strings.TrimSpace(tableCode)
+	if tableCode == "" {
+		return nil, nil
+	}
+	var bindings []model.SysDataScopeBinding
+	if err := s.db.Preload("Menu").
+		Where("table_code = ? AND state = ?", tableCode, true).
+		Order("menu_id ASC, id ASC").
+		Find(&bindings).Error; err != nil {
+		return nil, err
+	}
+	menuIDSet := map[int]struct{}{}
+	menuIDs := make([]int, 0)
+	for _, binding := range bindings {
+		if binding.Menu.Id == 0 || binding.Menu.IsHidden || !binding.Menu.State {
+			continue
+		}
+		binding.ActionList = decodeStringList(binding.Actions)
+		if !actionApplies(binding.ActionList, action) {
+			continue
+		}
+		if _, exists := menuIDSet[binding.MenuId]; exists {
+			continue
+		}
+		menuIDSet[binding.MenuId] = struct{}{}
+		menuIDs = append(menuIDs, binding.MenuId)
+	}
+	return menuIDs, nil
 }
 
 func (s *DataPermissionService) requireActiveDimension(code string) (model.SysDataDimension, error) {

@@ -1,24 +1,22 @@
-# 通用数据权限设计草案
+# 通用数据权限设计与实现说明
 
 ## 背景
 
-当前数据权限更接近“公司权限”场景，适合现有业务，但如果平台要作为通用低代码后台使用，权限维度不能写死为公司。不同项目可能按公司、组织、仓库、项目、租户、负责人、创建人或自定义业务字段隔离数据。
-
-这份文档只讨论设计方向，暂不直接改表和实现。
+底座的数据权限不能写死为公司、组织或某个行业对象。不同项目可能按租户、项目、范围、课程、负责人、创建人或自定义业务字段隔离数据。
 
 ## 结论
 
-如果 `sweet-auth-base` 要作为后续项目底座，推荐直接按“第二版通用数据权限模型”设计，不再继续把公司、部门、HRDB 这类业务实体写进底座。
+`sweet-auth-base` 已按“通用数据权限模型”落地，不再把公司、部门、HRDB 这类业务实体写进底座。
 
 第二版的核心是：
 
-1. 权限维度可配置，例如租户、公司、部门、项目、课程、仓库、承运商、创建人。
+1. 权限维度可配置，例如租户、项目、课程、业务范围、负责人、创建人。
 2. 菜单或低代码表声明自己受哪个维度控制，以及维度落在哪个字段上。
 3. 角色或用户只保存结构化的数据范围，不保存 SQL。
-4. 列表、详情、编辑、删除、导出、统计和文件访问都走统一的数据权限解析。
+4. 低代码列表、详情、新增、编辑、删除都走统一的数据权限解析；固定系统页列表也支持同一套列表过滤。
 5. 控制器不自己拼 `tenant_id`、`owner_id` 之类的条件。
 
-这套模型既能做 TMS，也能做在线学习平台，还能做其他 SaaS 或企业中台。区别只在配置的数据权限维度和绑定字段不同，底座代码不需要知道具体业务是什么。
+这套模型能做 SaaS、企业中台、在线学习、CRM 或其他业务系统。区别只在配置的数据权限维度和绑定字段不同，底座代码不需要知道具体业务是什么。
 
 ## 当前状态
 
@@ -29,10 +27,12 @@
 - 角色通过 `sys_role_data_scope` 保存常规范围策略。
 - 用户通过 `sys_user_data_scope_override` 保存临时覆盖或收窄/扩展。
 - 低代码列表、详情、创建、更新、删除会复用解析后的结构化范围做行级检查。
+- 固定系统页只要菜单绑定了数据表，也可以配置数据权限；列表查询会应用同一套结构化范围。
+- 角色权限保存时可以同时保存菜单、按钮和角色数据权限，避免权限保存到一半的中间态。
 
 当前树形范围先按指定值保存，后续可以在维度来源表稳定后扩展“包含下级”的展开策略。底座仍不应内置公司、部门或其他具体业务实体。
 
-现阶段不要在文件控制器或某个业务控制器里再临时写一套数据归属判断来替代通用数据权限。后续真正落地时，应统一在 service/repository 之前解析数据范围，再让列表、详情、导出、批量操作、文件预览和下载复用同一套规则。
+不要在文件控制器或某个业务控制器里再临时写一套数据归属判断来替代通用数据权限。后续新增导出、批量操作、文件预览和下载的业务记录上下文时，也应复用同一套规则。
 
 文件访问权限当前只负责判断文件本身是否存在、是否允许预览或下载；业务记录归属，例如某条订单、某篇文章、某个客户是否属于当前用户，应交给未来的数据权限层统一处理。
 
@@ -44,7 +44,7 @@
 用户 -> 租户列表 -> 查询时拼 tenant_id IN (...)
 ```
 
-这种做法适合单个业务系统，但不适合底座。因为在线学习平台可能按 `tenant_id`、`course_id` 或 `school_id` 控制，TMS 可能按 `carrier_id`、`warehouse_id` 或 `project_id` 控制，CRM 可能按 `owner_id` 或 `region_id` 控制。
+这种做法适合单个业务系统，但不适合底座。因为在线学习平台可能按 `tenant_id`、`course_id` 或 `school_id` 控制，CRM 可能按 `owner_id` 或 `region_id` 控制，通用项目管理也可能按 `scope_id` 或 `project_id` 控制。
 
 第二版改成配置化维度：
 
@@ -56,8 +56,8 @@
 
 | 项目场景 | 维度 | 菜单或表字段 | 范围值 |
 | --- | --- | --- | --- |
-| TMS | 承运商 | `carrier_id` | 1001、1002 |
-| TMS | 仓库 | `warehouse_id` | 10、11 |
+| 示例中心 | 业务范围 | `scope_id` | 1、2 |
+| 示例中心 | 项目 | `project_id` | 1001、1002 |
 | 在线学习 | 学校 | `school_id` | 2001 |
 | 在线学习 | 课程 | `course_id` | 3001、3002 |
 | CRM | 负责人 | `owner_id` | 当前用户 ID |
@@ -81,7 +81,7 @@
 
 示例字段：
 
-- `code`：维度编码，例如 `company`、`department`、`project`、`warehouse`、`owner`。
+- `code`：维度编码，例如 `tenant`、`project`、`demo_scope`、`owner`。
 - `name`：维度名称。
 - `value_type`：值类型，例如 `number`、`string`、`tree`。
 - `source_type`：取值来源，例如字典、低代码表、组织树、固定枚举。
@@ -94,12 +94,12 @@
 
 ```json
 {
-  "code": "carrier",
-  "name": "承运商",
+  "code": "demo_scope",
+  "name": "业务范围",
   "value_type": "number",
   "source_type": "table",
-  "source_code": "base_carrier",
-  "label_field": "carrier_name",
+  "source_code": "demo_scope",
+  "label_field": "scope_name",
   "value_field": "id",
   "state": true
 }
@@ -113,7 +113,7 @@
 
 - 用户管理绑定 `department`，字段是 `dept_id`。
 - 订单管理绑定 `tenant`，字段是 `tenant_id`。
-- 运输任务绑定 `carrier`，字段是 `carrier_id`。
+- 示例事项绑定 `demo_scope`，字段是 `scope_id`。
 
 建议字段：
 
@@ -128,18 +128,18 @@
 ```json
 {
   "menu_id": 1201,
-  "table_code": "tms_order",
-  "dimension_code": "carrier",
-  "field_code": "carrier_id",
+  "table_code": "demo_ticket",
+  "dimension_code": "demo_scope",
+  "field_code": "scope_id",
   "match_type": "in",
   "required": true
 }
 ```
 
-如果一张表需要多维度控制，例如订单既要限制承运商，又要限制仓库，可以绑定多条规则。运行时默认取交集：
+如果一张表需要多维度控制，例如事项既要限制业务范围，又要限制项目，可以绑定多条规则。运行时默认取交集：
 
 ```text
-carrier_id IN (...) AND warehouse_id IN (...)
+scope_id IN (...) AND project_id IN (...)
 ```
 
 ### 3. 角色授权
@@ -169,7 +169,7 @@ carrier_id IN (...) AND warehouse_id IN (...)
 {
   "role_id": 8,
   "menu_id": 1201,
-  "dimension_code": "carrier",
+  "dimension_code": "demo_scope",
   "strategy": "specified",
   "values": [1001, 1002]
 }
@@ -291,15 +291,15 @@ HTTP 请求
 
 ## 配置示例
 
-### TMS：订单只看指定承运商
+### 通用 Demo：事项只看指定业务范围
 
-1. 建维度 `carrier`，来源表 `base_carrier`。
-2. 订单菜单绑定 `carrier` 维度，字段为 `carrier_id`。
-3. 角色“承运商客服”授权 `carrier` 范围为 `[1001, 1002]`。
-4. 查询订单时自动追加：
+1. 建维度 `demo_scope`，来源表 `demo_scope`。
+2. 事项菜单绑定 `demo_scope` 维度，字段为 `scope_id`。
+3. 角色“范围 A 用户”授权 `demo_scope` 范围为 `[1]`。
+4. 查询事项时自动追加：
 
 ```text
-tms_order.carrier_id IN (1001, 1002)
+demo_ticket.scope_id IN (1)
 ```
 
 ### 在线学习：老师只看自己课程

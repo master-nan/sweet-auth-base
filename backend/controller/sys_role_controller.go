@@ -18,15 +18,17 @@ import (
 )
 
 type RoleController struct {
-	sysRoleService  *service.SysRoleService
-	sysTableService *service.SysTableService
-	translators     map[string]ut.Translator
+	sysRoleService        *service.SysRoleService
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	translators           map[string]ut.Translator
 }
 
-func NewRoleController(sysRoleService *service.SysRoleService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *RoleController {
+func NewRoleController(sysRoleService *service.SysRoleService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *RoleController {
 	return &RoleController{
 		sysRoleService,
 		sysTableService,
+		dataPermissionService,
 		translators,
 	}
 }
@@ -52,6 +54,10 @@ func (r *RoleController) QueryRole(ctx *gin.Context) {
 	}
 	table, err := r.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, r.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

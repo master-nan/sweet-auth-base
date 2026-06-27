@@ -6,6 +6,8 @@ Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字�
 
 低代码发布、字段配置、按钮动作、参数 Schema、关联下拉和权限排查见 [docs/LOW_CODE_MANUAL.md](docs/LOW_CODE_MANUAL.md)。
 
+通用数据权限模型和可手测 Demo 见 [docs/data-permission-design.md](docs/data-permission-design.md) 与 [docs/DATA_PERMISSION_DEMO.md](docs/DATA_PERMISSION_DEMO.md)。
+
 ## 快速启动
 
 启动完整 Docker 本地环境：
@@ -105,5 +107,6 @@ make docker-up-external
 
 - [运行手册](docs/RUNBOOK.md)
 - [低代码配置手册](docs/LOW_CODE_MANUAL.md)
+- [通用数据权限 Demo](docs/DATA_PERMISSION_DEMO.md)
 - [字段类型说明](docs/field-type-guide.md)
 - [联动配置说明](docs/linkage_config.md)

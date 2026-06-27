@@ -112,19 +112,19 @@ relation 模式会按需加载：
 
 ### 示例 2：关联下拉联动过滤
 
-场景：`vehicle_id` 字段需要根据已选的 `carrier_id` 过滤，只显示当前承运商下的车辆。
+场景：`project_id` 字段需要根据已选的 `scope_id` 过滤，只显示当前业务范围下的项目。
 
 ```json
 {
   "linkage": {
     "enabled": true,
     "mode": "relation",
-    "tableCode": "base_vehicle",
-    "labelKey": "plate_no",
+    "tableCode": "demo_project",
+    "labelKey": "project_name",
     "valueKey": "id",
     "pageSize": 50,
     "filterMapping": {
-      "carrier_id": "carrier_id"
+      "scope_id": "scope_id"
     }
   }
 }
@@ -132,17 +132,17 @@ relation 模式会按需加载：
 
 **`filterMapping` 规则**：`{ "关联表字段": "当前表单字段" }`
 
-- 键 `"carrier_id"` → 关联表（车辆表）中的过滤字段
-- 值 `"carrier_id"` → 当前表单中的字段名，取其当前值
+- 键 `"scope_id"` → 关联表（项目表）中的过滤字段
+- 值 `"scope_id"` → 当前表单中的字段名，取其当前值
 
-当用户选择了 `carrier_id = 100` 后，查询车辆表时会自动附加 `carrier_id = 100` 的过滤条件。
+当用户选择了 `scope_id = 100` 后，查询项目表时会自动附加 `scope_id = 100` 的过滤条件。
 
 如果两个表字段同名，可以这样写：
 
 ```json
 {
   "filterMapping": {
-    "carrier_id": "carrier_id"
+    "scope_id": "scope_id"
   }
 }
 ```

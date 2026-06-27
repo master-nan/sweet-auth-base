@@ -27,21 +27,22 @@ func NewSysTableFieldRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysTableFiel
 }
 
 func (s *SysTableFieldRepositoryImpl) Create(tx *gorm.DB, entity interface{}) error {
+	tableName := tableNameForModel(tx, &model.SysTableField{})
 	switch fields := entity.(type) {
 	case *model.SysTableField:
-		return tx.Model(&model.SysTableField{}).Create(sysTableFieldCreateMap(tx, fields)).Error
+		return tx.Table(tableName).Create(sysTableFieldCreateMap(tx, fields)).Error
 	case *[]model.SysTableField:
 		rows := make([]map[string]interface{}, 0, len(*fields))
 		for i := range *fields {
 			rows = append(rows, sysTableFieldCreateMap(tx, &(*fields)[i]))
 		}
-		return tx.Model(&model.SysTableField{}).Create(rows).Error
+		return tx.Table(tableName).Create(rows).Error
 	case []model.SysTableField:
 		rows := make([]map[string]interface{}, 0, len(fields))
 		for i := range fields {
 			rows = append(rows, sysTableFieldCreateMap(tx, &fields[i]))
 		}
-		return tx.Model(&model.SysTableField{}).Create(rows).Error
+		return tx.Table(tableName).Create(rows).Error
 	default:
 		return tx.Model(&model.SysTableField{}).Create(entity).Error
 	}

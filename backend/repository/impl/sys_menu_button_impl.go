@@ -39,21 +39,22 @@ func (s *SysMenuButtonRepositoryImpl) Create(tx *gorm.DB, entity interface{}) er
 	if tx == nil {
 		tx = s.db
 	}
+	tableName := tableNameForModel(tx, &model.SysMenuButton{})
 	switch buttons := entity.(type) {
 	case *model.SysMenuButton:
-		return tx.Model(&model.SysMenuButton{}).Create(sysMenuButtonCreateMap(tx, buttons)).Error
+		return tx.Table(tableName).Create(sysMenuButtonCreateMap(tx, buttons)).Error
 	case *[]model.SysMenuButton:
 		rows := make([]map[string]interface{}, 0, len(*buttons))
 		for i := range *buttons {
 			rows = append(rows, sysMenuButtonCreateMap(tx, &(*buttons)[i]))
 		}
-		return tx.Model(&model.SysMenuButton{}).Create(rows).Error
+		return tx.Table(tableName).Create(rows).Error
 	case []model.SysMenuButton:
 		rows := make([]map[string]interface{}, 0, len(buttons))
 		for i := range buttons {
 			rows = append(rows, sysMenuButtonCreateMap(tx, &buttons[i]))
 		}
-		return tx.Model(&model.SysMenuButton{}).Create(rows).Error
+		return tx.Table(tableName).Create(rows).Error
 	default:
 		return tx.Model(&model.SysMenuButton{}).Create(entity).Error
 	}

@@ -13,12 +13,12 @@ func TestValidateDataScopeWriteValue(t *testing.T) {
 	table := model.SysTable{
 		TableCode: "smoke_table",
 		TableFields: []model.SysTableField{
-			{FieldCode: "org_id", FieldType: enum.IntFieldType},
+			{FieldCode: "scope_id", FieldType: enum.IntFieldType},
 			{FieldCode: "name", FieldType: enum.VarcharFieldType},
 		},
 	}
 	scope := &request.DataScope{Conditions: []request.DataScopeCondition{
-		{DimensionCode: "org", Field: "org_id", MatchType: "in", Values: []string{"1", "3"}},
+		{DimensionCode: "scope", Field: "scope_id", MatchType: "in", Values: []string{"1", "3"}},
 	}}
 
 	tests := []struct {
@@ -27,13 +27,13 @@ func TestValidateDataScopeWriteValue(t *testing.T) {
 		requireField bool
 		wantErr      bool
 	}{
-		{name: "allowed integer", data: map[string]interface{}{"org_id": 1}, requireField: true},
-		{name: "allowed string", data: map[string]interface{}{"org_id": "3"}, requireField: true},
+		{name: "allowed integer", data: map[string]interface{}{"scope_id": 1}, requireField: true},
+		{name: "allowed string", data: map[string]interface{}{"scope_id": "3"}, requireField: true},
 		{name: "missing optional field", data: map[string]interface{}{"name": "updated"}, requireField: false},
 		{name: "missing required field", data: map[string]interface{}{"name": "created"}, requireField: true, wantErr: true},
-		{name: "out of scope", data: map[string]interface{}{"org_id": 2}, requireField: false, wantErr: true},
-		{name: "invalid typed value", data: map[string]interface{}{"org_id": "abc"}, requireField: false, wantErr: true},
-		{name: "fractional numeric value", data: map[string]interface{}{"org_id": 1.2}, requireField: false, wantErr: true},
+		{name: "out of scope", data: map[string]interface{}{"scope_id": 2}, requireField: false, wantErr: true},
+		{name: "invalid typed value", data: map[string]interface{}{"scope_id": "abc"}, requireField: false, wantErr: true},
+		{name: "fractional numeric value", data: map[string]interface{}{"scope_id": 1.2}, requireField: false, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -58,7 +58,7 @@ func TestValidateDataScopeWriteValueRejectsMissingScopeField(t *testing.T) {
 		TableFields: []model.SysTableField{{FieldCode: "name", FieldType: enum.VarcharFieldType}},
 	}
 	scope := &request.DataScope{Conditions: []request.DataScopeCondition{
-		{DimensionCode: "org", Field: "org_id", MatchType: "in", Values: []string{"1"}},
+		{DimensionCode: "scope", Field: "scope_id", MatchType: "in", Values: []string{"1"}},
 	}}
 
 	if err := validateDataScopeWriteValues(table, scope, map[string]interface{}{"name": "updated"}, false); err != apperrors.ErrPermissionDenied {

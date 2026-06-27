@@ -5,7 +5,14 @@ import type { Menu } from 'src/api/services/sys-menu'
 export type DataPermissionValueType = 'string' | 'number'
 export type DataPermissionSourceType = 'none' | 'table'
 export type DataPermissionMatchType = 'in' | 'eq'
-export type DataPermissionAction = 'query' | 'detail' | 'create' | 'update' | 'delete'
+export type DataPermissionAction =
+  | 'query'
+  | 'detail'
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'export'
+  | 'batch_delete'
 export type DataPermissionStrategy = 'all' | 'none' | 'specified' | 'tree' | 'self'
 export type DataPermissionOverrideMode = 'replace' | 'union' | 'intersect' | 'deny'
 
@@ -113,6 +120,8 @@ export const dataPermissionActionOptions = [
   { label: '新增', value: 'create' },
   { label: '编辑', value: 'update' },
   { label: '删除', value: 'delete' },
+  { label: '导出', value: 'export' },
+  { label: '批量删除', value: 'batch_delete' },
 ]
 
 export const dataPermissionStrategyOptions = [

@@ -18,15 +18,17 @@ import (
 )
 
 type DictController struct {
-	sysDictService  *service.SysDictService
-	sysTableService *service.SysTableService
-	translators     map[string]ut.Translator
+	sysDictService        *service.SysDictService
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	translators           map[string]ut.Translator
 }
 
-func NewDictController(sysDictService *service.SysDictService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *DictController {
+func NewDictController(sysDictService *service.SysDictService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *DictController {
 	return &DictController{
 		sysDictService,
 		sysTableService,
+		dataPermissionService,
 		translators,
 	}
 }
@@ -100,6 +102,10 @@ func (t *DictController) QuerySysDict(ctx *gin.Context) {
 	}
 	table, err := t.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, t.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

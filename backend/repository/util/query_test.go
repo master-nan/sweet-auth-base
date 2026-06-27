@@ -33,6 +33,31 @@ func TestExecuteQueryRejectsUnknownFilterFields(t *testing.T) {
 	}
 }
 
+func TestGetSQLTypeUsesPostgresTypes(t *testing.T) {
+	cases := []struct {
+		name      string
+		fieldType enum.SysTableFieldType
+		length    int
+		decimal   int
+		want      string
+	}{
+		{name: "datetime", fieldType: enum.DatetimeFieldType, want: "timestamp"},
+		{name: "json", fieldType: enum.JsonFieldType, want: "jsonb"},
+		{name: "tinyint", fieldType: enum.TinyintFieldType, want: "smallint"},
+		{name: "int", fieldType: enum.IntFieldType, want: "integer"},
+		{name: "decimal", fieldType: enum.FloatFieldType, length: 12, decimal: 2, want: "numeric(12,2)"},
+		{name: "varchar default length", fieldType: enum.VarcharFieldType, want: "varchar(255)"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getSQLType(tt.fieldType, tt.length, tt.decimal); got != tt.want {
+				t.Fatalf("getSQLType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestExecuteQueryRejectsUnknownExpressionFields(t *testing.T) {
 	db := dryRunDB(t)
 	table := queryTestTable()

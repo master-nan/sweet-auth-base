@@ -18,15 +18,17 @@ import (
 )
 
 type ApplicationController struct {
-	applicationService *service.ApplicationService
-	sysTableService    *service.SysTableService
-	translators        map[string]ut.Translator
+	applicationService    *service.ApplicationService
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	translators           map[string]ut.Translator
 }
 
-func NewApplicationController(applicationService *service.ApplicationService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *ApplicationController {
+func NewApplicationController(applicationService *service.ApplicationService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *ApplicationController {
 	return &ApplicationController{
 		applicationService,
 		sysTableService,
+		dataPermissionService,
 		translators,
 	}
 }
@@ -82,6 +84,10 @@ func (t *ApplicationController) QueryApplication(ctx *gin.Context) {
 	}
 	table, err := t.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := injectQueryDataScope(ctx, t.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
