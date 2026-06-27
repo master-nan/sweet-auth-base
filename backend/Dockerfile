@@ -9,5 +9,5 @@ COPY bin/healthcheck /app/healthcheck
 COPY config-docker.yaml config-pro.yaml casbin_model.conf /app/
 
 ENV APP_ENV=docker
-EXPOSE 9005
+EXPOSE 9009
 CMD ["/app/container-entrypoint"]

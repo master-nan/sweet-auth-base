@@ -19,7 +19,7 @@ services:
   redis:
     image: redis:6.2.7
     ports:
-      - "${SWEET_ADMIN_REDIS_PORT:-16379}:6379"
+      - "${SWEET_ADMIN_REDIS_PORT:-16380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -35,11 +35,11 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${SWEET_ADMIN_BACKEND_PORT:-9005}:9005"
+      - "${SWEET_ADMIN_BACKEND_PORT:-9009}:9009"
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
-      test: ["CMD", "/app/healthcheck", "http://127.0.0.1:9005/readyz"]
+      test: ["CMD", "/app/healthcheck", "http://127.0.0.1:9009/readyz"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -49,12 +49,12 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     environment:
-      API_PROXY_TARGET: http://backend:9005
+      API_PROXY_TARGET: http://backend:9009
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${SWEET_ADMIN_FRONTEND_PORT:-8080}:80"
+      - "${SWEET_ADMIN_FRONTEND_PORT:-8008}:80"
     healthcheck:
       test: ["CMD", "/app/healthcheck", "http://127.0.0.1/"]
       interval: 5s

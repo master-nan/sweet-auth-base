@@ -37,8 +37,8 @@ export function resolveSmokeCredential(env = process.env) {
 export function createSmokeRuntime(env = process.env) {
   const credential = resolveSmokeCredential(env)
   return {
-    baseUrl: normalizeBaseUrl(env.SWEET_ADMIN_BASE_URL || 'http://localhost:8080/sweet_admin'),
-    healthBaseUrl: normalizeBaseUrl(env.SWEET_ADMIN_HEALTH_BASE_URL || 'http://localhost:9005'),
+    baseUrl: normalizeBaseUrl(env.SWEET_ADMIN_BASE_URL || 'http://localhost:8008/sweet_admin'),
+    healthBaseUrl: normalizeBaseUrl(env.SWEET_ADMIN_HEALTH_BASE_URL || 'http://localhost:9009'),
     username: credential.username,
     password: credential.password,
     tableCode: env.SWEET_ADMIN_SMOKE_TABLE || 'sys_user',

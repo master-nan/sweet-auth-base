@@ -57,11 +57,11 @@ make docker-up
 
 访问地址：
 
-- 前端：http://localhost:8080/sweet_admin
-- 后端：http://localhost:9005/sweet_admin
-- Swagger：http://localhost:9005/swagger/index.html
+- 前端：http://localhost:8008/sweet_admin
+- 后端：http://localhost:9009/sweet_admin
+- Swagger：http://localhost:9009/swagger/index.html
 - PostgreSQL：localhost:15432
-- Redis：localhost:16379
+- Redis：localhost:16380
 
 查看日志：
 

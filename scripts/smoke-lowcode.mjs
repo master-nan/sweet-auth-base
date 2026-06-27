@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 
-const baseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_BASE_URL || 'http://localhost:8080/sweet_admin')
-const healthBaseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_HEALTH_BASE_URL || 'http://localhost:9005')
+const baseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_BASE_URL || 'http://localhost:8008/sweet_admin')
+const healthBaseUrl = normalizeBaseUrl(process.env.SWEET_ADMIN_HEALTH_BASE_URL || 'http://localhost:9009')
 const username = process.env.SWEET_ADMIN_ADMIN_USER || 'admin'
 const password = process.env.SWEET_ADMIN_ADMIN_PASSWORD || 'admin123'
 const tableCode = process.env.SWEET_ADMIN_SMOKE_TABLE || 'sys_user'

@@ -19,7 +19,7 @@ test('loadOptionalEnvFile loads env values without overriding explicit variables
     `
 SWEET_ADMIN_ADMIN_USER=file_admin
 SWEET_ADMIN_ADMIN_PASSWORD=file_password
-SWEET_ADMIN_BASE_URL=http://localhost:8080/sweet_admin
+SWEET_ADMIN_BASE_URL=http://localhost:8008/sweet_admin
 `,
   )
 
@@ -30,7 +30,7 @@ SWEET_ADMIN_BASE_URL=http://localhost:8080/sweet_admin
 
   assert.equal(targetEnv.SWEET_ADMIN_ADMIN_USER, 'explicit_admin')
   assert.equal(targetEnv.SWEET_ADMIN_ADMIN_PASSWORD, 'file_password')
-  assert.equal(targetEnv.SWEET_ADMIN_BASE_URL, 'http://localhost:8080/sweet_admin')
+  assert.equal(targetEnv.SWEET_ADMIN_BASE_URL, 'http://localhost:8008/sweet_admin')
 })
 
 test('resolveSmokeCredential falls back to bootstrap password', () => {
@@ -59,8 +59,8 @@ test('resolveSmokeCredential prefers smoke-specific password', () => {
 
 test('createSmokeRuntime normalizes URLs and resolves table code', () => {
   const runtime = createSmokeRuntime({
-    SWEET_ADMIN_BASE_URL: 'http://localhost:8080/sweet_admin/',
-    SWEET_ADMIN_HEALTH_BASE_URL: 'http://localhost:9005/',
+    SWEET_ADMIN_BASE_URL: 'http://localhost:8008/sweet_admin/',
+    SWEET_ADMIN_HEALTH_BASE_URL: 'http://localhost:9009/',
     SWEET_ADMIN_ADMIN_USER: 'audit_admin',
     SWEET_ADMIN_ADMIN_PASSWORD: 'current_password',
     SWEET_ADMIN_SMOKE_TABLE: 'application',
@@ -70,8 +70,8 @@ test('createSmokeRuntime normalizes URLs and resolves table code', () => {
   })
 
   assert.deepEqual(runtime, {
-    baseUrl: 'http://localhost:8080/sweet_admin',
-    healthBaseUrl: 'http://localhost:9005',
+    baseUrl: 'http://localhost:8008/sweet_admin',
+    healthBaseUrl: 'http://localhost:9009',
     username: 'audit_admin',
     password: 'current_password',
     tableCode: 'application',

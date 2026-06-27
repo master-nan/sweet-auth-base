@@ -319,7 +319,7 @@ test('validateExternalEnv rejects placeholder readonly smoke credentials when re
 
 test('validateExternalEnv rejects unsafe readonly smoke target URLs when required', () => {
   const env = parseEnvContent(validEnvContent)
-  env.SWEET_ADMIN_BASE_URL = 'http://localhost:8080/sweet_admin'
+  env.SWEET_ADMIN_BASE_URL = 'http://localhost:8008/sweet_admin'
   env.SWEET_ADMIN_HEALTH_BASE_URL = 'https://admin-health.company.test/readyz?debug=1'
 
   const result = validateExternalEnv(env, { requireSmokeCredentials: true })

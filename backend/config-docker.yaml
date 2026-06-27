@@ -1,6 +1,6 @@
 name: 'sweet_admin'
 version: '0.1'
-port: 9005
+port: 9009
 worker_id: 1
 dbs:
   primary:

@@ -16,19 +16,19 @@ make docker-up
 
 默认访问：
 
-- 前端：http://localhost:8080/sweet_admin
-- 后端：http://localhost:9005/sweet_admin
-- Swagger：http://localhost:9005/swagger/index.html
+- 前端：http://localhost:8008/sweet_admin
+- 后端：http://localhost:9009/sweet_admin
+- Swagger：http://localhost:9009/swagger/index.html
 - PostgreSQL：localhost:15432
-- Redis：localhost:16379
+- Redis：localhost:16380
 
 如果本机已有服务占用默认端口，可以临时覆盖：
 
 ```bash
-SWEET_ADMIN_FRONTEND_PORT=9301 \
-SWEET_ADMIN_BACKEND_PORT=9105 \
-SWEET_ADMIN_POSTGRES_PORT=15432 \
-SWEET_ADMIN_REDIS_PORT=16380 \
+SWEET_ADMIN_FRONTEND_PORT=18008 \
+SWEET_ADMIN_BACKEND_PORT=19009 \
+SWEET_ADMIN_POSTGRES_PORT=15433 \
+SWEET_ADMIN_REDIS_PORT=16381 \
 make docker-up
 ```
 
