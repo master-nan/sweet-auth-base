@@ -6,7 +6,7 @@
 make help
 ```
 
-低代码发布、字段配置、按钮动作、参数 Schema、关联下拉、权限排查和常用模板见 [LOW_CODE_MANUAL.md](/Users/nan/project/sweet-auth-base/docs/LOW_CODE_MANUAL.md)。
+低代码发布、字段配置、按钮动作、参数 Schema、关联下拉、权限排查和常用模板见 [LOW_CODE_MANUAL.md](LOW_CODE_MANUAL.md)。
 
 ## 1. 本地开发
 
@@ -25,7 +25,7 @@ yarn
 quasar dev
 ```
 
-本地后端读取 [backend/config-dev.yaml](/Users/nan/project/sweet-auth-base/backend/config-dev.yaml)，本地前端读取 [frontend/.env.development](/Users/nan/project/sweet-auth-base/frontend/.env.development)。
+本地后端读取 [backend/config-dev.yaml](../backend/config-dev.yaml)，本地前端读取 [frontend/.env.development](../frontend/.env.development)。
 
 ## 2. 测试命令
 
@@ -45,6 +45,19 @@ make frontend-ci
 
 ```bash
 make verify
+```
+
+脚本级检查：
+
+```bash
+node --test scripts/*.test.mjs
+```
+
+Docker 环境启动后做只读 smoke：
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 22
+node scripts/smoke-readonly.mjs
 ```
 
 ## 3. 使用容器 PostgreSQL/Redis
@@ -90,6 +103,15 @@ make docker-up-external
 ```
 
 `docker-compose.external.yml` 不创建 PostgreSQL/Redis 容器，只启动 backend 和 frontend。
+
+外部依赖模式默认不自动迁移、不自动 seed。首次接入已有库前先备份，再按需要显式开启或手动执行：
+
+```bash
+make db-migrate
+make db-seed
+```
+
+`.env.external` 里的 `APP_BOOTSTRAP_ADMIN_PASSWORD`、`APP_SESSION_SECRET`、`APP_CONF_SALT` 必须替换成环境专用值，不要沿用示例占位。
 
 ## 5. 修改代码后如何发布到本地测试
 
@@ -137,24 +159,24 @@ make db-seed
 
 ## 7. 配置文件说明
 
-[backend/config-dev.yaml](/Users/nan/project/sweet-auth-base/backend/config-dev.yaml)：本地 `go run main.go` 使用。
+[backend/config-dev.yaml](../backend/config-dev.yaml)：本地 `go run main.go` 使用。
 
-[backend/config-docker.yaml](/Users/nan/project/sweet-auth-base/backend/config-docker.yaml)：本地 Docker Compose 使用，数据库 host 是 compose 服务名 `postgres`、`redis`。
+[backend/config-docker.yaml](../backend/config-docker.yaml)：本地 Docker Compose 使用，数据库 host 是 compose 服务名 `postgres`、`redis`。
 
-[backend/config-pro.yaml](/Users/nan/project/sweet-auth-base/backend/config-pro.yaml)：生产/预发模板，只放占位值，不提交真实密码和密钥。
+[backend/config-pro.yaml](../backend/config-pro.yaml)：生产/预发模板，只放占位值，不提交真实密码和密钥。
 
-[.env.external.example](/Users/nan/project/sweet-auth-base/.env.external.example)：连接已有 PostgreSQL/Redis 的环境变量模板。
+[.env.external.example](../.env.external.example)：连接已有 PostgreSQL/Redis 的环境变量模板。
 
 `.env.external`：本机真实覆盖配置，不提交到 Git。
 
-[docker-compose.yml](/Users/nan/project/sweet-auth-base/docker-compose.yml)：完整本地环境，包含 PostgreSQL、Redis、backend、frontend。
+[docker-compose.yml](../docker-compose.yml)：完整本地环境，包含 PostgreSQL、Redis、backend、frontend。
 
-[docker-compose.external.yml](/Users/nan/project/sweet-auth-base/docker-compose.external.yml)：外部依赖环境，只启动 backend、frontend。
+[docker-compose.external.yml](../docker-compose.external.yml)：外部依赖环境，只启动 backend、frontend。
 
 ## 8. 正式发布建议
 
 1. 准备生产 PostgreSQL 和 Redis。
-2. 按 [backend/config-pro.yaml](/Users/nan/project/sweet-auth-base/backend/config-pro.yaml) 配置真实环境变量或平台 Secret。
+2. 按 [backend/config-pro.yaml](../backend/config-pro.yaml) 配置真实环境变量或平台 Secret。
 3. 发布前先备份数据库。
 4. 明确本次版本是否需要执行 `db-migrate` 和 `db-seed`。
 5. 构建前端时确认 `APP_BASE_PATH`，默认是 `/sweet_admin`。

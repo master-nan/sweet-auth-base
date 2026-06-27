@@ -138,6 +138,26 @@ func TestMenuAllowsTableCode(t *testing.T) {
 	}
 }
 
+func TestAllowQueryWithoutPublishedMenuBlocksProtectedTables(t *testing.T) {
+	tests := []struct {
+		tableCode string
+		want      bool
+	}{
+		{tableCode: "sys_user", want: false},
+		{tableCode: "casbin_rule", want: false},
+		{tableCode: "access_log", want: false},
+		{tableCode: "demo_customer", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tableCode, func(t *testing.T) {
+			if got := allowQueryWithoutPublishedMenu(tt.tableCode); got != tt.want {
+				t.Fatalf("allowQueryWithoutPublishedMenu(%q) = %v, want %v", tt.tableCode, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMenuButtonAllowsReadActionUsesExactEventAction(t *testing.T) {
 	tests := []struct {
 		name   string

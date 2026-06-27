@@ -4,7 +4,6 @@ backend/logs/
 .env.external
 backups/
 reports/
-backend/auth_center
 backend/sweet_admin*
 backend/bin/
 frontend/bin/

@@ -200,4 +200,4 @@ relation 模式会按需加载：
 3. **选项回退**：`labelKey` 找不到时会依次尝试 `label` → `name` → `title` → `code`；`valueKey` 找不到时回退到 `id`
 4. **分页限制**：relation 默认按页加载，建议 `pageSize` 设为 50；cascader 通常一次加载树形数据，建议控制在 1000 条以内
 5. **联动刷新**：使用 `filterMapping` 时，父字段值变化会自动触发子字段选项重新加载
-6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [LOW_CODE_MANUAL.md](/Users/nan/project/sweet-auth-base/docs/LOW_CODE_MANUAL.md)
+6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [LOW_CODE_MANUAL.md](LOW_CODE_MANUAL.md)

@@ -585,7 +585,7 @@ const buttonFields = computed(() =>
         }
       }
       if (field.field_code === 'is_hidden') {
-        return { ...field, field_name: '是否隐藏' }
+        return { ...field, field_name: '兼容隐藏字段' }
       }
       if (field.field_code === 'is_disabled') {
         return { ...field, field_name: '禁用按钮' }

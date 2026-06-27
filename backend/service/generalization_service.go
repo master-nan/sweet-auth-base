@@ -138,15 +138,9 @@ func (gs *GeneralizationService) ensureWritableRowExists(table model.SysTable, i
 	return nil
 }
 
-// setIfFieldExists 如果表中存在该字段则设置值
-func setIfFieldExists(table model.SysTable, data map[string]interface{}, fieldCode string, value interface{}) {
-	if utils.HasTableField(table, fieldCode) {
-		data[fieldCode] = value
-	}
-}
-
-// isProtectedTable 检查是否为受保护的系统表，防止通过通用接口操作核心数据
-func isProtectedTable(tableCode string) bool {
+// IsProtectedGeneralizationTable reports whether a table is core platform data
+// that must not be modified through generic low-code write APIs.
+func IsProtectedGeneralizationTable(tableCode string) bool {
 	code := strings.ToLower(tableCode)
 	protectedPrefixes := []string{"sys_", "casbin_"}
 	for _, prefix := range protectedPrefixes {
@@ -161,6 +155,18 @@ func isProtectedTable(tableCode string) bool {
 		}
 	}
 	return false
+}
+
+// setIfFieldExists 如果表中存在该字段则设置值
+func setIfFieldExists(table model.SysTable, data map[string]interface{}, fieldCode string, value interface{}) {
+	if utils.HasTableField(table, fieldCode) {
+		data[fieldCode] = value
+	}
+}
+
+// isProtectedTable 检查是否为受保护的系统表，防止通过通用接口操作核心数据
+func isProtectedTable(tableCode string) bool {
+	return IsProtectedGeneralizationTable(tableCode)
 }
 
 func filterDataByFields(table model.SysTable, data map[string]interface{}, isCreate bool) map[string]interface{} {

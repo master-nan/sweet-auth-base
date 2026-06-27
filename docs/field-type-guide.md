@@ -119,7 +119,7 @@ linkage_config: {
 }
 ```
 
-数据量较大的关联表会按页远程加载，支持输入关键字筛选和滚动加载。按钮参数 Schema 里的简写方式见 [LOW_CODE_MANUAL.md](/Users/nan/project/sweet-auth-base/docs/LOW_CODE_MANUAL.md)。
+数据量较大的关联表会按页远程加载，支持输入关键字筛选和滚动加载。按钮参数 Schema 里的简写方式见 [LOW_CODE_MANUAL.md](LOW_CODE_MANUAL.md)。
 
 ### 4.6 级联选择（树形）
 
@@ -200,4 +200,4 @@ input_type: FILE_PICKER (10)
 4. **字典选择 vs 关联选择**：
    - 固定选项（如状态: 启用/停用）→ 用字典 `dict_code`
    - 动态选项（如角色列表）→ 用 `linkage_config` 关联表
-5. **低代码配置手册**：字段联动、按钮参数表单、关系下拉、字典和静态选项的完整写法见 [LOW_CODE_MANUAL.md](/Users/nan/project/sweet-auth-base/docs/LOW_CODE_MANUAL.md)
+5. **低代码配置手册**：字段联动、按钮参数表单、关系下拉、字典和静态选项的完整写法见 [LOW_CODE_MANUAL.md](LOW_CODE_MANUAL.md)

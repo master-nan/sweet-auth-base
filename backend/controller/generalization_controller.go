@@ -95,7 +95,11 @@ func (gc *GeneralizationController) checkMenuPermission(ctx *gin.Context, menuId
 }
 
 func (gc *GeneralizationController) resolveQueryMenuId(ctx *gin.Context, requestedMenuId int, tableCode string) (int, error) {
-	return gc.resolveLowCodeMenuId(ctx, requestedMenuId, tableCode, enum.ButtonActionQuery, true)
+	return gc.resolveLowCodeMenuId(ctx, requestedMenuId, tableCode, enum.ButtonActionQuery, allowQueryWithoutPublishedMenu(tableCode))
+}
+
+func allowQueryWithoutPublishedMenu(tableCode string) bool {
+	return !service.IsProtectedGeneralizationTable(tableCode)
 }
 
 func (gc *GeneralizationController) checkButtonActionPermission(ctx *gin.Context, menuId int, tableCode, action string) error {
