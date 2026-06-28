@@ -30,7 +30,7 @@ func TestSysMenuButtonRepositoryCreatePersistsFalseBoolDefaults(t *testing.T) {
 		Path:        "/admin/user/query",
 		Method:      "POST",
 		IsButton:    false,
-		IsHidden:    true,
+		IsHidden:    false,
 	}
 	if err := repo.Create(db, &button); err != nil {
 		t.Fatalf("create menu button: %v", err)
@@ -40,7 +40,7 @@ func TestSysMenuButtonRepositoryCreatePersistsFalseBoolDefaults(t *testing.T) {
 	if err := db.First(&got, button.Id).Error; err != nil {
 		t.Fatalf("query menu button: %v", err)
 	}
-	if got.IsButton || !got.IsHidden {
-		t.Fatalf("expected hidden api permission, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
+	if got.IsButton || got.IsHidden {
+		t.Fatalf("expected non-page api permission, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
 	}
 }

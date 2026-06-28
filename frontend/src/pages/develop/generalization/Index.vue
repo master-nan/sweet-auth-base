@@ -748,7 +748,7 @@ const pagination = ref({
 
 const visibleMenuButtons = computed(() => {
   return menuButtons.value
-    .filter(isPageButton)
+    .filter((btn) => isPageButton(btn) && !btn.is_hidden)
     .slice()
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
 })

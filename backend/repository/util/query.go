@@ -193,7 +193,7 @@ func parseQueryDate(value interface{}) (time.Time, bool) {
 	if !ok {
 		return time.Time{}, false
 	}
-	t, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(raw), time.Local)
+	t, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(raw), model.AppLocation())
 	return t, err == nil
 }
 
@@ -207,7 +207,7 @@ func parseQueryDateTime(value interface{}) (time.Time, bool) {
 	}
 	raw = strings.TrimSpace(raw)
 	for _, layout := range []string{time.DateTime, "2006-01-02T15:04", "2006-01-02T15:04:05", time.RFC3339, time.RFC3339Nano} {
-		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, model.AppLocation()); err == nil {
 			return t, true
 		}
 	}
@@ -224,7 +224,7 @@ func parseQueryTime(value interface{}) (string, bool) {
 	}
 	raw = strings.TrimSpace(raw)
 	for _, layout := range []string{time.TimeOnly, "15:04"} {
-		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, model.AppLocation()); err == nil {
 			return t.Format(time.TimeOnly), true
 		}
 	}

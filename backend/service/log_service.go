@@ -133,7 +133,7 @@ func parseAccessLogQueryTime(value string) (*time.Time, error) {
 	}
 	layouts := []string{time.DateTime, time.DateOnly, time.RFC3339}
 	for _, layout := range layouts {
-		if parsed, err := time.ParseInLocation(layout, value, time.Local); err == nil {
+		if parsed, err := time.ParseInLocation(layout, value, model.AppLocation()); err == nil {
 			if layout == time.DateOnly {
 				parsed = parsed.Truncate(24 * time.Hour)
 			}

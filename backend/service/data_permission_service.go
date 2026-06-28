@@ -752,7 +752,7 @@ func (s *DataPermissionService) userOverrideFromReq(userId int, req request.User
 	}
 	var expireAt *model.CustomTime
 	if strings.TrimSpace(req.ExpireAt) != "" {
-		t, err := time.ParseInLocation(time.DateTime, strings.TrimSpace(req.ExpireAt), time.Local)
+		t, err := time.ParseInLocation(time.DateTime, strings.TrimSpace(req.ExpireAt), model.AppLocation())
 		if err != nil {
 			return model.SysUserDataScopeOverride{}, myerrors.NewBadRequestError("过期时间格式应为 YYYY-MM-DD HH:mm:ss")
 		}
@@ -946,7 +946,7 @@ func (s *DataPermissionService) applyUserOverrides(user model.SysUser, binding m
 	if err != nil {
 		return base, err
 	}
-	now := time.Now()
+	now := model.Now()
 	for _, override := range overrides {
 		if override.ExpireAt != nil && time.Time(*override.ExpireAt).Before(now) {
 			continue

@@ -177,8 +177,8 @@ func TestSeedMenuButtonPersistsAPIPermissionAsNonPageButton(t *testing.T) {
 	if err := db.Where("code = ?", "system_user_query").First(&got).Error; err != nil {
 		t.Fatalf("query seeded button: %v", err)
 	}
-	if got.IsButton || !got.IsHidden {
-		t.Fatalf("api permission should be hidden non-page button, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
+	if got.IsButton || got.IsHidden {
+		t.Fatalf("api permission should be non-page and visible in metadata, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
 	}
 }
 

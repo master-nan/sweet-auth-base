@@ -582,6 +582,7 @@ import {
   defaultValueForField,
   getFieldControlType,
   inputTypesAllowingDictionary,
+  isBooleanFieldMetadata,
   metadataDictDefault,
   parseLinkageConfig,
   selectLikeInputTypes,
@@ -701,6 +702,28 @@ const booleanToggleOptions = [
   { label: '否', value: false },
   { label: '是', value: true },
 ]
+
+const normalizeBooleanFormValue = (value: unknown, fallback = false): boolean => {
+  if (value === undefined || value === null || value === '') return fallback
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  const normalized = String(value).trim().toLowerCase()
+  if (['true', '1', 't', 'yes', 'y', '是'].includes(normalized)) return true
+  if (['false', '0', 'f', 'no', 'n', '否'].includes(normalized)) return false
+  return fallback
+}
+
+const normalizeBooleanFormFields = () => {
+  props.fields.forEach((field) => {
+    if (isEdit.value ? !field.is_update_show : !field.is_insert_show) return
+    if (!isBooleanFieldMetadata(field)) return
+    const fallback = defaultValueForField(field) === true
+    formData.value[field.field_code] = normalizeBooleanFormValue(
+      formData.value[field.field_code],
+      fallback,
+    )
+  })
+}
 
 const setFieldRef = (code: string) => (el: any) => {
   if (el) {
@@ -1469,6 +1492,7 @@ const initFormData = () => {
       }
     })
   }
+  normalizeBooleanFormFields()
   loadingData.value = false
 }
 
@@ -1856,6 +1880,7 @@ const submitForm = async () => {
       formData.value.linkage_config = decodeHtmlEntities(formData.value.linkage_config)
     }
   }
+  normalizeBooleanFormFields()
   // 通过事件发射表单数据，让父组件决定如何处理
   emit('submit', {
     data: formData.value,

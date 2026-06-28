@@ -29,6 +29,8 @@ services:
   backend:
     build:
       context: ./backend
+    environment:
+      TZ: Asia/Shanghai
     depends_on:
       postgres:
         condition: service_healthy

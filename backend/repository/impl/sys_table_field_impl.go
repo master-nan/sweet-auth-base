@@ -8,7 +8,6 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -55,14 +54,14 @@ func (s *SysTableFieldRepositoryImpl) GetTableFieldsByTableId(id int) ([]model.S
 }
 
 func sysTableFieldCreateMap(tx *gorm.DB, field *model.SysTableField) map[string]interface{} {
-	now := time.Now()
-	gmtCreate := time.Time(field.GmtCreate)
+	now := model.Now()
+	gmtCreate := field.GmtCreate
 	if gmtCreate.IsZero() {
-		gmtCreate = now
+		gmtCreate = model.CustomTime(now)
 	}
-	gmtModify := time.Time(field.GmtModify)
+	gmtModify := field.GmtModify
 	if gmtModify.IsZero() {
-		gmtModify = now
+		gmtModify = model.CustomTime(now)
 	}
 	row := map[string]interface{}{
 		"id":                   field.Id,

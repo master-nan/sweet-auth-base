@@ -76,7 +76,7 @@ func (gs *GeneralizationService) Create(ctx *gin.Context, table model.SysTable, 
 		filtered["id"] = int(id)
 	}
 	// 填充审计字段
-	now := time.Now()
+	now := model.Now()
 	setIfFieldExists(table, filtered, "gmt_create", now)
 	setIfFieldExists(table, filtered, "gmt_modify", now)
 	user := ctx.MustGet("user").(model.SysUser)
@@ -99,7 +99,7 @@ func (gs *GeneralizationService) Update(ctx *gin.Context, table model.SysTable, 
 	}
 	normalizeDataByFieldTypes(table, filtered)
 	// 填充审计字段
-	setIfFieldExists(table, filtered, "gmt_modify", time.Now())
+	setIfFieldExists(table, filtered, "gmt_modify", model.Now())
 	user := ctx.MustGet("user").(model.SysUser)
 	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
 	return gs.generalizationRepo.Update(table, id, filtered)
@@ -117,7 +117,7 @@ func (gs *GeneralizationService) Delete(ctx *gin.Context, table model.SysTable, 
 		return gs.generalizationRepo.HardDelete(table, id)
 	}
 	deleteData := map[string]interface{}{
-		"gmt_delete": time.Now(),
+		"gmt_delete": model.Now(),
 	}
 	user := ctx.MustGet("user").(model.SysUser)
 	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
@@ -613,7 +613,7 @@ func toDate(value interface{}) (time.Time, bool) {
 	if !ok {
 		return time.Time{}, false
 	}
-	t, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(raw), time.Local)
+	t, err := time.ParseInLocation(time.DateOnly, strings.TrimSpace(raw), model.AppLocation())
 	return t, err == nil
 }
 
@@ -627,7 +627,7 @@ func toDateTime(value interface{}) (time.Time, bool) {
 	}
 	raw = strings.TrimSpace(raw)
 	for _, layout := range []string{time.DateTime, "2006-01-02T15:04", "2006-01-02T15:04:05", time.RFC3339, time.RFC3339Nano} {
-		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, model.AppLocation()); err == nil {
 			return t, true
 		}
 	}
@@ -644,7 +644,7 @@ func toTimeValue(value interface{}) (string, bool) {
 	}
 	raw = strings.TrimSpace(raw)
 	for _, layout := range []string{time.TimeOnly, "15:04"} {
-		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, model.AppLocation()); err == nil {
 			return t.Format(time.TimeOnly), true
 		}
 	}

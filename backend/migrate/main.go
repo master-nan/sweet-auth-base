@@ -98,6 +98,7 @@ func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
 			},
 			DisableForeignKeyConstraintWhenMigrating: true,
 			Logger:                                   dbLogger,
+			NowFunc:                                  model.Now,
 		})
 		if err == nil {
 			sqlDB, dbErr := db.DB()
@@ -345,7 +346,7 @@ func seedConfigure(db *gorm.DB) error {
 		if len(updates) == 0 {
 			return nil
 		}
-		updates["gmt_modify"] = time.Now()
+		updates["gmt_modify"] = model.Now()
 		return db.Model(&model.SysConfigure{}).Where("id = ?", existing.Id).Updates(updates).Error
 	}
 	if err != gorm.ErrRecordNotFound {
@@ -649,7 +650,7 @@ func seedApplication(db *gorm.DB) error {
 }
 
 func seedAdminUser(db *gorm.DB, cfg *config.Server) error {
-	now := model.CustomTime(time.Now())
+	now := model.CustomTime(model.Now())
 	rawPassword, err := bootstrapAdminPassword()
 	if err != nil {
 		return err
@@ -859,7 +860,7 @@ func seedMenu(db *gorm.DB, sf *utils.Snowflake, item model.SysMenu) (model.SysMe
 			"icon":       item.Icon,
 			"redirect":   item.Redirect,
 			"is_unfold":  item.IsUnfold,
-			"gmt_modify": time.Now(),
+			"gmt_modify": model.Now(),
 		}
 		if err := db.Model(&model.SysMenu{}).Where("id = ?", existing.Id).Updates(updates).Error; err != nil {
 			return model.SysMenu{}, err
@@ -888,7 +889,7 @@ func seedRole(db *gorm.DB, sf *utils.Snowflake) (model.SysRole, error) {
 		if err := db.Model(&model.SysRole{}).Where("id = ?", role.Id).Updates(map[string]interface{}{
 			"memo":       "超级管理员",
 			"state":      true,
-			"gmt_modify": time.Now(),
+			"gmt_modify": model.Now(),
 		}).Error; err != nil {
 			return model.SysRole{}, err
 		}
@@ -924,7 +925,7 @@ func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.S
 }
 
 func migrationTimestamps(createAt, modifyAt model.CustomTime) (model.CustomTime, model.CustomTime) {
-	now := model.CustomTime(time.Now())
+	now := model.CustomTime(model.Now())
 	if createAt.IsZero() {
 		createAt = now
 	}
@@ -1177,9 +1178,9 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 		apiPermissionWithAPI(413, menuID, "数据权限查询", "system_user_data_permission_query", enum.Line, "query_data_permission", "search", "primary", 99, "/admin/user/:id/data-permissions", "GET"),
 	}
 	buttons[9].IsButton = false
-	buttons[9].IsHidden = true
+	buttons[9].IsHidden = false
 	buttons[10].IsButton = false
-	buttons[10].IsHidden = true
+	buttons[10].IsHidden = false
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
 
@@ -1253,7 +1254,7 @@ func seedMenuButton(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName strin
 			"before_hooks":  button.BeforeHooks,
 			"after_hooks":   button.AfterHooks,
 			"state":         true,
-			"gmt_modify":    time.Now(),
+			"gmt_modify":    model.Now(),
 		}).Error; err != nil {
 			return err
 		}
@@ -1354,7 +1355,7 @@ func seedLowCodeMenuButtonTemplate(db *gorm.DB, sf *utils.Snowflake, template mo
 			"before_hooks":  template.BeforeHooks,
 			"after_hooks":   template.AfterHooks,
 			"state":         true,
-			"gmt_modify":    time.Now(),
+			"gmt_modify":    model.Now(),
 		}).Error
 	}
 	if err != gorm.ErrRecordNotFound {
@@ -1561,7 +1562,7 @@ func menuButtonWithAPI(id, menuID int, name, code string, position enum.SysMenuB
 func apiPermissionWithAPI(id, menuID int, name, code string, position enum.SysMenuButtonPosition, action, icon, color string, sequence uint8, path, method string) model.SysMenuButton {
 	button := menuButtonWithAPI(id, menuID, name, code, position, action, icon, color, sequence, path, method)
 	button.IsButton = false
-	button.IsHidden = true
+	button.IsHidden = false
 	return button
 }
 
@@ -1743,6 +1744,9 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, table model.SysTable
 		if field.DictCode != nil {
 			updates["dict_code"] = *field.DictCode
 		}
+		if field.DefaultValue != nil {
+			updates["default_value"] = *field.DefaultValue
+		}
 		return db.Unscoped().Model(&model.SysTableField{}).Where("id = ?", existing.Id).Updates(updates).Error
 	}
 	if err != gorm.ErrRecordNotFound {
@@ -1793,6 +1797,9 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 		field.FieldLength = int(precision)
 		field.FieldDecimalLength = int(scale)
 	}
+	if defaultValue, ok := column.DefaultValue(); ok {
+		field.DefaultValue = utils.StringPtr(normalizeSystemColumnDefault(field.FieldType, defaultValue))
+	}
 	switch field.FieldType {
 	case enum.IntFieldType, enum.BigIntFieldType, enum.TinyintFieldType, enum.FloatFieldType:
 		field.InputType = enum.InputNumberInputType
@@ -1817,9 +1824,35 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 		field.DictCode = utils.StringPtr(dictCode)
 		field.InputType = enum.SelectInputType
 	}
+	if defaultValue := systemMetadataDefaultValue(tableCode, field.FieldCode, field.FieldType); defaultValue != "" {
+		field.DefaultValue = utils.StringPtr(defaultValue)
+	}
 	applyMigrationSensitiveFieldDefaults(&field)
 	applyMigrationManagedFieldDefaults(&field)
 	return field
+}
+
+func normalizeSystemColumnDefault(fieldType enum.SysTableFieldType, defaultValue string) string {
+	value := strings.TrimSpace(defaultValue)
+	if fieldType == enum.BooleanFieldType {
+		switch strings.ToLower(value) {
+		case "true", "t", "1":
+			return "true"
+		case "false", "f", "0":
+			return "false"
+		}
+	}
+	return value
+}
+
+func systemMetadataDefaultValue(tableCode, fieldCode string, fieldType enum.SysTableFieldType) string {
+	if fieldType != enum.BooleanFieldType {
+		return ""
+	}
+	if fieldCode == "state" || fieldCode == "is_button" {
+		return "true"
+	}
+	return "false"
 }
 
 func systemFieldType(databaseType string) enum.SysTableFieldType {
@@ -1992,7 +2025,7 @@ var systemTableFieldDisplayNameMap = map[string]map[string]string{
 		"params_schema": "参数Schema",
 		"confirm_text":  "确认提示",
 		"disable_when":  "禁用条件",
-		"is_hidden":     "是否隐藏(兼容旧字段)",
+		"is_hidden":     "是否隐藏",
 		"is_disabled":   "是否禁用",
 	},
 	"sys_menu_button_template": {

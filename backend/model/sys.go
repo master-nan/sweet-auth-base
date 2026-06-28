@@ -75,7 +75,7 @@ type SysMenuButton struct {
 	ConfirmText  string                        `gorm:"size:256;comment:确认提示" json:"confirm_text"`
 	DisableWhen  string                        `gorm:"type:text;comment:禁用条件" json:"disable_when"`
 	IsButton     bool                          `gorm:"default:true;comment:是否页面按钮" json:"is_button"`
-	IsHidden     bool                          `gorm:"default:false;comment:是否隐藏(兼容旧字段)" json:"is_hidden,omitempty"`
+	IsHidden     bool                          `gorm:"default:false;comment:是否隐藏" json:"is_hidden"`
 	IsDisabled   bool                          `gorm:"default:false;comment:是否禁用" json:"is_disabled"`
 	BeforeHooks  string                        `gorm:"type:text;comment:前置钩子JSON" json:"before_hooks"` // 执行事件前的钩子函数
 	AfterHooks   string                        `gorm:"type:text;comment:后置钩子JSON" json:"after_hooks"`  // 执行事件后的钩子函数

@@ -8,7 +8,6 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -61,7 +60,7 @@ func (s *SysMenuButtonRepositoryImpl) Create(tx *gorm.DB, entity interface{}) er
 }
 
 func sysMenuButtonCreateMap(tx *gorm.DB, button *model.SysMenuButton) map[string]interface{} {
-	now := model.CustomTime(time.Now())
+	now := model.CustomTime(model.Now())
 	gmtCreate := button.GmtCreate
 	if gmtCreate.IsZero() {
 		gmtCreate = now

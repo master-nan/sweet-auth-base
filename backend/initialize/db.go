@@ -7,6 +7,7 @@ package initialize
 
 import (
 	"backend/config"
+	"backend/model"
 	"context"
 	"fmt"
 	"reflect"
@@ -75,6 +76,7 @@ func InitDB(zapLogger *zap.Logger, serverConfig *config.Server) (map[string]*gor
 			},
 			DisableForeignKeyConstraintWhenMigrating: true,
 			Logger:                                   gormLogger,
+			NowFunc:                                  model.Now,
 		})
 		if err != nil {
 			zap.L().Error("failed to open database connection", zap.Error(err))

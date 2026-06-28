@@ -13,32 +13,51 @@ import (
 
 type CustomTime time.Time
 
+var appLocation = func() *time.Location {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.FixedZone("CST", 8*60*60)
+	}
+	return location
+}()
+
+func AppLocation() *time.Location {
+	return appLocation
+}
+
+func Now() time.Time {
+	return time.Now().In(AppLocation())
+}
+
 func (t CustomTime) IsZero() bool {
 	return time.Time(t).IsZero()
 }
 
 func (t *CustomTime) UnmarshalJSON(data []byte) (err error) {
-	now, err := time.ParseInLocation(`"`+time.DateTime+`"`, string(data), time.Local)
+	now, err := time.ParseInLocation(`"`+time.DateTime+`"`, string(data), AppLocation())
 	*t = CustomTime(now)
 	return
 }
 func (t CustomTime) MarshalJSON() ([]byte, error) {
 	b := make([]byte, 0, len(time.DateTime)+2)
 	b = append(b, '"')
-	b = time.Time(t).AppendFormat(b, time.DateTime)
+	b = time.Time(t).In(AppLocation()).AppendFormat(b, time.DateTime)
 	b = append(b, '"')
 	return b, nil
 }
 func (t CustomTime) String() string {
-	return time.Time(t).Format(time.DateTime)
+	return time.Time(t).In(AppLocation()).Format(time.DateTime)
 }
 
 func (t CustomTime) Format(s string) string {
-	return time.Time(t).Format(s)
+	return time.Time(t).In(AppLocation()).Format(s)
 }
 
 func (t CustomTime) Value() (driver.Value, error) {
-	return time.Time(t), nil
+	if t.IsZero() {
+		return time.Time{}, nil
+	}
+	return time.Time(t).In(AppLocation()), nil
 }
 
 func (t *CustomTime) Scan(value interface{}) error {
@@ -48,23 +67,49 @@ func (t *CustomTime) Scan(value interface{}) error {
 	}
 	switch v := value.(type) {
 	case time.Time:
-		*t = CustomTime(v)
+		*t = CustomTime(v.In(AppLocation()))
 	case []byte:
-		parsedTime, err := time.Parse(time.RFC3339, string(v))
+		parsedTime, err := parseCustomTimeString(string(v))
 		if err != nil {
 			return err
 		}
-		*t = CustomTime(parsedTime)
+		*t = CustomTime(parsedTime.In(AppLocation()))
 	case string:
-		parsedTime, err := time.Parse(time.RFC3339, v)
+		parsedTime, err := parseCustomTimeString(v)
 		if err != nil {
 			return err
 		}
-		*t = CustomTime(parsedTime)
+		*t = CustomTime(parsedTime.In(AppLocation()))
 	default:
 		return fmt.Errorf("unsupported scan type for CustomTime: %T", value)
 	}
 	return nil
+}
+
+func parseCustomTimeString(value string) (time.Time, error) {
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		time.DateTime,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05-07:00",
+	}
+	var lastErr error
+	for _, layout := range layouts {
+		var parsed time.Time
+		var err error
+		if layout == time.DateTime || layout == "2006-01-02 15:04:05.999999999" {
+			parsed, err = time.ParseInLocation(layout, value, AppLocation())
+		} else {
+			parsed, err = time.Parse(layout, value)
+		}
+		if err == nil {
+			return parsed, nil
+		}
+		lastErr = err
+	}
+	return time.Time{}, lastErr
 }
 
 // StringSlice 自定义字符串切片类型
@@ -134,7 +179,7 @@ func (b *Basic) BeforeDelete(tx *gorm.DB) error {
 				tx.Statement.AddClause(clause.Update{})
 				tx.Statement.AddClause(clause.Set{
 					{Column: clause.Column{Name: "delete_user"}, Value: user.Id},
-					{Column: clause.Column{Name: "gmt_delete"}, Value: time.Now()},
+					{Column: clause.Column{Name: "gmt_delete"}, Value: Now()},
 				})
 				tx.Statement.Build(
 					clause.Update{}.Name(),

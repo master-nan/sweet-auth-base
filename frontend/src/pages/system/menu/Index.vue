@@ -296,7 +296,6 @@ import { useI18n } from 'vue-i18n'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { useMasterDetailPageButtons } from 'src/composables/page-buttons'
-import { isPageButton } from 'src/utils/menu-button'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 
@@ -468,6 +467,16 @@ const buttonEditData = ref<MenuButtonFormData>({
 })
 const isButtonEdit = computed(() => 'id' in buttonEditData.value && Boolean(buttonEditData.value.id))
 
+const normalizeBooleanValue = (value: unknown, fallback = false): boolean => {
+  if (value === undefined || value === null || value === '') return fallback
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  const normalized = String(value).trim().toLowerCase()
+  if (['true', '1', 't', 'yes', 'y', '是'].includes(normalized)) return true
+  if (['false', '0', 'f', 'no', 'n', '否'].includes(normalized)) return false
+  return fallback
+}
+
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
@@ -585,10 +594,10 @@ const buttonFields = computed(() =>
         }
       }
       if (field.field_code === 'is_hidden') {
-        return { ...field, field_name: '兼容隐藏字段' }
+        return { ...field, field_name: '是否隐藏', default_value: 'false' }
       }
       if (field.field_code === 'is_disabled') {
-        return { ...field, field_name: '禁用按钮' }
+        return { ...field, field_name: '是否禁用', default_value: 'false' }
       }
       return field
     })
@@ -854,7 +863,12 @@ const openAddButtonDialog = () => {
 
 // 编辑按钮
 const openEditButtonDialog = (button: MenuButton) => {
-  buttonEditData.value = { ...button, is_button: isPageButton(button) }
+  buttonEditData.value = {
+    ...button,
+    is_button: normalizeBooleanValue(button.is_button, true),
+    is_hidden: normalizeBooleanValue(button.is_hidden, false),
+    is_disabled: normalizeBooleanValue(button.is_disabled, false),
+  }
   buttonDialogOpen.value = true
 }
 
@@ -901,9 +915,9 @@ const buildMenuButtonPayload = (
     params_schema: toJSONText(button.params_schema),
     confirm_text: String(button.confirm_text || ''),
     disable_when: toJSONText(button.disable_when),
-    is_button: button.is_button !== false,
-    is_hidden: Boolean(button.is_hidden),
-    is_disabled: Boolean(button.is_disabled),
+    is_button: normalizeBooleanValue(button.is_button, true),
+    is_hidden: normalizeBooleanValue(button.is_hidden, false),
+    is_disabled: normalizeBooleanValue(button.is_disabled, false),
   }
   if (button.display_mode !== undefined) payload.display_mode = button.display_mode
   if (button.before_hooks !== undefined) payload.before_hooks = toJSONText(button.before_hooks)
