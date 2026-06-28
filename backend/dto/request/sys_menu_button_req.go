@@ -24,7 +24,7 @@ type MenuButtonCreateReq struct {
 	ParamsSchema string                        `json:"params_schema"`
 	ConfirmText  string                        `json:"confirm_text"`
 	DisableWhen  string                        `json:"disable_when"`
-	IsButton     *bool                         `json:"is_button"`
+	IsButton     *bool                         `json:"is_button" binding:"required"`
 	IsHidden     bool                          `json:"is_hidden"`
 	IsDisabled   bool                          `json:"is_disabled"`
 	BeforeHooks  string                        `json:"before_hooks"`
@@ -49,7 +49,7 @@ type MenuButtonUpdateReq struct {
 	ParamsSchema string                        `json:"params_schema"`
 	ConfirmText  string                        `json:"confirm_text"`
 	DisableWhen  string                        `json:"disable_when"`
-	IsButton     *bool                         `json:"is_button"`
+	IsButton     *bool                         `json:"is_button" binding:"required"`
 	IsHidden     bool                          `json:"is_hidden"`
 	IsDisabled   bool                          `json:"is_disabled"`
 	BeforeHooks  string                        `json:"before_hooks"`

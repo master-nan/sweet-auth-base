@@ -14,7 +14,7 @@ import (
 
 func TestFilterGrantedMenuButtons(t *testing.T) {
 	buttons := []model.SysMenuButton{
-		{Basic: model.Basic{Id: 1, State: true}, MenuId: 10, Code: "query", IsButton: false, IsHidden: true},
+		{Basic: model.Basic{Id: 1, State: true}, MenuId: 10, Code: "query", IsButton: false, IsHidden: false},
 		{Basic: model.Basic{Id: 2, State: true}, MenuId: 10, Code: "create", IsButton: true},
 		{Basic: model.Basic{Id: 3, State: false}, MenuId: 10, Code: "update"},
 		{Basic: model.Basic{Id: 4, State: true}, MenuId: 10, Code: "delete", IsDisabled: true},
@@ -39,7 +39,7 @@ func TestMenuButtonAllowsAction(t *testing.T) {
 	}{
 		{
 			name:   "api permission is valid permission point",
-			button: model.SysMenuButton{Basic: model.Basic{State: true}, MenuId: 10, EventAction: "query", IsButton: false, IsHidden: true},
+			button: model.SysMenuButton{Basic: model.Basic{State: true}, MenuId: 10, EventAction: "query", IsButton: false, IsHidden: false},
 			want:   true,
 		},
 		{

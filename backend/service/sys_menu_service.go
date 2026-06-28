@@ -490,7 +490,9 @@ func (s *SysMenuService) CreateMenuButton(ctx *gin.Context, req request.MenuButt
 	}
 	data.Path = req.ApiPath
 	data.Method = req.HttpMethod
-	applyMenuButtonType(&data, req.IsButton, req.IsHidden)
+	if err := applyMenuButtonType(&data, req.IsButton, req.IsHidden); err != nil {
+		return err
+	}
 	menu, err := s.GetMenuById(req.MenuId)
 	if err != nil {
 		return err
@@ -518,7 +520,9 @@ func (s *SysMenuService) UpdateMenuButton(ctx *gin.Context, req request.MenuButt
 	}
 	data.Path = req.ApiPath
 	data.Method = req.HttpMethod
-	applyMenuButtonType(&data, req.IsButton, req.IsHidden)
+	if err := applyMenuButtonType(&data, req.IsButton, req.IsHidden); err != nil {
+		return err
+	}
 	menu, err := s.GetMenuById(req.MenuId)
 	if err != nil {
 		return err
@@ -558,8 +562,13 @@ func menuButtonUpdateMap(button model.SysMenuButton) map[string]any {
 	}
 }
 
-func applyMenuButtonType(button *model.SysMenuButton, isButton *bool, legacyHidden bool) {
-	button.IsButton, button.IsHidden = utils.ResolveMenuButtonType(isButton, legacyHidden)
+func applyMenuButtonType(button *model.SysMenuButton, isButton *bool, isHidden bool) error {
+	if isButton == nil {
+		return myerrors.NewBadRequestError("is_button不能为空")
+	}
+	button.IsButton = *isButton
+	button.IsHidden = isHidden
+	return nil
 }
 
 const (
