@@ -39,7 +39,7 @@
           :loading="loading"
           :pagination="{ rowsPerPage: 0 }"
           hide-pagination
-          @row-click="(_, row) => selectDimension(row)"
+          @row-click="(_, row) => openDimensionViewDialog(row)"
         >
           <template #body-cell-state="props">
             <q-td :props="props">
@@ -49,11 +49,27 @@
             </q-td>
           </template>
           <template #body-cell-actions="props">
-            <q-td :props="props" class="q-gutter-xs">
-              <q-btn flat dense round color="primary" icon="edit" @click.stop="openDimensionDialog(props.row)">
+            <q-td :props="props" class="q-gutter-xs dimension-actions-cell">
+              <q-btn
+                class="dimension-action-btn"
+                flat
+                dense
+                round
+                color="primary"
+                icon="edit"
+                @click.stop="openDimensionDialog(props.row)"
+              >
                 <q-tooltip>编辑</q-tooltip>
               </q-btn>
-              <q-btn flat dense round color="negative" icon="delete" @click.stop="confirmDeleteDimension(props.row)">
+              <q-btn
+                class="dimension-action-btn"
+                flat
+                dense
+                round
+                color="negative"
+                icon="delete"
+                @click.stop="confirmDeleteDimension(props.row)"
+              >
                 <q-tooltip>删除</q-tooltip>
               </q-btn>
             </q-td>
@@ -273,26 +289,92 @@
     <q-dialog v-model="dimensionDialogOpen" persistent>
       <q-card class="dimension-dialog-card">
         <q-card-section class="row items-center q-gutter-sm">
-          <div class="text-h6">{{ dimensionForm.id ? '编辑维度' : '新增维度' }}</div>
+          <div class="text-h6">{{ dimensionDialogTitle }}</div>
           <q-space />
           <q-btn flat round dense icon="close" @click="dimensionDialogOpen = false" />
         </q-card-section>
         <q-separator />
         <q-card-section class="dimension-form">
-          <q-input v-model="dimensionForm.code" dense outlined label="维度编码" />
-          <q-input v-model="dimensionForm.name" dense outlined label="维度名称" />
-          <q-select v-model="dimensionForm.value_type" dense outlined emit-value map-options label="值类型" :options="valueTypeOptions" />
-          <q-select v-model="dimensionForm.source_type" dense outlined emit-value map-options label="来源类型" :options="sourceTypeOptions" />
-          <q-input v-model="dimensionForm.source_code" dense outlined label="来源表编码" :disable="dimensionForm.source_type !== 'table'" />
-          <q-input v-model="dimensionForm.label_field" dense outlined label="展示字段" :disable="dimensionForm.source_type !== 'table'" />
-          <q-input v-model="dimensionForm.value_field" dense outlined label="值字段" :disable="dimensionForm.source_type !== 'table'" />
-          <q-input v-model="dimensionForm.parent_field" dense outlined label="父级字段" :disable="dimensionForm.source_type !== 'table'" />
-          <q-input v-model="dimensionForm.memo" dense outlined label="备注" type="textarea" autogrow />
-          <q-toggle v-model="dimensionForm.state" color="primary" label="启用" />
+          <q-input v-model="dimensionForm.code" dense outlined label="维度编码" :readonly="isDimensionViewMode" />
+          <q-input v-model="dimensionForm.name" dense outlined label="维度名称" :readonly="isDimensionViewMode" />
+          <q-select
+            v-model="dimensionForm.value_type"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="值类型"
+            :options="valueTypeOptions"
+            :readonly="isDimensionViewMode"
+          />
+          <q-select
+            v-model="dimensionForm.source_type"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="来源类型"
+            :options="sourceTypeOptions"
+            :readonly="isDimensionViewMode"
+          />
+          <q-input
+            v-model="dimensionForm.source_code"
+            dense
+            outlined
+            label="来源表编码"
+            :readonly="isDimensionViewMode"
+            :disable="dimensionForm.source_type !== 'table'"
+          />
+          <q-input
+            v-model="dimensionForm.label_field"
+            dense
+            outlined
+            label="展示字段"
+            :readonly="isDimensionViewMode"
+            :disable="dimensionForm.source_type !== 'table'"
+          />
+          <q-input
+            v-model="dimensionForm.value_field"
+            dense
+            outlined
+            label="值字段"
+            :readonly="isDimensionViewMode"
+            :disable="dimensionForm.source_type !== 'table'"
+          />
+          <q-input
+            v-model="dimensionForm.parent_field"
+            dense
+            outlined
+            label="父级字段"
+            :readonly="isDimensionViewMode"
+            :disable="dimensionForm.source_type !== 'table'"
+          />
+          <q-input
+            v-model="dimensionForm.memo"
+            dense
+            outlined
+            label="备注"
+            type="textarea"
+            autogrow
+            :readonly="isDimensionViewMode"
+          />
+          <q-toggle v-model="dimensionForm.state" color="primary" label="启用" :disable="isDimensionViewMode" />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat color="grey-7" label="取消" @click="dimensionDialogOpen = false" />
-          <q-btn unelevated color="primary" label="保存" :loading="savingDimension" @click="saveDimension" />
+          <q-btn
+            flat
+            color="grey-7"
+            :label="isDimensionViewMode ? '关闭' : '取消'"
+            @click="dimensionDialogOpen = false"
+          />
+          <q-btn
+            v-if="!isDimensionViewMode"
+            unelevated
+            color="primary"
+            label="保存"
+            :loading="savingDimension"
+            @click="saveDimension"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -361,6 +443,7 @@ const debugTableCode = ref('')
 const debugLoading = ref(false)
 const debugResult = ref<DataPermissionDebugResult | null>(null)
 const dimensionDialogOpen = ref(false)
+const dimensionDialogMode = ref<'view' | 'edit'>('edit')
 const savingDimension = ref(false)
 const dimensionForm = ref<DataPermissionDimensionSaveReq>(emptyDimensionForm())
 
@@ -437,6 +520,13 @@ const debugScopeColor = computed(() => {
 const debugScopeText = computed(() => {
   if (!debugResult.value) return ''
   return JSON.stringify(debugResult.value.scope || {}, null, 2)
+})
+
+const isDimensionViewMode = computed(() => dimensionDialogMode.value === 'view')
+
+const dimensionDialogTitle = computed(() => {
+  if (isDimensionViewMode.value) return '查看维度'
+  return dimensionForm.value.id ? '编辑维度' : '新增维度'
 })
 
 function emptyDimensionForm(): DataPermissionDimensionSaveReq {
@@ -626,11 +716,15 @@ const saveBindings = async () => {
   }
 }
 
-const selectDimension = (dimension: DataPermissionDimension) => {
-  openDimensionDialog(dimension)
+const openDimensionViewDialog = (dimension: DataPermissionDimension) => {
+  openDimensionDialog(dimension, 'view')
 }
 
-const openDimensionDialog = (dimension?: DataPermissionDimension) => {
+const openDimensionDialog = (
+  dimension?: DataPermissionDimension,
+  mode: 'view' | 'edit' = 'edit',
+) => {
+  dimensionDialogMode.value = mode
   dimensionForm.value = dimension
     ? {
         id: dimension.id,
@@ -748,6 +842,15 @@ onMounted(() => {
 
 .data-permission-icon-tile .q-icon {
   font-size: 24px;
+}
+
+.dimension-action-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.dimension-action-btn :deep(.q-icon) {
+  font-size: 18px;
 }
 
 .data-permission-detail-main {
