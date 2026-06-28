@@ -6,8 +6,8 @@
       :master-subtitle="`${dimensions.length} 个维度`"
       detail-title="菜单绑定"
       :detail-subtitle="selectedMenu ? `${displayMenuTitle(selectedMenu)} · ${selectedMenu.table_code}` : '选择低代码菜单'"
-      master-width="minmax(520px, 40%)"
-      min-width="1180px"
+      master-width="minmax(760px, 48%)"
+      min-width="1320px"
       min-height="calc(100vh - 150px)"
     >
       <template #master-actions>
@@ -39,8 +39,12 @@
           :loading="loading"
           :pagination="{ rowsPerPage: 0 }"
           hide-pagination
-          @row-click="(_, row) => openDimensionViewDialog(row)"
         >
+          <template #body-cell-source_code="props">
+            <q-td :props="props">
+              {{ sourceTableLabel(props.row.source_code) }}
+            </q-td>
+          </template>
           <template #body-cell-state="props">
             <q-td :props="props">
               <q-badge :color="props.row.state === false ? 'grey-6' : 'positive'" outline>
@@ -289,14 +293,14 @@
     <q-dialog v-model="dimensionDialogOpen" persistent>
       <q-card class="dimension-dialog-card">
         <q-card-section class="row items-center q-gutter-sm">
-          <div class="text-h6">{{ dimensionDialogTitle }}</div>
+          <div class="text-h6">{{ dimensionForm.id ? '编辑维度' : '新增维度' }}</div>
           <q-space />
           <q-btn flat round dense icon="close" @click="dimensionDialogOpen = false" />
         </q-card-section>
         <q-separator />
         <q-card-section class="dimension-form">
-          <q-input v-model="dimensionForm.code" dense outlined label="维度编码" :readonly="isDimensionViewMode" />
-          <q-input v-model="dimensionForm.name" dense outlined label="维度名称" :readonly="isDimensionViewMode" />
+          <q-input v-model="dimensionForm.code" dense outlined label="维度编码" />
+          <q-input v-model="dimensionForm.name" dense outlined label="维度名称" />
           <q-select
             v-model="dimensionForm.value_type"
             dense
@@ -305,7 +309,6 @@
             map-options
             label="值类型"
             :options="valueTypeOptions"
-            :readonly="isDimensionViewMode"
           />
           <q-select
             v-model="dimensionForm.source_type"
@@ -315,38 +318,54 @@
             map-options
             label="来源类型"
             :options="sourceTypeOptions"
-            :readonly="isDimensionViewMode"
+            @update:model-value="onDimensionSourceTypeChange"
           />
-          <q-input
+          <q-select
             v-model="dimensionForm.source_code"
             dense
             outlined
+            clearable
+            emit-value
+            map-options
+            use-input
+            input-debounce="150"
             label="来源表编码"
-            :readonly="isDimensionViewMode"
+            :options="filteredSourceTableOptions"
             :disable="dimensionForm.source_type !== 'table'"
+            @filter="filterSourceTableOptions"
+            @update:model-value="onDimensionSourceTableChange"
           />
-          <q-input
+          <q-select
             v-model="dimensionForm.label_field"
             dense
             outlined
+            clearable
+            emit-value
+            map-options
             label="展示字段"
-            :readonly="isDimensionViewMode"
+            :options="dimensionSourceFieldOptions"
             :disable="dimensionForm.source_type !== 'table'"
           />
-          <q-input
+          <q-select
             v-model="dimensionForm.value_field"
             dense
             outlined
+            clearable
+            emit-value
+            map-options
             label="值字段"
-            :readonly="isDimensionViewMode"
+            :options="dimensionSourceFieldOptions"
             :disable="dimensionForm.source_type !== 'table'"
           />
-          <q-input
+          <q-select
             v-model="dimensionForm.parent_field"
             dense
             outlined
+            clearable
+            emit-value
+            map-options
             label="父级字段"
-            :readonly="isDimensionViewMode"
+            :options="dimensionSourceFieldOptions"
             :disable="dimensionForm.source_type !== 'table'"
           />
           <q-input
@@ -356,19 +375,12 @@
             label="备注"
             type="textarea"
             autogrow
-            :readonly="isDimensionViewMode"
           />
-          <q-toggle v-model="dimensionForm.state" color="primary" label="启用" :disable="isDimensionViewMode" />
+          <q-toggle v-model="dimensionForm.state" color="primary" label="启用" />
         </q-card-section>
         <q-card-actions align="right">
+          <q-btn flat color="grey-7" label="取消" @click="dimensionDialogOpen = false" />
           <q-btn
-            flat
-            color="grey-7"
-            :label="isDimensionViewMode ? '关闭' : '取消'"
-            @click="dimensionDialogOpen = false"
-          />
-          <q-btn
-            v-if="!isDimensionViewMode"
             unelevated
             color="primary"
             label="保存"
@@ -389,7 +401,7 @@ import { type QTableProps, useQuasar } from 'quasar'
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
+import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
 import {
   dataPermissionActionOptions,
   type DataPermissionBinding,
@@ -419,6 +431,12 @@ type MenuOption = {
   menu: Menu
 }
 
+type TableOption = {
+  label: string
+  value: string
+  table: Table
+}
+
 const $q = useQuasar()
 const { t } = useI18n()
 const { confirmDanger } = useConfirmDialog($q)
@@ -433,6 +451,9 @@ const dimensions = ref<DataPermissionDimension[]>([])
 const menuTree = ref<Menu[]>([])
 const menuOptions = ref<MenuOption[]>([])
 const filteredMenuOptions = ref<MenuOption[]>([])
+const sourceTableOptions = ref<TableOption[]>([])
+const filteredSourceTableOptions = ref<TableOption[]>([])
+const dimensionSourceFieldOptions = ref<Array<{ label: string; value: string }>>([])
 const selectedMenuId = ref<number | null>(null)
 const selectedMenu = ref<Menu | null>(null)
 const tableFieldOptions = ref<Array<{ label: string; value: string }>>([])
@@ -443,7 +464,6 @@ const debugTableCode = ref('')
 const debugLoading = ref(false)
 const debugResult = ref<DataPermissionDebugResult | null>(null)
 const dimensionDialogOpen = ref(false)
-const dimensionDialogMode = ref<'view' | 'edit'>('edit')
 const savingDimension = ref(false)
 const dimensionForm = ref<DataPermissionDimensionSaveReq>(emptyDimensionForm())
 
@@ -469,6 +489,11 @@ const dimensionColumns: QTableProps['columns'] = [
   { name: 'name', label: '名称', field: 'name', align: 'left', sortable: true },
   { name: 'value_type', label: '值类型', field: 'value_type', align: 'left' },
   { name: 'source_type', label: '来源', field: 'source_type', align: 'left' },
+  { name: 'source_code', label: '来源表', field: 'source_code', align: 'left' },
+  { name: 'label_field', label: '展示字段', field: 'label_field', align: 'left' },
+  { name: 'value_field', label: '值字段', field: 'value_field', align: 'left' },
+  { name: 'parent_field', label: '父级字段', field: 'parent_field', align: 'left' },
+  { name: 'memo', label: '备注', field: 'memo', align: 'left' },
   { name: 'state', label: '状态', field: 'state', align: 'center' },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' },
 ]
@@ -522,13 +547,6 @@ const debugScopeText = computed(() => {
   return JSON.stringify(debugResult.value.scope || {}, null, 2)
 })
 
-const isDimensionViewMode = computed(() => dimensionDialogMode.value === 'view')
-
-const dimensionDialogTitle = computed(() => {
-  if (isDimensionViewMode.value) return '查看维度'
-  return dimensionForm.value.id ? '编辑维度' : '新增维度'
-})
-
 function emptyDimensionForm(): DataPermissionDimensionSaveReq {
   return {
     code: '',
@@ -576,6 +594,17 @@ const loadDimensions = async () => {
   dimensions.value = result.success ? result.data || [] : []
 }
 
+const loadTables = async () => {
+  const result = await tableApi.queryTable(emptyQuery())
+  const tables = result.success && Array.isArray(result.data) ? result.data : []
+  sourceTableOptions.value = tables.map((table) => ({
+    label: `${table.table_name || table.table_code} (${table.table_code})`,
+    value: table.table_code,
+    table,
+  }))
+  filteredSourceTableOptions.value = sourceTableOptions.value
+}
+
 const loadMenus = async () => {
   const result = await menuApi.queryMenu({
     ...emptyQuery(),
@@ -592,7 +621,7 @@ const loadMenus = async () => {
 }
 
 const loadAll = async () => {
-  await Promise.all([loadDimensions(), loadMenus()])
+  await Promise.all([loadDimensions(), loadMenus(), loadTables()])
   if (selectedMenuId.value) await onMenuChange(selectedMenuId.value)
 }
 
@@ -605,6 +634,61 @@ const filterMenuOptions = (value: string, update: (callback: () => void) => void
         )
       : menuOptions.value
   })
+}
+
+const filterSourceTableOptions = (value: string, update: (callback: () => void) => void) => {
+  update(() => {
+    const keyword = value.trim().toLowerCase()
+    filteredSourceTableOptions.value = keyword
+      ? sourceTableOptions.value.filter((option) =>
+          [option.label, option.value].join(' ').toLowerCase().includes(keyword),
+        )
+      : sourceTableOptions.value
+  })
+}
+
+const sourceTableLabel = (tableCode: string) =>
+  sourceTableOptions.value.find((option) => option.value === tableCode)?.label || tableCode || '-'
+
+const sourceFieldOptionsFromTable = (table?: Table | null) =>
+  (table?.table_fields || []).map((field) => ({
+    label: `${field.field_name || field.field_code} (${field.field_code})`,
+    value: field.field_code,
+  }))
+
+const loadDimensionSourceFields = async (tableCode: string) => {
+  if (!tableCode) {
+    dimensionSourceFieldOptions.value = []
+    return
+  }
+  const selectedOption = sourceTableOptions.value.find((option) => option.value === tableCode)
+  if (selectedOption?.table.table_fields?.length) {
+    dimensionSourceFieldOptions.value = sourceFieldOptionsFromTable(selectedOption.table)
+    return
+  }
+  const result = await tableApi.queryTableByCode(tableCode)
+  dimensionSourceFieldOptions.value = result.success ? sourceFieldOptionsFromTable(result.data) : []
+}
+
+const onDimensionSourceTypeChange = async (value: string) => {
+  if (value !== 'table') {
+    dimensionForm.value.source_code = ''
+    dimensionForm.value.label_field = ''
+    dimensionForm.value.value_field = ''
+    dimensionForm.value.parent_field = ''
+    dimensionSourceFieldOptions.value = []
+    return
+  }
+  await loadDimensionSourceFields(dimensionForm.value.source_code)
+}
+
+const onDimensionSourceTableChange = async (value: string | null) => {
+  const tableCode = value || ''
+  dimensionForm.value.source_code = tableCode
+  dimensionForm.value.label_field = ''
+  dimensionForm.value.value_field = ''
+  dimensionForm.value.parent_field = ''
+  await loadDimensionSourceFields(tableCode)
 }
 
 const onMenuChange = async (menuId: number | null) => {
@@ -716,15 +800,7 @@ const saveBindings = async () => {
   }
 }
 
-const openDimensionViewDialog = (dimension: DataPermissionDimension) => {
-  openDimensionDialog(dimension, 'view')
-}
-
-const openDimensionDialog = (
-  dimension?: DataPermissionDimension,
-  mode: 'view' | 'edit' = 'edit',
-) => {
-  dimensionDialogMode.value = mode
+const openDimensionDialog = async (dimension?: DataPermissionDimension) => {
   dimensionForm.value = dimension
     ? {
         id: dimension.id,
@@ -740,6 +816,7 @@ const openDimensionDialog = (
         state: dimension.state !== false,
       }
     : emptyDimensionForm()
+  await loadDimensionSourceFields(dimensionForm.value.source_code)
   dimensionDialogOpen.value = true
 }
 
