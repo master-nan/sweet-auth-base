@@ -6,6 +6,7 @@
 package impl
 
 import (
+	"backend/enum"
 	"backend/internal/database"
 	"backend/model"
 
@@ -60,6 +61,7 @@ func (s *SysMenuButtonRepositoryImpl) Create(tx *gorm.DB, entity interface{}) er
 }
 
 func sysMenuButtonCreateMap(tx *gorm.DB, button *model.SysMenuButton) map[string]interface{} {
+	normalizeSysMenuButtonDefaults(button)
 	now := model.CustomTime(model.Now())
 	gmtCreate := button.GmtCreate
 	if gmtCreate.IsZero() {
@@ -114,6 +116,14 @@ func sysMenuButtonCreateMap(tx *gorm.DB, button *model.SysMenuButton) map[string
 		}
 	}
 	return row
+}
+
+func normalizeSysMenuButtonDefaults(button *model.SysMenuButton) {
+	displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(button.DisplayMode))
+	if !ok {
+		displayMode = enum.ButtonDisplayAuto
+	}
+	button.DisplayMode = displayMode
 }
 
 func (s *SysMenuButtonRepositoryImpl) FindLegacyLowCodeButtons(tx *gorm.DB, menuId int) ([]model.SysMenuButton, error) {

@@ -259,7 +259,7 @@ func TestMenuButtonUpdateUsesScalarColumns(t *testing.T) {
 		Path:        "/admin/menu/button/:id",
 		Method:      "PUT",
 		IsButton:    false,
-		IsHidden:    true,
+		IsHidden:    false,
 		IsDisabled:  true,
 	}
 	if err := db.Create(&original).Error; err != nil {

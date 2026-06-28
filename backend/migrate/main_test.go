@@ -180,6 +180,9 @@ func TestSeedMenuButtonPersistsAPIPermissionAsNonPageButton(t *testing.T) {
 	if got.IsButton || got.IsHidden {
 		t.Fatalf("api permission should be non-page and visible in metadata, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
 	}
+	if got.DisplayMode != enum.ButtonDisplayAuto {
+		t.Fatalf("api permission should default display_mode to auto, got %q", got.DisplayMode)
+	}
 }
 
 func TestSeedSystemTableFieldRepairsGeneratedChineseName(t *testing.T) {

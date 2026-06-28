@@ -15,19 +15,25 @@ import (
 func TestLowCodeDefaultMenuButtonsUseTemplateData(t *testing.T) {
 	buttons := lowCodeDefaultMenuButtons("demo_table", lowCodeDefaultButtonTemplates())
 	actual := make(map[string]struct {
-		method   string
-		path     string
-		isButton bool
+		method      string
+		path        string
+		isButton    bool
+		isHidden    bool
+		displayMode enum.SysMenuButtonDisplayMode
 	}, len(buttons))
 	for _, button := range buttons {
 		actual[button.Code] = struct {
-			method   string
-			path     string
-			isButton bool
+			method      string
+			path        string
+			isButton    bool
+			isHidden    bool
+			displayMode enum.SysMenuButtonDisplayMode
 		}{
-			method:   button.Method,
-			path:     button.Path,
-			isButton: button.IsPageButton(),
+			method:      button.Method,
+			path:        button.Path,
+			isButton:    button.IsPageButton(),
+			isHidden:    button.IsHidden,
+			displayMode: button.DisplayMode,
 		}
 	}
 
@@ -47,8 +53,8 @@ func TestLowCodeDefaultMenuButtonsUseTemplateData(t *testing.T) {
 		if !ok {
 			t.Fatalf("default low-code button %s missing", code)
 		}
-		if got.method != want.method || got.path != want.path || got.isButton != want.isButton {
-			t.Fatalf("button %s = %s %s isButton=%v, want %s %s isButton=%v", code, got.method, got.path, got.isButton, want.method, want.path, want.isButton)
+		if got.method != want.method || got.path != want.path || got.isButton != want.isButton || got.isHidden || got.displayMode != enum.ButtonDisplayAuto {
+			t.Fatalf("button %s = %s %s isButton=%v hidden=%v display=%s, want %s %s isButton=%v hidden=false display=auto", code, got.method, got.path, got.isButton, got.isHidden, got.displayMode, want.method, want.path, want.isButton)
 		}
 	}
 }

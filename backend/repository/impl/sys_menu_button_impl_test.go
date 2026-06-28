@@ -43,4 +43,7 @@ func TestSysMenuButtonRepositoryCreatePersistsFalseBoolDefaults(t *testing.T) {
 	if got.IsButton || got.IsHidden {
 		t.Fatalf("expected non-page api permission, got is_button=%v is_hidden=%v", got.IsButton, got.IsHidden)
 	}
+	if got.DisplayMode != enum.ButtonDisplayAuto {
+		t.Fatalf("expected default display mode auto, got %q", got.DisplayMode)
+	}
 }

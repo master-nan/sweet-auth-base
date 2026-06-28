@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -290,7 +291,21 @@ func seedBaseData(db *gorm.DB, cfg *config.Server, sf *utils.Snowflake) error {
 	if err := seedMenusAndRole(db, sf); err != nil {
 		return err
 	}
-	return seedLowCodeMenuButtonTemplates(db, sf)
+	if err := seedLowCodeMenuButtonTemplates(db, sf); err != nil {
+		return err
+	}
+	return repairSeededMenuButtonDefaults(db)
+}
+
+func repairSeededMenuButtonDefaults(db *gorm.DB) error {
+	if err := db.Model(&model.SysMenuButton{}).
+		Where("display_mode = '' OR display_mode IS NULL").
+		Update("display_mode", enum.ButtonDisplayAuto).Error; err != nil {
+		return err
+	}
+	return db.Model(&model.SysMenuButtonTemplate{}).
+		Where("display_mode = '' OR display_mode IS NULL").
+		Update("display_mode", enum.ButtonDisplayAuto).Error
 }
 
 func seedConfigure(db *gorm.DB) error {
@@ -937,6 +952,7 @@ func migrationTimestamps(createAt, modifyAt model.CustomTime) (model.CustomTime,
 
 func migrationMenuButtonCreateMap(button model.SysMenuButton) map[string]interface{} {
 	gmtCreate, gmtModify := migrationTimestamps(button.GmtCreate, button.GmtModify)
+	button = normalizeMigrationMenuButton(button)
 	return map[string]interface{}{
 		"id":            button.Id,
 		"gmt_create":    gmtCreate,
@@ -972,6 +988,7 @@ func migrationMenuButtonCreateMap(button model.SysMenuButton) map[string]interfa
 
 func migrationMenuButtonTemplateCreateMap(template model.SysMenuButtonTemplate) map[string]interface{} {
 	gmtCreate, gmtModify := migrationTimestamps(template.GmtCreate, template.GmtModify)
+	template = normalizeMigrationMenuButtonTemplate(template)
 	return map[string]interface{}{
 		"id":            template.Id,
 		"gmt_create":    gmtCreate,
@@ -1230,6 +1247,7 @@ func seedMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName stri
 }
 
 func seedMenuButton(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, button model.SysMenuButton) error {
+	button = normalizeMigrationMenuButton(button)
 	var existing model.SysMenuButton
 	err := db.Where("menu_id = ? AND code = ?", button.MenuId, button.Code).First(&existing).Error
 	if err == nil {
@@ -1242,6 +1260,7 @@ func seedMenuButton(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName strin
 			"event_action":  button.EventAction,
 			"icon":          button.Icon,
 			"color":         button.Color,
+			"display_mode":  button.DisplayMode,
 			"sequence":      button.Sequence,
 			"path":          button.Path,
 			"method":        strings.ToUpper(button.Method),
@@ -1332,6 +1351,7 @@ func disableLowCodeFileButtonTemplates(db *gorm.DB) error {
 }
 
 func seedLowCodeMenuButtonTemplate(db *gorm.DB, sf *utils.Snowflake, template model.SysMenuButtonTemplate) error {
+	template = normalizeMigrationMenuButtonTemplate(template)
 	var existing model.SysMenuButtonTemplate
 	err := db.Where("scene = ? AND code_suffix = ?", template.Scene, template.CodeSuffix).First(&existing).Error
 	if err == nil {
@@ -1547,9 +1567,28 @@ func menuButton(id, menuID int, name, code string, position enum.SysMenuButtonPo
 		EventAction: action,
 		Icon:        icon,
 		Color:       color,
+		DisplayMode: enum.ButtonDisplayAuto,
 		Sequence:    sequence,
 		IsButton:    true,
 	}
+}
+
+func normalizeMigrationMenuButton(button model.SysMenuButton) model.SysMenuButton {
+	displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(button.DisplayMode))
+	if !ok {
+		displayMode = enum.ButtonDisplayAuto
+	}
+	button.DisplayMode = displayMode
+	return button
+}
+
+func normalizeMigrationMenuButtonTemplate(template model.SysMenuButtonTemplate) model.SysMenuButtonTemplate {
+	displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(template.DisplayMode))
+	if !ok {
+		displayMode = enum.ButtonDisplayAuto
+	}
+	template.DisplayMode = displayMode
+	return template
 }
 
 func menuButtonWithAPI(id, menuID int, name, code string, position enum.SysMenuButtonPosition, action, icon, color string, sequence uint8, path, method string) model.SysMenuButton {
@@ -1834,6 +1873,13 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 
 func normalizeSystemColumnDefault(fieldType enum.SysTableFieldType, defaultValue string) string {
 	value := strings.TrimSpace(defaultValue)
+	value = strings.TrimSuffix(value, "::character varying")
+	value = strings.TrimSuffix(value, "::text")
+	value = strings.TrimSuffix(value, "::bpchar")
+	value = strings.TrimSuffix(value, "::smallint")
+	value = strings.TrimSuffix(value, "::integer")
+	value = strings.TrimSuffix(value, "::bigint")
+	value = strings.Trim(value, "'")
 	if fieldType == enum.BooleanFieldType {
 		switch strings.ToLower(value) {
 		case "true", "t", "1":
@@ -1846,6 +1892,16 @@ func normalizeSystemColumnDefault(fieldType enum.SysTableFieldType, defaultValue
 }
 
 func systemMetadataDefaultValue(tableCode, fieldCode string, fieldType enum.SysTableFieldType) string {
+	switch fieldCode {
+	case "field_category":
+		if tableCode == "sys_table_field" {
+			return string(enum.NormalField)
+		}
+	case "relation_type":
+		if tableCode == "sys_table_relation" {
+			return strconv.Itoa(int(enum.OneToMany))
+		}
+	}
 	if fieldType != enum.BooleanFieldType {
 		return ""
 	}
@@ -1920,15 +1976,15 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 	case "relation_type":
 		return "sys_table_relation_type"
 	case "position":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_position"
 		}
 	case "display_mode":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_display_mode"
 		}
 	case "event_action":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_event_action"
 		}
 	case "method", "http_method":

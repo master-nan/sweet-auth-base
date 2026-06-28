@@ -115,8 +115,21 @@ export const metadataDictDefault = (
   if (code === 'input_type') return 'sys_table_field_input_type'
   if (code === 'field_category') return 'sys_table_field_category'
   if (code === 'relation_type') return 'sys_table_relation_type'
-  if (code === 'position' && table === 'sys_menu_button') return 'sys_menu_button_position'
-  if (code === 'display_mode' && table === 'sys_menu_button') return 'sys_menu_button_display_mode'
+  if (code === 'position' && (table === 'sys_menu_button' || table === 'sys_menu_button_template')) {
+    return 'sys_menu_button_position'
+  }
+  if (
+    code === 'display_mode' &&
+    (table === 'sys_menu_button' || table === 'sys_menu_button_template')
+  ) {
+    return 'sys_menu_button_display_mode'
+  }
+  if (
+    code === 'event_action' &&
+    (table === 'sys_menu_button' || table === 'sys_menu_button_template')
+  ) {
+    return 'sys_menu_button_event_action'
+  }
   if (code === 'method' || code === 'http_method') return 'http_method'
   if (isBooleanFieldType(fieldType) || booleanLikeFieldCode(code)) return 'whether'
   return ''

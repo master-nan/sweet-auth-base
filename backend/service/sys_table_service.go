@@ -2028,6 +2028,10 @@ func (s *SysTableService) ensureDefaultCrudButtons(tx *gorm.DB, tableCode string
 func lowCodeDefaultMenuButtons(tableCode string, templates []model.SysMenuButtonTemplate) []model.SysMenuButton {
 	buttons := make([]model.SysMenuButton, 0, len(templates))
 	for _, template := range templates {
+		displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(template.DisplayMode))
+		if !ok {
+			displayMode = enum.ButtonDisplayAuto
+		}
 		buttons = append(buttons, model.SysMenuButton{
 			Name:         template.Name,
 			Code:         tableCode + template.CodeSuffix,
@@ -2037,7 +2041,7 @@ func lowCodeDefaultMenuButtons(tableCode string, templates []model.SysMenuButton
 			EventAction:  template.EventAction,
 			Icon:         template.Icon,
 			Color:        template.Color,
-			DisplayMode:  template.DisplayMode,
+			DisplayMode:  displayMode,
 			Sequence:     template.Sequence,
 			Path:         template.Path,
 			Method:       strings.ToUpper(template.Method),
@@ -2045,7 +2049,7 @@ func lowCodeDefaultMenuButtons(tableCode string, templates []model.SysMenuButton
 			ConfirmText:  template.ConfirmText,
 			DisableWhen:  template.DisableWhen,
 			IsButton:     template.IsButton,
-			IsHidden:     !template.IsButton,
+			IsHidden:     false,
 			IsDisabled:   template.IsDisabled,
 			BeforeHooks:  template.BeforeHooks,
 			AfterHooks:   template.AfterHooks,
@@ -2451,15 +2455,15 @@ func systemFieldDictCode(tableCode, fieldCode string, fieldType enum.SysTableFie
 	case "relation_type":
 		return "sys_table_relation_type"
 	case "position":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_position"
 		}
 	case "display_mode":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_display_mode"
 		}
 	case "event_action":
-		if tableCode == "sys_menu_button" {
+		if tableCode == "sys_menu_button" || tableCode == "sys_menu_button_template" {
 			return "sys_menu_button_event_action"
 		}
 	case "method", "http_method":
