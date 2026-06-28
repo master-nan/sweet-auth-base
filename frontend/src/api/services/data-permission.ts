@@ -114,6 +114,42 @@ export interface UserDataPermissionOverrideSaveItem {
   state?: boolean
 }
 
+export interface DataPermissionScopeCondition {
+  DimensionCode?: string
+  Field?: string
+  MatchType?: string
+  ValueType?: string
+  Values?: string[]
+  dimension_code: string
+  field: string
+  match_type: string
+  value_type: string
+  values: string[]
+}
+
+export interface DataPermissionResolvedScope {
+  AllowAll?: boolean
+  DenyAll?: boolean
+  Conditions?: DataPermissionScopeCondition[]
+  allow_all?: boolean
+  deny_all?: boolean
+  conditions?: DataPermissionScopeCondition[]
+}
+
+export interface DataPermissionDebugResult {
+  user_id: number
+  user_name: string
+  menu_id: number
+  table_code: string
+  action: DataPermissionAction | string
+  role_ids: number[]
+  scope?: DataPermissionResolvedScope
+  bindings: DataPermissionBinding[]
+  role_scopes: RoleDataPermission[]
+  user_overrides: UserDataPermissionOverride[]
+  notes: string[]
+}
+
 export const dataPermissionActionOptions = [
   { label: '查询', value: 'query' },
   { label: '详情', value: 'detail' },
@@ -232,6 +268,16 @@ export const useDataPermissionApi = () => {
       .then((res) => res.data)
   }
 
+  const debugDataScope = async (params: {
+    menu_id?: number
+    table_code: string
+    action: DataPermissionAction | string
+  }) => {
+    return instance
+      .get<ResponseData<DataPermissionDebugResult>>('/admin/data-permission/debug', { params })
+      .then((res) => res.data)
+  }
+
   return {
     queryDimensions,
     getDimensionById,
@@ -245,5 +291,6 @@ export const useDataPermissionApi = () => {
     saveRoleDataPermissions,
     getUserDataPermissionOverrides,
     saveUserDataPermissionOverrides,
+    debugDataScope,
   }
 }

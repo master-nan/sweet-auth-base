@@ -98,7 +98,13 @@
             #[`body-cell-${field.field_code}`]="props"
           >
             <q-td :props="props">
-              <file-display :model-value="props.row[field.field_code]" dense />
+              <file-display
+                :model-value="props.row[field.field_code]"
+                :table-code="currentTable?.table_code || query.table_code || ''"
+                :record-id="props.row.id"
+                :menu-id="resolveMenuId() || 0"
+                dense
+              />
             </q-td>
           </template>
 
@@ -298,7 +304,12 @@
             #[`body-cell-${field.field_code}`]="props"
           >
             <q-td :props="props">
-              <file-display :model-value="props.row[field.field_code]" dense />
+              <file-display
+                :model-value="props.row[field.field_code]"
+                :table-code="detailTable?.table_code || ''"
+                :record-id="props.row.id"
+                dense
+              />
             </q-td>
           </template>
 
@@ -390,7 +401,13 @@
         #[`body-cell-${field.field_code}`]="props"
       >
         <q-td :props="props">
-          <file-display :model-value="props.row[field.field_code]" dense />
+          <file-display
+            :model-value="props.row[field.field_code]"
+            :table-code="currentTable?.table_code || query.table_code || ''"
+            :record-id="props.row.id"
+            :menu-id="resolveMenuId() || 0"
+            dense
+          />
         </q-td>
       </template>
 
@@ -1516,6 +1533,26 @@ const executeMenuButtonAction = async (
     },
     onBatchDelete: async (rows: Array<Record<string, any>>) => {
       if (!currentTable.value?.table_code) return
+      if (button.api_path) {
+        const method = (button.http_method || 'DELETE').toUpperCase()
+        await instance.request({
+          url: button.api_path,
+          method,
+          data: {
+            table_code: currentTable.value.table_code,
+            ids: rows.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0),
+            menu_id: resolveMenuId() || 0,
+          },
+        })
+        selected.value = []
+        $q.notify({
+          type: 'positive',
+          position: 'top-right',
+          message: t('generalization.actionSuccess'),
+        })
+        fetchData()
+        return
+      }
       for (const r of rows) {
         if (r.id) {
           await generalizationApi.deleteGeneralization({
@@ -1565,8 +1602,11 @@ const executeMenuButtonAction = async (
       // 有 api_path 时走后端导出
       const method = (button.http_method || 'POST').toUpperCase()
       const payload = {
-        table_code: currentTable.value?.table_code,
-        selection: selected.value,
+        ...query.value,
+        page: query.value.page || 1,
+        num: query.value.num || pagination.value.rowsPerPage || 10000,
+        table_code: currentTable.value?.table_code || '',
+        menu_id: resolveMenuId() || 0,
         params,
       }
       const res = await instance.request({
@@ -1579,7 +1619,7 @@ const executeMenuButtonAction = async (
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${currentTable.value?.table_code || 'export'}.xlsx`
+      a.download = `${currentTable.value?.table_code || 'export'}.csv`
       a.click()
       URL.revokeObjectURL(url)
     },

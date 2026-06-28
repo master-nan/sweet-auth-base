@@ -91,7 +91,14 @@
                 >
                   {{ field.rawValue ? '是' : '否' }}
                 </q-chip>
-                <file-display v-else-if="field.kind === 'file'" :model-value="field.rawValue" />
+                <file-display
+                  v-else-if="field.kind === 'file'"
+                  :model-value="field.rawValue"
+                  :table-code="tableCode"
+                  :record-id="recordId"
+                  :menu-id="resolveDetailMenuId()"
+                  access-action="detail"
+                />
                 <div
                   v-else-if="field.kind === 'rich-text'"
                   class="record-detail-rich-text"
@@ -510,7 +517,12 @@ async function hydrateDetailRichText() {
       if (typeof rawValue !== 'string' || rawValue.trim() === '') return
 
       next[key] = await hydrateRichTextFileUrls(rawValue, async (fileUuid, mode) => {
-        const response = await fileApi.getFileAccessUrl(fileUuid, mode)
+        const response = await fileApi.getFileAccessUrl(fileUuid, mode, 900, {
+          table_code: tableCode.value,
+          record_id: recordId.value,
+          menu_id: resolveDetailMenuId(),
+          action: 'detail',
+        })
         return response.success ? response.data?.url : undefined
       })
     }),

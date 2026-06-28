@@ -69,7 +69,7 @@ import {
 } from '@open-file-viewer/core'
 import '@open-file-viewer/core/style.css'
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
-import { useFileApi, type FileInfo } from 'src/api/services/file'
+import { useFileApi, type FileBusinessContext, type FileInfo } from 'src/api/services/file'
 
 const $q = useQuasar()
 const fileApi = useFileApi()
@@ -119,7 +119,7 @@ const toolbarOptions: PreviewToolbarOptions = {
   },
 }
 
-const open = async (file: FileInfo) => {
+const open = async (file: FileInfo, context?: FileBusinessContext) => {
   if (!file.file_uuid) {
     $q.notify({ type: 'warning', position: 'top-right', message: '文件缺少访问标识' })
     return
@@ -133,8 +133,8 @@ const open = async (file: FileInfo) => {
 
   try {
     const [previewRes, downloadRes] = await Promise.all([
-      fileApi.getFilePreviewAccessUrl(file.file_uuid),
-      fileApi.getFileDownloadAccessUrl(file.file_uuid),
+      fileApi.getFilePreviewAccessUrl(file.file_uuid, 900, context),
+      fileApi.getFileDownloadAccessUrl(file.file_uuid, 900, context),
     ])
     if (!previewRes.success || !previewRes.data?.url) {
       throw new Error(previewRes.message || '获取文件预览地址失败')

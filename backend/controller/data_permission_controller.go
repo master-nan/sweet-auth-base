@@ -3,10 +3,13 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
+	"backend/model"
 	"backend/service"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
@@ -224,4 +227,34 @@ func (d *DataPermissionController) SaveUserOverrides(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+}
+
+func (d *DataPermissionController) DebugDataScope(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	user := ctx.MustGet("user").(model.SysUser)
+	menuId := 0
+	if rawMenuId := strings.TrimSpace(ctx.Query("menu_id")); rawMenuId != "" {
+		parsed, err := strconv.Atoi(rawMenuId)
+		if err != nil || parsed < 0 {
+			_ = ctx.Error(myerrors.ErrParamInvalid)
+			return
+		}
+		menuId = parsed
+	}
+	action := enum.ButtonActionQuery
+	if rawAction := strings.TrimSpace(ctx.Query("action")); rawAction != "" {
+		normalized, ok := enum.NormalizeSysMenuButtonEventAction(rawAction)
+		if !ok {
+			_ = ctx.Error(myerrors.ErrParamInvalid)
+			return
+		}
+		action = normalized
+	}
+	result, err := d.dataPermissionService.DebugDataScope(user, menuId, ctx.Query("table_code"), action)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
 }

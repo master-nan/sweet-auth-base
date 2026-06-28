@@ -9,6 +9,7 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	"backend/internal/cache"
 	myerrors "backend/internal/errors"
 	"backend/internal/security"
@@ -187,6 +188,10 @@ func (u *UserController) GetUserById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionDetail); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	data, err := u.sysUserService.GetById(id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -258,6 +263,10 @@ func (u *UserController) UpdateUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	err = u.sysUserService.Update(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -282,6 +291,10 @@ func (u *UserController) DeleteUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionDelete); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	err = u.sysUserService.Delete(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -303,6 +316,10 @@ func (u *UserController) ResetPassword(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -354,6 +371,10 @@ func (u *UserController) UnlockLogin(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

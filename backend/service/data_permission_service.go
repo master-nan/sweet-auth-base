@@ -7,6 +7,7 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
+	queryutil "backend/repository/util"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -53,6 +54,20 @@ type DataPermissionOption struct {
 	Label  string `json:"label"`
 	Value  string `json:"value"`
 	Parent string `json:"parent,omitempty"`
+}
+
+type DataPermissionDebugResult struct {
+	UserId        int                              `json:"user_id"`
+	UserName      string                           `json:"user_name"`
+	MenuId        int                              `json:"menu_id"`
+	TableCode     string                           `json:"table_code"`
+	Action        enum.SysMenuButtonEventAction    `json:"action"`
+	RoleIds       []int                            `json:"role_ids"`
+	Scope         *request.DataScope               `json:"scope"`
+	Bindings      []model.SysDataScopeBinding      `json:"bindings"`
+	RoleScopes    []model.SysRoleDataScope         `json:"role_scopes"`
+	UserOverrides []model.SysUserDataScopeOverride `json:"user_overrides"`
+	Notes         []string                         `json:"notes"`
 }
 
 type scopeDecision struct {
@@ -385,7 +400,7 @@ func (s *DataPermissionService) ResolveDataScope(user model.SysUser, menuId int,
 		if dimension.Code == "" {
 			return &request.DataScope{DenyAll: true}, nil
 		}
-		decision, err := s.resolveBindingDecision(user, roleIds, binding)
+		decision, err := s.resolveBindingDecision(user, roleIds, binding, dimension)
 		if err != nil {
 			return nil, err
 		}
@@ -434,6 +449,173 @@ func (s *DataPermissionService) ResolveDataScopeForTableAction(user model.SysUse
 		return &request.DataScope{DenyAll: true}, nil
 	}
 	return s.ResolveDataScope(user, menuIds[0], table, action)
+}
+
+func (s *DataPermissionService) CheckRecordDataScope(user model.SysUser, menuId int, table model.SysTable, id int, action enum.SysMenuButtonEventAction) error {
+	if id <= 0 {
+		return myerrors.ErrParamInvalid
+	}
+	scope, err := s.ResolveDataScopeForTableAction(user, menuId, table, action)
+	if err != nil {
+		return err
+	}
+	if scope == nil || scope.AllowAll {
+		return nil
+	}
+	if scope.DenyAll {
+		return myerrors.ErrPermissionDenied
+	}
+	var count int64
+	query := s.db.Table(table.TableCode).Where("id = ?", id)
+	query = queryutil.ApplyDataScope(query, scope, table)
+	if err := query.Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return myerrors.ErrPermissionDenied
+	}
+	return nil
+}
+
+func (s *DataPermissionService) DebugDataScope(user model.SysUser, menuId int, tableCode string, action enum.SysMenuButtonEventAction) (DataPermissionDebugResult, error) {
+	tableCode = strings.TrimSpace(tableCode)
+	result := DataPermissionDebugResult{
+		UserId:    user.Id,
+		UserName:  user.UserName,
+		MenuId:    menuId,
+		TableCode: tableCode,
+		Action:    action,
+		Notes:     []string{},
+	}
+	if tableCode == "" {
+		return result, myerrors.ErrParamInvalid
+	}
+	var table model.SysTable
+	err := s.db.Preload("TableFields").Where("table_code = ?", tableCode).First(&table).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return result, myerrors.ErrTableNotFound
+	}
+	if err != nil {
+		return result, err
+	}
+	roleIds, err := s.userRoleIds(user.Id)
+	if err != nil {
+		return result, err
+	}
+	result.RoleIds = roleIds
+	scope, err := s.ResolveDataScopeForTableAction(user, menuId, table, action)
+	if err != nil {
+		return result, err
+	}
+	result.Scope = scope
+	effectiveMenuIds := []int{}
+	if menuId > 0 {
+		effectiveMenuIds = append(effectiveMenuIds, menuId)
+	} else {
+		effectiveMenuIds, err = s.activeBoundMenuIdsFor(tableCode, action)
+		if err != nil {
+			return result, err
+		}
+		if len(effectiveMenuIds) == 0 {
+			result.Notes = append(result.Notes, "当前表和动作未配置数据权限绑定")
+		}
+		if len(effectiveMenuIds) > 1 {
+			result.Notes = append(result.Notes, "未传menu_id且存在多个绑定菜单，运行时会拒绝访问")
+		}
+	}
+	if len(effectiveMenuIds) == 0 {
+		return result, nil
+	}
+	if err := s.db.Preload("Dimension").
+		Where("menu_id IN ? AND table_code = ? AND state = ?", effectiveMenuIds, tableCode, true).
+		Order("menu_id ASC, id ASC").
+		Find(&result.Bindings).Error; err != nil {
+		return result, err
+	}
+	filteredBindings := make([]model.SysDataScopeBinding, 0, len(result.Bindings))
+	dimensionCodes := map[string]struct{}{}
+	for _, binding := range result.Bindings {
+		binding.ActionList = decodeStringList(binding.Actions)
+		if !actionApplies(binding.ActionList, action) {
+			continue
+		}
+		filteredBindings = append(filteredBindings, binding)
+		dimensionCodes[binding.DimensionCode] = struct{}{}
+	}
+	result.Bindings = filteredBindings
+	if len(roleIds) > 0 && len(dimensionCodes) > 0 {
+		codes := sortedStringSet(dimensionCodes)
+		if err := s.db.Preload("Role").Preload("Dimension").
+			Where("role_id IN ? AND menu_id IN ? AND table_code = ? AND dimension_code IN ? AND state = ?", roleIds, effectiveMenuIds, tableCode, codes, true).
+			Order("role_id ASC, menu_id ASC, id ASC").
+			Find(&result.RoleScopes).Error; err != nil {
+			return result, err
+		}
+		for i := range result.RoleScopes {
+			result.RoleScopes[i].ScopeValueList = decodeStringList(result.RoleScopes[i].ScopeValues)
+		}
+		if err := s.db.Preload("Dimension").
+			Where("user_id = ? AND menu_id IN ? AND table_code = ? AND dimension_code IN ? AND state = ?", user.Id, effectiveMenuIds, tableCode, codes, true).
+			Order("menu_id ASC, id ASC").
+			Find(&result.UserOverrides).Error; err != nil {
+			return result, err
+		}
+		for i := range result.UserOverrides {
+			result.UserOverrides[i].ScopeValueList = decodeStringList(result.UserOverrides[i].ScopeValues)
+		}
+	}
+	return result, nil
+}
+
+func (s *DataPermissionService) RecordContainsValue(table model.SysTable, id int, needle string) (bool, error) {
+	if id <= 0 || strings.TrimSpace(table.TableCode) == "" || strings.TrimSpace(needle) == "" {
+		return false, nil
+	}
+	var row map[string]interface{}
+	err := s.db.Table(table.TableCode).Where("id = ?", id).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	fileFieldSet := map[string]struct{}{}
+	for _, field := range table.TableFields {
+		if field.InputType == enum.FilePickerInputType || field.InputType == enum.RichTextInputType {
+			fileFieldSet[field.FieldCode] = struct{}{}
+		}
+	}
+	for field, value := range row {
+		if len(fileFieldSet) > 0 {
+			if _, ok := fileFieldSet[field]; !ok {
+				continue
+			}
+		}
+		if recordValueContains(value, needle) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func recordValueContains(value interface{}, needle string) bool {
+	needle = strings.TrimSpace(needle)
+	if needle == "" || value == nil {
+		return false
+	}
+	haystack := ""
+	switch v := value.(type) {
+	case []byte:
+		haystack = string(v)
+	case string:
+		haystack = v
+	default:
+		haystack = fmt.Sprintf("%v", v)
+	}
+	if _, err := strconv.Atoi(needle); err == nil {
+		return regexp.MustCompile(`(^|[^0-9])` + regexp.QuoteMeta(needle) + `([^0-9]|$)`).MatchString(haystack)
+	}
+	return strings.Contains(haystack, needle)
 }
 
 func (s *DataPermissionService) dimensionFromCreateReq(req request.DataPermissionDimensionCreateReq) (model.SysDataDimension, error) {
@@ -714,7 +896,7 @@ func (s *DataPermissionService) userRoleIds(userId int) ([]int, error) {
 	return roleIds, nil
 }
 
-func (s *DataPermissionService) resolveBindingDecision(user model.SysUser, roleIds []int, binding model.SysDataScopeBinding) (scopeDecision, error) {
+func (s *DataPermissionService) resolveBindingDecision(user model.SysUser, roleIds []int, binding model.SysDataScopeBinding, dimension model.SysDataDimension) (scopeDecision, error) {
 	decision := scopeDecision{values: map[string]struct{}{}}
 	var roleScopes []model.SysRoleDataScope
 	err := s.db.
@@ -729,18 +911,21 @@ func (s *DataPermissionService) resolveBindingDecision(user model.SysUser, roleI
 		} else {
 			decision.all = true
 		}
-		return s.applyUserOverrides(user, binding, decision)
+		return s.applyUserOverrides(user, binding, dimension, decision)
 	}
 	hasSpecified := false
 	for _, scope := range roleScopes {
-		next := strategyDecision(scope.Strategy, decodeStringList(scope.ScopeValues), user.Id)
+		next, err := s.strategyDecision(dimension, scope.Strategy, decodeStringList(scope.ScopeValues), user.Id)
+		if err != nil {
+			return decision, err
+		}
 		if next.deny {
 			continue
 		}
 		if next.all {
 			decision.all = true
 			decision.values = map[string]struct{}{}
-			return s.applyUserOverrides(user, binding, decision)
+			return s.applyUserOverrides(user, binding, dimension, decision)
 		}
 		hasSpecified = true
 		for value := range next.values {
@@ -750,10 +935,10 @@ func (s *DataPermissionService) resolveBindingDecision(user model.SysUser, roleI
 	if !hasSpecified && len(decision.values) == 0 {
 		decision.deny = true
 	}
-	return s.applyUserOverrides(user, binding, decision)
+	return s.applyUserOverrides(user, binding, dimension, decision)
 }
 
-func (s *DataPermissionService) applyUserOverrides(user model.SysUser, binding model.SysDataScopeBinding, base scopeDecision) (scopeDecision, error) {
+func (s *DataPermissionService) applyUserOverrides(user model.SysUser, binding model.SysDataScopeBinding, dimension model.SysDataDimension, base scopeDecision) (scopeDecision, error) {
 	var overrides []model.SysUserDataScopeOverride
 	err := s.db.
 		Where("user_id = ? AND menu_id = ? AND table_code = ? AND dimension_code = ? AND state = ?", user.Id, binding.MenuId, binding.TableCode, binding.DimensionCode, true).
@@ -766,7 +951,10 @@ func (s *DataPermissionService) applyUserOverrides(user model.SysUser, binding m
 		if override.ExpireAt != nil && time.Time(*override.ExpireAt).Before(now) {
 			continue
 		}
-		overrideDecision := strategyDecision(override.Strategy, decodeStringList(override.ScopeValues), user.Id)
+		overrideDecision, err := s.strategyDecision(dimension, override.Strategy, decodeStringList(override.ScopeValues), user.Id)
+		if err != nil {
+			return base, err
+		}
 		switch normalizeOverrideModeValue(override.OverrideMode) {
 		case dataPermissionOverrideDeny:
 			return scopeDecision{deny: true, values: map[string]struct{}{}}, nil
@@ -781,21 +969,88 @@ func (s *DataPermissionService) applyUserOverrides(user model.SysUser, binding m
 	return base, nil
 }
 
-func strategyDecision(strategy string, values []string, userId int) scopeDecision {
+func (s *DataPermissionService) strategyDecision(dimension model.SysDataDimension, strategy string, values []string, userId int) (scopeDecision, error) {
 	decision := scopeDecision{values: map[string]struct{}{}}
 	switch normalizeStrategyValue(strategy) {
 	case dataPermissionStrategyAll:
 		decision.all = true
 	case dataPermissionStrategySelf:
 		decision.values[strconv.Itoa(userId)] = struct{}{}
-	case dataPermissionStrategySpecified, dataPermissionStrategyTree:
+	case dataPermissionStrategySpecified:
 		for _, value := range normalizeStringValues(values) {
 			decision.values[value] = struct{}{}
 		}
+	case dataPermissionStrategyTree:
+		for _, value := range normalizeStringValues(values) {
+			decision.values[value] = struct{}{}
+		}
+		expanded, err := s.expandTreeScopeValues(dimension, decision.values)
+		if err != nil {
+			return decision, err
+		}
+		decision.values = expanded
 	default:
 		decision.deny = true
 	}
-	return decision
+	return decision, nil
+}
+
+func (s *DataPermissionService) expandTreeScopeValues(dimension model.SysDataDimension, roots map[string]struct{}) (map[string]struct{}, error) {
+	if len(roots) == 0 ||
+		dimension.SourceType != dataPermissionSourceTypeTable ||
+		strings.TrimSpace(dimension.SourceCode) == "" ||
+		strings.TrimSpace(dimension.ValueField) == "" ||
+		strings.TrimSpace(dimension.ParentField) == "" {
+		return roots, nil
+	}
+	if err := validateIdentifier("来源表", dimension.SourceCode); err != nil {
+		return roots, err
+	}
+	if err := validateIdentifier("值字段", dimension.ValueField); err != nil {
+		return roots, err
+	}
+	if err := validateIdentifier("父级字段", dimension.ParentField); err != nil {
+		return roots, err
+	}
+	selects := []string{dimension.ValueField, dimension.ParentField}
+	var rows []map[string]interface{}
+	if err := s.db.Table(dimension.SourceCode).Select(strings.Join(selects, ",")).Limit(10000).Find(&rows).Error; err != nil {
+		return roots, err
+	}
+	childrenByParent := map[string][]string{}
+	for _, row := range rows {
+		value := strings.TrimSpace(fmt.Sprintf("%v", row[dimension.ValueField]))
+		if value == "" {
+			continue
+		}
+		parentRaw := row[dimension.ParentField]
+		if parentRaw == nil {
+			continue
+		}
+		parent := strings.TrimSpace(fmt.Sprintf("%v", parentRaw))
+		if parent == "" || parent == "<nil>" {
+			continue
+		}
+		childrenByParent[parent] = append(childrenByParent[parent], value)
+	}
+	expanded := map[string]struct{}{}
+	queue := make([]string, 0, len(roots))
+	for value := range roots {
+		expanded[value] = struct{}{}
+		queue = append(queue, value)
+	}
+	for len(queue) > 0 {
+		parent := queue[0]
+		queue = queue[1:]
+		for _, child := range childrenByParent[parent] {
+			if _, exists := expanded[child]; exists {
+				continue
+			}
+			expanded[child] = struct{}{}
+			queue = append(queue, child)
+		}
+	}
+	return expanded, nil
 }
 
 func unionScopeDecision(left, right scopeDecision) scopeDecision {

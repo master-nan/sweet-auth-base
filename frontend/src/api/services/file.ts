@@ -15,6 +15,13 @@ export interface FileInfo extends Basic {
 
 export type FileAccessMode = 'preview' | 'download'
 
+export interface FileBusinessContext {
+  table_code?: string
+  record_id?: number | string
+  menu_id?: number
+  action?: 'query' | 'detail' | 'update' | 'delete'
+}
+
 export interface FileAccessUrl {
   url: string
   expires_at: number
@@ -138,27 +145,32 @@ export const useFileApi = () => {
     return `/admin/file/download/${uuid}`
   }
 
-  const getFilePreviewAccessUrl = (uuid: string, ttl = 900) => {
+  const getFilePreviewAccessUrl = (uuid: string, ttl = 900, context?: FileBusinessContext) => {
     return instance
       .get<ResponseData<FileAccessUrl>>(`/admin/file/preview-url/${uuid}`, {
-        params: { ttl },
+        params: { ttl, ...(context || {}) },
       })
       .then((res) => res.data)
   }
 
-  const getFileDownloadAccessUrl = (uuid: string, ttl = 900) => {
+  const getFileDownloadAccessUrl = (uuid: string, ttl = 900, context?: FileBusinessContext) => {
     return instance
       .get<ResponseData<FileAccessUrl>>(`/admin/file/download-url/${uuid}`, {
-        params: { ttl },
+        params: { ttl, ...(context || {}) },
       })
       .then((res) => res.data)
   }
 
-  const getFileAccessUrl = (uuid: string, mode: FileAccessMode = 'preview', ttl = 900) => {
+  const getFileAccessUrl = (
+    uuid: string,
+    mode: FileAccessMode = 'preview',
+    ttl = 900,
+    context?: FileBusinessContext,
+  ) => {
     if (mode === 'download') {
-      return getFileDownloadAccessUrl(uuid, ttl)
+      return getFileDownloadAccessUrl(uuid, ttl, context)
     }
-    return getFilePreviewAccessUrl(uuid, ttl)
+    return getFilePreviewAccessUrl(uuid, ttl, context)
   }
 
   return {

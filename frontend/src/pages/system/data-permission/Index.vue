@@ -134,6 +134,55 @@
             当前菜单绑定表没有可用字段
           </q-banner>
 
+          <q-expansion-item
+            class="data-permission-debug-panel"
+            icon="policy"
+            label="权限排查"
+            caption="查看当前账号在该菜单和动作下的最终数据范围"
+            default-opened
+          >
+            <div class="data-permission-debug-body">
+              <q-select
+                v-model="debugAction"
+                dense
+                outlined
+                emit-value
+                map-options
+                label="动作"
+                :options="dataPermissionActionOptions"
+              />
+              <q-input v-model="debugTableCode" dense outlined label="表编码" />
+              <q-input
+                :model-value="String(selectedMenu.id)"
+                dense
+                outlined
+                readonly
+                label="菜单ID"
+              />
+              <q-btn
+                unelevated
+                color="primary"
+                icon="manage_search"
+                label="诊断"
+                :loading="debugLoading"
+                @click="loadDebugResult"
+              />
+            </div>
+            <div v-if="debugResult" class="data-permission-debug-result">
+              <q-chip dense square :color="debugScopeColor" text-color="white">
+                {{ debugScopeLabel }}
+              </q-chip>
+              <span>用户 {{ debugResult.user_name }} · 角色 {{ debugResult.role_ids?.join(', ') || '无' }}</span>
+              <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
+              <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
+              <span>个人覆盖 {{ debugResult.user_overrides?.length || 0 }} 条</span>
+              <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
+                {{ note }}
+              </q-chip>
+              <pre>{{ debugScopeText }}</pre>
+            </div>
+          </q-expansion-item>
+
           <q-table
             class="fit sticky-header-table"
             :rows="bindingRows"
@@ -263,6 +312,7 @@ import {
   dataPermissionActionOptions,
   type DataPermissionBinding,
   type DataPermissionBindingSaveItem,
+  type DataPermissionDebugResult,
   type DataPermissionDimension,
   type DataPermissionDimensionSaveReq,
   useDataPermissionApi,
@@ -306,6 +356,10 @@ const selectedMenu = ref<Menu | null>(null)
 const tableFieldOptions = ref<Array<{ label: string; value: string }>>([])
 const bindingRows = ref<BindingRow[]>([])
 const savingBindings = ref(false)
+const debugAction = ref('query')
+const debugTableCode = ref('')
+const debugLoading = ref(false)
+const debugResult = ref<DataPermissionDebugResult | null>(null)
 const dimensionDialogOpen = ref(false)
 const savingDimension = ref(false)
 const dimensionForm = ref<DataPermissionDimensionSaveReq>(emptyDimensionForm())
@@ -361,6 +415,28 @@ const filteredDimensions = computed(() => {
   return dimensions.value.filter((dimension) =>
     [dimension.code, dimension.name, dimension.memo].join(' ').toLowerCase().includes(keyword),
   )
+})
+
+const debugScope = computed(() => debugResult.value?.scope)
+
+const debugScopeLabel = computed(() => {
+  const scope = debugScope.value
+  if (!scope) return '未诊断'
+  if (scope.DenyAll || scope.deny_all) return '拒绝'
+  if (scope.AllowAll || scope.allow_all) return '全部'
+  return `条件 ${((scope.Conditions || scope.conditions) ?? []).length}`
+})
+
+const debugScopeColor = computed(() => {
+  const scope = debugScope.value
+  if (scope?.DenyAll || scope?.deny_all) return 'negative'
+  if (scope?.AllowAll || scope?.allow_all) return 'positive'
+  return 'primary'
+})
+
+const debugScopeText = computed(() => {
+  if (!debugResult.value) return ''
+  return JSON.stringify(debugResult.value.scope || {}, null, 2)
 })
 
 function emptyDimensionForm(): DataPermissionDimensionSaveReq {
@@ -445,6 +521,8 @@ const onMenuChange = async (menuId: number | null) => {
   selectedMenu.value = menuOptions.value.find((option) => option.value === menuId)?.menu || null
   tableFieldOptions.value = []
   bindingRows.value = []
+  debugResult.value = null
+  debugTableCode.value = selectedMenu.value?.table_code || ''
   if (!selectedMenu.value?.table_code) return
   const [tableResult, bindingResult] = await Promise.all([
     tableApi.queryTableByCode(selectedMenu.value.table_code),
@@ -459,6 +537,21 @@ const onMenuChange = async (menuId: number | null) => {
   bindingRows.value = (bindingResult.success ? bindingResult.data || [] : []).map((binding) =>
     bindingToRow(binding),
   )
+}
+
+const loadDebugResult = async () => {
+  if (!selectedMenu.value || !debugTableCode.value) return
+  debugLoading.value = true
+  try {
+    const result = await dataPermissionApi.debugDataScope({
+      menu_id: selectedMenu.value.id,
+      table_code: debugTableCode.value,
+      action: debugAction.value,
+    })
+    debugResult.value = result.success ? result.data || null : null
+  } finally {
+    debugLoading.value = false
+  }
 }
 
 const bindingToRow = (binding: DataPermissionBinding): BindingRow => ({
@@ -683,6 +776,44 @@ onMounted(() => {
   background: #f8fafc;
 }
 
+.data-permission-debug-panel {
+  margin-bottom: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-debug-body {
+  display: grid;
+  grid-template-columns: 180px minmax(180px, 1fr) 140px auto;
+  gap: 10px;
+  align-items: center;
+  padding: 0 16px 12px;
+}
+
+.data-permission-debug-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 0 16px 16px;
+  color: #4b5870;
+  font-size: 13px;
+}
+
+.data-permission-debug-result pre {
+  width: 100%;
+  max-height: 180px;
+  margin: 4px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f4f6fa;
+  color: #22304a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .data-permission-empty {
   height: 100%;
   display: flex;
@@ -722,6 +853,10 @@ onMounted(() => {
   .data-permission-menu-select {
     min-width: 0;
     width: 100%;
+  }
+
+  .data-permission-debug-body {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -1290,6 +1290,8 @@ func seedLowCodeMenuButtonTemplates(db *gorm.DB, sf *utils.Snowflake) error {
 		buttonTemplate(603, "详情", "_detail", enum.Line, "detail", "visibility", "primary", 0),
 		buttonTemplate(604, "编辑", "_update", enum.Line, "update", "edit", "primary", 1),
 		buttonTemplate(605, "删除", "_delete", enum.Line, "delete", "delete", "negative", 2),
+		buttonTemplate(606, "批量删除", "_batch_delete", enum.Top, "batch_delete", "delete_sweep", "negative", 3),
+		buttonTemplate(607, "导出", "_export", enum.Top, "export", "download", "primary", 4),
 	}
 	templates[1].Path = "/admin/generalization/create"
 	templates[1].Method = "POST"
@@ -1299,6 +1301,11 @@ func seedLowCodeMenuButtonTemplates(db *gorm.DB, sf *utils.Snowflake) error {
 	templates[5].Path = "/admin/generalization/delete"
 	templates[5].Method = "DELETE"
 	templates[5].ConfirmText = "确定要删除该数据吗？"
+	templates[6].Path = "/admin/generalization/batch-delete"
+	templates[6].Method = "DELETE"
+	templates[6].ConfirmText = "确定要批量删除选中的数据吗？"
+	templates[7].Path = "/admin/generalization/export"
+	templates[7].Method = "POST"
 	for _, template := range templates {
 		if err := seedLowCodeMenuButtonTemplate(db, sf, template); err != nil {
 			return err
@@ -1489,6 +1496,7 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/data-permission/dimension-options/:code", "GET"},
 		{"/admin/data-permission/bindings/menu/:menuId", "GET"},
 		{"/admin/data-permission/bindings/menu/:menuId", "PUT"},
+		{"/admin/data-permission/debug", "GET"},
 		{"/admin/application/:id", "GET"},
 		{"/admin/application/query", "POST"},
 		{"/admin/application", "POST"},
@@ -1506,6 +1514,8 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/generalization/create", "POST"},
 		{"/admin/generalization/update", "PUT"},
 		{"/admin/generalization/delete", "DELETE"},
+		{"/admin/generalization/batch-delete", "DELETE"},
+		{"/admin/generalization/export", "POST"},
 		{"/admin/file/upload", "POST"},
 		{"/admin/file/:id", "GET"},
 		{"/admin/file/:id", "DELETE"},

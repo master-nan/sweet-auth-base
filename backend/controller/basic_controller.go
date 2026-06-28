@@ -367,6 +367,10 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, b.sysTableService, b.dataPermissionService, "access_log", id, enum.ButtonActionDetail); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	logData, err := b.logService.GetAccessLogById(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)

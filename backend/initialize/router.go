@@ -191,6 +191,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/data-permission/dimension-options/:code", app.DataPermissionController.GetDimensionOptions)
 		adminGroup.GET("/data-permission/bindings/menu/:menuId", app.DataPermissionController.GetMenuBindings)
 		adminGroup.PUT("/data-permission/bindings/menu/:menuId", app.DataPermissionController.SaveMenuBindings)
+		adminGroup.GET("/data-permission/debug", app.DataPermissionController.DebugDataScope)
 
 		// application
 		adminGroup.GET("/application/:id", app.ApplicationController.GetApplicationById)
@@ -214,6 +215,8 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/generalization/create", app.GeneralizationController.Create)
 		adminGroup.PUT("/generalization/update", app.GeneralizationController.Update)
 		adminGroup.DELETE("/generalization/delete", app.GeneralizationController.Delete)
+		adminGroup.DELETE("/generalization/batch-delete", app.GeneralizationController.BatchDelete)
+		adminGroup.POST("/generalization/export", app.GeneralizationController.Export)
 
 		// file
 		adminGroup.POST("/file/upload", app.FileController.Upload)

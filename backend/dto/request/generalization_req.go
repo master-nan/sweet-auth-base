@@ -34,3 +34,9 @@ type GeneralizationDeleteReq struct {
 	TableCode string `json:"table_code" binding:"required"`
 	MenuId    int    `json:"menu_id"`
 }
+
+type GeneralizationBatchDeleteReq struct {
+	Ids       []int  `json:"ids" binding:"required,min=1"`
+	TableCode string `json:"table_code" binding:"required"`
+	MenuId    int    `json:"menu_id"`
+}

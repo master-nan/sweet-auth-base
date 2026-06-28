@@ -49,7 +49,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
+import {
+  useFileApi,
+  type FileAccessMode,
+  type FileBusinessContext,
+  type FileInfo,
+} from 'src/api/services/file'
 import { parseFileIds } from 'src/utils/file-value'
 import FilePreviewDialog from 'src/components/FileUpload/FilePreviewDialog.vue'
 
@@ -58,12 +63,20 @@ interface FileDisplayProps {
   dense?: boolean
   maxVisible?: number
   emptyText?: string
+  tableCode?: string
+  recordId?: number | string
+  menuId?: number
+  accessAction?: FileBusinessContext['action']
 }
 
 const props = withDefaults(defineProps<FileDisplayProps>(), {
   dense: false,
   maxVisible: 3,
   emptyText: '-',
+  tableCode: '',
+  recordId: 0,
+  menuId: 0,
+  accessAction: 'detail',
 })
 
 const $q = useQuasar()
@@ -109,14 +122,14 @@ async function openFile(file: FileInfo, mode: FileAccessMode) {
   }
 
   if (mode === 'preview') {
-    previewDialogRef.value?.open(file)
+    previewDialogRef.value?.open(file, fileBusinessContext.value)
     return
   }
 
   const response =
     mode === 'download'
-      ? await fileApi.getFileDownloadAccessUrl(file.file_uuid)
-      : await fileApi.getFilePreviewAccessUrl(file.file_uuid)
+      ? await fileApi.getFileDownloadAccessUrl(file.file_uuid, 900, fileBusinessContext.value)
+      : await fileApi.getFilePreviewAccessUrl(file.file_uuid, 900, fileBusinessContext.value)
   if (!response.success || !response.data?.url) {
     $q.notify({
       type: 'negative',
@@ -127,6 +140,16 @@ async function openFile(file: FileInfo, mode: FileAccessMode) {
   }
   window.open(response.data.url, '_blank', 'noopener,noreferrer')
 }
+
+const fileBusinessContext = computed<FileBusinessContext | undefined>(() => {
+  if (!props.tableCode || !props.recordId) return undefined
+  return {
+    table_code: props.tableCode,
+    record_id: props.recordId,
+    menu_id: props.menuId || 0,
+    action: props.accessAction || 'detail',
+  }
+})
 
 function formatFileSize(size: number) {
   if (!size) return '0 B'

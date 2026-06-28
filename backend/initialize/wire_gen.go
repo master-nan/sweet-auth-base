@@ -121,7 +121,7 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	fileService := service.NewFileService(fileRepositoryImpl, fileChunkRepositoryImpl, snowflake, server, storageStorage)
-	fileController := controller.NewFileController(fileService, server, v2)
+	fileController := controller.NewFileController(fileService, sysTableService, dataPermissionService, server, v2)
 	dingTalkCache := cache.NewDingTalkCache(redisUtil)
 	dingTalkUserIDCache := cache.NewDingTalkUserIDCache(redisUtil)
 	dingTalkService := service.NewDingTalkService(dingTalkCache, dingTalkUserIDCache, sysUserService)

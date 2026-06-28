@@ -169,6 +169,124 @@ func TestResolveDataScopeForTableActionDeniesAmbiguousBoundMenus(t *testing.T) {
 	}
 }
 
+func TestCheckRecordDataScopeDeniesOutsideRecord(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	table.TableFields = append(table.TableFields, model.SysTableField{FieldCode: "gmt_delete", FieldType: enum.DatetimeFieldType})
+	if err := service.db.Exec(`CREATE TABLE demo_order (id INTEGER PRIMARY KEY, tenant_id INTEGER, name TEXT, gmt_delete DATETIME)`).Error; err != nil {
+		t.Fatalf("create demo table: %v", err)
+	}
+	if err := service.db.Exec(`INSERT INTO demo_order (id, tenant_id, name) VALUES (1, 8, 'allowed'), (2, 9, 'denied')`).Error; err != nil {
+		t.Fatalf("seed demo rows: %v", err)
+	}
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysMenu{
+		Basic:     model.Basic{Id: 10, State: true},
+		Name:      "demo_order",
+		PageType:  enum.MenuPageTypeFixed,
+		TableCode: "demo_order",
+	})
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "specified",
+		ScopeValues:   `["8"]`,
+	})
+
+	user := model.SysUser{Basic: model.Basic{Id: 7}}
+	if err := service.CheckRecordDataScope(user, 10, table, 1, enum.ButtonActionUpdate); err != nil {
+		t.Fatalf("expected row 1 to pass: %v", err)
+	}
+	if err := service.CheckRecordDataScope(user, 10, table, 2, enum.ButtonActionUpdate); err == nil {
+		t.Fatalf("expected row 2 to be denied")
+	}
+}
+
+func TestRecordContainsValueMatchesFileIdExactly(t *testing.T) {
+	service, _ := newDataPermissionServiceForTest(t)
+	if err := service.db.Exec(`CREATE TABLE demo_file_record (id INTEGER PRIMARY KEY, attachments TEXT)`).Error; err != nil {
+		t.Fatalf("create file record table: %v", err)
+	}
+	if err := service.db.Exec(`INSERT INTO demo_file_record (id, attachments) VALUES (1, '[11,12]')`).Error; err != nil {
+		t.Fatalf("seed file record: %v", err)
+	}
+	table := model.SysTable{
+		TableCode: "demo_file_record",
+		TableFields: []model.SysTableField{
+			{FieldCode: "attachments", InputType: enum.FilePickerInputType},
+		},
+	}
+	matched, err := service.RecordContainsValue(table, 1, "11")
+	if err != nil {
+		t.Fatalf("contains exact file id: %v", err)
+	}
+	if !matched {
+		t.Fatalf("expected exact id 11 to match")
+	}
+	matched, err = service.RecordContainsValue(table, 1, "1")
+	if err != nil {
+		t.Fatalf("contains inexact file id: %v", err)
+	}
+	if matched {
+		t.Fatalf("did not expect id 1 to match [11,12]")
+	}
+}
+
+func TestTreeDataScopeExpandsDescendants(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	if err := service.db.Exec(`CREATE TABLE org_tree (id INTEGER PRIMARY KEY, parent_id INTEGER, name TEXT)`).Error; err != nil {
+		t.Fatalf("create tree table: %v", err)
+	}
+	if err := service.db.Exec(`INSERT INTO org_tree (id, parent_id, name) VALUES (1, 0, 'root'), (2, 1, 'child'), (3, 2, 'leaf'), (4, 0, 'other')`).Error; err != nil {
+		t.Fatalf("seed tree rows: %v", err)
+	}
+	mustCreate(t, service.db, &model.SysDataDimension{
+		Basic:       model.Basic{Id: 2, State: true},
+		Code:        "org",
+		Name:        "组织",
+		ValueType:   "number",
+		SourceType:  "table",
+		SourceCode:  "org_tree",
+		ValueField:  "id",
+		LabelField:  "name",
+		ParentField: "parent_id",
+	})
+	mustCreate(t, service.db, &model.SysDataScopeBinding{
+		Basic:         model.Basic{Id: 11, State: true},
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "org",
+		FieldCode:     "tenant_id",
+		MatchType:     "in",
+		Required:      true,
+		Actions:       `["query"]`,
+	})
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "org",
+		Strategy:      "tree",
+		ScopeValues:   `["1"]`,
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve tree scope: %v", err)
+	}
+	if scope == nil || scope.DenyAll || len(scope.Conditions) != 1 {
+		t.Fatalf("expected one tree condition, got %#v", scope)
+	}
+	if !reflect.DeepEqual(scope.Conditions[0].Values, []string{"1", "2", "3"}) {
+		t.Fatalf("unexpected expanded values: %#v", scope.Conditions[0].Values)
+	}
+}
+
 func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, model.SysTable) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

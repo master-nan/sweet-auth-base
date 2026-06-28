@@ -8,6 +8,7 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/service"
@@ -86,6 +87,10 @@ func (r *RoleController) GetRoleById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, r.sysTableService, r.dataPermissionService, "sys_role", id, enum.ButtonActionDetail); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	role, err := r.sysRoleService.GetRoleById(id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -146,6 +151,10 @@ func (r *RoleController) UpdateRole(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if err := checkRecordDataScopeByTableCode(ctx, r.sysTableService, r.dataPermissionService, "sys_role", id, enum.ButtonActionUpdate); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
 	err = r.sysRoleService.UpdateRole(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -167,6 +176,10 @@ func (r *RoleController) DeleteRoleById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := checkRecordDataScopeByTableCode(ctx, r.sysTableService, r.dataPermissionService, "sys_role", id, enum.ButtonActionDelete); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -218,6 +231,10 @@ func (r *RoleController) AssignPermissions(ctx *gin.Context) {
 	translator := r.translators["zh"]
 	err := utils.ValidatorBody[request.RoleAssignPermissionsReq](ctx, &data, translator)
 	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := checkRecordDataScopeByTableCode(ctx, r.sysTableService, r.dataPermissionService, "sys_role", data.RoleId, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

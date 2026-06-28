@@ -14,6 +14,9 @@ import (
 	"backend/model"
 	queryutil "backend/repository/util"
 	"backend/service"
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -459,4 +462,151 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+}
+
+func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	var data request.GeneralizationBatchDeleteReq
+	translator := gc.translators["zh"]
+	if err := utils.ValidatorBody[request.GeneralizationBatchDeleteReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := gc.sysTableService.GetTableByTableCode(data.TableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if table.Id == 0 {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionBatchDelete, false)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	for _, id := range data.Ids {
+		if err := gc.checkRowDataPermission(ctx, table, id, menuId, enum.ButtonActionBatchDelete); err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+	}
+	for _, id := range data.Ids {
+		if err := gc.generalizationService.Delete(ctx, table, id); err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+	}
+	resp.SetData(true)
+}
+
+func (gc *GeneralizationController) Export(ctx *gin.Context) {
+	var data request.Basic
+	translator := gc.translators["zh"]
+	if err := utils.ValidatorBody[request.Basic](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	tableCode := strings.TrimSpace(data.TableCode)
+	if tableCode == "" {
+		tableCode = strings.TrimSpace(ctx.Query("table_code"))
+	}
+	if tableCode == "" {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	table, err := gc.sysTableService.GetTableByTableCode(tableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if table.Id == 0 {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionExport, false)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	data.TableCode = table.TableCode
+	data.MenuId = menuId
+	if data.Page <= 0 {
+		data.Page = 1
+	}
+	if data.Num <= 0 || data.Num > 10000 {
+		data.Num = 10000
+	}
+	scope, err := gc.dataScopeForMenu(ctx, table, data.MenuId, enum.ButtonActionExport)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	data.DataScope = scope
+	result, err := gc.generalizationService.Query(&data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	content, err := buildGeneralizationCSV(table, result.Data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	ctx.Header("Content-Type", "text/csv; charset=utf-8")
+	ctx.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.csv"`, table.TableCode))
+	ctx.Data(200, "text/csv; charset=utf-8", content)
+}
+
+func buildGeneralizationCSV(table model.SysTable, rows []map[string]interface{}) ([]byte, error) {
+	fields := make([]model.SysTableField, 0, len(table.TableFields))
+	for _, field := range table.TableFields {
+		if field.IsListShow {
+			fields = append(fields, field)
+		}
+	}
+	if len(fields) == 0 {
+		fields = table.TableFields
+	}
+	header := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if strings.TrimSpace(field.FieldName) != "" {
+			header = append(header, field.FieldName)
+			continue
+		}
+		header = append(header, field.FieldCode)
+	}
+	var buf bytes.Buffer
+	buf.WriteString("\xEF\xBB\xBF")
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write(header); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		record := make([]string, 0, len(fields))
+		for _, field := range fields {
+			record = append(record, safeCSVCell(row[field.FieldCode]))
+		}
+		if err := writer.Write(record); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func safeCSVCell(value interface{}) string {
+	text := fmt.Sprint(value)
+	if text == "<nil>" {
+		return ""
+	}
+	if text != "" && strings.ContainsAny(text[:1], "=+-@") {
+		return "'" + text
+	}
+	return text
 }

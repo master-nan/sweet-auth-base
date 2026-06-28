@@ -9,6 +9,7 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
@@ -30,12 +31,20 @@ import (
 )
 
 // FileController 处理文件上传、下载、预览和短期签名访问。
-// 文件接口只判断文件本身的访问权限：本人、超管、公开预览或签名 URL。
-// 业务记录的数据权限后续应放到统一数据权限入口，不在文件控制器里按表字段临时判断。
+// 文件接口默认按文件本人/超管授权；低代码业务记录里的文件可通过业务上下文走统一数据权限校验。
 type FileController struct {
-	fileService *service.FileService
-	config      *config.Server
-	translators map[string]ut.Translator
+	fileService           *service.FileService
+	sysTableService       *service.SysTableService
+	dataPermissionService *service.DataPermissionService
+	config                *config.Server
+	translators           map[string]ut.Translator
+}
+
+type fileBusinessContext struct {
+	TableCode string
+	RecordId  int
+	MenuId    int
+	Action    enum.SysMenuButtonEventAction
 }
 
 type signedFileAccessClaims struct {
@@ -51,13 +60,17 @@ type fileAccessURLResponse struct {
 // NewFileController 创建文件控制器实例。
 func NewFileController(
 	fileService *service.FileService,
+	sysTableService *service.SysTableService,
+	dataPermissionService *service.DataPermissionService,
 	config *config.Server,
 	translators map[string]ut.Translator,
 ) *FileController {
 	return &FileController{
-		fileService: fileService,
-		config:      config,
-		translators: translators,
+		fileService:           fileService,
+		sysTableService:       sysTableService,
+		dataPermissionService: dataPermissionService,
+		config:                config,
+		translators:           translators,
 	}
 }
 
@@ -237,9 +250,8 @@ func (f *FileController) GetFileById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	if !utils.IsSuperAdmin(user) && (file.CreateUser == nil || *file.CreateUser != user.Id) {
-		_ = ctx.Error(myerrors.ErrPermissionDenied)
+	if err := f.ensureFileAccess(ctx, file, enum.ButtonActionDetail); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 	resp.SetData(file)
@@ -267,9 +279,8 @@ func (f *FileController) DeleteFileById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	if !utils.IsSuperAdmin(user) && (file.CreateUser == nil || *file.CreateUser != user.Id) {
-		_ = ctx.Error(myerrors.ErrPermissionDenied)
+	if err := f.ensureFileAccess(ctx, file, enum.ButtonActionDelete); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 	err = f.fileService.DeleteFileById(ctx, id)
@@ -299,9 +310,8 @@ func (f *FileController) Download(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	if !utils.IsSuperAdmin(user) && (file.CreateUser == nil || *file.CreateUser != user.Id) {
-		_ = ctx.Error(myerrors.ErrPermissionDenied)
+	if err := f.ensureFileAccess(ctx, file, enum.ButtonActionDetail); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 	f.streamFile(ctx, file, true)
@@ -368,9 +378,8 @@ func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, action string)
 		_ = ctx.Error(err)
 		return
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	if !utils.IsSuperAdmin(user) && (file.CreateUser == nil || *file.CreateUser != user.Id) {
-		_ = ctx.Error(myerrors.ErrPermissionDenied)
+	if err := f.ensureFileAccess(ctx, file, defaultFileBusinessAction(ctx, enum.ButtonActionDetail)); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 
@@ -464,13 +473,113 @@ func (f *FileController) preview(ctx *gin.Context, requireOwner bool) {
 		return
 	}
 	if requireOwner {
-		user := ctx.MustGet("user").(model.SysUser)
-		if !utils.IsSuperAdmin(user) && (file.CreateUser == nil || *file.CreateUser != user.Id) {
-			_ = ctx.Error(myerrors.ErrPermissionDenied)
+		if err := f.ensureFileAccess(ctx, file, enum.ButtonActionDetail); err != nil {
+			_ = ctx.Error(err)
 			return
 		}
 	}
 	f.streamFile(ctx, file, false)
+}
+
+func (f *FileController) ensureFileAccess(ctx *gin.Context, file model.File, fallbackAction enum.SysMenuButtonEventAction) error {
+	bizCtx, hasBizCtx, err := parseFileBusinessContext(ctx, fallbackAction)
+	if err != nil {
+		return err
+	}
+	if hasBizCtx {
+		return f.ensureBusinessFileAccess(ctx, file, bizCtx)
+	}
+	user := ctx.MustGet("user").(model.SysUser)
+	if utils.IsSuperAdmin(user) || (file.CreateUser != nil && *file.CreateUser == user.Id) {
+		return nil
+	}
+	return myerrors.ErrPermissionDenied
+}
+
+func (f *FileController) ensureBusinessFileAccess(ctx *gin.Context, file model.File, bizCtx fileBusinessContext) error {
+	if f.sysTableService == nil || f.dataPermissionService == nil {
+		return myerrors.ErrPermissionDenied
+	}
+	table, err := f.sysTableService.GetTableByTableCode(bizCtx.TableCode)
+	if err != nil {
+		return err
+	}
+	if table.Id == 0 {
+		return myerrors.ErrParamInvalid
+	}
+	user := ctx.MustGet("user").(model.SysUser)
+	if !utils.IsSuperAdmin(user) {
+		if err := f.dataPermissionService.CheckRecordDataScope(user, bizCtx.MenuId, table, bizCtx.RecordId, bizCtx.Action); err != nil {
+			return err
+		}
+	}
+	if file.FileUuid == "" {
+		return myerrors.ErrFileNotFound
+	}
+	matchesUuid, err := f.dataPermissionService.RecordContainsValue(table, bizCtx.RecordId, file.FileUuid)
+	if err != nil {
+		return err
+	}
+	matchesId := false
+	if file.Id > 0 {
+		matchesId, err = f.dataPermissionService.RecordContainsValue(table, bizCtx.RecordId, strconv.Itoa(file.Id))
+		if err != nil {
+			return err
+		}
+	}
+	if !matchesUuid && !matchesId {
+		return myerrors.ErrPermissionDenied
+	}
+	return nil
+}
+
+func parseFileBusinessContext(ctx *gin.Context, fallbackAction enum.SysMenuButtonEventAction) (fileBusinessContext, bool, error) {
+	tableCode := strings.TrimSpace(ctx.Query("table_code"))
+	recordIdRaw := strings.TrimSpace(firstNonEmpty(ctx.Query("record_id"), ctx.Query("row_id"), ctx.Query("id")))
+	if tableCode == "" && recordIdRaw == "" {
+		return fileBusinessContext{}, false, nil
+	}
+	if tableCode == "" || recordIdRaw == "" {
+		return fileBusinessContext{}, true, myerrors.ErrParamInvalid
+	}
+	recordId, err := strconv.Atoi(recordIdRaw)
+	if err != nil || recordId <= 0 {
+		return fileBusinessContext{}, true, myerrors.ErrParamInvalid
+	}
+	menuId := 0
+	if rawMenuId := strings.TrimSpace(ctx.Query("menu_id")); rawMenuId != "" {
+		menuId, err = strconv.Atoi(rawMenuId)
+		if err != nil || menuId < 0 {
+			return fileBusinessContext{}, true, myerrors.ErrParamInvalid
+		}
+	}
+	action := fallbackAction
+	if rawAction := strings.TrimSpace(ctx.Query("action")); rawAction != "" {
+		normalized, ok := enum.NormalizeSysMenuButtonEventAction(rawAction)
+		if !ok {
+			return fileBusinessContext{}, true, myerrors.ErrParamInvalid
+		}
+		action = normalized
+	}
+	return fileBusinessContext{TableCode: tableCode, RecordId: recordId, MenuId: menuId, Action: action}, true, nil
+}
+
+func defaultFileBusinessAction(ctx *gin.Context, fallbackAction enum.SysMenuButtonEventAction) enum.SysMenuButtonEventAction {
+	if rawAction := strings.TrimSpace(ctx.Query("action")); rawAction != "" {
+		if action, ok := enum.NormalizeSysMenuButtonEventAction(rawAction); ok {
+			return action
+		}
+	}
+	return fallbackAction
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // streamFile 输出文件内容，并根据预览/下载设置响应头。
