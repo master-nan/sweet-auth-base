@@ -1025,6 +1025,11 @@ function clearMenuDataScope(menuId) {
 DELETE FROM sys_user_data_scope_override WHERE menu_id = ${Number(menuId)};
 DELETE FROM sys_role_data_scope WHERE menu_id = ${Number(menuId)};
 DELETE FROM sys_data_scope_binding WHERE menu_id = ${Number(menuId)};
+DELETE FROM sys_data_dimension d
+WHERE d.code LIKE 'smoke_%'
+  AND NOT EXISTS (SELECT 1 FROM sys_data_scope_binding b WHERE b.dimension_code = d.code)
+  AND NOT EXISTS (SELECT 1 FROM sys_role_data_scope r WHERE r.dimension_code = d.code)
+  AND NOT EXISTS (SELECT 1 FROM sys_user_data_scope_override u WHERE u.dimension_code = d.code);
 `)
 }
 
