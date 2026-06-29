@@ -345,7 +345,7 @@ func (s *DataPermissionService) SaveUserDimensionValues(ctx *gin.Context, userId
 	if req.UserId > 0 && req.UserId != userId {
 		return myerrors.ErrParamInvalid
 	}
-	records := make([]model.SysUserDimensionValue, 0, len(req.Items))
+	valuesByDimension := make(map[string]map[string]struct{}, len(req.Items))
 	for _, item := range req.Items {
 		record, err := s.userDimensionValueFromReq(userId, item)
 		if err != nil {
@@ -354,12 +354,35 @@ func (s *DataPermissionService) SaveUserDimensionValues(ctx *gin.Context, userId
 		if !record.State {
 			continue
 		}
+		if _, ok := valuesByDimension[record.DimensionCode]; !ok {
+			valuesByDimension[record.DimensionCode] = map[string]struct{}{}
+		}
+		for _, value := range decodeStringList(record.ScopeValues) {
+			valuesByDimension[record.DimensionCode][value] = struct{}{}
+		}
+	}
+	dimensionCodes := make([]string, 0, len(valuesByDimension))
+	for dimensionCode := range valuesByDimension {
+		dimensionCodes = append(dimensionCodes, dimensionCode)
+	}
+	sort.Strings(dimensionCodes)
+	records := make([]model.SysUserDimensionValue, 0, len(dimensionCodes))
+	for _, dimensionCode := range dimensionCodes {
+		values := make([]string, 0, len(valuesByDimension[dimensionCode]))
+		for value := range valuesByDimension[dimensionCode] {
+			values = append(values, value)
+		}
+		sort.Strings(values)
 		id, err := s.sf.GenerateUniqueID()
 		if err != nil {
 			return err
 		}
-		record.Id = int(id)
-		records = append(records, record)
+		records = append(records, model.SysUserDimensionValue{
+			Basic:         model.Basic{Id: int(id), State: true},
+			UserId:        userId,
+			DimensionCode: dimensionCode,
+			ScopeValues:   encodeStringList(values),
+		})
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserDimensionValue{}).Error; err != nil {

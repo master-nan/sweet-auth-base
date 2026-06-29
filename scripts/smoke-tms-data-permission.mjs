@@ -28,6 +28,19 @@ const companyRelationLinkage = JSON.stringify({
     pageSize: 200,
   },
 })
+const companyCascaderLinkage = JSON.stringify({
+  linkage: {
+    enabled: true,
+    mode: 'cascader',
+    tableCode: 'tms_company',
+    labelKey: 'company_name',
+    valueKey: 'id',
+    parentKey: 'parent_id',
+    pageSize: 200,
+    selectable: 'any',
+    showPath: true,
+  },
+})
 
 let accessToken = ''
 
@@ -290,9 +303,10 @@ async function createTmsTables() {
       field_name: '上级公司',
       field_code: 'parent_id',
       type: 1,
-      input_type: 2,
+      input_type: 15,
       is_index: true,
       is_null: true,
+      linkage_config: companyCascaderLinkage,
     },
   ])
   await createTable('tms_waybill', 'TMS运单', [
@@ -377,6 +391,20 @@ async function createTmsTables() {
 }
 
 async function verifyTmsCompanyFieldLinkage() {
+  const companyTable = await fetchTable('tms_company')
+  const parentField = (companyTable.table_fields || []).find((field) => field.field_code === 'parent_id')
+  assert(parentField?.linkage_config, 'tms_company.parent_id cascader linkage config missing')
+  const parentParsed = JSON.parse(parentField.linkage_config || '{}')
+  assert(
+    parentParsed.linkage?.enabled === true &&
+      parentParsed.linkage?.mode === 'cascader' &&
+      parentParsed.linkage?.tableCode === 'tms_company' &&
+      parentParsed.linkage?.labelKey === 'company_name' &&
+      parentParsed.linkage?.valueKey === 'id' &&
+      parentParsed.linkage?.parentKey === 'parent_id',
+    `tms_company.parent_id cascader linkage mismatch: ${parentField.linkage_config}`,
+  )
+
   for (const tableCode of ['tms_waybill', 'tms_vehicle']) {
     const table = await fetchTable(tableCode)
     const companyField = table?.table_fields?.find((field) => field.field_code === 'company_id')

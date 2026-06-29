@@ -788,6 +788,11 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 		currentFields[currentFieldCode] = struct{}{}
 	}
 	relatedFields := tableFieldCodeSet(relatedTable.TableFields)
+	if strings.TrimSpace(currentFieldCode) != "" &&
+		((relatedTable.Id != 0 && relatedTable.Id == currentTable.Id) ||
+			(strings.TrimSpace(relatedTable.TableCode) != "" && relatedTable.TableCode == currentTable.TableCode)) {
+		relatedFields[currentFieldCode] = struct{}{}
+	}
 	if err := validateOptionalLinkageField("labelKey", cfg.LabelKey, relatedFields); err != nil {
 		return "", err
 	}
@@ -796,6 +801,9 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	}
 	if err := validateOptionalLinkageField("parentKey", cfg.ParentKey, relatedFields); err != nil {
 		return "", err
+	}
+	if cfg.Mode == "cascader" && strings.TrimSpace(cfg.ParentKey) == strings.TrimSpace(cfg.ValueKey) {
+		return "", myerrors.NewBadRequestError("级联配置父级字段不能和取值字段相同")
 	}
 	for targetField, sourceField := range cfg.FilterMapping {
 		targetField = strings.TrimSpace(targetField)

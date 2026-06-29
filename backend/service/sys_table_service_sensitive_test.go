@@ -287,6 +287,26 @@ func TestNormalizeTableFieldLinkageConfigFillsTableCodeAndPreservesExtras(t *tes
 	}
 }
 
+func TestValidateTableFieldLinkageConfigAllowsCurrentSelfCascaderField(t *testing.T) {
+	currentTable := model.SysTable{
+		Basic:     model.Basic{Id: 1},
+		TableCode: "companies",
+		TableFields: []model.SysTableField{
+			{FieldCode: "id"},
+			{FieldCode: "company_name"},
+		},
+	}
+	relatedTable := currentTable
+	raw := `{"linkage":{"enabled":true,"mode":"cascader","tableCode":"companies","labelKey":"company_name","valueKey":"id","parentKey":"parent_id"}}`
+
+	err := validateTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+		return relatedTable, nil
+	})
+	if err != nil {
+		t.Fatalf("expected current self cascader field to be accepted: %v", err)
+	}
+}
+
 func TestValidateTableFieldLinkageConfigRejectsInvalidJSON(t *testing.T) {
 	err := validateTableFieldLinkageConfig(`{"linkage":`, model.SysTable{}, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return model.SysTable{}, nil
@@ -346,6 +366,31 @@ func TestValidateTableFieldLinkageConfigRejectsMissingFilterSourceField(t *testi
 	})
 	if err == nil {
 		t.Fatal("expected missing filter source field to fail")
+	}
+}
+
+func TestValidateTableFieldLinkageConfigRejectsCascaderParentSameAsValue(t *testing.T) {
+	currentTable := model.SysTable{
+		Basic:       model.Basic{Id: 1},
+		TableCode:   "companies",
+		TableFields: []model.SysTableField{{FieldCode: "parent_id"}},
+	}
+	relatedTable := model.SysTable{
+		Basic:     model.Basic{Id: 1},
+		TableCode: "companies",
+		TableFields: []model.SysTableField{
+			{FieldCode: "id"},
+			{FieldCode: "company_name"},
+			{FieldCode: "parent_id"},
+		},
+	}
+	raw := `{"linkage":{"enabled":true,"mode":"cascader","tableCode":"companies","labelKey":"company_name","valueKey":"id","parentKey":"id"}}`
+
+	err := validateTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+		return relatedTable, nil
+	})
+	if err == nil {
+		t.Fatal("expected cascader parentKey equal valueKey to fail")
 	}
 }
 

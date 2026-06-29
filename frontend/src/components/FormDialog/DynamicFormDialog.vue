@@ -1100,9 +1100,14 @@ const buildTreeFromFlat = (
 ): Array<Record<string, any>> => {
   const labelKey = cfg?.labelKey || 'label'
   const valueKey = cfg?.valueKey || 'value'
-  const parentKey = cfg?.parentKey || 'parent_id'
+  const configuredParentKey = cfg?.parentKey || 'parent_id'
+  const parentKey =
+    configuredParentKey === valueKey && rows.some((row) => row.parent_id !== undefined)
+      ? 'parent_id'
+      : configuredParentKey
   const childrenKey = cfg?.childrenKey || 'children'
   const rootValue = cfg?.rootValue ?? 0
+  const normalizeTreeKey = (value: unknown) => String(value ?? '')
 
   // 先构建所有节点
   const nodeMap = new Map<any, Record<string, any>>()
@@ -1115,7 +1120,7 @@ const buildTreeFromFlat = (
       value: rawValue ?? row.value ?? row.id,
       [childrenKey]: [],
     }
-    nodeMap.set(node.value, node)
+    nodeMap.set(normalizeTreeKey(node.value), node)
     return node
   })
 
@@ -1125,11 +1130,14 @@ const buildTreeFromFlat = (
     const parentVal = node[parentKey]
     // 根节点判断：parentKey 为 rootValue 或 null/undefined/空串，或找不到父节点
     const isRoot =
-      parentVal === rootValue || parentVal === null || parentVal === undefined || parentVal === ''
+      normalizeTreeKey(parentVal) === normalizeTreeKey(rootValue) ||
+      parentVal === null ||
+      parentVal === undefined ||
+      parentVal === ''
     if (isRoot) {
       tree.push(node)
     } else {
-      const parent = nodeMap.get(parentVal)
+      const parent = nodeMap.get(normalizeTreeKey(parentVal))
       if (parent) {
         parent[childrenKey].push(node)
       } else {
@@ -1940,6 +1948,24 @@ watch(
     if (props.editData && show.value) {
       initFormData()
     }
+  },
+)
+
+watch(
+  () =>
+    props.fields.map((field) =>
+      [field.id, field.field_code, field.input_type, field.dict_code, field.linkage_config].join(':'),
+    ),
+  async () => {
+    if (!show.value || props.fields.length === 0) return
+    await preloadDictionaries()
+    isInitializing.value = true
+    initFormData()
+    await nextTick()
+    isInitializing.value = false
+    prevFilterSnapshot = {}
+    await refreshLinkageOptions(true)
+    formRef.value?.resetValidation()
   },
 )
 

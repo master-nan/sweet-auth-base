@@ -1,12 +1,15 @@
 package service
 
 import (
+	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/utils"
 	"backend/model"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -174,6 +177,40 @@ func TestResolveDataScopeUserDimensionStrategyWithoutValuesDenies(t *testing.T) 
 	}
 	if scope == nil || !scope.DenyAll {
 		t.Fatalf("expected deny all without user dimension values, got %#v", scope)
+	}
+}
+
+func TestSaveUserDimensionValuesMergesDuplicateDimensions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service, _ := newDataPermissionServiceForTest(t)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	mustCreate(t, service.db, &model.SysDataDimension{
+		Basic:      model.Basic{Id: 40, State: true},
+		Code:       "tenant",
+		Name:       "租户",
+		ValueType:  "number",
+		SourceType: "none",
+	})
+
+	err := service.SaveUserDimensionValues(ctx, 7, request.UserDimensionValueSaveReq{
+		UserId: 7,
+		Items: []request.UserDimensionValueItemReq{
+			{DimensionCode: "tenant", ScopeValues: []string{"2", "1"}},
+			{DimensionCode: "tenant", ScopeValues: []string{"2", "3"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("save duplicate user dimension values: %v", err)
+	}
+	var items []model.SysUserDimensionValue
+	if err := service.db.Where("user_id = ? AND dimension_code = ?", 7, "tenant").Find(&items).Error; err != nil {
+		t.Fatalf("query user dimension values: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one merged dimension value row, got %d: %#v", len(items), items)
+	}
+	if got := decodeStringList(items[0].ScopeValues); !reflect.DeepEqual(got, []string{"1", "2", "3"}) {
+		t.Fatalf("expected merged sorted values, got %#v", got)
 	}
 }
 

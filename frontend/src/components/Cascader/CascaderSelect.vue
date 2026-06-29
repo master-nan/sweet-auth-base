@@ -1,5 +1,10 @@
 <template>
-  <div class="cascader-select" :style="containerStyle" @click="handleOpen">
+  <div
+    class="cascader-select"
+    :style="containerStyle"
+    @mousedown.capture="handleOpen"
+    @click="handleOpen"
+  >
     <q-input
       ref="inputRef"
       v-model="inputValue"
@@ -14,39 +19,41 @@
       class="cascader-input"
       input-class="cursor-pointer"
       @clear.stop="clearSelection"
+      @click.stop="handleOpen"
+      @focus="handleOpen"
     >
       <template v-slot:append>
-        <q-icon name="arrow_drop_down" class="cursor-pointer" />
+        <q-icon name="arrow_drop_down" class="cursor-pointer" @click.stop="handleOpen" />
       </template>
-      <q-menu v-model="menu" anchor="bottom left" self="top left" :fit="false" no-refocus>
-        <div class="cascader-menu" :style="menuStyle">
-          <div
-            v-for="(levelOptions, index) in levels"
-            :key="index"
-            class="cascader-column"
-            :style="columnStyle"
-          >
-            <q-list separator>
-              <q-item
-                v-for="(option, optionIndex) in levelOptions"
-                :key="getOptionValue(option) ?? `option-${index}-${optionIndex}`"
-                clickable
-                v-ripple
-                :active="innerValue[index] === getOptionValue(option)"
-                active-class="cascader-active"
-                :disable="isOptionDisabled(option)"
-                @click="() => handleOptionClick(index, option)"
-              >
-                <q-item-section>{{ getOptionLabel(option) }}</q-item-section>
-                <q-item-section v-if="hasChildren(option)" side>
-                  <q-icon name="chevron_right" size="18px" />
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-        </div>
-      </q-menu>
     </q-input>
+    <q-menu v-model="menu" anchor="bottom left" self="top left" :fit="false" no-refocus>
+      <div class="cascader-menu" :style="menuStyle">
+        <div
+          v-for="(levelOptions, index) in levels"
+          :key="index"
+          class="cascader-column"
+          :style="columnStyle"
+        >
+          <q-list separator>
+            <q-item
+              v-for="(option, optionIndex) in levelOptions"
+              :key="getOptionValue(option) ?? `option-${index}-${optionIndex}`"
+              clickable
+              v-ripple
+              :active="innerValue[index] === getOptionValue(option)"
+              active-class="cascader-active"
+              :disable="isOptionDisabled(option)"
+              @click="() => handleOptionClick(index, option)"
+            >
+              <q-item-section>{{ getOptionLabel(option) }}</q-item-section>
+              <q-item-section v-if="hasChildren(option)" side>
+                <q-icon name="chevron_right" size="18px" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </div>
+      </div>
+    </q-menu>
   </div>
 </template>
 
