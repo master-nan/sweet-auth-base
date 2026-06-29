@@ -80,6 +80,8 @@ export default defineBoot(({ router }) => {
               next({ path: changePasswordPath })
               return
             }
+          }
+          if (!userStore.menus.length || !userStore.menu_names.length) {
             // 获取权限菜单，收集按钮编码和菜单名称
             const menuRes = await menuApi.queryMyMenu()
             if (menuRes.success && menuRes.data) {

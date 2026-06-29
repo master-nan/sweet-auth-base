@@ -28,7 +28,7 @@ export default function constructionRouters(router: Route[], backendMenus?: Menu
     }
   })
 
-  appendLowCodeRoutes(temp, sourceMenus)
+  appendDynamicMenuRoutes(temp, sourceMenus)
 
   // 过滤掉子路由全部被移除的布局节点
   return temp.filter((item) => {
@@ -43,16 +43,17 @@ const componentMap: Record<string, any> = {
   'pages/system/data-permission/Index.vue': () => import('pages/system/data-permission/Index.vue'),
 }
 
-function appendLowCodeRoutes(routes: Route[], menus: Menu[]) {
+function appendDynamicMenuRoutes(routes: Route[], menus: Menu[]) {
   if (!menus?.length) return
   const byName = new Map(routes.map((route) => [route.name, route]))
   for (const menu of menus) {
     const route = byName.get(menu.name)
     if (route?.children?.length && menu.children?.length) {
-      appendLowCodeRoutes(route.children, menu.children)
+      appendDynamicMenuRoutes(route.children, menu.children)
     }
-    if (route || !isLowCodeMenu(menu)) continue
-    routes.push(menuToRoute(menu))
+    if (route) continue
+    const dynamicRoute = menuToDynamicRoute(menu)
+    if (dynamicRoute) routes.push(dynamicRoute)
   }
 }
 
@@ -60,7 +61,32 @@ function isLowCodeMenu(menu: Menu) {
   return menu.page_type === 'low_code' && !!menu.table_code
 }
 
-function menuToRoute(menu: Menu): Route {
+function isDirectoryMenu(menu: Menu) {
+  return menu.page_type === 'directory' && !!menu.children?.length
+}
+
+function menuToDynamicRoute(menu: Menu): Route | null {
+  if (isLowCodeMenu(menu)) return menuToLowCodeRoute(menu)
+  if (!isDirectoryMenu(menu)) return null
+  const children = (menu.children || [])
+    .map((child) => menuToDynamicRoute(child))
+    .filter((route): route is Route => !!route)
+  if (!children.length) return null
+  return {
+    path: menu.path,
+    name: menu.name,
+    component: componentMap[menu.component] || layout,
+    meta: {
+      title: menu.title,
+      ...(menu.icon ? { icon: menu.icon } : {}),
+      isHidden: menu.is_hidden,
+      menuId: menu.id,
+    },
+    children,
+  }
+}
+
+function menuToLowCodeRoute(menu: Menu): Route {
   const tableCode = menu.table_code || ''
   return {
     path: menu.path,

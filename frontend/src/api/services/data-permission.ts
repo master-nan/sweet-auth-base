@@ -13,7 +13,7 @@ export type DataPermissionAction =
   | 'delete'
   | 'export'
   | 'batch_delete'
-export type DataPermissionStrategy = 'all' | 'none' | 'specified' | 'tree' | 'self'
+export type DataPermissionStrategy = 'all' | 'none' | 'specified' | 'tree' | 'self' | 'user_dimension'
 export type DataPermissionOverrideMode = 'replace' | 'union' | 'intersect' | 'deny'
 
 export interface DataPermissionOption {
@@ -103,6 +103,13 @@ export interface UserDataPermissionOverride extends Basic {
   dimension?: DataPermissionDimension
 }
 
+export interface UserDimensionValue extends Basic {
+  user_id: number
+  dimension_code: string
+  scope_values: string[]
+  dimension?: DataPermissionDimension
+}
+
 export interface UserDataPermissionOverrideSaveItem {
   menu_id: number
   table_code?: string
@@ -111,6 +118,12 @@ export interface UserDataPermissionOverrideSaveItem {
   scope_values: string[]
   override_mode: DataPermissionOverrideMode | string
   expire_at?: string
+  state?: boolean
+}
+
+export interface UserDimensionValueSaveItem {
+  dimension_code: string
+  scope_values: string[]
   state?: boolean
 }
 
@@ -147,6 +160,7 @@ export interface DataPermissionDebugResult {
   bindings: DataPermissionBinding[]
   role_scopes: RoleDataPermission[]
   user_overrides: UserDataPermissionOverride[]
+  user_dimensions: UserDimensionValue[]
   notes: string[]
 }
 
@@ -165,6 +179,7 @@ export const dataPermissionStrategyOptions = [
   { label: '无权限', value: 'none' },
   { label: '指定值', value: 'specified' },
   { label: '树范围', value: 'tree' },
+  { label: '当前用户归属', value: 'user_dimension' },
   { label: '本人', value: 'self' },
 ]
 
@@ -268,6 +283,21 @@ export const useDataPermissionApi = () => {
       .then((res) => res.data)
   }
 
+  const getUserDimensionValues = async (userId: number) => {
+    return instance
+      .get<ResponseData<UserDimensionValue[]>>(`/admin/user/${userId}/dimension-values`)
+      .then((res) => res.data)
+  }
+
+  const saveUserDimensionValues = async (userId: number, items: UserDimensionValueSaveItem[]) => {
+    return instance
+      .put<ResponseData<boolean>>(`/admin/user/${userId}/dimension-values`, {
+        user_id: userId,
+        items,
+      })
+      .then((res) => res.data)
+  }
+
   const debugDataScope = async (params: {
     menu_id?: number
     table_code: string
@@ -291,6 +321,8 @@ export const useDataPermissionApi = () => {
     saveRoleDataPermissions,
     getUserDataPermissionOverrides,
     saveUserDataPermissionOverrides,
+    getUserDimensionValues,
+    saveUserDimensionValues,
     debugDataScope,
   }
 }

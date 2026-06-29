@@ -147,7 +147,7 @@
                 name="data_scope"
                 icon="rule"
                 label="数据权限"
-                :disable="!isSelectedMenuLowCode"
+                :disable="!isSelectedMenuDataScopeCapable"
               />
             </q-tabs>
 
@@ -270,9 +270,9 @@
                 </div>
 
                 <q-scroll-area class="permission-data-scope-scroll">
-                  <div v-if="!isSelectedMenuLowCode" class="permission-empty permission-empty--large">
+                  <div v-if="!isSelectedMenuDataScopeCapable" class="permission-empty permission-empty--large">
                     <q-icon name="rule" />
-                    <span>当前菜单不是低代码菜单</span>
+                    <span>当前菜单未绑定数据表</span>
                   </div>
                   <div v-else-if="selectedRoleDataScopeRows.length === 0" class="permission-empty permission-empty--large">
                     <q-icon name="rule_folder" />
@@ -317,16 +317,23 @@
                           outlined
                           multiple
                           use-input
-                          use-chips
                           new-value-mode="add-unique"
                           emit-value
                           map-options
+                          options-dense
+                          clearable
                           label="范围值"
+                          class="permission-scope-value-select"
                           :disable="!row.enabled"
                           :loading="row.loading_options"
                           :options="row.option_items"
+                          :display-value="roleScopeValueDisplay(row)"
                           @focus="loadRoleDimensionOptions(row)"
-                        />
+                        >
+                          <q-tooltip v-if="roleScopeValueTooltip(row)">
+                            {{ roleScopeValueTooltip(row) }}
+                          </q-tooltip>
+                        </q-select>
                       </div>
                     </div>
                   </div>
@@ -376,6 +383,7 @@ import {
   type RoleDataPermissionSaveItem,
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
+import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
 
 type ButtonGroup = {
   key: string
@@ -445,6 +453,8 @@ const menuButtonSelections = ref<Map<number, number[]>>(new Map())
 const activeDetailTab = ref<'buttons' | 'data_scope'>('buttons')
 const savedRoleDataScopes = ref<RoleDataPermission[]>([])
 const roleDataScopeRows = ref<RoleDataScopeRow[]>([])
+const dimensionOptionCache = ref<Map<string, DataPermissionOption[]>>(new Map())
+const dimensionOptionRequests = new Map<string, Promise<DataPermissionOption[]>>()
 
 const flattenedMenus = computed(() => flattenMenus(menuTree.value))
 const totalMenuCount = computed(() => flattenedMenus.value.length)
@@ -460,8 +470,8 @@ const isSelectedMenuTicked = computed(() => {
   return !!selectedMenu.value && tickedMenus.value.includes(selectedMenu.value.id)
 })
 
-const isSelectedMenuLowCode = computed(() => {
-  return !!selectedMenu.value && isLowCodeMenu(selectedMenu.value)
+const isSelectedMenuDataScopeCapable = computed(() => {
+  return !!selectedMenu.value?.table_code && !selectedMenu.value?.is_hidden
 })
 
 const selectedRoleDataScopeRows = computed(() => {
@@ -579,6 +589,8 @@ const resetState = () => {
   activeDetailTab.value = 'buttons'
   savedRoleDataScopes.value = []
   roleDataScopeRows.value = []
+  dimensionOptionCache.value = new Map()
+  dimensionOptionRequests.clear()
 }
 
 const fetchMenuTree = async () => {
@@ -669,7 +681,7 @@ const fetchMenuButtons = (menuId: number) => {
     selectedMenu.value = menu
     menuButtons.value = menu.menu_buttons || []
     tickedButtons.value = menuButtonSelections.value.get(menuId) || []
-    if (!isLowCodeMenu(menu)) {
+    if (!isDataScopeCapableMenu(menu)) {
       activeDetailTab.value = 'buttons'
     }
     void ensureRoleDataScopeRows(menu)
@@ -825,8 +837,8 @@ const derivedButtonApi = (button: MenuButton) => {
   return ''
 }
 
-const isLowCodeMenu = (menu: Menu) => {
-  return menu.page_type === 'low_code' && !!menu.table_code && !menu.is_hidden
+const isDataScopeCapableMenu = (menu: Menu) => {
+  return !!menu.table_code && !menu.is_hidden
 }
 
 const roleDataScopeKey = (menuId: number, dimensionCode: string) => `${menuId}:${dimensionCode}`
@@ -838,7 +850,7 @@ const findSavedRoleScope = (menuId: number, dimensionCode: string) => {
 }
 
 const ensureRoleDataScopeRows = async (menu: Menu) => {
-  if (!isLowCodeMenu(menu)) return
+  if (!isDataScopeCapableMenu(menu)) return
   const existingKeys = new Set(roleDataScopeRows.value.map((row) => row.key))
   if (roleDataScopeRows.value.some((row) => row.menu_id === menu.id)) return
   const result = await dataPermissionApi.getMenuBindings(menu.id)
@@ -849,6 +861,11 @@ const ensureRoleDataScopeRows = async (menu: Menu) => {
     .filter((row) => !existingKeys.has(row.key))
   if (rows.length > 0) {
     roleDataScopeRows.value = [...roleDataScopeRows.value, ...rows]
+    rows
+      .filter((row) => row.enabled && needsRoleScopeValues(row) && row.scope_values.length > 0)
+      .forEach((row) => {
+        void loadRoleDimensionOptions(row)
+      })
   }
 }
 
@@ -892,14 +909,47 @@ const onRoleStrategyChange = (row: RoleDataScopeRow) => {
 }
 
 const loadRoleDimensionOptions = async (row: RoleDataScopeRow) => {
-  if (row.option_items.length || row.loading_options) return
+  if (row.option_items.length) return
+  const cachedOptions = dimensionOptionCache.value.get(row.dimension_code)
+  if (cachedOptions) {
+    row.option_items = cachedOptions
+    return
+  }
+
   row.loading_options = true
   try {
-    const result = await dataPermissionApi.getDimensionOptions(row.dimension_code)
-    row.option_items = result.success ? result.data || [] : []
+    let request = dimensionOptionRequests.get(row.dimension_code)
+    if (!request) {
+      request = dataPermissionApi.getDimensionOptions(row.dimension_code).then((result) =>
+        result.success ? result.data || [] : [],
+      )
+      dimensionOptionRequests.set(row.dimension_code, request)
+    }
+    const options = await request
+    dimensionOptionCache.value.set(row.dimension_code, options)
+    roleDataScopeRows.value.forEach((item) => {
+      if (item.dimension_code === row.dimension_code) {
+        item.option_items = options
+      }
+    })
+  } catch {
+    row.option_items = []
   } finally {
-    row.loading_options = false
+    dimensionOptionRequests.delete(row.dimension_code)
+    roleDataScopeRows.value.forEach((item) => {
+      if (item.dimension_code === row.dimension_code) {
+        item.loading_options = false
+      }
+    })
   }
+}
+
+const roleScopeValueDisplay = (row: RoleDataScopeRow) => {
+  return compactSelectionDisplay(row.scope_values, row.option_items, 2)
+}
+
+const roleScopeValueTooltip = (row: RoleDataScopeRow) => {
+  return compactSelectionTooltip(row.scope_values, row.option_items)
 }
 
 const validateRoleDataScopes = () => {
@@ -1312,6 +1362,12 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(150px, 0.7fr) minmax(180px, 1fr);
   gap: 10px;
+}
+
+.permission-scope-value-select :deep(.q-field__native) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 1120px) {

@@ -767,6 +767,11 @@ const isDictCodeField = (field: TableField) =>
 const isLinkageConfigField = (field: TableField) =>
   isFieldMetadataForm.value && field.field_code === 'linkage_config'
 
+const hasActiveMetadataLinkage = () =>
+  !!parseLinkageConfig({
+    linkage_config: formData.value.linkage_config,
+  } as Partial<TableField>)
+
 const filterDictCodeOptions = (value: string, update: (callback: () => void) => void) => {
   const keyword = String(value || '')
     .toLowerCase()
@@ -811,10 +816,19 @@ const applyFieldMetadataInputLinkage = (changedCode: string) => {
     formData.value.input_type = SysTableFieldInputType.SELECT
   }
 
+  if (
+    (changedCode === 'linkage_config' || changedCode === 'submit') &&
+    hasActiveMetadataLinkage() &&
+    !selectLikeInputTypes.has(inputType)
+  ) {
+    formData.value.input_type = SysTableFieldInputType.SELECT
+  }
+
   const nextInputType = Number(formData.value.input_type) as SysTableFieldInputType
   if (
     (changedCode === 'input_type' || changedCode === 'submit') &&
-    !inputTypesAllowingDictionary.has(nextInputType)
+    !inputTypesAllowingDictionary.has(nextInputType) &&
+    !hasActiveMetadataLinkage()
   ) {
     formData.value.dict_code = ''
     formData.value.linkage_config = ''

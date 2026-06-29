@@ -36,6 +36,10 @@ export interface UserUpdateReq {
   is_reset?: boolean
 }
 
+export interface UserAssignRolesReq {
+  role_ids: number[]
+}
+
 export const useSysUserApi = () => {
   const queryUser = async (params: Query) => {
     // return instance
@@ -75,6 +79,12 @@ export const useSysUserApi = () => {
     })
   }
 
+  const assignRoles = async (id: number, req: UserAssignRolesReq) => {
+    return instance.put<ResponseData<boolean>>(`/admin/user/${id}/roles`, req).then((res) => {
+      return res.data
+    })
+  }
+
   const deleteUser = async (id: number) => {
     return instance.delete<ResponseData<number>>(`/admin/user/${id}`).then((res) => {
       return res.data
@@ -107,6 +117,7 @@ export const useSysUserApi = () => {
     queryUser,
     createUser,
     updateUser,
+    assignRoles,
     deleteUser,
     updatePassword,
     resetPassword,

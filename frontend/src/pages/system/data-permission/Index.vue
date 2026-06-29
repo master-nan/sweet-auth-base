@@ -157,9 +157,8 @@
           <q-expansion-item
             class="data-permission-debug-panel"
             icon="policy"
-            label="权限排查"
-            caption="查看当前账号在该菜单和动作下的最终数据范围"
-            default-opened
+            label="当前账号权限排查"
+            caption="模拟运行时按菜单、绑定表和动作解析出的最终数据范围"
           >
             <div class="data-permission-debug-body">
               <q-select
@@ -170,14 +169,6 @@
                 map-options
                 label="动作"
                 :options="dataPermissionActionOptions"
-              />
-              <q-input v-model="debugTableCode" dense outlined label="表编码" />
-              <q-input
-                :model-value="String(selectedMenu.id)"
-                dense
-                outlined
-                readonly
-                label="菜单ID"
               />
               <q-btn
                 unelevated
@@ -195,6 +186,7 @@
               <span>用户 {{ debugResult.user_name }} · 角色 {{ debugResult.role_ids?.join(', ') || '无' }}</span>
               <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
               <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
+              <span>用户归属 {{ debugResult.user_dimensions?.length || 0 }} 条</span>
               <span>个人覆盖 {{ debugResult.user_overrides?.length || 0 }} 条</span>
               <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
                 {{ note }}
@@ -203,84 +195,102 @@
             </div>
           </q-expansion-item>
 
-          <q-table
-            class="fit sticky-header-table"
-            :rows="bindingRows"
-            :columns="bindingColumns"
-            row-key="local_id"
-            flat
-            bordered
-            separator="cell"
-            :pagination="{ rowsPerPage: 0 }"
-            hide-pagination
-          >
-            <template #body-cell-dimension_code="props">
-              <q-td :props="props">
-                <q-select
-                  v-model="props.row.dimension_code"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  :options="dimensionOptions"
-                />
-              </q-td>
-            </template>
-            <template #body-cell-field_code="props">
-              <q-td :props="props">
-                <q-select
-                  v-model="props.row.field_code"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  :options="tableFieldOptions"
-                />
-              </q-td>
-            </template>
-            <template #body-cell-match_type="props">
-              <q-td :props="props">
-                <q-select v-model="props.row.match_type" dense outlined emit-value map-options :options="matchTypeOptions" />
-              </q-td>
-            </template>
-            <template #body-cell-actions="props">
-              <q-td :props="props">
-                <q-select
-                  v-model="props.row.actions"
-                  dense
-                  outlined
-                  multiple
-                  emit-value
-                  map-options
-                  :display-value="actionsDisplay(props.row.actions)"
-                  :options="dataPermissionActionOptions"
-                />
-              </q-td>
-            </template>
-            <template #body-cell-required="props">
-              <q-td :props="props" class="text-center">
-                <q-toggle v-model="props.row.required" color="primary" />
-              </q-td>
-            </template>
-            <template #body-cell-state="props">
-              <q-td :props="props" class="text-center">
-                <q-toggle v-model="props.row.state" color="primary" />
-              </q-td>
-            </template>
-            <template #body-cell-row_actions="props">
-              <q-td :props="props" class="text-center">
-                <q-btn flat dense round color="negative" icon="delete" @click="removeBindingRow(props.row.local_id)">
-                  <q-tooltip>删除</q-tooltip>
-                </q-btn>
-              </q-td>
-            </template>
-            <template #no-data>
-              <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
-                <q-icon name="rule_folder" size="32px" />
-                <span>暂无绑定</span>
-              </div>
-            </template>
-          </q-table>
+          <div class="data-permission-binding-table-wrap">
+            <q-table
+              class="fit sticky-header-table data-permission-binding-table"
+              :rows="bindingRows"
+              :columns="bindingColumns"
+              row-key="local_id"
+              flat
+              bordered
+              separator="cell"
+              :pagination="{ rowsPerPage: 0 }"
+              hide-pagination
+            >
+              <template #body-cell-dimension_code="props">
+                <q-td :props="props">
+                  <q-select
+                    v-model="props.row.dimension_code"
+                    dense
+                    outlined
+                    emit-value
+                    map-options
+                    options-dense
+                    :options="dimensionOptions"
+                  />
+                </q-td>
+              </template>
+              <template #body-cell-field_code="props">
+                <q-td :props="props">
+                  <q-select
+                    v-model="props.row.field_code"
+                    dense
+                    outlined
+                    emit-value
+                    map-options
+                    options-dense
+                    :options="tableFieldOptions"
+                  />
+                </q-td>
+              </template>
+              <template #body-cell-match_type="props">
+                <q-td :props="props">
+                  <q-select
+                    v-model="props.row.match_type"
+                    dense
+                    outlined
+                    emit-value
+                    map-options
+                    options-dense
+                    :options="matchTypeOptions"
+                  />
+                </q-td>
+              </template>
+              <template #body-cell-actions="props">
+                <q-td :props="props">
+                  <q-select
+                    v-model="props.row.actions"
+                    class="data-permission-action-select"
+                    dense
+                    outlined
+                    multiple
+                    emit-value
+                    map-options
+                    options-dense
+                    :display-value="actionsDisplay(props.row.actions)"
+                    :options="dataPermissionActionOptions"
+                  >
+                    <q-tooltip v-if="actionsTooltip(props.row.actions)">
+                      {{ actionsTooltip(props.row.actions) }}
+                    </q-tooltip>
+                  </q-select>
+                </q-td>
+              </template>
+              <template #body-cell-required="props">
+                <q-td :props="props" class="text-center">
+                  <q-toggle v-model="props.row.required" color="primary" />
+                </q-td>
+              </template>
+              <template #body-cell-state="props">
+                <q-td :props="props" class="text-center">
+                  <q-toggle v-model="props.row.state" color="primary" />
+                </q-td>
+              </template>
+              <template #body-cell-row_actions="props">
+                <q-td :props="props" class="text-center">
+                  <q-btn flat dense round color="negative" icon="delete" @click="removeBindingRow(props.row.local_id)">
+                    <q-tooltip>删除</q-tooltip>
+                  </q-btn>
+                </q-td>
+              </template>
+              <template #no-data>
+                <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
+                  <q-icon name="rule_folder" size="32px" />
+                  <span>暂无绑定</span>
+                </div>
+              </template>
+            </q-table>
+          </div>
         </div>
 
         <div v-else class="data-permission-empty">
@@ -417,6 +427,7 @@ import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useI18n } from 'vue-i18n'
+import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
 
 type BindingRow = DataPermissionBindingSaveItem & {
   local_id: string
@@ -499,13 +510,13 @@ const dimensionColumns: QTableProps['columns'] = [
 ]
 
 const bindingColumns: QTableProps['columns'] = [
-  { name: 'dimension_code', label: '维度', field: 'dimension_code', align: 'left' },
-  { name: 'field_code', label: '字段', field: 'field_code', align: 'left' },
-  { name: 'match_type', label: '匹配', field: 'match_type', align: 'left' },
-  { name: 'actions', label: '动作', field: 'actions', align: 'left' },
-  { name: 'required', label: '必配', field: 'required', align: 'center' },
-  { name: 'state', label: '启用', field: 'state', align: 'center' },
-  { name: 'row_actions', label: '操作', field: 'row_actions', align: 'center' },
+  { name: 'dimension_code', label: '维度', field: 'dimension_code', align: 'left', style: 'min-width: 220px; width: 260px;' },
+  { name: 'field_code', label: '字段', field: 'field_code', align: 'left', style: 'min-width: 190px; width: 220px;' },
+  { name: 'match_type', label: '匹配', field: 'match_type', align: 'left', style: 'min-width: 140px; width: 150px;' },
+  { name: 'actions', label: '动作', field: 'actions', align: 'left', style: 'min-width: 260px; width: 320px;' },
+  { name: 'required', label: '必配', field: 'required', align: 'center', style: 'width: 92px;' },
+  { name: 'state', label: '启用', field: 'state', align: 'center', style: 'width: 92px;' },
+  { name: 'row_actions', label: '操作', field: 'row_actions', align: 'center', style: 'width: 92px;' },
 ]
 
 const dimensionOptions = computed(() =>
@@ -761,11 +772,11 @@ const removeBindingRow = (localId: string) => {
 }
 
 const actionsDisplay = (actions: string[]) => {
-  if (!actions?.length) return '全部动作'
-  const labels = dataPermissionActionOptions
-    .filter((option) => actions.includes(option.value))
-    .map((option) => option.label)
-  return labels.join('、')
+  return compactSelectionDisplay(actions, dataPermissionActionOptions, 2, '全部动作')
+}
+
+const actionsTooltip = (actions: string[]) => {
+  return compactSelectionTooltip(actions, dataPermissionActionOptions)
 }
 
 const validateBindings = () => {
@@ -952,11 +963,15 @@ onMounted(() => {
 .data-permission-binding-wrap {
   height: 100%;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 12px;
+  overflow: hidden;
   background: #f8fafc;
 }
 
 .data-permission-debug-panel {
+  flex-shrink: 0;
   margin-bottom: 12px;
   border: 1px solid #dbe3ef;
   border-radius: 8px;
@@ -965,7 +980,7 @@ onMounted(() => {
 
 .data-permission-debug-body {
   display: grid;
-  grid-template-columns: 180px minmax(180px, 1fr) 140px auto;
+  grid-template-columns: 180px auto;
   gap: 10px;
   align-items: center;
   padding: 0 16px 12px;
@@ -992,6 +1007,22 @@ onMounted(() => {
   color: #22304a;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.data-permission-binding-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-permission-binding-table {
+  height: 100%;
+}
+
+.data-permission-action-select :deep(.q-field__native) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .data-permission-empty {

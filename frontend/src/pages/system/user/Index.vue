@@ -128,6 +128,47 @@
       @submit="handleFormSubmit"
     />
 
+    <q-dialog v-model="showRoleDialog" @hide="clearRoleDialog">
+      <q-card style="min-width: 520px; max-width: 90vw">
+        <q-card-section>
+          <div class="text-h6">分配角色</div>
+          <div class="text-caption text-grey-7">
+            {{ currentRoleUser?.user_name || '' }}
+          </div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section>
+          <q-select
+            v-model="selectedRoleIds"
+            :options="roleOptions"
+            :loading="roleDialogLoading"
+            label="角色"
+            outlined
+            dense
+            multiple
+            emit-value
+            map-options
+            use-chips
+            options-dense
+            option-label="name"
+            option-value="id"
+            :rules="[(val) => (val && val.length > 0) || '至少选择一个角色']"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="取消" v-close-popup />
+          <q-btn
+            color="primary"
+            icon="save"
+            label="保存"
+            :loading="roleDialogLoading"
+            :disable="selectedRoleIds.length === 0"
+            @click="saveUserRoles"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="showResetPasswordDialog" @hide="clearResetPassword">
       <q-card style="min-width: 520px; max-width: 90vw">
         <q-card-section class="text-h6">临时密码已生成</q-card-section>
@@ -198,6 +239,7 @@ import {
   type UserCreateReq,
   type UserUpdateReq,
 } from 'src/api/services/sys-user'
+import { useRoleApi, type Role } from 'src/api/services/sys-role'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
 
 import { useLoadingStore } from 'src/stores/loading'
@@ -221,6 +263,7 @@ const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 
 const sysUserApi = useSysUserApi()
+const roleApi = useRoleApi()
 const tableApi = useTableApi()
 
 const rows = ref<User[]>([])
@@ -240,6 +283,7 @@ const action_handlers: Record<string, (row?: User) => void> = {
   delete: (row) => row && confirmDelete(row),
   reset_password: (row) => row && confirmResetPassword(row),
   unlock_login: (row) => row && confirmUnlockLogin(row),
+  assign_role: (row) => row && openRoleDialog(row),
   assign_data_permission: (row) => row && openDataPermissionDialog(row),
 }
 
@@ -268,6 +312,11 @@ const resetPasswordValue = ref('')
 const resetPasswordEmailSent = ref(false)
 const resetPasswordEmailMessage = ref('')
 let resetPasswordClearTimer: ReturnType<typeof setTimeout> | null = null
+const showRoleDialog = ref(false)
+const roleDialogLoading = ref(false)
+const currentRoleUser = ref<User | null>(null)
+const roleOptions = ref<Role[]>([])
+const selectedRoleIds = ref<number[]>([])
 const showDataPermissionDialog = ref(false)
 const currentPermissionUser = ref<User | null>(null)
 
@@ -459,6 +508,61 @@ const confirmUnlockLogin = (row: User) => {
       }
     })()
   })
+}
+
+const openRoleDialog = async (row: User) => {
+  roleDialogLoading.value = true
+  showRoleDialog.value = true
+  try {
+    currentRoleUser.value = row
+    const [userRes, roleRes] = await Promise.all([
+      sysUserApi.queryUserById(row.id),
+      roleApi.queryRole({
+        page: 1,
+        num: 1000,
+        table_code: 'sys_role',
+        expressions: emptyAdvancedQuery().expressions,
+        quick_query: { keyword: '' },
+        include_deleted: false,
+      }),
+    ])
+    if (roleRes.success) {
+      roleOptions.value = roleRes.data || []
+    }
+    if (userRes.success && userRes.data) {
+      currentRoleUser.value = userRes.data
+      selectedRoleIds.value = (userRes.data.roles || []).map((role) => role.id)
+    }
+  } catch (error) {
+    console.error('加载用户角色失败', error)
+    $q.notify({ type: 'negative', position: 'top-right', message: '加载用户角色失败' })
+  } finally {
+    roleDialogLoading.value = false
+  }
+}
+
+const saveUserRoles = async () => {
+  if (!currentRoleUser.value) return
+  roleDialogLoading.value = true
+  try {
+    const result = await sysUserApi.assignRoles(currentRoleUser.value.id, {
+      role_ids: selectedRoleIds.value,
+    })
+    if (result.success) {
+      $q.notify({ type: 'positive', position: 'top-right', message: '角色已保存' })
+      showRoleDialog.value = false
+      await fetchData()
+    }
+  } catch (error) {
+    console.error('保存用户角色失败', error)
+  } finally {
+    roleDialogLoading.value = false
+  }
+}
+
+const clearRoleDialog = () => {
+  currentRoleUser.value = null
+  selectedRoleIds.value = []
 }
 
 const openDataPermissionDialog = (row: User) => {
