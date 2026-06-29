@@ -274,6 +274,34 @@ func (u *UserController) UpdateUser(ctx *gin.Context) {
 	}
 }
 
+// AssignRoles 分配用户角色
+func (u *UserController) AssignRoles(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		return
+	}
+	var data request.SysUserAssignRolesReq
+	translator := u.translators["zh"]
+	err = utils.ValidatorBody[request.SysUserAssignRolesReq](ctx, &data, translator)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	err = u.sysUserService.AssignRoles(ctx, id, data.RoleIds)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(true)
+}
+
 // DeleteUser 删除用户
 // @Summary 删除用户
 // @Description 删除用户

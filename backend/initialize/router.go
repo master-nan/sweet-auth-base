@@ -179,6 +179,9 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/user/unlock_login/:id", app.UserController.UnlockLogin)
 		adminGroup.GET("/user/:id/data-permissions", app.DataPermissionController.GetUserOverrides)
 		adminGroup.PUT("/user/:id/data-permissions", app.DataPermissionController.SaveUserOverrides)
+		adminGroup.GET("/user/:id/dimension-values", app.DataPermissionController.GetUserDimensionValues)
+		adminGroup.PUT("/user/:id/dimension-values", app.DataPermissionController.SaveUserDimensionValues)
+		adminGroup.PUT("/user/:id/roles", app.UserController.AssignRoles)
 		adminGroup.PUT("/user/:id", app.UserController.UpdateUser)
 		adminGroup.DELETE("/user/:id", app.UserController.DeleteUser)
 

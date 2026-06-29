@@ -74,6 +74,22 @@ func TestAssignedRoleDataScopeRecordsBuildsSelectedMenuScopes(t *testing.T) {
 	}
 }
 
+func TestAssignedRoleDataScopeRecordsAcceptsUserDimensionStrategy(t *testing.T) {
+	dataPermissionService, _ := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, dataPermissionService.db, true)
+	svc := &SysRoleService{dataPermissionService: dataPermissionService}
+
+	records, err := svc.assignedRoleDataScopeRecords(1, map[int]bool{10: true}, []request.RoleDataPermissionItemReq{
+		{MenuId: 10, TableCode: "demo_order", DimensionCode: "tenant", Strategy: "user_dimension"},
+	})
+	if err != nil {
+		t.Fatalf("expected user dimension strategy to be accepted: %v", err)
+	}
+	if len(records) != 1 || records[0].Strategy != "user_dimension" || records[0].ScopeValues != "[]" {
+		t.Fatalf("unexpected user dimension role scope: %#v", records)
+	}
+}
+
 func TestButtonAPIPolicies(t *testing.T) {
 	tests := []struct {
 		name   string

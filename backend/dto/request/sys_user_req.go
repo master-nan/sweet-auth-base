@@ -31,3 +31,7 @@ type SysUserUpdatePasswordReq struct {
 	IsReset           *bool             `json:"is_reset"`
 	PasswordChangedAt *model.CustomTime `json:"password_changed_at"`
 }
+
+type SysUserAssignRolesReq struct {
+	RoleIds []int `json:"role_ids"`
+}

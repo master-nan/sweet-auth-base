@@ -229,6 +229,43 @@ func (d *DataPermissionController) SaveUserOverrides(ctx *gin.Context) {
 	}
 }
 
+func (d *DataPermissionController) GetUserDimensionValues(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	userId, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	result, err := d.dataPermissionService.GetUserDimensionValues(userId)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+func (d *DataPermissionController) SaveUserDimensionValues(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	userId, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	var data request.UserDimensionValueSaveReq
+	data.UserId = userId
+	translator := d.translators["zh"]
+	if err := utils.ValidatorBody[request.UserDimensionValueSaveReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := d.dataPermissionService.SaveUserDimensionValues(ctx, userId, data); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+}
+
 func (d *DataPermissionController) DebugDataScope(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

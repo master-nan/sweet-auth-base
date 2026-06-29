@@ -24,6 +24,21 @@ func TestResolveDataScopeRequiredBindingWithoutRoleDenies(t *testing.T) {
 	}
 }
 
+func TestResolveDataScopeSuperAdminBypassesRequiredBinding(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysRole{Basic: model.Basic{Id: 1, State: true}, Name: "super_admin"})
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve data scope: %v", err)
+	}
+	if scope == nil || !scope.AllowAll || scope.DenyAll || len(scope.Conditions) != 0 {
+		t.Fatalf("expected super admin allow all scope, got %#v", scope)
+	}
+}
+
 func TestResolveDataScopeMergesRoleScopesAndUserIntersection(t *testing.T) {
 	service, table := newDataPermissionServiceForTest(t)
 	seedDataPermissionBinding(t, service.db, true)
@@ -99,6 +114,66 @@ func TestResolveDataScopeUserDenyOverrideWins(t *testing.T) {
 	}
 	if scope == nil || !scope.DenyAll {
 		t.Fatalf("expected deny override to win, got %#v", scope)
+	}
+}
+
+func TestResolveDataScopeUserDimensionStrategyUsesCurrentUserValues(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "user_dimension",
+	})
+	mustCreate(t, service.db, &model.SysUserDimensionValue{
+		Basic:         model.Basic{Id: 30, State: true},
+		UserId:        7,
+		DimensionCode: "tenant",
+		ScopeValues:   `["8","9"]`,
+	})
+	mustCreate(t, service.db, &model.SysUserDimensionValue{
+		Basic:         model.Basic{Id: 31, State: true},
+		UserId:        8,
+		DimensionCode: "tenant",
+		ScopeValues:   `["10"]`,
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve user dimension scope: %v", err)
+	}
+	if scope == nil || scope.AllowAll || scope.DenyAll || len(scope.Conditions) != 1 {
+		t.Fatalf("expected one user dimension condition, got %#v", scope)
+	}
+	got := scope.Conditions[0]
+	if got.Field != "tenant_id" || !reflect.DeepEqual(got.Values, []string{"8", "9"}) {
+		t.Fatalf("unexpected user dimension condition: %#v", got)
+	}
+}
+
+func TestResolveDataScopeUserDimensionStrategyWithoutValuesDenies(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "user_dimension",
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve missing user dimension scope: %v", err)
+	}
+	if scope == nil || !scope.DenyAll {
+		t.Fatalf("expected deny all without user dimension values, got %#v", scope)
 	}
 }
 
@@ -298,7 +373,9 @@ func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, mode
 		&model.SysDataScopeBinding{},
 		&model.SysRoleDataScope{},
 		&model.SysUserDataScopeOverride{},
+		&model.SysUserDimensionValue{},
 		&model.SysUserRole{},
+		&model.SysRole{},
 		&model.SysMenu{},
 	); err != nil {
 		t.Fatalf("migrate data permission models: %v", err)

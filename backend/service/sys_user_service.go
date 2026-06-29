@@ -26,20 +26,23 @@ import (
 )
 
 type SysUserService struct {
-	sysUserRepo  repository.SysUserRepository
-	sf           *utils.Snowflake
-	sysUserCache *cache.SysUserCache
-	serverConfig *config.Server
+	sysUserRepo     repository.SysUserRepository
+	sysUserRoleRepo repository.SysUserRoleRepository
+	sf              *utils.Snowflake
+	sysUserCache    *cache.SysUserCache
+	serverConfig    *config.Server
 }
 
 func NewSysUserService(
 	sysUserRepo repository.SysUserRepository,
+	sysUserRoleRepo repository.SysUserRoleRepository,
 	sf *utils.Snowflake,
 	sysUserCache *cache.SysUserCache,
 	serverConfig *config.Server,
 ) *SysUserService {
 	return &SysUserService{
 		sysUserRepo,
+		sysUserRoleRepo,
 		sf,
 		sysUserCache,
 		serverConfig,
@@ -217,6 +220,60 @@ func (s *SysUserService) Delete(ctx *gin.Context, id int) error {
 	}
 	// 删除缓存
 	s.DeleteCache(id)
+	return nil
+}
+
+func (s *SysUserService) AssignRoles(ctx *gin.Context, userId int, roleIds []int) error {
+	if userId <= 0 {
+		return error2.ErrParamInvalid
+	}
+	user, err := s.GetById(userId)
+	if err != nil {
+		return err
+	}
+	if user.Id == 0 {
+		return error2.ErrUserNotExist
+	}
+	normalizedRoleIds := make([]int, 0, len(roleIds))
+	roleIDSet := make(map[int]bool, len(roleIds))
+	for _, roleId := range roleIds {
+		if roleId <= 0 || roleIDSet[roleId] {
+			continue
+		}
+		roleIDSet[roleId] = true
+		normalizedRoleIds = append(normalizedRoleIds, roleId)
+	}
+	if len(normalizedRoleIds) == 0 {
+		return error2.NewBadRequestError("用户至少需要绑定一个角色")
+	}
+	tx := s.sysUserRepo.DBWithContext(ctx)
+	var count int64
+	if err := tx.Model(&model.SysRole{}).Where("id IN ?", normalizedRoleIds).Count(&count).Error; err != nil {
+		return err
+	}
+	if int(count) != len(normalizedRoleIds) {
+		return error2.NewBadRequestError("存在无效角色")
+	}
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserRole{}).Error; err != nil {
+			return err
+		}
+		if len(normalizedRoleIds) == 0 {
+			return nil
+		}
+		userRoles := make([]model.SysUserRole, 0, len(normalizedRoleIds))
+		for _, roleId := range normalizedRoleIds {
+			userRoles = append(userRoles, model.SysUserRole{
+				UserId: userId,
+				RoleId: roleId,
+			})
+		}
+		return tx.Create(&userRoles).Error
+	})
+	if err != nil {
+		return err
+	}
+	s.RefreshCache(userId)
 	return nil
 }
 

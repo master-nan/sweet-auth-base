@@ -36,6 +36,7 @@ const (
 	dataPermissionStrategySpecified = "specified"
 	dataPermissionStrategyTree      = "tree"
 	dataPermissionStrategySelf      = "self"
+	dataPermissionStrategyUserDim   = "user_dimension"
 
 	dataPermissionOverrideReplace   = "replace"
 	dataPermissionOverrideUnion     = "union"
@@ -57,17 +58,18 @@ type DataPermissionOption struct {
 }
 
 type DataPermissionDebugResult struct {
-	UserId        int                              `json:"user_id"`
-	UserName      string                           `json:"user_name"`
-	MenuId        int                              `json:"menu_id"`
-	TableCode     string                           `json:"table_code"`
-	Action        enum.SysMenuButtonEventAction    `json:"action"`
-	RoleIds       []int                            `json:"role_ids"`
-	Scope         *request.DataScope               `json:"scope"`
-	Bindings      []model.SysDataScopeBinding      `json:"bindings"`
-	RoleScopes    []model.SysRoleDataScope         `json:"role_scopes"`
-	UserOverrides []model.SysUserDataScopeOverride `json:"user_overrides"`
-	Notes         []string                         `json:"notes"`
+	UserId         int                              `json:"user_id"`
+	UserName       string                           `json:"user_name"`
+	MenuId         int                              `json:"menu_id"`
+	TableCode      string                           `json:"table_code"`
+	Action         enum.SysMenuButtonEventAction    `json:"action"`
+	RoleIds        []int                            `json:"role_ids"`
+	Scope          *request.DataScope               `json:"scope"`
+	Bindings       []model.SysDataScopeBinding      `json:"bindings"`
+	RoleScopes     []model.SysRoleDataScope         `json:"role_scopes"`
+	UserOverrides  []model.SysUserDataScopeOverride `json:"user_overrides"`
+	UserDimensions []model.SysUserDimensionValue    `json:"user_dimensions"`
+	Notes          []string                         `json:"notes"`
 }
 
 type scopeDecision struct {
@@ -145,6 +147,12 @@ func (s *DataPermissionService) DeleteDimension(ctx *gin.Context, id int) error 
 		}
 		if count > 0 {
 			return myerrors.NewBadRequestError("数据权限维度已被菜单绑定使用")
+		}
+		if err := tx.Model(&model.SysUserDimensionValue{}).Where("dimension_code = ? AND state = ?", dimension.Code, true).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return myerrors.NewBadRequestError("数据权限维度已被用户归属使用")
 		}
 		return tx.Delete(&dimension).Error
 	})
@@ -321,6 +329,49 @@ func (s *DataPermissionService) SaveUserOverrides(ctx *gin.Context, userId int, 
 	})
 }
 
+func (s *DataPermissionService) GetUserDimensionValues(userId int) ([]model.SysUserDimensionValue, error) {
+	var items []model.SysUserDimensionValue
+	err := s.db.Preload("Dimension").Where("user_id = ?", userId).Order("dimension_code ASC, id ASC").Find(&items).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		items[i].ScopeValueList = decodeStringList(items[i].ScopeValues)
+	}
+	return items, nil
+}
+
+func (s *DataPermissionService) SaveUserDimensionValues(ctx *gin.Context, userId int, req request.UserDimensionValueSaveReq) error {
+	if req.UserId > 0 && req.UserId != userId {
+		return myerrors.ErrParamInvalid
+	}
+	records := make([]model.SysUserDimensionValue, 0, len(req.Items))
+	for _, item := range req.Items {
+		record, err := s.userDimensionValueFromReq(userId, item)
+		if err != nil {
+			return err
+		}
+		if !record.State {
+			continue
+		}
+		id, err := s.sf.GenerateUniqueID()
+		if err != nil {
+			return err
+		}
+		record.Id = int(id)
+		records = append(records, record)
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserDimensionValue{}).Error; err != nil {
+			return err
+		}
+		if len(records) == 0 {
+			return nil
+		}
+		return tx.Create(&records).Error
+	})
+}
+
 func (s *DataPermissionService) DimensionOptions(code string) ([]DataPermissionOption, error) {
 	code, err := normalizeDataPermissionCode("维度编码", code)
 	if err != nil {
@@ -387,6 +438,13 @@ func (s *DataPermissionService) ResolveDataScope(user model.SysUser, menuId int,
 	}
 	if len(roleIds) == 0 {
 		return &request.DataScope{DenyAll: true}, nil
+	}
+	isSuperAdmin, err := s.hasSuperAdminRole(roleIds)
+	if err != nil {
+		return nil, err
+	}
+	if isSuperAdmin {
+		return &request.DataScope{AllowAll: true}, nil
 	}
 	conditions := make([]request.DataScopeCondition, 0, len(bindings))
 	for _, binding := range bindings {
@@ -562,6 +620,15 @@ func (s *DataPermissionService) DebugDataScope(user model.SysUser, menuId int, t
 		}
 		for i := range result.UserOverrides {
 			result.UserOverrides[i].ScopeValueList = decodeStringList(result.UserOverrides[i].ScopeValues)
+		}
+		if err := s.db.Preload("Dimension").
+			Where("user_id = ? AND dimension_code IN ? AND state = ?", user.Id, codes, true).
+			Order("dimension_code ASC, id ASC").
+			Find(&result.UserDimensions).Error; err != nil {
+			return result, err
+		}
+		for i := range result.UserDimensions {
+			result.UserDimensions[i].ScopeValueList = decodeStringList(result.UserDimensions[i].ScopeValues)
 		}
 	}
 	return result, nil
@@ -776,6 +843,30 @@ func (s *DataPermissionService) userOverrideFromReq(userId int, req request.User
 	}, nil
 }
 
+func (s *DataPermissionService) userDimensionValueFromReq(userId int, req request.UserDimensionValueItemReq) (model.SysUserDimensionValue, error) {
+	dimensionCode, err := normalizeDataPermissionCode("维度编码", req.DimensionCode)
+	if err != nil {
+		return model.SysUserDimensionValue{}, err
+	}
+	if _, err := s.requireActiveDimension(dimensionCode); err != nil {
+		return model.SysUserDimensionValue{}, err
+	}
+	values := normalizeStringValues(req.ScopeValues)
+	if len(values) == 0 {
+		return model.SysUserDimensionValue{}, myerrors.NewBadRequestError("用户维度归属必须填写范围值")
+	}
+	state := true
+	if req.State != nil {
+		state = *req.State
+	}
+	return model.SysUserDimensionValue{
+		Basic:         model.Basic{State: state},
+		UserId:        userId,
+		DimensionCode: dimensionCode,
+		ScopeValues:   encodeStringList(values),
+	}, nil
+}
+
 func (s *DataPermissionService) boundMenuTable(menuId int) (model.SysMenu, model.SysTable, error) {
 	var menu model.SysMenu
 	if err := s.db.First(&menu, menuId).Error; err != nil {
@@ -896,6 +987,15 @@ func (s *DataPermissionService) userRoleIds(userId int) ([]int, error) {
 	return roleIds, nil
 }
 
+func (s *DataPermissionService) hasSuperAdminRole(roleIds []int) (bool, error) {
+	if len(roleIds) == 0 {
+		return false, nil
+	}
+	var count int64
+	err := s.db.Model(&model.SysRole{}).Where("id IN ? AND name = ?", roleIds, "super_admin").Count(&count).Error
+	return count > 0, err
+}
+
 func (s *DataPermissionService) resolveBindingDecision(user model.SysUser, roleIds []int, binding model.SysDataScopeBinding, dimension model.SysDataDimension) (scopeDecision, error) {
 	decision := scopeDecision{values: map[string]struct{}{}}
 	var roleScopes []model.SysRoleDataScope
@@ -989,7 +1089,28 @@ func (s *DataPermissionService) strategyDecision(dimension model.SysDataDimensio
 			return decision, err
 		}
 		decision.values = expanded
+	case dataPermissionStrategyUserDim:
+		return s.userDimensionScopeDecision(dimension, userId)
 	default:
+		decision.deny = true
+	}
+	return decision, nil
+}
+
+func (s *DataPermissionService) userDimensionScopeDecision(dimension model.SysDataDimension, userId int) (scopeDecision, error) {
+	decision := scopeDecision{values: map[string]struct{}{}}
+	var items []model.SysUserDimensionValue
+	if err := s.db.Where("user_id = ? AND dimension_code = ? AND state = ?", userId, dimension.Code, true).Find(&items).Error; err != nil {
+		return decision, err
+	}
+	for _, item := range items {
+		for _, value := range decodeStringList(item.ScopeValues) {
+			if strings.TrimSpace(value) != "" {
+				decision.values[strings.TrimSpace(value)] = struct{}{}
+			}
+		}
+	}
+	if len(decision.values) == 0 {
 		decision.deny = true
 	}
 	return decision, nil
@@ -1168,6 +1289,8 @@ func normalizeScopeStrategyValues(rawStrategy string, rawValues []string, subjec
 	values := normalizeStringValues(rawValues)
 	switch strategy {
 	case dataPermissionStrategyAll, dataPermissionStrategyNone:
+		return strategy, []string{}, nil
+	case dataPermissionStrategyUserDim:
 		return strategy, []string{}, nil
 	case dataPermissionStrategySelf:
 		if len(values) == 0 {

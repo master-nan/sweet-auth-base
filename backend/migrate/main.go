@@ -141,6 +141,7 @@ func migrateSchema(db *gorm.DB) error {
 		&model.SysDataScopeBinding{},
 		&model.SysRoleDataScope{},
 		&model.SysUserDataScopeOverride{},
+		&model.SysUserDimensionValue{},
 		&model.Application{},
 		&model.SmsTemplate{},
 		&model.SmsLog{},
@@ -1190,14 +1191,21 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 		menuButtonWithAPI(453, menuID, "删除", "system_user_delete", enum.Line, "delete", "delete", "negative", 2, "/admin/user/:id", "DELETE"),
 		menuButtonWithAPI(454, menuID, "重置密码", "system_user_reset_password", enum.Line, "reset_password", "lock_reset", "warning", 3, "/admin/user/reset_password/:id", "POST"),
 		menuButtonWithAPI(492, menuID, "解除锁定", "system_user_unlock_login", enum.Line, "unlock_login", "lock_open", "warning", 4, "/admin/user/unlock_login/:id", "POST"),
+		menuButtonWithAPI(615, menuID, "分配角色", "system_user_assign_role", enum.Line, "assign_role", "supervisor_account", "primary", 5, "/admin/user/:id/roles", "PUT"),
 		menuButtonWithAPI(411, menuID, "数据权限", "system_user_data_permission", enum.Line, "assign_data_permission", "shield", "primary", 6, "/admin/user/:id/data-permissions", "PUT"),
 		menuButtonWithAPI(412, menuID, "用户菜单", "system_user_menu_query", enum.Line, "query_user_menu", "account_tree", "primary", 98, "/admin/menu/user/:id", "GET"),
 		apiPermissionWithAPI(413, menuID, "数据权限查询", "system_user_data_permission_query", enum.Line, "query_data_permission", "search", "primary", 99, "/admin/user/:id/data-permissions", "GET"),
+		apiPermissionWithAPI(616, menuID, "角色选项", "system_user_role_options", enum.Line, "query_role_options", "groups", "primary", 100, "/admin/role/query", "POST"),
+		apiPermissionWithAPI(617, menuID, "用户归属查询", "system_user_dimension_value_query", enum.Line, "query_data_permission", "person_search", "primary", 101, "/admin/user/:id/dimension-values", "GET"),
+		apiPermissionWithAPI(618, menuID, "用户归属保存", "system_user_dimension_value_save", enum.Line, "save", "badge", "primary", 102, "/admin/user/:id/dimension-values", "PUT"),
 	}
-	buttons[9].IsButton = false
-	buttons[9].IsHidden = false
-	buttons[10].IsButton = false
-	buttons[10].IsHidden = false
+	for i := range buttons {
+		switch buttons[i].Code {
+		case "system_user_menu_query", "system_user_data_permission_query", "system_user_role_options", "system_user_dimension_value_query", "system_user_dimension_value_save":
+			buttons[i].IsButton = false
+			buttons[i].IsHidden = false
+		}
+	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
 
@@ -1215,6 +1223,9 @@ func seedDataPermissionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int,
 		apiPermissionWithAPI(609, menuID, "角色数据权限保存", "system_data_permission_role_save", enum.Line, "save", "save", "primary", 96, "/admin/role/:id/data-permissions", "PUT"),
 		apiPermissionWithAPI(610, menuID, "用户覆盖查询", "system_data_permission_user_query", enum.Line, "query", "person", "primary", 97, "/admin/user/:id/data-permissions", "GET"),
 		apiPermissionWithAPI(611, menuID, "用户覆盖保存", "system_data_permission_user_save", enum.Line, "save", "save", "primary", 98, "/admin/user/:id/data-permissions", "PUT"),
+		apiPermissionWithAPI(619, menuID, "用户归属查询", "system_data_permission_user_dimension_query", enum.Line, "query", "person_search", "primary", 99, "/admin/user/:id/dimension-values", "GET"),
+		apiPermissionWithAPI(620, menuID, "用户归属保存", "system_data_permission_user_dimension_save", enum.Line, "save", "badge", "primary", 100, "/admin/user/:id/dimension-values", "PUT"),
+		apiPermissionWithAPI(614, menuID, "权限排查", "system_data_permission_debug", enum.Line, "debug", "manage_search", "primary", 101, "/admin/data-permission/debug", "GET"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -1507,6 +1518,8 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/user/unlock_login/:id", "POST"},
 		{"/admin/user/:id/data-permissions", "GET"},
 		{"/admin/user/:id/data-permissions", "PUT"},
+		{"/admin/user/:id/dimension-values", "GET"},
+		{"/admin/user/:id/dimension-values", "PUT"},
 		{"/admin/user/:id", "PUT"},
 		{"/admin/user/:id", "DELETE"},
 		{"/admin/data-permission/dimension/query", "POST"},
@@ -1690,6 +1703,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "sys_data_scope_binding", name: "数据权限绑定"},
 		{code: "sys_role_data_scope", name: "角色数据权限"},
 		{code: "sys_user_data_scope_override", name: "用户数据权限覆盖"},
+		{code: "sys_user_dimension_value", name: "用户维度归属"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }

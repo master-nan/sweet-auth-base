@@ -71,3 +71,14 @@ type UserDataPermissionOverrideSaveReq struct {
 	UserId    int                                 `json:"user_id" binding:"required"`
 	Overrides []UserDataPermissionOverrideItemReq `json:"overrides"`
 }
+
+type UserDimensionValueItemReq struct {
+	DimensionCode string   `json:"dimension_code" binding:"required"`
+	ScopeValues   []string `json:"scope_values"`
+	State         *bool    `json:"state"`
+}
+
+type UserDimensionValueSaveReq struct {
+	UserId int                         `json:"user_id" binding:"required"`
+	Items  []UserDimensionValueItemReq `json:"items"`
+}
