@@ -1,191 +1,194 @@
 <template>
   <base-content class="q-pa-sm data-permission-page">
-    <master-detail-page
-      :mode="SysMasterDetailMode.TABLE"
-      master-title="数据维度"
-      :master-subtitle="`${dimensions.length} 个维度`"
-      detail-title="权限绑定"
-      :detail-subtitle="selectedMenu ? `${displayMenuTitle(selectedMenu)} · ${selectedMenu.table_code}` : '选择低代码菜单'"
-      master-width="minmax(480px, 42%)"
-      min-width="0"
-      min-height="calc(100vh - 150px)"
-    >
-      <template #master-actions>
-        <q-btn unelevated color="primary" icon="add" label="新增维度" @click="openDimensionDialog()" />
-        <q-btn outline color="primary" round icon="refresh" :loading="loading" @click="loadAll">
-          <q-tooltip>刷新</q-tooltip>
-        </q-btn>
-      </template>
-
-      <template #master-toolbar>
-        <div class="data-permission-toolbar">
-          <q-input v-model="dimensionKeyword" dense outlined clearable placeholder="搜索维度编码 / 名称">
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+    <div class="data-permission-shell">
+      <div class="data-permission-summary">
+        <div class="data-permission-summary-card">
+          <q-icon name="badge" />
+          <div>
+            <strong>{{ dimensions.length }}</strong>
+            <span>数据维度</span>
+          </div>
         </div>
-      </template>
+        <div class="data-permission-summary-card">
+          <q-icon name="rule" />
+          <div>
+            <strong>{{ bindingRows.length }}</strong>
+            <span>当前绑定</span>
+          </div>
+        </div>
+        <div class="data-permission-summary-card">
+          <q-icon name="dynamic_form" />
+          <div>
+            <strong>{{ menuOptions.length }}</strong>
+            <span>可配置菜单</span>
+          </div>
+        </div>
+        <div class="data-permission-summary-card">
+          <q-icon name="policy" />
+          <div>
+            <strong>{{ debugScopeLabel }}</strong>
+            <span>诊断结果</span>
+          </div>
+        </div>
+      </div>
 
-      <template #master-content>
-        <q-table
-          class="fit sticky-header-table"
-          :rows="filteredDimensions"
-          :columns="dimensionColumns"
-          row-key="id"
-          flat
-          bordered
-          separator="cell"
-          :loading="loading"
-          :pagination="{ rowsPerPage: 0 }"
-          hide-pagination
+      <div class="data-permission-workspace">
+        <q-tabs
+          v-model="activeWorkspaceTab"
+          class="data-permission-tabs"
+          active-color="primary"
+          indicator-color="primary"
+          align="left"
+          no-caps
         >
-          <template #body-cell-source_code="props">
-            <q-td :props="props">
-              {{ sourceTableLabel(props.row.source_code) }}
-            </q-td>
-          </template>
-          <template #body-cell-state="props">
-            <q-td :props="props">
-              <q-badge :color="props.row.state === false ? 'grey-6' : 'positive'" outline>
-                {{ props.row.state === false ? '停用' : '启用' }}
-              </q-badge>
-            </q-td>
-          </template>
-          <template #body-cell-actions="props">
-            <q-td :props="props" class="q-gutter-xs dimension-actions-cell">
-              <q-btn
-                class="dimension-action-btn"
-                flat
-                dense
-                round
-                color="primary"
-                icon="edit"
-                @click.stop="openDimensionDialog(props.row)"
-              >
-                <q-tooltip>编辑</q-tooltip>
-              </q-btn>
-              <q-btn
-                class="dimension-action-btn"
-                flat
-                dense
-                round
-                color="negative"
-                icon="delete"
-                @click.stop="confirmDeleteDimension(props.row)"
-              >
-                <q-tooltip>删除</q-tooltip>
-              </q-btn>
-            </q-td>
-          </template>
-        </q-table>
-      </template>
+          <q-tab name="dimensions" icon="badge" label="数据维度" />
+          <q-tab name="bindings" icon="rule" label="权限绑定" />
+          <q-tab name="debug" icon="policy" label="权限诊断" />
+          <q-tab name="checks" icon="fact_check" label="配置检查" />
+        </q-tabs>
 
-      <template #detail-context>
-        <div class="data-permission-detail-head">
-          <div class="data-permission-icon-tile">
-            <q-icon name="rule" />
-          </div>
-          <div class="data-permission-detail-main">
-            <div class="data-permission-detail-title">权限绑定</div>
-            <div class="data-permission-detail-meta">
-              <q-chip v-if="selectedMenu" dense square color="primary" text-color="white">
-                {{ selectedMenu.name }}
-              </q-chip>
-              <span>{{ selectedMenu?.path || '低代码菜单' }}</span>
+        <q-separator />
+
+        <q-tab-panels v-model="activeWorkspaceTab" animated keep-alive class="data-permission-panels">
+          <q-tab-panel name="dimensions" class="data-permission-tab-panel">
+            <div class="data-permission-panel-head">
+              <div>
+                <div class="data-permission-panel-title">数据维度</div>
+                <div class="data-permission-panel-caption">定义公司、部门、区域等可复用业务维度，角色和用户授权都会引用这里的维度。</div>
+              </div>
+              <div class="data-permission-panel-actions">
+                <q-btn unelevated color="primary" icon="add" label="新增维度" @click="openDimensionDialog()" />
+                <q-btn outline color="primary" round icon="refresh" :loading="loading" @click="loadAll">
+                  <q-tooltip>刷新</q-tooltip>
+                </q-btn>
+              </div>
             </div>
-          </div>
-        </div>
-      </template>
 
-      <template #detail-toolbar>
-        <div class="data-permission-toolbar data-permission-toolbar--detail">
-          <sweet-select
-            v-model="selectedMenuId"
-            class="data-permission-menu-select"
-            emit-value
-            map-options
-            use-input
-            clearable
-            input-debounce="150"
-            label="低代码菜单"
-            :options="filteredMenuOptions"
-            @filter="filterMenuOptions"
-            @update:model-value="onMenuChange"
-          >
-            <template #option="scope">
-              <q-item v-bind="scope.itemProps">
-                <q-item-section avatar>
-                  <q-icon :name="scope.opt.icon || 'dynamic_form'" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ scope.opt.label }}</q-item-label>
-                  <q-item-label caption>{{ scope.opt.caption }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </sweet-select>
-          <q-space />
-          <q-btn
-            unelevated
-            color="primary"
-            icon="add"
-            label="新增"
-            :disable="!selectedMenu || dimensions.length === 0"
-            @click="openBindingDialog()"
-          />
-        </div>
-      </template>
+            <div class="data-permission-panel-toolbar">
+              <q-input v-model="dimensionKeyword" dense outlined clearable placeholder="搜索维度编码 / 名称">
+                <template #prepend>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+            </div>
 
-      <template #detail-content>
-        <div v-if="selectedMenu" class="data-permission-binding-wrap">
-          <q-banner v-if="tableFieldOptions.length === 0" rounded class="bg-orange-1 text-warning q-ma-md">
-            当前菜单绑定表没有可用字段
-          </q-banner>
+            <q-table
+              class="sticky-header-table data-permission-table"
+              :rows="filteredDimensions"
+              :columns="dimensionColumns"
+              row-key="id"
+              flat
+              bordered
+              separator="cell"
+              :loading="loading"
+              :pagination="{ rowsPerPage: 0 }"
+              hide-pagination
+            >
+              <template #body-cell-source_code="props">
+                <q-td :props="props">
+                  {{ sourceTableLabel(props.row.source_code) }}
+                </q-td>
+              </template>
+              <template #body-cell-state="props">
+                <q-td :props="props">
+                  <q-badge :color="props.row.state === false ? 'grey-6' : 'positive'" outline>
+                    {{ props.row.state === false ? '停用' : '启用' }}
+                  </q-badge>
+                </q-td>
+              </template>
+              <template #body-cell-actions="props">
+                <q-td :props="props" class="q-gutter-xs dimension-actions-cell">
+                  <q-btn
+                    class="dimension-action-btn"
+                    flat
+                    dense
+                    round
+                    color="primary"
+                    icon="edit"
+                    @click.stop="openDimensionDialog(props.row)"
+                  >
+                    <q-tooltip>编辑</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    class="dimension-action-btn"
+                    flat
+                    dense
+                    round
+                    color="negative"
+                    icon="delete"
+                    @click.stop="confirmDeleteDimension(props.row)"
+                  >
+                    <q-tooltip>删除</q-tooltip>
+                  </q-btn>
+                </q-td>
+              </template>
+            </q-table>
+          </q-tab-panel>
 
-          <q-expansion-item
-            class="data-permission-debug-panel"
-            icon="policy"
-            label="当前账号权限排查"
-            caption="模拟运行时按菜单、绑定表和动作解析出的最终数据范围"
-          >
-            <div class="data-permission-debug-body">
+          <q-tab-panel name="bindings" class="data-permission-tab-panel">
+            <div class="data-permission-panel-head">
+              <div>
+                <div class="data-permission-panel-title">权限绑定</div>
+                <div class="data-permission-panel-caption">给低代码菜单绑定数据维度和表字段，运行时会按角色范围与用户归属合并出最终可见数据。</div>
+              </div>
+              <div class="data-permission-panel-actions">
+                <q-btn
+                  unelevated
+                  color="primary"
+                  icon="add"
+                  label="新增"
+                  :disable="!selectedMenu || dimensions.length === 0"
+                  @click="openBindingDialog()"
+                />
+              </div>
+            </div>
+
+            <div class="data-permission-panel-toolbar">
               <sweet-select
-                v-model="debugAction"
+                v-model="selectedMenuId"
+                class="data-permission-menu-select"
                 emit-value
                 map-options
-                label="动作"
-                :options="dataPermissionActionOptions"
-              />
-              <q-btn
-                unelevated
-                dense
-                color="primary"
-                icon="manage_search"
-                label="排查"
-                :loading="debugLoading"
-                @click="loadDebugResult"
-              />
+                use-input
+                clearable
+                input-debounce="150"
+                label="低代码菜单"
+                :options="filteredMenuOptions"
+                @filter="filterMenuOptions"
+                @update:model-value="onMenuChange"
+              >
+                <template #option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section avatar>
+                      <q-icon :name="scope.opt.icon || 'dynamic_form'" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ scope.opt.label }}</q-item-label>
+                      <q-item-label caption>{{ scope.opt.caption }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </sweet-select>
             </div>
-            <div v-if="debugResult" class="data-permission-debug-result">
-              <q-chip dense square :color="debugScopeColor" text-color="white">
-                {{ debugScopeLabel }}
-              </q-chip>
-              <span>用户 {{ debugResult.user_name }} · 角色 {{ debugResult.role_ids?.join(', ') || '无' }}</span>
-              <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
-              <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
-              <span>用户归属 {{ debugResult.user_dimensions?.length || 0 }} 条</span>
-              <span>特殊授权 {{ debugResult.user_overrides?.length || 0 }} 条</span>
-              <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
-                {{ note }}
-              </q-chip>
-              <pre>{{ debugScopeText }}</pre>
-            </div>
-          </q-expansion-item>
 
-          <div class="data-permission-binding-table-wrap">
+            <div v-if="selectedMenu" class="data-permission-menu-context">
+              <q-icon :name="selectedMenu.icon || 'dynamic_form'" />
+              <div>
+                <div class="data-permission-context-title">{{ selectedMenuDisplayTitle }}</div>
+                <div class="data-permission-context-meta">
+                  <q-chip dense square color="primary" text-color="white">{{ selectedMenu.name }}</q-chip>
+                  <q-chip dense square outline color="primary">绑定表 {{ selectedMenu.table_code }}</q-chip>
+                </div>
+              </div>
+            </div>
+
+            <q-banner v-if="selectedMenu && tableFieldOptions.length === 0" rounded class="bg-orange-1 text-warning q-mb-md">
+              当前菜单绑定表没有可用字段
+            </q-banner>
+
             <q-table
-              class="fit sticky-header-table data-permission-binding-table"
+              v-if="selectedMenu"
+              class="sticky-header-table data-permission-binding-table"
               :rows="bindingRows"
               :columns="bindingColumns"
               row-key="local_id"
@@ -253,22 +256,108 @@
                 </div>
               </template>
             </q-table>
-          </div>
-        </div>
 
-        <div v-else class="data-permission-empty">
-          <q-icon name="ads_click" />
-          <span>选择一个低代码菜单</span>
-        </div>
-      </template>
-    </master-detail-page>
+            <div v-else class="data-permission-empty">
+              <q-icon name="ads_click" />
+              <span>选择一个低代码菜单</span>
+            </div>
+          </q-tab-panel>
+
+          <q-tab-panel name="debug" class="data-permission-tab-panel">
+            <div class="data-permission-panel-head">
+              <div>
+                <div class="data-permission-panel-title">权限诊断</div>
+                <div class="data-permission-panel-caption">用当前账号模拟菜单和动作，查看最终解析出的数据范围。</div>
+              </div>
+            </div>
+
+            <div class="data-permission-debug-card">
+              <sweet-select
+                v-model="selectedMenuId"
+                class="data-permission-menu-select"
+                emit-value
+                map-options
+                use-input
+                clearable
+                input-debounce="150"
+                label="低代码菜单"
+                :options="filteredMenuOptions"
+                @filter="filterMenuOptions"
+                @update:model-value="onMenuChange"
+              />
+              <sweet-select
+                v-model="debugAction"
+                emit-value
+                map-options
+                label="动作"
+                :options="dataPermissionActionOptions"
+              />
+              <q-btn
+                unelevated
+                color="primary"
+                icon="manage_search"
+                label="诊断"
+                :disable="!selectedMenu"
+                :loading="debugLoading"
+                @click="loadDebugResult"
+              />
+            </div>
+
+            <div v-if="debugResult" class="data-permission-debug-result">
+              <q-chip dense square :color="debugScopeColor" text-color="white">
+                {{ debugScopeLabel }}
+              </q-chip>
+              <span>用户 {{ debugResult.user_name }} · 角色 {{ debugResult.role_ids?.join(', ') || '无' }}</span>
+              <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
+              <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
+              <span>用户归属 {{ debugResult.user_dimensions?.length || 0 }} 条</span>
+              <span>特殊授权 {{ debugResult.user_overrides?.length || 0 }} 条</span>
+              <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
+                {{ note }}
+              </q-chip>
+              <pre>{{ debugScopeText }}</pre>
+            </div>
+            <div v-else class="data-permission-empty data-permission-empty--panel">
+              <q-icon name="policy" />
+              <span>选择菜单和动作后点击诊断</span>
+            </div>
+          </q-tab-panel>
+
+          <q-tab-panel name="checks" class="data-permission-tab-panel">
+            <div class="data-permission-panel-head">
+              <div>
+                <div class="data-permission-panel-title">配置检查</div>
+                <div class="data-permission-panel-caption">快速发现维度来源、菜单字段和当前绑定里容易影响授权结果的配置。</div>
+              </div>
+              <div class="data-permission-panel-actions">
+                <q-btn outline color="primary" round icon="refresh" :loading="loading" @click="loadAll">
+                  <q-tooltip>刷新</q-tooltip>
+                </q-btn>
+              </div>
+            </div>
+
+            <div class="data-permission-check-grid">
+              <div v-for="item in configCheckItems" :key="item.label" class="data-permission-check-card">
+                <q-icon :name="item.icon" :color="item.color" />
+                <div>
+                  <strong>{{ item.value }}</strong>
+                  <span>{{ item.label }}</span>
+                  <em>{{ item.caption }}</em>
+                </div>
+              </div>
+            </div>
+          </q-tab-panel>
+        </q-tab-panels>
+      </div>
+    </div>
+
 
     <q-dialog v-model="bindingDialogOpen" persistent>
       <q-card class="binding-dialog-card">
         <q-card-section class="row items-center q-gutter-sm">
           <div>
             <div class="text-h6">{{ editingBindingLocalId ? '编辑绑定' : '新增绑定' }}</div>
-            <div class="text-caption text-grey-7">{{ selectedMenu ? displayMenuTitle(selectedMenu) : '低代码菜单' }}</div>
+            <div class="text-caption text-grey-7">{{ selectedMenuDisplayTitle || '低代码菜单' }}</div>
           </div>
           <q-space />
           <q-btn flat round dense icon="close" @click="bindingDialogOpen = false" />
@@ -427,7 +516,6 @@ defineOptions({ name: 'system_data_permission' })
 import { computed, onMounted, ref } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import BaseContent from 'components/BaseContent/BaseContent.vue'
-import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import SweetSelect from 'src/components/Select/SweetSelect.vue'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
 import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
@@ -441,7 +529,6 @@ import {
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
 import type { Query } from 'src/types/global'
-import { SysMasterDetailMode } from 'src/types/enum'
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
@@ -499,6 +586,7 @@ const debugResult = ref<DataPermissionDebugResult | null>(null)
 const dimensionDialogOpen = ref(false)
 const savingDimension = ref(false)
 const dimensionForm = ref<DataPermissionDimensionSaveReq>(emptyDimensionForm())
+const activeWorkspaceTab = ref<'dimensions' | 'bindings' | 'debug' | 'checks'>('dimensions')
 
 const valueTypeOptions = [
   { label: '字符串', value: 'string' },
@@ -556,6 +644,44 @@ const filteredDimensions = computed(() => {
   return dimensions.value.filter((dimension) =>
     [dimension.code, dimension.name, dimension.memo].join(' ').toLowerCase().includes(keyword),
   )
+})
+
+const configCheckItems = computed(() => {
+  const disabledDimensions = dimensions.value.filter((dimension) => dimension.state === false).length
+  const noSourceDimensions = dimensions.value.filter((dimension) => dimension.source_type !== 'table').length
+  const selectedMenuMissingFields = selectedMenu.value && tableFieldOptions.value.length === 0 ? 1 : 0
+  const disabledBindings = bindingRows.value.filter((binding) => binding.state === false).length
+
+  return [
+    {
+      label: '停用维度',
+      value: disabledDimensions,
+      caption: '停用后不会作为有效授权维度使用',
+      icon: 'pause_circle',
+      color: disabledDimensions > 0 ? 'warning' : 'positive',
+    },
+    {
+      label: '无来源维度',
+      value: noSourceDimensions,
+      caption: '无来源维度需要手工录入范围值',
+      icon: 'edit_note',
+      color: noSourceDimensions > 0 ? 'warning' : 'positive',
+    },
+    {
+      label: '当前菜单无字段',
+      value: selectedMenuMissingFields,
+      caption: '绑定表没有字段时无法新增规则',
+      icon: 'view_column',
+      color: selectedMenuMissingFields > 0 ? 'negative' : 'positive',
+    },
+    {
+      label: '停用绑定',
+      value: disabledBindings,
+      caption: '当前菜单中不会参与解析的绑定',
+      icon: 'rule_folder',
+      color: disabledBindings > 0 ? 'warning' : 'positive',
+    },
+  ]
 })
 
 const debugScope = computed(() => debugResult.value?.scope)
@@ -620,6 +746,10 @@ const displayMenuTitle = (menu: Menu) => {
   const title = menu.title || menu.name
   return title.startsWith('router.') ? t(title) : title
 }
+
+const selectedMenuDisplayTitle = computed(() => (
+  selectedMenu.value ? displayMenuTitle(selectedMenu.value) : ''
+))
 
 const flattenMenus = (menus: Menu[]): Menu[] =>
   menus.flatMap((menu) => [menu, ...flattenMenus(menu.children || [])])
@@ -991,52 +1121,231 @@ onMounted(() => {
   background: #f6f7fb;
 }
 
-.data-permission-toolbar {
+.data-permission-shell {
   display: flex;
-  gap: 10px;
+  min-height: calc(100vh - 150px);
+  flex-direction: column;
+  gap: 12px;
+}
+
+.data-permission-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.data-permission-summary-card {
+  display: flex;
   align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid #e3e8f2;
+  gap: 12px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
   background: #fff;
 }
 
-.data-permission-toolbar--detail {
-  min-height: 64px;
-  gap: 8px;
-}
-
-.data-permission-toolbar--detail .q-btn {
-  min-height: 36px;
-}
-
-.data-permission-toolbar--detail :deep(.q-btn__content) {
-  white-space: nowrap;
-}
-
-.data-permission-menu-select {
-  flex: 1;
-  min-width: 220px;
-  max-width: 360px;
-}
-
-.data-permission-detail-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.data-permission-icon-tile {
+.data-permission-summary-card > .q-icon {
   width: 42px;
   height: 42px;
   display: grid;
   place-items: center;
   border-radius: 8px;
   color: var(--q-primary);
-  background: rgba(25, 118, 210, 0.1);
+  background: rgba(105, 93, 238, 0.1);
+  font-size: 24px;
 }
 
-.data-permission-icon-tile .q-icon {
+.data-permission-summary-card strong {
+  display: block;
+  color: #172033;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.data-permission-summary-card span {
+  color: #7b879d;
+  font-size: 13px;
+}
+
+.data-permission-workspace {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-tabs {
+  min-height: 58px;
+  padding: 0 14px;
+}
+
+.data-permission-tabs :deep(.q-tab) {
+  min-height: 58px;
+  padding: 0 18px;
+}
+
+.data-permission-panels {
+  height: calc(100vh - 250px);
+  min-height: 540px;
+  background: #f8fafc;
+}
+
+.data-permission-tab-panel {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.data-permission-panel-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.data-permission-panel-title {
+  color: #172033;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.data-permission-panel-caption {
+  margin-top: 3px;
+  color: #748198;
+  font-size: 13px;
+}
+
+.data-permission-panel-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.data-permission-panel-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.data-permission-panel-toolbar .q-field {
+  width: 320px;
+  max-width: 100%;
+}
+
+.data-permission-table,
+.data-permission-binding-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.data-permission-menu-context {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dfe6f3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-menu-context > .q-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--q-primary);
+  background: rgba(105, 93, 238, 0.1);
   font-size: 24px;
+}
+
+.data-permission-context-title {
+  color: #172033;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.data-permission-context-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.data-permission-debug-card {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) 180px max-content;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid #dfe6f3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-check-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.data-permission-check-card {
+  display: flex;
+  gap: 12px;
+  min-height: 120px;
+  padding: 16px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-check-card > .q-icon {
+  margin-top: 2px;
+  font-size: 28px;
+}
+
+.data-permission-check-card strong {
+  display: block;
+  color: #172033;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.data-permission-check-card span {
+  display: block;
+  margin-top: 8px;
+  color: #172033;
+  font-weight: 700;
+}
+
+.data-permission-check-card em {
+  display: block;
+  margin-top: 6px;
+  color: #7b879d;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.data-permission-menu-select {
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
 }
 
 .dimension-action-btn {
@@ -1046,51 +1355,6 @@ onMounted(() => {
 
 .dimension-action-btn :deep(.q-icon) {
   font-size: 18px;
-}
-
-.data-permission-detail-main {
-  min-width: 0;
-}
-
-.data-permission-detail-title {
-  color: #172033;
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.data-permission-detail-meta {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-  color: #657189;
-  font-size: 12px;
-}
-
-.data-permission-binding-wrap {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  overflow: hidden;
-  background: #f8fafc;
-}
-
-.data-permission-debug-panel {
-  flex-shrink: 0;
-  margin-bottom: 12px;
-  border: 1px solid #dbe3ef;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.data-permission-debug-body {
-  display: grid;
-  grid-template-columns: 180px max-content;
-  gap: 10px;
-  align-items: center;
-  padding: 0 16px 12px;
 }
 
 .data-permission-debug-result {
@@ -1116,12 +1380,6 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-.data-permission-binding-table-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
 .data-permission-binding-table {
   height: 100%;
 }
@@ -1137,7 +1395,8 @@ onMounted(() => {
 }
 
 .data-permission-empty {
-  height: 100%;
+  min-height: 260px;
+  flex: 1;
   display: flex;
   gap: 10px;
   align-items: center;
@@ -1148,6 +1407,12 @@ onMounted(() => {
 
 .data-permission-empty .q-icon {
   font-size: 36px;
+}
+
+.data-permission-empty--panel {
+  border: 1px dashed #d8e0ec;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .dimension-dialog-card {
@@ -1195,10 +1460,6 @@ onMounted(() => {
   .data-permission-menu-select {
     min-width: 0;
     width: 100%;
-  }
-
-  .data-permission-debug-body {
-    grid-template-columns: 1fr;
   }
 }
 </style>
