@@ -100,11 +100,9 @@
 
       <template #detail-toolbar>
         <div class="data-permission-toolbar data-permission-toolbar--detail">
-          <q-select
+          <sweet-select
             v-model="selectedMenuId"
             class="data-permission-menu-select"
-            dense
-            outlined
             emit-value
             map-options
             use-input
@@ -126,7 +124,7 @@
                 </q-item-section>
               </q-item>
             </template>
-          </q-select>
+          </sweet-select>
           <q-space />
           <q-btn
             unelevated
@@ -152,10 +150,8 @@
             caption="模拟运行时按菜单、绑定表和动作解析出的最终数据范围"
           >
             <div class="data-permission-debug-body">
-              <q-select
+              <sweet-select
                 v-model="debugAction"
-                dense
-                outlined
                 emit-value
                 map-options
                 label="动作"
@@ -279,41 +275,33 @@
         </q-card-section>
         <q-separator />
         <q-card-section class="binding-form">
-          <q-select
+          <sweet-select
             v-model="bindingForm.dimension_code"
-            dense
-            outlined
             emit-value
             map-options
             options-dense
             label="维度"
             :options="dimensionOptions"
           />
-          <q-select
+          <sweet-select
             v-model="bindingForm.field_code"
-            dense
-            outlined
             emit-value
             map-options
             options-dense
             label="字段"
             :options="tableFieldOptions"
           />
-          <q-select
+          <sweet-select
             v-model="bindingForm.match_type"
-            dense
-            outlined
             emit-value
             map-options
             options-dense
             label="匹配"
             :options="matchTypeOptions"
           />
-          <q-select
+          <sweet-select
             v-model="bindingForm.actions"
             class="data-permission-action-select"
-            dense
-            outlined
             multiple
             emit-value
             map-options
@@ -325,7 +313,7 @@
             <q-tooltip v-if="actionsTooltip(bindingForm.actions)">
               {{ actionsTooltip(bindingForm.actions) }}
             </q-tooltip>
-          </q-select>
+          </sweet-select>
           <q-toggle v-model="bindingForm.required" color="primary" label="必配授权" />
           <q-toggle v-model="bindingForm.state" color="primary" label="启用" />
         </q-card-section>
@@ -353,29 +341,23 @@
         <q-card-section class="dimension-form">
           <q-input v-model="dimensionForm.code" dense outlined label="维度编码" />
           <q-input v-model="dimensionForm.name" dense outlined label="维度名称" />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.value_type"
-            dense
-            outlined
             emit-value
             map-options
             label="值类型"
             :options="valueTypeOptions"
           />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.source_type"
-            dense
-            outlined
             emit-value
             map-options
             label="来源类型"
             :options="sourceTypeOptions"
             @update:model-value="onDimensionSourceTypeChange"
           />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.source_code"
-            dense
-            outlined
             clearable
             emit-value
             map-options
@@ -387,10 +369,8 @@
             @filter="filterSourceTableOptions"
             @update:model-value="onDimensionSourceTableChange"
           />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.label_field"
-            dense
-            outlined
             clearable
             emit-value
             map-options
@@ -398,10 +378,8 @@
             :options="dimensionSourceFieldOptions"
             :disable="dimensionForm.source_type !== 'table'"
           />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.value_field"
-            dense
-            outlined
             clearable
             emit-value
             map-options
@@ -409,10 +387,8 @@
             :options="dimensionSourceFieldOptions"
             :disable="dimensionForm.source_type !== 'table'"
           />
-          <q-select
+          <sweet-select
             v-model="dimensionForm.parent_field"
-            dense
-            outlined
             clearable
             emit-value
             map-options
@@ -452,6 +428,7 @@ import { computed, onMounted, ref } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
+import SweetSelect from 'src/components/Select/SweetSelect.vue'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
 import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
 import {

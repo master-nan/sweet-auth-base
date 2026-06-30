@@ -299,10 +299,8 @@
                         <div class="permission-button-code">{{ row.dimension_code }}</div>
                       </div>
                       <div class="permission-data-scope-fields">
-                        <q-select
+                        <sweet-select
                           v-model="row.strategy"
-                          dense
-                          outlined
                           emit-value
                           map-options
                           options-dense
@@ -374,6 +372,7 @@ import {
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
 import ScopeValueSelect from 'src/components/DataPermission/ScopeValueSelect.vue'
+import SweetSelect from 'src/components/Select/SweetSelect.vue'
 
 type ButtonGroup = {
   key: string

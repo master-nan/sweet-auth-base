@@ -78,10 +78,8 @@
 
           <q-tab-panel name="overrides" class="q-pa-none data-permission-tab-panel">
             <div class="data-permission-filter">
-              <q-select
+              <sweet-select
                 v-model="selectedMenuId"
-                dense
-                outlined
                 clearable
                 emit-value
                 map-options
@@ -111,10 +109,8 @@
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side class="data-permission-item-fields">
-                    <q-select
+                    <sweet-select
                       v-model="point.override_mode"
-                      dense
-                      outlined
                       emit-value
                       map-options
                       label="覆盖模式"
@@ -122,10 +118,8 @@
                       :options="dataPermissionOverrideModeOptions"
                       @update:model-value="normalizeDenyPoint(point)"
                     />
-                    <q-select
+                    <sweet-select
                       v-model="point.strategy"
-                      dense
-                      outlined
                       emit-value
                       map-options
                       label="范围策略"
@@ -197,6 +191,7 @@ import {
 } from 'src/api/services/data-permission'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import ScopeValueSelect from 'src/components/DataPermission/ScopeValueSelect.vue'
+import SweetSelect from 'src/components/Select/SweetSelect.vue'
 
 const props = defineProps<{
   open: boolean

@@ -1,5 +1,5 @@
 <template>
-  <q-select
+  <sweet-select
     ref="selectRef"
     :model-value="normalizedModel"
     :options="filteredOptions"
@@ -48,12 +48,13 @@
         </q-item-section>
       </q-item>
     </template>
-  </q-select>
+  </sweet-select>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { DataPermissionOption } from 'src/api/services/data-permission'
+import SweetSelect from 'src/components/Select/SweetSelect.vue'
 
 const props = withDefaults(
   defineProps<{
