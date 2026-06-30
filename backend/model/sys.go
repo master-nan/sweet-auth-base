@@ -184,8 +184,8 @@ type SysUserDataScopeOverride struct {
 
 type SysUserDimensionValue struct {
 	Basic
-	UserId         int              `gorm:"uniqueIndex:uni_user_dimension_value;index:idx_user_dimension_value_user;comment:用户ID" json:"user_id"`
-	DimensionCode  string           `gorm:"size:64;uniqueIndex:uni_user_dimension_value;index:idx_user_dimension_value_dimension;comment:维度编码" json:"dimension_code"`
+	UserId         int              `gorm:"index:idx_user_dimension_value_user;comment:用户ID" json:"user_id"`
+	DimensionCode  string           `gorm:"size:64;index:idx_user_dimension_value_dimension;comment:维度编码" json:"dimension_code"`
 	ScopeValues    string           `gorm:"type:text;comment:维度值JSON" json:"-"`
 	ScopeValueList []string         `gorm:"-" json:"scope_values"`
 	User           SysUser          `gorm:"foreignKey:UserId;references:Id" json:"user,omitempty"`

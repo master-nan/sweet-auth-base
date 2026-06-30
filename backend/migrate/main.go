@@ -149,7 +149,25 @@ func migrateSchema(db *gorm.DB) error {
 		&model.FileChunk{},
 		&model.CasbinRule{},
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return ensureDataPermissionIndexes(db)
+}
+
+func ensureDataPermissionIndexes(db *gorm.DB) error {
+	if db.Dialector.Name() != "postgres" {
+		return nil
+	}
+	table := db.NamingStrategy.TableName("SysUserDimensionValue")
+	if err := db.Exec(`DROP INDEX IF EXISTS uni_user_dimension_value`).Error; err != nil {
+		return err
+	}
+	sql := fmt.Sprintf(
+		`CREATE UNIQUE INDEX IF NOT EXISTS uni_user_dimension_value_active ON "%s" ("user_id", "dimension_code") WHERE "gmt_delete" IS NULL`,
+		table,
+	)
+	return db.Exec(sql).Error
 }
 
 func backfillSysMenuPageBinding(db *gorm.DB) error {

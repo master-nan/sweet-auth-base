@@ -221,6 +221,9 @@ func (s *DataPermissionService) SaveRoleDataScopes(ctx *gin.Context, roleId int,
 	if err != nil {
 		return err
 	}
+	if err := s.ensureRoleOwnsScopeMenus(roleId, records); err != nil {
+		return err
+	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return s.ReplaceRoleDataScopes(tx, roleId, records)
 	})
@@ -254,6 +257,43 @@ func (s *DataPermissionService) ReplaceRoleDataScopes(tx *gorm.DB, roleId int, r
 		return nil
 	}
 	return tx.Create(&records).Error
+}
+
+func (s *DataPermissionService) ensureRoleOwnsScopeMenus(roleId int, records []model.SysRoleDataScope) error {
+	if len(records) == 0 {
+		return nil
+	}
+	menuIds := make([]int, 0, len(records))
+	seen := map[int]struct{}{}
+	for _, record := range records {
+		if record.MenuId <= 0 {
+			continue
+		}
+		if _, ok := seen[record.MenuId]; ok {
+			continue
+		}
+		seen[record.MenuId] = struct{}{}
+		menuIds = append(menuIds, record.MenuId)
+	}
+	if len(menuIds) == 0 {
+		return nil
+	}
+	var assigned []int
+	if err := s.db.Model(&model.SysRoleMenu{}).
+		Where("role_id = ? AND menu_id IN ?", roleId, menuIds).
+		Pluck("menu_id", &assigned).Error; err != nil {
+		return err
+	}
+	assignedSet := make(map[int]struct{}, len(assigned))
+	for _, menuId := range assigned {
+		assignedSet[menuId] = struct{}{}
+	}
+	for _, menuId := range menuIds {
+		if _, ok := assignedSet[menuId]; !ok {
+			return myerrors.NewBadRequestError("请先为角色授权菜单，再配置该菜单的数据权限")
+		}
+	}
+	return nil
 }
 
 func (s *DataPermissionService) DeleteRoleScopesByRoleId(tx *gorm.DB, roleId int) error {
@@ -385,7 +425,7 @@ func (s *DataPermissionService) SaveUserDimensionValues(ctx *gin.Context, userId
 		})
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserDimensionValue{}).Error; err != nil {
+		if err := tx.Unscoped().Where("user_id = ?", userId).Delete(&model.SysUserDimensionValue{}).Error; err != nil {
 			return err
 		}
 		if len(records) == 0 {

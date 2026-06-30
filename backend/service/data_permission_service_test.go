@@ -214,6 +214,117 @@ func TestSaveUserDimensionValuesMergesDuplicateDimensions(t *testing.T) {
 	}
 }
 
+func TestSaveUserDimensionValuesCanRepeatClearAndResave(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service, _ := newDataPermissionServiceForTest(t)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	mustCreate(t, service.db, &model.SysDataDimension{
+		Basic:      model.Basic{Id: 40, State: true},
+		Code:       "tenant",
+		Name:       "租户",
+		ValueType:  "number",
+		SourceType: "none",
+	})
+
+	saveReq := request.UserDimensionValueSaveReq{
+		UserId: 7,
+		Items: []request.UserDimensionValueItemReq{
+			{DimensionCode: "tenant", ScopeValues: []string{"1", "2"}},
+		},
+	}
+	if err := service.SaveUserDimensionValues(ctx, 7, saveReq); err != nil {
+		t.Fatalf("initial save user dimension values: %v", err)
+	}
+	if err := service.SaveUserDimensionValues(ctx, 7, saveReq); err != nil {
+		t.Fatalf("repeat save user dimension values should not hit unique index: %v", err)
+	}
+	if err := service.SaveUserDimensionValues(ctx, 7, request.UserDimensionValueSaveReq{UserId: 7}); err != nil {
+		t.Fatalf("clear user dimension values: %v", err)
+	}
+	if err := service.SaveUserDimensionValues(ctx, 7, request.UserDimensionValueSaveReq{
+		UserId: 7,
+		Items: []request.UserDimensionValueItemReq{
+			{DimensionCode: "tenant", ScopeValues: []string{"3"}},
+		},
+	}); err != nil {
+		t.Fatalf("resave user dimension values after clear should not hit unique index: %v", err)
+	}
+
+	var items []model.SysUserDimensionValue
+	if err := service.db.Where("user_id = ? AND dimension_code = ?", 7, "tenant").Find(&items).Error; err != nil {
+		t.Fatalf("query user dimension values: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one active user dimension row, got %d: %#v", len(items), items)
+	}
+	if got := decodeStringList(items[0].ScopeValues); !reflect.DeepEqual(got, []string{"3"}) {
+		t.Fatalf("expected latest values after resave, got %#v", got)
+	}
+}
+
+func TestSaveRoleDataScopesDoesNotPersistUnownedMenu(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service, _ := newDataPermissionServiceForTest(t)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysRole{Basic: model.Basic{Id: 1, State: true}, Name: "operator"})
+	mustCreate(t, service.db, &model.SysMenu{
+		Basic:     model.Basic{Id: 10, State: true},
+		Name:      "demo_order",
+		PageType:  enum.MenuPageTypeFixed,
+		TableCode: "demo_order",
+	})
+
+	err := service.SaveRoleDataScopes(ctx, 1, request.RoleDataPermissionSaveReq{
+		RoleId: 1,
+		Permissions: []request.RoleDataPermissionItemReq{
+			{
+				MenuId:        10,
+				TableCode:     "demo_order",
+				DimensionCode: "tenant",
+				Strategy:      "specified",
+				ScopeValues:   []string{"8"},
+			},
+		},
+	})
+	var count int64
+	if queryErr := service.db.Model(&model.SysRoleDataScope{}).Where("role_id = ? AND menu_id = ?", 1, 10).Count(&count).Error; queryErr != nil {
+		t.Fatalf("count role data scopes: %v", queryErr)
+	}
+	if err == nil && count != 0 {
+		t.Fatalf("expected unowned menu data scopes to be rejected or left unpersisted, got %d rows", count)
+	}
+	if err != nil && count != 0 {
+		t.Fatalf("save returned error but left partial data scopes: %d rows, err: %v", count, err)
+	}
+}
+
+func TestResolveDataScopeSpecifiedStrategyNormalizesValues(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "specified",
+		ScopeValues:   `["9","8","8"]`,
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve specified scope: %v", err)
+	}
+	if scope == nil || scope.AllowAll || scope.DenyAll || len(scope.Conditions) != 1 {
+		t.Fatalf("expected one specified condition, got %#v", scope)
+	}
+	if got := scope.Conditions[0].Values; !reflect.DeepEqual(got, []string{"8", "9"}) {
+		t.Fatalf("expected sorted unique specified values, got %#v", got)
+	}
+}
+
 func TestResolveDataScopeForTableActionUsesUniqueBoundMenu(t *testing.T) {
 	service, table := newDataPermissionServiceForTest(t)
 	seedDataPermissionBinding(t, service.db, true)
@@ -412,6 +523,7 @@ func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, mode
 		&model.SysUserDataScopeOverride{},
 		&model.SysUserDimensionValue{},
 		&model.SysUserRole{},
+		&model.SysRoleMenu{},
 		&model.SysRole{},
 		&model.SysMenu{},
 	); err != nil {
