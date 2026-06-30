@@ -151,7 +151,6 @@ scope_id IN (...) AND project_id IN (...)
 - `none`：无数据。
 - `specified`：指定范围，`scope_values` 保存 JSON 数组。
 - `tree`：指定树节点并展开下级，要求维度来源表配置 `value_field` 和 `parent_field`。
-- `self`：本人数据，解析为当前用户 ID。
 - `user_dimension`：从 `sys_user_dimension_value` 读取当前用户在该维度上的归属值。
 - `user_field`：从当前登录用户的 `sys_user` 字段读取范围值，`scope_values` 保存一个用户字段名，例如 `company_id` 或 `dept_id`。
 
@@ -174,18 +173,6 @@ scope_id IN (...) AND project_id IN (...)
   "dimension_code": "demo_scope",
   "strategy": "specified",
   "scope_values": ["1001", "1002"]
-}
-```
-
-如果策略是本人数据，不需要手工填值：
-
-```json
-{
-  "role_id": 9,
-  "menu_id": 1301,
-  "dimension_code": "owner",
-  "strategy": "self",
-  "scope_values": []
 }
 ```
 

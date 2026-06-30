@@ -35,7 +35,6 @@ const (
 	dataPermissionStrategyNone      = "none"
 	dataPermissionStrategySpecified = "specified"
 	dataPermissionStrategyTree      = "tree"
-	dataPermissionStrategySelf      = "self"
 	dataPermissionStrategyUserDim   = "user_dimension"
 	dataPermissionStrategyUserField = "user_field"
 
@@ -1138,8 +1137,6 @@ func (s *DataPermissionService) strategyDecision(dimension model.SysDataDimensio
 	switch normalizeStrategyValue(strategy) {
 	case dataPermissionStrategyAll:
 		decision.all = true
-	case dataPermissionStrategySelf:
-		decision.values[strconv.Itoa(userId)] = struct{}{}
 	case dataPermissionStrategySpecified:
 		for _, value := range normalizeStringValues(values) {
 			decision.values[value] = struct{}{}
@@ -1422,11 +1419,6 @@ func normalizeScopeStrategyValues(rawStrategy string, rawValues []string, subjec
 		}
 		if err := validateIdentifier("用户字段", values[0]); err != nil {
 			return "", nil, err
-		}
-		return strategy, values, nil
-	case dataPermissionStrategySelf:
-		if len(values) == 0 {
-			values = []string{strconv.Itoa(subjectId)}
 		}
 		return strategy, values, nil
 	case dataPermissionStrategySpecified, dataPermissionStrategyTree:

@@ -18,7 +18,6 @@ export type DataPermissionStrategy =
   | 'none'
   | 'specified'
   | 'tree'
-  | 'self'
   | 'user_dimension'
   | 'user_field'
 export type DataPermissionOverrideMode = 'replace' | 'union' | 'intersect' | 'deny'
@@ -188,7 +187,6 @@ export const dataPermissionStrategyOptions = [
   { label: '树范围', value: 'tree' },
   { label: '用户归属', value: 'user_dimension' },
   { label: '当前用户字段', value: 'user_field' },
-  { label: '本人ID', value: 'self' },
 ]
 
 export const dataPermissionOverrideModeOptions = [
