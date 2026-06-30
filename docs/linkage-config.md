@@ -48,7 +48,7 @@
 | `tableId`       | number  | 二选一 | - | 关联表的 ID，环境间可能变化，主要用于兼容旧配置或排障 |
 | `labelKey`      | string  | 否 | `label` | 关联表中作为显示文本的字段名，自动回退 `name`、`title`、`code` |
 | `valueKey`      | string  | 否 | `value` | 关联表中作为存储值的字段名，自动回退 `id` |
-| `pageSize`      | number  | 否 | relation: 50, cascader: 1000 | 查询关联表时的分页大小；relation 支持远程搜索和滚动加载 |
+| `pageSize`      | number  | 否 | 200 | 查询关联表时的分页大小；relation 运行时会限制在 20-200，cascader 建议不要超过 1000 |
 | `filterMapping` | object  | 否 | `{}` | 联动过滤映射，格式为 `{ "关联表字段": "当前表单字段" }` |
 
 ### 3.2 cascader 模式额外字段
@@ -77,15 +77,16 @@
 对话框打开时自动执行：
 
 1. 解析 `linkage_config` JSON
-2. 根据 `tableId` 或 `tableCode` 调用后端接口查询关联表数据
+2. 根据 `tableCode` 调用后端接口查询关联表数据
 3. 用 `labelKey` / `valueKey` 将返回数据映射为 `{ label, value }` 格式
 4. cascader 模式额外按 `parentKey` 构建树形结构
 5. 将选项挂载到字段的 `options` 属性上
 
 **API 端点**：
 
-- 按 ID：`POST /admin/generalization/query/{tableId}`
 - 按编码：`POST /admin/generalization/query/code/{tableCode}`
+
+`tableId` 只用于后端保存旧配置时解析并补齐 `tableCode`。前端下拉、级联、列表回显和参数 Schema 运行时都依赖 `tableCode`。
 
 relation 模式会按需加载：
 
@@ -203,6 +204,6 @@ relation 模式会按需加载：
 1. **配置入口**：常规维护优先使用字段管理界面，JSON 只作为高级参考和排障入口
 2. **字段类型**：关联字段通常为 `BIGINT` 类型（存储关联表的 ID）
 3. **选项回退**：`labelKey` 找不到时会依次尝试 `label` → `name` → `title` → `code`；`valueKey` 找不到时回退到 `id`
-4. **分页限制**：relation 默认按页加载，建议 `pageSize` 设为 50；cascader 通常一次加载树形数据，建议控制在 1000 条以内
+4. **分页限制**：字段管理编辑器默认 `pageSize=200`；relation 按页加载并在运行时限制为 20-200，cascader 通常一次加载树形数据，建议控制在 1000 条以内
 5. **联动刷新**：使用 `filterMapping` 时，父字段值变化会自动触发子字段选项重新加载
 6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [low-code-manual.md](low-code-manual.md)

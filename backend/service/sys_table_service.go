@@ -2378,15 +2378,17 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 		} else {
 			field.FieldName = column.ColumnName
 		}
-		switch column.DataType {
-		case "bigint":
+		dataType := strings.ToLower(strings.TrimSpace(column.DataType))
+		columnType := strings.ToLower(strings.TrimSpace(column.ColumnType))
+		switch dataType {
+		case "bigint", "int8":
 			field.FieldType = enum.BigIntFieldType
 			field.InputType = enum.InputNumberInputType
-		case "int":
+		case "int", "integer", "int4", "mediumint":
 			field.FieldType = enum.IntFieldType
 			field.InputType = enum.InputNumberInputType
-		case "tinyint":
-			if column.ColumnType == "tinyint(1)" {
+		case "smallint", "tinyint", "int2":
+			if columnType == "tinyint(1)" {
 				field.FieldType = enum.BooleanFieldType
 				field.InputType = enum.BooleanInputType
 			} else {
@@ -2394,7 +2396,7 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 				field.InputType = enum.InputNumberInputType
 				field.FieldLength = int(column.NumericPrecision.Int64)
 			}
-		case "varchar":
+		case "varchar", "character varying", "character", "char", "bpchar":
 			field.FieldType = enum.VarcharFieldType
 			field.FieldLength = int(column.CharacterMaximumLength.Int64)
 		case "text", "mediumtext", "longtext":
@@ -2407,15 +2409,26 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 		case "date":
 			field.FieldType = enum.DateFieldType
 			field.InputType = enum.DatePickerInputType
-		case "datetime", "timestamp":
+		case "datetime", "timestamp", "timestamp without time zone", "timestamp with time zone", "timestamptz":
 			field.FieldType = enum.DatetimeFieldType
 			field.InputType = enum.DatetimePickerInputType
-		case "time":
+		case "time", "time without time zone", "time with time zone", "timetz":
 			field.FieldType = enum.TimeFieldType
 			field.InputType = enum.TimePickerInputType
+		case "numeric", "decimal", "double precision", "float", "float4", "float8", "real":
+			field.FieldType = enum.FloatFieldType
+			field.InputType = enum.InputNumberInputType
+			field.FieldLength = int(column.NumericPrecision.Int64)
+		case "json", "jsonb":
+			field.FieldType = enum.JsonFieldType
+			field.InputType = enum.JsonInputType
 		default:
 			field.FieldType = enum.VarcharFieldType
-			field.FieldLength = int(column.NumericPrecision.Int64)
+			if column.CharacterMaximumLength.Valid {
+				field.FieldLength = int(column.CharacterMaximumLength.Int64)
+			} else {
+				field.FieldLength = int(column.NumericPrecision.Int64)
+			}
 		}
 		// 检查DefaultValue是否有值
 		if column.ColumnDefault.Valid {

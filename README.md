@@ -21,7 +21,8 @@ make docker-up
 默认访问：
 
 - 前端：http://localhost:8008/sweet_admin
-- 后端：http://localhost:9009/sweet_admin
+- 后端 API 前缀：http://localhost:9009/sweet_admin
+- 后端健康检查：http://localhost:9009/healthz、http://localhost:9009/readyz
 - Swagger：http://localhost:9009/swagger/index.html
 - PostgreSQL：localhost:15432
 - Redis：localhost:16380
@@ -64,6 +65,8 @@ quasar dev
 ```
 
 前端本地开发默认读取 [frontend/.env.development](frontend/.env.development)，后端本地开发默认读取 [backend/config-dev.yaml](backend/config-dev.yaml)。
+
+注意：`make docker-up` 暴露给宿主机的 PostgreSQL/Redis 端口是 `15432/16380`，而 `go run main.go` 默认按 [backend/config-dev.yaml](backend/config-dev.yaml) 连接 `5432/6379`。如果本地后端要复用 Docker 里的数据库和 Redis，需要通过环境变量覆盖端口。
 
 ## 文档
 

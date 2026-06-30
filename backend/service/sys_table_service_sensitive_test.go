@@ -210,6 +210,50 @@ func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
 	assertFieldDict(t, tableFields[2], "sys_detail_open_mode")
 }
 
+func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
+	fields := convertColumnsToSysTableFields("demo_pg", []model.TableColumnMate{
+		{ColumnName: "id", OrdinalPosition: 1, IsNullable: "NO", DataType: "bigint"},
+		{ColumnName: "count", OrdinalPosition: 2, IsNullable: "YES", DataType: "integer"},
+		{ColumnName: "flag", OrdinalPosition: 3, IsNullable: "YES", DataType: "boolean"},
+		{ColumnName: "status", OrdinalPosition: 4, IsNullable: "YES", DataType: "smallint", NumericPrecision: sql.NullInt64{Int64: 16, Valid: true}},
+		{ColumnName: "name", OrdinalPosition: 5, IsNullable: "YES", DataType: "character varying", CharacterMaximumLength: sql.NullInt64{Int64: 128, Valid: true}},
+		{ColumnName: "amount", OrdinalPosition: 6, IsNullable: "YES", DataType: "numeric", NumericPrecision: sql.NullInt64{Int64: 12, Valid: true}, NumericScale: sql.NullInt64{Int64: 2, Valid: true}},
+		{ColumnName: "payload", OrdinalPosition: 7, IsNullable: "YES", DataType: "jsonb"},
+		{ColumnName: "created_at", OrdinalPosition: 8, IsNullable: "YES", DataType: "timestamp without time zone"},
+		{ColumnName: "clock", OrdinalPosition: 9, IsNullable: "YES", DataType: "time without time zone"},
+	})
+	if len(fields) != 9 {
+		t.Fatalf("expected 9 fields, got %d", len(fields))
+	}
+	cases := []struct {
+		index     int
+		fieldType enum.SysTableFieldType
+		inputType enum.SysTableFieldInputType
+	}{
+		{0, enum.BigIntFieldType, enum.InputNumberInputType},
+		{1, enum.IntFieldType, enum.InputNumberInputType},
+		{2, enum.BooleanFieldType, enum.SelectInputType},
+		{3, enum.TinyintFieldType, enum.InputNumberInputType},
+		{4, enum.VarcharFieldType, enum.InputType},
+		{5, enum.FloatFieldType, enum.InputNumberInputType},
+		{6, enum.JsonFieldType, enum.JsonInputType},
+		{7, enum.DatetimeFieldType, enum.DatetimePickerInputType},
+		{8, enum.TimeFieldType, enum.TimePickerInputType},
+	}
+	for _, item := range cases {
+		field := fields[item.index]
+		if field.FieldType != item.fieldType || field.InputType != item.inputType {
+			t.Fatalf("unexpected type for %s: fieldType=%v inputType=%v", field.FieldCode, field.FieldType, field.InputType)
+		}
+	}
+	if fields[4].FieldLength != 128 {
+		t.Fatalf("expected varchar length 128, got %d", fields[4].FieldLength)
+	}
+	if fields[5].FieldLength != 12 || fields[5].FieldDecimalLength != 2 {
+		t.Fatalf("expected numeric(12,2), got length=%d decimal=%d", fields[5].FieldLength, fields[5].FieldDecimalLength)
+	}
+}
+
 func TestValidateTableFieldLinkageConfigAllowsValidRelation(t *testing.T) {
 	currentTable := model.SysTable{
 		Basic:     model.Basic{Id: 1},

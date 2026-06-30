@@ -46,6 +46,7 @@
 | 13     | 数组输入 ARRAY_INPUT        | ArrayInput            | 标签式数组编辑，存为 JSON 数组      |
 | 14     | 键值对编辑 KEY_VALUE_EDITOR | KeyValueEditor        | 双列 key-value 编辑，存为 JSON 对象 |
 | 15     | 级联选择 CASCADER           | CascaderSelect        | 树形级联选择，需配 linkage_config   |
+| 16     | 富文本 RICH_TEXT            | RichTextEditor        | HTML 内容编辑和详情渲染             |
 
 ---
 
@@ -70,6 +71,7 @@
 | **数组输入** ARRAY_INPUT        |   ❌   |  ❌   |   ❌    |  ❌  |   ❌    |  ❌  |    ❌    |  ❌  |   ❌    |  ✅  | ❌  |
 | **键值对编辑** KEY_VALUE_EDITOR |   ❌   |  ❌   |   ❌    |  ❌  |   ❌    |  ❌  |    ❌    |  ❌  |   ❌    |  ✅  | ❌  |
 | **级联选择** CASCADER           |   ✅   |  ❌   |   ✅    |  ❌  |   ❌    |  ❌  |    ❌    |  ❌  |   ❌    |  ❌  | ✅  |
+| **富文本** RICH_TEXT            |   ❌   |  ❌   |   ⚠️    |  ✅  |   ❌    |  ❌  |    ❌    |  ❌  |   ❌    |  ❌  | ❌  |
 
 ---
 
@@ -168,14 +170,17 @@ field_length: 7
 ### 4.9 文件上传字段
 
 ```
-field_type: VARCHAR (3)          ← 存文件URL
+field_type: JSON (10)            ← 存文件 ID 数组，例如 [123,456]
 input_type: FILE_PICKER (10)
-field_length: 512
+```
 
-或者
+### 4.10 富文本字段
 
-field_type: JSON (10)            ← 存多文件信息数组
-input_type: FILE_PICKER (10)
+```
+field_type: TEXT (4)
+input_type: RICH_TEXT (16)
+form_span: 2
+detail_span: 4
 ```
 
 ---

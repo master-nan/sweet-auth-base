@@ -63,13 +63,16 @@
 - 华东运输公司：`company_id = 1`
 - 华南运输公司：`company_id = 2`
 
-准备三个角色：
+准备一个运营角色：
 
-- `tms_admin`：TMS 管理员，策略为“全部”。
-- `tms_east_operator`：华东运营，策略为“指定值”，范围值为 `["1"]`。
-- `tms_south_operator`：华南运营，策略为“指定值”，范围值为 `["2"]`。
+- `tms_operator`：TMS 运营，拥有 `tms_waybill`、`tms_vehicle` 的菜单和按钮权限，数据权限策略为“当前用户归属”。
 
-把测试用户分配到 `tms_east_operator`，并给它 `tms_waybill`、`tms_vehicle` 的菜单和按钮权限。
+准备两个测试用户：
+
+- `tms_east_operator_user`：归属值为华东运输公司 ID。
+- `tms_south_operator_user`：归属值为华南运输公司 ID。
+
+两个用户都分配到 `tms_operator`。角色本身不写死公司范围，运行时根据 `sys_user_dimension_value` 读取当前登录用户自己的公司归属。
 
 ## 验证点
 
@@ -82,7 +85,15 @@
 - 更新华东公司运单并保持 `company_id = 1`：成功。
 - 把华东公司运单改成 `company_id = 2`：拒绝。
 - 删除华南公司运单：拒绝。
-- `tms_waybill.company_id` 或关联车辆下拉候选项也应只出现当前账号有权限的数据。
-- 数据权限页右侧“权限排查”选择运单菜单、动作“查询”，应看到最终范围条件包含 `company_id IN ["1"]`。
+- 数据权限页右侧“权限排查”选择运单菜单、动作“查询”，应看到解析后的范围条件包含 `company_id` 和当前用户归属公司 ID。
 
-项目里的 `scripts/smoke-lowcode.mjs` 已经用 `scope_id` 覆盖了低代码 CRUD、关联候选项和数据权限越权场景，可以作为自动化回归参考。后续可以再补一份 TMS seed/smoke，让手测账号和页面数据更贴近这个 Demo。
+关联下拉候选项是否被同一数据范围限制，取决于候选目标表对应菜单是否能解析数据权限。比如运单表里的 `company_id` 下拉如果要按公司权限过滤，需要 `tms_company` 目标菜单也具备可解析的菜单权限和数据权限上下文。
+
+自动化回归：
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 22
+node scripts/smoke-tms-data-permission.mjs
+```
+
+项目里的 `scripts/smoke-lowcode.mjs` 仍覆盖通用低代码 CRUD、关联候选项和数据权限越权场景；`scripts/smoke-tms-data-permission.mjs` 覆盖 TMS 公司、运单、车辆和“当前用户归属”策略。

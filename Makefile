@@ -1,4 +1,4 @@
-.PHONY: help verify backend-test frontend-ci db-migrate db-seed docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
@@ -19,6 +19,8 @@ help:
 	@printf '%s\n' '数据库：'
 	@printf '%s\n' '  make db-migrate                           执行结构迁移'
 	@printf '%s\n' '  make db-seed                              补基础菜单、按钮、角色等数据'
+	@printf '%s\n' '  make db-migrate-external                  对 .env.external 指向的外部库执行结构迁移'
+	@printf '%s\n' '  make db-seed-external                     对 .env.external 指向的外部库补基础数据'
 	@printf '%s\n' ''
 	@printf '%s\n' 'Docker 本地完整环境：'
 	@printf '%s\n' '  make docker-up                            启动 PostgreSQL、Redis、backend、frontend'
@@ -46,6 +48,12 @@ db-migrate:
 
 db-seed:
 	cd backend && go run ./migrate seed
+
+db-migrate-external: docker-build-backend-assets
+	$(EXTERNAL_DOCKER_COMPOSE) run --rm --no-deps backend /app/migrate
+
+db-seed-external: docker-build-backend-assets
+	$(EXTERNAL_DOCKER_COMPOSE) run --rm --no-deps backend /app/migrate seed
 
 docker-build-backend-assets:
 	mkdir -p backend/bin frontend/bin
