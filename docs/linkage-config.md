@@ -1,17 +1,32 @@
-# 字段联动配置（linkage_config）
+# 字段联动配置
 
-`linkage_config` 是 `sys_table_field` 表上的一个 JSON 字段，用于将表单字段与其他数据表关联，使其自动渲染为**下拉选择框**或**级联选择器**，并从关联表动态加载选项数据。
+字段联动用于把表单字段配置成关联下拉或级联选择，例如项目、客户、菜单、组织、区域这类来自其他表的数据。
 
----
+日常配置优先使用字段管理界面：选择关联表、显示字段、值字段、分页大小和联动筛选即可。`sys_table_field.linkage_config` 是后端保存这些配置的 JSON 字段，主要用于批量初始化、排障、数据修复和高级场景参考，不建议日常手写。
 
-## 基本结构
+## 1. 推荐配置方式
+
+在字段管理里配置关联字段时，按下面顺序确认：
+
+1. 字段本身保存什么值，通常保存关联表的 `id`。
+2. 数据来源是普通关联下拉还是树形级联。
+3. 关联表优先使用 `tableCode`，避免环境间表 ID 变化。
+4. `labelKey` 选择用户可读字段，例如 `name`、`title`、`project_name`。
+5. `valueKey` 通常选择 `id`。
+6. 如果需要父子联动，配置筛选映射：左边是关联表字段，右边是当前表单字段。
+
+按钮参数表单里的关联下拉优先使用 `relation` 或 `cascader` 简写，写法见 [low-code-manual.md](low-code-manual.md)。前端会把简写转换成同一套联动配置。
+
+## 2. JSON 存储格式参考
+
+普通关联下拉的存储结构如下：
 
 ```json
 {
   "linkage": {
     "enabled": true,
     "mode": "relation",
-    "tableId": 101724747440640,
+    "tableCode": "demo_project",
     "labelKey": "title",
     "valueKey": "id",
     "filterMapping": {}
@@ -19,24 +34,24 @@
 }
 ```
 
----
+字段管理界面生成的 JSON 可能包含更多字段；排障时只需要确认 `enabled`、`mode`、`tableCode` 或 `tableId`、`labelKey`、`valueKey` 和 `filterMapping` 是否正确。
 
-## 字段说明
+## 3. 字段说明
 
-### 通用字段
+### 3.1 通用字段
 
 | 字段            | 类型    | 必填 | 默认值                        | 说明                                                           |
 | --------------- | ------- | :--: | ----------------------------- | -------------------------------------------------------------- |
-| `enabled`       | boolean |  ✅  | —                             | 是否启用联动，为 `false` 时整个配置不生效                      |
-| `mode`          | string  |  ✅  | —                             | 联动模式：`"relation"` 普通下拉选择，`"cascader"` 级联树形选择 |
-| `tableId`       | number  |  ⚠️  | —                             | 关联表的 ID（与 `tableCode` 二选一）                           |
-| `tableCode`     | string  |  ⚠️  | —                             | 关联表的编码（与 `tableId` 二选一）                            |
-| `labelKey`      | string  |  ❌  | `"label"`                     | 关联表中作为**显示文本**的字段名，自动回退 `name` → `title`    |
-| `valueKey`      | string  |  ❌  | `"value"`                     | 关联表中作为**存储值**的字段名，自动回退 `id`                  |
-| `pageSize`      | number  |  ❌  | relation: 50, cascader: 1000  | 查询关联表时的分页大小；relation 支持远程搜索和滚动加载        |
-| `filterMapping` | object  |  ❌  | `{}`                          | 级联过滤映射，详见下文                                         |
+| `enabled`       | boolean | 是 | - | 是否启用联动，为 `false` 时整个配置不生效 |
+| `mode`          | string  | 是 | - | 联动模式：`relation` 普通下拉选择，`cascader` 级联树形选择 |
+| `tableId`       | number  | 二选一 | - | 关联表的 ID，环境间可能变化，日常更推荐 `tableCode` |
+| `tableCode`     | string  | 二选一 | - | 关联表编码，推荐优先使用 |
+| `labelKey`      | string  | 否 | `label` | 关联表中作为显示文本的字段名，自动回退 `name`、`title`、`code` |
+| `valueKey`      | string  | 否 | `value` | 关联表中作为存储值的字段名，自动回退 `id` |
+| `pageSize`      | number  | 否 | relation: 50, cascader: 1000 | 查询关联表时的分页大小；relation 支持远程搜索和滚动加载 |
+| `filterMapping` | object  | 否 | `{}` | 联动过滤映射，格式为 `{ "关联表字段": "当前表单字段" }` |
 
-### cascader 模式额外字段
+### 3.2 cascader 模式额外字段
 
 | 字段          | 类型    | 默认值        | 说明                                                           |
 | ------------- | ------- | ------------- | -------------------------------------------------------------- |
@@ -46,11 +61,9 @@
 | `selectable`  | string  | `"any"`       | 可选模式：`"any"` 任意级可选，`"leaf"` 只能选末级节点          |
 | `showPath`    | boolean | `true`        | 是否在输入框中显示完整路径（如 `父 / 子`），`false` 只显示末级 |
 
----
+## 4. 工作原理
 
-## 工作原理
-
-### 1. 输入类型自动推断
+### 4.1 输入类型自动推断
 
 只要字段的 `linkage_config` 中 `enabled` 为 `true`：
 
@@ -59,7 +72,7 @@
 
 > 即使字段的 `input_type` 设置为 `NUMBER` 或其他类型，联动配置也会覆盖渲染类型。
 
-### 2. 数据加载
+### 4.2 数据加载
 
 对话框打开时自动执行：
 
@@ -81,15 +94,15 @@ relation 模式会按需加载：
 - 滚动到底时继续加载下一页
 - 编辑已有记录时补查当前已选值，保证 ID 能回显成名称
 
-### 3. 表单值变化时自动刷新
+### 4.3 表单值变化时自动刷新
 
 当表单数据发生变化时，会重新触发联动选项加载，确保依赖字段（通过 `filterMapping`）能根据父字段的值动态更新。
 
----
+## 5. JSON 示例
 
-## 配置示例
+下面示例用于理解最终保存结构或批量初始化。界面能配置的场景，优先通过界面维护。
 
-### 示例 1：普通关联（下拉选择）
+### 5.1 普通关联下拉
 
 场景：字段 `menu_id` 关联到菜单表，显示菜单标题，存储菜单 ID。
 
@@ -98,7 +111,7 @@ relation 模式会按需加载：
   "linkage": {
     "enabled": true,
     "mode": "relation",
-    "tableId": 101724747440640,
+    "tableCode": "sys_menu",
     "labelKey": "title",
     "valueKey": "id",
     "filterMapping": {}
@@ -108,9 +121,7 @@ relation 模式会按需加载：
 
 **效果**：表单中 `menu_id` 渲染为下拉框，选项来自菜单表，显示 `title`，存储 `id`。
 
----
-
-### 示例 2：关联下拉联动过滤
+### 5.2 关联下拉联动过滤
 
 场景：`project_id` 字段需要根据已选的 `scope_id` 过滤，只显示当前业务范围下的项目。
 
@@ -137,7 +148,7 @@ relation 模式会按需加载：
 
 当用户选择了 `scope_id = 100` 后，查询项目表时会自动附加 `scope_id = 100` 的过滤条件。
 
-如果两个表字段同名，可以这样写：
+如果两个表字段同名，左右两边也都写同一个字段名：
 
 ```json
 {
@@ -147,9 +158,7 @@ relation 模式会按需加载：
 }
 ```
 
----
-
-### 示例 3：级联树形选择
+### 5.3 级联树形选择
 
 场景：`parent_id` 字段选择上级菜单，数据为树形结构。
 
@@ -158,7 +167,7 @@ relation 模式会按需加载：
   "linkage": {
     "enabled": true,
     "mode": "cascader",
-    "tableId": 300,
+    "tableCode": "sys_menu",
     "labelKey": "title",
     "valueKey": "id",
     "parentKey": "parent_id",
@@ -170,18 +179,16 @@ relation 模式会按需加载：
 
 **效果**：查出所有菜单的扁平数据后，按 `parent_id` 字段组装成树形结构，渲染为级联选择器。`parent_id = 0` 的记录为根节点。
 
----
+### 5.4 tableId 兼容格式
 
-### 示例 4：使用 tableCode 替代 tableId
-
-当不确定目标表 ID 或 ID 可能变化时，可使用 `tableCode`：
+老配置或一次性数据修复中可能仍会看到 `tableId`。它可以继续使用，但日常配置优先使用 `tableCode`，避免不同环境表 ID 不一致。
 
 ```json
 {
   "linkage": {
     "enabled": true,
     "mode": "relation",
-    "tableCode": "sys_menu",
+    "tableId": 101724747440640,
     "labelKey": "title",
     "valueKey": "id",
     "filterMapping": {}
@@ -189,15 +196,13 @@ relation 模式会按需加载：
 }
 ```
 
-> `tableId` 和 `tableCode` 二选一。同时存在时优先使用 `tableId`。
-
----
+> `tableId` 和 `tableCode` 二选一。同时存在时兼容旧逻辑会优先使用 `tableId`，新配置不建议同时填写。
 
 ## 注意事项
 
-1. **存储格式**：`linkage_config` 存储为 JSON 字符串，确保 JSON 格式正确
+1. **配置入口**：常规维护优先使用字段管理界面，JSON 只作为高级参考和排障入口
 2. **字段类型**：关联字段通常为 `BIGINT` 类型（存储关联表的 ID）
 3. **选项回退**：`labelKey` 找不到时会依次尝试 `label` → `name` → `title` → `code`；`valueKey` 找不到时回退到 `id`
 4. **分页限制**：relation 默认按页加载，建议 `pageSize` 设为 50；cascader 通常一次加载树形数据，建议控制在 1000 条以内
 5. **联动刷新**：使用 `filterMapping` 时，父字段值变化会自动触发子字段选项重新加载
-6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [LOW_CODE_MANUAL.md](LOW_CODE_MANUAL.md)
+6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [low-code-manual.md](low-code-manual.md)
