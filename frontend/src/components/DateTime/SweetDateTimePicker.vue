@@ -13,10 +13,14 @@
     :hint="hint"
     :lazy-rules="lazyRules"
     class="sweet-date-time-picker"
+    @click="openPopup"
+    @keydown.prevent
+    @paste.prevent
+    @drop.prevent
     @clear.stop="clearValue"
   >
     <template #append>
-      <q-icon :name="appendIcon" class="cursor-pointer">
+      <q-icon :name="appendIcon" class="cursor-pointer" @click.stop="openPopup">
         <q-popup-proxy
           ref="popupRef"
           transition-show="scale"
@@ -161,6 +165,12 @@ const clearValue = () => {
   timeValue.value = ''
   emit('update:modelValue', '')
   emit('change', '')
+  popupRef.value?.hide?.()
+}
+
+const openPopup = () => {
+  if (props.disable) return
+  popupRef.value?.show?.()
 }
 
 const confirmValue = () => {

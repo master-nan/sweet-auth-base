@@ -54,30 +54,17 @@
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side class="data-permission-ownership-fields">
-                    <q-select
+                    <scope-value-select
                       v-model="item.scope_values"
                       class="data-permission-value-select"
-                      dense
-                      outlined
-                      multiple
-                      use-input
-                      new-value-mode="add-unique"
-                      emit-value
-                      map-options
-                      options-dense
-                      :use-chips="isFreeValueDimension(item.dimension)"
                       label="归属值"
                       :disable="busy || !item.enabled"
                       :loading="item.loading_options"
                       :options="item.option_items"
-                      :display-value="scopeValuesDisplayForDimension(item.dimension, item.scope_values, item.option_items)"
+                      :free-input="isFreeValueDimension(item.dimension)"
                       :hint="ownershipValueHint(item)"
                       @focus="loadDimensionOptionsFor(item)"
-                    >
-                      <q-tooltip v-if="scopeValuesTooltip(item.scope_values, item.option_items)">
-                        {{ scopeValuesTooltip(item.scope_values, item.option_items) }}
-                      </q-tooltip>
-                    </q-select>
+                    />
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -146,31 +133,18 @@
                       :options="dataPermissionStrategyOptions"
                       @update:model-value="onStrategyChange(point)"
                     />
-                    <q-select
+                    <scope-value-select
                       v-if="needsValues(point)"
                       v-model="point.scope_values"
                       class="data-permission-value-select"
-                      dense
-                      outlined
-                      multiple
-                      :max-values="point.strategy === 'user_field' ? 1 : undefined"
-                      use-input
-                      new-value-mode="add-unique"
-                      emit-value
-                      map-options
-                      options-dense
-                      :use-chips="point.strategy !== 'user_field' && isFreeValueDimension(point.binding.dimension)"
+                      :max-values="point.strategy === 'user_field' ? 1 : 0"
                       :label="point.strategy === 'user_field' ? '用户字段' : '范围值'"
                       :disable="busy || !point.enabled"
                       :loading="point.loading_options"
                       :options="scopeValueOptionsForPoint(point)"
-                      :display-value="point.strategy === 'user_field' ? scopeValuesDisplay(point.scope_values, userFieldOptions) : scopeValuesDisplayForDimension(point.binding.dimension, point.scope_values, point.option_items)"
+                      :free-input="point.strategy !== 'user_field' && isFreeValueDimension(point.binding.dimension)"
                       @focus="loadDimensionOptionsFor(point)"
-                    >
-                      <q-tooltip v-if="scopeValuesTooltip(point.scope_values, scopeValueOptionsForPoint(point))">
-                        {{ scopeValuesTooltip(point.scope_values, scopeValueOptionsForPoint(point)) }}
-                      </q-tooltip>
-                    </q-select>
+                    />
                     <sweet-date-time-picker
                       v-model="point.expire_at"
                       type="datetime"
@@ -221,8 +195,8 @@ import {
   type UserDimensionValueSaveItem,
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
-import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
+import ScopeValueSelect from 'src/components/DataPermission/ScopeValueSelect.vue'
 
 const props = defineProps<{
   open: boolean
@@ -328,6 +302,14 @@ const isDataScopeCapableMenu = (menu: Menu) => !!menu.table_code && !menu.is_hid
 
 const pointKey = (menuId: number, dimensionCode: string) => `${menuId}:${dimensionCode}`
 
+const normalizeScopeValues = (values: unknown) => {
+  const list = Array.isArray(values) ? values : values === null || values === undefined || values === '' ? [] : [values]
+  return list
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.indexOf(item) === index)
+}
+
 const resetState = () => {
   saving.value = false
   keyword.value = ''
@@ -409,7 +391,7 @@ const pointFromBinding = (
   binding,
   enabled: !!override,
   strategy: override?.strategy || 'specified',
-  scope_values: override?.scope_values || [],
+  scope_values: normalizeScopeValues(override?.scope_values),
   override_mode: override?.override_mode || 'replace',
   expire_at: override?.expire_at ? String(override.expire_at).replace('T', ' ').slice(0, 19) : '',
   option_items: [],
@@ -423,7 +405,7 @@ const ownershipFromDimension = (
   key: dimension.code,
   dimension,
   enabled: !!value && value.state !== false,
-  scope_values: value?.scope_values || [],
+  scope_values: normalizeScopeValues(value?.scope_values),
   option_items: [],
   loading_options: false,
 })
@@ -531,26 +513,10 @@ const toggleOwnership = (item: OwnershipPoint) => {
   void loadDimensionOptionsFor(item)
 }
 
-const scopeValuesDisplay = (values: string[], options: DataPermissionOption[]) => {
-  return compactSelectionDisplay(values, options, 2)
-}
-
 const isFreeValueDimension = (dimension?: DataPermissionDimension) => dimension?.source_type !== 'table'
-
-const scopeValuesDisplayForDimension = (
-  dimension: DataPermissionDimension | undefined,
-  values: string[],
-  options: DataPermissionOption[],
-) => {
-  return isFreeValueDimension(dimension) ? undefined : scopeValuesDisplay(values, options)
-}
 
 const scopeValueOptionsForPoint = (point: PermissionPoint) =>
   point.strategy === 'user_field' ? userFieldOptions.value : point.option_items
-
-const scopeValuesTooltip = (values: string[], options: DataPermissionOption[]) => {
-  return compactSelectionTooltip(values, options)
-}
 
 const ownershipValueHint = (item: OwnershipPoint) => {
   if (item.dimension.source_type === 'table') {
@@ -608,7 +574,7 @@ const save = async () => {
         ...(point.menu.table_code ? { table_code: point.menu.table_code } : {}),
         dimension_code: point.binding.dimension_code,
         strategy: point.override_mode === 'deny' ? 'none' : point.strategy,
-        scope_values: needsValues(point) ? point.scope_values : [],
+        scope_values: needsValues(point) ? normalizeScopeValues(point.scope_values) : [],
         override_mode: point.override_mode,
         ...(point.expire_at ? { expire_at: point.expire_at } : {}),
         state: true,
@@ -617,7 +583,7 @@ const save = async () => {
       .filter((item) => item.enabled)
       .map<UserDimensionValueSaveItem>((item) => ({
         dimension_code: item.dimension.code,
-        scope_values: item.scope_values,
+        scope_values: normalizeScopeValues(item.scope_values),
         state: true,
       }))
     const ownershipResult = await dataPermissionApi.saveUserDimensionValues(props.user.id, ownershipValues)
@@ -783,12 +749,6 @@ watch(
 
 .data-permission-ownership-fields {
   width: min(420px, 42%);
-}
-
-.data-permission-value-select :deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .data-permission-empty {

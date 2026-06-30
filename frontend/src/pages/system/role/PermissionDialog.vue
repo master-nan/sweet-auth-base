@@ -311,31 +311,18 @@
                           :options="dataPermissionStrategyOptions"
                           @update:model-value="onRoleStrategyChange(row)"
                         />
-                        <q-select
+                        <scope-value-select
                           v-if="needsRoleScopeValues(row)"
                           v-model="row.scope_values"
-                          dense
-                          outlined
-                          multiple
-                          :max-values="row.strategy === 'user_field' ? 1 : undefined"
-                          use-input
-                          new-value-mode="add-unique"
-                          emit-value
-                          map-options
-                          options-dense
-                          clearable
+                          :max-values="row.strategy === 'user_field' ? 1 : 0"
                           :label="row.strategy === 'user_field' ? '用户字段' : '范围值'"
                           class="permission-scope-value-select"
                           :disable="!row.enabled"
                           :loading="row.loading_options"
                           :options="scopeValueOptions(row)"
-                          :display-value="roleScopeValueDisplay(row)"
+                          :free-input="row.strategy !== 'user_field' && row.dimension_source_type !== 'table'"
                           @focus="loadRoleDimensionOptions(row)"
-                        >
-                          <q-tooltip v-if="roleScopeValueTooltip(row)">
-                            {{ roleScopeValueTooltip(row) }}
-                          </q-tooltip>
-                        </q-select>
+                        />
                       </div>
                     </div>
                   </div>
@@ -386,7 +373,7 @@ import {
   type RoleDataPermissionSaveItem,
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
-import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
+import ScopeValueSelect from 'src/components/DataPermission/ScopeValueSelect.vue'
 
 type ButtonGroup = {
   key: string
@@ -401,6 +388,7 @@ type RoleDataScopeRow = {
   table_code: string
   dimension_code: string
   dimension_label: string
+  dimension_source_type: string
   field_code: string
   enabled: boolean
   strategy: string
@@ -850,6 +838,14 @@ const isDataScopeCapableMenu = (menu: Menu) => {
 
 const roleDataScopeKey = (menuId: number, dimensionCode: string) => `${menuId}:${dimensionCode}`
 
+const normalizeScopeValues = (values: unknown) => {
+  const list = Array.isArray(values) ? values : values === null || values === undefined || values === '' ? [] : [values]
+  return list
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.indexOf(item) === index)
+}
+
 const findSavedRoleScope = (menuId: number, dimensionCode: string) => {
   return savedRoleDataScopes.value.find(
     (scope) => scope.menu_id === menuId && scope.dimension_code === dimensionCode,
@@ -886,10 +882,11 @@ const roleDataScopeRowFromBinding = (
   table_code: menu.table_code || binding.table_code,
   dimension_code: binding.dimension_code,
   dimension_label: binding.dimension?.name || binding.dimension_code,
+  dimension_source_type: binding.dimension?.source_type || 'none',
   field_code: binding.field_code,
   enabled: !!saved,
   strategy: saved?.strategy || 'specified',
-  scope_values: saved?.scope_values || [],
+  scope_values: normalizeScopeValues(saved?.scope_values),
   option_items: [],
   loading_options: false,
 })
@@ -974,14 +971,6 @@ const scopeValueOptions = (row: RoleDataScopeRow) => {
   return row.strategy === 'user_field' ? userFieldOptions.value : row.option_items
 }
 
-const roleScopeValueDisplay = (row: RoleDataScopeRow) => {
-  return compactSelectionDisplay(row.scope_values, scopeValueOptions(row), 2)
-}
-
-const roleScopeValueTooltip = (row: RoleDataScopeRow) => {
-  return compactSelectionTooltip(row.scope_values, scopeValueOptions(row))
-}
-
 const validateRoleDataScopes = () => {
   for (const row of roleDataScopeRows.value.filter((item) => item.enabled)) {
     if (needsRoleScopeValues(row) && row.scope_values.length === 0) {
@@ -1007,7 +996,7 @@ const buildRoleDataPermissionPayload = () => {
       table_code: row.table_code,
       dimension_code: row.dimension_code,
       strategy: row.strategy,
-      scope_values: needsRoleScopeValues(row) ? row.scope_values : [],
+      scope_values: needsRoleScopeValues(row) ? normalizeScopeValues(row.scope_values) : [],
       state: true,
     }))
 
@@ -1019,7 +1008,7 @@ const buildRoleDataPermissionPayload = () => {
       table_code: scope.table_code,
       dimension_code: scope.dimension_code,
       strategy: scope.strategy,
-      scope_values: scope.scope_values || [],
+      scope_values: normalizeScopeValues(scope.scope_values),
       state: scope.state !== false,
     })
   })
@@ -1393,12 +1382,6 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(140px, 0.65fr) minmax(180px, 1fr);
   gap: 8px;
-}
-
-.permission-scope-value-select :deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @media (max-width: 1120px) {

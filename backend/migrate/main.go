@@ -160,6 +160,10 @@ func ensureDataPermissionIndexes(db *gorm.DB) error {
 		return nil
 	}
 	table := db.NamingStrategy.TableName("SysUserDimensionValue")
+	dropConstraintSQL := fmt.Sprintf(`ALTER TABLE "%s" DROP CONSTRAINT IF EXISTS uni_user_dimension_value`, table)
+	if err := db.Exec(dropConstraintSQL).Error; err != nil {
+		return err
+	}
 	if err := db.Exec(`DROP INDEX IF EXISTS uni_user_dimension_value`).Error; err != nil {
 		return err
 	}
