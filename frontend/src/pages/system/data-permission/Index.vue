@@ -4,10 +4,10 @@
       :mode="SysMasterDetailMode.TABLE"
       master-title="数据维度"
       :master-subtitle="`${dimensions.length} 个维度`"
-      detail-title="菜单绑定"
+      detail-title="权限绑定"
       :detail-subtitle="selectedMenu ? `${displayMenuTitle(selectedMenu)} · ${selectedMenu.table_code}` : '选择低代码菜单'"
-      master-width="minmax(760px, 48%)"
-      min-width="1320px"
+      master-width="minmax(480px, 42%)"
+      min-width="0"
       min-height="calc(100vh - 150px)"
     >
       <template #master-actions>
@@ -87,7 +87,7 @@
             <q-icon name="rule" />
           </div>
           <div class="data-permission-detail-main">
-            <div class="data-permission-detail-title">菜单数据权限绑定</div>
+            <div class="data-permission-detail-title">权限绑定</div>
             <div class="data-permission-detail-meta">
               <q-chip v-if="selectedMenu" dense square color="primary" text-color="white">
                 {{ selectedMenu.name }}
@@ -130,17 +130,19 @@
           <q-space />
           <q-btn
             outline
+            dense
             color="primary"
             icon="add"
-            label="新增绑定"
+            label="新增"
             :disable="!selectedMenu || dimensions.length === 0"
-            @click="addBindingRow"
+            @click="openBindingDialog()"
           />
           <q-btn
             unelevated
+            dense
             color="primary"
             icon="save"
-            label="保存绑定"
+            label="保存"
             :loading="savingBindings"
             :disable="!selectedMenu"
             @click="saveBindings"
@@ -172,6 +174,7 @@
               />
               <q-btn
                 unelevated
+                dense
                 color="primary"
                 icon="manage_search"
                 label="诊断"
@@ -187,7 +190,7 @@
               <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
               <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
               <span>用户归属 {{ debugResult.user_dimensions?.length || 0 }} 条</span>
-              <span>个人覆盖 {{ debugResult.user_overrides?.length || 0 }} 条</span>
+              <span>特殊授权 {{ debugResult.user_overrides?.length || 0 }} 条</span>
               <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
                 {{ note }}
               </q-chip>
@@ -209,75 +212,50 @@
             >
               <template #body-cell-dimension_code="props">
                 <q-td :props="props">
-                  <q-select
-                    v-model="props.row.dimension_code"
-                    dense
-                    outlined
-                    emit-value
-                    map-options
-                    options-dense
-                    :options="dimensionOptions"
-                  />
+                  {{ dimensionLabel(props.row.dimension_code) }}
                 </q-td>
               </template>
               <template #body-cell-field_code="props">
                 <q-td :props="props">
-                  <q-select
-                    v-model="props.row.field_code"
-                    dense
-                    outlined
-                    emit-value
-                    map-options
-                    options-dense
-                    :options="tableFieldOptions"
-                  />
+                  {{ fieldLabel(props.row.field_code) }}
                 </q-td>
               </template>
               <template #body-cell-match_type="props">
                 <q-td :props="props">
-                  <q-select
-                    v-model="props.row.match_type"
-                    dense
-                    outlined
-                    emit-value
-                    map-options
-                    options-dense
-                    :options="matchTypeOptions"
-                  />
+                  {{ matchTypeLabel(props.row.match_type) }}
                 </q-td>
               </template>
               <template #body-cell-actions="props">
                 <q-td :props="props">
-                  <q-select
-                    v-model="props.row.actions"
-                    class="data-permission-action-select"
-                    dense
-                    outlined
-                    multiple
-                    emit-value
-                    map-options
-                    options-dense
-                    :display-value="actionsDisplay(props.row.actions)"
-                    :options="dataPermissionActionOptions"
-                  >
-                    <q-tooltip v-if="actionsTooltip(props.row.actions)">
+                  <q-chip dense square color="primary" text-color="white">
+                    {{ actionsDisplay(props.row.actions) }}
+                  </q-chip>
+                  <span v-if="actionsTooltip(props.row.actions)" class="data-permission-action-hint">
+                    <q-tooltip>
                       {{ actionsTooltip(props.row.actions) }}
                     </q-tooltip>
-                  </q-select>
+                  </span>
                 </q-td>
               </template>
               <template #body-cell-required="props">
                 <q-td :props="props" class="text-center">
-                  <q-toggle v-model="props.row.required" color="primary" />
+                  <q-badge :color="props.row.required === false ? 'grey-6' : 'warning'" outline>
+                    {{ props.row.required === false ? '否' : '是' }}
+                  </q-badge>
                 </q-td>
               </template>
               <template #body-cell-state="props">
                 <q-td :props="props" class="text-center">
-                  <q-toggle v-model="props.row.state" color="primary" />
+                  <q-badge :color="props.row.state === false ? 'grey-6' : 'positive'" outline>
+                    {{ props.row.state === false ? '停用' : '启用' }}
+                  </q-badge>
                 </q-td>
               </template>
               <template #body-cell-row_actions="props">
-                <q-td :props="props" class="text-center">
+                <q-td :props="props" class="text-center q-gutter-xs">
+                  <q-btn flat dense round color="primary" icon="edit" @click="openBindingDialog(props.row)">
+                    <q-tooltip>编辑</q-tooltip>
+                  </q-btn>
                   <q-btn flat dense round color="negative" icon="delete" @click="removeBindingRow(props.row.local_id)">
                     <q-tooltip>删除</q-tooltip>
                   </q-btn>
@@ -299,6 +277,75 @@
         </div>
       </template>
     </master-detail-page>
+
+    <q-dialog v-model="bindingDialogOpen" persistent>
+      <q-card class="binding-dialog-card">
+        <q-card-section class="row items-center q-gutter-sm">
+          <div>
+            <div class="text-h6">{{ editingBindingLocalId ? '编辑绑定' : '新增绑定' }}</div>
+            <div class="text-caption text-grey-7">{{ selectedMenu ? displayMenuTitle(selectedMenu) : '低代码菜单' }}</div>
+          </div>
+          <q-space />
+          <q-btn flat round dense icon="close" @click="bindingDialogOpen = false" />
+        </q-card-section>
+        <q-separator />
+        <q-card-section class="binding-form">
+          <q-select
+            v-model="bindingForm.dimension_code"
+            dense
+            outlined
+            emit-value
+            map-options
+            options-dense
+            label="维度"
+            :options="dimensionOptions"
+          />
+          <q-select
+            v-model="bindingForm.field_code"
+            dense
+            outlined
+            emit-value
+            map-options
+            options-dense
+            label="字段"
+            :options="tableFieldOptions"
+          />
+          <q-select
+            v-model="bindingForm.match_type"
+            dense
+            outlined
+            emit-value
+            map-options
+            options-dense
+            label="匹配"
+            :options="matchTypeOptions"
+          />
+          <q-select
+            v-model="bindingForm.actions"
+            class="data-permission-action-select"
+            dense
+            outlined
+            multiple
+            emit-value
+            map-options
+            options-dense
+            label="动作"
+            :display-value="actionsDisplay(bindingForm.actions)"
+            :options="dataPermissionActionOptions"
+          >
+            <q-tooltip v-if="actionsTooltip(bindingForm.actions)">
+              {{ actionsTooltip(bindingForm.actions) }}
+            </q-tooltip>
+          </q-select>
+          <q-toggle v-model="bindingForm.required" color="primary" label="必配授权" />
+          <q-toggle v-model="bindingForm.state" color="primary" label="启用" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat color="grey-7" label="取消" @click="bindingDialogOpen = false" />
+          <q-btn unelevated color="primary" label="确定" @click="saveBindingDialog" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="dimensionDialogOpen" persistent>
       <q-card class="dimension-dialog-card">
@@ -470,6 +517,9 @@ const selectedMenu = ref<Menu | null>(null)
 const tableFieldOptions = ref<Array<{ label: string; value: string }>>([])
 const bindingRows = ref<BindingRow[]>([])
 const savingBindings = ref(false)
+const bindingDialogOpen = ref(false)
+const editingBindingLocalId = ref('')
+const bindingForm = ref<BindingRow>(emptyBindingForm())
 const debugAction = ref('query')
 const debugTableCode = ref('')
 const debugLoading = ref(false)
@@ -573,6 +623,19 @@ function emptyDimensionForm(): DataPermissionDimensionSaveReq {
   }
 }
 
+function emptyBindingForm(): BindingRow {
+  return {
+    local_id: '',
+    dimension_code: '',
+    field_code: '',
+    match_type: 'in',
+    required: true,
+    actions: [],
+    state: true,
+    table_code: '',
+  }
+}
+
 const emptyQuery = (): Query => ({
   page: 1,
   num: 1000,
@@ -660,6 +723,15 @@ const filterSourceTableOptions = (value: string, update: (callback: () => void) 
 
 const sourceTableLabel = (tableCode: string) =>
   sourceTableOptions.value.find((option) => option.value === tableCode)?.label || tableCode || '-'
+
+const dimensionLabel = (dimensionCode: string) =>
+  dimensionOptions.value.find((option) => option.value === dimensionCode)?.label || dimensionCode || '-'
+
+const fieldLabel = (fieldCode: string) =>
+  tableFieldOptions.value.find((option) => option.value === fieldCode)?.label || fieldCode || '-'
+
+const matchTypeLabel = (matchType: string) =>
+  matchTypeOptions.find((option) => option.value === matchType)?.label || matchType || '-'
 
 const sourceFieldOptionsFromTable = (table?: Table | null) =>
   (table?.table_fields || []).map((field) => ({
@@ -751,20 +823,57 @@ const bindingToRow = (binding: DataPermissionBinding): BindingRow => ({
   table_code: binding.table_code,
 })
 
-const addBindingRow = () => {
-  bindingRows.value = [
-    ...bindingRows.value,
-    {
-      local_id: `new-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      dimension_code: dimensionOptions.value[0]?.value || '',
-      field_code: tableFieldOptions.value[0]?.value || '',
-      match_type: 'in',
-      required: true,
-      actions: defaultBindingActions,
-      state: true,
-      table_code: selectedMenu.value?.table_code || '',
-    },
-  ]
+const nextBindingLocalId = () => `new-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+const openBindingDialog = (row?: BindingRow) => {
+  editingBindingLocalId.value = row?.local_id || ''
+  bindingForm.value = row
+    ? {
+        ...row,
+        actions: [...(row.actions?.length ? row.actions : defaultBindingActions)],
+      }
+    : {
+        ...emptyBindingForm(),
+        local_id: nextBindingLocalId(),
+        dimension_code: dimensionOptions.value[0]?.value || '',
+        field_code: tableFieldOptions.value[0]?.value || '',
+        actions: [...defaultBindingActions],
+        table_code: selectedMenu.value?.table_code || '',
+      }
+  bindingDialogOpen.value = true
+}
+
+const saveBindingDialog = () => {
+  const row = {
+    ...bindingForm.value,
+    actions: bindingForm.value.actions?.length ? [...bindingForm.value.actions] : [],
+  }
+  if (!row.dimension_code || !row.field_code) {
+    $q.notify({ type: 'warning', position: 'top-right', message: '请选择维度和字段' })
+    return
+  }
+  if (!row.actions.length) {
+    $q.notify({ type: 'warning', position: 'top-right', message: '请选择动作' })
+    return
+  }
+  const duplicate = bindingRows.value.some(
+    (item) =>
+      item.local_id !== editingBindingLocalId.value &&
+      item.dimension_code === row.dimension_code &&
+      item.field_code === row.field_code,
+  )
+  if (duplicate) {
+    $q.notify({ type: 'warning', position: 'top-right', message: '同一维度和字段不能重复绑定' })
+    return
+  }
+  if (editingBindingLocalId.value) {
+    bindingRows.value = bindingRows.value.map((item) =>
+      item.local_id === editingBindingLocalId.value ? row : item,
+    )
+  } else {
+    bindingRows.value = [...bindingRows.value, row]
+  }
+  bindingDialogOpen.value = false
 }
 
 const removeBindingRow = (localId: string) => {
@@ -780,11 +889,22 @@ const actionsTooltip = (actions: string[]) => {
 }
 
 const validateBindings = () => {
+  const uniqueKeys = new Set<string>()
   for (const row of bindingRows.value) {
     if (!row.dimension_code || !row.field_code) {
       $q.notify({ type: 'warning', position: 'top-right', message: '请选择维度和字段' })
       return false
     }
+    if (!row.actions?.length) {
+      $q.notify({ type: 'warning', position: 'top-right', message: '请选择动作' })
+      return false
+    }
+    const uniqueKey = `${row.dimension_code}:${row.field_code}`
+    if (uniqueKeys.has(uniqueKey)) {
+      $q.notify({ type: 'warning', position: 'top-right', message: '同一维度和字段不能重复绑定' })
+      return false
+    }
+    uniqueKeys.add(uniqueKey)
   }
   return true
 }
@@ -906,10 +1026,21 @@ onMounted(() => {
 
 .data-permission-toolbar--detail {
   min-height: 64px;
+  gap: 8px;
+}
+
+.data-permission-toolbar--detail .q-btn {
+  min-height: 36px;
+}
+
+.data-permission-toolbar--detail :deep(.q-btn__content) {
+  white-space: nowrap;
 }
 
 .data-permission-menu-select {
-  min-width: 360px;
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
 }
 
 .data-permission-detail-head {
@@ -980,7 +1111,7 @@ onMounted(() => {
 
 .data-permission-debug-body {
   display: grid;
-  grid-template-columns: 180px auto;
+  grid-template-columns: 180px max-content;
   gap: 10px;
   align-items: center;
   padding: 0 16px 12px;
@@ -1012,11 +1143,15 @@ onMounted(() => {
 .data-permission-binding-table-wrap {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .data-permission-binding-table {
   height: 100%;
+}
+
+.data-permission-action-hint {
+  display: inline-block;
 }
 
 .data-permission-action-select :deep(.q-field__native) {
@@ -1045,6 +1180,22 @@ onMounted(() => {
   border-radius: 8px;
 }
 
+.binding-dialog-card {
+  width: 720px;
+  max-width: 92vw;
+  border-radius: 8px;
+}
+
+.binding-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.binding-form .data-permission-action-select {
+  grid-column: 1 / -1;
+}
+
 .dimension-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1058,6 +1209,10 @@ onMounted(() => {
 
 @media (max-width: 900px) {
   .dimension-form {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-form {
     grid-template-columns: 1fr;
   }
 

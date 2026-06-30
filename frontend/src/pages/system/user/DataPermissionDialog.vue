@@ -4,11 +4,11 @@
       <q-card-section class="data-permission-dialog-header">
         <div>
           <div class="data-permission-dialog-title">数据权限 - {{ user?.user_name }}</div>
-          <div class="data-permission-dialog-subtitle">维护用户业务归属，必要时配置个人例外覆盖</div>
+          <div class="data-permission-dialog-subtitle">基础归属用于用户自己的公司/部门等范围，特殊授权只处理例外</div>
         </div>
         <q-space />
         <q-badge color="primary" class="data-permission-dialog-badge">
-          {{ enabledOwnershipCount }} 归属 / {{ enabledPointCount }} 覆盖
+          {{ enabledOwnershipCount }} 归属 / {{ enabledPointCount }} 特殊
         </q-badge>
         <q-btn flat round dense icon="close" :disable="busy" @click="isOpen = false">
           <q-tooltip>关闭</q-tooltip>
@@ -24,8 +24,8 @@
           indicator-color="primary"
           align="left"
         >
-          <q-tab name="ownership" icon="badge" label="用户归属" />
-          <q-tab name="overrides" icon="rule" label="个人覆盖" />
+          <q-tab name="ownership" icon="badge" label="基础归属" />
+          <q-tab name="overrides" icon="rule" label="特殊授权" />
         </q-tabs>
 
         <q-tab-panels v-model="activeTab" animated class="data-permission-tab-panels">
@@ -70,6 +70,7 @@
                       :loading="item.loading_options"
                       :options="item.option_items"
                       :display-value="scopeValuesDisplay(item.scope_values, item.option_items)"
+                      :hint="ownershipValueHint(item)"
                       @focus="loadDimensionOptionsFor(item)"
                     >
                       <q-tooltip v-if="scopeValuesTooltip(item.scope_values, item.option_items)">
@@ -504,6 +505,13 @@ const scopeValuesTooltip = (values: string[], options: DataPermissionOption[]) =
   return compactSelectionTooltip(values, options)
 }
 
+const ownershipValueHint = (item: OwnershipPoint) => {
+  if (item.dimension.source_type === 'table') {
+    return item.dimension.source_code ? `来自 ${item.dimension.source_code}` : ''
+  }
+  return item.enabled ? '无来源维度可直接输入后回车' : ''
+}
+
 const validate = () => {
   for (const item of ownerships.value.filter((entry) => entry.enabled)) {
     if (item.scope_values.length === 0) {
@@ -704,11 +712,15 @@ watch(
 }
 
 .data-permission-item-fields {
-  width: min(680px, 62%);
+  width: min(560px, 54%);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-items: start;
+}
+
+.data-permission-item-fields .data-permission-value-select {
+  grid-column: 1 / -1;
 }
 
 .data-permission-ownership-fields {

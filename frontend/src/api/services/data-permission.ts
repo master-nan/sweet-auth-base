@@ -179,8 +179,8 @@ export const dataPermissionStrategyOptions = [
   { label: '无权限', value: 'none' },
   { label: '指定值', value: 'specified' },
   { label: '树范围', value: 'tree' },
-  { label: '当前用户归属', value: 'user_dimension' },
-  { label: '本人', value: 'self' },
+  { label: '用户归属', value: 'user_dimension' },
+  { label: '本人ID', value: 'self' },
 ]
 
 export const dataPermissionOverrideModeOptions = [

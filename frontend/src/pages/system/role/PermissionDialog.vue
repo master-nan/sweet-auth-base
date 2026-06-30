@@ -305,6 +305,7 @@
                           outlined
                           emit-value
                           map-options
+                          options-dense
                           label="范围策略"
                           :disable="!row.enabled"
                           :options="dataPermissionStrategyOptions"
@@ -1334,16 +1335,17 @@ onMounted(() => {
 
 .permission-data-scope-list {
   display: grid;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 8px;
+  padding: 12px 16px;
 }
 
 .permission-data-scope-item {
   display: grid;
   grid-template-columns: auto minmax(180px, 1fr) minmax(360px, 0.95fr);
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  padding: 12px;
+  min-height: 64px;
+  padding: 8px 10px;
   border: 1px solid #e4e9f3;
   border-radius: 8px;
   background: #fff;
@@ -1360,8 +1362,8 @@ onMounted(() => {
 
 .permission-data-scope-fields {
   display: grid;
-  grid-template-columns: minmax(150px, 0.7fr) minmax(180px, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(140px, 0.65fr) minmax(180px, 1fr);
+  gap: 8px;
 }
 
 .permission-scope-value-select :deep(.q-field__native) {
