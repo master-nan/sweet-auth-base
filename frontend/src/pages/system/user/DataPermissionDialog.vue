@@ -65,11 +65,12 @@
                       emit-value
                       map-options
                       options-dense
+                      :use-chips="isFreeValueDimension(item.dimension)"
                       label="归属值"
                       :disable="busy || !item.enabled"
                       :loading="item.loading_options"
                       :options="item.option_items"
-                      :display-value="scopeValuesDisplay(item.scope_values, item.option_items)"
+                      :display-value="scopeValuesDisplayForDimension(item.dimension, item.scope_values, item.option_items)"
                       :hint="ownershipValueHint(item)"
                       @focus="loadDimensionOptionsFor(item)"
                     >
@@ -152,29 +153,28 @@
                       dense
                       outlined
                       multiple
+                      :max-values="point.strategy === 'user_field' ? 1 : undefined"
                       use-input
                       new-value-mode="add-unique"
                       emit-value
                       map-options
                       options-dense
-                      label="范围值"
+                      :use-chips="point.strategy !== 'user_field' && isFreeValueDimension(point.binding.dimension)"
+                      :label="point.strategy === 'user_field' ? '用户字段' : '范围值'"
                       :disable="busy || !point.enabled"
                       :loading="point.loading_options"
-                      :options="point.option_items"
-                      :display-value="scopeValuesDisplay(point.scope_values, point.option_items)"
+                      :options="scopeValueOptionsForPoint(point)"
+                      :display-value="point.strategy === 'user_field' ? scopeValuesDisplay(point.scope_values, userFieldOptions) : scopeValuesDisplayForDimension(point.binding.dimension, point.scope_values, point.option_items)"
                       @focus="loadDimensionOptionsFor(point)"
                     >
-                      <q-tooltip v-if="scopeValuesTooltip(point.scope_values, point.option_items)">
-                        {{ scopeValuesTooltip(point.scope_values, point.option_items) }}
+                      <q-tooltip v-if="scopeValuesTooltip(point.scope_values, scopeValueOptionsForPoint(point))">
+                        {{ scopeValuesTooltip(point.scope_values, scopeValueOptionsForPoint(point)) }}
                       </q-tooltip>
                     </q-select>
-                    <q-input
+                    <sweet-date-time-picker
                       v-model="point.expire_at"
-                      dense
-                      outlined
-                      clearable
+                      type="datetime"
                       label="过期时间"
-                      placeholder="YYYY-MM-DD HH:mm:ss"
                       :disable="busy || !point.enabled"
                     />
                   </q-item-section>
@@ -206,6 +206,7 @@ import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import type { Menu } from 'src/api/services/sys-menu'
 import { useMenuApi } from 'src/api/services/sys-menu'
+import { useTableApi } from 'src/api/services/sys-table'
 import type { User } from 'src/api/services/sys-user'
 import { useLoadingStore } from 'src/stores/loading'
 import {
@@ -221,6 +222,7 @@ import {
   useDataPermissionApi,
 } from 'src/api/services/data-permission'
 import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 
 const props = defineProps<{
   open: boolean
@@ -257,6 +259,7 @@ type OwnershipPoint = {
 const $q = useQuasar()
 const { t } = useI18n()
 const menuApi = useMenuApi()
+const tableApi = useTableApi()
 const dataPermissionApi = useDataPermissionApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
@@ -269,6 +272,7 @@ const activeTab = ref<'ownership' | 'overrides'>('ownership')
 const menuOptions = ref<Array<{ label: string; value: number }>>([])
 const points = ref<PermissionPoint[]>([])
 const ownerships = ref<OwnershipPoint[]>([])
+const userFieldOptions = ref<DataPermissionOption[]>([])
 const dimensionOptionCache = ref<Map<string, DataPermissionOption[]>>(new Map())
 const dimensionOptionRequests = new Map<string, Promise<DataPermissionOption[]>>()
 const busy = computed(() => loading.value || saving.value)
@@ -333,6 +337,7 @@ const resetState = () => {
   menuOptions.value = []
   points.value = []
   ownerships.value = []
+  userFieldOptions.value = []
   dimensionOptionCache.value = new Map()
   dimensionOptionRequests.clear()
 }
@@ -353,6 +358,7 @@ const load = async () => {
       }),
       dataPermissionApi.getUserDimensionValues(props.user.id),
     ])
+    await loadUserFieldOptions()
     const userMenus = menusResult.success ? flattenMenus(menusResult.data || []).filter(isDataScopeCapableMenu) : []
     const overrides = overridesResult.success ? overridesResult.data || [] : []
     const dimensions = dimensionsResult.success ? dimensionsResult.data || [] : []
@@ -423,7 +429,7 @@ const ownershipFromDimension = (
 })
 
 const needsValues = (point: PermissionPoint) => {
-  return point.override_mode !== 'deny' && (point.strategy === 'specified' || point.strategy === 'tree')
+  return point.override_mode !== 'deny' && (point.strategy === 'specified' || point.strategy === 'tree' || point.strategy === 'user_field')
 }
 
 const normalizeDenyPoint = (point: PermissionPoint) => {
@@ -434,8 +440,12 @@ const normalizeDenyPoint = (point: PermissionPoint) => {
 }
 
 const onStrategyChange = (point: PermissionPoint) => {
+  point.scope_values = []
+  if (point.strategy === 'user_field') {
+    point.option_items = userFieldOptions.value
+    return
+  }
   if (!needsValues(point)) {
-    point.scope_values = []
     return
   }
   void loadDimensionOptionsFor(point)
@@ -443,6 +453,10 @@ const onStrategyChange = (point: PermissionPoint) => {
 
 const dimensionCodeForOptionTarget = (target: PermissionPoint | OwnershipPoint) => {
   return 'binding' in target ? target.binding.dimension_code : target.dimension.code
+}
+
+const dimensionForOptionTarget = (target: PermissionPoint | OwnershipPoint) => {
+  return 'binding' in target ? target.binding.dimension : target.dimension
 }
 
 const setOptionTargetLoading = (dimensionCode: string, loadingOptions: boolean) => {
@@ -465,6 +479,15 @@ const setOptionTargetOptions = (dimensionCode: string, options: DataPermissionOp
 
 const loadDimensionOptionsFor = async (target: PermissionPoint | OwnershipPoint) => {
   const dimensionCode = dimensionCodeForOptionTarget(target)
+  if ('binding' in target && target.strategy === 'user_field') {
+    target.option_items = userFieldOptions.value
+    return
+  }
+  const dimension = dimensionForOptionTarget(target)
+  if (dimension?.source_type !== 'table') {
+    setOptionTargetOptions(dimensionCode, [])
+    return
+  }
   if (target.option_items.length) return
   const cached = dimensionOptionCache.value.get(dimensionCode)
   if (cached) {
@@ -489,6 +512,17 @@ const loadDimensionOptionsFor = async (target: PermissionPoint | OwnershipPoint)
   }
 }
 
+const loadUserFieldOptions = async () => {
+  const result = await tableApi.queryTableByCode('sys_user')
+  const fields = result.success ? result.data?.table_fields || [] : []
+  userFieldOptions.value = fields
+    .filter((field) => !['password', 'access_tokens'].includes(field.field_code))
+    .map((field) => ({
+      label: `${field.field_name || field.field_code} (${field.field_code})`,
+      value: field.field_code,
+    }))
+}
+
 const toggleOwnership = (item: OwnershipPoint) => {
   if (!item.enabled) {
     item.scope_values = []
@@ -500,6 +534,19 @@ const toggleOwnership = (item: OwnershipPoint) => {
 const scopeValuesDisplay = (values: string[], options: DataPermissionOption[]) => {
   return compactSelectionDisplay(values, options, 2)
 }
+
+const isFreeValueDimension = (dimension?: DataPermissionDimension) => dimension?.source_type !== 'table'
+
+const scopeValuesDisplayForDimension = (
+  dimension: DataPermissionDimension | undefined,
+  values: string[],
+  options: DataPermissionOption[],
+) => {
+  return isFreeValueDimension(dimension) ? undefined : scopeValuesDisplay(values, options)
+}
+
+const scopeValueOptionsForPoint = (point: PermissionPoint) =>
+  point.strategy === 'user_field' ? userFieldOptions.value : point.option_items
 
 const scopeValuesTooltip = (values: string[], options: DataPermissionOption[]) => {
   return compactSelectionTooltip(values, options)
@@ -529,7 +576,19 @@ const validate = () => {
       $q.notify({
         type: 'warning',
         position: 'top-right',
-        message: `${displayMenuTitle(point.menu)} / ${point.binding.dimension_code} 需要范围值`,
+        message:
+          point.strategy === 'user_field'
+            ? `${displayMenuTitle(point.menu)} / ${point.binding.dimension_code} 需要选择用户字段`
+            : `${displayMenuTitle(point.menu)} / ${point.binding.dimension_code} 需要范围值`,
+      })
+      activeTab.value = 'overrides'
+      return false
+    }
+    if (point.expire_at && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(point.expire_at)) {
+      $q.notify({
+        type: 'warning',
+        position: 'top-right',
+        message: `${displayMenuTitle(point.menu)} 过期时间格式应为 YYYY-MM-DD HH:mm:ss`,
       })
       activeTab.value = 'overrides'
       return false
@@ -561,10 +620,9 @@ const save = async () => {
         scope_values: item.scope_values,
         state: true,
       }))
-    const [ownershipResult, overrideResult] = await Promise.all([
-      dataPermissionApi.saveUserDimensionValues(props.user.id, ownershipValues),
-      dataPermissionApi.saveUserDataPermissionOverrides(props.user.id, overrides),
-    ])
+    const ownershipResult = await dataPermissionApi.saveUserDimensionValues(props.user.id, ownershipValues)
+    if (!ownershipResult.success) return
+    const overrideResult = await dataPermissionApi.saveUserDataPermissionOverrides(props.user.id, overrides)
     if (ownershipResult.success && overrideResult.success) {
       emit('saved')
       isOpen.value = false

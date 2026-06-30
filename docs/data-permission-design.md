@@ -153,8 +153,11 @@ scope_id IN (...) AND project_id IN (...)
 - `tree`：指定树节点并展开下级，要求维度来源表配置 `value_field` 和 `parent_field`。
 - `self`：本人数据，解析为当前用户 ID。
 - `user_dimension`：从 `sys_user_dimension_value` 读取当前用户在该维度上的归属值。
+- `user_field`：从当前登录用户的 `sys_user` 字段读取范围值，`scope_values` 保存一个用户字段名，例如 `company_id` 或 `dept_id`。
 
 指定范围保存为结构化值，例如 JSON 数组，而不是 SQL。
+
+`specified` 是角色固定范围，适合“这个角色永远只能看某几个范围”的场景。`user_dimension` 和 `user_field` 都不是写死角色范围：同一个角色下，不同用户会在运行时按自己的归属值或用户字段值解析出不同数据范围。
 
 运行时以“角色授权”为主，“用户授权”为补充：
 
@@ -186,9 +189,23 @@ scope_id IN (...) AND project_id IN (...)
 }
 ```
 
+如果策略是当前用户字段，`scope_values` 填用户表字段名；运行时会读取当前登录用户这一列的值，再与菜单绑定字段比较：
+
+```json
+{
+  "role_id": 10,
+  "menu_id": 1401,
+  "dimension_code": "company",
+  "strategy": "user_field",
+  "scope_values": ["company_id"]
+}
+```
+
 ### 4. 用户维度归属与覆盖
 
 `sys_user_dimension_value` 保存用户在某个维度上的默认归属值，供 `user_dimension` 策略使用。例如某个用户归属业务范围 `1`、`2`，角色策略选 `user_dimension` 后运行时会读取这组值。
+
+如果业务已经在 `sys_user` 上扩展了 `company_id`、`dept_id` 等字段，可以优先使用 `user_field` 策略，让角色授权直接读取当前用户字段；如果用户表不想承载业务归属，或同一维度需要维护多个值，则使用 `user_dimension`。
 
 `sys_user_data_scope_override` 保存用户级覆盖，字段包括 `user_id`、`menu_id`、`table_code`、`dimension_code`、`strategy`、`scope_values`、`override_mode`、`expire_at` 和 `state`。
 
@@ -377,8 +394,8 @@ demo_ticket.scope_id IN (1)
 
 1. 数据权限维度：维护维度、来源表、展示字段、值字段、父级字段。
 2. 权限绑定：把菜单绑定到表、维度、字段和生效动作。
-3. 角色管理：保存菜单权限、按钮权限、接口权限和角色数据权限。
-4. 用户维度归属和用户覆盖：保存特殊人员的默认归属或临时覆盖。
+3. 角色管理：保存菜单权限、按钮权限、接口权限和角色数据权限；角色数据权限可选固定范围、树范围、用户归属或当前用户字段。
+4. 用户维度归属和用户覆盖：保存用户默认归属或临时特殊授权。
 5. 权限排查：按用户、菜单、表编码和动作查看最终解析结果。
 
 权限排查展示：

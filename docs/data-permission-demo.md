@@ -74,6 +74,8 @@
 
 两个用户都分配到 `tms_operator`。角色本身不写死公司范围，运行时根据 `sys_user_dimension_value` 读取当前登录用户自己的公司归属。
 
+如果业务项目已经在 `sys_user` 扩展了 `company_id` 字段，也可以把角色数据权限策略改为“当前用户字段”，范围值选择 `company_id`。这样不再需要维护 `sys_user_dimension_value`，运行时会直接读取登录用户自己的 `company_id`。
+
 ## 验证点
 
 登录华东运营账号后：
@@ -96,4 +98,4 @@ source ~/.nvm/nvm.sh && nvm use 22
 node scripts/smoke-tms-data-permission.mjs
 ```
 
-项目里的 `scripts/smoke-lowcode.mjs` 仍覆盖通用低代码 CRUD、关联候选项和数据权限越权场景；`scripts/smoke-tms-data-permission.mjs` 覆盖 TMS 公司、运单、车辆和“当前用户归属”策略。
+项目里的 `scripts/smoke-lowcode.mjs` 仍覆盖通用低代码 CRUD、关联候选项和数据权限越权场景；`scripts/smoke-tms-data-permission.mjs` 覆盖 TMS 公司、运单、车辆和“当前用户归属”策略。“当前用户字段”策略由后端单元测试覆盖。

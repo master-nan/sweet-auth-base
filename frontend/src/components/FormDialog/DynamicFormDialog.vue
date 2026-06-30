@@ -295,148 +295,74 @@
                   </div>
 
                   <!-- 日期选择器 -->
-                  <q-input
+                  <sweet-date-time-picker
                     v-else-if="getFieldInputType(field) === 'date'"
                     v-model="formData[field.field_code]"
                     :label="field.field_name"
-                    outlined
-                    dense
-                    mask="date"
+                    type="date"
                     :disable="isReadonly"
                     :rules="getFieldRules(field)"
                     :hint="getFieldHint(field)"
                     :lazy-rules="lazyRulesValue"
                     :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="event" class="cursor-pointer">
-                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                          <q-date v-model="formData[field.field_code]" />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                    @change="handleFieldInput(field.field_code)"
+                  />
 
                   <!-- 日期时间选择器 -->
-                  <q-input
+                  <sweet-date-time-picker
                     v-else-if="getFieldInputType(field) === 'datetime'"
                     v-model="formData[field.field_code]"
                     :label="field.field_name"
-                    outlined
-                    dense
+                    type="datetime"
                     :disable="isReadonly"
                     :rules="getFieldRules(field)"
                     :hint="getFieldHint(field)"
                     :lazy-rules="lazyRulesValue"
                     :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="event" class="cursor-pointer">
-                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                          <div class="row">
-                            <q-date v-model="formData[field.field_code]" />
-                            <q-time v-model="formData[field.field_code]" />
-                          </div>
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                    @change="handleFieldInput(field.field_code)"
+                  />
 
                   <!-- 时间选择器 -->
-                  <q-input
+                  <sweet-date-time-picker
                     v-else-if="getFieldInputType(field) === 'time'"
                     v-model="formData[field.field_code]"
                     :label="field.field_name"
-                    outlined
-                    dense
+                    type="time"
                     :disable="isReadonly"
                     :rules="getFieldRules(field)"
                     :hint="getFieldHint(field)"
                     :lazy-rules="lazyRulesValue"
                     :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                          <q-time v-model="formData[field.field_code]" />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                    @change="handleFieldInput(field.field_code)"
+                  />
 
                   <!-- 年份选择器 -->
-                  <q-input
+                  <sweet-date-time-picker
                     v-else-if="getFieldInputType(field) === 'year'"
                     v-model="formData[field.field_code]"
                     :label="field.field_name"
-                    outlined
-                    dense
-                    readonly
+                    type="year"
                     :disable="isReadonly"
                     :rules="getFieldRules(field)"
                     :hint="getFieldHint(field)"
                     :lazy-rules="lazyRulesValue"
                     :ref="setFieldRef(field.field_code)"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="event" class="cursor-pointer">
-                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                          <q-date
-                            v-model="formData[field.field_code]"
-                            emit-immediately
-                            default-view="Years"
-                            years-in-month-view
-                            @update:model-value="
-                              (val: string) => {
-                                formData[field.field_code] = val?.slice(0, 4) || ''
-                              }
-                            "
-                          />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                    @change="handleFieldInput(field.field_code)"
+                  />
 
                   <!-- 年月选择器 -->
-                  <q-input
+                  <sweet-date-time-picker
                     v-else-if="getFieldInputType(field) === 'year-month'"
                     v-model="formData[field.field_code]"
                     :label="field.field_name"
-                    outlined
-                    dense
-                    readonly
+                    type="year-month"
                     :disable="isReadonly"
                     :rules="getFieldRules(field)"
                     :hint="getFieldHint(field)"
                     :lazy-rules="lazyRulesValue"
                     :ref="setFieldRef(field.field_code)"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="event" class="cursor-pointer">
-                        <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                          <q-date
-                            v-model="formData[field.field_code]"
-                            emit-immediately
-                            default-view="Months"
-                            @update:model-value="
-                              (val: string) => {
-                                formData[field.field_code] = val?.slice(0, 7) || ''
-                              }
-                            "
-                          />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
+                    @change="handleFieldInput(field.field_code)"
+                  />
 
                   <!-- 文件上传 -->
                   <file-upload
@@ -574,6 +500,7 @@ import FileUpload from 'src/components/FileUpload/FileUpload.vue'
 import RichTextEditor from 'src/components/RichTextEditor/RichTextEditor.vue'
 import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import { instance } from 'boot/axios'
 import {
   coerceDictOptions,

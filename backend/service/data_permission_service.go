@@ -37,6 +37,7 @@ const (
 	dataPermissionStrategyTree      = "tree"
 	dataPermissionStrategySelf      = "self"
 	dataPermissionStrategyUserDim   = "user_dimension"
+	dataPermissionStrategyUserField = "user_field"
 
 	dataPermissionOverrideReplace   = "replace"
 	dataPermissionOverrideUnion     = "union"
@@ -1154,6 +1155,8 @@ func (s *DataPermissionService) strategyDecision(dimension model.SysDataDimensio
 		decision.values = expanded
 	case dataPermissionStrategyUserDim:
 		return s.userDimensionScopeDecision(dimension, userId)
+	case dataPermissionStrategyUserField:
+		return s.userFieldScopeDecision(userId, values)
 	default:
 		decision.deny = true
 	}
@@ -1177,6 +1180,61 @@ func (s *DataPermissionService) userDimensionScopeDecision(dimension model.SysDa
 		decision.deny = true
 	}
 	return decision, nil
+}
+
+func (s *DataPermissionService) userFieldScopeDecision(userId int, fields []string) (scopeDecision, error) {
+	decision := scopeDecision{values: map[string]struct{}{}}
+	normalizedFields := normalizeStringValues(fields)
+	if len(normalizedFields) == 0 {
+		decision.deny = true
+		return decision, nil
+	}
+	field := normalizedFields[0]
+	if err := validateIdentifier("用户字段", field); err != nil {
+		return decision, err
+	}
+	var row map[string]interface{}
+	err := s.db.Table("sys_user").Select(field).Where("id = ?", userId).Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		decision.deny = true
+		return decision, nil
+	}
+	if err != nil {
+		return decision, err
+	}
+	for _, value := range normalizeRawScopeValues(row[field]) {
+		decision.values[value] = struct{}{}
+	}
+	if len(decision.values) == 0 {
+		decision.deny = true
+	}
+	return decision, nil
+}
+
+func normalizeRawScopeValues(raw interface{}) []string {
+	if raw == nil {
+		return nil
+	}
+	switch value := raw.(type) {
+	case []byte:
+		return normalizeRawScopeValues(string(value))
+	case string:
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			return nil
+		}
+		var arrayValues []string
+		if strings.HasPrefix(trimmed, "[") && json.Unmarshal([]byte(trimmed), &arrayValues) == nil {
+			return normalizeStringValues(arrayValues)
+		}
+		return normalizeStringValues(strings.Split(trimmed, ","))
+	default:
+		text := strings.TrimSpace(fmt.Sprintf("%v", value))
+		if text == "" || text == "<nil>" {
+			return nil
+		}
+		return []string{text}
+	}
 }
 
 func (s *DataPermissionService) expandTreeScopeValues(dimension model.SysDataDimension, roots map[string]struct{}) (map[string]struct{}, error) {
@@ -1355,6 +1413,17 @@ func normalizeScopeStrategyValues(rawStrategy string, rawValues []string, subjec
 		return strategy, []string{}, nil
 	case dataPermissionStrategyUserDim:
 		return strategy, []string{}, nil
+	case dataPermissionStrategyUserField:
+		if len(values) == 0 {
+			return "", nil, myerrors.NewBadRequestError("当前用户字段策略必须选择用户字段")
+		}
+		if len(values) > 1 {
+			return "", nil, myerrors.NewBadRequestError("当前用户字段策略只能选择一个用户字段")
+		}
+		if err := validateIdentifier("用户字段", values[0]); err != nil {
+			return "", nil, err
+		}
+		return strategy, values, nil
 	case dataPermissionStrategySelf:
 		if len(values) == 0 {
 			values = []string{strconv.Itoa(subjectId)}

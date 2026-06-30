@@ -129,23 +129,12 @@
           </q-select>
           <q-space />
           <q-btn
-            outline
-            dense
+            unelevated
             color="primary"
             icon="add"
             label="新增"
             :disable="!selectedMenu || dimensions.length === 0"
             @click="openBindingDialog()"
-          />
-          <q-btn
-            unelevated
-            dense
-            color="primary"
-            icon="save"
-            label="保存"
-            :loading="savingBindings"
-            :disable="!selectedMenu"
-            @click="saveBindings"
           />
         </div>
       </template>
@@ -177,7 +166,7 @@
                 dense
                 color="primary"
                 icon="manage_search"
-                label="诊断"
+                label="排查"
                 :loading="debugLoading"
                 @click="loadDebugResult"
               />
@@ -342,7 +331,13 @@
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat color="grey-7" label="取消" @click="bindingDialogOpen = false" />
-          <q-btn unelevated color="primary" label="确定" @click="saveBindingDialog" />
+          <q-btn
+            unelevated
+            color="primary"
+            label="保存"
+            :loading="savingBindings"
+            @click="saveBindingDialog"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -843,7 +838,7 @@ const openBindingDialog = (row?: BindingRow) => {
   bindingDialogOpen.value = true
 }
 
-const saveBindingDialog = () => {
+const saveBindingDialog = async () => {
   const row = {
     ...bindingForm.value,
     actions: bindingForm.value.actions?.length ? [...bindingForm.value.actions] : [],
@@ -866,18 +861,20 @@ const saveBindingDialog = () => {
     $q.notify({ type: 'warning', position: 'top-right', message: '同一维度和字段不能重复绑定' })
     return
   }
-  if (editingBindingLocalId.value) {
-    bindingRows.value = bindingRows.value.map((item) =>
+  const nextRows = editingBindingLocalId.value
+    ? bindingRows.value.map((item) =>
       item.local_id === editingBindingLocalId.value ? row : item,
     )
-  } else {
-    bindingRows.value = [...bindingRows.value, row]
-  }
-  bindingDialogOpen.value = false
+    : [...bindingRows.value, row]
+  const saved = await persistBindings(nextRows)
+  if (saved) bindingDialogOpen.value = false
 }
 
 const removeBindingRow = (localId: string) => {
-  bindingRows.value = bindingRows.value.filter((row) => row.local_id !== localId)
+  void persistBindings(
+    bindingRows.value.filter((row) => row.local_id !== localId),
+    '绑定已删除',
+  )
 }
 
 const actionsDisplay = (actions: string[]) => {
@@ -888,9 +885,9 @@ const actionsTooltip = (actions: string[]) => {
   return compactSelectionTooltip(actions, dataPermissionActionOptions)
 }
 
-const validateBindings = () => {
+const validateBindingRows = (rows: BindingRow[]) => {
   const uniqueKeys = new Set<string>()
-  for (const row of bindingRows.value) {
+  for (const row of rows) {
     if (!row.dimension_code || !row.field_code) {
       $q.notify({ type: 'warning', position: 'top-right', message: '请选择维度和字段' })
       return false
@@ -909,11 +906,11 @@ const validateBindings = () => {
   return true
 }
 
-const saveBindings = async () => {
-  if (!selectedMenu.value || !validateBindings()) return
+const persistBindings = async (rows: BindingRow[], successMessage = '绑定已保存') => {
+  if (!selectedMenu.value || !validateBindingRows(rows)) return false
   savingBindings.value = true
   try {
-    const payload = bindingRows.value.map<DataPermissionBindingSaveItem>((row) => ({
+    const payload = rows.map<DataPermissionBindingSaveItem>((row) => ({
       dimension_code: row.dimension_code,
       field_code: row.field_code,
       match_type: row.match_type || 'in',
@@ -923,9 +920,11 @@ const saveBindings = async () => {
     }))
     const result = await dataPermissionApi.saveMenuBindings(selectedMenu.value.id, payload)
     if (result.success) {
-      $q.notify({ type: 'positive', position: 'top-right', message: '绑定已保存' })
+      $q.notify({ type: 'positive', position: 'top-right', message: successMessage })
       await onMenuChange(selectedMenu.value.id)
+      return true
     }
+    return false
   } finally {
     savingBindings.value = false
   }

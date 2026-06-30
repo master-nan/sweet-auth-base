@@ -317,17 +317,18 @@
                           dense
                           outlined
                           multiple
+                          :max-values="row.strategy === 'user_field' ? 1 : undefined"
                           use-input
                           new-value-mode="add-unique"
                           emit-value
                           map-options
                           options-dense
                           clearable
-                          label="范围值"
+                          :label="row.strategy === 'user_field' ? '用户字段' : '范围值'"
                           class="permission-scope-value-select"
                           :disable="!row.enabled"
                           :loading="row.loading_options"
-                          :options="row.option_items"
+                          :options="scopeValueOptions(row)"
                           :display-value="roleScopeValueDisplay(row)"
                           @focus="loadRoleDimensionOptions(row)"
                         >
@@ -369,6 +370,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import type { Role } from 'src/api/services/sys-role'
 import type { Menu, MenuButton } from 'src/api/services/sys-menu'
 import { useMenuApi } from 'src/api/services/sys-menu'
+import { useTableApi } from 'src/api/services/sys-table'
 import { SysMenuButtonEventAction, SysMenuButtonPosition, SysMenuButtonPositionMap } from 'src/types/enum'
 import { type Query } from 'src/types/global'
 import { useI18n } from 'vue-i18n'
@@ -435,6 +437,7 @@ const emit = defineEmits<{
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 const { queryMenu } = useMenuApi()
+const tableApi = useTableApi()
 const dataPermissionApi = useDataPermissionApi()
 
 const isOpen = computed({
@@ -454,6 +457,7 @@ const menuButtonSelections = ref<Map<number, number[]>>(new Map())
 const activeDetailTab = ref<'buttons' | 'data_scope'>('buttons')
 const savedRoleDataScopes = ref<RoleDataPermission[]>([])
 const roleDataScopeRows = ref<RoleDataScopeRow[]>([])
+const userFieldOptions = ref<DataPermissionOption[]>([])
 const dimensionOptionCache = ref<Map<string, DataPermissionOption[]>>(new Map())
 const dimensionOptionRequests = new Map<string, Promise<DataPermissionOption[]>>()
 
@@ -590,6 +594,7 @@ const resetState = () => {
   activeDetailTab.value = 'buttons'
   savedRoleDataScopes.value = []
   roleDataScopeRows.value = []
+  userFieldOptions.value = []
   dimensionOptionCache.value = new Map()
   dimensionOptionRequests.clear()
 }
@@ -621,6 +626,7 @@ const fetchMenuTree = async () => {
     queryMenu(query),
     dataPermissionApi.getRoleDataPermissions(props.role?.id || 0),
   ])
+  await loadUserFieldOptions()
   if (!result.success) return
   savedRoleDataScopes.value = scopeResult.success ? scopeResult.data || [] : []
 
@@ -889,7 +895,7 @@ const roleDataScopeRowFromBinding = (
 })
 
 const needsRoleScopeValues = (row: RoleDataScopeRow) => {
-  return row.strategy === 'specified' || row.strategy === 'tree'
+  return row.strategy === 'specified' || row.strategy === 'tree' || row.strategy === 'user_field'
 }
 
 const toggleRoleDataScope = (row: RoleDataScopeRow) => {
@@ -902,14 +908,22 @@ const toggleRoleDataScope = (row: RoleDataScopeRow) => {
 }
 
 const onRoleStrategyChange = (row: RoleDataScopeRow) => {
+  row.scope_values = []
+  if (row.strategy === 'user_field') {
+    row.option_items = userFieldOptions.value
+    return
+  }
   if (!needsRoleScopeValues(row)) {
-    row.scope_values = []
     return
   }
   void loadRoleDimensionOptions(row)
 }
 
 const loadRoleDimensionOptions = async (row: RoleDataScopeRow) => {
+  if (row.strategy === 'user_field') {
+    row.option_items = userFieldOptions.value
+    return
+  }
   if (row.option_items.length) return
   const cachedOptions = dimensionOptionCache.value.get(row.dimension_code)
   if (cachedOptions) {
@@ -945,12 +959,27 @@ const loadRoleDimensionOptions = async (row: RoleDataScopeRow) => {
   }
 }
 
+const loadUserFieldOptions = async () => {
+  const result = await tableApi.queryTableByCode('sys_user')
+  const fields = result.success ? result.data?.table_fields || [] : []
+  userFieldOptions.value = fields
+    .filter((field) => !['password', 'access_tokens'].includes(field.field_code))
+    .map((field) => ({
+      label: `${field.field_name || field.field_code} (${field.field_code})`,
+      value: field.field_code,
+    }))
+}
+
+const scopeValueOptions = (row: RoleDataScopeRow) => {
+  return row.strategy === 'user_field' ? userFieldOptions.value : row.option_items
+}
+
 const roleScopeValueDisplay = (row: RoleDataScopeRow) => {
-  return compactSelectionDisplay(row.scope_values, row.option_items, 2)
+  return compactSelectionDisplay(row.scope_values, scopeValueOptions(row), 2)
 }
 
 const roleScopeValueTooltip = (row: RoleDataScopeRow) => {
-  return compactSelectionTooltip(row.scope_values, row.option_items)
+  return compactSelectionTooltip(row.scope_values, scopeValueOptions(row))
 }
 
 const validateRoleDataScopes = () => {
@@ -959,7 +988,7 @@ const validateRoleDataScopes = () => {
       $q.notify({
         type: 'warning',
         position: 'top-right',
-        message: `${row.dimension_label} 需要范围值`,
+        message: row.strategy === 'user_field' ? `${row.dimension_label} 需要选择用户字段` : `${row.dimension_label} 需要范围值`,
       })
       activeDetailTab.value = 'data_scope'
       return false

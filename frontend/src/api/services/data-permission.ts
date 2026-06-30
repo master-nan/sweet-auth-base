@@ -13,7 +13,14 @@ export type DataPermissionAction =
   | 'delete'
   | 'export'
   | 'batch_delete'
-export type DataPermissionStrategy = 'all' | 'none' | 'specified' | 'tree' | 'self' | 'user_dimension'
+export type DataPermissionStrategy =
+  | 'all'
+  | 'none'
+  | 'specified'
+  | 'tree'
+  | 'self'
+  | 'user_dimension'
+  | 'user_field'
 export type DataPermissionOverrideMode = 'replace' | 'union' | 'intersect' | 'deny'
 
 export interface DataPermissionOption {
@@ -180,6 +187,7 @@ export const dataPermissionStrategyOptions = [
   { label: '指定值', value: 'specified' },
   { label: '树范围', value: 'tree' },
   { label: '用户归属', value: 'user_dimension' },
+  { label: '当前用户字段', value: 'user_field' },
   { label: '本人ID', value: 'self' },
 ]
 

@@ -152,6 +152,7 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const innerValue = ref<Array<string | number>>([])
 // 已确认选中的值（仅在 canSelect 通过时更新）
 const confirmedValue = ref<Array<string | number>>([])
+const menuPath = ref<Array<string | number>>([])
 const inputRef = ref<any>(null)
 
 const menu = ref(false)
@@ -234,11 +235,11 @@ const levels = computed(() => {
   const result: CascaderOption[][] = []
   let currentOptions = props.options
   if (!currentOptions || currentOptions.length === 0) {
-    return [[]]
+    return []
   }
   result.push(currentOptions)
 
-  for (const value of innerValue.value) {
+  for (const value of menuPath.value) {
     const matched = findOption(currentOptions, value)
     const children = matched ? getOptionChildren(matched) : undefined
     if (!children || children.length === 0) {
@@ -306,6 +307,7 @@ const handleOptionClick = (index: number, option: CascaderOption) => {
   const nextValue = innerValue.value.slice(0, index)
   nextValue[index] = getOptionValue(option)
   innerValue.value = nextValue
+  menuPath.value = nextValue
 
   const isLeaf = !hasChildren(option)
   const selectableNow = canSelect(index, option)
@@ -332,6 +334,7 @@ const handleOptionClick = (index: number, option: CascaderOption) => {
 const clearSelection = () => {
   innerValue.value = []
   confirmedValue.value = []
+  menuPath.value = []
   const emitValue = buildEmitValue([])
   emit('update:modelValue', emitValue)
   emit('change', emitValue)
@@ -339,6 +342,7 @@ const clearSelection = () => {
 
 const handleOpen = () => {
   if (props.disable || props.readonly) return
+  menuPath.value = []
   menu.value = true
 }
 

@@ -180,6 +180,77 @@ func TestResolveDataScopeUserDimensionStrategyWithoutValuesDenies(t *testing.T) 
 	}
 }
 
+func TestResolveDataScopeUserFieldStrategyUsesCurrentUserColumn(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	if err := service.db.Exec(`ALTER TABLE sys_user ADD COLUMN tenant_id INTEGER`).Error; err != nil {
+		t.Fatalf("add tenant column: %v", err)
+	}
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	if err := service.db.Table("sys_user").Create(map[string]interface{}{
+		"id":        7,
+		"state":     true,
+		"user_name": "u7",
+		"tenant_id": 8,
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "user_field",
+		ScopeValues:   `["tenant_id"]`,
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve user field scope: %v", err)
+	}
+	if scope == nil || scope.AllowAll || scope.DenyAll || len(scope.Conditions) != 1 {
+		t.Fatalf("expected one user field condition, got %#v", scope)
+	}
+	got := scope.Conditions[0]
+	if got.Field != "tenant_id" || !reflect.DeepEqual(got.Values, []string{"8"}) {
+		t.Fatalf("unexpected user field condition: %#v", got)
+	}
+}
+
+func TestResolveDataScopeUserFieldStrategyWithoutValueDenies(t *testing.T) {
+	service, table := newDataPermissionServiceForTest(t)
+	seedDataPermissionBinding(t, service.db, true)
+	if err := service.db.Exec(`ALTER TABLE sys_user ADD COLUMN tenant_id INTEGER`).Error; err != nil {
+		t.Fatalf("add tenant column: %v", err)
+	}
+	mustCreate(t, service.db, &model.SysUserRole{UserId: 7, RoleId: 1})
+	if err := service.db.Table("sys_user").Create(map[string]interface{}{
+		"id":        7,
+		"state":     true,
+		"user_name": "u7",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	mustCreate(t, service.db, &model.SysRoleDataScope{
+		Basic:         model.Basic{Id: 20, State: true},
+		RoleId:        1,
+		MenuId:        10,
+		TableCode:     "demo_order",
+		DimensionCode: "tenant",
+		Strategy:      "user_field",
+		ScopeValues:   `["tenant_id"]`,
+	})
+
+	scope, err := service.ResolveDataScope(model.SysUser{Basic: model.Basic{Id: 7}}, 10, table, enum.ButtonActionQuery)
+	if err != nil {
+		t.Fatalf("resolve empty user field scope: %v", err)
+	}
+	if scope == nil || !scope.DenyAll {
+		t.Fatalf("expected deny all without user field value, got %#v", scope)
+	}
+}
+
 func TestSaveUserDimensionValuesMergesDuplicateDimensions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service, _ := newDataPermissionServiceForTest(t)
@@ -528,6 +599,9 @@ func newDataPermissionServiceForTest(t *testing.T) (*DataPermissionService, mode
 		&model.SysMenu{},
 	); err != nil {
 		t.Fatalf("migrate data permission models: %v", err)
+	}
+	if err := db.Exec(`CREATE TABLE sys_user (id INTEGER PRIMARY KEY, state BOOLEAN, user_name TEXT)`).Error; err != nil {
+		t.Fatalf("create sys_user table: %v", err)
 	}
 	table := model.SysTable{
 		Basic:     model.Basic{Id: 1, State: true},
