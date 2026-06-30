@@ -20,27 +20,12 @@
     :hint="hint"
     :max-values="maxValues || undefined"
     :new-value-mode="freeInput ? 'add-unique' : undefined"
+    :display-value="selectionDisplay"
     @update:model-value="emitNormalized"
     @filter="filterOptions"
     @new-value="addFreeValues"
     @focus="emit('focus')"
   >
-    <template #selected>
-      <div v-if="normalizedModel.length" class="scope-value-select__chips">
-        <q-chip
-          v-for="value in normalizedModel"
-          :key="value"
-          dense
-          square
-          removable
-          class="scope-value-select__chip"
-          @remove.stop="removeValue(value)"
-        >
-          <span class="scope-value-select__chip-label">{{ labelForValue(value) }}</span>
-        </q-chip>
-      </div>
-    </template>
-
     <template #no-option>
       <q-item>
         <q-item-section class="text-grey">
@@ -48,6 +33,9 @@
         </q-item-section>
       </q-item>
     </template>
+    <q-tooltip v-if="selectionTooltip">
+      {{ selectionTooltip }}
+    </q-tooltip>
   </sweet-select>
 </template>
 
@@ -132,11 +120,22 @@ const filteredOptions = computed(() => {
   const keyword = filterKeyword.value.trim().toLowerCase()
   if (!keyword) return mergedOptions.value
   return mergedOptions.value.filter((option) =>
-    [option.label, option.value].join(' ').toLowerCase().includes(keyword),
+    String(props.freeInput ? `${option.label} ${option.value}` : option.label).toLowerCase().includes(keyword),
   )
 })
 
 const labelForValue = (value: string) => optionMap.value.get(value) || value
+
+const selectedLabels = computed(() => normalizedModel.value.map(labelForValue))
+
+const selectionDisplay = computed(() => {
+  const labels = selectedLabels.value
+  if (labels.length === 0) return ''
+  const visibleLabels = labels.slice(0, 2).join('、')
+  return labels.length > 2 ? `${visibleLabels} 等 ${labels.length} 个` : visibleLabels
+})
+
+const selectionTooltip = computed(() => selectedLabels.value.join('、'))
 
 const emitNormalized = (value: unknown) => {
   const next = Array.isArray(value) ? value : value === null || value === undefined || value === '' ? [] : [value]
@@ -147,10 +146,6 @@ const emitNormalized = (value: unknown) => {
       .filter(Boolean)
       .filter((item, index, values) => values.indexOf(item) === index),
   )
-}
-
-const removeValue = (value: string) => {
-  emit('update:modelValue', normalizedModel.value.filter((item) => item !== value))
 }
 
 const addFreeValues = (value: string, done: (value?: string | string[], mode?: 'toggle' | 'add' | 'add-unique') => void) => {
@@ -188,27 +183,6 @@ defineExpose({
 <style scoped lang="scss">
 .scope-value-select :deep(.q-field__native) {
   min-width: 0;
-}
-
-.scope-value-select__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  max-height: 72px;
-  overflow: auto;
-  padding: 2px 0;
-}
-
-.scope-value-select__chip {
-  max-width: 190px;
-  margin: 0;
-  border-radius: 6px;
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-.scope-value-select__chip-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

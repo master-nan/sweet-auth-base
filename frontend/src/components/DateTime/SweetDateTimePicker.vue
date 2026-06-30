@@ -326,6 +326,17 @@ defineExpose({
   border-radius: 6px;
 }
 
+.sweet-date-time-panel :deep(.q-date__calendar-item .bg-primary),
+.sweet-date-time-panel :deep(.q-date__calendar-item .bg-primary .q-btn__content),
+.sweet-date-time-panel :deep(.q-date__calendar-item .q-btn--active),
+.sweet-date-time-panel :deep(.q-date__calendar-item .q-btn--active .q-btn__content) {
+  color: #fff !important;
+}
+
+.sweet-date-time-panel :deep(.q-date__calendar-item .text-primary:not(.bg-primary)) {
+  color: var(--q-primary) !important;
+}
+
 .sweet-date-time-clock {
   width: 180px;
   display: flex;
