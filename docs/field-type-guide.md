@@ -7,19 +7,23 @@
 
 ## 一、字段类型一览（field_type）
 
-| 枚举值 | 名称              | 数据库类型   | 说明                            |
-| ------ | ----------------- | ------------ | ------------------------------- |
-| 1      | 大数字 BIGINT     | bigint       | ID、雪花ID、大数值              |
-| 2      | 浮点 FLOAT        | float/double | 小数、金额                      |
-| 3      | 字符串 VARCHAR    | varchar(N)   | 定长字符串，需指定 field_length |
-| 4      | 文本 TEXT         | text         | 大段文本（备注、描述等）        |
-| 5      | 布尔 BOOLEAN      | tinyint(1)   | true/false                      |
-| 6      | 日期 DATE         | date         | 年-月-日                        |
-| 7      | 日期时间 DATETIME | datetime     | 年-月-日 时:分:秒               |
-| 8      | 时间 TIME         | time         | 时:分:秒                        |
-| 9      | 微型整数 TINYINT  | tinyint      | 小范围枚举值（0~255）           |
-| 10     | JSON              | json         | JSON 对象/数组                  |
-| 11     | 数字 INT          | int          | 普通整数                        |
+`field_type` 是系统内部的逻辑枚举名，不是直接写入数据库的 SQL 类型。当前底座默认使用 PostgreSQL，低代码建表和字段变更会按下表生成实际字段类型。
+
+| 枚举值 | 名称              | PostgreSQL 类型        | 说明                            |
+| ------ | ----------------- | ---------------------- | ------------------------------- |
+| 1      | 大数字 BIGINT     | bigint                 | ID、雪花ID、大数值              |
+| 2      | 浮点 FLOAT        | numeric 或 numeric(N,D) | 小数、金额                      |
+| 3      | 字符串 VARCHAR    | varchar(N)             | 定长字符串，需指定 field_length |
+| 4      | 文本 TEXT         | text                   | 大段文本（备注、描述等）        |
+| 5      | 布尔 BOOLEAN      | boolean                | true/false                      |
+| 6      | 日期 DATE         | date                   | 年-月-日                        |
+| 7      | 日期时间 DATETIME | timestamp              | 年-月-日 时:分:秒               |
+| 8      | 时间 TIME         | time                   | 时:分:秒                        |
+| 9      | 微型整数 TINYINT  | smallint               | 小范围枚举值                    |
+| 10     | JSON              | jsonb                  | JSON 对象/数组                  |
+| 11     | 数字 INT          | integer                | 普通整数                        |
+
+> 迁移到 PostgreSQL 后，不要在配置、文档或初始化数据里继续使用 MySQL 写法，例如 `tinyint(1)`、`datetime`、`int(11)`、`auto_increment`。布尔值使用 `boolean`，日期时间使用 `timestamp`，JSON 默认使用 `jsonb`。
 
 ---
 
@@ -197,7 +201,8 @@ input_type: FILE_PICKER (10)
 1. **dict_code 优先级**：字段配了 `dict_code` 时，列表展示优先用字典标签，匹配不到再 fallback
 2. **linkage_config**：`input_type=SELECT` 或 `CASCADER` 时，通过 `linkage_config` JSON 配置关联表，字段类型应为存储关联 ID 的类型（通常 BIGINT 或 INT）
 3. **JSON 系列**：`JSON_EDITOR`、`ARRAY_INPUT`、`KEY_VALUE_EDITOR` 三者的字段类型都应该是 **JSON**，不要用 TEXT
-4. **字典选择 vs 关联选择**：
+4. **默认值**：PostgreSQL 默认值按字段类型生成，布尔值写 `true/false` 或 `1/0`，JSON 默认值需要是合法 JSON，数值字段不要带引号
+5. **字典选择 vs 关联选择**：
    - 固定选项（如状态: 启用/停用）→ 用字典 `dict_code`
    - 动态选项（如角色列表）→ 用 `linkage_config` 关联表
-5. **低代码配置手册**：字段联动、按钮参数表单、关系下拉、字典和静态选项的完整写法见 [low-code-manual.md](low-code-manual.md)
+6. **低代码配置手册**：字段联动、按钮参数表单、关系下拉、字典和静态选项的完整写法见 [low-code-manual.md](low-code-manual.md)

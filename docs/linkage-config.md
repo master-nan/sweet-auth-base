@@ -44,8 +44,8 @@
 | --------------- | ------- | :--: | ----------------------------- | -------------------------------------------------------------- |
 | `enabled`       | boolean | 是 | - | 是否启用联动，为 `false` 时整个配置不生效 |
 | `mode`          | string  | 是 | - | 联动模式：`relation` 普通下拉选择，`cascader` 级联树形选择 |
-| `tableId`       | number  | 二选一 | - | 关联表的 ID，环境间可能变化，日常更推荐 `tableCode` |
-| `tableCode`     | string  | 二选一 | - | 关联表编码，推荐优先使用 |
+| `tableCode`     | string  | 二选一 | - | 关联表编码，推荐优先使用；可视化配置默认保存这个字段 |
+| `tableId`       | number  | 二选一 | - | 关联表的 ID，环境间可能变化，主要用于兼容旧配置或排障 |
 | `labelKey`      | string  | 否 | `label` | 关联表中作为显示文本的字段名，自动回退 `name`、`title`、`code` |
 | `valueKey`      | string  | 否 | `value` | 关联表中作为存储值的字段名，自动回退 `id` |
 | `pageSize`      | number  | 否 | relation: 50, cascader: 1000 | 查询关联表时的分页大小；relation 支持远程搜索和滚动加载 |
@@ -196,7 +196,7 @@ relation 模式会按需加载：
 }
 ```
 
-> `tableId` 和 `tableCode` 二选一。同时存在时兼容旧逻辑会优先使用 `tableId`，新配置不建议同时填写。
+> `tableCode` 是新配置的主用法，`tableId` 只作为旧配置兼容入口。后端保存时会校验二者是否指向同一张表，并在只有 `tableId` 时尽量补齐 `tableCode`。
 
 ## 注意事项
 
