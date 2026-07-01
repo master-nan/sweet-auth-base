@@ -43,6 +43,7 @@ type App struct {
 	DataPermissionController *controller.DataPermissionController
 	ApplicationController    *controller.ApplicationController
 	GeneralizationController *controller.GeneralizationController
+	ReportController         *controller.ReportController
 	SmsController            *controller.SmsController
 	FileController           *controller.FileController
 	AuthApi                  *api.AuthApi
@@ -79,6 +80,8 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewSysUserRoleRepositoryImpl,
 	impl.NewApplicationRepositoryImpl,
 	impl.NewGeneralizationRepositoryImpl,
+	impl.NewReportDefinitionRepositoryImpl,
+	impl.NewReportExecutionLogRepositoryImpl,
 	impl.NewCasbinRuleRepositoryImpl,
 	impl.NewSmsLogImpl,
 	impl.NewSmsTemplateImpl,
@@ -106,6 +109,8 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.SysUserRoleRepository), new(*impl.SysUserRoleRepositoryImpl)),
 	wire.Bind(new(repository.ApplicationRepository), new(*impl.ApplicationRepositoryImpl)),
 	wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)),
+	wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)),
+	wire.Bind(new(repository.ReportExecutionLogRepository), new(*impl.ReportExecutionLogRepositoryImpl)),
 	wire.Bind(new(repository.CasbinRuleRepository), new(*impl.CasbinRuleRepositoryImpl)),
 	wire.Bind(new(repository.SmsLogRepository), new(*impl.SmsLogImpl)),
 	wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)),
@@ -150,6 +155,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewSysUserService,
 	service.NewGeneralizationService,
 	service.NewDataPermissionService,
+	service.NewReportService,
 	service.NewCasbinRuleService,
 	service.NewApplicationService,
 	service.NewDingTalkService,
@@ -167,6 +173,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewDataPermissionController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
+	controller.NewReportController,
 	controller.NewApplicationController,
 	controller.NewSmsController,
 	controller.NewFileController,

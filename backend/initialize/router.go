@@ -221,6 +221,15 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.DELETE("/generalization/batch-delete", app.GeneralizationController.BatchDelete)
 		adminGroup.POST("/generalization/export", app.GeneralizationController.Export)
 
+		// report
+		adminGroup.POST("/report/query", app.ReportController.QueryReportDefinitions)
+		adminGroup.GET("/report/data-sources", app.ReportController.GetReportDataSources)
+		adminGroup.GET("/report/:id", app.ReportController.GetReportDefinitionById)
+		adminGroup.POST("/report", app.ReportController.CreateReportDefinition)
+		adminGroup.PUT("/report/:id", app.ReportController.UpdateReportDefinition)
+		adminGroup.DELETE("/report/:id", app.ReportController.DeleteReportDefinitionById)
+		adminGroup.POST("/report/:id/preview", app.ReportController.PreviewReport)
+
 		// file
 		adminGroup.POST("/file/upload", app.FileController.Upload)
 		adminGroup.GET("/file/:id", app.FileController.GetFileById)

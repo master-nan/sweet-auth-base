@@ -181,7 +181,38 @@ const asyncRoutesChildren: Route[] = [
           icon: 'menu_book',
           keepAlive: true,
         },
-
+      },
+    ],
+  },
+  {
+    component: layout,
+    path: 'report',
+    name: 'report',
+    meta: {
+      title: 'router.report.default',
+      icon: 'assessment',
+      isOpen: false,
+    },
+    children: [
+      {
+        component: () => import('pages/report/center/Index.vue'),
+        path: 'center',
+        name: 'report_center',
+        meta: {
+          title: 'router.report.center',
+          icon: 'table_chart',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/report/design/Index.vue'),
+        path: 'design',
+        name: 'report_design',
+        meta: {
+          title: 'router.report.design',
+          icon: 'design_services',
+          keepAlive: true,
+        },
       },
     ],
   },
@@ -195,7 +226,6 @@ const asyncRootRoute: Route[] = [
     redirect: '/admin/home',
     children: asyncRoutesChildren,
   },
-
 ]
 
 export { asyncRootRoute, asyncRoutesChildren }

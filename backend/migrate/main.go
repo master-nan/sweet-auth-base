@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -142,6 +143,8 @@ func migrateSchema(db *gorm.DB) error {
 		&model.SysRoleDataScope{},
 		&model.SysUserDataScopeOverride{},
 		&model.SysUserDimensionValue{},
+		&model.ReportDefinition{},
+		&model.ReportExecutionLog{},
 		&model.Application{},
 		&model.SmsTemplate{},
 		&model.SmsLog{},
@@ -773,6 +776,9 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menu(302, 300, "develop_generalization", "generalization/:table_code", "pages/develop/generalization/Index.vue", "router.develop.generalization", "dynamic_form", 2),
 		menuWithOption(menu(303, 300, "develop_database", "database", "pages/develop/database/Index.vue", "router.develop.database", "storage", 3), "sys_table,sys_table_field,sys_table_index,sys_table_relation"),
 		menuWithOption(menu(304, 300, "develop_dictionary", "dictionary", "pages/develop/dictionary/Index.vue", "router.develop.dictionary", "menu_book", 4), "sys_dict,sys_dict_item"),
+		directoryMenu(menu(900, 0, "report", "report", "src/components/Layout/Layout.vue", "router.report.default", "analytics", 4)),
+		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
+		menuWithTable(menu(902, 900, "report_design", "design", "pages/report/design/Index.vue", "router.report.design", "design_services", 2), "report_definition"),
 	}
 	menuByName := make(map[string]model.SysMenu, len(menus))
 	for _, item := range menus {
@@ -799,6 +805,9 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		}
 	}
 	if err := seedBuiltinMenuButtons(db, sf, role.Id, role.Name, menuByName); err != nil {
+		return err
+	}
+	if err := seedReportDefinitions(db, sf); err != nil {
 		return err
 	}
 	if err := seedSuperAdminRoutePolicies(db, role.Name); err != nil {
@@ -878,6 +887,20 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 	if err := seedAuditMenuButtons(db, sf, roleID, roleName, auditMenu.Id); err != nil {
 		return err
 	}
+	reportCenterMenu, ok := menuByName["report_center"]
+	if !ok {
+		return fmt.Errorf("report_center menu missing after seed")
+	}
+	if err := seedReportCenterMenuButtons(db, sf, roleID, roleName, reportCenterMenu.Id); err != nil {
+		return err
+	}
+	reportDesignMenu, ok := menuByName["report_design"]
+	if !ok {
+		return fmt.Errorf("report_design menu missing after seed")
+	}
+	if err := seedReportDesignMenuButtons(db, sf, roleID, roleName, reportDesignMenu.Id); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -949,6 +972,51 @@ func seedRole(db *gorm.DB, sf *utils.Snowflake) (model.SysRole, error) {
 		return model.SysRole{}, err
 	}
 	return role, nil
+}
+
+func seedReportDefinitions(db *gorm.DB, sf *utils.Snowflake) error {
+	if !db.Migrator().HasTable(&model.ReportDefinition{}) {
+		return nil
+	}
+	seed := model.ReportDefinition{
+		Code:                "access_log_overview",
+		Name:                "访问日志概览",
+		Description:         "基于访问日志的报表样例，用于验证报表中心和数据权限链路",
+		Category:            "系统审计",
+		SourceType:          "table",
+		SourceCode:          "access_log",
+		PermissionTableCode: "access_log",
+		QueryConfig:         datatypes.JSON([]byte(`{"fields":[{"name":"时间","code":"gmt_create","type":"datetime"},{"name":"用户","code":"user_name","type":"string"},{"name":"方法","code":"method","type":"string"},{"name":"路径","code":"url","type":"string"},{"name":"状态码","code":"status_code","type":"number"},{"name":"结果","code":"success","type":"boolean"}]}`)),
+		LayoutConfig:        datatypes.JSON([]byte(`{"view":"table"}`)),
+		Remark:              "系统初始化示例",
+	}
+	var existing model.ReportDefinition
+	err := db.Where("code = ?", seed.Code).First(&existing).Error
+	if err == nil {
+		return db.Model(&model.ReportDefinition{}).Where("id = ?", existing.Id).Updates(map[string]interface{}{
+			"name":                  seed.Name,
+			"description":           seed.Description,
+			"category":              seed.Category,
+			"source_type":           seed.SourceType,
+			"source_code":           seed.SourceCode,
+			"permission_table_code": seed.PermissionTableCode,
+			"query_config":          seed.QueryConfig,
+			"layout_config":         seed.LayoutConfig,
+			"remark":                seed.Remark,
+			"state":                 true,
+			"gmt_modify":            model.Now(),
+		}).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	id, err := newMigrationID(sf)
+	if err != nil {
+		return err
+	}
+	seed.Id = id
+	seed.State = true
+	return db.Create(&seed).Error
 }
 
 func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.Snowflake) (int, error) {
@@ -1201,6 +1269,31 @@ func seedAuditMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName
 		}
 	}
 	return nil
+}
+
+func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		menuButtonWithAPI(700, menuID, "新建报表", "report_center_create", enum.Top, "create", "add", "primary", 1, "/admin/report", "POST"),
+		menuButtonWithAPI(701, menuID, "设计", "report_center_design", enum.Line, "navigate", "design_services", "primary", 1, "/admin/report/:id", "GET"),
+		menuButtonWithAPI(702, menuID, "预览", "report_center_preview", enum.Line, "preview", "visibility", "primary", 2, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(703, menuID, "删除", "report_center_delete", enum.Line, "delete", "delete", "negative", 3, "/admin/report/:id", "DELETE"),
+		apiPermissionWithAPI(704, menuID, "报表列表", "report_center_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
+		apiPermissionWithAPI(705, menuID, "报表详情", "report_center_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
+		apiPermissionWithAPI(706, menuID, "数据源列表", "report_center_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
+}
+
+func seedReportDesignMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		menuButtonWithAPI(707, menuID, "保存", "report_design_save", enum.Top, "save", "save", "primary", 1, "/admin/report/:id", "PUT"),
+		menuButtonWithAPI(708, menuID, "预览", "report_design_preview", enum.Top, "preview", "preview", "primary", 2, "/admin/report/:id/preview", "POST"),
+		apiPermissionWithAPI(709, menuID, "报表详情", "report_design_detail", enum.Top, "detail", "visibility", "primary", 90, "/admin/report/:id", "GET"),
+		apiPermissionWithAPI(710, menuID, "新建报表", "report_design_create", enum.Top, "create", "add", "primary", 91, "/admin/report", "POST"),
+		apiPermissionWithAPI(711, menuID, "报表更新", "report_design_update", enum.Top, "update", "edit", "primary", 92, "/admin/report/:id", "PUT"),
+		apiPermissionWithAPI(712, menuID, "数据源列表", "report_design_data_source", enum.Top, "metadata", "dataset", "primary", 93, "/admin/report/data-sources", "GET"),
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
 
 func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
@@ -1572,6 +1665,13 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/generalization/delete", "DELETE"},
 		{"/admin/generalization/batch-delete", "DELETE"},
 		{"/admin/generalization/export", "POST"},
+		{"/admin/report/query", "POST"},
+		{"/admin/report/data-sources", "GET"},
+		{"/admin/report/:id", "GET"},
+		{"/admin/report", "POST"},
+		{"/admin/report/:id", "PUT"},
+		{"/admin/report/:id", "DELETE"},
+		{"/admin/report/:id/preview", "POST"},
 		{"/admin/file/upload", "POST"},
 		{"/admin/file/:id", "GET"},
 		{"/admin/file/:id", "DELETE"},
@@ -1726,6 +1826,8 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "sys_role_data_scope", name: "角色数据权限"},
 		{code: "sys_user_data_scope_override", name: "用户数据权限覆盖"},
 		{code: "sys_user_dimension_value", name: "用户维度归属"},
+		{code: "report_definition", name: "报表定义"},
+		{code: "report_execution_log", name: "报表执行日志"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }
