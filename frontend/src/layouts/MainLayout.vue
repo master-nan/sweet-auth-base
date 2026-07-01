@@ -1,6 +1,6 @@
 <template>
   <q-layout view="lHr LpR lFr">
-    <q-header class="app-header">
+    <q-header v-if="!isFullscreenRoute" class="app-header">
       <q-toolbar class="app-header__toolbar">
         <q-btn
           class="app-header__menu"
@@ -22,21 +22,22 @@
       </div>
     </q-header>
     <drawer
+      v-if="!isFullscreenRoute"
       ref="drawerRef"
       v-model="isDrawerOpen"
       :title="systemName"
       :subtitle="systemDescription"
       :logo="systemLogo"
     />
-    <theme-setting ref="settingRef" />
-    <q-page-container class="app-main" style="height: 100vh">
+    <theme-setting v-if="!isFullscreenRoute" ref="settingRef" />
+    <q-page-container class="app-main" :class="{ 'app-main--fullscreen': isFullscreenRoute }" style="height: 100vh">
       <router-view v-if="appStore.reload_flag" v-slot="{ Component }">
         <keep-alive :include="keepAliveStore.getKeepAliveList">
           <component :is="Component" />
         </keep-alive>
       </router-view>
     </q-page-container>
-    <q-footer class="q-pa-sm">
+    <q-footer v-if="!isFullscreenRoute" class="q-pa-sm">
       <div>Copyright © 2026 {{ systemName }}</div>
     </q-footer>
   </q-layout>
@@ -46,7 +47,7 @@
 defineOptions({ name: 'MainLayout' })
 
 import { computed, onMounted, ref } from 'vue'
-// import { useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import Drawer from 'src/components/Drawer/Drawer.vue'
 import Breadcrumbs from 'src/components/Breadcrumbs/Breadcrumbs.vue'
@@ -65,6 +66,8 @@ import TagView from 'components/TagView/TagView.vue'
 const appStore = useAppStore()
 const keepAliveStore = useKeepAliveStore()
 const configureStore = useConfigureStore()
+const route = useRoute()
+const isFullscreenRoute = computed(() => route.meta.fullscreen === true)
 const drawerMenuIcon = computed(() => {
   if (!isDrawerOpen.value) return 'menu'
   return appStore.is_drawer_mini ? 'keyboard_double_arrow_right' : 'menu_open'
@@ -81,8 +84,6 @@ const $q = useQuasar()
 onMounted(() => {
   void configureStore.fetchConfigure()
 })
-// const route = useRoute()
-
 // const rightDrawerOpen = ref(false)
 
 // function headerClassActive (path: string) {

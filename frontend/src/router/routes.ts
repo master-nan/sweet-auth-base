@@ -13,6 +13,7 @@ declare module 'vue-router' {
     tableCode?: string
     menuId?: number
     showTag?: boolean
+    fullscreen?: boolean
   }
 }
 
@@ -211,7 +212,9 @@ const asyncRoutesChildren: Route[] = [
         meta: {
           title: 'router.report.design',
           icon: 'design_services',
-          keepAlive: true,
+          keepAlive: false,
+          fullscreen: true,
+          showTag: true,
         },
       },
     ],

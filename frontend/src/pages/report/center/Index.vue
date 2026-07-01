@@ -225,9 +225,7 @@
             </div>
           </div>
           <q-space />
-          <q-btn outline color="primary" icon="download" label="导出" disable>
-            <q-tooltip>导出接口尚未接入，当前先支持在线运行预览</q-tooltip>
-          </q-btn>
+          <q-btn outline color="primary" icon="download" label="导出 CSV" :disable="!runtimeRows.length" @click="exportRuntimeCsv" />
           <q-btn flat round icon="close" v-close-popup />
         </q-card-section>
         <q-separator />
@@ -241,18 +239,48 @@
             class="runtime-filter"
             @keyup.enter="loadRuntimePreview"
           />
-          <q-input
-            v-for="param in runtimeParameters"
-            :key="param.id"
-            v-model="runtimeFilterValues[param.id]"
-            dense
-            outlined
-            clearable
-            :label="param.label"
-            :placeholder="param.placeholder"
-            class="runtime-filter"
-            @keyup.enter="loadRuntimePreview"
-          />
+          <template v-for="param in runtimeParameters" :key="param.id">
+            <sweet-date-time-picker
+              v-if="param.type === 'date'"
+              :model-value="runtimeScalarValue(param.id)"
+              type="date"
+              dense
+              :label="param.label"
+              class="runtime-filter"
+              @update:model-value="runtimeFilterValues[param.id] = $event"
+            />
+            <div v-else-if="param.type === 'date_range'" class="runtime-range-filter">
+              <sweet-date-time-picker
+                :model-value="runtimeRangeValue(param.id, 0)"
+                type="date"
+                dense
+                :label="`${param.label}开始`"
+                class="runtime-filter"
+                @update:model-value="setRuntimeRangeValue(param.id, 0, $event)"
+              />
+              <sweet-date-time-picker
+                :model-value="runtimeRangeValue(param.id, 1)"
+                type="date"
+                dense
+                :label="`${param.label}结束`"
+                class="runtime-filter"
+                @update:model-value="setRuntimeRangeValue(param.id, 1, $event)"
+              />
+            </div>
+            <q-input
+              v-else
+              :model-value="runtimeScalarValue(param.id)"
+              dense
+              outlined
+              clearable
+              :type="param.type === 'number' ? 'number' : 'text'"
+              :label="param.label"
+              :placeholder="param.placeholder"
+              class="runtime-filter"
+              @update:model-value="runtimeFilterValues[param.id] = $event"
+              @keyup.enter="loadRuntimePreview"
+            />
+          </template>
           <q-select
             dense
             outlined
@@ -287,12 +315,13 @@
 defineOptions({ name: 'report_center' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
+import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
 import { computed, onMounted, ref } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
-import type { ExpressionGroup, Query } from 'src/types/global'
-import { ExpressionLogic, ExpressionType } from 'src/types/enum'
+import type { Query } from 'src/types/global'
 import {
+  defaultReportSheet,
   useReportApi,
   type Report,
   type ReportParameter,
@@ -335,7 +364,7 @@ const runtimeReport = ref<Report | null>(null)
 const runtimeData = ref<ReportPreviewRes>({ columns: [], rows: [] })
 const runtimeLoading = ref(false)
 const runtimeKeyword = ref('')
-const runtimeFilterValues = ref<Record<string, string | number | null>>({})
+const runtimeFilterValues = ref<Record<string, string | number | Array<string | number> | null | undefined>>({})
 const runtimePagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -472,8 +501,7 @@ async function loadRuntimePreview() {
       page: runtimePagination.value.page,
       num: runtimePagination.value.rowsPerPage,
       keyword: runtimeKeyword.value,
-      filters: buildRuntimeFilters(),
-      expressions: buildRuntimeExpressions(),
+      parameters: buildRuntimeParameterValues(),
     })
     runtimeData.value = res.data
     runtimePagination.value.rowsNumber = res.data.total ?? res.data.rows.length
@@ -498,37 +526,55 @@ function resetRuntimeFilters() {
   void loadRuntimePreview()
 }
 
-function buildRuntimeFilters() {
-  const filters: Record<string, unknown> = {}
+function buildRuntimeParameterValues() {
+  const values: Record<string, unknown> = {}
   runtimeParameters.value.forEach((param) => {
     const value = runtimeFilterValues.value[param.id]
     if (value === '' || value === null || value === undefined) return
-    if (param.operator === 'eq') filters[param.field] = value
+    if (Array.isArray(value) && !value.some((item) => item !== '' && item !== null && item !== undefined)) return
+    values[param.id] = value
   })
-  return filters
+  return values
 }
 
-function buildRuntimeExpressions(): ExpressionGroup[] {
-  const rules = runtimeParameters.value
-    .map((param) => {
-      const value = runtimeFilterValues.value[param.id]
-      if (value === '' || value === null || value === undefined) return null
-      if (param.operator === 'eq') return null
-      const expressionTypeMap: Record<ReportParameter['operator'], ExpressionType> = {
-        eq: ExpressionType.EQ,
-        like: ExpressionType.LIKE,
-        between: ExpressionType.BETWEEN,
-        gte: ExpressionType.GTE,
-        lte: ExpressionType.LTE,
-      }
-      return {
-        field: param.field,
-        expression_type: expressionTypeMap[param.operator],
-        value,
-      }
-    })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-  return rules.length ? [{ logic: ExpressionLogic.AND, rules, nested: [] }] : []
+function runtimeScalarValue(id: string) {
+  const value = runtimeFilterValues.value[id]
+  return Array.isArray(value) ? String(value[0] || '') : value === undefined ? null : String(value)
+}
+
+function runtimeRangeValue(id: string, index: number) {
+  const value = runtimeFilterValues.value[id]
+  return Array.isArray(value) ? String(value[index] || '') : ''
+}
+
+function setRuntimeRangeValue(id: string, index: number, value: string | null) {
+  const current = Array.isArray(runtimeFilterValues.value[id]) ? [...(runtimeFilterValues.value[id] as Array<string | number>)] : ['', '']
+  current[index] = value || ''
+  runtimeFilterValues.value[id] = current
+}
+
+function exportRuntimeCsv() {
+  if (!runtimeRows.value.length) return
+  const columns = runtimeColumns.value || []
+  const headers = columns.map((column) => String(column.label || column.name))
+  const fields = columns.map((column) => String(column.field || column.name))
+  const lines = [
+    headers,
+    ...runtimeRows.value.map((row) => fields.map((field) => csvCell(row[field]))),
+  ]
+  const csv = lines.map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${runtimeReport.value?.report_code || 'report'}_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function csvCell(value: unknown) {
+  const text = value === null || value === undefined ? '' : String(value)
+  return `"${text.replaceAll('"', '""')}"`
 }
 
 async function copyReport(row: Report) {
@@ -540,8 +586,10 @@ async function copyReport(row: Report) {
       report_code: `${row.report_code}_copy_${Date.now().toString().slice(-4)}`,
       report_kind: row.report_kind,
       fields,
-      parameters: layout?.parameters || [],
-      widgets: layout?.widgets || [],
+      datasets: layout?.datasets || row.query_config?.datasets || [],
+      dataset_joins: layout?.dataset_joins || row.query_config?.dataset_joins || [],
+      parameters: layout?.parameters || row.query_config?.parameters || [],
+      sheet: layout?.sheet || defaultReportSheet(),
     }
     const res = await reportApi.createReport({
       ...payload,
@@ -839,6 +887,13 @@ function statusColor(status: ReportStatus) {
 
 .runtime-filter {
   width: 220px;
+}
+
+.runtime-range-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .runtime-body {
