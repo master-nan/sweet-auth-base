@@ -49,23 +49,49 @@
 
         <q-separator />
 
-        <q-tab-panels v-model="activeWorkspaceTab" animated keep-alive class="data-permission-panels">
+        <q-tab-panels
+          v-model="activeWorkspaceTab"
+          animated
+          keep-alive
+          class="data-permission-panels"
+        >
           <q-tab-panel name="dimensions" class="data-permission-tab-panel">
             <div class="data-permission-panel-head">
               <div>
                 <div class="data-permission-panel-title">数据维度</div>
-                <div class="data-permission-panel-caption">定义公司、部门、区域等可复用业务维度，角色和用户授权都会引用这里的维度。</div>
+                <div class="data-permission-panel-caption">
+                  定义公司、部门、区域等可复用业务维度，角色和用户授权都会引用这里的维度。
+                </div>
               </div>
               <div class="data-permission-panel-actions">
-                <q-btn unelevated color="primary" icon="add" label="新增维度" @click="openDimensionDialog()" />
-                <q-btn outline color="primary" round icon="refresh" :loading="loading" @click="loadAll">
+                <q-btn
+                  unelevated
+                  color="primary"
+                  icon="add"
+                  label="新增维度"
+                  @click="openDimensionDialog()"
+                />
+                <q-btn
+                  outline
+                  color="primary"
+                  round
+                  icon="refresh"
+                  :loading="loading"
+                  @click="loadAll"
+                >
                   <q-tooltip>刷新</q-tooltip>
                 </q-btn>
               </div>
             </div>
 
             <div class="data-permission-panel-toolbar">
-              <q-input v-model="dimensionKeyword" dense outlined clearable placeholder="搜索维度编码 / 名称">
+              <q-input
+                v-model="dimensionKeyword"
+                dense
+                outlined
+                clearable
+                placeholder="搜索维度编码 / 名称"
+              >
                 <template #prepend>
                   <q-icon name="search" />
                 </template>
@@ -129,7 +155,9 @@
             <div class="data-permission-panel-head">
               <div>
                 <div class="data-permission-panel-title">权限绑定</div>
-                <div class="data-permission-panel-caption">给低代码菜单绑定数据维度和表字段，运行时会按角色范围与用户归属合并出最终可见数据。</div>
+                <div class="data-permission-panel-caption">
+                  给低代码菜单绑定数据维度和表字段，运行时会按角色范围与用户归属合并出最终可见数据。
+                </div>
               </div>
               <div class="data-permission-panel-actions">
                 <q-btn
@@ -176,13 +204,21 @@
               <div>
                 <div class="data-permission-context-title">{{ selectedMenuDisplayTitle }}</div>
                 <div class="data-permission-context-meta">
-                  <q-chip dense square color="primary" text-color="white">{{ selectedMenu.name }}</q-chip>
-                  <q-chip dense square outline color="primary">绑定表 {{ selectedMenu.table_code }}</q-chip>
+                  <q-chip dense square color="primary" text-color="white">{{
+                    selectedMenu.name
+                  }}</q-chip>
+                  <q-chip dense square outline color="primary"
+                    >绑定表 {{ selectedMenu.table_code }}</q-chip
+                  >
                 </div>
               </div>
             </div>
 
-            <q-banner v-if="selectedMenu && tableFieldOptions.length === 0" rounded class="bg-orange-1 text-warning q-mb-md">
+            <q-banner
+              v-if="selectedMenu && tableFieldOptions.length === 0"
+              rounded
+              class="bg-orange-1 text-warning q-mb-md"
+            >
               当前菜单绑定表没有可用字段
             </q-banner>
 
@@ -218,7 +254,10 @@
                   <q-chip dense square color="primary" text-color="white">
                     {{ actionsDisplay(props.row.actions) }}
                   </q-chip>
-                  <span v-if="actionsTooltip(props.row.actions)" class="data-permission-action-hint">
+                  <span
+                    v-if="actionsTooltip(props.row.actions)"
+                    class="data-permission-action-hint"
+                  >
                     <q-tooltip>
                       {{ actionsTooltip(props.row.actions) }}
                     </q-tooltip>
@@ -241,10 +280,24 @@
               </template>
               <template #body-cell-row_actions="props">
                 <q-td :props="props" class="text-center q-gutter-xs">
-                  <q-btn flat dense round color="primary" icon="edit" @click="openBindingDialog(props.row)">
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    color="primary"
+                    icon="edit"
+                    @click="openBindingDialog(props.row)"
+                  >
                     <q-tooltip>编辑</q-tooltip>
                   </q-btn>
-                  <q-btn flat dense round color="negative" icon="delete" @click="removeBindingRow(props.row.local_id)">
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    color="negative"
+                    icon="delete"
+                    @click="removeBindingRow(props.row.local_id)"
+                  >
                     <q-tooltip>删除</q-tooltip>
                   </q-btn>
                 </q-td>
@@ -267,7 +320,9 @@
             <div class="data-permission-panel-head">
               <div>
                 <div class="data-permission-panel-title">权限诊断</div>
-                <div class="data-permission-panel-caption">用当前账号模拟菜单和动作，查看最终解析出的数据范围。</div>
+                <div class="data-permission-panel-caption">
+                  用当前账号模拟菜单和动作，查看最终解析出的数据范围。
+                </div>
               </div>
             </div>
 
@@ -307,12 +362,22 @@
               <q-chip dense square :color="debugScopeColor" text-color="white">
                 {{ debugScopeLabel }}
               </q-chip>
-              <span>用户 {{ debugResult.user_name }} · 角色 {{ debugResult.role_ids?.join(', ') || '无' }}</span>
+              <span
+                >用户 {{ debugResult.user_name }} · 角色
+                {{ debugResult.role_ids?.join(', ') || '无' }}</span
+              >
               <span>绑定 {{ debugResult.bindings?.length || 0 }} 个</span>
               <span>角色范围 {{ debugResult.role_scopes?.length || 0 }} 条</span>
               <span>用户归属 {{ debugResult.user_dimensions?.length || 0 }} 条</span>
               <span>特殊授权 {{ debugResult.user_overrides?.length || 0 }} 条</span>
-              <q-chip v-for="note in debugResult.notes || []" :key="note" dense square color="warning" text-color="white">
+              <q-chip
+                v-for="note in debugResult.notes || []"
+                :key="note"
+                dense
+                square
+                color="warning"
+                text-color="white"
+              >
                 {{ note }}
               </q-chip>
               <pre>{{ debugScopeText }}</pre>
@@ -327,17 +392,30 @@
             <div class="data-permission-panel-head">
               <div>
                 <div class="data-permission-panel-title">配置检查</div>
-                <div class="data-permission-panel-caption">快速发现维度来源、菜单字段和当前绑定里容易影响授权结果的配置。</div>
+                <div class="data-permission-panel-caption">
+                  快速发现维度来源、菜单字段和当前绑定里容易影响授权结果的配置。
+                </div>
               </div>
               <div class="data-permission-panel-actions">
-                <q-btn outline color="primary" round icon="refresh" :loading="loading" @click="loadAll">
+                <q-btn
+                  outline
+                  color="primary"
+                  round
+                  icon="refresh"
+                  :loading="loading"
+                  @click="loadAll"
+                >
                   <q-tooltip>刷新</q-tooltip>
                 </q-btn>
               </div>
             </div>
 
             <div class="data-permission-check-grid">
-              <div v-for="item in configCheckItems" :key="item.label" class="data-permission-check-card">
+              <div
+                v-for="item in configCheckItems"
+                :key="item.label"
+                class="data-permission-check-card"
+              >
                 <q-icon :name="item.icon" :color="item.color" />
                 <div>
                   <strong>{{ item.value }}</strong>
@@ -351,13 +429,14 @@
       </div>
     </div>
 
-
     <q-dialog v-model="bindingDialogOpen" persistent>
       <q-card class="binding-dialog-card">
         <q-card-section class="row items-center q-gutter-sm">
           <div>
             <div class="text-h6">{{ editingBindingLocalId ? '编辑绑定' : '新增绑定' }}</div>
-            <div class="text-caption text-grey-7">{{ selectedMenuDisplayTitle || '低代码菜单' }}</div>
+            <div class="text-caption text-grey-7">
+              {{ selectedMenuDisplayTitle || '低代码菜单' }}
+            </div>
           </div>
           <q-space />
           <q-btn flat round dense icon="close" @click="bindingDialogOpen = false" />
@@ -620,13 +699,43 @@ const dimensionColumns: QTableProps['columns'] = [
 ]
 
 const bindingColumns: QTableProps['columns'] = [
-  { name: 'dimension_code', label: '维度', field: 'dimension_code', align: 'left', style: 'min-width: 220px; width: 260px;' },
-  { name: 'field_code', label: '字段', field: 'field_code', align: 'left', style: 'min-width: 190px; width: 220px;' },
-  { name: 'match_type', label: '匹配', field: 'match_type', align: 'left', style: 'min-width: 140px; width: 150px;' },
-  { name: 'actions', label: '动作', field: 'actions', align: 'left', style: 'min-width: 260px; width: 320px;' },
+  {
+    name: 'dimension_code',
+    label: '维度',
+    field: 'dimension_code',
+    align: 'left',
+    style: 'min-width: 220px; width: 260px;',
+  },
+  {
+    name: 'field_code',
+    label: '字段',
+    field: 'field_code',
+    align: 'left',
+    style: 'min-width: 190px; width: 220px;',
+  },
+  {
+    name: 'match_type',
+    label: '匹配',
+    field: 'match_type',
+    align: 'left',
+    style: 'min-width: 140px; width: 150px;',
+  },
+  {
+    name: 'actions',
+    label: '动作',
+    field: 'actions',
+    align: 'left',
+    style: 'min-width: 260px; width: 320px;',
+  },
   { name: 'required', label: '必配', field: 'required', align: 'center', style: 'width: 92px;' },
   { name: 'state', label: '启用', field: 'state', align: 'center', style: 'width: 92px;' },
-  { name: 'row_actions', label: '操作', field: 'row_actions', align: 'center', style: 'width: 92px;' },
+  {
+    name: 'row_actions',
+    label: '操作',
+    field: 'row_actions',
+    align: 'center',
+    style: 'width: 92px;',
+  },
 ]
 
 const dimensionOptions = computed(() =>
@@ -647,9 +756,14 @@ const filteredDimensions = computed(() => {
 })
 
 const configCheckItems = computed(() => {
-  const disabledDimensions = dimensions.value.filter((dimension) => dimension.state === false).length
-  const noSourceDimensions = dimensions.value.filter((dimension) => dimension.source_type !== 'table').length
-  const selectedMenuMissingFields = selectedMenu.value && tableFieldOptions.value.length === 0 ? 1 : 0
+  const disabledDimensions = dimensions.value.filter(
+    (dimension) => dimension.state === false,
+  ).length
+  const noSourceDimensions = dimensions.value.filter(
+    (dimension) => dimension.source_type !== 'table',
+  ).length
+  const selectedMenuMissingFields =
+    selectedMenu.value && tableFieldOptions.value.length === 0 ? 1 : 0
   const disabledBindings = bindingRows.value.filter((binding) => binding.state === false).length
 
   return [
@@ -747,9 +861,9 @@ const displayMenuTitle = (menu: Menu) => {
   return title.startsWith('router.') ? t(title) : title
 }
 
-const selectedMenuDisplayTitle = computed(() => (
-  selectedMenu.value ? displayMenuTitle(selectedMenu.value) : ''
-))
+const selectedMenuDisplayTitle = computed(() =>
+  selectedMenu.value ? displayMenuTitle(selectedMenu.value) : '',
+)
 
 const flattenMenus = (menus: Menu[]): Menu[] =>
   menus.flatMap((menu) => [menu, ...flattenMenus(menu.children || [])])
@@ -827,7 +941,9 @@ const sourceTableLabel = (tableCode: string) =>
   sourceTableOptions.value.find((option) => option.value === tableCode)?.label || tableCode || '-'
 
 const dimensionLabel = (dimensionCode: string) =>
-  dimensionOptions.value.find((option) => option.value === dimensionCode)?.label || dimensionCode || '-'
+  dimensionOptions.value.find((option) => option.value === dimensionCode)?.label ||
+  dimensionCode ||
+  '-'
 
 const fieldLabel = (fieldCode: string) =>
   tableFieldOptions.value.find((option) => option.value === fieldCode)?.label || fieldCode || '-'
@@ -969,9 +1085,7 @@ const saveBindingDialog = async () => {
     return
   }
   const nextRows = editingBindingLocalId.value
-    ? bindingRows.value.map((item) =>
-      item.local_id === editingBindingLocalId.value ? row : item,
-    )
+    ? bindingRows.value.map((item) => (item.local_id === editingBindingLocalId.value ? row : item))
     : [...bindingRows.value, row]
   const saved = await persistBindings(nextRows)
   if (saved) bindingDialogOpen.value = false
@@ -1063,7 +1177,10 @@ const validateDimension = () => {
     $q.notify({ type: 'warning', position: 'top-right', message: '请填写维度编码和名称' })
     return false
   }
-  if (form.source_type === 'table' && (!form.source_code.trim() || !form.label_field.trim() || !form.value_field.trim())) {
+  if (
+    form.source_type === 'table' &&
+    (!form.source_code.trim() || !form.label_field.trim() || !form.value_field.trim())
+  ) {
     $q.notify({ type: 'warning', position: 'top-right', message: '请填写来源表、展示字段和值字段' })
     return false
   }
@@ -1131,7 +1248,6 @@ onMounted(() => {
   height: 100%;
   flex-direction: column;
   gap: 12px;
-  padding-bottom: 12px;
 }
 
 .data-permission-summary {
