@@ -4,9 +4,10 @@ import "gorm.io/datatypes"
 
 // ReportDefinition stores a reusable report definition.
 //
-// MVP reports run against an existing low-code table or view. Free-form SQL is
-// intentionally not executed here so report preview/export can reuse the same
-// metadata and data-permission path as low-code pages.
+// The canonical report model lives in query_config/layout_config as datasets,
+// parameters and sheet layout. SourceCode and SourceType are denormalized from
+// the primary table dataset for list/search compatibility. SQL datasets are
+// executed only through the report service's read-only preview guard.
 type ReportDefinition struct {
 	Basic
 	Code                string         `gorm:"size:128;uniqueIndex:uni_report_definition_code;comment:报表编码" json:"code"`

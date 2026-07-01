@@ -7,8 +7,8 @@ type ReportDefinitionCreateReq struct {
 	Name                string         `json:"name" binding:"required" example:"销售汇总"`
 	Description         string         `json:"description" example:"按组织和日期查看销售汇总"`
 	Category            string         `json:"category" example:"经营分析"`
-	SourceType          string         `json:"source_type" binding:"required" example:"table"`
-	SourceCode          string         `json:"source_code" binding:"required" example:"tms_waybill"`
+	SourceType          string         `json:"source_type" example:"table"`
+	SourceCode          string         `json:"source_code" example:"tms_waybill"`
 	PermissionMenuId    int            `json:"permission_menu_id" example:"0"`
 	PermissionTableCode string         `json:"permission_table_code" example:"tms_waybill"`
 	QueryConfig         datatypes.JSON `json:"query_config" binding:"omitempty,non_empty_json"`
@@ -23,8 +23,8 @@ type ReportDefinitionUpdateReq struct {
 	Name                string         `json:"name" binding:"required" example:"销售汇总"`
 	Description         string         `json:"description" example:"按组织和日期查看销售汇总"`
 	Category            string         `json:"category" example:"经营分析"`
-	SourceType          string         `json:"source_type" binding:"required" example:"table"`
-	SourceCode          string         `json:"source_code" binding:"required" example:"tms_waybill"`
+	SourceType          string         `json:"source_type" example:"table"`
+	SourceCode          string         `json:"source_code" example:"tms_waybill"`
 	PermissionMenuId    int            `json:"permission_menu_id" example:"0"`
 	PermissionTableCode string         `json:"permission_table_code" example:"tms_waybill"`
 	QueryConfig         datatypes.JSON `json:"query_config" binding:"omitempty,non_empty_json"`
@@ -34,6 +34,8 @@ type ReportDefinitionUpdateReq struct {
 }
 
 type ReportPreviewReq struct {
-	MenuId int   `json:"menu_id" example:"401"`
-	Query  Basic `json:"query"`
+	MenuId     int            `json:"menu_id" example:"401"`
+	DatasetId  string         `json:"dataset_id" example:"main"`
+	Parameters map[string]any `json:"parameters"`
+	Query      Basic          `json:"query"`
 }
