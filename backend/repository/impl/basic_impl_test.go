@@ -64,6 +64,38 @@ func TestBasicRepositoryFindByFieldScansIntoEntity(t *testing.T) {
 	}
 }
 
+func TestBasicRepositoryUpdateOmitsEmbeddedBasicField(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:basic_repo_update?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&basicRepositoryFindByFieldFixture{}); err != nil {
+		t.Fatalf("migrate fixture: %v", err)
+	}
+	if err := db.Create(&basicRepositoryFindByFieldFixture{
+		Basic: model.Basic{Id: 1, State: true},
+		Name:  "alpha",
+	}).Error; err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	if err := repo.Update(db, &basicRepositoryFindByFieldFixture{
+		Basic: model.Basic{Id: 1, State: true},
+		Name:  "beta",
+	}, 1); err != nil {
+		t.Fatalf("update fixture: %v", err)
+	}
+
+	got, err := repo.FindByField("id", 1)
+	if err != nil {
+		t.Fatalf("find updated fixture: %v", err)
+	}
+	if got.Name != "beta" {
+		t.Fatalf("expected updated name, got %+v", got)
+	}
+}
+
 func TestBasicRepositoryPaginateAndCountAsyncAppliesDataScope(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:basic_repo_scope?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

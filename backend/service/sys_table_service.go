@@ -711,7 +711,6 @@ type tableFieldLinkageEnvelope struct {
 type tableFieldLinkageConfig struct {
 	Enabled       bool              `json:"enabled"`
 	Mode          string            `json:"mode"`
-	TableId       int               `json:"tableId"`
 	TableCode     string            `json:"tableCode"`
 	LabelKey      string            `json:"labelKey"`
 	ValueKey      string            `json:"valueKey"`
@@ -734,16 +733,6 @@ func (s *SysTableService) validateTableFieldLinkageConfig(raw string, currentTab
 }
 
 func (s *SysTableService) resolveLinkageRelatedTable(cfg tableFieldLinkageConfig) (model.SysTable, error) {
-	if cfg.TableId > 0 {
-		table, err := s.GetTableById(cfg.TableId)
-		if err != nil {
-			return model.SysTable{}, err
-		}
-		if strings.TrimSpace(cfg.TableCode) != "" && table.Id != 0 && table.TableCode != strings.TrimSpace(cfg.TableCode) {
-			return model.SysTable{}, myerrors.NewBadRequestError("联动配置的tableId和tableCode不匹配")
-		}
-		return table, nil
-	}
 	return s.GetTableByTableCode(strings.TrimSpace(cfg.TableCode))
 }
 
@@ -770,8 +759,8 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	default:
 		return "", myerrors.NewBadRequestError("联动配置mode仅支持relation或cascader")
 	}
-	if cfg.TableId <= 0 && strings.TrimSpace(cfg.TableCode) == "" {
-		return "", myerrors.NewBadRequestError("联动配置必须指定tableId或tableCode")
+	if strings.TrimSpace(cfg.TableCode) == "" {
+		return "", myerrors.NewBadRequestError("联动配置必须指定tableCode")
 	}
 	if cfg.PageSize < 0 || cfg.PageSize > 1000 {
 		return "", myerrors.NewBadRequestError("联动配置pageSize必须在0到1000之间")

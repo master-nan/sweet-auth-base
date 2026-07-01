@@ -132,8 +132,6 @@ func allowAuthenticatedCommonRoute(objs []string, act string) bool {
 // 看不到当前访问的是哪张发布表，所以表归属、菜单授权、按钮动作和数据权限必须在控制器中继续校验。
 func allowControllerScopedPermissionRoute(obj, act string) bool {
 	switch obj {
-	case "/admin/generalization/query/:id":
-		return act == "POST"
 	case "/admin/generalization/query/code/:code":
 		return act == "POST"
 	case "/admin/generalization/detail/code/:code/:id":

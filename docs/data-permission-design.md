@@ -309,7 +309,7 @@ HTTP 请求
 | `menu_id` | 菜单 ID |
 | `table_code` | 表编码 |
 | `dimension_code` | 维度编码 |
-| `strategy` | 全部、本人、指定范围、无数据等 |
+| `strategy` | 全部、无权限、指定值、树范围、用户归属、当前用户字段等 |
 | `scope_values` | JSON 数组，保存指定范围 |
 | `state` | 是否启用 |
 

@@ -34,7 +34,7 @@
 }
 ```
 
-字段管理界面生成的 JSON 可能包含更多字段；排障时只需要确认 `enabled`、`mode`、`tableCode` 或 `tableId`、`labelKey`、`valueKey` 和 `filterMapping` 是否正确。
+字段管理界面生成的 JSON 可能包含更多字段；排障时只需要确认 `enabled`、`mode`、`tableCode`、`labelKey`、`valueKey` 和 `filterMapping` 是否正确。
 
 ## 3. 字段说明
 
@@ -44,8 +44,7 @@
 | --------------- | ------- | :--: | ----------------------------- | -------------------------------------------------------------- |
 | `enabled`       | boolean | 是 | - | 是否启用联动，为 `false` 时整个配置不生效 |
 | `mode`          | string  | 是 | - | 联动模式：`relation` 普通下拉选择，`cascader` 级联树形选择 |
-| `tableCode`     | string  | 二选一 | - | 关联表编码，推荐优先使用；可视化配置默认保存这个字段 |
-| `tableId`       | number  | 二选一 | - | 关联表的 ID，环境间可能变化，主要用于兼容旧配置或排障 |
+| `tableCode`     | string  | 是 | - | 关联表编码；可视化配置默认保存这个字段 |
 | `labelKey`      | string  | 否 | `label` | 关联表中作为显示文本的字段名，自动回退 `name`、`title`、`code` |
 | `valueKey`      | string  | 否 | `value` | 关联表中作为存储值的字段名，自动回退 `id` |
 | `pageSize`      | number  | 否 | 200 | 查询关联表时的分页大小；relation 运行时会限制在 20-200，cascader 建议不要超过 1000 |
@@ -86,7 +85,7 @@
 
 - 按编码：`POST /admin/generalization/query/code/{tableCode}`
 
-`tableId` 只用于后端保存旧配置时解析并补齐 `tableCode`。前端下拉、级联、列表回显和参数 Schema 运行时都依赖 `tableCode`。
+新配置统一使用 `tableCode`。前端下拉、级联、列表回显和参数 Schema 运行时都依赖 `tableCode`，不要再手写环境相关的表 ID。
 
 relation 模式会按需加载：
 
@@ -179,25 +178,6 @@ relation 模式会按需加载：
 ```
 
 **效果**：查出所有菜单的扁平数据后，按 `parent_id` 字段组装成树形结构，渲染为级联选择器。`parent_id = 0` 的记录为根节点。
-
-### 5.4 tableId 兼容格式
-
-老配置或一次性数据修复中可能仍会看到 `tableId`。它可以继续使用，但日常配置优先使用 `tableCode`，避免不同环境表 ID 不一致。
-
-```json
-{
-  "linkage": {
-    "enabled": true,
-    "mode": "relation",
-    "tableId": 101724747440640,
-    "labelKey": "title",
-    "valueKey": "id",
-    "filterMapping": {}
-  }
-}
-```
-
-> `tableCode` 是新配置的主用法，`tableId` 只作为旧配置兼容入口。后端保存时会校验二者是否指向同一张表，并在只有 `tableId` 时尽量补齐 `tableCode`。
 
 ## 注意事项
 

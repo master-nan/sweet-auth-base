@@ -2176,7 +2176,7 @@ async function assertRelationCandidateMenuScope() {
         linkage: {
           enabled: true,
           mode: 'relation',
-          tableId: targetTable.id,
+          tableCode: targetCode,
           labelKey: 'name',
           valueKey: 'id',
           searchPageSize: 20,
@@ -2190,7 +2190,7 @@ async function assertRelationCandidateMenuScope() {
     const linkageConfig = JSON.parse(targetField.linkage_config)
     assert(
       linkageConfig.linkage?.tableCode === targetCode,
-      `source relation linkage tableCode was not normalized: ${targetField.linkage_config}`,
+      `source relation linkage tableCode was not saved: ${targetField.linkage_config}`,
     )
 
     const publishSource = await request(`/admin/table/publish/${sourceCode}`, { method: 'POST' })

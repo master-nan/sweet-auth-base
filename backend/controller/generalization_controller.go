@@ -220,48 +220,6 @@ func (gc *GeneralizationController) checkRowDataPermission(ctx *gin.Context, tab
 	return myerrors.ErrPermissionDenied
 }
 
-func (gc *GeneralizationController) Query(ctx *gin.Context) {
-	resp := response.NewResponse()
-	ctx.Set("response", resp)
-	id, err := strconv.Atoi(ctx.Param("id"))
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	table, err := gc.sysTableService.GetTableById(id)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if table.Id == 0 {
-		_ = ctx.Error(myerrors.ErrParamInvalid)
-		return
-	}
-	var data request.Basic
-	translator := gc.translators["zh"]
-	if err := utils.ValidatorBody[request.Basic](ctx, &data, translator); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	data.TableCode = table.TableCode
-	menuId, err := gc.resolveQueryMenuId(ctx, data.MenuId, table.TableCode)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	data.MenuId = menuId
-	if err := gc.injectDataScope(ctx, &data, table, enum.ButtonActionQuery); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	result, err := gc.generalizationService.Query(&data, table)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(result.Data).SetTotal(result.Total)
-}
-
 func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

@@ -212,7 +212,6 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.DELETE("/sms/template/:id", app.SmsController.DeleteSmsTemplateById)
 
 		// generalization
-		adminGroup.POST("/generalization/query/:id", app.GeneralizationController.Query)
 		adminGroup.POST("/generalization/query/code/:code", app.GeneralizationController.QueryByCode)
 		adminGroup.GET("/generalization/detail/code/:code/:id", app.GeneralizationController.DetailByCode)
 		adminGroup.POST("/generalization/create", app.GeneralizationController.Create)

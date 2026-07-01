@@ -1680,7 +1680,6 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/sms/template", "POST"},
 		{"/admin/sms/template/:id", "PUT"},
 		{"/admin/sms/template/:id", "DELETE"},
-		{"/admin/generalization/query/:id", "POST"},
 		{"/admin/generalization/query/code/:code", "POST"},
 		{"/admin/generalization/detail/code/:code/:id", "GET"},
 		{"/admin/generalization/create", "POST"},

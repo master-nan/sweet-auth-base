@@ -156,7 +156,7 @@
               <div>
                 <div class="data-permission-panel-title">权限绑定</div>
                 <div class="data-permission-panel-caption">
-                  给低代码菜单绑定数据维度和表字段，运行时会按角色范围与用户归属合并出最终可见数据。
+                  给受控菜单绑定数据维度和表字段，运行时会按角色范围与用户归属合并出最终可见数据。
                 </div>
               </div>
               <div class="data-permission-panel-actions">
@@ -180,7 +180,7 @@
                 use-input
                 clearable
                 input-debounce="150"
-                label="低代码菜单"
+                label="受控菜单"
                 :options="filteredMenuOptions"
                 @filter="filterMenuOptions"
                 @update:model-value="onMenuChange"
@@ -312,7 +312,7 @@
 
             <div v-else class="data-permission-empty">
               <q-icon name="ads_click" />
-              <span>选择一个低代码菜单</span>
+              <span>选择一个受控菜单</span>
             </div>
           </q-tab-panel>
 
@@ -335,7 +335,7 @@
                 use-input
                 clearable
                 input-debounce="150"
-                label="低代码菜单"
+                label="受控菜单"
                 :options="filteredMenuOptions"
                 @filter="filterMenuOptions"
                 @update:model-value="onMenuChange"
@@ -435,7 +435,7 @@
           <div>
             <div class="text-h6">{{ editingBindingLocalId ? '编辑绑定' : '新增绑定' }}</div>
             <div class="text-caption text-grey-7">
-              {{ selectedMenuDisplayTitle || '低代码菜单' }}
+              {{ selectedMenuDisplayTitle || '受控菜单' }}
             </div>
           </div>
           <q-space />

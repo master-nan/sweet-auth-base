@@ -147,6 +147,8 @@ func (b *BasicRepositoryImpl[T]) Update(tx *gorm.DB, entity interface{}, id int)
 	if err != nil {
 		return err
 	}
+	delete(entityMap, "Basic")
+	delete(entityMap, "basic")
 	query := tx.Model(b.model).Where("id = ?", id).Omit("id")
 	// 是否更新已删除的记录
 	if b.unscoped {

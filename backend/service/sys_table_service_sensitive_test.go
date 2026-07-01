@@ -272,7 +272,7 @@ func TestValidateTableFieldLinkageConfigAllowsValidRelation(t *testing.T) {
 			{FieldCode: "tenant_id"},
 		},
 	}
-	raw := `{"linkage":{"enabled":true,"mode":"relation","tableId":2,"labelKey":"name","valueKey":"id","filterMapping":{"tenant_id":"tenant_id"}}}`
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id","filterMapping":{"tenant_id":"tenant_id"}}}`
 
 	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
@@ -282,7 +282,7 @@ func TestValidateTableFieldLinkageConfigAllowsValidRelation(t *testing.T) {
 	}
 }
 
-func TestNormalizeTableFieldLinkageConfigFillsTableCodeAndPreservesExtras(t *testing.T) {
+func TestNormalizeTableFieldLinkageConfigPreservesTableCodeAndExtras(t *testing.T) {
 	currentTable := model.SysTable{
 		Basic:     model.Basic{Id: 1},
 		TableCode: "orders",
@@ -300,7 +300,7 @@ func TestNormalizeTableFieldLinkageConfigFillsTableCodeAndPreservesExtras(t *tes
 			{FieldCode: "tenant_id"},
 		},
 	}
-	raw := `{"linkage":{"enabled":true,"mode":"relation","tableId":2,"labelKey":"name","valueKey":"id","searchPageSize":80,"targetMenuId":123,"filterMapping":{" tenant_id ":" tenant_id "}},"memo":"keep"}`
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id","searchPageSize":80,"targetMenuId":123,"filterMapping":{" tenant_id ":" tenant_id "}},"memo":"keep"}`
 
 	normalized, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
@@ -382,7 +382,7 @@ func TestValidateTableFieldLinkageConfigRejectsMissingRelatedField(t *testing.T)
 		TableCode:   "customers",
 		TableFields: []model.SysTableField{{FieldCode: "id"}},
 	}
-	raw := `{"linkage":{"enabled":true,"mode":"relation","tableId":2,"labelKey":"name","valueKey":"id"}}`
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id"}}`
 
 	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
@@ -403,7 +403,7 @@ func TestValidateTableFieldLinkageConfigRejectsMissingFilterSourceField(t *testi
 		TableCode:   "customers",
 		TableFields: []model.SysTableField{{FieldCode: "id"}, {FieldCode: "tenant_id"}},
 	}
-	raw := `{"linkage":{"enabled":true,"mode":"relation","tableId":2,"valueKey":"id","filterMapping":{"tenant_id":"project_id"}}}`
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","valueKey":"id","filterMapping":{"tenant_id":"project_id"}}}`
 
 	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
