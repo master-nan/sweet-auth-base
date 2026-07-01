@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm configure-page" scrollable>
+  <base-content class="q-pa-sm configure-page">
     <q-form ref="formRef" class="configure-shell" @submit.prevent="saveConfig">
       <section class="configure-hero">
         <div class="configure-hero__icon">
@@ -716,17 +716,26 @@ const saveConfig = async () => {
 
 <style scoped lang="scss">
 .configure-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   --configure-border: rgba(115, 103, 240, 0.16);
   --configure-muted: #6f7d95;
   --configure-ink: #1f2a44;
 }
 
 .configure-shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
   min-width: 0;
 }
 
 .configure-hero {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 14px;
   min-height: 72px;
@@ -777,11 +786,13 @@ const saveConfig = async () => {
 }
 
 .configure-layout {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 10px;
   margin-top: 10px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .configure-sidebar,
@@ -795,6 +806,8 @@ const saveConfig = async () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
+  overflow: auto;
   padding: 8px;
 }
 
@@ -895,12 +908,15 @@ const saveConfig = async () => {
 
 .configure-main {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .configure-section-head {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -927,6 +943,7 @@ const saveConfig = async () => {
 
 .configure-overview {
   display: grid;
+  flex-shrink: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 8px 16px;
@@ -973,7 +990,9 @@ const saveConfig = async () => {
 }
 
 .configure-panel {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding: 14px;
 }
 
@@ -1184,9 +1203,8 @@ const saveConfig = async () => {
 }
 
 .configure-actions {
-  position: sticky;
-  bottom: 0;
   z-index: 2;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
