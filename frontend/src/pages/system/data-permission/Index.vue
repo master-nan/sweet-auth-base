@@ -1123,9 +1123,10 @@ onMounted(() => {
 
 .data-permission-shell {
   display: flex;
-  min-height: calc(100vh - 150px);
+  min-height: calc(100vh - 162px);
   flex-direction: column;
   gap: 12px;
+  padding-bottom: 12px;
 }
 
 .data-permission-summary {
@@ -1188,8 +1189,8 @@ onMounted(() => {
 }
 
 .data-permission-panels {
-  height: calc(100vh - 250px);
-  min-height: 540px;
+  height: 100%;
+  min-height: 500px;
   background: #f8fafc;
 }
 
