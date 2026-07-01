@@ -1118,12 +1118,17 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .data-permission-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #f6f7fb;
 }
 
 .data-permission-shell {
+  flex: 1 1 auto;
   display: flex;
-  min-height: calc(100vh - 162px);
+  min-height: 0;
+  height: 100%;
   flex-direction: column;
   gap: 12px;
   padding-bottom: 12px;
@@ -1131,6 +1136,7 @@ onMounted(() => {
 
 .data-permission-summary {
   display: grid;
+  flex-shrink: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
@@ -1170,7 +1176,9 @@ onMounted(() => {
 }
 
 .data-permission-workspace {
-  flex: 1;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
   border: 1px solid #e3e8f2;
@@ -1179,6 +1187,7 @@ onMounted(() => {
 }
 
 .data-permission-tabs {
+  flex-shrink: 0;
   min-height: 58px;
   padding: 0 14px;
 }
@@ -1189,8 +1198,9 @@ onMounted(() => {
 }
 
 .data-permission-panels {
-  height: 100%;
-  min-height: 500px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   background: #f8fafc;
 }
 
@@ -1246,7 +1256,15 @@ onMounted(() => {
 
 .data-permission-table,
 .data-permission-binding-table {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.data-permission-table :deep(.q-table__middle),
+.data-permission-binding-table :deep(.q-table__middle) {
+  flex: 1 1 auto;
   min-height: 0;
 }
 
