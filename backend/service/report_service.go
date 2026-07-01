@@ -184,9 +184,10 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
+	columns := reportPreviewColumnsFromConfig(sourceTable, report.QueryConfig)
 	preview := response.ReportPreviewRes{
-		Columns: reportPreviewColumns(sourceTable),
-		Rows:    result.Data,
+		Columns: columns,
+		Rows:    filterReportRows(result.Data, columns),
 		Total:   result.Total,
 		Meta: response.ReportPreviewMeta{
 			ReportId:    report.Id,
@@ -265,28 +266,22 @@ func (s *ReportService) resolveReportTables(report model.ReportDefinition) (mode
 	}
 	permissionTable := sourceTable
 	if strings.TrimSpace(report.PermissionTableCode) != "" && report.PermissionTableCode != sourceTable.TableCode {
-		permissionTable, err = s.sysTableService.GetTableByTableCode(strings.TrimSpace(report.PermissionTableCode))
-		if err != nil {
-			return model.SysTable{}, model.SysTable{}, err
-		}
-		if permissionTable.Id == 0 {
-			return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表权限表不存在")
-		}
+		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表权限表暂仅支持与数据源表一致")
 	}
 	return sourceTable, permissionTable, nil
 }
 
 func (s *ReportService) injectReportDataScope(ctx *gin.Context, query *request.Basic, permissionTable model.SysTable) error {
 	if s.dataPermissionService == nil || query == nil {
-		return nil
+		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
 	}
 	value, exists := ctx.Get("user")
 	if !exists {
-		return nil
+		return myerrors.NewBadRequestError("报表运行缺少当前用户上下文")
 	}
 	user, ok := value.(model.SysUser)
 	if !ok {
-		return nil
+		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
 	}
 	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, query.MenuId, permissionTable, enum.ButtonActionQuery)
 	if err != nil {
@@ -353,6 +348,66 @@ func reportPreviewColumns(table model.SysTable) []response.ReportPreviewColumn {
 		})
 	}
 	return columns
+}
+
+func reportPreviewColumnsFromConfig(table model.SysTable, raw datatypes.JSON) []response.ReportPreviewColumn {
+	type fieldConfig struct {
+		Name string `json:"name"`
+		Code string `json:"code"`
+		Type string `json:"type"`
+	}
+	var config struct {
+		Fields []fieldConfig `json:"fields"`
+	}
+	allColumns := reportPreviewColumns(table)
+	if len(raw) == 0 || json.Unmarshal(raw, &config) != nil || len(config.Fields) == 0 {
+		return allColumns
+	}
+	columnByField := make(map[string]response.ReportPreviewColumn, len(allColumns))
+	for _, column := range allColumns {
+		columnByField[column.Field] = column
+	}
+	columns := make([]response.ReportPreviewColumn, 0, len(config.Fields))
+	for _, item := range config.Fields {
+		code := strings.TrimSpace(item.Code)
+		if code == "" {
+			continue
+		}
+		column, ok := columnByField[code]
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(item.Name) != "" {
+			column.Label = strings.TrimSpace(item.Name)
+			column.Name = column.Label
+		}
+		if strings.TrimSpace(item.Type) != "" {
+			column.Type = strings.TrimSpace(item.Type)
+		}
+		columns = append(columns, column)
+	}
+	if len(columns) == 0 {
+		return allColumns
+	}
+	return columns
+}
+
+func filterReportRows(rows []map[string]interface{}, columns []response.ReportPreviewColumn) []map[string]interface{} {
+	if len(rows) == 0 || len(columns) == 0 {
+		return rows
+	}
+	filtered := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		item := make(map[string]interface{}, len(columns)+1)
+		if value, ok := row["id"]; ok {
+			item["id"] = value
+		}
+		for _, column := range columns {
+			item[column.Field] = row[column.Field]
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 func reportTableTypeLabel(tableType enum.SysTableType) string {

@@ -406,15 +406,9 @@ func ExecuteQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) *gorm
 	if basic.QuickQuery == nil {
 		basic.QuickQuery = &request.QuickQuery{}
 	}
-	// 构建基本查询
-	var query *gorm.DB
-
-	// 如果存在关键字，则进行快速搜索
+	query := buildQuery(db, basic, table)
 	if basic.QuickQuery != nil && basic.QuickQuery.Keyword != "" {
-		query = buildKeywordQuery(db, basic.QuickQuery.Keyword, table)
-	} else {
-		// 没有关键字时使用常规查询
-		query = buildQuery(db, basic, table)
+		query = buildKeywordQuery(query, basic.QuickQuery.Keyword, table)
 	}
 
 	// 应用排序和分页

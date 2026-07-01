@@ -986,9 +986,32 @@ func seedReportDefinitions(db *gorm.DB, sf *utils.Snowflake) error {
 		SourceType:          "table",
 		SourceCode:          "access_log",
 		PermissionTableCode: "access_log",
-		QueryConfig:         datatypes.JSON([]byte(`{"fields":[{"name":"时间","code":"gmt_create","type":"datetime"},{"name":"用户","code":"user_name","type":"string"},{"name":"方法","code":"method","type":"string"},{"name":"路径","code":"url","type":"string"},{"name":"状态码","code":"status_code","type":"number"},{"name":"结果","code":"success","type":"boolean"}]}`)),
-		LayoutConfig:        datatypes.JSON([]byte(`{"view":"table"}`)),
-		Remark:              "系统初始化示例",
+		QueryConfig: datatypes.JSON([]byte(`{
+			"fields":[
+				{"name":"用户","code":"user_name","type":"string","role":"dimension"},
+				{"name":"方法","code":"method","type":"string","role":"dimension"},
+				{"name":"路径","code":"url","type":"string","role":"dimension"},
+				{"name":"状态码","code":"status_code","type":"number","role":"metric","aggregate":"count"},
+				{"name":"结果","code":"success","type":"boolean","role":"dimension"}
+			],
+			"parameters":[
+				{"id":"param_keyword","label":"关键字","field":"url","type":"text","operator":"like","placeholder":"输入路径或用户关键字"}
+			]
+		}`)),
+		LayoutConfig: datatypes.JSON([]byte(`{
+			"view":"sheet",
+			"title":"访问日志概览",
+			"subtitle":"按当前账号权限范围查看系统访问记录",
+			"kind":"detail",
+			"parameters":[
+				{"id":"param_keyword","label":"关键字","field":"url","type":"text","operator":"like","placeholder":"输入路径或用户关键字"}
+			],
+			"widgets":[
+				{"id":"widget_table","type":"table","title":"访问日志明细","fields":["user_name","method","url","status_code","success"],"options":{"height":320}},
+				{"id":"widget_metric","type":"metric","title":"访问次数","fields":["status_code"],"options":{"aggregate":"count"}}
+			]
+		}`)),
+		Remark: "系统初始化示例",
 	}
 	var existing model.ReportDefinition
 	err := db.Where("code = ?", seed.Code).First(&existing).Error
