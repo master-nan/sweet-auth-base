@@ -84,7 +84,7 @@
 
           <div class="section-title">使用说明</div>
           <div class="flow-list">
-            <div class="flow-step"><b>1</b><span>选择目录或搜索报表</span></div>
+            <div class="flow-step"><b>1</b><span>选择分类或搜索报表</span></div>
             <div class="flow-step"><b>2</b><span>运行报表并输入查询参数</span></div>
             <div class="flow-step"><b>3</b><span>导出当前结果为 CSV</span></div>
           </div>
