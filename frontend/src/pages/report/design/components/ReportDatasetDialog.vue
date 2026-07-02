@@ -68,6 +68,12 @@
             />
             <span>根据 SQL 结果列自动生成字段，避免手工维护字段编码。</span>
           </div>
+          <q-banner v-if="draft.type === 'sql'" dense rounded class="sql-note">
+            <template #avatar>
+              <q-icon name="verified" color="primary" />
+            </template>
+            SQL 数据集保存前必须生成字段；接口无权限时，请在角色授权中勾选报表的“SQL字段解析”接口。
+          </q-banner>
           <q-expansion-item
             v-if="draft.type === 'sql'"
             dense
@@ -96,11 +102,13 @@
             flat
             bordered
             dense
+            class="field-preview-table"
             row-key="code"
             separator="cell"
             :rows="previewFields"
             :columns="fieldColumns"
-            :pagination="{ rowsPerPage: 10 }"
+            :pagination="{ rowsPerPage: 0 }"
+            hide-pagination
           />
         </div>
       </q-card-section>
@@ -229,10 +237,22 @@ const fieldColumns = computed<QTableProps['columns']>(() => [
   font-size: 12px;
 }
 
+.sql-note {
+  grid-column: 1 / -1;
+  color: #50607a;
+  background: #f5f7ff;
+  border: 1px solid #dfe5ff;
+}
+
 .field-preview {
   min-height: 0;
   display: grid;
   gap: 10px;
+}
+
+.field-preview-table {
+  max-height: 300px;
+  overflow: auto;
 }
 
 .preview-head {

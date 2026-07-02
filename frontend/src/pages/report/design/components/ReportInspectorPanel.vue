@@ -34,9 +34,9 @@
             dense
             outlined
             emit-value
-              map-options
-              label="绑定类型"
-              :options="bindingTypeOptions"
+            map-options
+            label="绑定类型"
+            :options="bindingTypeOptions"
             @update:model-value="emitBindingType"
           />
           <q-select
@@ -169,6 +169,20 @@
             readonly
             label="运行主表"
           />
+          <q-select
+            :model-value="reportKind"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="模板模式"
+            :options="reportKindOptions"
+            @update:model-value="emitReportKind"
+          >
+            <q-tooltip>
+              明细模板适合逐行展开数据，汇总模板适合固定汇总行。
+            </q-tooltip>
+          </q-select>
           <div class="runtime-grid">
             <q-select
               :model-value="runtimeDisplay"
@@ -210,6 +224,7 @@ import type {
   ReportCellStyle,
   ReportDataset,
   ReportDatasetJoin,
+  ReportKind,
   ReportRuntimeDisplayMode,
 } from 'src/api/services/report'
 
@@ -238,6 +253,8 @@ const props = defineProps<{
   datasetJoins: ReportDatasetJoin[]
   category: string
   description: string
+  reportKind: ReportKind
+  reportKindOptions: Array<Option<ReportKind>>
   runtimeDisplay: ReportRuntimeDisplayMode
   runtimePageSize: number
   runtimeDisplayOptions: Array<Option<ReportRuntimeDisplayMode>>
@@ -258,6 +275,7 @@ const emit = defineEmits<{
   removeJoin: [id: string]
   'update:category': [value: string]
   'update:description': [value: string]
+  'update:reportKind': [value: ReportKind]
   'update:runtimeDisplay': [value: ReportRuntimeDisplayMode]
   'update:runtimePageSize': [value: number]
 }>()
@@ -282,6 +300,12 @@ function emitBindingType(value: unknown) {
 function emitCellAlign(value: unknown) {
   if (value === 'left' || value === 'center' || value === 'right') {
     emit('update:cellAlign', value)
+  }
+}
+
+function emitReportKind(value: unknown) {
+  if (value === 'detail' || value === 'summary') {
+    emit('update:reportKind', value)
   }
 }
 

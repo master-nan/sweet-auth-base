@@ -27,20 +27,6 @@
         label="报表编码"
         @update:model-value="$emit('update:reportCode', String($event || ''))"
       />
-      <q-select
-        :model-value="reportKind"
-        dense
-        outlined
-        emit-value
-        map-options
-        label="模板模式"
-        :options="kindOptions"
-        @update:model-value="updateReportKind"
-      >
-        <q-tooltip>
-          明细模板按数据逐行展开，汇总模板优先使用汇总行。
-        </q-tooltip>
-      </q-select>
     </div>
 
     <div class="topbar-actions">
@@ -68,21 +54,16 @@
 </template>
 
 <script setup lang="ts">
-import type { ReportKind } from 'src/api/services/report'
-
 defineProps<{
   reportName: string
   reportCode: string
-  reportKind: ReportKind
   primarySourceCode: string | undefined
   saving: boolean
-  kindOptions: Array<{ label: string; value: ReportKind; disable?: boolean }>
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   'update:reportName': [value: string]
   'update:reportCode': [value: string]
-  'update:reportKind': [value: ReportKind]
   back: []
   addParameter: []
   preview: []
@@ -90,12 +71,6 @@ const emit = defineEmits<{
   saveDraft: []
   publish: []
 }>()
-
-function updateReportKind(value: unknown) {
-  if (value === 'detail' || value === 'summary') {
-    emit('update:reportKind', value)
-  }
-}
 </script>
 
 <style scoped lang="scss">
@@ -134,7 +109,7 @@ function updateReportKind(value: unknown) {
 
 .meta-editor {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(150px, 0.8fr) 140px;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.9fr);
   gap: 8px;
 }
 
