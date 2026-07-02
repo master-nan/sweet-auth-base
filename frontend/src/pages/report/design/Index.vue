@@ -29,6 +29,7 @@
         @edit-dataset="openDatasetDialog"
         @remove-dataset="removeDataset"
         @start-drag-field="startDragField"
+        @end-drag-field="draggingField = null"
         @bind-field="bindFieldToActiveCell"
         @add-parameter="addParameter"
         @select-parameter="selectedParameterId = $event"
@@ -44,6 +45,7 @@
         :scale="sheet.scale || 0.85"
         :datasets="datasets"
         :dataset-joins="datasetJoins"
+        :field-dragging="!!draggingField"
         @toggle-bold="toggleBold"
         @set-align="setAlign"
         @merge-right="mergeRight"
@@ -1260,7 +1262,7 @@ function applyReportKind(kind: ReportKind) {
 }
 
 function buildLocalPreview() {
-  previewData.value = buildReportLocalPreview(usedFields.value)
+  previewData.value = buildReportLocalPreview(datasets.value, sheet.value)
 }
 
 async function preview() {

@@ -93,6 +93,26 @@ export const reportRuntimeCellValue = (
   return ''
 }
 
+const reportBoundFields = (
+  datasets: ReportDataset[],
+  sheet: ReportSheetConfig,
+) => {
+  const fields: Array<{ dataset: ReportDataset; field: ReportField }> = []
+  const seen = new Set<string>()
+  sheet.cells.forEach((cell) => {
+    const binding = cell.binding
+    if (!binding?.dataset_id || !binding.field || binding.type === 'static') return
+    const dataset = datasets.find((item) => item.id === binding.dataset_id)
+    const field = dataset?.fields.find((item) => item.code === binding.field)
+    if (!dataset || !field) return
+    const key = `${dataset.id}:${field.code}`
+    if (seen.has(key)) return
+    seen.add(key)
+    fields.push({ dataset, field })
+  })
+  return fields
+}
+
 export const reportSheetCellAt = (
   sheet: ReportSheetConfig,
   row: number,
@@ -214,16 +234,32 @@ export const reportSampleCellValue = (
   return `${field.name}${rowIndex}`
 }
 
-export const buildReportLocalPreview = (fields: ReportField[]): ReportPreviewRes => ({
-  columns: fields,
-  rows: [1, 2, 3].map((id) => {
-    const row: Record<string, unknown> = { id }
-    fields.forEach((field, index) => {
-      row[field.code] = reportSampleCellValue(field, id, index)
-    })
-    return row
-  }),
-  total: 3,
-})
+export const buildReportLocalPreview = (
+  datasets: ReportDataset[],
+  sheet: ReportSheetConfig,
+): ReportPreviewRes => {
+  const boundFields = reportBoundFields(datasets, sheet)
+  const fallbackDataset = datasets.find((item) => item.primary) || datasets[0]
+  const fallbackFields =
+    boundFields.length || !fallbackDataset
+      ? boundFields
+      : fallbackDataset.fields.slice(0, 6).map((field) => ({ dataset: fallbackDataset, field }))
+
+  return {
+    columns: fallbackFields.map((item) => item.field),
+    datasets,
+    rows: [1, 2, 3].map((id) => {
+      const row: Record<string, unknown> = { id }
+      fallbackFields.forEach(({ dataset, field }, index) => {
+        const value = reportSampleCellValue(field, id, index)
+        row[reportRuntimeColumnAlias(dataset.id, field.code)] = value
+        row[reportRuntimeColumnAlias(dataset.source_code, field.code)] = value
+        row[field.code] = value
+      })
+      return row
+    }),
+    total: 3,
+  }
+}
 
 export const reportCellId = makeReportCellId

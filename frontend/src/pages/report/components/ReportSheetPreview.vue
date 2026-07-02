@@ -93,6 +93,21 @@ const detailRows = computed(() => {
   return [...rows].sort((a, b) => a - b)
 })
 
+const configuredRows = computed(() => {
+  const rows = new Set<number>()
+  props.sheet.cells.forEach((cell) => {
+    if (
+      cell.value ||
+      cell.binding?.field ||
+      (cell.colspan && cell.colspan > 1) ||
+      (cell.rowspan && cell.rowspan > 1)
+    ) {
+      rows.add(cell.row)
+    }
+  })
+  return [...rows].sort((a, b) => a - b)
+})
+
 const detailRowGroups = computed(() => {
   const groups: number[][] = []
   detailRows.value.forEach((row) => {
@@ -114,7 +129,9 @@ const renderPlan = computed(() => {
   const dataRows = props.previewData.rows || []
   let renderRow = 1
 
-  for (let sourceRow = usedBounds.value.minRow; sourceRow <= usedBounds.value.maxRow; sourceRow += 1) {
+  const sourceRows = configuredRows.value.length ? configuredRows.value : [usedBounds.value.minRow]
+  for (let index = 0; index < sourceRows.length; index += 1) {
+    const sourceRow = sourceRows[index]!
     const detailGroup = groupByStart.get(sourceRow)
     if (detailGroup && props.reportKind === 'detail') {
       const repeatedRows = dataRows.length ? dataRows : [undefined]
@@ -129,7 +146,7 @@ const renderPlan = computed(() => {
           renderRow += 1
         })
       })
-      sourceRow = detailGroup[detailGroup.length - 1] || sourceRow
+      index += Math.max(detailGroup.length - 1, 0)
       continue
     }
     if (props.reportKind === 'detail' && rowsInDetailGroup.has(sourceRow)) continue

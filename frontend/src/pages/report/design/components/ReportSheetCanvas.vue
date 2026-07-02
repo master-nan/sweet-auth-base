@@ -97,6 +97,7 @@
                 selected: renderCell.selected,
                 bound: renderCell.bound,
                 summary: renderCell.summary,
+                'drop-target': dragOverCellId === renderCell.id,
               }"
               :style="renderCell.style"
               :data-cell-id="renderCell.id"
@@ -105,8 +106,10 @@
               @click="handleCellClick(renderCell.row, renderCell.col, $event)"
               @dblclick.stop="startEdit(renderCell.row, renderCell.col)"
               @keydown.enter.prevent="startEdit(renderCell.row, renderCell.col)"
-              @dragover.prevent
-              @drop.prevent="$emit('dropField', renderCell.row, renderCell.col)"
+              @dragenter.prevent="handleDragEnter(renderCell.id)"
+              @dragover.prevent="handleDragEnter(renderCell.id)"
+              @dragleave="handleDragLeave(renderCell.id)"
+              @drop.prevent="handleDrop(renderCell.row, renderCell.col)"
               @contextmenu.prevent.stop="openContextMenu(renderCell.row, renderCell.col, $event)"
             >
               <input
@@ -193,6 +196,7 @@ const props = defineProps<{
   scale: number
   datasets: ReportDataset[]
   datasetJoins: ReportDatasetJoin[]
+  fieldDragging: boolean
 }>()
 
 const emit = defineEmits<{
@@ -222,6 +226,7 @@ const emit = defineEmits<{
 const editingCellId = ref('')
 const editingValue = ref('')
 const sheetScrollRef = ref<HTMLElement | null>(null)
+const dragOverCellId = ref('')
 const contextMenu = reactive({
   visible: false,
   row: 1,
@@ -379,6 +384,20 @@ function cancelEdit() {
   editingCellId.value = ''
 }
 
+function handleDragEnter(cellId: string) {
+  if (!props.fieldDragging) return
+  dragOverCellId.value = cellId
+}
+
+function handleDragLeave(cellId: string) {
+  if (dragOverCellId.value === cellId) dragOverCellId.value = ''
+}
+
+function handleDrop(row: number, col: number) {
+  dragOverCellId.value = ''
+  emit('dropField', row, col)
+}
+
 function isSummaryRow(row: number) {
   return summaryRows.value.has(row)
 }
@@ -534,6 +553,28 @@ function joinLabel(join: ReportDatasetJoin) {
 
 .sheet-cell.bound {
   background: #fbfaff;
+}
+
+.sheet-cell.drop-target {
+  position: relative;
+  z-index: 2;
+  outline: 2px dashed var(--q-primary);
+  outline-offset: -4px;
+  background: #f4f1ff;
+}
+
+.sheet-cell.drop-target::after {
+  content: '放到这里';
+  position: absolute;
+  right: 8px;
+  bottom: 5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--q-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .sheet-cell.selected {

@@ -59,6 +59,7 @@
               class="field-row"
               draggable="true"
               @dragstart="$emit('startDragField', dataset, field)"
+              @dragend="$emit('endDragField')"
               @click.stop="$emit('bindField', dataset, field)"
             >
               <q-icon :name="reportFieldIcon(field)" />
@@ -131,6 +132,7 @@ defineEmits<{
   editDataset: [id: string]
   removeDataset: [id: string]
   startDragField: [dataset: ReportDataset, field: ReportField]
+  endDragField: []
   bindField: [dataset: ReportDataset, field: ReportField]
   addParameter: []
   selectParameter: [id: string]
