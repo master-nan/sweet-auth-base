@@ -14,6 +14,7 @@ type ReportDefinition struct {
 	Name                string         `gorm:"size:128;comment:报表名称" json:"name"`
 	Description         string         `gorm:"size:512;comment:报表说明" json:"description"`
 	Category            string         `gorm:"size:128;comment:报表分类" json:"category"`
+	Status              string         `gorm:"size:32;default:draft;index:idx_report_definition_status;comment:报表状态（draft:草稿,published:已发布,disabled:已停用）" json:"status"`
 	SourceType          string         `gorm:"size:32;default:table;comment:数据源类型" json:"source_type"`
 	SourceCode          string         `gorm:"size:128;index:idx_report_definition_source;comment:数据源表/视图编码" json:"source_code"`
 	PermissionMenuId    int            `gorm:"comment:数据权限菜单ID" json:"permission_menu_id"`

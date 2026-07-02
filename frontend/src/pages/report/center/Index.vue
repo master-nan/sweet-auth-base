@@ -9,6 +9,15 @@
           </div>
         </div>
         <div class="report-head-actions">
+          <q-btn-toggle
+            v-model="viewMode"
+            dense
+            unelevated
+            toggle-color="primary"
+            color="white"
+            text-color="primary"
+            :options="viewModeOptions"
+          />
           <q-input
             v-model="query.quick_query!.keyword"
             dense
@@ -23,7 +32,13 @@
               <q-icon name="search" />
             </template>
           </q-input>
-          <q-btn color="primary" icon="add" label="新建报表" @click="openDesigner()" />
+          <q-btn
+            v-if="viewMode === 'manage'"
+            color="primary"
+            icon="add"
+            label="新建报表"
+            @click="openDesigner()"
+          />
           <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
         </div>
       </section>
@@ -65,7 +80,7 @@
           <button
             class="category-item"
             :class="{ active: activeCategory === '' }"
-            @click="activeCategory = ''"
+            @click="selectCategory('')"
           >
             <span>全部报表</span>
             <q-badge color="primary" outline>{{ rows.length }}</q-badge>
@@ -75,7 +90,7 @@
             :key="category.name"
             class="category-item"
             :class="{ active: activeCategory === category.name }"
-            @click="activeCategory = category.name"
+            @click="selectCategory(category.name)"
           >
             <span>{{ category.name }}</span>
             <q-badge color="primary" outline>{{ category.count }}</q-badge>
@@ -95,12 +110,17 @@
         <section class="report-list-panel">
           <div class="list-head">
             <div>
-              <div class="section-title">常用报表</div>
+              <div class="section-title">{{ viewMode === 'runtime' ? '报表目录' : '报表管理' }}</div>
               <div class="report-caption">
-                运行页只面向使用者，设计和发布由管理员进入设计器维护。
+                {{
+                  viewMode === 'runtime'
+                    ? '只展示已发布并可运行的报表。'
+                    : '维护草稿、发布和停用状态，设计配置在设计器中处理。'
+                }}
               </div>
             </div>
             <q-select
+              v-if="viewMode === 'manage'"
               v-model="statusFilter"
               dense
               outlined
@@ -122,8 +142,7 @@
             :columns="columns"
             :loading="loading"
             v-model:pagination="pagination"
-            :rows-per-page-options="[10, 20, 50]"
-            @request="onTableRequest"
+            hide-pagination
           >
             <template #body-cell-report_name="props">
               <q-td :props="props">
@@ -166,6 +185,7 @@
               <q-td :props="props">
                 <div class="row no-wrap justify-center q-gutter-xs">
                   <q-btn
+                    v-if="props.row.status === 'published'"
                     flat
                     size="sm"
                     round
@@ -176,6 +196,7 @@
                     <q-tooltip>运行</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="viewMode === 'manage'"
                     flat
                     size="sm"
                     round
@@ -186,6 +207,7 @@
                     <q-tooltip>设计</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="viewMode === 'manage'"
                     flat
                     size="sm"
                     round
@@ -196,6 +218,29 @@
                     <q-tooltip>复制</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="viewMode === 'manage' && props.row.status !== 'published'"
+                    flat
+                    size="sm"
+                    round
+                    color="positive"
+                    icon="publish"
+                    @click="changeReportStatus(props.row, 'published')"
+                  >
+                    <q-tooltip>发布</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="viewMode === 'manage' && props.row.status === 'published'"
+                    flat
+                    size="sm"
+                    round
+                    color="warning"
+                    icon="pause_circle"
+                    @click="changeReportStatus(props.row, 'disabled')"
+                  >
+                    <q-tooltip>停用</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="viewMode === 'manage'"
                     flat
                     size="sm"
                     round
@@ -211,8 +256,12 @@
             <template #no-data>
               <div class="empty-state">
                 <q-icon name="assignment_late" size="36px" />
-                <span>暂无报表，点击右上角新建报表开始配置。</span>
+                <span>{{ emptyText }}</span>
               </div>
+            </template>
+            <template #bottom>
+              <q-space />
+              <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
             </template>
           </q-table>
         </section>
@@ -354,8 +403,9 @@
 defineOptions({ name: 'report_center' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
+import TablePagination from 'components/Table/TablePagination.vue'
 import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
 import type { Query } from 'src/types/global'
@@ -382,7 +432,7 @@ const { loading } = storeToRefs(loadingStore)
 
 const query = ref<Query>({
   page: 1,
-  num: 20,
+  num: 15,
   order: { field: 'gmt_modify', is_asc: false },
   expressions: [],
   quick_query: { keyword: '' },
@@ -391,15 +441,17 @@ const query = ref<Query>({
 
 const pagination = ref({
   page: 1,
-  rowsPerPage: 20,
+  rowsPerPage: 0,
   rowsNumber: 0,
   sortBy: 'gmt_modify',
   descending: true,
 })
 
 const rows = ref<Report[]>([])
+const total = ref(0)
 const activeCategory = ref('')
 const statusFilter = ref<'all' | ReportStatus>('all')
+const viewMode = ref<'runtime' | 'manage'>('runtime')
 const dataSourceCount = ref(0)
 const runtimeVisible = ref(false)
 const runtimeReport = ref<Report | null>(null)
@@ -420,21 +472,16 @@ const runtimePageSizeOptions = [
   { label: '100 / 页', value: 100 },
 ]
 
-type TableRequest = {
-  pagination: {
-    page: number
-    rowsPerPage: number
-    rowsNumber?: number
-    sortBy?: string
-    descending?: boolean
-  }
-}
-
 const statusOptions = [
   { label: '全部状态', value: 'all' },
   { label: '已发布', value: 'published' },
   { label: '草稿', value: 'draft' },
-  { label: '已归档', value: 'archived' },
+  { label: '已停用', value: 'disabled' },
+]
+
+const viewModeOptions = [
+  { label: '报表目录', value: 'runtime' },
+  { label: '报表管理', value: 'manage' },
 ]
 
 const columns = computed<QTableProps['columns']>(() => [
@@ -462,20 +509,13 @@ const categories = computed(() => {
   return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
 })
 
-const filteredRows = computed(() => {
-  const keyword = query.value.quick_query?.keyword?.trim().toLowerCase() || ''
-  return rows.value.filter((item) => {
-    const matchCategory =
-      !activeCategory.value || (item.category || '未分类') === activeCategory.value
-    const matchStatus = statusFilter.value === 'all' || item.status === statusFilter.value
-    const matchKeyword =
-      !keyword ||
-      [item.report_name, item.report_code, item.category, item.data_source_name]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword))
-    return matchCategory && matchStatus && matchKeyword
-  })
-})
+const filteredRows = computed(() => rows.value)
+
+const emptyText = computed(() =>
+  viewMode.value === 'runtime'
+    ? '暂无可运行报表，请先在报表管理中发布。'
+    : '暂无报表，点击右上角新建报表开始配置。',
+)
 
 const publishedCount = computed(
   () => rows.value.filter((item) => item.status === 'published').length,
@@ -524,22 +564,50 @@ onMounted(() => {
 })
 
 function handleSearch() {
-  pagination.value.page = 1
-  void fetchData()
+  resetToFirstPageOrFetch()
 }
 
 async function fetchData() {
   try {
-    query.value.page = pagination.value.page
-    query.value.num = pagination.value.rowsPerPage
+    query.value.filters = buildListFilters()
     const res = await reportApi.queryReports(query.value)
     rows.value = res.data || []
-    pagination.value.rowsNumber = res.total ?? rows.value.length
+    total.value = res.total ?? rows.value.length
+    pagination.value.page = query.value.page
+    pagination.value.rowsNumber = total.value
   } catch {
     rows.value = []
+    total.value = 0
     pagination.value.rowsNumber = 0
     $q.notify({ type: 'negative', message: '报表列表加载失败，请检查后端服务或接口权限' })
   }
+}
+
+function buildListFilters() {
+  const filters: Record<string, string> = {}
+  const status =
+    viewMode.value === 'runtime'
+      ? 'published'
+      : statusFilter.value === 'all'
+        ? ''
+        : statusFilter.value
+  if (status) filters.status = status
+  if (activeCategory.value) filters.category = activeCategory.value
+  return filters
+}
+
+function selectCategory(category: string) {
+  if (activeCategory.value === category) return
+  activeCategory.value = category
+  resetToFirstPageOrFetch()
+}
+
+function resetToFirstPageOrFetch() {
+  if (query.value.page !== 1) {
+    query.value.page = 1
+    return
+  }
+  void fetchData()
 }
 
 async function loadDataSources() {
@@ -550,11 +618,6 @@ async function loadDataSources() {
     dataSourceCount.value = 0
     $q.notify({ type: 'warning', message: '数据集列表加载失败，设计器可能无法选择数据源' })
   }
-}
-
-function onTableRequest(props: TableRequest) {
-  pagination.value = { ...pagination.value, ...props.pagination }
-  void fetchData()
 }
 
 function openDesigner(row?: Report) {
@@ -713,6 +776,29 @@ async function copyReport(row: Report) {
   }
 }
 
+async function changeReportStatus(row: Report, status: ReportStatus) {
+  const actionText = status === 'published' ? '发布' : '停用'
+  const confirmed = await new Promise<boolean>((resolve) => {
+    $q.dialog({
+      title: `${actionText}报表`,
+      message: `确认${actionText}「${row.report_name}」吗？`,
+      cancel: true,
+      persistent: true,
+    })
+      .onOk(() => resolve(true))
+      .onCancel(() => resolve(false))
+      .onDismiss(() => resolve(false))
+  })
+  if (!confirmed) return
+  try {
+    await reportApi.updateReportStatus(row.id, status)
+    $q.notify({ type: 'positive', message: `报表已${actionText}` })
+    await fetchData()
+  } catch {
+    $q.notify({ type: 'negative', message: `${actionText}失败` })
+  }
+}
+
 async function deleteReport(row: Report) {
   const confirmed = await new Promise<boolean>((resolve) => {
     $q.dialog({
@@ -759,7 +845,7 @@ function statusLabel(status: ReportStatus) {
   const map: Record<ReportStatus, string> = {
     draft: '草稿',
     published: '已发布',
-    archived: '已归档',
+    disabled: '已停用',
   }
   return map[status] || '草稿'
 }
@@ -768,10 +854,26 @@ function statusColor(status: ReportStatus) {
   const map: Record<ReportStatus, string> = {
     draft: 'grey-7',
     published: 'positive',
-    archived: 'warning',
+    disabled: 'warning',
   }
   return map[status] || 'grey-7'
 }
+
+watch(
+  () => [query.value.page, query.value.num] as const,
+  ([page]) => {
+    pagination.value.page = page
+    void fetchData()
+  },
+)
+
+watch(
+  () => [viewMode.value, statusFilter.value] as const,
+  () => {
+    activeCategory.value = ''
+    resetToFirstPageOrFetch()
+  },
+)
 </script>
 
 <style scoped lang="scss">

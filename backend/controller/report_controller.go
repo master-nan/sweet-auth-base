@@ -147,6 +147,27 @@ func (r *ReportController) DeleteReportDefinitionById(ctx *gin.Context) {
 	}
 }
 
+func (r *ReportController) UpdateReportDefinitionStatus(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportStatusUpdateReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportStatusUpdateReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := r.reportService.UpdateReportDefinitionStatus(ctx, id, data.Status); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(id)
+}
+
 func (r *ReportController) PreviewReport(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

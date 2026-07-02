@@ -27,6 +27,9 @@ import (
 const (
 	reportSourceTypeTable = "table"
 	reportSourceTypeView  = "view"
+	reportStatusDraft     = "draft"
+	reportStatusPublished = "published"
+	reportStatusDisabled  = "disabled"
 )
 
 var reportSQLForbiddenPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|replace|call|execute|exec|copy|vacuum|reindex|attach|detach|pragma)\b`)
@@ -162,6 +165,7 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 		"name":                  report.Name,
 		"description":           report.Description,
 		"category":              report.Category,
+		"status":                report.Status,
 		"source_type":           report.SourceType,
 		"source_code":           report.SourceCode,
 		"permission_menu_id":    report.PermissionMenuId,
@@ -175,6 +179,17 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 
 func (s *ReportService) DeleteReportDefinitionById(ctx *gin.Context, id int) error {
 	return s.reportRepo.DeleteById(s.reportRepo.DBWithContext(ctx), id)
+}
+
+func (s *ReportService) UpdateReportDefinitionStatus(ctx *gin.Context, id int, status string) error {
+	status = normalizeReportStatus(status)
+	if id <= 0 || !isValidReportStatus(status) {
+		return myerrors.ErrParamInvalid
+	}
+	return s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", id).Updates(map[string]any{
+		"status":     status,
+		"gmt_modify": model.Now(),
+	}).Error
 }
 
 func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
@@ -289,7 +304,11 @@ func (s *ReportService) reportFromCreateReq(req request.ReportDefinitionCreateRe
 	report.SourceType = strings.TrimSpace(req.SourceType)
 	report.SourceCode = strings.TrimSpace(req.SourceCode)
 	report.PermissionTableCode = strings.TrimSpace(req.PermissionTableCode)
+	report.Status = normalizeReportStatus(req.Status)
 	if report.Code == "" || report.Name == "" {
+		return report, myerrors.ErrParamInvalid
+	}
+	if !isValidReportStatus(report.Status) {
 		return report, myerrors.ErrParamInvalid
 	}
 	if len(report.QueryConfig) == 0 {
@@ -315,7 +334,11 @@ func (s *ReportService) reportFromUpdateReq(req request.ReportDefinitionUpdateRe
 	report.SourceType = strings.TrimSpace(req.SourceType)
 	report.SourceCode = strings.TrimSpace(req.SourceCode)
 	report.PermissionTableCode = strings.TrimSpace(req.PermissionTableCode)
+	report.Status = normalizeReportStatus(req.Status)
 	if req.Id <= 0 || report.Code == "" || report.Name == "" {
+		return report, myerrors.ErrParamInvalid
+	}
+	if !isValidReportStatus(report.Status) {
 		return report, myerrors.ErrParamInvalid
 	}
 	if len(report.QueryConfig) == 0 {
@@ -328,6 +351,23 @@ func (s *ReportService) reportFromUpdateReq(req request.ReportDefinitionUpdateRe
 		return report, err
 	}
 	return report, s.validateReportTables(report)
+}
+
+func normalizeReportStatus(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		return reportStatusDraft
+	}
+	return status
+}
+
+func isValidReportStatus(status string) bool {
+	switch status {
+	case reportStatusDraft, reportStatusPublished, reportStatusDisabled:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *ReportService) applyReportPrimaryDataset(report *model.ReportDefinition) error {

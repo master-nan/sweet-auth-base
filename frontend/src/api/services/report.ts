@@ -58,6 +58,7 @@ interface BackendReport extends Basic {
   code: string
   name: string
   category?: string
+  status?: string
   description?: string
   source_type: string
   source_code: string
@@ -184,10 +185,15 @@ const toReport = (item: BackendReport): Report => {
       dataset_joins: item.query_config?.dataset_joins || layout.dataset_joins || [],
       parameters: item.query_config?.parameters || layout.parameters || [],
     },
-    status: item.state === false ? 'archived' : item.remark === 'draft' ? 'draft' : 'published',
+    status: normalizeReportStatus(item.status || (item.remark === 'draft' ? 'draft' : 'published')),
     owner: item.modify_user_name || item.create_user_name || '',
     updated_at: item.gmt_modify || '',
   }
+}
+
+const normalizeReportStatus = (status: string): Report['status'] => {
+  if (status === 'published' || status === 'disabled') return status
+  return 'draft'
 }
 
 const toBackendReport = (req: ReportSaveReq) => {
@@ -212,6 +218,7 @@ const toBackendReport = (req: ReportSaveReq) => {
     code: req.report_code,
     name: req.report_name,
     category: req.category || '',
+    status: req.status || 'draft',
     description: req.description || '',
     source_type: primary?.type || 'table',
     source_code: sourceCode,
@@ -226,7 +233,7 @@ const toBackendReport = (req: ReportSaveReq) => {
     },
     layout_config: layoutConfig,
     remark: req.status === 'draft' ? 'draft' : '',
-    state: req.status !== 'archived',
+    state: true,
   }
 }
 
@@ -279,6 +286,12 @@ export const useReportApi = () => {
 
   const deleteReport = async (id: number) => {
     return instance.delete<ResponseData<number>>(`/admin/report/${id}`).then((res) => res.data)
+  }
+
+  const updateReportStatus = async (id: number, status: Report['status']) => {
+    return instance
+      .post<ResponseData<number>>(`/admin/report/${id}/status`, { status })
+      .then((res) => res.data)
   }
 
   const queryDataSources = async () => {
@@ -348,6 +361,7 @@ export const useReportApi = () => {
     queryReportById,
     createReport,
     updateReport,
+    updateReportStatus,
     deleteReport,
     queryDataSources,
     previewReport,

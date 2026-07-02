@@ -92,7 +92,7 @@ export default {
       userName: 'User Growth Analysis',
     },
     status: {
-      archived: 'Archived',
+      disabled: 'Disabled',
       draft: 'Draft',
       published: 'Published',
     },

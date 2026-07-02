@@ -7,6 +7,7 @@ type ReportDefinitionCreateReq struct {
 	Name                string         `json:"name" binding:"required" example:"销售汇总"`
 	Description         string         `json:"description" example:"按组织和日期查看销售汇总"`
 	Category            string         `json:"category" example:"经营分析"`
+	Status              string         `json:"status" example:"draft"`
 	SourceType          string         `json:"source_type" example:"table"`
 	SourceCode          string         `json:"source_code" example:"tms_waybill"`
 	PermissionMenuId    int            `json:"permission_menu_id" example:"0"`
@@ -23,6 +24,7 @@ type ReportDefinitionUpdateReq struct {
 	Name                string         `json:"name" binding:"required" example:"销售汇总"`
 	Description         string         `json:"description" example:"按组织和日期查看销售汇总"`
 	Category            string         `json:"category" example:"经营分析"`
+	Status              string         `json:"status" example:"draft"`
 	SourceType          string         `json:"source_type" example:"table"`
 	SourceCode          string         `json:"source_code" example:"tms_waybill"`
 	PermissionMenuId    int            `json:"permission_menu_id" example:"0"`
@@ -42,4 +44,8 @@ type ReportPreviewReq struct {
 
 type ReportSQLFieldsReq struct {
 	SQL string `json:"sql" binding:"required" example:"select id, name from sys_user"`
+}
+
+type ReportStatusUpdateReq struct {
+	Status string `json:"status" binding:"required" example:"published"`
 }

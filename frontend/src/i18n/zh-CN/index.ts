@@ -92,7 +92,7 @@ export default {
       userName: '用户增长分析',
     },
     status: {
-      archived: '已归档',
+      disabled: '已停用',
       draft: '草稿',
       published: '已发布',
     },
