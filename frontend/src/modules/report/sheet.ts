@@ -15,6 +15,13 @@ export type ReportSheetBounds = {
   maxCol: number
 }
 
+export type ReportSheetRange = {
+  startRow: number
+  startCol: number
+  endRow: number
+  endCol: number
+}
+
 export const reportColumnName = (col: number) => {
   let name = ''
   let value = col
@@ -142,6 +149,25 @@ export const reportSheetUsedBounds = (sheet: ReportSheetConfig): ReportSheetBoun
     minCol: Math.max(minCol, 1),
     maxCol: Math.min(Math.max(maxCol, 1), sheet.cols || maxCol),
   }
+}
+
+export const reportNormalizeSheetRange = (
+  range: ReportSheetRange,
+): ReportSheetBounds => ({
+  minRow: Math.min(range.startRow, range.endRow),
+  maxRow: Math.max(range.startRow, range.endRow),
+  minCol: Math.min(range.startCol, range.endCol),
+  maxCol: Math.max(range.startCol, range.endCol),
+})
+
+export const reportSheetRangeContains = (
+  range: ReportSheetRange | null | undefined,
+  row: number,
+  col: number,
+) => {
+  if (!range) return false
+  const bounds = reportNormalizeSheetRange(range)
+  return row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol
 }
 
 export const reportCellStyle = (cell: ReportSheetCell) => {

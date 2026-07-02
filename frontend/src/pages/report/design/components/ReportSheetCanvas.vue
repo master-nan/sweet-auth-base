@@ -16,8 +16,9 @@
         <q-btn flat dense icon="format_align_center" @click="$emit('setAlign', 'center')" />
         <q-btn flat dense icon="format_align_right" @click="$emit('setAlign', 'right')" />
         <q-separator vertical />
-        <q-btn flat dense icon="call_merge" label="合并右侧" @click="$emit('mergeRight')" />
-        <q-btn flat dense icon="backspace" label="清除" @click="$emit('clearActiveCell')" />
+        <q-btn flat dense icon="call_merge" label="合并选区" :disable="!hasRangeSelection" @click="$emit('mergeSelection')" />
+        <q-btn flat dense icon="splitscreen" label="取消合并" @click="$emit('unmergeActiveCell')" />
+        <q-btn flat dense icon="backspace" label="清除选区" @click="$emit('clearSelection')" />
       </div>
       <div class="toolbar-group">
         <q-chip
@@ -65,6 +66,7 @@
               class="sheet-cell"
               :class="{
                 active: selectedCellId === cellAt(row, col).id,
+                selected: isSelectedCell(row, col),
                 bound: !!cellAt(row, col).binding?.field,
                 summary: isSummaryRow(row),
               }"
@@ -103,9 +105,17 @@
                     <q-item-section avatar><q-icon name="backspace" /></q-item-section>
                     <q-item-section>清除单元格</q-item-section>
                   </q-item>
+                  <q-item clickable v-close-popup :disable="!hasRangeSelection" @click="$emit('mergeSelection')">
+                    <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
+                    <q-item-section>合并选区</q-item-section>
+                  </q-item>
                   <q-item clickable v-close-popup @click="$emit('mergeCellRight', row, col)">
                     <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
                     <q-item-section>合并右侧</q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="$emit('unmergeCell', row, col)">
+                    <q-item-section avatar><q-icon name="splitscreen" /></q-item-section>
+                    <q-item-section>取消合并</q-item-section>
                   </q-item>
                   <q-separator />
                   <q-item clickable v-close-popup @click="$emit('insertRowAfter', row)">
@@ -132,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type {
   ReportDataset,
   ReportDatasetJoin,
@@ -142,14 +152,18 @@ import type {
 import {
   reportCellStyle,
   reportColumnName,
+  reportNormalizeSheetRange,
   reportSheetCellAt,
   reportSheetCellSpan,
   reportSheetIsCoveredCell,
+  reportSheetRangeContains,
+  type ReportSheetRange,
 } from 'src/modules/report/sheet'
 
 const props = defineProps<{
   sheet: ReportSheetConfig
   selectedCellId: string
+  selectionRange: ReportSheetRange | null
   activeBold: boolean
   scale: number
   datasets: ReportDataset[]
@@ -160,15 +174,20 @@ const emit = defineEmits<{
   toggleBold: []
   setAlign: [value: 'left' | 'center' | 'right']
   mergeRight: []
+  mergeSelection: []
+  unmergeActiveCell: []
   clearActiveCell: []
+  clearSelection: []
   addRow: []
   addCol: []
   selectCell: [row: number, col: number]
+  selectRange: [row: number, col: number]
   startDragCell: [row: number, col: number]
   dropField: [row: number, col: number]
   updateCellValue: [row: number, col: number, value: string]
   clearCell: [row: number, col: number]
   mergeCellRight: [row: number, col: number]
+  unmergeCell: [row: number, col: number]
   insertRowAfter: [row: number]
   insertColAfter: [col: number]
   toggleSummaryRow: [row: number]
@@ -178,6 +197,11 @@ const emit = defineEmits<{
 
 const editingCellId = ref('')
 const editingValue = ref('')
+const hasRangeSelection = computed(() => {
+  if (!props.selectionRange) return false
+  const bounds = reportNormalizeSheetRange(props.selectionRange)
+  return bounds.maxRow > bounds.minRow || bounds.maxCol > bounds.minCol
+})
 
 function cellAt(row: number, col: number): ReportSheetCell {
   return reportSheetCellAt(props.sheet, row, col)
@@ -213,6 +237,10 @@ function isCoveredCell(row: number, col: number) {
   return reportSheetIsCoveredCell(props.sheet, row, col)
 }
 
+function isSelectedCell(row: number, col: number) {
+  return reportSheetRangeContains(props.selectionRange, row, col)
+}
+
 function startEdit(row: number, col: number) {
   const cell = cellAt(row, col)
   editingCellId.value = cell.id
@@ -221,7 +249,8 @@ function startEdit(row: number, col: number) {
 }
 
 function handleCellClick(row: number, col: number, event: MouseEvent) {
-  emit('selectCell', row, col)
+  if (event.shiftKey) emit('selectRange', row, col)
+  else emit('selectCell', row, col)
   if (event.detail >= 2) {
     startEdit(row, col)
   }
@@ -352,6 +381,11 @@ function joinLabel(join: ReportDatasetJoin) {
 
 .sheet-cell.bound {
   background: #fbfaff;
+}
+
+.sheet-cell.selected {
+  background: #f1efff;
+  box-shadow: inset 0 0 0 1px rgba(115, 103, 240, 0.34);
 }
 
 .sheet-row-head.summary,

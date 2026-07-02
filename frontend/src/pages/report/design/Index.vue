@@ -39,6 +39,7 @@
       <report-sheet-canvas
         :sheet="sheet"
         :selected-cell-id="selectedCellId"
+        :selection-range="selectionRange"
         :active-bold="!!activeCell?.style?.bold"
         :scale="sheet.scale || 0.85"
         :datasets="datasets"
@@ -46,15 +47,20 @@
         @toggle-bold="toggleBold"
         @set-align="setAlign"
         @merge-right="mergeRight"
+        @merge-selection="mergeSelection"
+        @unmerge-active-cell="unmergeActiveCell"
         @clear-active-cell="clearActiveCell"
+        @clear-selection="clearSelection"
         @add-row="addRow"
         @add-col="addCol"
         @select-cell="selectCell"
+        @select-range="selectRange"
         @start-drag-cell="startDragCell"
         @drop-field="dropField"
         @update-cell-value="updateCellValue"
         @clear-cell="clearCellAt"
         @merge-cell-right="mergeCellRightAt"
+        @unmerge-cell="unmergeCellAt"
         @insert-row-after="insertRowAfter"
         @insert-col-after="insertColAfter"
         @toggle-summary-row="toggleSummaryRow"
@@ -255,6 +261,9 @@ import {
   reportBindingText,
   reportCellId,
   reportColumnName,
+  reportNormalizeSheetRange,
+  reportSheetCellSpan,
+  type ReportSheetRange,
 } from 'src/modules/report/sheet'
 
 const $q = useQuasar()
@@ -272,6 +281,7 @@ const parameters = ref<ReportParameter[]>([])
 const sheet = ref<ReportSheetConfig>(defaultReportSheet())
 const selectedDatasetId = ref('')
 const selectedCellId = ref('2:2')
+const selectionRange = ref<ReportSheetRange | null>(null)
 const selectedParameterId = ref('')
 const inspectorTab = ref<'cell' | 'data' | 'report'>('cell')
 const draggingField = ref<{ datasetId: string; fieldCode: string } | null>(null)
@@ -865,6 +875,20 @@ function isGeneratedBindingValue(value: string) {
 
 function selectCell(row: number, col: number) {
   selectedCellId.value = reportCellId(row, col)
+  selectionRange.value = { startRow: row, startCol: col, endRow: row, endCol: col }
+  sheet.value.active_cell = selectedCellId.value
+  selectedParameterId.value = ''
+}
+
+function selectRange(row: number, col: number) {
+  const active = activeCell.value || cellAt(row, col)
+  selectionRange.value = {
+    startRow: active.row,
+    startCol: active.col,
+    endRow: row,
+    endCol: col,
+  }
+  selectedCellId.value = reportCellId(row, col)
   sheet.value.active_cell = selectedCellId.value
   selectedParameterId.value = ''
 }
@@ -872,7 +896,7 @@ function selectCell(row: number, col: number) {
 function clearActiveCell() {
   const cell = activeCell.value
   if (!cell) return
-  patchActiveCell({ value: '', binding: undefined, style: {} })
+  patchActiveCell({ value: '', binding: undefined, style: {}, rowspan: 1, colspan: 1 })
   buildLocalPreview()
 }
 
@@ -887,12 +911,83 @@ function setAlign(value: 'left' | 'center' | 'right') {
 function mergeRight() {
   const cell = activeCell.value
   if (!cell || cell.col >= sheet.value.cols) return
+  const nextCol = cell.col + (cell.colspan || 1)
+  if (nextCol <= sheet.value.cols && cellHasContent(cellAt(cell.row, nextCol))) {
+    $q.notify({ type: 'warning', message: '右侧单元格已有内容，请先选择区域合并或清空后再合并' })
+    return
+  }
   patchActiveCell({ colspan: Math.min((cell.colspan || 1) + 1, sheet.value.cols - cell.col + 1) })
   buildLocalPreview()
 }
 
+function mergeSelection() {
+  const range = selectionRange.value
+  if (!range) return
+  const bounds = reportNormalizeSheetRange(range)
+  if (bounds.maxRow === bounds.minRow && bounds.maxCol === bounds.minCol) {
+    $q.notify({ type: 'warning', message: '请先按住 Shift 选择要合并的单元格区域' })
+    return
+  }
+  const anchor = cellAt(bounds.minRow, bounds.minCol)
+  const blocked = cellsInBounds(bounds).some((cell) => {
+    if (cell.row === anchor.row && cell.col === anchor.col) return false
+    return cellHasContent(cell)
+  })
+  if (blocked) {
+    $q.notify({ type: 'warning', message: '合并区域内已有内容，请先清理后再合并' })
+    return
+  }
+  cellsInBounds(bounds).forEach((cell) => {
+    if (cell.row === anchor.row && cell.col === anchor.col) return
+    patchCell(cell.row, cell.col, {
+      value: '',
+      binding: undefined,
+      style: {},
+      rowspan: 1,
+      colspan: 1,
+    })
+  })
+  patchCell(anchor.row, anchor.col, {
+    rowspan: bounds.maxRow - bounds.minRow + 1,
+    colspan: bounds.maxCol - bounds.minCol + 1,
+  })
+  selectedCellId.value = anchor.id
+  selectionRange.value = {
+    startRow: anchor.row,
+    startCol: anchor.col,
+    endRow: anchor.row,
+    endCol: anchor.col,
+  }
+  buildLocalPreview()
+}
+
+function unmergeActiveCell() {
+  const cell = activeCell.value
+  if (!cell) return
+  unmergeCellAt(cell.row, cell.col)
+}
+
+function clearSelection() {
+  const range = selectionRange.value
+  if (!range) {
+    clearActiveCell()
+    return
+  }
+  const bounds = reportNormalizeSheetRange(range)
+  cellsInBounds(bounds).forEach((cell) => {
+    patchCell(cell.row, cell.col, {
+      value: '',
+      binding: undefined,
+      style: {},
+      rowspan: 1,
+      colspan: 1,
+    })
+  })
+  buildLocalPreview()
+}
+
 function clearCellAt(row: number, col: number) {
-  patchCell(row, col, { value: '', binding: undefined, style: {} })
+  patchCell(row, col, { value: '', binding: undefined, style: {}, rowspan: 1, colspan: 1 })
   buildLocalPreview()
 }
 
@@ -901,12 +996,35 @@ function mergeCellRightAt(row: number, col: number) {
   mergeRight()
 }
 
+function unmergeCellAt(row: number, col: number) {
+  const cell = cellAt(row, col)
+  const span = reportSheetCellSpan(cell, { maxRow: sheet.value.rows, maxCol: sheet.value.cols })
+  if (span.rowspan === 1 && span.colspan === 1) return
+  patchCell(row, col, { rowspan: 1, colspan: 1 })
+  buildLocalPreview()
+}
+
+function cellHasContent(cell: ReportSheetCell) {
+  return Boolean(cell.value || cell.binding?.field || cell.binding?.formula)
+}
+
+function cellsInBounds(bounds: ReturnType<typeof reportNormalizeSheetRange>) {
+  const cells: ReportSheetCell[] = []
+  for (let row = bounds.minRow; row <= bounds.maxRow; row += 1) {
+    for (let col = bounds.minCol; col <= bounds.maxCol; col += 1) {
+      cells.push(cellAt(row, col))
+    }
+  }
+  return cells
+}
+
 function addRow() {
   const nextRows = sheet.value.rows + 1
   for (let col = 1; col <= sheet.value.cols; col += 1) {
     sheet.value.cells.push({ id: reportCellId(nextRows, col), row: nextRows, col, value: '' })
   }
   sheet.value.rows = nextRows
+  buildLocalPreview()
 }
 
 function insertRowAfter(row: number) {
@@ -921,6 +1039,7 @@ function insertRowAfter(row: number) {
   }
   sheet.value.rows += 1
   sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) => (item > row ? item + 1 : item))
+  buildLocalPreview()
 }
 
 function addCol() {
@@ -929,6 +1048,7 @@ function addCol() {
     sheet.value.cells.push({ id: reportCellId(row, nextCols), row, col: nextCols, value: '' })
   }
   sheet.value.cols = nextCols
+  buildLocalPreview()
 }
 
 function insertColAfter(col: number) {
@@ -942,6 +1062,7 @@ function insertColAfter(col: number) {
     sheet.value.cells.push({ id: reportCellId(row, nextCol), row, col: nextCol, value: '' })
   }
   sheet.value.cols += 1
+  buildLocalPreview()
 }
 
 function toggleSummaryRow(row: number) {
@@ -949,6 +1070,7 @@ function toggleSummaryRow(row: number) {
   if (rows.has(row)) rows.delete(row)
   else rows.add(row)
   sheet.value.summary_rows = [...rows].sort((a, b) => a - b)
+  buildLocalPreview()
 }
 
 function zoomIn() {
