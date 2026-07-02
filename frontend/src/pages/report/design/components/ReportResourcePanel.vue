@@ -6,7 +6,7 @@
           <strong>数据集</strong>
           <span>{{ datasets.length }} 个数据集</span>
         </div>
-        <q-btn dense unelevated color="primary" icon="add" label="新增" @click="$emit('openDataset')" />
+        <q-btn size="sm" color="primary" icon="add" label="新增" @click="$emit('openDataset')" />
       </div>
 
       <div class="dataset-list">
@@ -35,7 +35,7 @@
             <q-badge v-if="dataset.primary" color="primary">主</q-badge>
             <q-btn
               flat
-              dense
+              size="sm"
               round
               color="primary"
               icon="edit"
@@ -44,7 +44,7 @@
             <q-btn
               v-if="datasets.length > 1"
               flat
-              dense
+              size="sm"
               round
               color="negative"
               icon="delete"
@@ -77,7 +77,7 @@
           <strong>参数</strong>
           <span>{{ parameters.length }} 个查询参数</span>
         </div>
-        <q-btn flat dense color="primary" icon="add" label="新增" @click="$emit('addParameter')" />
+        <q-btn size="sm" color="primary" icon="add" label="新增" @click="$emit('addParameter')" />
       </div>
       <div v-if="parameters.length" class="param-list">
         <div
@@ -90,8 +90,22 @@
           <q-icon name="tune" />
           <span>{{ param.label }}</span>
           <em>{{ parameterTargetLabel(param) }}</em>
-          <q-btn flat dense round color="primary" icon="edit" @click.stop="$emit('editParameter', param.id)" />
-          <q-btn flat dense round color="negative" icon="delete" @click.stop="$emit('removeParameter', param.id)" />
+          <q-btn
+            flat
+            size="sm"
+            round
+            color="primary"
+            icon="edit"
+            @click.stop="$emit('editParameter', param.id)"
+          />
+          <q-btn
+            flat
+            size="sm"
+            round
+            color="negative"
+            icon="delete"
+            @click.stop="$emit('removeParameter', param.id)"
+          />
         </div>
       </div>
       <div v-else class="empty-note">暂无参数</div>
@@ -173,7 +187,7 @@ function parameterTargetLabel(param: ReportParameter) {
 }
 
 .panel-section {
-  padding: 14px;
+  padding: 10px;
   border-bottom: 1px solid #e7ecf6;
 }
 
@@ -215,11 +229,11 @@ function parameterTargetLabel(param: ReportParameter) {
 .field-tree,
 .param-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .dataset-card {
-  padding: 10px;
+  padding: 2px;
   border: 1px solid #dfe5f2;
   border-radius: 8px;
   background: #fff;
@@ -233,7 +247,7 @@ function parameterTargetLabel(param: ReportParameter) {
 
 .dataset-card__head {
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .dataset-card__head strong,

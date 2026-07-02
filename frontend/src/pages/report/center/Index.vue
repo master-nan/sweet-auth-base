@@ -4,7 +4,9 @@
       <section class="report-head">
         <div>
           <div class="report-title">报表中心</div>
-          <div class="report-caption">按目录查找、运行、导出和维护报表，设计配置只在设计器中处理。</div>
+          <div class="report-caption">
+            按目录查找、运行、导出和维护报表，设计配置只在设计器中处理。
+          </div>
         </div>
         <div class="report-head-actions">
           <q-input
@@ -21,8 +23,8 @@
               <q-icon name="search" />
             </template>
           </q-input>
-          <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
           <q-btn color="primary" icon="add" label="新建报表" @click="openDesigner()" />
+          <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
         </div>
       </section>
 
@@ -94,7 +96,9 @@
           <div class="list-head">
             <div>
               <div class="section-title">常用报表</div>
-              <div class="report-caption">运行页只面向使用者，设计和发布由管理员进入设计器维护。</div>
+              <div class="report-caption">
+                运行页只面向使用者，设计和发布由管理员进入设计器维护。
+              </div>
             </div>
             <q-select
               v-model="statusFilter"
@@ -163,7 +167,7 @@
                 <div class="row no-wrap justify-center q-gutter-xs">
                   <q-btn
                     flat
-                    dense
+                    size="sm"
                     round
                     color="primary"
                     icon="play_arrow"
@@ -173,7 +177,7 @@
                   </q-btn>
                   <q-btn
                     flat
-                    dense
+                    size="sm"
                     round
                     color="primary"
                     icon="design_services"
@@ -183,7 +187,7 @@
                   </q-btn>
                   <q-btn
                     flat
-                    dense
+                    size="sm"
                     round
                     color="primary"
                     icon="content_copy"
@@ -193,7 +197,7 @@
                   </q-btn>
                   <q-btn
                     flat
-                    dense
+                    size="sm"
                     round
                     color="negative"
                     icon="delete"
@@ -221,11 +225,19 @@
           <div>
             <div class="report-title">{{ runtimeReport?.report_name || '报表运行' }}</div>
             <div class="report-caption">
-              {{ runtimeReport?.data_source_name || '-' }} · {{ runtimeReport?.description || '运行预览会应用后端数据权限' }}
+              {{ runtimeReport?.data_source_name || '-' }} ·
+              {{ runtimeReport?.description || '运行预览会应用后端数据权限' }}
             </div>
           </div>
           <q-space />
-          <q-btn outline color="primary" icon="download" label="导出 CSV" :disable="!runtimeRows.length" @click="exportRuntimeCsv" />
+          <q-btn
+            outline
+            color="primary"
+            icon="download"
+            label="导出 CSV"
+            :disable="!runtimeRows.length"
+            @click="exportRuntimeCsv"
+          />
           <q-btn flat round icon="close" v-close-popup />
         </q-card-section>
         <q-separator />
@@ -290,7 +302,13 @@
             :options="['继承当前菜单数据权限']"
           />
           <q-btn color="primary" icon="search" label="查询" @click="loadRuntimePreview" />
-          <q-btn outline color="primary" icon="restart_alt" label="重置" @click="resetRuntimeFilters" />
+          <q-btn
+            outline
+            color="primary"
+            icon="restart_alt"
+            label="重置"
+            @click="resetRuntimeFilters"
+          />
         </q-card-section>
         <q-card-section class="runtime-body">
           <report-sheet-preview
@@ -388,7 +406,9 @@ const runtimeReport = ref<Report | null>(null)
 const runtimeData = ref<ReportPreviewRes>({ columns: [], rows: [] })
 const runtimeLoading = ref(false)
 const runtimeKeyword = ref('')
-const runtimeFilterValues = ref<Record<string, string | number | Array<string | number> | null | undefined>>({})
+const runtimeFilterValues = ref<
+  Record<string, string | number | Array<string | number> | null | undefined>
+>({})
 const runtimePagination = ref({
   page: 1,
   rowsPerPage: 20,
@@ -424,7 +444,12 @@ const columns = computed<QTableProps['columns']>(() => [
   { name: 'data_source_name', field: 'data_source_name', label: '数据集', align: 'left' },
   { name: 'permission', field: 'permission_table_code', label: '权限', align: 'center' },
   { name: 'status', field: 'status', label: '状态', align: 'center' },
-  { name: 'updated_at', field: (row) => row.updated_at || row.gmt_modify || '-', label: '最近更新', align: 'left' },
+  {
+    name: 'updated_at',
+    field: (row) => row.updated_at || row.gmt_modify || '-',
+    label: '最近更新',
+    align: 'left',
+  },
   { name: 'actions', field: 'actions', label: '操作', align: 'center' },
 ])
 
@@ -440,7 +465,8 @@ const categories = computed(() => {
 const filteredRows = computed(() => {
   const keyword = query.value.quick_query?.keyword?.trim().toLowerCase() || ''
   return rows.value.filter((item) => {
-    const matchCategory = !activeCategory.value || (item.category || '未分类') === activeCategory.value
+    const matchCategory =
+      !activeCategory.value || (item.category || '未分类') === activeCategory.value
     const matchStatus = statusFilter.value === 'all' || item.status === statusFilter.value
     const matchKeyword =
       !keyword ||
@@ -451,8 +477,12 @@ const filteredRows = computed(() => {
   })
 })
 
-const publishedCount = computed(() => rows.value.filter((item) => item.status === 'published').length)
-const permissionCount = computed(() => rows.value.filter((item) => item.permission_table_code).length)
+const publishedCount = computed(
+  () => rows.value.filter((item) => item.status === 'published').length,
+)
+const permissionCount = computed(
+  () => rows.value.filter((item) => item.permission_table_code).length,
+)
 const runtimeColumns = computed<QTableProps['columns']>(() =>
   runtimeData.value.columns.map((field) => ({
     name: field.code,
@@ -467,17 +497,20 @@ const runtimeDatasets = computed<ReportDataset[]>(() =>
     ? runtimeReport.value.layout_config.datasets
     : runtimeData.value.datasets || [],
 )
-const runtimeSheet = computed<ReportSheetConfig>(() =>
-  runtimeReport.value?.layout_config?.sheet || defaultReportSheet(),
+const runtimeSheet = computed<ReportSheetConfig>(
+  () => runtimeReport.value?.layout_config?.sheet || defaultReportSheet(),
 )
-const runtimeDisplayMode = computed(() =>
-  runtimeReport.value?.layout_config?.runtime_display || 'paged',
+const runtimeDisplayMode = computed(
+  () => runtimeReport.value?.layout_config?.runtime_display || 'paged',
 )
 const runtimeConfiguredPageSize = computed(() =>
   Number(runtimeReport.value?.layout_config?.runtime_page_size || 20),
 )
 const runtimePageCount = computed(() =>
-  Math.max(1, Math.ceil((runtimePagination.value.rowsNumber || 0) / runtimePagination.value.rowsPerPage)),
+  Math.max(
+    1,
+    Math.ceil((runtimePagination.value.rowsNumber || 0) / runtimePagination.value.rowsPerPage),
+  ),
 )
 const runtimeParameters = computed<ReportParameter[]>(() => {
   const report = runtimeReport.value
@@ -576,9 +609,16 @@ function resetRuntimeFilters() {
 function buildRuntimeDefaultFilters() {
   const values: Record<string, string | number | Array<string | number> | null | undefined> = {}
   runtimeParameters.value.forEach((param) => {
-    if (param.default_value === null || param.default_value === undefined || param.default_value === '') return
+    if (
+      param.default_value === null ||
+      param.default_value === undefined ||
+      param.default_value === ''
+    )
+      return
     if (Array.isArray(param.default_value)) {
-      const next = param.default_value.filter((item) => item !== '' && item !== null && item !== undefined)
+      const next = param.default_value.filter(
+        (item) => item !== '' && item !== null && item !== undefined,
+      )
       if (next.length) values[param.id] = next
       return
     }
@@ -592,7 +632,11 @@ function buildRuntimeParameterValues() {
   runtimeParameters.value.forEach((param) => {
     const value = runtimeFilterValues.value[param.id]
     if (value === '' || value === null || value === undefined) return
-    if (Array.isArray(value) && !value.some((item) => item !== '' && item !== null && item !== undefined)) return
+    if (
+      Array.isArray(value) &&
+      !value.some((item) => item !== '' && item !== null && item !== undefined)
+    )
+      return
     values[param.id] = value
   })
   return values
@@ -609,7 +653,9 @@ function runtimeRangeValue(id: string, index: number) {
 }
 
 function setRuntimeRangeValue(id: string, index: number, value: string | null) {
-  const current = Array.isArray(runtimeFilterValues.value[id]) ? [...(runtimeFilterValues.value[id] as Array<string | number>)] : ['', '']
+  const current = Array.isArray(runtimeFilterValues.value[id])
+    ? [...(runtimeFilterValues.value[id] as Array<string | number>)]
+    : ['', '']
   current[index] = value || ''
   runtimeFilterValues.value[id] = current
 }
@@ -726,7 +772,6 @@ function statusColor(status: ReportStatus) {
   }
   return map[status] || 'grey-7'
 }
-
 </script>
 
 <style scoped lang="scss">

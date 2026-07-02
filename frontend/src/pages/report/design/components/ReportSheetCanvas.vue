@@ -16,7 +16,14 @@
         <q-btn flat dense icon="format_align_center" @click="$emit('setAlign', 'center')" />
         <q-btn flat dense icon="format_align_right" @click="$emit('setAlign', 'right')" />
         <q-separator vertical />
-        <q-btn flat dense icon="call_merge" label="合并选区" :disable="!hasRangeSelection" @click="$emit('mergeSelection')" />
+        <q-btn
+          flat
+          dense
+          icon="call_merge"
+          label="合并选区"
+          :disable="!hasRangeSelection"
+          @click="$emit('mergeSelection')"
+        />
         <q-btn flat dense icon="splitscreen" label="取消合并" @click="$emit('unmergeActiveCell')" />
         <q-btn flat dense icon="backspace" label="清除选区" @click="$emit('clearSelection')" />
       </div>
@@ -33,11 +40,27 @@
           {{ joinLabel(join) }}
         </q-chip>
         <q-separator v-if="datasetJoins.length" vertical />
-        <q-btn outline dense color="primary" icon="add" label="行" @click="$emit('addRow')" />
-        <q-btn outline dense color="primary" icon="add" label="列" @click="$emit('addCol')" />
-        <q-btn flat dense icon="zoom_out" @click="$emit('zoomOut')" />
-        <q-chip dense square outline color="primary">{{ Math.round(scale * 100) }}%</q-chip>
-        <q-btn flat dense icon="zoom_in" @click="$emit('zoomIn')" />
+        <q-btn
+          dense
+          outline
+          size="sm"
+          color="primary"
+          icon="add"
+          label="行"
+          @click="$emit('addRow')"
+        />
+        <q-btn
+          dense
+          outline
+          size="sm"
+          color="primary"
+          icon="add"
+          label="列"
+          @click="$emit('addCol')"
+        />
+        <q-btn flat round dense icon="zoom_out" @click="$emit('zoomOut')" />
+        <q-chip square outline color="primary">{{ Math.round(scale * 100) }}%</q-chip>
+        <q-btn flat round dense icon="zoom_in" @click="$emit('zoomIn')" />
       </div>
     </div>
 
@@ -95,7 +118,7 @@
                 @keydown.enter.stop.prevent="commitEdit(renderCell.row, renderCell.col)"
                 @keydown.esc.stop.prevent="cancelEdit"
                 @blur="commitEdit(renderCell.row, renderCell.col)"
-              >
+              />
               <span v-else>{{ renderCell.value }}</span>
             </div>
           </template>
@@ -109,19 +132,36 @@
         @mousedown.stop
         @click.stop
       >
-        <button type="button" @click="runContextAction('edit')"><q-icon name="edit" /> 编辑文本</button>
-        <button type="button" @click="runContextAction('clear')"><q-icon name="backspace" /> 清除单元格</button>
-        <button type="button" :disabled="!hasRangeSelection" @click="runContextAction('mergeSelection')">
+        <button type="button" @click="runContextAction('edit')">
+          <q-icon name="edit" /> 编辑文本
+        </button>
+        <button type="button" @click="runContextAction('clear')">
+          <q-icon name="backspace" /> 清除单元格
+        </button>
+        <button
+          type="button"
+          :disabled="!hasRangeSelection"
+          @click="runContextAction('mergeSelection')"
+        >
           <q-icon name="call_merge" /> 合并选区
         </button>
-        <button type="button" @click="runContextAction('mergeRight')"><q-icon name="call_merge" /> 合并右侧</button>
-        <button type="button" @click="runContextAction('unmerge')"><q-icon name="splitscreen" /> 取消合并</button>
+        <button type="button" @click="runContextAction('mergeRight')">
+          <q-icon name="call_merge" /> 合并右侧
+        </button>
+        <button type="button" @click="runContextAction('unmerge')">
+          <q-icon name="splitscreen" /> 取消合并
+        </button>
         <div class="sheet-context-menu__separator" />
-        <button type="button" @click="runContextAction('insertRow')"><q-icon name="table_rows" /> 下方插入行</button>
-        <button type="button" @click="runContextAction('insertCol')"><q-icon name="view_column" /> 右侧插入列</button>
+        <button type="button" @click="runContextAction('insertRow')">
+          <q-icon name="table_rows" /> 下方插入行
+        </button>
+        <button type="button" @click="runContextAction('insertCol')">
+          <q-icon name="view_column" /> 右侧插入列
+        </button>
         <div class="sheet-context-menu__separator" />
         <button type="button" @click="runContextAction('summary')">
-          <q-icon name="functions" /> {{ isSummaryRow(contextMenu.row) ? '取消汇总行' : '设为汇总行' }}
+          <q-icon name="functions" />
+          {{ isSummaryRow(contextMenu.row) ? '取消汇总行' : '设为汇总行' }}
         </button>
       </div>
     </div>
@@ -288,12 +328,14 @@ function renderCellsForRow(row: number, summary: boolean) {
 }
 
 function cellAt(row: number, col: number): ReportSheetCell {
-  return cellMap.value.get(cellKey(row, col)) || {
-    id: reportCellId(row, col),
-    row,
-    col,
-    value: '',
-  }
+  return (
+    cellMap.value.get(cellKey(row, col)) || {
+      id: reportCellId(row, col),
+      row,
+      col,
+      value: '',
+    }
+  )
 }
 
 function cellKey(row: number, col: number) {
@@ -302,7 +344,13 @@ function cellKey(row: number, col: number) {
 
 function isSelectedCell(row: number, col: number) {
   const bounds = selectionBounds.value
-  return Boolean(bounds && row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol)
+  return Boolean(
+    bounds &&
+      row >= bounds.minRow &&
+      row <= bounds.maxRow &&
+      col >= bounds.minCol &&
+      col <= bounds.maxCol,
+  )
 }
 
 function startEdit(row: number, col: number) {
@@ -340,7 +388,8 @@ function openContextMenu(row: number, col: number, event: MouseEvent) {
   const rect = scrollEl?.getBoundingClientRect()
   contextMenu.row = row
   contextMenu.col = col
-  contextMenu.left = rect && scrollEl ? event.clientX - rect.left + scrollEl.scrollLeft : event.offsetX
+  contextMenu.left =
+    rect && scrollEl ? event.clientX - rect.left + scrollEl.scrollLeft : event.offsetX
   contextMenu.top = rect && scrollEl ? event.clientY - rect.top + scrollEl.scrollTop : event.offsetY
   contextMenu.visible = true
   emit('selectCell', row, col)
@@ -351,7 +400,15 @@ function closeContextMenu() {
 }
 
 function runContextAction(
-  action: 'edit' | 'clear' | 'mergeSelection' | 'mergeRight' | 'unmerge' | 'insertRow' | 'insertCol' | 'summary',
+  action:
+    | 'edit'
+    | 'clear'
+    | 'mergeSelection'
+    | 'mergeRight'
+    | 'unmerge'
+    | 'insertRow'
+    | 'insertCol'
+    | 'summary',
 ) {
   const { row, col } = contextMenu
   closeContextMenu()
