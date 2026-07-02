@@ -128,17 +128,12 @@ const expandedDatasetIds = ref<string[]>([])
 
 watch(
   () => props.datasets.map((item) => item.id),
-  (ids, previousIds = []) => {
+  (ids) => {
     if (!expandedDatasetIds.value.length) {
       expandedDatasetIds.value = ids.slice(0, 1)
       return
     }
-    const previous = new Set(previousIds)
-    const added = ids.filter((id) => !previous.has(id))
     expandedDatasetIds.value = expandedDatasetIds.value.filter((id) => ids.includes(id))
-    added.forEach((id) => {
-      if (!expandedDatasetIds.value.includes(id)) expandedDatasetIds.value = [...expandedDatasetIds.value, id]
-    })
   },
   { immediate: true },
 )

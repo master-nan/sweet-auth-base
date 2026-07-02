@@ -36,7 +36,11 @@
         label="类型"
         :options="kindOptions"
         @update:model-value="updateReportKind"
-      />
+      >
+        <q-tooltip>
+          类型决定运行渲染方式：明细表按模板行逐条展开，汇总表使用汇总行；图表和交叉表后续增强。
+        </q-tooltip>
+      </q-select>
     </div>
 
     <div class="topbar-actions">
@@ -72,7 +76,7 @@ defineProps<{
   reportKind: ReportKind
   primarySourceCode: string | undefined
   saving: boolean
-  kindOptions: Array<{ label: string; value: ReportKind }>
+  kindOptions: Array<{ label: string; value: ReportKind; disable?: boolean }>
 }>()
 
 const emit = defineEmits<{

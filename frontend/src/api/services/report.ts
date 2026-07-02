@@ -47,6 +47,7 @@ export type {
   ReportPreviewReq,
   ReportPreviewRes,
   ReportQueryConfig,
+  ReportRuntimeDisplayMode,
   ReportSaveReq,
   ReportSheetCell,
   ReportSheetConfig,
@@ -178,6 +179,8 @@ const toReport = (item: BackendReport): Report => {
       ...layout,
       version: layout.version || REPORT_SCHEMA_VERSION,
       kind,
+      runtime_display: layout.runtime_display || 'paged',
+      runtime_page_size: Number(layout.runtime_page_size || 20),
       dataset_joins: item.query_config?.dataset_joins || layout.dataset_joins || [],
       parameters: item.query_config?.parameters || layout.parameters || [],
     },
@@ -201,6 +204,8 @@ const toBackendReport = (req: ReportSaveReq) => {
     dataset_joins: req.dataset_joins || [],
     parameters: req.parameters || [],
     sheet: req.sheet || defaultReportSheet(),
+    runtime_display: req.runtime_display || 'paged',
+    runtime_page_size: Number(req.runtime_page_size || 20),
   }
   return {
     id: req.id,
@@ -323,6 +328,17 @@ export const useReportApi = () => {
       })
   }
 
+  const inferSqlFields = async (sql: string) => {
+    return instance
+      .post<ResponseData<BackendReportColumn[]>>('/admin/report/sql-fields', { sql })
+      .then((res) => {
+        return {
+          ...res.data,
+          data: (res.data.data || []).map(toField),
+        } as ResponseData<ReportField[]>
+      })
+  }
+
   const getSelectedFields = (report: Report): ReportField[] => {
     return report.query_config?.fields || []
   }
@@ -335,6 +351,7 @@ export const useReportApi = () => {
     deleteReport,
     queryDataSources,
     previewReport,
+    inferSqlFields,
     getSelectedFields,
   }
 }

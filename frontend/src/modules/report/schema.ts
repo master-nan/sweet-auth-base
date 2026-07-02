@@ -19,11 +19,23 @@ export const normalizeReportKind = (value: unknown): ReportKind => {
 
 export const guessReportFieldRole = (code: string, type: string): NonNullable<ReportField['role']> => {
   const lower = code.toLowerCase()
-  if (lower.includes('date') || lower.includes('time') || type === 'datetime') return 'time'
-  if (['number', 'decimal', 'float', 'int'].some((item) => type.toLowerCase().includes(item))) {
+  const normalizedType = String(type || '').toLowerCase()
+  if (
+    lower.includes('date') ||
+    lower.includes('time') ||
+    ['6', '7', '8'].includes(normalizedType) ||
+    ['date', 'datetime', 'timestamp', 'time'].some((item) => normalizedType.includes(item))
+  ) return 'time'
+  if (lower === 'id' || lower.endsWith('_id')) {
+    return 'dimension'
+  }
+  if (
+    ['1', '2', '9', '11'].includes(normalizedType) ||
+    ['number', 'numeric', 'decimal', 'float', 'double', 'int', 'bigint'].some((item) => normalizedType.includes(item))
+  ) {
     return 'metric'
   }
-  if (lower.endsWith('_id') || lower.includes('name') || lower.includes('status')) {
+  if (lower.includes('name') || lower.includes('status')) {
     return 'dimension'
   }
   return 'text'
@@ -63,6 +75,8 @@ export const createReportLayout = (report?: Partial<Report>): ReportLayoutConfig
   dataset_joins: [],
   parameters: [],
   sheet: defaultReportSheet(),
+  runtime_display: 'paged',
+  runtime_page_size: 20,
 })
 
 export const primaryTableDataset = (datasets: ReportDataset[] = []) =>

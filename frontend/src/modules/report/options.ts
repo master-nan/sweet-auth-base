@@ -5,13 +5,14 @@ import type {
   ReportKind,
   ReportParameterOperator,
   ReportParameterType,
+  ReportRuntimeDisplayMode,
 } from './types'
 
-export const reportKindOptions: Array<{ label: string; value: ReportKind }> = [
+export const reportKindOptions: Array<{ label: string; value: ReportKind; disable?: boolean }> = [
   { label: '明细表', value: 'detail' },
   { label: '汇总表', value: 'summary' },
-  { label: '图表', value: 'chart' },
-  { label: '交叉表', value: 'pivot' },
+  { label: '图表（后续增强）', value: 'chart', disable: true },
+  { label: '交叉表（后续增强）', value: 'pivot', disable: true },
 ]
 
 export const reportDatasetTypeOptions: Array<{ label: string; value: ReportDatasetType }> = [
@@ -53,4 +54,9 @@ export const reportParameterOperatorOptions: Array<{ label: string; value: Repor
 export const reportDatasetJoinTypeOptions: Array<{ label: string; value: ReportDatasetJoinType }> = [
   { label: '左关联', value: 'left' },
   { label: '内关联', value: 'inner' },
+]
+
+export const reportRuntimeDisplayOptions: Array<{ label: string; value: ReportRuntimeDisplayMode }> = [
+  { label: '分页展示', value: 'paged' },
+  { label: '全部展示', value: 'all' },
 ]

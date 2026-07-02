@@ -84,12 +84,17 @@
         :dataset-joins="datasetJoins"
         :category="form.category || ''"
         :description="form.description || ''"
+        :runtime-display="form.runtime_display || 'paged'"
+        :runtime-page-size="form.runtime_page_size || 20"
+        :runtime-display-options="reportRuntimeDisplayOptions"
         @update-dataset-name="updateDatasetName"
         @set-primary-dataset="setPrimaryDataset"
         @add-join="openJoinDialog"
         @remove-join="removeJoin"
         @update:category="form.category = $event"
         @update:description="form.description = $event"
+        @update:runtime-display="form.runtime_display = $event"
+        @update:runtime-page-size="form.runtime_page_size = $event"
       />
     </main>
 
@@ -107,11 +112,13 @@
       :dataset-type-options="reportDatasetTypeOptions"
       :data-sources="dataSources"
       :preview-fields="datasetDraftPreviewFields"
+      :sql-fields-loading="sqlFieldsLoading"
       @update:type="handleDraftTypeChange"
       @update:name="datasetDraft.name = $event"
       @update:source-code="handleDraftSourceChange"
-      @update:sql="datasetDraft.sql = $event"
+      @update:sql="handleDatasetDraftSqlChange"
       @update:fields-text="datasetDraft.fieldsText = $event"
+      @infer-sql-fields="inferSqlDatasetFields"
       @confirm="confirmDataset"
     />
 
@@ -184,16 +191,12 @@
               {{ joinLabel(join) }}
             </q-chip>
           </div>
-          <q-table
-            flat
-            bordered
-            dense
-            separator="cell"
-            row-key="id"
-            :rows="previewRows"
-            :columns="previewColumns"
+          <report-sheet-preview
+            :sheet="sheet"
+            :datasets="datasets"
+            :preview-data="previewData"
             :loading="previewLoading"
-            :pagination="{ rowsPerPage: 10 }"
+            :report-kind="form.report_kind"
           />
         </q-card-section>
       </q-card>
@@ -205,7 +208,6 @@
 defineOptions({ name: 'report_design' })
 
 import { computed, onMounted, reactive, ref } from 'vue'
-import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -235,6 +237,7 @@ import ReportJoinDialog from './components/ReportJoinDialog.vue'
 import ReportParameterDialog from './components/ReportParameterDialog.vue'
 import ReportResourcePanel from './components/ReportResourcePanel.vue'
 import ReportSheetCanvas from './components/ReportSheetCanvas.vue'
+import ReportSheetPreview from '../components/ReportSheetPreview.vue'
 import {
   reportAlignOptions,
   reportDatasetJoinTypeOptions,
@@ -243,6 +246,7 @@ import {
   reportKindOptions,
   reportParameterOperatorOptions,
   reportParameterTypeOptions,
+  reportRuntimeDisplayOptions,
 } from 'src/modules/report/options'
 import {
   buildReportLocalPreview,
@@ -274,6 +278,7 @@ const draggingField = ref<{ datasetId: string; fieldCode: string } | null>(null)
 const draggingCell = ref<{ row: number; col: number } | null>(null)
 const datasetDialogVisible = ref(false)
 const editingDatasetId = ref('')
+const sqlFieldsLoading = ref(false)
 const parameterDialogVisible = ref(false)
 const editingParameterId = ref('')
 const joinDialogVisible = ref(false)
@@ -294,6 +299,8 @@ const form = reactive<ReportSaveReq>({
   dataset_joins: [],
   parameters: [],
   sheet: defaultReportSheet(),
+  runtime_display: 'paged',
+  runtime_page_size: 20,
   status: 'draft',
 })
 
@@ -343,6 +350,7 @@ const joinDraft = reactive<{
   join_type: 'left',
 })
 
+const sqlDraftFields = ref<ReportField[]>([])
 const datasetOptions = computed(() =>
   datasets.value.map((item) => ({
     label: `${item.name} (${item.type === 'sql' ? 'SQL' : item.source_code})`,
@@ -380,17 +388,8 @@ const datasetDraftPreviewFields = computed(() => {
   if (datasetDraft.type === 'table') {
     return dataSources.value.find((item) => item.code === datasetDraft.source_code)?.fields || []
   }
-  return parseSqlDatasetFields(datasetDraft.fieldsText)
+  return sqlDraftFields.value.length ? sqlDraftFields.value : parseSqlDatasetFields(datasetDraft.fieldsText)
 })
-const previewColumns = computed<QTableProps['columns']>(() =>
-  previewData.value.columns.map((field) => ({
-    name: field.code,
-    field: field.code,
-    label: field.name,
-    align: 'left',
-  })),
-)
-const previewRows = computed(() => previewData.value.rows)
 const parameterFieldOptions = computed(() => {
   const dataset = datasets.value.find((item) => item.id === parameterDraft.dataset_id)
   return (dataset?.fields || []).map((field) => ({
@@ -484,6 +483,8 @@ function applyReport(report: Report) {
   form.description = report.description || ''
   form.permission_menu_id = report.permission_menu_id || 0
   form.permission_table_code = report.permission_table_code || report.source_code || ''
+  form.runtime_display = report.layout_config?.runtime_display || 'paged'
+  form.runtime_page_size = Number(report.layout_config?.runtime_page_size || 20)
   datasets.value = enrichReportDatasets(
     report.layout_config?.datasets?.length
       ? report.layout_config.datasets
@@ -505,6 +506,8 @@ function initNewReport() {
   form.description = ''
   form.permission_menu_id = 0
   form.permission_table_code = ''
+  form.runtime_display = 'paged'
+  form.runtime_page_size = 20
   datasets.value = []
   datasetJoins.value = []
   sheet.value = defaultReportSheet()
@@ -556,6 +559,7 @@ function openDatasetDialog(id = '') {
     datasetDraft.name = current.name || ''
     datasetDraft.sql = current.sql || ''
     datasetDraft.fieldsText = current.fields.map((field) => field.code).join(',')
+    sqlDraftFields.value = current.type === 'sql' ? [...current.fields] : []
     datasetDialogVisible.value = true
     return
   }
@@ -564,15 +568,19 @@ function openDatasetDialog(id = '') {
   datasetDraft.name = dataSources.value[0]?.name || ''
   datasetDraft.sql = ''
   datasetDraft.fieldsText = ''
+  sqlDraftFields.value = []
   datasetDialogVisible.value = true
 }
 
 function handleDraftTypeChange(value: ReportDatasetType) {
   datasetDraft.type = value
   if (datasetDraft.type === 'table') {
+    sqlDraftFields.value = []
     handleDraftSourceChange(datasetDraft.source_code || dataSources.value[0]?.code || '')
   } else {
     datasetDraft.name = 'SQL 数据集'
+    datasetDraft.source_code = ''
+    sqlDraftFields.value = parseSqlDatasetFields(datasetDraft.fieldsText)
   }
 }
 
@@ -582,7 +590,39 @@ function handleDraftSourceChange(value: string) {
   datasetDraft.name = source?.name || value
 }
 
-function confirmDataset() {
+function handleDatasetDraftSqlChange(value: string) {
+  datasetDraft.sql = value
+  sqlDraftFields.value = []
+  datasetDraft.fieldsText = ''
+}
+
+async function inferSqlDatasetFields() {
+  const sql = datasetDraft.sql.trim()
+  if (!sql) {
+    $q.notify({ type: 'warning', message: '请先填写 SQL' })
+    return false
+  }
+  sqlFieldsLoading.value = true
+  try {
+    const res = await reportApi.inferSqlFields(sql)
+    sqlDraftFields.value = res.data || []
+    datasetDraft.fieldsText = sqlDraftFields.value.map((field) => field.code).join(',')
+    if (!sqlDraftFields.value.length) {
+      $q.notify({ type: 'warning', message: 'SQL 未解析出字段' })
+      return false
+    }
+    $q.notify({ type: 'positive', message: `已解析 ${sqlDraftFields.value.length} 个字段` })
+    return true
+  } catch {
+    sqlDraftFields.value = []
+    $q.notify({ type: 'negative', message: 'SQL 字段解析失败，请检查 SQL 或后端权限' })
+    return false
+  } finally {
+    sqlFieldsLoading.value = false
+  }
+}
+
+async function confirmDataset() {
   const id = editingDatasetId.value || `dataset_${Date.now()}`
   if (datasetDraft.type === 'table') {
     const source = dataSources.value.find((item) => item.code === datasetDraft.source_code)
@@ -599,10 +639,18 @@ function confirmDataset() {
       primary: editingDataset.value?.primary || datasets.value.length === 0,
     })
   } else {
-    const fields = parseSqlDatasetFields(datasetDraft.fieldsText)
-    if (!datasetDraft.sql.trim() || fields.length === 0) {
-      $q.notify({ type: 'warning', message: '请填写 SQL 和字段' })
+    if (!datasetDraft.sql.trim()) {
+      $q.notify({ type: 'warning', message: '请填写 SQL' })
       return
+    }
+    let fields = datasetDraftPreviewFields.value
+    if (!datasetDraft.sql.trim() || fields.length === 0) {
+      const ok = await inferSqlDatasetFields()
+      fields = datasetDraftPreviewFields.value
+      if (!ok || fields.length === 0) {
+        $q.notify({ type: 'warning', message: '请先解析 SQL 字段' })
+        return
+      }
     }
     upsertDataset({
       id,
@@ -840,6 +888,7 @@ function mergeRight() {
   const cell = activeCell.value
   if (!cell || cell.col >= sheet.value.cols) return
   patchActiveCell({ colspan: Math.min((cell.colspan || 1) + 1, sheet.value.cols - cell.col + 1) })
+  buildLocalPreview()
 }
 
 function clearCellAt(row: number, col: number) {
@@ -1109,7 +1158,7 @@ async function preview() {
       dataset_id: datasetJoins.value.length ? undefined : primaryDataset.value?.id,
       data_source_id: primaryDataset.value?.source_code,
       page: 1,
-      num: 50,
+      num: form.runtime_display === 'all' ? 10000 : Number(form.runtime_page_size || 20),
     })
     previewData.value = res.data
   } catch {

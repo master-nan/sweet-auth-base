@@ -169,6 +169,27 @@
             readonly
             label="运行主表"
           />
+          <q-select
+            :model-value="runtimeDisplay"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="运行展示"
+            :options="runtimeDisplayOptions"
+            @update:model-value="emitRuntimeDisplay"
+          />
+          <q-input
+            v-if="runtimeDisplay === 'paged'"
+            :model-value="runtimePageSize"
+            dense
+            outlined
+            type="number"
+            label="每页条数"
+            min="1"
+            max="500"
+            @update:model-value="emitRuntimePageSize"
+          />
           <div class="capability-list">
             <div><q-icon name="security" /> 预览和运行继承主表数据权限</div>
             <div><q-icon name="table_view" /> 当前版本保存类 Excel 单元格设计</div>
@@ -187,6 +208,7 @@ import type {
   ReportCellStyle,
   ReportDataset,
   ReportDatasetJoin,
+  ReportRuntimeDisplayMode,
 } from 'src/api/services/report'
 
 type InspectorTab = 'cell' | 'data' | 'report'
@@ -214,6 +236,9 @@ const props = defineProps<{
   datasetJoins: ReportDatasetJoin[]
   category: string
   description: string
+  runtimeDisplay: ReportRuntimeDisplayMode
+  runtimePageSize: number
+  runtimeDisplayOptions: Array<Option<ReportRuntimeDisplayMode>>
 }>()
 
 const emit = defineEmits<{
@@ -231,6 +256,8 @@ const emit = defineEmits<{
   removeJoin: [id: string]
   'update:category': [value: string]
   'update:description': [value: string]
+  'update:runtimeDisplay': [value: ReportRuntimeDisplayMode]
+  'update:runtimePageSize': [value: number]
 }>()
 
 function emitTab(value: unknown) {
@@ -254,6 +281,17 @@ function emitCellAlign(value: unknown) {
   if (value === 'left' || value === 'center' || value === 'right') {
     emit('update:cellAlign', value)
   }
+}
+
+function emitRuntimeDisplay(value: unknown) {
+  if (value === 'paged' || value === 'all') {
+    emit('update:runtimeDisplay', value)
+  }
+}
+
+function emitRuntimePageSize(value: unknown) {
+  const numeric = Number(value)
+  emit('update:runtimePageSize', Number.isFinite(numeric) ? Math.min(Math.max(numeric, 1), 500) : 20)
 }
 
 function datasetName(id: string) {

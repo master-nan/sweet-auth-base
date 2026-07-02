@@ -8,6 +8,13 @@ import type {
   ReportSheetConfig,
 } from './types'
 
+export type ReportSheetBounds = {
+  minRow: number
+  maxRow: number
+  minCol: number
+  maxCol: number
+}
+
 export const reportColumnName = (col: number) => {
   let name = ''
   let value = col
@@ -45,6 +52,98 @@ export const reportBindingText = (
   return `${prefix}.S(${field.name})`
 }
 
+export const reportRuntimeColumnAlias = (datasetId: string | undefined, fieldCode: string | undefined) => {
+  const raw = `${datasetId || ''}__${fieldCode || ''}`.replace(/^_+|_+$/g, '') || fieldCode || ''
+  const normalized = raw.replace(/[^A-Za-z0-9_]/g, '_')
+  if (!normalized) return ''
+  return /^[0-9]/.test(normalized) ? `c_${normalized}` : normalized
+}
+
+export const reportRuntimeCellValue = (
+  row: Record<string, unknown> | undefined,
+  cell: ReportSheetCell,
+  datasets: ReportDataset[],
+) => {
+  const binding = cell.binding
+  if (!binding?.field || !row) return cell.value || ''
+  const dataset = datasets.find((item) => item.id === binding.dataset_id)
+  const candidates = [
+    reportRuntimeColumnAlias(binding.dataset_id, binding.field),
+    reportRuntimeColumnAlias(dataset?.id, binding.field),
+    reportRuntimeColumnAlias(dataset?.source_code, binding.field),
+    binding.field,
+  ].filter(Boolean)
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      const value = row[key]
+      if (value === null || value === undefined) return ''
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value)
+      }
+      return JSON.stringify(value)
+    }
+  }
+  return ''
+}
+
+export const reportSheetCellAt = (
+  sheet: ReportSheetConfig,
+  row: number,
+  col: number,
+): ReportSheetCell => {
+  return sheet.cells.find((cell) => cell.row === row && cell.col === col) || {
+    id: makeReportCellId(row, col),
+    row,
+    col,
+    value: '',
+  }
+}
+
+export const reportSheetCellSpan = (cell: ReportSheetCell, bounds?: Partial<ReportSheetBounds>) => {
+  const rawRowspan = Math.max(cell.rowspan || 1, 1)
+  const rawColspan = Math.max(cell.colspan || 1, 1)
+  return {
+    rowspan: Math.max(Math.min(rawRowspan, (bounds?.maxRow || cell.row + rawRowspan - 1) - cell.row + 1), 1),
+    colspan: Math.max(Math.min(rawColspan, (bounds?.maxCol || cell.col + rawColspan - 1) - cell.col + 1), 1),
+  }
+}
+
+export const reportSheetIsCoveredCell = (
+  sheet: ReportSheetConfig,
+  row: number,
+  col: number,
+) => {
+  return sheet.cells.some((cell) => {
+    if (cell.row === row && cell.col === col) return false
+    const { rowspan, colspan } = reportSheetCellSpan(cell)
+    return row >= cell.row && row < cell.row + rowspan && col >= cell.col && col < cell.col + colspan
+  })
+}
+
+export const reportSheetUsedBounds = (sheet: ReportSheetConfig): ReportSheetBounds => {
+  const used = sheet.cells.filter((cell) => {
+    return Boolean(
+      cell.value ||
+      cell.binding?.field ||
+      (cell.colspan && cell.colspan > 1) ||
+      (cell.rowspan && cell.rowspan > 1),
+    )
+  })
+  if (!used.length) {
+    return { minRow: 1, maxRow: 1, minCol: 1, maxCol: 1 }
+  }
+  const minRow = Math.min(...used.map((cell) => cell.row))
+  const minCol = Math.min(...used.map((cell) => cell.col))
+  const maxRow = Math.max(1, ...used.map((cell) => cell.row + (cell.rowspan || 1) - 1))
+  const maxCol = Math.max(1, ...used.map((cell) => cell.col + (cell.colspan || 1) - 1))
+  return {
+    minRow: Math.max(minRow, 1),
+    maxRow: Math.min(Math.max(maxRow, 1), sheet.rows || maxRow),
+    minCol: Math.max(minCol, 1),
+    maxCol: Math.min(Math.max(maxCol, 1), sheet.cols || maxCol),
+  }
+}
+
 export const reportCellStyle = (cell: ReportSheetCell) => {
   const style = cell.style || {}
   return {
@@ -69,9 +168,8 @@ export const collectReportUsedFields = (
     if (!binding?.field || !binding.dataset_id) return
     const dataset = datasets.find((item) => item.id === binding.dataset_id)
     if (!dataset || dataset.type !== 'table') return
-    if (primary && dataset.id !== primary.id) return
     const field = dataset.fields.find((item) => item.code === binding.field)
-    if (field) used.set(field.code, field)
+    if (field) used.set(`${dataset.id}:${field.code}`, field)
   })
   if (used.size === 0 && primary) {
     primary.fields.slice(0, 6).forEach((field) => used.set(field.code, field))

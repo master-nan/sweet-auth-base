@@ -7,6 +7,7 @@ export type ReportCellBindingType = 'static' | 'field' | 'group' | 'sum' | 'coun
 export type ReportParameterType = 'text' | 'select' | 'date' | 'date_range' | 'number'
 export type ReportParameterOperator = 'eq' | 'like' | 'between' | 'gte' | 'lte'
 export type ReportDatasetJoinType = 'left' | 'inner'
+export type ReportRuntimeDisplayMode = 'paged' | 'all'
 
 export interface ReportField {
   name: string
@@ -92,6 +93,8 @@ export interface ReportLayoutConfig {
   dataset_joins?: ReportDatasetJoin[] | undefined
   parameters: ReportParameter[]
   sheet: ReportSheetConfig
+  runtime_display?: ReportRuntimeDisplayMode
+  runtime_page_size?: number
 }
 
 export interface ReportQueryConfig {
@@ -147,6 +150,8 @@ export interface ReportSaveReq {
   dataset_joins?: ReportDatasetJoin[] | undefined
   parameters: ReportParameter[]
   sheet: ReportSheetConfig
+  runtime_display?: ReportRuntimeDisplayMode
+  runtime_page_size?: number
   status?: ReportStatus
 }
 

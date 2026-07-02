@@ -49,76 +49,82 @@
         }"
       >
         <div class="sheet-corner" />
-        <div v-for="col in sheet.cols" :key="`head-${col}`" class="sheet-col-head">
+        <div
+          v-for="col in sheet.cols"
+          :key="`head-${col}`"
+          class="sheet-col-head"
+          :style="columnHeaderStyle(col)"
+        >
           {{ reportColumnName(col) }}
         </div>
         <template v-for="row in sheet.rows" :key="`row-${row}`">
-          <div class="sheet-row-head" :class="{ summary: isSummaryRow(row) }">{{ row }}</div>
-          <div
-            v-for="col in sheet.cols"
-            :key="cellAt(row, col).id"
-            class="sheet-cell"
-            :class="{
-              active: selectedCellId === cellAt(row, col).id,
-              bound: !!cellAt(row, col).binding?.field,
-              summary: isSummaryRow(row),
-            }"
-            :style="reportCellStyle(cellAt(row, col))"
-            :data-cell-id="cellAt(row, col).id"
-            role="button"
-            tabindex="0"
-            :draggable="editingCellId !== cellAt(row, col).id"
-            @click="handleCellClick(row, col, $event)"
-            @dblclick.stop="startEdit(row, col)"
-            @keydown.enter.prevent="startEdit(row, col)"
-            @mousedown.left="$emit('startDragCell', row, col)"
-            @mouseup.left="$emit('dropField', row, col)"
-            @dragstart="$emit('startDragCell', row, col)"
-            @dragover.prevent
-            @drop.prevent="$emit('dropField', row, col)"
-          >
-            <input
-              v-if="editingCellId === cellAt(row, col).id"
-              v-model="editingValue"
-              autofocus
-              class="sheet-cell__editor"
-              @click.stop
-              @keydown.enter.stop.prevent="commitEdit(row, col)"
-              @keydown.esc.stop.prevent="cancelEdit"
-              @blur="commitEdit(row, col)"
+          <div class="sheet-row-head" :class="{ summary: isSummaryRow(row) }" :style="rowHeaderStyle(row)">{{ row }}</div>
+          <template v-for="col in sheet.cols" :key="cellAt(row, col).id">
+            <div
+              v-if="!isCoveredCell(row, col)"
+              class="sheet-cell"
+              :class="{
+                active: selectedCellId === cellAt(row, col).id,
+                bound: !!cellAt(row, col).binding?.field,
+                summary: isSummaryRow(row),
+              }"
+              :style="sheetCellStyle(cellAt(row, col))"
+              :data-cell-id="cellAt(row, col).id"
+              role="button"
+              tabindex="0"
+              :draggable="editingCellId !== cellAt(row, col).id"
+              @click="handleCellClick(row, col, $event)"
+              @dblclick.stop="startEdit(row, col)"
+              @keydown.enter.prevent="startEdit(row, col)"
+              @mousedown.left="$emit('startDragCell', row, col)"
+              @mouseup.left="$emit('dropField', row, col)"
+              @dragstart="$emit('startDragCell', row, col)"
+              @dragover.prevent
+              @drop.prevent="$emit('dropField', row, col)"
             >
-            <span v-else>{{ cellAt(row, col).value || '' }}</span>
-            <q-menu context-menu @before-show="$emit('selectCell', row, col)">
-              <q-list dense style="min-width: 150px">
-                <q-item clickable v-close-popup @click="startEdit(row, col)">
-                  <q-item-section avatar><q-icon name="edit" /></q-item-section>
-                  <q-item-section>编辑文本</q-item-section>
-                </q-item>
-                <q-item clickable v-close-popup @click="$emit('clearCell', row, col)">
-                  <q-item-section avatar><q-icon name="backspace" /></q-item-section>
-                  <q-item-section>清除单元格</q-item-section>
-                </q-item>
-                <q-item clickable v-close-popup @click="$emit('mergeCellRight', row, col)">
-                  <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
-                  <q-item-section>合并右侧</q-item-section>
-                </q-item>
-                <q-separator />
-                <q-item clickable v-close-popup @click="$emit('insertRowAfter', row)">
-                  <q-item-section avatar><q-icon name="table_rows" /></q-item-section>
-                  <q-item-section>下方插入行</q-item-section>
-                </q-item>
-                <q-item clickable v-close-popup @click="$emit('insertColAfter', col)">
-                  <q-item-section avatar><q-icon name="view_column" /></q-item-section>
-                  <q-item-section>右侧插入列</q-item-section>
-                </q-item>
-                <q-separator />
-                <q-item clickable v-close-popup @click="$emit('toggleSummaryRow', row)">
-                  <q-item-section avatar><q-icon name="functions" /></q-item-section>
-                  <q-item-section>{{ isSummaryRow(row) ? '取消汇总行' : '设为汇总行' }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </div>
+              <input
+                v-if="editingCellId === cellAt(row, col).id"
+                v-model="editingValue"
+                autofocus
+                class="sheet-cell__editor"
+                @click.stop
+                @keydown.enter.stop.prevent="commitEdit(row, col)"
+                @keydown.esc.stop.prevent="cancelEdit"
+                @blur="commitEdit(row, col)"
+              >
+              <span v-else>{{ cellAt(row, col).value || '' }}</span>
+              <q-menu context-menu @before-show="$emit('selectCell', row, col)">
+                <q-list dense style="min-width: 150px">
+                  <q-item clickable v-close-popup @click="startEdit(row, col)">
+                    <q-item-section avatar><q-icon name="edit" /></q-item-section>
+                    <q-item-section>编辑文本</q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="$emit('clearCell', row, col)">
+                    <q-item-section avatar><q-icon name="backspace" /></q-item-section>
+                    <q-item-section>清除单元格</q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="$emit('mergeCellRight', row, col)">
+                    <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
+                    <q-item-section>合并右侧</q-item-section>
+                  </q-item>
+                  <q-separator />
+                  <q-item clickable v-close-popup @click="$emit('insertRowAfter', row)">
+                    <q-item-section avatar><q-icon name="table_rows" /></q-item-section>
+                    <q-item-section>下方插入行</q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="$emit('insertColAfter', col)">
+                    <q-item-section avatar><q-icon name="view_column" /></q-item-section>
+                    <q-item-section>右侧插入列</q-item-section>
+                  </q-item>
+                  <q-separator />
+                  <q-item clickable v-close-popup @click="$emit('toggleSummaryRow', row)">
+                    <q-item-section avatar><q-icon name="functions" /></q-item-section>
+                    <q-item-section>{{ isSummaryRow(row) ? '取消汇总行' : '设为汇总行' }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </div>
+          </template>
         </template>
       </div>
     </div>
@@ -133,7 +139,13 @@ import type {
   ReportSheetCell,
   ReportSheetConfig,
 } from 'src/api/services/report'
-import { reportCellId, reportCellStyle, reportColumnName } from 'src/modules/report/sheet'
+import {
+  reportCellStyle,
+  reportColumnName,
+  reportSheetCellAt,
+  reportSheetCellSpan,
+  reportSheetIsCoveredCell,
+} from 'src/modules/report/sheet'
 
 const props = defineProps<{
   sheet: ReportSheetConfig
@@ -168,14 +180,37 @@ const editingCellId = ref('')
 const editingValue = ref('')
 
 function cellAt(row: number, col: number): ReportSheetCell {
-  return (
-    props.sheet.cells.find((item) => item.row === row && item.col === col) || {
-      id: reportCellId(row, col),
-      row,
-      col,
-      value: '',
-    }
-  )
+  return reportSheetCellAt(props.sheet, row, col)
+}
+
+function columnHeaderStyle(col: number) {
+  return {
+    gridColumn: col + 1,
+    gridRow: 1,
+  }
+}
+
+function rowHeaderStyle(row: number) {
+  return {
+    gridColumn: 1,
+    gridRow: row + 1,
+  }
+}
+
+function sheetCellStyle(cell: ReportSheetCell) {
+  const { rowspan, colspan } = reportSheetCellSpan(cell, {
+    maxRow: props.sheet.rows,
+    maxCol: props.sheet.cols,
+  })
+  return {
+    ...reportCellStyle(cell),
+    gridColumn: `${cell.col + 1} / span ${colspan}`,
+    gridRow: `${cell.row + 1} / span ${rowspan}`,
+  }
+}
+
+function isCoveredCell(row: number, col: number) {
+  return reportSheetIsCoveredCell(props.sheet, row, col)
 }
 
 function startEdit(row: number, col: number) {

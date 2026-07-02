@@ -293,18 +293,39 @@
           <q-btn outline color="primary" icon="restart_alt" label="重置" @click="resetRuntimeFilters" />
         </q-card-section>
         <q-card-section class="runtime-body">
-          <q-table
-            flat
-            bordered
-            separator="cell"
-            row-key="id"
-            :rows="runtimeRows"
-            :columns="runtimeColumns"
+          <report-sheet-preview
+            :sheet="runtimeSheet"
+            :datasets="runtimeDatasets"
+            :preview-data="runtimeData"
             :loading="runtimeLoading"
-            v-model:pagination="runtimePagination"
-            :rows-per-page-options="[20, 50, 100]"
-            @request="onRuntimeTableRequest"
+            :report-kind="runtimeReport?.report_kind || 'detail'"
           />
+          <div v-if="runtimeDisplayMode === 'paged'" class="runtime-pagination">
+            <span>共 {{ runtimePagination.rowsNumber }} 行</span>
+            <q-pagination
+              v-model="runtimePagination.page"
+              color="primary"
+              :max="runtimePageCount"
+              :max-pages="7"
+              boundary-numbers
+              direction-links
+              @update:model-value="loadRuntimePreview"
+            />
+            <q-select
+              v-model="runtimePagination.rowsPerPage"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="runtime-page-size"
+              :options="runtimePageSizeOptions"
+              @update:model-value="changeRuntimePageSize"
+            />
+          </div>
+          <div v-else class="runtime-pagination">
+            <span>共 {{ runtimePagination.rowsNumber }} 行</span>
+            <q-badge color="primary" label="全部展示" />
+          </div>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -324,13 +345,16 @@ import {
   defaultReportSheet,
   useReportApi,
   type Report,
+  type ReportDataset,
   type ReportParameter,
   type ReportPreviewRes,
   type ReportStatus,
   type ReportKind,
+  type ReportSheetConfig,
 } from 'src/api/services/report'
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
+import ReportSheetPreview from '../components/ReportSheetPreview.vue'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -370,6 +394,11 @@ const runtimePagination = ref({
   rowsPerPage: 20,
   rowsNumber: 0,
 })
+const runtimePageSizeOptions = [
+  { label: '20 / 页', value: 20 },
+  { label: '50 / 页', value: 50 },
+  { label: '100 / 页', value: 100 },
+]
 
 type TableRequest = {
   pagination: {
@@ -433,6 +462,23 @@ const runtimeColumns = computed<QTableProps['columns']>(() =>
   })),
 )
 const runtimeRows = computed(() => runtimeData.value.rows)
+const runtimeDatasets = computed<ReportDataset[]>(() =>
+  runtimeReport.value?.layout_config?.datasets?.length
+    ? runtimeReport.value.layout_config.datasets
+    : runtimeData.value.datasets || [],
+)
+const runtimeSheet = computed<ReportSheetConfig>(() =>
+  runtimeReport.value?.layout_config?.sheet || defaultReportSheet(),
+)
+const runtimeDisplayMode = computed(() =>
+  runtimeReport.value?.layout_config?.runtime_display || 'paged',
+)
+const runtimeConfiguredPageSize = computed(() =>
+  Number(runtimeReport.value?.layout_config?.runtime_page_size || 20),
+)
+const runtimePageCount = computed(() =>
+  Math.max(1, Math.ceil((runtimePagination.value.rowsNumber || 0) / runtimePagination.value.rowsPerPage)),
+)
 const runtimeParameters = computed<ReportParameter[]>(() => {
   const report = runtimeReport.value
   return report?.layout_config?.parameters?.length
@@ -487,6 +533,7 @@ async function openRuntime(row: Report) {
   runtimeKeyword.value = ''
   runtimeFilterValues.value = {}
   runtimePagination.value.page = 1
+  runtimePagination.value.rowsPerPage = runtimeConfiguredPageSize.value
   runtimeVisible.value = true
   await loadRuntimePreview()
 }
@@ -498,8 +545,8 @@ async function loadRuntimePreview() {
     const res = await reportApi.previewReport({
       report_id: runtimeReport.value.id,
       data_source_id: runtimeReport.value.data_source_id,
-      page: runtimePagination.value.page,
-      num: runtimePagination.value.rowsPerPage,
+      page: runtimeDisplayMode.value === 'all' ? 1 : runtimePagination.value.page,
+      num: runtimeDisplayMode.value === 'all' ? 10000 : runtimePagination.value.rowsPerPage,
       keyword: runtimeKeyword.value,
       parameters: buildRuntimeParameterValues(),
     })
@@ -514,8 +561,8 @@ async function loadRuntimePreview() {
   }
 }
 
-function onRuntimeTableRequest(props: TableRequest) {
-  runtimePagination.value = { ...runtimePagination.value, ...props.pagination }
+function changeRuntimePageSize() {
+  runtimePagination.value.page = 1
   void loadRuntimePreview()
 }
 
@@ -900,6 +947,21 @@ function statusColor(status: ReportStatus) {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.runtime-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  color: #71809a;
+}
+
+.runtime-page-size {
+  width: 110px;
 }
 
 @media (max-width: 1200px) {
