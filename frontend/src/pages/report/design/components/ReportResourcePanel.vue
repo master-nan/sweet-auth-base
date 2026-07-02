@@ -38,6 +38,16 @@
               dense
               round
               color="primary"
+              icon="view_week"
+              @click.stop="$emit('layoutDataset', dataset.id)"
+            >
+              <q-tooltip>从当前单元格开始布置字段</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              dense
+              round
+              color="primary"
               icon="edit"
               @click.stop="$emit('editDataset', dataset.id)"
             />
@@ -116,6 +126,7 @@ defineEmits<{
   selectDataset: [id: string]
   editDataset: [id: string]
   removeDataset: [id: string]
+  layoutDataset: [id: string]
   startDragField: [dataset: ReportDataset, field: ReportField]
   bindField: [dataset: ReportDataset, field: ReportField]
   addParameter: []

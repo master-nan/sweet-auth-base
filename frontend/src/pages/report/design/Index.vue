@@ -28,6 +28,7 @@
         @select-dataset="selectedDatasetId = $event"
         @edit-dataset="openDatasetDialog"
         @remove-dataset="removeDataset"
+        @layout-dataset="layoutDataset"
         @start-drag-field="startDragField"
         @bind-field="bindFieldToActiveCell"
         @add-parameter="addParameter"
@@ -707,6 +708,81 @@ function removeDataset(id: string) {
   if (removed?.primary && datasets.value[0]) datasets.value[0].primary = true
   selectedDatasetId.value = datasets.value[0]?.id || ''
   buildLocalPreview()
+}
+
+function layoutDataset(id: string) {
+  const dataset = datasets.value.find((item) => item.id === id)
+  if (!dataset || !dataset.fields.length) {
+    $q.notify({ type: 'warning', message: '数据集暂无字段，SQL 数据集请先解析字段' })
+    return
+  }
+  const anchor = activeCell.value || cellAt(1, 1)
+  const fields = dataset.fields.slice(0, 24)
+  ensureSheetSize(anchor.row + 1, anchor.col + fields.length - 1)
+  fields.forEach((field, index) => {
+    const col = anchor.col + index
+    patchCell(anchor.row, col, {
+      value: field.name,
+      binding: undefined,
+      rowspan: 1,
+      colspan: 1,
+      style: {
+        bold: true,
+        align: 'center',
+        background: '#f3f5fb',
+      },
+    })
+    const bindingType: ReportCellBindingType = form.report_kind === 'detail'
+      ? 'field'
+      : defaultReportBindingType(field)
+    patchCell(anchor.row + 1, col, {
+      value: reportBindingText(bindingType, dataset, field),
+      binding: {
+        type: bindingType,
+        dataset_id: dataset.id,
+        field: field.code,
+      },
+      rowspan: 1,
+      colspan: 1,
+      style: {
+        color: '#6d5dfc',
+        bold: true,
+        align: field.role === 'metric' ? 'right' : 'left',
+      },
+    })
+  })
+  selectedDatasetId.value = dataset.id
+  selectedCellId.value = reportCellId(anchor.row + 1, anchor.col)
+  selectionRange.value = {
+    startRow: anchor.row,
+    startCol: anchor.col,
+    endRow: anchor.row + 1,
+    endCol: anchor.col + fields.length - 1,
+  }
+  if (dataset.primary && dataset.type === 'table') {
+    form.permission_table_code = dataset.source_code || form.permission_table_code
+  }
+  buildLocalPreview()
+  $q.notify({ type: 'positive', message: `已布置 ${fields.length} 个字段` })
+}
+
+function ensureSheetSize(rows: number, cols: number) {
+  if (rows > sheet.value.rows) {
+    for (let row = sheet.value.rows + 1; row <= rows; row += 1) {
+      for (let col = 1; col <= sheet.value.cols; col += 1) {
+        sheet.value.cells.push({ id: reportCellId(row, col), row, col, value: '' })
+      }
+    }
+    sheet.value.rows = rows
+  }
+  if (cols > sheet.value.cols) {
+    for (let col = sheet.value.cols + 1; col <= cols; col += 1) {
+      for (let row = 1; row <= sheet.value.rows; row += 1) {
+        sheet.value.cells.push({ id: reportCellId(row, col), row, col, value: '' })
+      }
+    }
+    sheet.value.cols = cols
+  }
 }
 
 function setPrimaryDataset(id: string) {
