@@ -66,7 +66,7 @@
 
       <section class="report-main-grid">
         <aside class="category-panel">
-          <div class="section-title">目录</div>
+          <div class="section-title">分类筛选</div>
           <button
             class="category-item"
             :class="{ active: activeCategory === '' }"
@@ -348,25 +348,11 @@
             :report-kind="runtimeReport?.report_kind || 'detail'"
           />
           <div v-if="runtimeDisplayMode === 'paged'" class="runtime-pagination">
-            <span>共 {{ runtimePagination.rowsNumber }} 行</span>
-            <q-pagination
-              v-model="runtimePagination.page"
-              color="primary"
-              :max="runtimePageCount"
-              :max-pages="7"
-              boundary-numbers
-              direction-links
-              @update:model-value="loadRuntimePreview"
-            />
-            <q-select
-              v-model="runtimePagination.rowsPerPage"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="runtime-page-size"
-              :options="runtimePageSizeOptions"
-              @update:model-value="changeRuntimePageSize"
+            <table-pagination
+              v-model:page="runtimePagination.page"
+              v-model:page-size="runtimePagination.rowsPerPage"
+              :total="runtimePagination.rowsNumber"
+              @update:page="loadRuntimePreview"
             />
           </div>
           <div v-else class="runtime-pagination">
@@ -445,11 +431,6 @@ const runtimePagination = ref({
   rowsPerPage: 20,
   rowsNumber: 0,
 })
-const runtimePageSizeOptions = [
-  { label: '20 / 页', value: 20 },
-  { label: '50 / 页', value: 50 },
-  { label: '100 / 页', value: 100 },
-]
 
 const statusOptions = [
   { label: '全部状态', value: 'all' },
@@ -515,12 +496,6 @@ const runtimeDisplayMode = computed(
 )
 const runtimeConfiguredPageSize = computed(() =>
   Number(runtimeReport.value?.layout_config?.runtime_page_size || 20),
-)
-const runtimePageCount = computed(() =>
-  Math.max(
-    1,
-    Math.ceil((runtimePagination.value.rowsNumber || 0) / runtimePagination.value.rowsPerPage),
-  ),
 )
 const runtimeParameters = computed<ReportParameter[]>(() => {
   const report = runtimeReport.value
@@ -619,11 +594,6 @@ async function loadRuntimePreview() {
   } finally {
     runtimeLoading.value = false
   }
-}
-
-function changeRuntimePageSize() {
-  runtimePagination.value.page = 1
-  void loadRuntimePreview()
 }
 
 function resetRuntimeFilters() {
@@ -1083,10 +1053,6 @@ watch(
   justify-content: flex-end;
   gap: 12px;
   color: #71809a;
-}
-
-.runtime-page-size {
-  width: 110px;
 }
 
 @media (max-width: 1200px) {

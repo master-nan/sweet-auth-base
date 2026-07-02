@@ -268,6 +268,7 @@ import {
   reportSheetCellSpan,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
+import { reportParameterDefaultsForField } from 'src/modules/report/schema'
 
 const $q = useQuasar()
 const route = useRoute()
@@ -1089,8 +1090,9 @@ function openParameterDialog(id = '') {
   parameterDraft.label = current?.label || field.name
   parameterDraft.dataset_id = current?.dataset_id || dataset.id
   parameterDraft.field = current?.field || field.code
-  parameterDraft.type = current?.type || (field.role === 'time' ? 'date_range' : 'text')
-  parameterDraft.operator = current?.operator || (field.role === 'time' ? 'between' : 'like')
+  const defaults = reportParameterDefaultsForField(field)
+  parameterDraft.type = current?.type || defaults.type
+  parameterDraft.operator = current?.operator || defaults.operator
   parameterDraft.placeholder = current?.placeholder || `请输入${field.name}`
   parameterDraft.default_value = stringifyParameterDefault(current?.default_value)
   parameterDialogVisible.value = true
@@ -1102,8 +1104,11 @@ function handleParameterDatasetChange(id: string) {
   parameterDraft.field = field?.code || ''
   parameterDraft.default_value = ''
   if (field) {
+    const defaults = reportParameterDefaultsForField(field)
     parameterDraft.label = field.name
     parameterDraft.placeholder = `请输入${field.name}`
+    parameterDraft.type = defaults.type
+    parameterDraft.operator = defaults.operator
   }
 }
 
@@ -1115,10 +1120,9 @@ function handleParameterFieldChange(fieldCode: string) {
   parameterDraft.label = field.name
   parameterDraft.placeholder = `请输入${field.name}`
   parameterDraft.default_value = ''
-  if (field.role === 'time') {
-    parameterDraft.type = 'date_range'
-    parameterDraft.operator = 'between'
-  }
+  const defaults = reportParameterDefaultsForField(field)
+  parameterDraft.type = defaults.type
+  parameterDraft.operator = defaults.operator
 }
 
 function confirmParameter() {

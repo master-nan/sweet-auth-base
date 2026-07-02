@@ -1111,7 +1111,11 @@ func applyReportParameterValues(query *request.Basic, config reportconfig.Config
 		case "", "eq":
 			query.Filters[field] = value
 		case "like":
-			rules = append(rules, request.QueryRule{Field: field, ExpressionType: enum.Like, Value: value})
+			if reportParameterFieldAllowsLike(config, param) {
+				rules = append(rules, request.QueryRule{Field: field, ExpressionType: enum.Like, Value: value})
+			} else {
+				query.Filters[field] = value
+			}
 		case "between":
 			if !reportValueIsRange(value) {
 				return myerrors.NewBadRequestError("报表区间参数必须传入两个值")
@@ -1133,6 +1137,49 @@ func applyReportParameterValues(query *request.Basic, config reportconfig.Config
 		})
 	}
 	return nil
+}
+
+func reportParameterFieldAllowsLike(config reportconfig.Config, param reportconfig.Parameter) bool {
+	field, ok := reportParameterField(config, param)
+	if !ok {
+		return true
+	}
+	role := strings.ToLower(strings.TrimSpace(field.Role))
+	if role == "metric" || role == "time" {
+		return false
+	}
+	typ := strings.ToLower(strings.TrimSpace(field.Type))
+	if typ == "" {
+		return true
+	}
+	if typ == "date" || typ == "datetime" || typ == "timestamp" || typ == "time" {
+		return false
+	}
+	for _, token := range []string{"int", "number", "numeric", "decimal", "float", "double", "bigint", "smallint", "serial"} {
+		if strings.Contains(typ, token) {
+			return false
+		}
+	}
+	return true
+}
+
+func reportParameterField(config reportconfig.Config, param reportconfig.Parameter) (reportconfig.Field, bool) {
+	paramDatasetID := strings.TrimSpace(param.DatasetId)
+	paramField := strings.TrimSpace(param.Field)
+	if paramField == "" {
+		return reportconfig.Field{}, false
+	}
+	for _, dataset := range config.Datasets() {
+		if paramDatasetID != "" && strings.TrimSpace(dataset.Id) != paramDatasetID {
+			continue
+		}
+		for _, field := range dataset.Fields {
+			if strings.TrimSpace(field.Code) == paramField || strings.TrimSpace(field.Field) == paramField {
+				return field, true
+			}
+		}
+	}
+	return reportconfig.Field{}, false
 }
 
 func reportSQLParameterWhere(config reportconfig.Config, datasetID string, values map[string]any) (string, []any, error) {

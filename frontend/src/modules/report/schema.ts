@@ -4,6 +4,8 @@ import type {
   ReportField,
   ReportKind,
   ReportLayoutConfig,
+  ReportParameterOperator,
+  ReportParameterType,
   ReportSheetCell,
   ReportSheetConfig,
 } from './types'
@@ -39,6 +41,15 @@ export const guessReportFieldRole = (code: string, type: string): NonNullable<Re
     return 'dimension'
   }
   return 'text'
+}
+
+export const reportParameterDefaultsForField = (
+  field?: ReportField,
+): { type: ReportParameterType; operator: ReportParameterOperator } => {
+  if (!field) return { type: 'text', operator: 'like' }
+  if (field.role === 'time') return { type: 'date_range', operator: 'between' }
+  if (field.role === 'metric') return { type: 'number', operator: 'eq' }
+  return { type: 'text', operator: 'like' }
 }
 
 export const createBlankReportSheet = (rows = 24, cols = 12): ReportSheetConfig => {

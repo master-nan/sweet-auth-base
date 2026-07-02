@@ -48,13 +48,13 @@ const emit = defineEmits<{
   'update:pageSize': [value: number]
 }>()
 
-const pageSizeOptions = [15, 30, 50, 100]
+const pageSizeOptions = [15, 20, 30, 50, 100]
 
 const currentPage = ref(props.page)
 const currentPageSize = ref(props.pageSize)
 
 const totalPages = computed(() => {
-  return Math.ceil(props.total / currentPageSize.value)
+  return Math.max(1, Math.ceil(props.total / currentPageSize.value))
 })
 
 const onPageChange = (page: number) => {
@@ -63,8 +63,8 @@ const onPageChange = (page: number) => {
 
 const onPageSizeChange = (pageSize: number) => {
   currentPage.value = 1
-  emit('update:page', 1)
   emit('update:pageSize', pageSize)
+  emit('update:page', 1)
 }
 
 watch(
