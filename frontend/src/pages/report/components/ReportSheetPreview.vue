@@ -5,32 +5,27 @@
       <span>正在加载报表数据</span>
     </div>
 
-    <div v-else-if="!renderRows.length" class="report-sheet-preview__state">
+    <div v-else-if="!renderCells.length" class="report-sheet-preview__state">
       <q-icon name="dataset_off" size="32px" />
       <span>暂无可预览的数据或单元格配置</span>
     </div>
 
     <div v-else class="report-sheet-preview__scroll">
-      <table class="report-sheet-preview__table">
-        <tbody>
-          <tr v-for="row in renderRows" :key="row.key">
-            <td
-              v-for="cell in row.cells"
-              :key="cell.key"
-              :colspan="cell.colspan"
-              :rowspan="cell.rowspan"
-              :class="{
-                'is-bound': cell.bound,
-                'is-summary': cell.summary,
-                'is-empty': !cell.value,
-              }"
-              :style="cell.style"
-            >
-              {{ cell.value }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="report-sheet-preview__grid" :style="gridStyle">
+        <div
+          v-for="cell in renderCells"
+          :key="cell.key"
+          class="report-sheet-preview__cell"
+          :class="{
+            'is-bound': cell.bound,
+            'is-summary': cell.summary,
+            'is-empty': !cell.value,
+          }"
+          :style="cell.style"
+        >
+          {{ cell.value }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -68,19 +63,23 @@ type RenderCell = {
   value: string
   bound: boolean
   summary: boolean
-  colspan: number
-  rowspan: number
   style: Record<string, string | number | undefined>
 }
 
-type RenderRow = {
-  key: string
-  cells: RenderCell[]
+type RenderPlanItem = {
+  sourceRow: number
+  renderRow: number
+  dataRow: Record<string, unknown> | undefined
+  suffix: string
 }
 
 const usedBounds = computed(() => reportSheetUsedBounds(props.sheet))
 
-const templateRows = computed(() => {
+const sourceColCount = computed(() =>
+  Math.max(1, usedBounds.value.maxCol - usedBounds.value.minCol + 1),
+)
+
+const detailRows = computed(() => {
   const rows = new Set<number>()
   props.sheet.cells.forEach((cell) => {
     if (
@@ -94,9 +93,9 @@ const templateRows = computed(() => {
   return [...rows].sort((a, b) => a - b)
 })
 
-const templateRowGroups = computed(() => {
+const detailRowGroups = computed(() => {
   const groups: number[][] = []
-  templateRows.value.forEach((row) => {
+  detailRows.value.forEach((row) => {
     const lastGroup = groups[groups.length - 1]
     const lastRow = lastGroup?.[lastGroup.length - 1]
     if (lastGroup && lastRow !== undefined && row === lastRow + 1) {
@@ -108,119 +107,98 @@ const templateRowGroups = computed(() => {
   return groups
 })
 
-const renderRows = computed<RenderRow[]>(() => {
-  const rows: RenderRow[] = []
-  const templateGroupByStart = new Map(templateRowGroups.value.map((group) => [group[0], group]))
-  const templateRowsInGroup = new Set(templateRowGroups.value.flat())
+const renderPlan = computed(() => {
+  const plan: RenderPlanItem[] = []
+  const groupByStart = new Map(detailRowGroups.value.map((group) => [group[0], group]))
+  const rowsInDetailGroup = new Set(detailRowGroups.value.flat())
   const dataRows = props.previewData.rows || []
-  const minRow = usedBounds.value.minRow
-  const maxRow = usedBounds.value.maxRow
-  const minCol = usedBounds.value.minCol
-  const maxCol = usedBounds.value.maxCol
+  let renderRow = 1
 
-  for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex += 1) {
-    const templateGroup = templateGroupByStart.get(rowIndex)
-    if (templateGroup && props.reportKind === 'detail') {
-      if (!dataRows.length) {
-        pushVisibleRow(rows, buildDetailRow(templateGroup, undefined, 'template-empty', minCol, maxCol, maxRow))
-      } else {
-        dataRows.forEach((dataRow, dataIndex) => {
-          pushVisibleRow(rows, buildDetailRow(templateGroup, dataRow, `data-${dataIndex}`, minCol, maxCol, maxRow))
+  for (let sourceRow = usedBounds.value.minRow; sourceRow <= usedBounds.value.maxRow; sourceRow += 1) {
+    const detailGroup = groupByStart.get(sourceRow)
+    if (detailGroup && props.reportKind === 'detail') {
+      const repeatedRows = dataRows.length ? dataRows : [undefined]
+      repeatedRows.forEach((dataRow, dataIndex) => {
+        detailGroup.forEach((groupRow) => {
+          plan.push({
+            sourceRow: groupRow,
+            renderRow,
+            dataRow,
+            suffix: `data-${dataIndex}-${groupRow}`,
+          })
+          renderRow += 1
         })
-      }
-      rowIndex = templateGroup[templateGroup.length - 1] || rowIndex
+      })
+      sourceRow = detailGroup[detailGroup.length - 1] || sourceRow
       continue
     }
-    if (templateRowsInGroup.has(rowIndex) && props.reportKind === 'detail') continue
-    pushVisibleRow(rows, buildRow(rowIndex, undefined, 'static', minCol, maxCol, maxRow))
+    if (props.reportKind === 'detail' && rowsInDetailGroup.has(sourceRow)) continue
+    plan.push({
+      sourceRow,
+      renderRow,
+      dataRow: undefined,
+      suffix: `row-${sourceRow}`,
+    })
+    renderRow += 1
   }
 
-  return trimTrailingEmptyRows(rows)
+  return trimTrailingBlankRenderRows(plan)
 })
 
-function pushVisibleRow(rows: RenderRow[], row: RenderRow) {
-  if (rowHasContent(row)) rows.push(row)
-}
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${sourceColCount.value}, minmax(132px, 1fr))`,
+  gridTemplateRows: `repeat(${Math.max(renderRowCount.value, 1)}, minmax(42px, auto))`,
+}))
 
-function rowHasContent(row: RenderRow) {
-  return row.cells.some((cell) => String(cell.value || '').trim() !== '')
-}
+const renderRowCount = computed(() =>
+  Math.max(1, ...renderPlan.value.map((item) => item.renderRow)),
+)
 
-function buildRow(
-  sourceRow: number,
-  dataRow: Record<string, unknown> | undefined,
-  suffix: string,
-  minCol: number,
-  maxCol: number,
-  maxRow: number,
-): RenderRow {
+const renderCells = computed<RenderCell[]>(() => {
   const cells: RenderCell[] = []
-  for (let col = minCol; col <= maxCol; col += 1) {
-    if (reportSheetIsCoveredCell(props.sheet, sourceRow, col)) continue
-    const cell = cellAt(sourceRow, col)
-    const { rowspan, colspan } = reportSheetCellSpan(cell, { maxRow, maxCol })
-    cells.push({
-      key: `${sourceRow}:${col}:${suffix}`,
-      value: displayCellValue(cell, dataRow),
-      bound: Boolean(cell.binding?.field),
-      summary: props.sheet.summary_rows?.includes(sourceRow) || false,
-      colspan,
-      rowspan,
-      style: cellStyle(cell),
-    })
-  }
-  return { key: `${sourceRow}:${suffix}`, cells }
-}
+  const maxRow = props.sheet.rows || usedBounds.value.maxRow
+  const maxCol = usedBounds.value.maxCol
 
-function buildDetailRow(
-  sourceRows: number[],
-  dataRow: Record<string, unknown> | undefined,
-  suffix: string,
-  minCol: number,
-  maxCol: number,
-  maxRow: number,
-): RenderRow {
-  const cells: RenderCell[] = []
-  for (let col = minCol; col <= maxCol; col += 1) {
-    const sourceCell = firstDetailCellAt(sourceRows, col)
-    if (!sourceCell) {
-      cells.push(emptyRenderCell(`empty:${col}:${suffix}`))
-      continue
+  renderPlan.value.forEach((item) => {
+    for (let col = usedBounds.value.minCol; col <= usedBounds.value.maxCol; col += 1) {
+      if (reportSheetIsCoveredCell(props.sheet, item.sourceRow, col)) continue
+      const sourceCell = cellAt(item.sourceRow, col)
+      const { rowspan, colspan } = reportSheetCellSpan(sourceCell, { maxRow, maxCol })
+      cells.push({
+        key: `${sourceCell.row}:${sourceCell.col}:${item.suffix}`,
+        value: displayCellValue(sourceCell, item.dataRow),
+        bound: Boolean(sourceCell.binding?.field),
+        summary: props.sheet.summary_rows?.includes(item.sourceRow) || false,
+        style: {
+          ...cellStyle(sourceCell),
+          gridColumn: `${col - usedBounds.value.minCol + 1} / span ${colspan}`,
+          gridRow: `${item.renderRow} / span ${rowspan}`,
+        },
+      })
     }
-    const { colspan } = reportSheetCellSpan(sourceCell, { maxRow, maxCol })
-    cells.push({
-      key: `${sourceCell.row}:${sourceCell.col}:${suffix}`,
-      value: displayCellValue(sourceCell, dataRow),
-      bound: Boolean(sourceCell.binding?.field),
-      summary: false,
-      colspan,
-      rowspan: 1,
-      style: cellStyle(sourceCell),
-    })
-    col += colspan - 1
+  })
+
+  return cells
+})
+
+function trimTrailingBlankRenderRows(
+  plan: RenderPlanItem[],
+) {
+  let end = plan.length
+  while (end > 1) {
+    const item = plan[end - 1]
+    if (!item || rowHasContent(item.sourceRow, item.dataRow)) break
+    end -= 1
   }
-  return { key: `detail:${sourceRows.join('-')}:${suffix}`, cells }
+  return plan.slice(0, end)
 }
 
-function firstDetailCellAt(sourceRows: number[], col: number) {
-  for (const row of sourceRows) {
-    if (reportSheetIsCoveredCell(props.sheet, row, col)) continue
-    const cell = cellAt(row, col)
-    if (cell.binding?.field || String(cell.value || '').trim() !== '') return cell
+function rowHasContent(sourceRow: number, dataRow: Record<string, unknown> | undefined) {
+  for (let col = usedBounds.value.minCol; col <= usedBounds.value.maxCol; col += 1) {
+    if (reportSheetIsCoveredCell(props.sheet, sourceRow, col)) continue
+    if (String(displayCellValue(cellAt(sourceRow, col), dataRow) || '').trim() !== '') return true
   }
-  return null
-}
-
-function emptyRenderCell(key: string): RenderCell {
-  return {
-    key,
-    value: '',
-    bound: false,
-    summary: false,
-    colspan: 1,
-    rowspan: 1,
-    style: {},
-  }
+  return false
 }
 
 function cellAt(row: number, col: number): ReportSheetCell {
@@ -229,7 +207,7 @@ function cellAt(row: number, col: number): ReportSheetCell {
 
 function displayCellValue(cell: ReportSheetCell, dataRow: Record<string, unknown> | undefined) {
   if (cell.binding?.field && cell.binding.type !== 'static') {
-    if (!dataRow && props.reportKind !== 'detail') {
+    if (!dataRow && (props.reportKind !== 'detail' || props.sheet.summary_rows?.includes(cell.row))) {
       return aggregateCellValue(cell)
     }
     return reportRuntimeCellValue(dataRow, cell, props.datasets)
@@ -259,23 +237,15 @@ function aggregateCellValue(cell: ReportSheetCell) {
 
 function cellStyle(cell: ReportSheetCell) {
   const style = cell.style || {}
+  const align = style.align || 'left'
   return {
-    textAlign: style.align || 'left',
+    textAlign: align,
+    justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
     fontWeight: style.bold ? 800 : 500,
     fontStyle: style.italic ? 'italic' : 'normal',
-    background: style.background || undefined,
-    color: style.color && !cell.binding?.field ? style.color : undefined,
+    background: style.background || (cell.binding?.field ? '#fbfaff' : '#fff'),
+    color: style.color || '#172033',
   }
-}
-
-function trimTrailingEmptyRows(rows: RenderRow[]) {
-  let end = rows.length
-  while (end > 1) {
-    const row = rows[end - 1]
-    if (!row || rowHasContent(row)) break
-    end -= 1
-  }
-  return rows.slice(0, end)
 }
 </script>
 
@@ -302,15 +272,13 @@ function trimTrailingEmptyRows(rows: RenderRow[]) {
   overflow: auto;
 }
 
-.report-sheet-preview__table {
+.report-sheet-preview__grid {
   min-width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
+  display: grid;
 }
 
-.report-sheet-preview__table td {
-  min-width: 128px;
-  height: 42px;
+.report-sheet-preview__cell {
+  min-height: 42px;
   padding: 8px 10px;
   border-right: 1px solid #dfe5f2;
   border-bottom: 1px solid #dfe5f2;
@@ -319,18 +287,20 @@ function trimTrailingEmptyRows(rows: RenderRow[]) {
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: middle;
+  display: flex;
+  align-items: center;
 }
 
-.report-sheet-preview__table td.is-bound {
+.report-sheet-preview__cell.is-bound {
   background: #fbfaff;
 }
 
-.report-sheet-preview__table td.is-summary {
+.report-sheet-preview__cell.is-summary {
   background: #fff8e8;
   font-weight: 800;
 }
 
-.report-sheet-preview__table td.is-empty {
+.report-sheet-preview__cell.is-empty {
   color: transparent;
 }
 </style>
