@@ -2,15 +2,18 @@ package service
 
 import (
 	"backend/dto/request"
+	"backend/dto/response"
 	"backend/enum"
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/reportconfig"
 	"backend/model"
 	"backend/repository/impl"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -166,11 +169,43 @@ func TestReportSQLParameterWhere(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build sql where: %v", err)
 	}
-	if where != `"customer_name" LIKE ? AND "amount" >= ?` {
+	if where != `CAST("customer_name" AS TEXT) ILIKE ? AND "amount" >= ?` {
 		t.Fatalf("unexpected where: %s", where)
 	}
 	if len(args) != 2 || args[0] != "%华南%" || args[1] != 100 {
 		t.Fatalf("unexpected args: %#v", args)
+	}
+}
+
+func TestReportJoinedParameterLikeCastsNumericField(t *testing.T) {
+	config, err := reportconfig.Parse(
+		datatypes.JSON([]byte(`{
+			"datasets":[{"id":"main","name":"按钮","type":"table","source_code":"sys_menu_button","primary":true}],
+			"parameters":[{"id":"id","dataset_id":"main","field":"id","operator":"like"}]
+		}`)),
+		datatypes.JSON([]byte(`{"view":"sheet"}`)),
+	)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	table := model.SysTable{
+		TableCode: "sys_menu_button",
+		TableFields: []model.SysTableField{
+			{FieldName: "ID", FieldCode: "id", FieldType: enum.BigIntFieldType, IsListShow: true},
+		},
+	}
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{DryRun: true})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	query := db.Table(table.TableCode)
+	query, err = reportApplyJoinedParameters(query, config, "main", table.TableCode, map[string]model.SysTable{"main": table}, reportDatasetAliases(config, "main", table.TableCode), map[string]any{"id": "33"})
+	if err != nil {
+		t.Fatalf("apply joined params: %v", err)
+	}
+	stmt := query.Find(&[]map[string]any{}).Statement
+	if !strings.Contains(stmt.SQL.String(), "CAST(") || !strings.Contains(stmt.SQL.String(), "ILIKE") {
+		t.Fatalf("numeric like should cast field to text: %s", stmt.SQL.String())
 	}
 }
 
@@ -254,6 +289,63 @@ func TestReportDataSourceColumnsIncludesSyntheticID(t *testing.T) {
 	}
 }
 
+func TestReportDataSourceColumnsIncludeNonListFields(t *testing.T) {
+	table := model.SysTable{
+		TableCode: "sys_menu_button",
+		TableFields: []model.SysTableField{
+			{FieldName: "按钮名称", FieldCode: "name", FieldType: enum.VarcharFieldType, IsListShow: true},
+			{FieldName: "菜单ID", FieldCode: "menu_id", FieldType: enum.BigIntFieldType, IsListShow: false},
+		},
+	}
+	columns := reportDataSourceColumns(table)
+	if !hasReportColumn(columns, "menu_id") {
+		t.Fatalf("report dataset fields should include non-list menu_id: %#v", columns)
+	}
+	if !hasReportColumn(reportPreviewColumns(table), "menu_id") {
+		t.Fatalf("report preview fallback should include non-list menu_id")
+	}
+	config, err := reportconfig.Parse(
+		datatypes.JSON([]byte(`{"datasets":[{"id":"main","name":"按钮","type":"table","source_code":"sys_menu_button","primary":true}]}`)),
+		datatypes.JSON([]byte(`{"view":"sheet"}`)),
+	)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	_, previewColumns, err := reportJoinedPreviewSelections(config, "main", table, map[string]model.SysTable{"main": table}, reportDatasetAliases(config, "main", table.TableCode))
+	if err != nil {
+		t.Fatalf("build preview selections: %v", err)
+	}
+	if !hasReportColumn(previewColumns, "main__menu_id") {
+		t.Fatalf("joined preview fallback should include non-list menu_id: %#v", previewColumns)
+	}
+}
+
+func TestInferSQLFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newReportServiceForConfigTest(t)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	fields, err := svc.InferSQLFields(ctx, request.ReportSQLFieldsReq{
+		SQL: "select id, name, amount from demo_order",
+	})
+	if err != nil {
+		t.Fatalf("infer sql fields: %v", err)
+	}
+	for _, code := range []string{"id", "name", "amount"} {
+		if !hasReportColumn(fields, code) {
+			t.Fatalf("missing inferred column %s in %#v", code, fields)
+		}
+	}
+}
+
+func hasReportColumn(columns []response.ReportPreviewColumn, field string) bool {
+	for _, column := range columns {
+		if column.Field == field {
+			return true
+		}
+	}
+	return false
+}
+
 func newReportServiceForConfigTest(t *testing.T) *ReportService {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -280,9 +372,13 @@ func newReportServiceForConfigTest(t *testing.T) *ReportService {
 	if err := db.Create(&fields).Error; err != nil {
 		t.Fatalf("seed fields: %v", err)
 	}
+	if err := db.Exec(`CREATE TABLE demo_order (id integer, name text, amount real)`).Error; err != nil {
+		t.Fatalf("create physical demo_order: %v", err)
+	}
 	primaryDB := &database.PrimaryDB{DB: db}
 	store := newJSONMemoryCacher()
 	return &ReportService{
+		reportRepo: impl.NewReportDefinitionRepositoryImpl(primaryDB),
 		sysTableService: &SysTableService{
 			sysTableRepo:       impl.NewSysTableRepositoryImpl(primaryDB),
 			sysTableCache:      cache.NewSysTableCache(store),

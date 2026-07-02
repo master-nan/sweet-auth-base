@@ -223,6 +223,7 @@ func InitRouter(app *App) *gin.Engine {
 		// report
 		adminGroup.POST("/report/query", app.ReportController.QueryReportDefinitions)
 		adminGroup.GET("/report/data-sources", app.ReportController.GetReportDataSources)
+		adminGroup.POST("/report/sql-fields", app.ReportController.InferSQLFields)
 		adminGroup.GET("/report/:id", app.ReportController.GetReportDefinitionById)
 		adminGroup.POST("/report", app.ReportController.CreateReportDefinition)
 		adminGroup.PUT("/report/:id", app.ReportController.UpdateReportDefinition)

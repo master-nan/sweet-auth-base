@@ -108,6 +108,23 @@ func (s *ReportService) GetDataSources() ([]response.ReportDataSourceRes, error)
 	return items, nil
 }
 
+func (s *ReportService) InferSQLFields(ctx *gin.Context, req request.ReportSQLFieldsReq) ([]response.ReportPreviewColumn, error) {
+	if s.reportRepo == nil {
+		return nil, myerrors.NewBadRequestError("报表数据仓储未初始化")
+	}
+	sqlText, err := safeReportPreviewSQL(req.SQL)
+	if err != nil {
+		return nil, err
+	}
+	wrapped := fmt.Sprintf("SELECT * FROM (%s) AS report_sql_dataset_fields LIMIT 0", sqlText)
+	sqlRows, err := s.reportRepo.DBWithContext(ctx).Raw(wrapped).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer sqlRows.Close()
+	return reportSQLColumns(sqlRows)
+}
+
 func (s *ReportService) CreateReportDefinition(ctx *gin.Context, req request.ReportDefinitionCreateReq) (int, error) {
 	report, err := s.reportFromCreateReq(req)
 	if err != nil {
@@ -140,7 +157,20 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 	if existing.Id != 0 && existing.Id != req.Id {
 		return myerrors.NewBadRequestError("报表编码已存在")
 	}
-	return s.reportRepo.Update(s.reportRepo.DBWithContext(ctx), &report, req.Id)
+	return s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", req.Id).Updates(map[string]any{
+		"code":                  report.Code,
+		"name":                  report.Name,
+		"description":           report.Description,
+		"category":              report.Category,
+		"source_type":           report.SourceType,
+		"source_code":           report.SourceCode,
+		"permission_menu_id":    report.PermissionMenuId,
+		"permission_table_code": report.PermissionTableCode,
+		"query_config":          report.QueryConfig,
+		"layout_config":         report.LayoutConfig,
+		"remark":                report.Remark,
+		"state":                 report.State,
+	}).Error
 }
 
 func (s *ReportService) DeleteReportDefinitionById(ctx *gin.Context, id int) error {
@@ -507,7 +537,11 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, report mode
 	if len(selections) == 0 {
 		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表未配置可预览字段")
 	}
-	query = reportApplyJoinedQuickSearch(query, req.Query.QuickQuery.Keyword, selections)
+	keyword := ""
+	if req.Query.QuickQuery != nil {
+		keyword = req.Query.QuickQuery.Keyword
+	}
+	query = reportApplyJoinedQuickSearch(query, keyword, selections)
 
 	page := req.Query.Page
 	if page <= 0 {
@@ -603,20 +637,26 @@ func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereCl
 	if err != nil {
 		return nil, nil, err
 	}
+	columnMeta, err := reportSQLColumns(sqlRows)
+	if err != nil {
+		return nil, nil, err
+	}
 	records, columnNames, err := scanReportSQLRows(sqlRows)
 	if err != nil {
 		return nil, nil, err
 	}
-	columns := make([]response.ReportPreviewColumn, 0, len(columnNames))
-	for _, name := range columnNames {
-		columns = append(columns, response.ReportPreviewColumn{
-			Name:  name,
-			Field: name,
-			Label: name,
-			Type:  "string",
-		})
+	if len(columnMeta) == 0 {
+		columnMeta = make([]response.ReportPreviewColumn, 0, len(columnNames))
+		for _, name := range columnNames {
+			columnMeta = append(columnMeta, response.ReportPreviewColumn{
+				Name:  name,
+				Field: name,
+				Label: name,
+				Type:  "string",
+			})
+		}
 	}
-	return records, columns, nil
+	return records, columnMeta, nil
 }
 
 type reportJoinedSelection struct {
@@ -655,6 +695,47 @@ func scanReportSQLRows(sqlRows *sql.Rows) ([]map[string]interface{}, []string, e
 		return nil, nil, err
 	}
 	return records, columnNames, nil
+}
+
+func reportSQLColumns(sqlRows *sql.Rows) ([]response.ReportPreviewColumn, error) {
+	columnNames, err := sqlRows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	columnTypes, _ := sqlRows.ColumnTypes()
+	typeByName := make(map[string]string, len(columnTypes))
+	for _, columnType := range columnTypes {
+		typeByName[columnType.Name()] = reportSQLColumnType(columnType.DatabaseTypeName())
+	}
+	columns := make([]response.ReportPreviewColumn, 0, len(columnNames))
+	for _, name := range columnNames {
+		columns = append(columns, response.ReportPreviewColumn{
+			Name:  name,
+			Field: name,
+			Label: name,
+			Type:  typeByName[name],
+		})
+		if columns[len(columns)-1].Type == "" {
+			columns[len(columns)-1].Type = "string"
+		}
+	}
+	return columns, nil
+}
+
+func reportSQLColumnType(dbType string) string {
+	value := strings.ToLower(strings.TrimSpace(dbType))
+	switch {
+	case strings.Contains(value, "int"), strings.Contains(value, "numeric"), strings.Contains(value, "decimal"), strings.Contains(value, "real"), strings.Contains(value, "double"), strings.Contains(value, "float"):
+		return "number"
+	case strings.Contains(value, "bool"):
+		return "boolean"
+	case strings.Contains(value, "date"), strings.Contains(value, "time"):
+		return "datetime"
+	case strings.Contains(value, "json"):
+		return "json"
+	default:
+		return "string"
+	}
 }
 
 func reportShouldUseJoinedPreview(config reportconfig.Config) bool {
@@ -803,13 +884,17 @@ func reportJoinedPreviewSelections(config reportconfig.Config, primaryDatasetID 
 		selections = append(selections, reportJoinedSelection{Expr: expr, Alias: alias, Label: label, Type: fmt.Sprintf("%d", field.FieldType), Role: strings.ToLower(strings.TrimSpace(binding.Type)), Field: field, DatasetID: datasetID})
 	}
 	if len(selections) == 0 {
-		for _, field := range primaryTable.TableFields {
-			if !field.IsListShow || strings.TrimSpace(field.FieldCode) == "" {
+		for _, column := range reportDataSourceColumns(primaryTable) {
+			field, ok := reportFindTableField(primaryTable, column.Field)
+			if !ok {
 				continue
 			}
-			alias := reportColumnAlias(primaryDatasetID, field.FieldCode)
-			expr := reportDatasetFieldExpr(primaryDatasetID, field.FieldCode, primaryDatasetID, primaryTable.TableCode, aliasByDatasetID)
-			selections = append(selections, reportJoinedSelection{Expr: expr, Alias: alias, Label: field.FieldName, Type: fmt.Sprintf("%d", field.FieldType), Field: field, DatasetID: primaryDatasetID})
+			alias := reportColumnAlias(primaryDatasetID, column.Field)
+			expr := reportDatasetFieldExpr(primaryDatasetID, column.Field, primaryDatasetID, primaryTable.TableCode, aliasByDatasetID)
+			if expr == "" {
+				return nil, nil, myerrors.NewBadRequestError("报表绑定字段不合法")
+			}
+			selections = append(selections, reportJoinedSelection{Expr: expr, Alias: alias, Label: column.Label, Type: column.Type, Field: field, DatasetID: primaryDatasetID})
 		}
 	}
 	columns := make([]response.ReportPreviewColumn, 0, len(selections))
@@ -853,7 +938,7 @@ func reportApplyJoinedParameters(query *gorm.DB, config reportconfig.Config, pri
 		case "", "eq":
 			query = query.Where(fmt.Sprintf("%s = ?", fieldExpr), value)
 		case "like":
-			query = query.Where(fmt.Sprintf("%s ILIKE ?", fieldExpr), "%"+fmt.Sprint(value)+"%")
+			query = query.Where(fmt.Sprintf("%s ILIKE ?", reportTextSearchExpr(fieldExpr)), "%"+fmt.Sprint(value)+"%")
 		case "between":
 			items, ok := reportRangeValues(value)
 			if !ok {
@@ -882,7 +967,7 @@ func reportApplyJoinedQuickSearch(query *gorm.DB, keyword string, selections []r
 		if !reportFieldLooksText(selection.Field) {
 			continue
 		}
-		conditions = append(conditions, fmt.Sprintf("%s ILIKE ?", selection.Expr))
+		conditions = append(conditions, fmt.Sprintf("%s ILIKE ?", reportTextSearchExpr(selection.Expr)))
 		args = append(args, "%"+keyword+"%")
 	}
 	if len(conditions) == 0 {
@@ -1005,7 +1090,7 @@ func reportSQLParameterWhere(config reportconfig.Config, datasetID string, value
 			conditions = append(conditions, fmt.Sprintf("%s = ?", fieldExpr))
 			args = append(args, value)
 		case "like":
-			conditions = append(conditions, fmt.Sprintf("%s LIKE ?", fieldExpr))
+			conditions = append(conditions, fmt.Sprintf("%s ILIKE ?", reportTextSearchExpr(fieldExpr)))
 			args = append(args, "%"+fmt.Sprint(value)+"%")
 		case "between":
 			items, ok := reportRangeValues(value)
@@ -1025,6 +1110,10 @@ func reportSQLParameterWhere(config reportconfig.Config, datasetID string, value
 		}
 	}
 	return strings.Join(conditions, " AND "), args, nil
+}
+
+func reportTextSearchExpr(fieldExpr string) string {
+	return fmt.Sprintf("CAST(%s AS TEXT)", fieldExpr)
 }
 
 func reportParameterApplies(param reportconfig.Parameter, datasetID string) bool {
@@ -1188,19 +1277,7 @@ func normalizeReportSourceType(raw string) string {
 }
 
 func reportPreviewColumns(table model.SysTable) []response.ReportPreviewColumn {
-	columns := make([]response.ReportPreviewColumn, 0, len(table.TableFields))
-	for _, field := range table.TableFields {
-		if !field.IsListShow || strings.TrimSpace(field.FieldCode) == "" {
-			continue
-		}
-		columns = append(columns, response.ReportPreviewColumn{
-			Name:  field.FieldCode,
-			Field: field.FieldCode,
-			Label: field.FieldName,
-			Type:  fmt.Sprintf("%d", field.FieldType),
-		})
-	}
-	return columns
+	return reportDataSourceColumns(table)
 }
 
 func reportDataSourceColumns(table model.SysTable) []response.ReportPreviewColumn {

@@ -39,3 +39,7 @@ type ReportPreviewReq struct {
 	Parameters map[string]any `json:"parameters"`
 	Query      Basic          `json:"query"`
 }
+
+type ReportSQLFieldsReq struct {
+	SQL string `json:"sql" binding:"required" example:"select id, name from sys_user"`
+}

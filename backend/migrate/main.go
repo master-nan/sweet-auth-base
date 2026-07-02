@@ -1315,6 +1315,7 @@ func seedReportDesignMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		apiPermissionWithAPI(710, menuID, "新建报表", "report_design_create", enum.Top, "create", "add", "primary", 91, "/admin/report", "POST"),
 		apiPermissionWithAPI(711, menuID, "报表更新", "report_design_update", enum.Top, "update", "edit", "primary", 92, "/admin/report/:id", "PUT"),
 		apiPermissionWithAPI(712, menuID, "数据源列表", "report_design_data_source", enum.Top, "metadata", "dataset", "primary", 93, "/admin/report/data-sources", "GET"),
+		apiPermissionWithAPI(713, menuID, "SQL字段解析", "report_design_sql_fields", enum.Top, "metadata", "schema", "primary", 94, "/admin/report/sql-fields", "POST"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -1694,6 +1695,7 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/report/:id", "PUT"},
 		{"/admin/report/:id", "DELETE"},
 		{"/admin/report/:id/preview", "POST"},
+		{"/admin/report/sql-fields", "POST"},
 		{"/admin/file/upload", "POST"},
 		{"/admin/file/:id", "GET"},
 		{"/admin/file/:id", "DELETE"},

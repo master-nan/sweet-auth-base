@@ -77,6 +77,23 @@ func (r *ReportController) GetReportDataSources(ctx *gin.Context) {
 	resp.SetData(data).SetTotal(len(data))
 }
 
+func (r *ReportController) InferSQLFields(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	var data request.ReportSQLFieldsReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportSQLFieldsReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	fields, err := r.reportService.InferSQLFields(ctx, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(fields).SetTotal(len(fields))
+}
+
 func (r *ReportController) CreateReportDefinition(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
