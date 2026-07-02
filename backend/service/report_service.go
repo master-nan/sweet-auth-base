@@ -233,6 +233,7 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
+	sourceTable = reportTableWithPreviewFields(sourceTable, config, activeDatasetID)
 	query := req.Query
 	if err := applyReportParameterValues(&query, config, activeDatasetID, req.Parameters); err != nil {
 		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
@@ -1278,6 +1279,72 @@ func normalizeReportSourceType(raw string) string {
 
 func reportPreviewColumns(table model.SysTable) []response.ReportPreviewColumn {
 	return reportDataSourceColumns(table)
+}
+
+func reportTableWithPreviewFields(table model.SysTable, config reportconfig.Config, datasetID string) model.SysTable {
+	needed := reportPreviewFieldCodes(config, datasetID)
+	if len(needed) == 0 {
+		return table
+	}
+	hasID := false
+	for index := range table.TableFields {
+		code := strings.TrimSpace(table.TableFields[index].FieldCode)
+		if strings.EqualFold(code, "id") {
+			hasID = true
+		}
+		if _, ok := needed[code]; ok {
+			table.TableFields[index].IsListShow = true
+		}
+	}
+	if _, ok := needed["id"]; ok && !hasID {
+		table.TableFields = append([]model.SysTableField{{
+			FieldName:    "ID",
+			FieldCode:    "id",
+			FieldType:    enum.BigIntFieldType,
+			IsPrimaryKey: true,
+			IsListShow:   true,
+		}}, table.TableFields...)
+	}
+	return table
+}
+
+func reportPreviewFieldCodes(config reportconfig.Config, datasetID string) map[string]struct{} {
+	datasetID = strings.TrimSpace(datasetID)
+	result := make(map[string]struct{})
+	add := func(code string) {
+		code = strings.TrimSpace(code)
+		if code != "" && !reportFieldIsSensitive(code) {
+			result[code] = struct{}{}
+		}
+	}
+	add("id")
+	for _, dataset := range config.Datasets() {
+		if datasetID != "" && strings.TrimSpace(dataset.Id) != datasetID {
+			continue
+		}
+		for _, field := range dataset.Fields {
+			add(field.Code)
+			add(field.Field)
+		}
+	}
+	for _, field := range config.Query.Fields {
+		add(field.Code)
+		add(field.Field)
+	}
+	for _, param := range config.Parameters() {
+		if reportParameterApplies(param, datasetID) {
+			add(param.Field)
+		}
+	}
+	for _, cell := range config.Layout.Sheet.Cells {
+		if cell.Binding.Field == "" {
+			continue
+		}
+		if datasetID == "" || strings.TrimSpace(cell.Binding.DatasetId) == "" || strings.TrimSpace(cell.Binding.DatasetId) == datasetID {
+			add(cell.Binding.Field)
+		}
+	}
+	return result
 }
 
 func reportDataSourceColumns(table model.SysTable) []response.ReportPreviewColumn {

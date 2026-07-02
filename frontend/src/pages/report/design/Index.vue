@@ -55,7 +55,6 @@
         @add-col="addCol"
         @select-cell="selectCell"
         @select-range="selectRange"
-        @start-drag-cell="startDragCell"
         @drop-field="dropField"
         @update-cell-value="updateCellValue"
         @clear-cell="clearCellAt"
@@ -286,7 +285,6 @@ const selectionRange = ref<ReportSheetRange | null>(null)
 const selectedParameterId = ref('')
 const inspectorTab = ref<'cell' | 'data' | 'report'>('cell')
 const draggingField = ref<{ datasetId: string; fieldCode: string } | null>(null)
-const draggingCell = ref<{ row: number; col: number } | null>(null)
 const datasetDialogVisible = ref(false)
 const editingDatasetId = ref('')
 const sqlFieldsLoading = ref(false)
@@ -731,30 +729,15 @@ function updateDatasetName(id: string, name: string) {
 
 function startDragField(dataset: ReportDataset, field: ReportField) {
   draggingField.value = { datasetId: dataset.id, fieldCode: field.code }
-  draggingCell.value = null
-}
-
-function startDragCell(row: number, col: number) {
-  draggingCell.value = { row, col }
-  draggingField.value = null
 }
 
 function dropField(row: number, col: number) {
   const dragged = draggingField.value
-  if (dragged) {
-    const dataset = datasets.value.find((item) => item.id === dragged.datasetId)
-    const field = dataset?.fields.find((item) => item.code === dragged.fieldCode)
-    if (dataset && field) bindCell(row, col, dataset, field, defaultReportBindingType(field))
-    draggingField.value = null
-    return
-  }
-  const source = draggingCell.value
-  if (!source || (source.row === row && source.col === col)) {
-    draggingCell.value = null
-    return
-  }
-  moveCell(source.row, source.col, row, col)
-  draggingCell.value = null
+  if (!dragged) return
+  const dataset = datasets.value.find((item) => item.id === dragged.datasetId)
+  const field = dataset?.fields.find((item) => item.code === dragged.fieldCode)
+  if (dataset && field) bindCell(row, col, dataset, field, defaultReportBindingType(field))
+  draggingField.value = null
 }
 
 function bindFieldToActiveCell(dataset: ReportDataset, field: ReportField) {
@@ -810,27 +793,6 @@ function patchActiveCell(patch: Partial<ReportSheetCell>) {
 
 function updateCellValue(row: number, col: number, value: string) {
   patchCell(row, col, { value })
-  buildLocalPreview()
-}
-
-function moveCell(sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) {
-  const source = cellAt(sourceRow, sourceCol)
-  const target = cellAt(targetRow, targetCol)
-  patchCell(target.row, target.col, {
-    value: source.value,
-    binding: source.binding ? { ...source.binding } : undefined,
-    style: source.style ? { ...source.style } : undefined,
-    colspan: source.colspan,
-    rowspan: source.rowspan,
-  })
-  patchCell(source.row, source.col, {
-    value: target.value,
-    binding: target.binding ? { ...target.binding } : undefined,
-    style: target.style ? { ...target.style } : undefined,
-    colspan: target.colspan,
-    rowspan: target.rowspan,
-  })
-  selectedCellId.value = reportCellId(targetRow, targetCol)
   buildLocalPreview()
 }
 

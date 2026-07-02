@@ -241,6 +241,23 @@ func TestExecuteQueryCastsNumericLikeFieldToText(t *testing.T) {
 	assertVars(t, stmt.Vars, []interface{}{"%43%"})
 }
 
+func TestExecuteQueryCastsQuickSearchFieldsToText(t *testing.T) {
+	db := dryRunDB(t)
+	table := queryTestTable()
+	table.TableFields[0].IsQuickSearch = true
+	basic := &request.Basic{
+		QuickQuery: &request.QuickQuery{Keyword: "43"},
+	}
+
+	stmt := renderQueryStatement(ExecuteQuery(db.Table(table.TableCode), basic, table))
+	sql := stmt.SQL.String()
+
+	if !strings.Contains(sql, "CAST(") || !strings.Contains(sql, " LIKE ") {
+		t.Fatalf("quick search should cast searchable fields to text: %s", sql)
+	}
+	assertVars(t, stmt.Vars, []interface{}{"%43%"})
+}
+
 func TestExecuteQueryBuildsMultiKeywordNotLikeExpression(t *testing.T) {
 	db := dryRunDB(t)
 	table := queryTestTable()

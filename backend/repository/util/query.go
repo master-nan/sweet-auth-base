@@ -387,7 +387,7 @@ func buildKeywordQuery(db *gorm.DB, keyword string, table model.SysTable) *gorm.
 		if field.IsQuickSearch {
 			fieldExpr := qualifyField(field.FieldCode, table.TableCode)
 			// 使用参数化查询，避免SQL注入
-			conditions = append(conditions, fmt.Sprintf("%s LIKE ?", fieldExpr))
+			conditions = append(conditions, fmt.Sprintf("CAST(%s AS TEXT) LIKE ?", fieldExpr))
 			values = append(values, fmt.Sprintf("%%%s%%", keyword))
 		}
 	}

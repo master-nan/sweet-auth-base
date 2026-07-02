@@ -320,6 +320,29 @@ func TestReportDataSourceColumnsIncludeNonListFields(t *testing.T) {
 	}
 }
 
+func TestReportTableWithPreviewFieldsEnablesConfiguredNonListFields(t *testing.T) {
+	table := model.SysTable{
+		TableCode: "sys_menu_button",
+		TableFields: []model.SysTableField{
+			{FieldName: "按钮名称", FieldCode: "name", FieldType: enum.VarcharFieldType, IsListShow: true},
+			{FieldName: "菜单ID", FieldCode: "menu_id", FieldType: enum.BigIntFieldType, IsListShow: false},
+		},
+	}
+	config, err := reportconfig.Parse(
+		datatypes.JSON([]byte(`{"datasets":[{"id":"main","name":"按钮","type":"table","source_code":"sys_menu_button","primary":true,"fields":[{"name":"菜单ID","code":"menu_id"}]}]}`)),
+		datatypes.JSON([]byte(`{"view":"sheet","sheet":{"cells":[{"row":1,"col":1,"binding":{"type":"group","dataset_id":"main","field":"menu_id"}}]}}`)),
+	)
+	if err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+
+	result := reportTableWithPreviewFields(table, config, "main")
+	field, ok := reportFindTableField(result, "menu_id")
+	if !ok || !field.IsListShow {
+		t.Fatalf("configured non-list field should be selected in report preview: %#v", result.TableFields)
+	}
+}
+
 func TestInferSQLFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := newReportServiceForConfigTest(t)

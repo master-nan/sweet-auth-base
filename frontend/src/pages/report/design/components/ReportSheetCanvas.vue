@@ -79,13 +79,9 @@
               :data-cell-id="renderCell.id"
               role="button"
               tabindex="0"
-              :draggable="editingCellId !== renderCell.id"
               @click="handleCellClick(renderCell.row, renderCell.col, $event)"
               @dblclick.stop="startEdit(renderCell.row, renderCell.col)"
               @keydown.enter.prevent="startEdit(renderCell.row, renderCell.col)"
-              @mousedown.left="$emit('startDragCell', renderCell.row, renderCell.col)"
-              @mouseup.left="$emit('dropField', renderCell.row, renderCell.col)"
-              @dragstart="$emit('startDragCell', renderCell.row, renderCell.col)"
               @dragover.prevent
               @drop.prevent="$emit('dropField', renderCell.row, renderCell.col)"
               @contextmenu.prevent.stop="openContextMenu(renderCell.row, renderCell.col, $event)"
@@ -171,7 +167,6 @@ const emit = defineEmits<{
   addCol: []
   selectCell: [row: number, col: number]
   selectRange: [row: number, col: number]
-  startDragCell: [row: number, col: number]
   dropField: [row: number, col: number]
   updateCellValue: [row: number, col: number, value: string]
   clearCell: [row: number, col: number]
