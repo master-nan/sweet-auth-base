@@ -153,16 +153,16 @@ const asyncRoutesChildren: Route[] = [
           keepAlive: true,
         },
       },
-      {
-        component: () => import('pages/develop/generalization/Index.vue'),
-        path: 'generalization/:table_code',
-        name: 'develop_generalization',
-        meta: {
-          title: 'router.develop.generalization',
-          icon: 'dynamic_form',
-          keepAlive: true,
-        },
-      },
+      // {
+      //   component: () => import('pages/develop/generalization/Index.vue'),
+      //   path: 'generalization/:table_code',
+      //   name: 'develop_generalization',
+      //   meta: {
+      //     title: 'router.develop.generalization',
+      //     icon: 'dynamic_form',
+      //     keepAlive: true,
+      //   },
+      // },
       {
         component: () => import('pages/develop/database/Index.vue'),
         path: 'database',
