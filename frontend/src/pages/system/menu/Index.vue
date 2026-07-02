@@ -251,7 +251,7 @@
     <dynamic-form-dialog
       v-model="buttonDialogOpen"
       :edit-data="buttonEditData"
-      :title="isButtonEdit ? '编辑按钮' : '新增按钮'"
+      :title="buttonDialogTitle"
       :fields="buttonFields"
       :submit-btn-text="isButtonEdit ? '保存' : '创建'"
       table-code="sys_menu_button"
@@ -466,6 +466,11 @@ const buttonEditData = ref<MenuButtonFormData>({
   is_disabled: false,
 })
 const isButtonEdit = computed(() => 'id' in buttonEditData.value && Boolean(buttonEditData.value.id))
+const currentButtonIsPageButton = computed(() => normalizeBooleanValue(buttonEditData.value.is_button, true))
+const buttonDialogTitle = computed(() => {
+  const kind = currentButtonIsPageButton.value ? '页面按钮' : '接口权限'
+  return `${isButtonEdit.value ? '编辑' : '新增'}${kind}`
+})
 
 const normalizeBooleanValue = (value: unknown, fallback = false): boolean => {
   if (value === undefined || value === null || value === '') return fallback
@@ -546,7 +551,7 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'sys_menu_button_position',
-          field_name: '按钮位置',
+          field_name: currentButtonIsPageButton.value ? '展示位置' : '接口归类',
         }
       }
       if (field.field_code === 'display_mode') {
@@ -562,7 +567,7 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'sys_menu_button_event_action',
-          field_name: '事件动作',
+          field_name: currentButtonIsPageButton.value ? '事件动作' : '权限动作',
           options: menuButtonEventActionOptions,
         }
       }
@@ -592,6 +597,12 @@ const buttonFields = computed(() =>
           field_name: '是否页面按钮',
           default_value: 'true',
         }
+      }
+      if (field.field_code === 'name') {
+        return { ...field, field_name: currentButtonIsPageButton.value ? '按钮名称' : '接口名称' }
+      }
+      if (field.field_code === 'code') {
+        return { ...field, field_name: currentButtonIsPageButton.value ? '按钮编码' : '接口编码' }
       }
       if (field.field_code === 'is_hidden') {
         return { ...field, field_name: '是否隐藏', default_value: 'false' }
