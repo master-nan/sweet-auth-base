@@ -64,6 +64,15 @@
           label="占位提示"
           @update:model-value="$emit('update:placeholder', String($event || ''))"
         />
+        <q-input
+          :model-value="draft.default_value"
+          dense
+          outlined
+          clearable
+          label="默认值"
+          hint="运行页打开时自动带入；日期范围用英文逗号分隔开始和结束"
+          @update:model-value="$emit('update:defaultValue', String($event || ''))"
+        />
       </q-card-section>
 
       <q-card-actions align="right">
@@ -93,6 +102,7 @@ defineProps<{
     type: ReportParameterType
     operator: ReportParameterOperator
     placeholder: string
+    default_value: string
   }
   datasetOptions: Array<Option>
   fieldOptions: Array<Option>
@@ -108,6 +118,7 @@ defineEmits<{
   'update:type': [value: ReportParameterType]
   'update:operator': [value: ReportParameterOperator]
   'update:placeholder': [value: string]
+  'update:defaultValue': [value: string]
   confirm: []
 }>()
 </script>

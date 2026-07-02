@@ -531,7 +531,7 @@ function openDesigner(row?: Report) {
 async function openRuntime(row: Report) {
   runtimeReport.value = row
   runtimeKeyword.value = ''
-  runtimeFilterValues.value = {}
+  runtimeFilterValues.value = buildRuntimeDefaultFilters()
   runtimePagination.value.page = 1
   runtimePagination.value.rowsPerPage = runtimeConfiguredPageSize.value
   runtimeVisible.value = true
@@ -568,9 +568,23 @@ function changeRuntimePageSize() {
 
 function resetRuntimeFilters() {
   runtimeKeyword.value = ''
-  runtimeFilterValues.value = {}
+  runtimeFilterValues.value = buildRuntimeDefaultFilters()
   runtimePagination.value.page = 1
   void loadRuntimePreview()
+}
+
+function buildRuntimeDefaultFilters() {
+  const values: Record<string, string | number | Array<string | number> | null | undefined> = {}
+  runtimeParameters.value.forEach((param) => {
+    if (param.default_value === null || param.default_value === undefined || param.default_value === '') return
+    if (Array.isArray(param.default_value)) {
+      const next = param.default_value.filter((item) => item !== '' && item !== null && item !== undefined)
+      if (next.length) values[param.id] = next
+      return
+    }
+    values[param.id] = param.default_value
+  })
+  return values
 }
 
 function buildRuntimeParameterValues() {

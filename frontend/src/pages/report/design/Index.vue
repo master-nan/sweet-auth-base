@@ -142,6 +142,7 @@
       @update:type="parameterDraft.type = $event"
       @update:operator="parameterDraft.operator = $event"
       @update:placeholder="parameterDraft.placeholder = $event"
+      @update:default-value="parameterDraft.default_value = $event"
       @confirm="confirmParameter"
     />
 
@@ -336,6 +337,7 @@ const parameterDraft = reactive<{
   type: ReportParameterType
   operator: ReportParameterOperator
   placeholder: string
+  default_value: string
 }>({
   id: '',
   label: '',
@@ -344,6 +346,7 @@ const parameterDraft = reactive<{
   type: 'text',
   operator: 'like',
   placeholder: '',
+  default_value: '',
 })
 
 const joinDraft = reactive<{
@@ -623,9 +626,9 @@ async function inferSqlDatasetFields() {
     }
     $q.notify({ type: 'positive', message: `已解析 ${sqlDraftFields.value.length} 个字段` })
     return true
-  } catch {
+  } catch (error) {
     sqlDraftFields.value = []
-    $q.notify({ type: 'negative', message: 'SQL 字段解析失败，请检查 SQL 或后端权限' })
+    $q.notify({ type: 'negative', message: sqlFieldInferErrorMessage(error) })
     return false
   } finally {
     sqlFieldsLoading.value = false
@@ -1101,6 +1104,7 @@ function openParameterDialog(id = '') {
   parameterDraft.type = current?.type || (field.role === 'time' ? 'date_range' : 'text')
   parameterDraft.operator = current?.operator || (field.role === 'time' ? 'between' : 'like')
   parameterDraft.placeholder = current?.placeholder || `请输入${field.name}`
+  parameterDraft.default_value = stringifyParameterDefault(current?.default_value)
   parameterDialogVisible.value = true
 }
 
@@ -1108,6 +1112,7 @@ function handleParameterDatasetChange(id: string) {
   parameterDraft.dataset_id = id
   const field = datasets.value.find((item) => item.id === id)?.fields[0]
   parameterDraft.field = field?.code || ''
+  parameterDraft.default_value = ''
   if (field) {
     parameterDraft.label = field.name
     parameterDraft.placeholder = `请输入${field.name}`
@@ -1121,6 +1126,7 @@ function handleParameterFieldChange(fieldCode: string) {
   if (!field) return
   parameterDraft.label = field.name
   parameterDraft.placeholder = `请输入${field.name}`
+  parameterDraft.default_value = ''
   if (field.role === 'time') {
     parameterDraft.type = 'date_range'
     parameterDraft.operator = 'between'
@@ -1141,6 +1147,7 @@ function confirmParameter() {
     type: parameterDraft.type,
     operator: parameterDraft.operator,
     placeholder: parameterDraft.placeholder,
+    default_value: parseParameterDefault(parameterDraft.default_value, parameterDraft.type),
   }
   const index = parameters.value.findIndex((item) => item.id === id)
   if (index === -1) parameters.value.push(param)
@@ -1153,6 +1160,34 @@ function confirmParameter() {
 function removeParameter(id: string) {
   parameters.value = parameters.value.filter((item) => item.id !== id)
   if (selectedParameterId.value === id) selectedParameterId.value = ''
+}
+
+function stringifyParameterDefault(value: ReportParameter['default_value']) {
+  if (Array.isArray(value)) return value.map((item) => String(item ?? '')).filter(Boolean).join(',')
+  if (value === null || value === undefined) return ''
+  return String(value)
+}
+
+function parseParameterDefault(value: string, type: ReportParameterType): ReportParameter['default_value'] {
+  const text = value.trim()
+  if (!text) return undefined
+  if (type === 'date_range') {
+    const parts = text.split(',').map((item) => item.trim()).filter(Boolean)
+    return parts.length ? parts.slice(0, 2) : undefined
+  }
+  if (type === 'number') {
+    const num = Number(text)
+    return Number.isFinite(num) ? num : text
+  }
+  return text
+}
+
+function sqlFieldInferErrorMessage(error: unknown) {
+  const status = (error as { response?: { status?: number } })?.response?.status
+  if (status === 401 || status === 403) {
+    return 'SQL 字段解析接口无权限，请给当前角色分配“SQL字段解析”接口权限'
+  }
+  return 'SQL 字段解析失败，请检查 SQL 语句或后端接口'
 }
 
 function datasetFieldOptions(datasetId: string) {

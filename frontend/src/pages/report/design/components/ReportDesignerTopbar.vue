@@ -33,12 +33,12 @@
         outlined
         emit-value
         map-options
-        label="类型"
+        label="渲染模式"
         :options="kindOptions"
         @update:model-value="updateReportKind"
       >
         <q-tooltip>
-          类型决定运行渲染方式：明细表按模板行逐条展开，汇总表使用汇总行；图表和交叉表后续增强。
+          决定运行页如何展开模板：明细表逐条展开数据行，汇总表使用汇总行；图表和交叉表后续增强。
         </q-tooltip>
       </q-select>
     </div>
@@ -134,7 +134,7 @@ function updateReportKind(value: unknown) {
 
 .meta-editor {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(150px, 0.8fr) 120px;
+  grid-template-columns: minmax(160px, 1fr) minmax(150px, 0.8fr) 140px;
   gap: 8px;
 }
 
