@@ -108,7 +108,7 @@
               tabindex="0"
               @click="handleCellClick(renderCell.row, renderCell.col, $event)"
               @dblclick.stop="startEdit(renderCell.row, renderCell.col)"
-              @keydown.enter.prevent="startEdit(renderCell.row, renderCell.col)"
+              @keydown="handleCellKeydown($event, renderCell.row, renderCell.col)"
               @dragenter.prevent="handleDragEnter(renderCell.id)"
               @dragover.prevent="handleDragEnter(renderCell.id)"
               @dragleave="handleDragLeave(renderCell.id)"
@@ -384,6 +384,39 @@ function handleCellClick(row: number, col: number, event: MouseEvent) {
   if (event.detail >= 2) {
     startEdit(row, col)
   }
+}
+
+function handleCellKeydown(event: KeyboardEvent, row: number, col: number) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    startEdit(row, col)
+    return
+  }
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    event.preventDefault()
+    emit('clearSelection')
+    return
+  }
+  if (event.metaKey || event.ctrlKey) {
+    if (event.key.toLowerCase() === 'b') {
+      event.preventDefault()
+      emit('toggleBold')
+    }
+    return
+  }
+  const next = nextCellByKey(event.key, row, col)
+  if (!next) return
+  event.preventDefault()
+  if (event.shiftKey) emit('selectRange', next.row, next.col)
+  else emit('selectCell', next.row, next.col)
+}
+
+function nextCellByKey(key: string, row: number, col: number) {
+  if (key === 'ArrowUp') return { row: Math.max(row - 1, 1), col }
+  if (key === 'ArrowDown') return { row: Math.min(row + 1, props.sheet.rows), col }
+  if (key === 'ArrowLeft') return { row, col: Math.max(col - 1, 1) }
+  if (key === 'ArrowRight') return { row, col: Math.min(col + 1, props.sheet.cols) }
+  return null
 }
 
 function commitEdit(row: number, col: number) {
