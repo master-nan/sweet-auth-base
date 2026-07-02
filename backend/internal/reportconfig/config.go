@@ -26,14 +26,16 @@ type QueryConfig struct {
 }
 
 type LayoutConfig struct {
-	View         string        `json:"view"`
-	Title        string        `json:"title"`
-	Subtitle     string        `json:"subtitle"`
-	Kind         string        `json:"kind"`
-	Datasets     []Dataset     `json:"datasets"`
-	DatasetJoins []DatasetJoin `json:"dataset_joins"`
-	Parameters   []Parameter   `json:"parameters"`
-	Sheet        SheetConfig   `json:"sheet"`
+	View            string        `json:"view"`
+	Title           string        `json:"title"`
+	Subtitle        string        `json:"subtitle"`
+	Kind            string        `json:"kind"`
+	Datasets        []Dataset     `json:"datasets"`
+	DatasetJoins    []DatasetJoin `json:"dataset_joins"`
+	Parameters      []Parameter   `json:"parameters"`
+	Sheet           SheetConfig   `json:"sheet"`
+	RuntimeDisplay  string        `json:"runtime_display"`
+	RuntimePageSize int           `json:"runtime_page_size"`
 }
 
 type Dataset struct {
@@ -82,6 +84,7 @@ type SheetConfig struct {
 	Cols        int         `json:"cols"`
 	Scale       float64     `json:"scale"`
 	ActiveCell  string      `json:"active_cell"`
+	DetailRows  []int       `json:"detail_rows"`
 	SummaryRows []int       `json:"summary_rows"`
 	Cells       []SheetCell `json:"cells"`
 }

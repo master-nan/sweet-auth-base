@@ -48,7 +48,7 @@ export const createBlankReportSheet = (rows = 24, cols = 12): ReportSheetConfig 
       cells.push({ id: makeReportCellId(row, col), row, col, value: '' })
     }
   }
-  return { rows, cols, scale: 0.85, summary_rows: [], cells }
+  return { rows, cols, scale: 0.85, detail_rows: [], summary_rows: [], cells }
 }
 
 export const defaultReportSheet = (): ReportSheetConfig => createBlankReportSheet()
@@ -61,8 +61,18 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
   blank.cells = blank.cells.map((cell) => ({ ...cell, ...(incoming.get(cell.id) || {}) }))
   if (sheet?.active_cell) blank.active_cell = sheet.active_cell
   if (sheet?.scale) blank.scale = sheet.scale
-  blank.summary_rows = sheet?.summary_rows || []
+  blank.detail_rows = normalizeSheetRows(sheet?.detail_rows, rows)
+  blank.summary_rows = normalizeSheetRows(sheet?.summary_rows, rows)
   return blank
+}
+
+const normalizeSheetRows = (rows: number[] | undefined, maxRows: number) => {
+  const unique = new Set<number>()
+  ;(rows || []).forEach((row) => {
+    const value = Number(row)
+    if (Number.isInteger(value) && value >= 1 && value <= maxRows) unique.add(value)
+  })
+  return [...unique].sort((a, b) => a - b)
 }
 
 export const createReportLayout = (report?: Partial<Report>): ReportLayoutConfig => ({

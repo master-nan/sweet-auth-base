@@ -79,6 +79,7 @@ export interface ReportSheetConfig {
   cols: number
   scale?: number | undefined
   active_cell?: string | undefined
+  detail_rows?: number[] | undefined
   summary_rows?: number[] | undefined
   cells: ReportSheetCell[]
 }

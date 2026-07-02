@@ -190,6 +190,13 @@ export const reportSheetRangeContains = (
   return row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol
 }
 
+export const reportSheetMarkedRows = (sheet: ReportSheetConfig) => {
+  const rows = new Set<number>()
+  ;(sheet.detail_rows || []).forEach((row) => rows.add(row))
+  ;(sheet.summary_rows || []).forEach((row) => rows.add(row))
+  return [...rows].sort((a, b) => a - b)
+}
+
 export const reportCellStyle = (cell: ReportSheetCell) => {
   const style = cell.style || {}
   return {

@@ -1335,6 +1335,7 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		apiPermissionWithAPI(726, menuID, "报表列表", "report_manage_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(728, menuID, "数据源列表", "report_manage_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
+		apiPermissionWithAPI(729, menuID, "SQL字段解析", "report_manage_sql_fields", enum.Top, "metadata", "schema", "primary", 93, "/admin/report/sql-fields", "POST"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }

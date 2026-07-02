@@ -18,6 +18,7 @@
           class="report-sheet-preview__cell"
           :class="{
             'is-bound': cell.bound,
+            'is-detail': cell.detail,
             'is-summary': cell.summary,
             'is-empty': !cell.value,
           }"
@@ -62,6 +63,7 @@ type RenderCell = {
   key: string
   value: string
   bound: boolean
+  detail: boolean
   summary: boolean
   style: Record<string, string | number | undefined>
 }
@@ -80,6 +82,9 @@ const sourceColCount = computed(() =>
 )
 
 const detailRows = computed(() => {
+  const configured = props.sheet.detail_rows?.filter((row) => row >= 1 && row <= props.sheet.rows)
+  if (configured?.length) return [...new Set(configured)].sort((a, b) => a - b)
+
   const rows = new Set<number>()
   props.sheet.cells.forEach((cell) => {
     if (
@@ -95,6 +100,8 @@ const detailRows = computed(() => {
 
 const configuredRows = computed(() => {
   const rows = new Set<number>()
+  ;(props.sheet.detail_rows || []).forEach((row) => rows.add(row))
+  ;(props.sheet.summary_rows || []).forEach((row) => rows.add(row))
   props.sheet.cells.forEach((cell) => {
     if (
       cell.value ||
@@ -163,7 +170,7 @@ const renderPlan = computed(() => {
 })
 
 const gridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${sourceColCount.value}, minmax(132px, 1fr))`,
+  gridTemplateColumns: `repeat(${sourceColCount.value}, 118px)`,
   gridTemplateRows: `repeat(${Math.max(renderRowCount.value, 1)}, minmax(42px, auto))`,
 }))
 
@@ -185,6 +192,7 @@ const renderCells = computed<RenderCell[]>(() => {
         key: `${sourceCell.row}:${sourceCell.col}:${item.suffix}`,
         value: displayCellValue(sourceCell, item.dataRow),
         bound: Boolean(sourceCell.binding?.field),
+        detail: detailRows.value.includes(item.sourceRow),
         summary: props.sheet.summary_rows?.includes(item.sourceRow) || false,
         style: {
           ...cellStyle(sourceCell),
@@ -310,6 +318,10 @@ function cellStyle(cell: ReportSheetCell) {
 
 .report-sheet-preview__cell.is-bound {
   background: #fbfaff;
+}
+
+.report-sheet-preview__cell.is-detail {
+  background: #fff;
 }
 
 .report-sheet-preview__cell.is-summary {

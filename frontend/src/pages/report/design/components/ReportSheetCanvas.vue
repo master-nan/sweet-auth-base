@@ -84,10 +84,12 @@
         <template v-for="renderRow in renderRows" :key="renderRow.key">
           <div
             class="sheet-row-head"
-            :class="{ summary: renderRow.summary }"
+            :class="{ detail: renderRow.detail, summary: renderRow.summary }"
             :style="renderRow.headerStyle"
           >
             {{ renderRow.row }}
+            <q-tooltip v-if="renderRow.detail">明细行：运行时按数据逐行展开</q-tooltip>
+            <q-tooltip v-else-if="renderRow.summary">汇总行：运行时聚合当前数据</q-tooltip>
           </div>
           <template v-for="renderCell in renderRow.cells" :key="renderCell.key">
             <div
@@ -96,6 +98,7 @@
                 active: renderCell.active,
                 selected: renderCell.selected,
                 bound: renderCell.bound,
+                detail: renderCell.detail,
                 summary: renderCell.summary,
                 'drop-target': dragOverCellId === renderCell.id,
               }"
@@ -166,6 +169,10 @@
           <q-icon name="functions" />
           {{ isSummaryRow(contextMenu.row) ? '取消汇总行' : '设为汇总行' }}
         </button>
+        <button type="button" @click="runContextAction('detail')">
+          <q-icon name="view_stream" />
+          {{ isDetailRow(contextMenu.row) ? '取消明细行' : '设为明细行' }}
+        </button>
       </div>
     </div>
   </section>
@@ -219,6 +226,7 @@ const emit = defineEmits<{
   insertRowAfter: [row: number]
   insertColAfter: [col: number]
   toggleSummaryRow: [row: number]
+  toggleDetailRow: [row: number]
   zoomIn: []
   zoomOut: []
 }>()
@@ -241,6 +249,7 @@ const hasRangeSelection = computed(() => {
 })
 
 const summaryRows = computed(() => new Set(props.sheet.summary_rows || []))
+const detailRows = computed(() => new Set(props.sheet.detail_rows || []))
 
 const selectionBounds = computed(() =>
   props.selectionRange ? reportNormalizeSheetRange(props.selectionRange) : null,
@@ -290,20 +299,22 @@ const renderRows = computed(() =>
   Array.from({ length: props.sheet.rows }, (_, index) => {
     const row = index + 1
     const summary = summaryRows.value.has(row)
+    const detail = detailRows.value.has(row)
     return {
       key: `row-${row}`,
       row,
+      detail,
       summary,
       headerStyle: {
         gridColumn: 1,
         gridRow: row + 1,
       },
-      cells: renderCellsForRow(row, summary),
+      cells: renderCellsForRow(row, detail, summary),
     }
   }),
 )
 
-function renderCellsForRow(row: number, summary: boolean) {
+function renderCellsForRow(row: number, detail: boolean, summary: boolean) {
   const cells = []
   for (let col = 1; col <= props.sheet.cols; col += 1) {
     if (coveredCells.value.has(cellKey(row, col))) continue
@@ -321,6 +332,7 @@ function renderCellsForRow(row: number, summary: boolean) {
       active: props.selectedCellId === cell.id,
       selected: isSelectedCell(row, col),
       bound: Boolean(cell.binding?.field),
+      detail,
       summary,
       style: {
         ...reportCellStyle(cell),
@@ -402,6 +414,10 @@ function isSummaryRow(row: number) {
   return summaryRows.value.has(row)
 }
 
+function isDetailRow(row: number) {
+  return detailRows.value.has(row)
+}
+
 function openContextMenu(row: number, col: number, event: MouseEvent) {
   const scrollEl = sheetScrollRef.value
   const rect = scrollEl?.getBoundingClientRect()
@@ -427,7 +443,8 @@ function runContextAction(
     | 'unmerge'
     | 'insertRow'
     | 'insertCol'
-    | 'summary',
+    | 'summary'
+    | 'detail',
 ) {
   const { row, col } = contextMenu
   closeContextMenu()
@@ -438,7 +455,8 @@ function runContextAction(
   else if (action === 'unmerge') emit('unmergeCell', row, col)
   else if (action === 'insertRow') emit('insertRowAfter', row)
   else if (action === 'insertCol') emit('insertColAfter', col)
-  else emit('toggleSummaryRow', row)
+  else if (action === 'summary') emit('toggleSummaryRow', row)
+  else emit('toggleDetailRow', row)
 }
 
 function joinLabel(join: ReportDatasetJoin) {
@@ -580,6 +598,15 @@ function joinLabel(join: ReportDatasetJoin) {
 .sheet-cell.selected {
   background: #f1efff;
   box-shadow: inset 0 0 0 1px rgba(115, 103, 240, 0.34);
+}
+
+.sheet-row-head.detail,
+.sheet-cell.detail {
+  background: #f8fbff;
+}
+
+.sheet-row-head.detail {
+  color: #4b6b9b;
 }
 
 .sheet-row-head.summary,

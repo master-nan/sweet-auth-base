@@ -65,6 +65,7 @@
         @insert-row-after="insertRowAfter"
         @insert-col-after="insertColAfter"
         @toggle-summary-row="toggleSummaryRow"
+        @toggle-detail-row="toggleDetailRow"
         @zoom-in="zoomIn"
         @zoom-out="zoomOut"
       />
@@ -765,6 +766,7 @@ function bindCell(
     },
     style: { ...cellAt(row, col).style, color: '#6d5dfc', bold: true },
   })
+  markDetailRow(row)
   selectedCellId.value = reportCellId(row, col)
   inspectorTab.value = 'cell'
   buildLocalPreview()
@@ -1006,6 +1008,7 @@ function insertRowAfter(row: number) {
   }
   sheet.value.rows += 1
   sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) => (item > row ? item + 1 : item))
+  sheet.value.detail_rows = (sheet.value.detail_rows || []).map((item) => (item > row ? item + 1 : item))
   buildLocalPreview()
 }
 
@@ -1037,7 +1040,28 @@ function toggleSummaryRow(row: number) {
   if (rows.has(row)) rows.delete(row)
   else rows.add(row)
   sheet.value.summary_rows = [...rows].sort((a, b) => a - b)
+  if (rows.has(row)) {
+    sheet.value.detail_rows = (sheet.value.detail_rows || []).filter((item) => item !== row)
+  }
   buildLocalPreview()
+}
+
+function toggleDetailRow(row: number) {
+  const rows = new Set(sheet.value.detail_rows || [])
+  if (rows.has(row)) rows.delete(row)
+  else rows.add(row)
+  sheet.value.detail_rows = [...rows].sort((a, b) => a - b)
+  if (rows.has(row)) {
+    sheet.value.summary_rows = (sheet.value.summary_rows || []).filter((item) => item !== row)
+  }
+  buildLocalPreview()
+}
+
+function markDetailRow(row: number) {
+  const rows = new Set(sheet.value.detail_rows || [])
+  rows.add(row)
+  sheet.value.detail_rows = [...rows].sort((a, b) => a - b)
+  sheet.value.summary_rows = (sheet.value.summary_rows || []).filter((item) => item !== row)
 }
 
 function zoomIn() {
@@ -1250,7 +1274,6 @@ function removeJoin(id: string) {
 function applyReportKind(kind: ReportKind) {
   form.report_kind = kind
   if (kind === 'detail') {
-    sheet.value.summary_rows = []
     return
   }
   if ((kind === 'summary' || kind === 'pivot') && !(sheet.value.summary_rows || []).length) {

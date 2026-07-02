@@ -160,7 +160,7 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 	if existing.Id != 0 && existing.Id != req.Id {
 		return myerrors.NewBadRequestError("报表编码已存在")
 	}
-	return s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", req.Id).Updates(map[string]any{
+	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", req.Id).Updates(map[string]any{
 		"code":                  report.Code,
 		"name":                  report.Name,
 		"description":           report.Description,
@@ -174,7 +174,14 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 		"layout_config":         report.LayoutConfig,
 		"remark":                report.Remark,
 		"state":                 report.State,
-	}).Error
+	})
+	if tx.Error != nil {
+		return tx.Error
+	}
+	if tx.RowsAffected == 0 {
+		return myerrors.ErrDataNotFound
+	}
+	return nil
 }
 
 func (s *ReportService) DeleteReportDefinitionById(ctx *gin.Context, id int) error {
@@ -186,10 +193,18 @@ func (s *ReportService) UpdateReportDefinitionStatus(ctx *gin.Context, id int, s
 	if id <= 0 || !isValidReportStatus(status) {
 		return myerrors.ErrParamInvalid
 	}
-	return s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", id).Updates(map[string]any{
+	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", id).Updates(map[string]any{
 		"status":     status,
+		"state":      status != reportStatusDisabled,
 		"gmt_modify": model.Now(),
-	}).Error
+	})
+	if tx.Error != nil {
+		return tx.Error
+	}
+	if tx.RowsAffected == 0 {
+		return myerrors.ErrDataNotFound
+	}
+	return nil
 }
 
 func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
@@ -204,7 +219,7 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
-	if !report.State {
+	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
 		err = myerrors.NewBadRequestError("报表已停用")
 		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
@@ -317,7 +332,7 @@ func (s *ReportService) reportFromCreateReq(req request.ReportDefinitionCreateRe
 	if len(report.LayoutConfig) == 0 {
 		report.LayoutConfig = datatypes.JSON([]byte("{}"))
 	}
-	report.State = true
+	report.State = report.Status != reportStatusDisabled
 	if err := s.applyReportPrimaryDataset(&report); err != nil {
 		return report, err
 	}
@@ -347,6 +362,7 @@ func (s *ReportService) reportFromUpdateReq(req request.ReportDefinitionUpdateRe
 	if len(report.LayoutConfig) == 0 {
 		report.LayoutConfig = datatypes.JSON([]byte("{}"))
 	}
+	report.State = report.Status != reportStatusDisabled
 	if err := s.applyReportPrimaryDataset(&report); err != nil {
 		return report, err
 	}
@@ -488,14 +504,18 @@ func (s *ReportService) previewSQLDataset(ctx *gin.Context, report model.ReportD
 	if limit <= 0 || limit > 200 {
 		limit = 20
 	}
-	rows, columns, err := s.queryReportSQL(ctx, sqlText, whereClause, args, limit)
+	page := req.Query.Page
+	if page <= 0 {
+		page = 1
+	}
+	rows, columns, total, err := s.queryReportSQL(ctx, sqlText, whereClause, args, page, limit)
 	if err != nil {
 		return response.ReportPreviewRes{}, err
 	}
 	return response.ReportPreviewRes{
 		Columns:  columns,
 		Rows:     rows,
-		Total:    len(rows),
+		Total:    total,
 		Datasets: reportConfigDatasetMetadata(config),
 		Joins:    reportConfigDatasetJoins(config),
 		Meta: response.ReportPreviewMeta{
@@ -664,27 +684,32 @@ func safeReportPreviewSQL(raw string) (string, error) {
 	return sqlText, nil
 }
 
-func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereClause string, args []any, limit int) ([]map[string]interface{}, []response.ReportPreviewColumn, error) {
+func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereClause string, args []any, page int, limit int) ([]map[string]interface{}, []response.ReportPreviewColumn, int, error) {
 	if s.reportRepo == nil {
-		return nil, nil, myerrors.NewBadRequestError("报表数据仓储未初始化")
+		return nil, nil, 0, myerrors.NewBadRequestError("报表数据仓储未初始化")
 	}
 	wrapped := fmt.Sprintf("SELECT * FROM (%s) AS report_sql_dataset_preview", sqlText)
 	if strings.TrimSpace(whereClause) != "" {
 		wrapped += " WHERE " + whereClause
 	}
-	wrapped += " LIMIT ?"
-	args = append(args, limit)
-	sqlRows, err := s.reportRepo.DBWithContext(ctx).Raw(wrapped, args...).Rows()
+	var total int64
+	if err := s.reportRepo.DBWithContext(ctx).Raw("SELECT COUNT(1) FROM ("+wrapped+") AS report_sql_dataset_count", args...).Scan(&total).Error; err != nil {
+		return nil, nil, 0, err
+	}
+	queryArgs := append([]any{}, args...)
+	wrapped += " LIMIT ? OFFSET ?"
+	queryArgs = append(queryArgs, limit, (page-1)*limit)
+	sqlRows, err := s.reportRepo.DBWithContext(ctx).Raw(wrapped, queryArgs...).Rows()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	columnMeta, err := reportSQLColumns(sqlRows)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	records, columnNames, err := scanReportSQLRows(sqlRows)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	if len(columnMeta) == 0 {
 		columnMeta = make([]response.ReportPreviewColumn, 0, len(columnNames))
@@ -697,7 +722,7 @@ func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereCl
 			})
 		}
 	}
-	return records, columnMeta, nil
+	return records, columnMeta, int(total), nil
 }
 
 type reportJoinedSelection struct {
