@@ -441,7 +441,7 @@ const statusOptions = [
 
 const columns = computed<QTableProps['columns']>(() => [
   { name: 'report_name', field: 'report_name', label: '报表名称', align: 'left' },
-  { name: 'report_kind', field: 'report_kind', label: '类型', align: 'center' },
+  { name: 'report_kind', field: 'report_kind', label: '展开方式', align: 'center' },
   { name: 'category', field: 'category', label: '分类', align: 'left' },
   { name: 'data_source_name', field: 'data_source_name', label: '数据集', align: 'left' },
   { name: 'permission', field: 'permission_table_code', label: '权限', align: 'center' },
@@ -757,10 +757,10 @@ async function deleteReport(row: Report) {
 
 function kindLabel(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
-    detail: '明细模板',
-    summary: '汇总模板',
+    detail: '明细行',
+    summary: '汇总行',
   }
-  return map[kind] || '明细模板'
+  return map[kind] || '明细行'
 }
 
 function kindIcon(kind: ReportKind) {

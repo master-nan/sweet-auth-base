@@ -1382,7 +1382,7 @@ function syncForm() {
   datasets.value = ensureDesignerDatasets(datasets.value)
   const primary = primaryDataset.value
   form.data_source_id = primary?.source_code || ''
-  form.permission_table_code = form.permission_table_code || primary?.source_code || ''
+  form.permission_table_code = primary?.source_code || form.permission_table_code || ''
   form.fields = usedFields.value
   form.datasets = datasets.value.map((dataset) => ({
     ...dataset,
