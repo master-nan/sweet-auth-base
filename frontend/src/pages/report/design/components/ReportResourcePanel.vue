@@ -8,6 +8,28 @@
         </div>
         <q-btn size="sm" color="primary" icon="add" label="新增" @click="$emit('openDataset')" />
       </div>
+      <div class="dataset-tools">
+        <q-input
+          v-model="fieldKeyword"
+          dense
+          outlined
+          clearable
+          placeholder="搜索字段名称 / 编码"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+        <q-btn
+          flat
+          dense
+          color="primary"
+          :icon="allExpanded ? 'unfold_less' : 'unfold_more'"
+          @click="toggleAllDatasets"
+        >
+          <q-tooltip>{{ allExpanded ? '收起全部数据集' : '展开全部数据集' }}</q-tooltip>
+        </q-btn>
+      </div>
 
       <div class="dataset-list">
         <article
@@ -29,7 +51,10 @@
             <q-icon :name="dataset.type === 'sql' ? 'data_object' : 'table_chart'" />
             <div>
               <strong>{{ dataset.name }}</strong>
-              <span>{{ dataset.type === 'sql' ? 'SQL 数据集' : dataset.source_code }}</span>
+              <span>
+                {{ dataset.type === 'sql' ? 'SQL 数据集' : dataset.source_code }}
+                · {{ filteredFields(dataset).length }}/{{ dataset.fields.length }} 字段
+              </span>
             </div>
             <q-space />
             <q-badge v-if="dataset.primary" color="primary">主</q-badge>
@@ -57,7 +82,7 @@
               拖字段到画布单元格，或点击绑定当前单元格
             </div>
             <button
-              v-for="field in dataset.fields"
+              v-for="field in filteredFields(dataset)"
               :key="`${dataset.id}-${field.code}`"
               class="field-row"
               draggable="true"
@@ -70,6 +95,9 @@
               <em>{{ field.code }}</em>
               <q-badge outline color="primary">{{ fieldRoleLabel(field) }}</q-badge>
             </button>
+            <div v-if="dataset.fields.length && !filteredFields(dataset).length" class="empty-note">
+              没有匹配字段
+            </div>
           </div>
         </article>
       </div>
@@ -118,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ReportDataset, ReportField, ReportParameter } from 'src/api/services/report'
 import { reportFieldIcon } from 'src/modules/report/sheet'
 
@@ -144,6 +172,10 @@ defineEmits<{
 }>()
 
 const expandedDatasetIds = ref<string[]>([])
+const fieldKeyword = ref('')
+const allExpanded = computed(
+  () => props.datasets.length > 0 && expandedDatasetIds.value.length === props.datasets.length,
+)
 
 watch(
   () => props.datasets.map((item) => item.id),
@@ -167,6 +199,18 @@ function toggleDataset(id: string) {
   } else {
     expandedDatasetIds.value = [...expandedDatasetIds.value, id]
   }
+}
+
+function toggleAllDatasets() {
+  expandedDatasetIds.value = allExpanded.value ? [] : props.datasets.map((item) => item.id)
+}
+
+function filteredFields(dataset: ReportDataset) {
+  const keyword = fieldKeyword.value.trim().toLowerCase()
+  if (!keyword) return dataset.fields
+  return dataset.fields.filter((field) =>
+    `${field.name} ${field.code}`.toLowerCase().includes(keyword),
+  )
 }
 
 function fieldRoleLabel(field: ReportField) {
@@ -206,6 +250,14 @@ function parameterTargetLabel(param: ReportParameter) {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.dataset-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .section-head strong,

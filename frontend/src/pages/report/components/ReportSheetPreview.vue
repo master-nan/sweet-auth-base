@@ -82,7 +82,9 @@ const sourceColCount = computed(() =>
 )
 
 const detailRows = computed(() => {
-  const configured = props.sheet.detail_rows?.filter((row) => row >= 1 && row <= props.sheet.rows)
+  const configured = props.sheet.detail_rows?.filter(
+    (row) => row >= 1 && row <= props.sheet.rows && rowHasTemplateContent(row),
+  )
   if (configured?.length) return [...new Set(configured)].sort((a, b) => a - b)
 
   const rows = new Set<number>()
@@ -100,8 +102,12 @@ const detailRows = computed(() => {
 
 const configuredRows = computed(() => {
   const rows = new Set<number>()
-  ;(props.sheet.detail_rows || []).forEach((row) => rows.add(row))
-  ;(props.sheet.summary_rows || []).forEach((row) => rows.add(row))
+  ;(props.sheet.detail_rows || []).forEach((row) => {
+    if (rowHasTemplateContent(row)) rows.add(row)
+  })
+  ;(props.sheet.summary_rows || []).forEach((row) => {
+    if (rowHasTemplateContent(row)) rows.add(row)
+  })
   props.sheet.cells.forEach((cell) => {
     if (
       cell.value ||
@@ -222,6 +228,22 @@ function rowHasContent(sourceRow: number, dataRow: Record<string, unknown> | und
   for (let col = usedBounds.value.minCol; col <= usedBounds.value.maxCol; col += 1) {
     if (reportSheetIsCoveredCell(props.sheet, sourceRow, col)) continue
     if (String(displayCellValue(cellAt(sourceRow, col), dataRow) || '').trim() !== '') return true
+  }
+  return false
+}
+
+function rowHasTemplateContent(sourceRow: number) {
+  for (let col = usedBounds.value.minCol; col <= usedBounds.value.maxCol; col += 1) {
+    if (reportSheetIsCoveredCell(props.sheet, sourceRow, col)) continue
+    const cell = cellAt(sourceRow, col)
+    if (
+      cell.value ||
+      cell.binding?.field ||
+      (cell.colspan && cell.colspan > 1) ||
+      (cell.rowspan && cell.rowspan > 1)
+    ) {
+      return true
+    }
   }
   return false
 }
