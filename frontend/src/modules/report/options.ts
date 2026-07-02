@@ -9,8 +9,8 @@ import type {
 } from './types'
 
 export const reportKindOptions: Array<{ label: string; value: ReportKind; disable?: boolean }> = [
-  { label: '明细模板', value: 'detail' },
-  { label: '汇总模板', value: 'summary' },
+  { label: '明细行展开', value: 'detail' },
+  { label: '固定汇总行', value: 'summary' },
 ]
 
 export const reportDatasetTypeOptions: Array<{ label: string; value: ReportDatasetType }> = [

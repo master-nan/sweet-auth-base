@@ -127,6 +127,17 @@
 
         <q-separator class="q-my-md" />
         <div class="inspector-title">数据集关联</div>
+        <q-banner
+          v-if="datasets.length > 1 && !datasetJoins.length"
+          dense
+          rounded
+          class="join-warning"
+        >
+          <template #avatar>
+            <q-icon name="warning" color="warning" />
+          </template>
+          已添加多个数据集，绑定到画布前需要配置关联字段。
+        </q-banner>
         <div class="join-list">
           <div v-for="join in datasetJoins" :key="join.id" class="join-row">
             <span>{{ joinLabel(join) }}</span>
@@ -175,12 +186,12 @@
             outlined
             emit-value
             map-options
-            label="模板模式"
+            label="数据展开方式"
             :options="reportKindOptions"
             @update:model-value="emitReportKind"
           >
             <q-tooltip>
-              明细模板适合逐行展开数据，汇总模板适合固定汇总行。
+              明细行会按数据逐行展开，固定汇总行只渲染设计好的统计行。
             </q-tooltip>
           </q-select>
           <div class="runtime-grid">
@@ -208,7 +219,7 @@
           </div>
           <div class="capability-list">
             <div><q-icon name="security" /> 预览和运行继承主表数据权限</div>
-            <div><q-icon name="table_view" /> 明细模板逐行展开，汇总模板使用汇总行</div>
+            <div><q-icon name="table_view" /> 明细行逐行展开，固定汇总行只使用汇总行</div>
             <div><q-icon name="data_object" /> SQL 数据集先保存设计，执行会在安全校验后开放</div>
             <div><q-icon name="ios_share" /> Excel 导出结构已预留</div>
           </div>
@@ -425,6 +436,13 @@ function joinLabel(join: ReportDatasetJoin) {
   display: grid;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.join-warning {
+  margin-bottom: 10px;
+  color: #806000;
+  background: #fff8e1;
+  border: 1px solid #ffe6a3;
 }
 
 .join-row {

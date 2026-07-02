@@ -433,7 +433,10 @@ const joinRightFieldOptions = computed(() => datasetFieldOptions(joinDraft.right
 
 const activeCellValue = computed({
   get: () => activeCell.value?.value || '',
-  set: (value: string) => patchActiveCell({ value }),
+  set: (value: string) => {
+    patchActiveCell({ value })
+    buildLocalPreview()
+  },
 })
 const activeBindingType = computed<ReportCellBindingType>({
   get: () => activeCell.value?.binding?.type || 'static',
@@ -464,7 +467,10 @@ const activeBindingField = computed({
 })
 const activeFormula = computed({
   get: () => activeCell.value?.binding?.formula || '',
-  set: (value: string) => patchBinding({ formula: value }),
+  set: (value: string) => {
+    patchBinding({ formula: value })
+    buildLocalPreview()
+  },
 })
 const activeCellBold = computed({
   get: () => !!activeCell.value?.style?.bold,
@@ -850,6 +856,7 @@ function patchCellStyle(patch: Partial<NonNullable<ReportSheetCell['style']>>) {
   const cell = activeCell.value
   if (!cell) return
   patchActiveCell({ style: { ...(cell.style || {}), ...patch } })
+  buildLocalPreview()
 }
 
 function refreshActiveCellBindingText() {
@@ -1147,6 +1154,17 @@ function confirmParameter() {
     $q.notify({ type: 'warning', message: '请完整配置参数名称、数据集和字段' })
     return
   }
+  const dataset = datasets.value.find((item) => item.id === parameterDraft.dataset_id)
+  const field = dataset?.fields.find((item) => item.code === parameterDraft.field)
+  const compatibilityError = parameterCompatibilityError(
+    parameterDraft.type,
+    parameterDraft.operator,
+    field,
+  )
+  if (compatibilityError) {
+    $q.notify({ type: 'warning', message: compatibilityError })
+    return
+  }
   const id = editingParameterId.value || `param_${Date.now()}`
   const param: ReportParameter = {
     id,
@@ -1393,6 +1411,18 @@ function validateReport(strict = true) {
     $q.notify({ type: 'warning', message: '请至少绑定一个主数据集字段' })
     return false
   }
+  if (!validateSqlDatasets()) {
+    return false
+  }
+  if (!validateBoundCells()) {
+    return false
+  }
+  if (!validateParameters()) {
+    return false
+  }
+  if (!validateRuntimeSettings()) {
+    return false
+  }
   if (!validateDatasetJoins()) {
     return false
   }
@@ -1439,6 +1469,112 @@ function validateDatasetJoins() {
     return false
   }
   return true
+}
+
+function validateSqlDatasets() {
+  const invalid = datasets.value.find((dataset) =>
+    dataset.type === 'sql' && (!dataset.sql?.trim() || !dataset.fields?.length),
+  )
+  if (!invalid) return true
+  $q.notify({ type: 'warning', message: `SQL 数据集“${invalid.name}”需要先填写 SQL 并解析字段` })
+  return false
+}
+
+function validateBoundCells() {
+  for (const cell of sheet.value.cells) {
+    const binding = cell.binding
+    if (!binding || binding.type === 'static') continue
+    const label = `${reportColumnName(cell.col)}${cell.row}`
+    if (binding.type === 'formula') {
+      if (!binding.formula?.trim() && !cell.value?.trim()) {
+        $q.notify({ type: 'warning', message: `单元格 ${label} 的公式为空` })
+        return false
+      }
+      continue
+    }
+    if (!binding.dataset_id || !binding.field) {
+      $q.notify({ type: 'warning', message: `单元格 ${label} 未完整绑定数据集字段` })
+      return false
+    }
+    const dataset = datasets.value.find((item) => item.id === binding.dataset_id)
+    const field = dataset?.fields.find((item) => item.code === binding.field)
+    if (!dataset || !field) {
+      $q.notify({ type: 'warning', message: `单元格 ${label} 绑定的数据集或字段已不存在` })
+      return false
+    }
+    if (binding.type === 'sum' && !isNumericReportField(field)) {
+      $q.notify({ type: 'warning', message: `单元格 ${label} 的求和字段应选择数值字段` })
+      return false
+    }
+  }
+  return true
+}
+
+function validateParameters() {
+  const seen = new Set<string>()
+  for (const param of parameters.value) {
+    if (!param.label?.trim() || !param.dataset_id || !param.field) {
+      $q.notify({ type: 'warning', message: '请检查报表参数，参数名称、数据集和字段不能为空' })
+      return false
+    }
+    const key = `${param.dataset_id}:${param.field}:${param.operator}`
+    if (seen.has(key)) {
+      $q.notify({ type: 'warning', message: `参数“${param.label}”重复绑定了同一字段和匹配方式` })
+      return false
+    }
+    seen.add(key)
+    const dataset = datasets.value.find((item) => item.id === param.dataset_id)
+    const field = dataset?.fields.find((item) => item.code === param.field)
+    if (!dataset || !field) {
+      $q.notify({ type: 'warning', message: `参数“${param.label}”绑定的数据集或字段已不存在` })
+      return false
+    }
+    const compatibilityError = parameterCompatibilityError(param.type, param.operator, field)
+    if (compatibilityError) {
+      $q.notify({ type: 'warning', message: `参数“${param.label}”：${compatibilityError}` })
+      return false
+    }
+  }
+  return true
+}
+
+function validateRuntimeSettings() {
+  if (form.runtime_display !== 'paged') return true
+  const pageSize = Number(form.runtime_page_size || 0)
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {
+    $q.notify({ type: 'warning', message: '分页展示时，每页条数必须在 1 到 500 之间' })
+    return false
+  }
+  return true
+}
+
+function parameterCompatibilityError(
+  type: ReportParameterType,
+  operator: ReportParameterOperator,
+  field?: ReportField,
+) {
+  if (!field) return '请选择有效字段'
+  if (type === 'date_range' && operator !== 'between') {
+    return '日期范围参数必须使用区间匹配'
+  }
+  if (operator === 'between' && type !== 'date_range') {
+    return '区间匹配请使用日期范围参数'
+  }
+  if (operator === 'like' && isNumericReportField(field)) {
+    return '数字字段不能使用包含匹配，请改为等于、大于等于或小于等于'
+  }
+  if (type === 'number' && operator === 'like') {
+    return '数字参数不能使用包含匹配'
+  }
+  return ''
+}
+
+function isNumericReportField(field: ReportField) {
+  const type = String(field.type || '').toLowerCase()
+  return field.role === 'metric' ||
+    ['number', 'numeric', 'decimal', 'float', 'double', 'real', 'int', 'bigint', 'smallint', 'serial'].some((item) =>
+      type.includes(item),
+    )
 }
 
 function goBack() {
