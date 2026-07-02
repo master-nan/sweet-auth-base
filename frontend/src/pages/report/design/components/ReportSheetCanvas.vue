@@ -533,6 +533,25 @@ function joinLabel(join: ReportDatasetJoin) {
   background: #f3f5fb;
   color: #71809a;
   font-weight: 800;
+  position: sticky;
+  z-index: 4;
+}
+
+.sheet-corner {
+  top: 0;
+  left: 0;
+  z-index: 8;
+}
+
+.sheet-col-head {
+  top: 0;
+  z-index: 6;
+}
+
+.sheet-row-head {
+  left: 0;
+  z-index: 5;
+  box-shadow: 1px 0 0 #dfe5f2;
 }
 
 .sheet-cell {

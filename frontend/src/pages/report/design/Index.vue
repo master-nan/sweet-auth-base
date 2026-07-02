@@ -555,18 +555,34 @@ function createInitialDatasets(sourceCode?: string): ReportDataset[] {
 }
 
 function enrichReportDatasets(sourceDatasets: ReportDataset[]): ReportDataset[] {
+  return ensureDesignerDatasets(sourceDatasets)
+}
+
+function ensureDesignerDatasets(sourceDatasets: ReportDataset[]): ReportDataset[] {
   return sourceDatasets.map((dataset) => {
-    if (dataset.type !== 'table' || !dataset.source_code) return dataset
+    if (dataset.type !== 'table' || !dataset.source_code) {
+      return {
+        ...dataset,
+        fields: (dataset.fields || []).map((field) => ({ ...field })),
+      }
+    }
     const source = dataSources.value.find((item) => item.code === dataset.source_code)
-    if (!source) return dataset
-    const existingByCode = new Map(dataset.fields.map((field) => [field.code, field]))
+    if (!source) {
+      return {
+        ...dataset,
+        fields: (dataset.fields || []).map((field) => ({ ...field })),
+      }
+    }
+    const existingByCode = new Map((dataset.fields || []).map((field) => [field.code, field]))
     const sourceCodes = new Set(source.fields.map((field) => field.code))
     return {
       ...dataset,
       name: dataset.name || source.name,
       fields: [
-        ...source.fields.map((field) => existingByCode.get(field.code) || field),
-        ...dataset.fields.filter((field) => !sourceCodes.has(field.code)),
+        ...source.fields.map((field) => ({ ...(existingByCode.get(field.code) || field) })),
+        ...(dataset.fields || [])
+          .filter((field) => !sourceCodes.has(field.code))
+          .map((field) => ({ ...field })),
       ],
     }
   })
@@ -698,9 +714,10 @@ function parseSqlDatasetFields(fieldsText: string): ReportField[] {
 }
 
 function upsertDataset(dataset: ReportDataset) {
+  const normalizedDataset = ensureDesignerDatasets([dataset])[0] || dataset
   const index = datasets.value.findIndex((item) => item.id === dataset.id)
-  if (index === -1) datasets.value.push(dataset)
-  else datasets.value[index] = dataset
+  if (index === -1) datasets.value.push(normalizedDataset)
+  else datasets.value[index] = normalizedDataset
 }
 
 function removeDataset(id: string) {
@@ -1335,11 +1352,15 @@ async function publishReport() {
 }
 
 function syncForm() {
+  datasets.value = ensureDesignerDatasets(datasets.value)
   const primary = primaryDataset.value
   form.data_source_id = primary?.source_code || ''
   form.permission_table_code = form.permission_table_code || primary?.source_code || ''
   form.fields = usedFields.value
-  form.datasets = datasets.value
+  form.datasets = datasets.value.map((dataset) => ({
+    ...dataset,
+    fields: (dataset.fields || []).map((field) => ({ ...field })),
+  }))
   form.dataset_joins = datasetJoins.value
   form.parameters = parameters.value
   form.sheet = normalizeReportSheet(sheet.value)
