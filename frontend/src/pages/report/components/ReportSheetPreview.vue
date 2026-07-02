@@ -83,7 +83,11 @@ const usedBounds = computed(() => reportSheetUsedBounds(props.sheet))
 const templateRows = computed(() => {
   const rows = new Set<number>()
   props.sheet.cells.forEach((cell) => {
-    if (cell.binding?.field && cell.binding.type !== 'static') {
+    if (
+      cell.binding?.field &&
+      cell.binding.type !== 'static' &&
+      !props.sheet.summary_rows?.includes(cell.row)
+    ) {
       rows.add(cell.row)
     }
   })
@@ -118,14 +122,10 @@ const renderRows = computed<RenderRow[]>(() => {
     const templateGroup = templateGroupByStart.get(rowIndex)
     if (templateGroup && props.reportKind === 'detail') {
       if (!dataRows.length) {
-        templateGroup.forEach((sourceRow) => {
-          pushVisibleRow(rows, buildRow(sourceRow, undefined, 'template-empty', minCol, maxCol, maxRow))
-        })
+        pushVisibleRow(rows, buildDetailRow(templateGroup, undefined, 'template-empty', minCol, maxCol, maxRow))
       } else {
         dataRows.forEach((dataRow, dataIndex) => {
-          templateGroup.forEach((sourceRow) => {
-            pushVisibleRow(rows, buildRow(sourceRow, dataRow, `data-${dataIndex}`, minCol, maxCol, maxRow))
-          })
+          pushVisibleRow(rows, buildDetailRow(templateGroup, dataRow, `data-${dataIndex}`, minCol, maxCol, maxRow))
         })
       }
       rowIndex = templateGroup[templateGroup.length - 1] || rowIndex
@@ -170,6 +170,57 @@ function buildRow(
     })
   }
   return { key: `${sourceRow}:${suffix}`, cells }
+}
+
+function buildDetailRow(
+  sourceRows: number[],
+  dataRow: Record<string, unknown> | undefined,
+  suffix: string,
+  minCol: number,
+  maxCol: number,
+  maxRow: number,
+): RenderRow {
+  const cells: RenderCell[] = []
+  for (let col = minCol; col <= maxCol; col += 1) {
+    const sourceCell = firstDetailCellAt(sourceRows, col)
+    if (!sourceCell) {
+      cells.push(emptyRenderCell(`empty:${col}:${suffix}`))
+      continue
+    }
+    const { colspan } = reportSheetCellSpan(sourceCell, { maxRow, maxCol })
+    cells.push({
+      key: `${sourceCell.row}:${sourceCell.col}:${suffix}`,
+      value: displayCellValue(sourceCell, dataRow),
+      bound: Boolean(sourceCell.binding?.field),
+      summary: false,
+      colspan,
+      rowspan: 1,
+      style: cellStyle(sourceCell),
+    })
+    col += colspan - 1
+  }
+  return { key: `detail:${sourceRows.join('-')}:${suffix}`, cells }
+}
+
+function firstDetailCellAt(sourceRows: number[], col: number) {
+  for (const row of sourceRows) {
+    if (reportSheetIsCoveredCell(props.sheet, row, col)) continue
+    const cell = cellAt(row, col)
+    if (cell.binding?.field || String(cell.value || '').trim() !== '') return cell
+  }
+  return null
+}
+
+function emptyRenderCell(key: string): RenderCell {
+  return {
+    key,
+    value: '',
+    bound: false,
+    summary: false,
+    colspan: 1,
+    rowspan: 1,
+    style: {},
+  }
 }
 
 function cellAt(row: number, col: number): ReportSheetCell {

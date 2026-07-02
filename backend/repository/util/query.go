@@ -359,8 +359,9 @@ func applyLikeRule(query *gorm.DB, fieldExpr string, value interface{}, valueTyp
 	}
 	conditions := make([]string, 0, len(items))
 	args := make([]interface{}, 0, len(items))
+	textFieldExpr := fmt.Sprintf("CAST(%s AS TEXT)", fieldExpr)
 	for _, item := range items {
-		conditions = append(conditions, fmt.Sprintf("%s %s ?", fieldExpr, operator))
+		conditions = append(conditions, fmt.Sprintf("%s %s ?", textFieldExpr, operator))
 		args = append(args, fmt.Sprintf("%%%v%%", item))
 	}
 	condition := strings.Join(conditions, joiner)

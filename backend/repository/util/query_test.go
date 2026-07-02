@@ -213,6 +213,34 @@ func TestExecuteQueryBuildsMultiKeywordLikeExpression(t *testing.T) {
 	assertVars(t, stmt.Vars, []interface{}{"%role%", "%admin%"})
 }
 
+func TestExecuteQueryCastsNumericLikeFieldToText(t *testing.T) {
+	db := dryRunDB(t)
+	table := queryTestTable()
+	basic := &request.Basic{
+		Expressions: []request.ExpressionGroup{
+			{
+				Logic: enum.And,
+				Rules: []request.QueryRule{
+					{
+						Field:          "id",
+						ExpressionType: enum.Like,
+						Value:          "43",
+						Type:           enum.BigIntFieldType,
+					},
+				},
+			},
+		},
+	}
+
+	stmt := renderQueryStatement(ExecuteQuery(db.Table(table.TableCode), basic, table))
+	sql := stmt.SQL.String()
+
+	if !strings.Contains(sql, "CAST(") || !strings.Contains(sql, " LIKE ") {
+		t.Fatalf("numeric LIKE should cast field to text: %s", sql)
+	}
+	assertVars(t, stmt.Vars, []interface{}{"%43%"})
+}
+
 func TestExecuteQueryBuildsMultiKeywordNotLikeExpression(t *testing.T) {
 	db := dryRunDB(t)
 	table := queryTestTable()
