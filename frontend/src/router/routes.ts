@@ -206,6 +206,16 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
+        component: () => import('pages/report/manage/Index.vue'),
+        path: 'manage',
+        name: 'report_manage',
+        meta: {
+          title: 'router.report.manage',
+          icon: 'build',
+          keepAlive: true,
+        },
+      },
+      {
         component: () => import('pages/report/design/Index.vue'),
         path: 'design',
         name: 'report_design',

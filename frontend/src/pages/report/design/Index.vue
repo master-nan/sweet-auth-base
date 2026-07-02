@@ -1359,7 +1359,7 @@ function validateAndNotify() {
 }
 
 function goBack() {
-  void router.push({ name: 'report_center' })
+  void router.push({ name: 'report_manage' })
 }
 </script>
 

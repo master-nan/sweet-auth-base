@@ -11,8 +11,9 @@ export default {
       generalization: 'Generic Page',
     },
     report: {
-      default: 'Report Center',
+      default: 'Reports',
       center: 'Report Center',
+      manage: 'Report Management',
       design: 'Report Designer',
     },
     system: {

@@ -1,11 +1,11 @@
 <template>
-  <base-content class="q-pa-sm report-center-page">
+  <base-content class="q-pa-sm report-manage-page">
     <div class="report-workspace">
       <section class="report-head">
         <div>
-          <div class="report-title">报表中心</div>
+          <div class="report-title">报表管理</div>
           <div class="report-caption">
-            面向业务用户查看和运行已发布报表，设计、发布和停用请到报表管理处理。
+            管理报表草稿、发布、停用和设计入口，业务运行请到报表中心。
           </div>
         </div>
         <div class="report-head-actions">
@@ -23,6 +23,12 @@
               <q-icon name="search" />
             </template>
           </q-input>
+          <q-btn
+            color="primary"
+            icon="add"
+            label="新建报表"
+            @click="openDesigner()"
+          />
           <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
         </div>
       </section>
@@ -82,20 +88,30 @@
 
           <q-separator class="q-my-md" />
 
-          <div class="section-title">使用说明</div>
+          <div class="section-title">快速流程</div>
           <div class="flow-list">
-            <div class="flow-step"><b>1</b><span>选择目录或搜索报表</span></div>
-            <div class="flow-step"><b>2</b><span>运行报表并输入查询参数</span></div>
-            <div class="flow-step"><b>3</b><span>导出当前结果为 CSV</span></div>
+            <div class="flow-step"><b>1</b><span>新建报表并选择数据集</span></div>
+            <div class="flow-step"><b>2</b><span>进入设计器配置参数、组件和字段</span></div>
+            <div class="flow-step"><b>3</b><span>运行预览，继承菜单数据权限</span></div>
+            <div class="flow-step"><b>4</b><span>发布给业务角色使用</span></div>
           </div>
         </aside>
 
         <section class="report-list-panel">
           <div class="list-head">
             <div>
-              <div class="section-title">报表目录</div>
-              <div class="report-caption">只展示已发布并可运行的报表。</div>
+              <div class="section-title">报表管理</div>
+              <div class="report-caption">维护草稿、发布和停用状态，设计配置在设计器中处理。</div>
             </div>
+            <q-select
+              v-model="statusFilter"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="status-filter"
+              :options="statusOptions"
+            />
           </div>
 
           <q-table
@@ -141,10 +157,18 @@
                 </q-chip>
               </q-td>
             </template>
+            <template #body-cell-status="props">
+              <q-td :props="props">
+                <q-chip dense square :color="statusColor(props.row.status)" text-color="white">
+                  {{ statusLabel(props.row.status) }}
+                </q-chip>
+              </q-td>
+            </template>
             <template #body-cell-actions="props">
               <q-td :props="props">
                 <div class="row no-wrap justify-center q-gutter-xs">
                   <q-btn
+                    v-if="props.row.status === 'published'"
                     flat
                     size="sm"
                     round
@@ -153,6 +177,58 @@
                     @click="openRuntime(props.row)"
                   >
                     <q-tooltip>运行</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    size="sm"
+                    round
+                    color="primary"
+                    icon="design_services"
+                    @click="openDesigner(props.row)"
+                  >
+                    <q-tooltip>设计</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    size="sm"
+                    round
+                    color="primary"
+                    icon="content_copy"
+                    @click="copyReport(props.row)"
+                  >
+                    <q-tooltip>复制</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="props.row.status !== 'published'"
+                    flat
+                    size="sm"
+                    round
+                    color="positive"
+                    icon="publish"
+                    @click="changeReportStatus(props.row, 'published')"
+                  >
+                    <q-tooltip>发布</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    v-if="props.row.status === 'published'"
+                    flat
+                    size="sm"
+                    round
+                    color="warning"
+                    icon="pause_circle"
+                    @click="changeReportStatus(props.row, 'disabled')"
+                  >
+                    <q-tooltip>停用</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    flat
+                    size="sm"
+                    round
+                    color="negative"
+                    icon="delete"
+                    @click="deleteReport(props.row)"
+                  >
+                    <q-tooltip>删除</q-tooltip>
                   </q-btn>
                 </div>
               </q-td>
@@ -304,13 +380,14 @@
 </template>
 
 <script setup lang="ts">
-defineOptions({ name: 'report_center' })
+defineOptions({ name: 'report_manage' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
+import { useRouter } from 'vue-router'
 import type { Query } from 'src/types/global'
 import {
   defaultReportSheet,
@@ -319,6 +396,7 @@ import {
   type ReportDataset,
   type ReportParameter,
   type ReportPreviewRes,
+  type ReportStatus,
   type ReportKind,
   type ReportSheetConfig,
 } from 'src/api/services/report'
@@ -327,6 +405,7 @@ import { storeToRefs } from 'pinia'
 import ReportSheetPreview from '../components/ReportSheetPreview.vue'
 
 const $q = useQuasar()
+const router = useRouter()
 const reportApi = useReportApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
@@ -351,6 +430,7 @@ const pagination = ref({
 const rows = ref<Report[]>([])
 const total = ref(0)
 const activeCategory = ref('')
+const statusFilter = ref<'all' | ReportStatus>('all')
 const dataSourceCount = ref(0)
 const runtimeVisible = ref(false)
 const runtimeReport = ref<Report | null>(null)
@@ -371,12 +451,20 @@ const runtimePageSizeOptions = [
   { label: '100 / 页', value: 100 },
 ]
 
+const statusOptions = [
+  { label: '全部状态', value: 'all' },
+  { label: '已发布', value: 'published' },
+  { label: '草稿', value: 'draft' },
+  { label: '已停用', value: 'disabled' },
+]
+
 const columns = computed<QTableProps['columns']>(() => [
   { name: 'report_name', field: 'report_name', label: '报表名称', align: 'left' },
   { name: 'report_kind', field: 'report_kind', label: '类型', align: 'center' },
   { name: 'category', field: 'category', label: '分类', align: 'left' },
   { name: 'data_source_name', field: 'data_source_name', label: '数据集', align: 'left' },
   { name: 'permission', field: 'permission_table_code', label: '权限', align: 'center' },
+  { name: 'status', field: 'status', label: '状态', align: 'center' },
   {
     name: 'updated_at',
     field: (row) => row.updated_at || row.gmt_modify || '-',
@@ -397,7 +485,7 @@ const categories = computed(() => {
 
 const filteredRows = computed(() => rows.value)
 
-const emptyText = computed(() => '暂无可运行报表，请先在报表管理中发布。')
+const emptyText = computed(() => '暂无报表，点击右上角新建报表开始配置。')
 
 const publishedCount = computed(
   () => rows.value.filter((item) => item.status === 'published').length,
@@ -466,7 +554,8 @@ async function fetchData() {
 }
 
 function buildListFilters() {
-  const filters: Record<string, string> = { status: 'published' }
+  const filters: Record<string, string> = {}
+  if (statusFilter.value !== 'all') filters.status = statusFilter.value
   if (activeCategory.value) filters.category = activeCategory.value
   return filters
 }
@@ -493,6 +582,10 @@ async function loadDataSources() {
     dataSourceCount.value = 0
     $q.notify({ type: 'warning', message: '数据集列表加载失败，设计器可能无法选择数据源' })
   }
+}
+
+function openDesigner(row?: Report) {
+  void router.push({ name: 'report_design', query: row?.id ? { id: row.id } : {} })
 }
 
 async function openRuntime(row: Report) {
@@ -618,6 +711,80 @@ function csvCell(value: unknown) {
   return `"${text.replaceAll('"', '""')}"`
 }
 
+async function copyReport(row: Report) {
+  try {
+    const fields = row.query_config?.fields || []
+    const layout = row.layout_config
+    const payload = {
+      report_name: `${row.report_name} 副本`,
+      report_code: `${row.report_code}_copy_${Date.now().toString().slice(-4)}`,
+      report_kind: row.report_kind,
+      fields,
+      datasets: layout?.datasets || row.query_config?.datasets || [],
+      dataset_joins: layout?.dataset_joins || row.query_config?.dataset_joins || [],
+      parameters: layout?.parameters || row.query_config?.parameters || [],
+      sheet: layout?.sheet || defaultReportSheet(),
+    }
+    const res = await reportApi.createReport({
+      ...payload,
+      ...(row.category ? { category: row.category } : {}),
+      ...(row.description ? { description: row.description } : {}),
+      ...(row.data_source_id ? { data_source_id: row.data_source_id } : {}),
+      ...(row.permission_menu_id ? { permission_menu_id: row.permission_menu_id } : {}),
+      ...(row.permission_table_code ? { permission_table_code: row.permission_table_code } : {}),
+    })
+    $q.notify({ type: 'positive', message: `已复制报表 #${res.data}` })
+    await fetchData()
+  } catch {
+    $q.notify({ type: 'negative', message: '复制失败' })
+  }
+}
+
+async function changeReportStatus(row: Report, status: ReportStatus) {
+  const actionText = status === 'published' ? '发布' : '停用'
+  const confirmed = await new Promise<boolean>((resolve) => {
+    $q.dialog({
+      title: `${actionText}报表`,
+      message: `确认${actionText}「${row.report_name}」吗？`,
+      cancel: true,
+      persistent: true,
+    })
+      .onOk(() => resolve(true))
+      .onCancel(() => resolve(false))
+      .onDismiss(() => resolve(false))
+  })
+  if (!confirmed) return
+  try {
+    await reportApi.updateReportStatus(row.id, status)
+    $q.notify({ type: 'positive', message: `报表已${actionText}` })
+    await fetchData()
+  } catch {
+    $q.notify({ type: 'negative', message: `${actionText}失败` })
+  }
+}
+
+async function deleteReport(row: Report) {
+  const confirmed = await new Promise<boolean>((resolve) => {
+    $q.dialog({
+      title: '删除报表',
+      message: `确认删除「${row.report_name}」吗？删除后不可恢复。`,
+      cancel: true,
+      persistent: true,
+    })
+      .onOk(() => resolve(true))
+      .onCancel(() => resolve(false))
+      .onDismiss(() => resolve(false))
+  })
+  if (!confirmed) return
+  try {
+    await reportApi.deleteReport(row.id)
+    $q.notify({ type: 'positive', message: '报表已删除' })
+    await fetchData()
+  } catch {
+    $q.notify({ type: 'negative', message: '删除失败' })
+  }
+}
+
 function kindLabel(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
     detail: '明细表',
@@ -638,6 +805,24 @@ function kindIcon(kind: ReportKind) {
   return map[kind] || 'table_rows'
 }
 
+function statusLabel(status: ReportStatus) {
+  const map: Record<ReportStatus, string> = {
+    draft: '草稿',
+    published: '已发布',
+    disabled: '已停用',
+  }
+  return map[status] || '草稿'
+}
+
+function statusColor(status: ReportStatus) {
+  const map: Record<ReportStatus, string> = {
+    draft: 'grey-7',
+    published: 'positive',
+    disabled: 'warning',
+  }
+  return map[status] || 'grey-7'
+}
+
 watch(
   () => [query.value.page, query.value.num] as const,
   ([page]) => {
@@ -646,10 +831,17 @@ watch(
   },
 )
 
+watch(
+  () => statusFilter.value,
+  () => {
+    activeCategory.value = ''
+    resetToFirstPageOrFetch()
+  },
+)
 </script>
 
 <style scoped lang="scss">
-.report-center-page {
+.report-manage-page {
   min-height: 0;
 }
 
@@ -817,6 +1009,10 @@ watch(
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid #dfe5f2;
+}
+
+.status-filter {
+  width: 150px;
 }
 
 .report-table {

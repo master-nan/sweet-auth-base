@@ -761,6 +761,8 @@ func insecureBootstrapAdminPassword(password string) bool {
 }
 
 func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
+	reportDesignMenu := menuWithTable(menu(903, 900, "report_design", "design", "pages/report/design/Index.vue", "router.report.design", "design_services", 3), "report_definition")
+	reportDesignMenu.IsHidden = true
 	menus := []model.SysMenu{
 		menu(100, 0, "home", "home", "pages/dashboard/Dashboard.vue", "router.home", "home", 1),
 		directoryMenu(menu(200, 0, "system", "system", "src/components/Layout/Layout.vue", "router.system.default", "settings", 2)),
@@ -778,7 +780,8 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithOption(menu(304, 300, "develop_dictionary", "dictionary", "pages/develop/dictionary/Index.vue", "router.develop.dictionary", "menu_book", 4), "sys_dict,sys_dict_item"),
 		directoryMenu(menu(900, 0, "report", "report", "src/components/Layout/Layout.vue", "router.report.default", "analytics", 4)),
 		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
-		menuWithTable(menu(902, 900, "report_design", "design", "pages/report/design/Index.vue", "router.report.design", "design_services", 2), "report_definition"),
+		menuWithTable(menu(902, 900, "report_manage", "manage", "pages/report/manage/Index.vue", "router.report.manage", "build", 2), "report_definition"),
+		reportDesignMenu,
 	}
 	menuByName := make(map[string]model.SysMenu, len(menus))
 	for _, item := range menus {
@@ -892,6 +895,13 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 		return fmt.Errorf("report_center menu missing after seed")
 	}
 	if err := seedReportCenterMenuButtons(db, sf, roleID, roleName, reportCenterMenu.Id); err != nil {
+		return err
+	}
+	reportManageMenu, ok := menuByName["report_manage"]
+	if !ok {
+		return fmt.Errorf("report_manage menu missing after seed")
+	}
+	if err := seedReportManageMenuButtons(db, sf, roleID, roleName, reportManageMenu.Id); err != nil {
 		return err
 	}
 	reportDesignMenu, ok := menuByName["report_design"]
@@ -1297,15 +1307,34 @@ func seedAuditMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName
 }
 
 func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	if err := retireMenuButtons(db, menuID, []string{
+		"report_center_create",
+		"report_center_design",
+		"report_center_delete",
+		"report_center_status",
+	}); err != nil {
+		return err
+	}
 	buttons := []model.SysMenuButton{
-		menuButtonWithAPI(700, menuID, "新建报表", "report_center_create", enum.Top, "create", "add", "primary", 1, "/admin/report", "POST"),
-		menuButtonWithAPI(701, menuID, "设计", "report_center_design", enum.Line, "navigate", "design_services", "primary", 1, "/admin/report/:id", "GET"),
-		menuButtonWithAPI(702, menuID, "预览", "report_center_preview", enum.Line, "preview", "visibility", "primary", 2, "/admin/report/:id/preview", "POST"),
-		menuButtonWithAPI(703, menuID, "删除", "report_center_delete", enum.Line, "delete", "delete", "negative", 4, "/admin/report/:id", "DELETE"),
-		menuButtonWithAPI(714, menuID, "发布状态", "report_center_status", enum.Line, "update", "published_with_changes", "primary", 3, "/admin/report/:id/status", "POST"),
+		menuButtonWithAPI(702, menuID, "运行报表", "report_center_preview", enum.Line, "preview", "play_arrow", "primary", 1, "/admin/report/:id/preview", "POST"),
 		apiPermissionWithAPI(704, menuID, "报表列表", "report_center_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(705, menuID, "报表详情", "report_center_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(706, menuID, "数据源列表", "report_center_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
+}
+
+func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		menuButtonWithAPI(720, menuID, "新建报表", "report_manage_create", enum.Top, "create", "add", "primary", 1, "/admin/report", "POST"),
+		menuButtonWithAPI(721, menuID, "设计", "report_manage_design", enum.Line, "navigate", "design_services", "primary", 1, "/admin/report/:id", "GET"),
+		menuButtonWithAPI(722, menuID, "复制", "report_manage_copy", enum.Line, "duplicate", "content_copy", "primary", 2, "/admin/report", "POST"),
+		menuButtonWithAPI(723, menuID, "发布状态", "report_manage_status", enum.Line, "update", "published_with_changes", "primary", 3, "/admin/report/:id/status", "POST"),
+		menuButtonWithAPI(724, menuID, "删除", "report_manage_delete", enum.Line, "delete", "delete", "negative", 4, "/admin/report/:id", "DELETE"),
+		menuButtonWithAPI(725, menuID, "运行预览", "report_manage_preview", enum.Line, "preview", "play_arrow", "primary", 5, "/admin/report/:id/preview", "POST"),
+		apiPermissionWithAPI(726, menuID, "报表列表", "report_manage_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
+		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
+		apiPermissionWithAPI(728, menuID, "数据源列表", "report_manage_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -1397,6 +1426,21 @@ func seedMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName stri
 		}
 	}
 	return nil
+}
+
+func retireMenuButtons(db *gorm.DB, menuID int, codes []string) error {
+	if len(codes) == 0 {
+		return nil
+	}
+	return db.Model(&model.SysMenuButton{}).
+		Where("menu_id = ? AND code IN ?", menuID, codes).
+		Updates(map[string]interface{}{
+			"is_button":   false,
+			"is_hidden":   true,
+			"is_disabled": true,
+			"state":       false,
+			"gmt_modify":  model.Now(),
+		}).Error
 }
 
 func seedMenuButton(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, button model.SysMenuButton) error {

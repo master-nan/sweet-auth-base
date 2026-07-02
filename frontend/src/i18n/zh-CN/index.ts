@@ -11,8 +11,9 @@ export default {
       generalization: '通用页面'
     },
     report: {
-      default: '报表中心',
+      default: '报表',
       center: '报表中心',
+      manage: '报表管理',
       design: '报表设计器',
     },
     system: {
