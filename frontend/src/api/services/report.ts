@@ -209,7 +209,7 @@ const toBackendReport = (req: ReportSaveReq) => {
     datasets,
     dataset_joins: req.dataset_joins || [],
     parameters: req.parameters || [],
-    sheet: req.sheet || defaultReportSheet(),
+    sheet: normalizeReportSheet(req.sheet || defaultReportSheet()),
     runtime_display: req.runtime_display || 'paged',
     runtime_page_size: Number(req.runtime_page_size || 20),
   }

@@ -53,13 +53,7 @@ export const reportParameterDefaultsForField = (
 }
 
 export const createBlankReportSheet = (rows = 24, cols = 12): ReportSheetConfig => {
-  const cells: ReportSheetCell[] = []
-  for (let row = 1; row <= rows; row += 1) {
-    for (let col = 1; col <= cols; col += 1) {
-      cells.push({ id: makeReportCellId(row, col), row, col, value: '' })
-    }
-  }
-  return { rows, cols, scale: 0.85, detail_rows: [], summary_rows: [], cells }
+  return { rows, cols, scale: 0.85, detail_rows: [], summary_rows: [], cells: [] }
 }
 
 export const defaultReportSheet = (): ReportSheetConfig => createBlankReportSheet()
@@ -68,8 +62,22 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
   const rows = Math.max(Number(sheet?.rows || 24), 8)
   const cols = Math.max(Number(sheet?.cols || 12), 6)
   const blank = createBlankReportSheet(rows, cols)
-  const incoming = new Map((sheet?.cells || []).map((cell) => [cell.id || makeReportCellId(cell.row, cell.col), cell]))
-  blank.cells = blank.cells.map((cell) => ({ ...cell, ...(incoming.get(cell.id) || {}) }))
+  const incoming = new Map<string, ReportSheetCell>()
+  ;(sheet?.cells || []).forEach((cell) => {
+    const row = Number(cell.row)
+    const col = Number(cell.col)
+    if (!Number.isInteger(row) || !Number.isInteger(col)) return
+    if (row < 1 || row > rows || col < 1 || col > cols) return
+    const next = {
+      ...cell,
+      id: cell.id || makeReportCellId(row, col),
+      row,
+      col,
+      value: cell.value || '',
+    }
+    if (hasReportCellConfig(next)) incoming.set(makeReportCellId(row, col), next)
+  })
+  blank.cells = [...incoming.values()].sort((a, b) => a.row - b.row || a.col - b.col)
   if (sheet?.active_cell) blank.active_cell = sheet.active_cell
   if (sheet?.scale) blank.scale = sheet.scale
   blank.detail_rows = normalizeSheetRows(sheet?.detail_rows, rows)
@@ -85,6 +93,15 @@ const normalizeSheetRows = (rows: number[] | undefined, maxRows: number) => {
   })
   return [...unique].sort((a, b) => a - b)
 }
+
+export const hasReportCellConfig = (cell: Partial<ReportSheetCell>) => Boolean(
+  cell.value ||
+    cell.binding?.field ||
+    cell.binding?.formula ||
+    (cell.style && Object.keys(cell.style).length > 0) ||
+    (cell.colspan && cell.colspan > 1) ||
+    (cell.rowspan && cell.rowspan > 1),
+)
 
 export const createReportLayout = (report?: Partial<Report>): ReportLayoutConfig => ({
   version: REPORT_SCHEMA_VERSION,

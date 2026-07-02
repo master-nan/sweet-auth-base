@@ -265,10 +265,11 @@ import {
   reportCellId,
   reportColumnName,
   reportNormalizeSheetRange,
+  reportSheetCellAt,
   reportSheetCellSpan,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
-import { reportParameterDefaultsForField } from 'src/modules/report/schema'
+import { hasReportCellConfig, normalizeReportSheet, reportParameterDefaultsForField } from 'src/modules/report/schema'
 
 const $q = useQuasar()
 const route = useRoute()
@@ -375,7 +376,13 @@ const datasetOptions = computed(() =>
 const primaryDataset = computed(() => datasets.value.find((item) => item.primary) || datasets.value[0])
 const selectedDataset = computed(() => datasets.value.find((item) => item.id === selectedDatasetId.value))
 const editingDataset = computed(() => datasets.value.find((item) => item.id === editingDatasetId.value))
-const activeCell = computed(() => sheet.value.cells.find((cell) => cell.id === selectedCellId.value))
+const activeCell = computed(() => {
+  const parts = selectedCellId.value.split(':')
+  const row = Number(parts[0])
+  const col = Number(parts[1])
+  if (!Number.isInteger(row) || !Number.isInteger(col)) return undefined
+  return reportSheetCellAt(sheet.value, row, col)
+})
 const activeCellLabel = computed(() => {
   const cell = activeCell.value
   if (!cell) return '-'
@@ -506,10 +513,10 @@ function applyReport(report: Report) {
       : createInitialDatasets(report.source_code),
   )
   datasetJoins.value = report.layout_config?.dataset_joins || report.query_config?.dataset_joins || []
-  sheet.value = report.layout_config?.sheet || defaultReportSheet()
+  sheet.value = normalizeReportSheet(report.layout_config?.sheet || defaultReportSheet())
   parameters.value = report.layout_config?.parameters || report.query_config?.parameters || []
   selectedDatasetId.value = datasets.value[0]?.id || ''
-  selectedCellId.value = sheet.value.active_cell || sheet.value.cells[0]?.id || ''
+  selectedCellId.value = sheet.value.active_cell || '1:1'
   syncForm()
 }
 
@@ -528,7 +535,7 @@ function initNewReport() {
   sheet.value = defaultReportSheet()
   parameters.value = []
   selectedDatasetId.value = ''
-  selectedCellId.value = sheet.value.cells[0]?.id || '1:1'
+  selectedCellId.value = '1:1'
   syncForm()
 }
 
@@ -708,7 +715,7 @@ function removeDataset(id: string) {
     const style = { ...(cell.style || {}) }
     delete style.color
     return { ...cell, value: '', binding: undefined, style }
-  })
+  }).filter(hasReportCellConfig)
   if (removed?.primary && datasets.value[0]) datasets.value[0].primary = true
   selectedDatasetId.value = datasets.value[0]?.id || ''
   buildLocalPreview()
@@ -774,20 +781,20 @@ function bindCell(
 }
 
 function cellAt(row: number, col: number) {
-  let cell = sheet.value.cells.find((item) => item.row === row && item.col === col)
-  if (!cell) {
-    cell = { id: reportCellId(row, col), row, col, value: '' }
-    sheet.value.cells.push(cell)
-  }
-  return cell
+  return reportSheetCellAt(sheet.value, row, col)
 }
 
 function patchCell(row: number, col: number, patch: Partial<ReportSheetCell>) {
   const index = sheet.value.cells.findIndex((item) => item.row === row && item.col === col)
   const current = index === -1 ? { id: reportCellId(row, col), row, col, value: '' } : sheet.value.cells[index]!
   const next = { ...current, ...patch }
+  if (!hasReportCellConfig(next)) {
+    if (index !== -1) sheet.value.cells.splice(index, 1)
+    return
+  }
   if (index === -1) sheet.value.cells.push(next)
   else sheet.value.cells[index] = next
+  sheet.value.cells.sort((a, b) => a.row - b.row || a.col - b.col)
 }
 
 function patchActiveCell(patch: Partial<ReportSheetCell>) {
@@ -989,11 +996,7 @@ function cellsInBounds(bounds: ReturnType<typeof reportNormalizeSheetRange>) {
 }
 
 function addRow() {
-  const nextRows = sheet.value.rows + 1
-  for (let col = 1; col <= sheet.value.cols; col += 1) {
-    sheet.value.cells.push({ id: reportCellId(nextRows, col), row: nextRows, col, value: '' })
-  }
-  sheet.value.rows = nextRows
+  sheet.value.rows += 1
   buildLocalPreview()
 }
 
@@ -1003,10 +1006,6 @@ function insertRowAfter(row: number) {
       ? { ...cell, row: cell.row + 1, id: reportCellId(cell.row + 1, cell.col) }
       : cell,
   )
-  const nextRow = row + 1
-  for (let col = 1; col <= sheet.value.cols; col += 1) {
-    sheet.value.cells.push({ id: reportCellId(nextRow, col), row: nextRow, col, value: '' })
-  }
   sheet.value.rows += 1
   sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) => (item > row ? item + 1 : item))
   sheet.value.detail_rows = (sheet.value.detail_rows || []).map((item) => (item > row ? item + 1 : item))
@@ -1014,11 +1013,7 @@ function insertRowAfter(row: number) {
 }
 
 function addCol() {
-  const nextCols = sheet.value.cols + 1
-  for (let row = 1; row <= sheet.value.rows; row += 1) {
-    sheet.value.cells.push({ id: reportCellId(row, nextCols), row, col: nextCols, value: '' })
-  }
-  sheet.value.cols = nextCols
+  sheet.value.cols += 1
   buildLocalPreview()
 }
 
@@ -1028,10 +1023,6 @@ function insertColAfter(col: number) {
       ? { ...cell, col: cell.col + 1, id: reportCellId(cell.row, cell.col + 1) }
       : cell,
   )
-  const nextCol = col + 1
-  for (let row = 1; row <= sheet.value.rows; row += 1) {
-    sheet.value.cells.push({ id: reportCellId(row, nextCol), row, col: nextCol, value: '' })
-  }
   sheet.value.cols += 1
   buildLocalPreview()
 }
@@ -1354,7 +1345,7 @@ function syncForm() {
   form.datasets = datasets.value
   form.dataset_joins = datasetJoins.value
   form.parameters = parameters.value
-  form.sheet = sheet.value
+  form.sheet = normalizeReportSheet(sheet.value)
 }
 
 function validateReport(strict = true) {
