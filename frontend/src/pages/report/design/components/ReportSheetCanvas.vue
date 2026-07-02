@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <div class="sheet-scroll">
+    <div ref="sheetScrollRef" class="sheet-scroll" @scroll="closeContextMenu">
       <div
         class="sheet-grid"
         :style="{
@@ -51,98 +51,89 @@
       >
         <div class="sheet-corner" />
         <div
-          v-for="col in sheet.cols"
-          :key="`head-${col}`"
+          v-for="header in columnHeaders"
+          :key="header.key"
           class="sheet-col-head"
-          :style="columnHeaderStyle(col)"
+          :style="header.style"
         >
-          {{ reportColumnName(col) }}
+          {{ header.label }}
         </div>
-        <template v-for="row in sheet.rows" :key="`row-${row}`">
-          <div class="sheet-row-head" :class="{ summary: isSummaryRow(row) }" :style="rowHeaderStyle(row)">{{ row }}</div>
-          <template v-for="col in sheet.cols" :key="cellAt(row, col).id">
+        <template v-for="renderRow in renderRows" :key="renderRow.key">
+          <div
+            class="sheet-row-head"
+            :class="{ summary: renderRow.summary }"
+            :style="renderRow.headerStyle"
+          >
+            {{ renderRow.row }}
+          </div>
+          <template v-for="renderCell in renderRow.cells" :key="renderCell.key">
             <div
-              v-if="!isCoveredCell(row, col)"
               class="sheet-cell"
               :class="{
-                active: selectedCellId === cellAt(row, col).id,
-                selected: isSelectedCell(row, col),
-                bound: !!cellAt(row, col).binding?.field,
-                summary: isSummaryRow(row),
+                active: renderCell.active,
+                selected: renderCell.selected,
+                bound: renderCell.bound,
+                summary: renderCell.summary,
               }"
-              :style="sheetCellStyle(cellAt(row, col))"
-              :data-cell-id="cellAt(row, col).id"
+              :style="renderCell.style"
+              :data-cell-id="renderCell.id"
               role="button"
               tabindex="0"
-              :draggable="editingCellId !== cellAt(row, col).id"
-              @click="handleCellClick(row, col, $event)"
-              @dblclick.stop="startEdit(row, col)"
-              @keydown.enter.prevent="startEdit(row, col)"
-              @mousedown.left="$emit('startDragCell', row, col)"
-              @mouseup.left="$emit('dropField', row, col)"
-              @dragstart="$emit('startDragCell', row, col)"
+              :draggable="editingCellId !== renderCell.id"
+              @click="handleCellClick(renderCell.row, renderCell.col, $event)"
+              @dblclick.stop="startEdit(renderCell.row, renderCell.col)"
+              @keydown.enter.prevent="startEdit(renderCell.row, renderCell.col)"
+              @mousedown.left="$emit('startDragCell', renderCell.row, renderCell.col)"
+              @mouseup.left="$emit('dropField', renderCell.row, renderCell.col)"
+              @dragstart="$emit('startDragCell', renderCell.row, renderCell.col)"
               @dragover.prevent
-              @drop.prevent="$emit('dropField', row, col)"
+              @drop.prevent="$emit('dropField', renderCell.row, renderCell.col)"
+              @contextmenu.prevent.stop="openContextMenu(renderCell.row, renderCell.col, $event)"
             >
               <input
-                v-if="editingCellId === cellAt(row, col).id"
+                v-if="editingCellId === renderCell.id"
                 v-model="editingValue"
                 autofocus
                 class="sheet-cell__editor"
                 @click.stop
-                @keydown.enter.stop.prevent="commitEdit(row, col)"
+                @keydown.enter.stop.prevent="commitEdit(renderCell.row, renderCell.col)"
                 @keydown.esc.stop.prevent="cancelEdit"
-                @blur="commitEdit(row, col)"
+                @blur="commitEdit(renderCell.row, renderCell.col)"
               >
-              <span v-else>{{ cellAt(row, col).value || '' }}</span>
-              <q-menu context-menu @before-show="$emit('selectCell', row, col)">
-                <q-list dense style="min-width: 150px">
-                  <q-item clickable v-close-popup @click="startEdit(row, col)">
-                    <q-item-section avatar><q-icon name="edit" /></q-item-section>
-                    <q-item-section>编辑文本</q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup @click="$emit('clearCell', row, col)">
-                    <q-item-section avatar><q-icon name="backspace" /></q-item-section>
-                    <q-item-section>清除单元格</q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup :disable="!hasRangeSelection" @click="$emit('mergeSelection')">
-                    <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
-                    <q-item-section>合并选区</q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup @click="$emit('mergeCellRight', row, col)">
-                    <q-item-section avatar><q-icon name="call_merge" /></q-item-section>
-                    <q-item-section>合并右侧</q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup @click="$emit('unmergeCell', row, col)">
-                    <q-item-section avatar><q-icon name="splitscreen" /></q-item-section>
-                    <q-item-section>取消合并</q-item-section>
-                  </q-item>
-                  <q-separator />
-                  <q-item clickable v-close-popup @click="$emit('insertRowAfter', row)">
-                    <q-item-section avatar><q-icon name="table_rows" /></q-item-section>
-                    <q-item-section>下方插入行</q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup @click="$emit('insertColAfter', col)">
-                    <q-item-section avatar><q-icon name="view_column" /></q-item-section>
-                    <q-item-section>右侧插入列</q-item-section>
-                  </q-item>
-                  <q-separator />
-                  <q-item clickable v-close-popup @click="$emit('toggleSummaryRow', row)">
-                    <q-item-section avatar><q-icon name="functions" /></q-item-section>
-                    <q-item-section>{{ isSummaryRow(row) ? '取消汇总行' : '设为汇总行' }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
+              <span v-else>{{ renderCell.value }}</span>
             </div>
           </template>
         </template>
+      </div>
+
+      <div
+        v-if="contextMenu.visible"
+        class="sheet-context-menu"
+        :style="{ left: `${contextMenu.left}px`, top: `${contextMenu.top}px` }"
+        @mousedown.stop
+        @click.stop
+      >
+        <button type="button" @click="runContextAction('edit')"><q-icon name="edit" /> 编辑文本</button>
+        <button type="button" @click="runContextAction('clear')"><q-icon name="backspace" /> 清除单元格</button>
+        <button type="button" :disabled="!hasRangeSelection" @click="runContextAction('mergeSelection')">
+          <q-icon name="call_merge" /> 合并选区
+        </button>
+        <button type="button" @click="runContextAction('mergeRight')"><q-icon name="call_merge" /> 合并右侧</button>
+        <button type="button" @click="runContextAction('unmerge')"><q-icon name="splitscreen" /> 取消合并</button>
+        <div class="sheet-context-menu__separator" />
+        <button type="button" @click="runContextAction('insertRow')"><q-icon name="table_rows" /> 下方插入行</button>
+        <button type="button" @click="runContextAction('insertCol')"><q-icon name="view_column" /> 右侧插入列</button>
+        <div class="sheet-context-menu__separator" />
+        <button type="button" @click="runContextAction('summary')">
+          <q-icon name="functions" /> {{ isSummaryRow(contextMenu.row) ? '取消汇总行' : '设为汇总行' }}
+        </button>
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import type {
   ReportDataset,
   ReportDatasetJoin,
@@ -153,10 +144,8 @@ import {
   reportCellStyle,
   reportColumnName,
   reportNormalizeSheetRange,
-  reportSheetCellAt,
+  reportCellId,
   reportSheetCellSpan,
-  reportSheetIsCoveredCell,
-  reportSheetRangeContains,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
 
@@ -197,48 +186,128 @@ const emit = defineEmits<{
 
 const editingCellId = ref('')
 const editingValue = ref('')
+const sheetScrollRef = ref<HTMLElement | null>(null)
+const contextMenu = reactive({
+  visible: false,
+  row: 1,
+  col: 1,
+  left: 0,
+  top: 0,
+})
 const hasRangeSelection = computed(() => {
   if (!props.selectionRange) return false
   const bounds = reportNormalizeSheetRange(props.selectionRange)
   return bounds.maxRow > bounds.minRow || bounds.maxCol > bounds.minCol
 })
 
-function cellAt(row: number, col: number): ReportSheetCell {
-  return reportSheetCellAt(props.sheet, row, col)
-}
+const summaryRows = computed(() => new Set(props.sheet.summary_rows || []))
 
-function columnHeaderStyle(col: number) {
-  return {
-    gridColumn: col + 1,
-    gridRow: 1,
-  }
-}
+const selectionBounds = computed(() =>
+  props.selectionRange ? reportNormalizeSheetRange(props.selectionRange) : null,
+)
 
-function rowHeaderStyle(row: number) {
-  return {
-    gridColumn: 1,
-    gridRow: row + 1,
-  }
-}
-
-function sheetCellStyle(cell: ReportSheetCell) {
-  const { rowspan, colspan } = reportSheetCellSpan(cell, {
-    maxRow: props.sheet.rows,
-    maxCol: props.sheet.cols,
+const cellMap = computed(() => {
+  const map = new Map<string, ReportSheetCell>()
+  props.sheet.cells.forEach((cell) => {
+    map.set(cellKey(cell.row, cell.col), cell)
   })
-  return {
-    ...reportCellStyle(cell),
-    gridColumn: `${cell.col + 1} / span ${colspan}`,
-    gridRow: `${cell.row + 1} / span ${rowspan}`,
+  return map
+})
+
+const coveredCells = computed(() => {
+  const covered = new Set<string>()
+  props.sheet.cells.forEach((cell) => {
+    const { rowspan, colspan } = reportSheetCellSpan(cell, {
+      maxRow: props.sheet.rows,
+      maxCol: props.sheet.cols,
+    })
+    if (rowspan === 1 && colspan === 1) return
+    for (let row = cell.row; row < cell.row + rowspan; row += 1) {
+      for (let col = cell.col; col < cell.col + colspan; col += 1) {
+        if (row === cell.row && col === cell.col) continue
+        covered.add(cellKey(row, col))
+      }
+    }
+  })
+  return covered
+})
+
+const columnHeaders = computed(() =>
+  Array.from({ length: props.sheet.cols }, (_, index) => {
+    const col = index + 1
+    return {
+      key: `head-${col}`,
+      label: reportColumnName(col),
+      style: {
+        gridColumn: col + 1,
+        gridRow: 1,
+      },
+    }
+  }),
+)
+
+const renderRows = computed(() =>
+  Array.from({ length: props.sheet.rows }, (_, index) => {
+    const row = index + 1
+    const summary = summaryRows.value.has(row)
+    return {
+      key: `row-${row}`,
+      row,
+      summary,
+      headerStyle: {
+        gridColumn: 1,
+        gridRow: row + 1,
+      },
+      cells: renderCellsForRow(row, summary),
+    }
+  }),
+)
+
+function renderCellsForRow(row: number, summary: boolean) {
+  const cells = []
+  for (let col = 1; col <= props.sheet.cols; col += 1) {
+    if (coveredCells.value.has(cellKey(row, col))) continue
+    const cell = cellAt(row, col)
+    const { rowspan, colspan } = reportSheetCellSpan(cell, {
+      maxRow: props.sheet.rows,
+      maxCol: props.sheet.cols,
+    })
+    cells.push({
+      key: cell.id,
+      id: cell.id,
+      row,
+      col,
+      value: cell.value || '',
+      active: props.selectedCellId === cell.id,
+      selected: isSelectedCell(row, col),
+      bound: Boolean(cell.binding?.field),
+      summary,
+      style: {
+        ...reportCellStyle(cell),
+        gridColumn: `${cell.col + 1} / span ${colspan}`,
+        gridRow: `${cell.row + 1} / span ${rowspan}`,
+      },
+    })
+  }
+  return cells
+}
+
+function cellAt(row: number, col: number): ReportSheetCell {
+  return cellMap.value.get(cellKey(row, col)) || {
+    id: reportCellId(row, col),
+    row,
+    col,
+    value: '',
   }
 }
 
-function isCoveredCell(row: number, col: number) {
-  return reportSheetIsCoveredCell(props.sheet, row, col)
+function cellKey(row: number, col: number) {
+  return `${row}:${col}`
 }
 
 function isSelectedCell(row: number, col: number) {
-  return reportSheetRangeContains(props.selectionRange, row, col)
+  const bounds = selectionBounds.value
+  return Boolean(bounds && row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol)
 }
 
 function startEdit(row: number, col: number) {
@@ -249,6 +318,7 @@ function startEdit(row: number, col: number) {
 }
 
 function handleCellClick(row: number, col: number, event: MouseEvent) {
+  closeContextMenu()
   if (event.shiftKey) emit('selectRange', row, col)
   else emit('selectCell', row, col)
   if (event.detail >= 2) {
@@ -267,7 +337,37 @@ function cancelEdit() {
 }
 
 function isSummaryRow(row: number) {
-  return props.sheet.summary_rows?.includes(row) || false
+  return summaryRows.value.has(row)
+}
+
+function openContextMenu(row: number, col: number, event: MouseEvent) {
+  const scrollEl = sheetScrollRef.value
+  const rect = scrollEl?.getBoundingClientRect()
+  contextMenu.row = row
+  contextMenu.col = col
+  contextMenu.left = rect && scrollEl ? event.clientX - rect.left + scrollEl.scrollLeft : event.offsetX
+  contextMenu.top = rect && scrollEl ? event.clientY - rect.top + scrollEl.scrollTop : event.offsetY
+  contextMenu.visible = true
+  emit('selectCell', row, col)
+}
+
+function closeContextMenu() {
+  contextMenu.visible = false
+}
+
+function runContextAction(
+  action: 'edit' | 'clear' | 'mergeSelection' | 'mergeRight' | 'unmerge' | 'insertRow' | 'insertCol' | 'summary',
+) {
+  const { row, col } = contextMenu
+  closeContextMenu()
+  if (action === 'edit') startEdit(row, col)
+  else if (action === 'clear') emit('clearCell', row, col)
+  else if (action === 'mergeSelection') emit('mergeSelection')
+  else if (action === 'mergeRight') emit('mergeCellRight', row, col)
+  else if (action === 'unmerge') emit('unmergeCell', row, col)
+  else if (action === 'insertRow') emit('insertRowAfter', row)
+  else if (action === 'insertCol') emit('insertColAfter', col)
+  else emit('toggleSummaryRow', row)
 }
 
 function joinLabel(join: ReportDatasetJoin) {
@@ -315,6 +415,7 @@ function joinLabel(join: ReportDatasetJoin) {
   min-height: 0;
   overflow: auto;
   padding: 24px;
+  position: relative;
 }
 
 .sheet-grid {
@@ -395,5 +496,46 @@ function joinLabel(join: ReportDatasetJoin) {
 
 .sheet-row-head.summary {
   color: #b7791f;
+}
+
+.sheet-context-menu {
+  position: absolute;
+  z-index: 20;
+  width: 168px;
+  padding: 6px;
+  border: 1px solid #dfe5f2;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(24, 32, 51, 0.16);
+}
+
+.sheet-context-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #172033;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheet-context-menu button:hover:not(:disabled) {
+  background: #f1efff;
+  color: var(--q-primary);
+}
+
+.sheet-context-menu button:disabled {
+  color: #a6afc0;
+  cursor: not-allowed;
+}
+
+.sheet-context-menu__separator {
+  height: 1px;
+  margin: 5px 0;
+  background: #e7ecf6;
 }
 </style>
