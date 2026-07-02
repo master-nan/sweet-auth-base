@@ -406,6 +406,15 @@ const activeBindingPreview = computed(() => {
   return reportBindingText(binding.type, dataset, field)
 })
 const usedFields = computed(() => collectReportUsedFields(datasets.value, sheet.value))
+const boundDatasetIds = computed(() => {
+  const ids = new Set<string>()
+  sheet.value.cells.forEach((cell) => {
+    const binding = cell.binding
+    if (!binding?.dataset_id || !binding.field || binding.type === 'static') return
+    ids.add(binding.dataset_id)
+  })
+  return [...ids]
+})
 const datasetDraftPreviewFields = computed(() => {
   if (datasetDraft.type === 'table') {
     return dataSources.value.find((item) => item.code === datasetDraft.source_code)?.fields || []
@@ -1384,6 +1393,9 @@ function validateReport(strict = true) {
     $q.notify({ type: 'warning', message: '请至少绑定一个主数据集字段' })
     return false
   }
+  if (!validateDatasetJoins()) {
+    return false
+  }
   return true
 }
 
@@ -1392,6 +1404,41 @@ function validateAndNotify() {
   if (validateReport(true)) {
     $q.notify({ type: 'positive', message: '配置检查通过' })
   }
+}
+
+function validateDatasetJoins() {
+  for (const join of datasetJoins.value) {
+    const leftDataset = datasets.value.find((item) => item.id === join.left_dataset_id)
+    const rightDataset = datasets.value.find((item) => item.id === join.right_dataset_id)
+    if (!leftDataset || !rightDataset || leftDataset.id === rightDataset.id) {
+      $q.notify({ type: 'warning', message: '请检查数据集关联，两端必须是不同且存在的数据集' })
+      return false
+    }
+    const leftFieldExists = leftDataset.fields.some((field) => field.code === join.left_field)
+    const rightFieldExists = rightDataset.fields.some((field) => field.code === join.right_field)
+    if (!leftFieldExists || !rightFieldExists) {
+      $q.notify({ type: 'warning', message: '请检查数据集关联字段，字段必须来自对应数据集' })
+      return false
+    }
+  }
+
+  if (boundDatasetIds.value.length <= 1) return true
+  if (!datasetJoins.value.length) {
+    $q.notify({ type: 'warning', message: '当前报表使用了多个数据集字段，请先配置数据集关联' })
+    return false
+  }
+  const joinedDatasetIds = new Set<string>()
+  datasetJoins.value.forEach((join) => {
+    joinedDatasetIds.add(join.left_dataset_id)
+    joinedDatasetIds.add(join.right_dataset_id)
+  })
+  const unjoinedDataset = boundDatasetIds.value.find((id) => !joinedDatasetIds.has(id))
+  if (unjoinedDataset) {
+    const datasetName = datasets.value.find((item) => item.id === unjoinedDataset)?.name || unjoinedDataset
+    $q.notify({ type: 'warning', message: `数据集“${datasetName}”已绑定到单元格，但没有配置关联` })
+    return false
+  }
+  return true
 }
 
 function goBack() {
