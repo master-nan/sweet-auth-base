@@ -1271,11 +1271,8 @@ function applyReportKind(kind: ReportKind) {
   if (kind === 'detail') {
     return
   }
-  if ((kind === 'summary' || kind === 'pivot') && !(sheet.value.summary_rows || []).length) {
+  if (kind === 'summary' && !(sheet.value.summary_rows || []).length) {
     sheet.value.summary_rows = [3]
-  }
-  if (kind === 'chart') {
-    $q.notify({ type: 'info', message: '图表类型会优先使用维度和指标字段，图表渲染面板将在后续批次接入' })
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Basic, Query } from 'src/types/global'
 
 export type ReportStatus = 'draft' | 'published' | 'disabled'
-export type ReportKind = 'detail' | 'summary' | 'chart' | 'pivot'
+export type ReportKind = 'detail' | 'summary'
 export type ReportDatasetType = 'table' | 'sql'
 export type ReportCellBindingType = 'static' | 'field' | 'group' | 'sum' | 'count' | 'formula'
 export type ReportParameterType = 'text' | 'select' | 'date' | 'date_range' | 'number'

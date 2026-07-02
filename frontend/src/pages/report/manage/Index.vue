@@ -757,20 +757,16 @@ async function deleteReport(row: Report) {
 
 function kindLabel(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
-    detail: '明细表',
-    summary: '汇总表',
-    chart: '图表',
-    pivot: '交叉表',
+    detail: '明细模板',
+    summary: '汇总模板',
   }
-  return map[kind] || '明细表'
+  return map[kind] || '明细模板'
 }
 
 function kindIcon(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
     detail: 'table_rows',
     summary: 'summarize',
-    chart: 'bar_chart',
-    pivot: 'pivot_table_chart',
   }
   return map[kind] || 'table_rows'
 }

@@ -169,30 +169,32 @@
             readonly
             label="运行主表"
           />
-          <q-select
-            :model-value="runtimeDisplay"
-            dense
-            outlined
-            emit-value
-            map-options
-            label="运行展示"
-            :options="runtimeDisplayOptions"
-            @update:model-value="emitRuntimeDisplay"
-          />
-          <q-input
-            v-if="runtimeDisplay === 'paged'"
-            :model-value="runtimePageSize"
-            dense
-            outlined
-            type="number"
-            label="每页条数"
-            min="1"
-            max="500"
-            @update:model-value="emitRuntimePageSize"
-          />
+          <div class="runtime-grid">
+            <q-select
+              :model-value="runtimeDisplay"
+              dense
+              outlined
+              emit-value
+              map-options
+              label="运行分页"
+              :options="runtimeDisplayOptions"
+              @update:model-value="emitRuntimeDisplay"
+            />
+            <q-input
+              :model-value="runtimePageSize"
+              dense
+              outlined
+              type="number"
+              label="每页条数"
+              min="1"
+              max="500"
+              :disable="runtimeDisplay !== 'paged'"
+              @update:model-value="emitRuntimePageSize"
+            />
+          </div>
           <div class="capability-list">
             <div><q-icon name="security" /> 预览和运行继承主表数据权限</div>
-            <div><q-icon name="table_view" /> 当前版本保存类 Excel 单元格设计</div>
+            <div><q-icon name="table_view" /> 明细模板逐行展开，汇总模板使用汇总行</div>
             <div><q-icon name="data_object" /> SQL 数据集先保存设计，执行会在安全校验后开放</div>
             <div><q-icon name="ios_share" /> Excel 导出结构已预留</div>
           </div>
@@ -329,6 +331,12 @@ function joinLabel(join: ReportDatasetJoin) {
 .inspector-form,
 .capability-list {
   display: grid;
+  gap: 10px;
+}
+
+.runtime-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
   gap: 10px;
 }
 

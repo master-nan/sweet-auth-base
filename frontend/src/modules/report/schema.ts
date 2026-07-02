@@ -15,7 +15,7 @@ export const REPORT_SCHEMA_VERSION = 1
 export const makeReportCellId = (row: number, col: number) => `${row}:${col}`
 
 export const normalizeReportKind = (value: unknown): ReportKind => {
-  if (value === 'summary' || value === 'chart' || value === 'pivot') return value
+  if (value === 'summary') return value
   return 'detail'
 }
 

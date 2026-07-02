@@ -2,7 +2,7 @@
   <header class="designer-topbar">
     <div class="brand-block">
       <q-btn flat round dense icon="arrow_back" @click="$emit('back')">
-        <q-tooltip>返回报表中心</q-tooltip>
+        <q-tooltip>返回报表管理</q-tooltip>
       </q-btn>
       <div>
         <div class="designer-title">报表设计器</div>
@@ -33,12 +33,12 @@
         outlined
         emit-value
         map-options
-        label="渲染模式"
+        label="模板模式"
         :options="kindOptions"
         @update:model-value="updateReportKind"
       >
         <q-tooltip>
-          决定运行页如何展开模板：明细表逐条展开数据行，汇总表使用汇总行；图表和交叉表后续增强。
+          明细模板按数据逐行展开，汇总模板优先使用汇总行。
         </q-tooltip>
       </q-select>
     </div>
@@ -92,7 +92,7 @@ const emit = defineEmits<{
 }>()
 
 function updateReportKind(value: unknown) {
-  if (value === 'detail' || value === 'summary' || value === 'chart' || value === 'pivot') {
+  if (value === 'detail' || value === 'summary') {
     emit('update:reportKind', value)
   }
 }

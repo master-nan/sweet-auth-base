@@ -53,6 +53,9 @@
           </div>
 
           <div v-show="isDatasetExpanded(dataset.id)" class="field-tree">
+            <div v-if="dataset.fields.length" class="field-tree__hint">
+              拖字段到画布单元格，或点击绑定当前单元格
+            </div>
             <button
               v-for="field in dataset.fields"
               :key="`${dataset.id}-${field.code}`"
@@ -232,6 +235,12 @@ function parameterTargetLabel(param: ReportParameter) {
 .param-list {
   display: grid;
   gap: 6px;
+}
+
+.field-tree__hint {
+  padding: 2px 8px 4px;
+  color: #71809a;
+  font-size: 12px;
 }
 
 .dataset-card {
