@@ -27,11 +27,33 @@
         label="报表编码"
         @update:model-value="$emit('update:reportCode', String($event || ''))"
       />
+      <div class="status-strip">
+        <q-chip dense square :color="statusColor" text-color="white">
+          {{ statusLabel }}
+        </q-chip>
+        <q-chip
+          v-if="publishedVersionNo"
+          dense
+          square
+          outline
+          color="primary"
+        >
+          线上版本 V{{ publishedVersionNo }}
+        </q-chip>
+      </div>
     </div>
 
     <div class="topbar-actions">
       <q-btn outline color="primary" icon="tune" label="参数" @click="$emit('addParameter')" />
-      <q-btn outline color="primary" icon="preview" label="预览" @click="$emit('preview')" />
+      <q-btn
+        outline
+        color="primary"
+        icon="preview"
+        label="保存并预览"
+        :disable="previewDisabled"
+        :loading="previewing"
+        @click="$emit('preview')"
+      />
       <q-btn outline color="primary" icon="rule" label="校验" @click="$emit('validate')" />
       <q-btn
         unelevated
@@ -45,20 +67,39 @@
         unelevated
         color="primary"
         icon="publish"
-        label="发布"
-        :loading="saving"
+        label="保存并发布"
+        :disable="publishDisabled"
+        :loading="publishing"
         @click="$emit('publish')"
+      />
+      <q-btn
+        outline
+        color="primary"
+        icon="history"
+        label="版本"
+        :disable="versionDisabled"
+        @click="$emit('versions')"
       />
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import type { ReportStatus } from 'src/api/services/report'
+
+const props = defineProps<{
   reportName: string
   reportCode: string
   primarySourceCode: string | undefined
+  reportStatus: ReportStatus
+  publishedVersionNo?: number | undefined
   saving: boolean
+  previewing?: boolean
+  publishing?: boolean
+  previewDisabled?: boolean
+  publishDisabled?: boolean
+  versionDisabled?: boolean
 }>()
 
 defineEmits<{
@@ -70,7 +111,26 @@ defineEmits<{
   validate: []
   saveDraft: []
   publish: []
+  versions: []
 }>()
+
+const statusLabel = computed(() => {
+  const labels: Record<ReportStatus, string> = {
+    draft: '草稿',
+    published: '已发布',
+    disabled: '已停用',
+  }
+  return labels[props.reportStatus] || '草稿'
+})
+
+const statusColor = computed(() => {
+  const colors: Record<ReportStatus, string> = {
+    draft: 'grey-7',
+    published: 'positive',
+    disabled: 'warning',
+  }
+  return colors[props.reportStatus] || 'grey-7'
+})
 </script>
 
 <style scoped lang="scss">
@@ -109,8 +169,16 @@ defineEmits<{
 
 .meta-editor {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.9fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 0.9fr) auto;
+  align-items: center;
   gap: 8px;
+}
+
+.status-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .topbar-actions {

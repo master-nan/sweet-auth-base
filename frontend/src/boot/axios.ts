@@ -100,6 +100,10 @@ instance.interceptors.response.use(
     const loadingStore = useLoadingStore()
 
     loadingStore.setLoading(false)
+    if (response.config.responseType === 'blob') {
+      return response
+    }
+
     const res = response.data
     if (!res.success) {
       notifyRequestError(
@@ -148,6 +152,10 @@ instance.interceptors.response.use(
       userStore.setLogout()
       return Promise.reject(error instanceof Error ? error : new Error(error.message || '网络异常'))
     }
+    if (error.config?.responseType === 'blob') {
+      return Promise.reject(error instanceof Error ? error : new Error(error.message || '导出失败'))
+    }
+
     switch (res.status) {
       case 404:
         error.message = '资源不存在(404)'

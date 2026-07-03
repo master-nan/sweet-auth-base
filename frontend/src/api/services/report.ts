@@ -1,5 +1,6 @@
 import { instance } from 'boot/axios'
 import type { Basic, Query, ResponseData } from 'src/types/global'
+import { parseBlobJsonError, parseContentDispositionFilename } from 'src/utils/download'
 import {
   createReportLayout,
   defaultReportSheet,
@@ -15,12 +16,17 @@ import type {
   ReportDataSource,
   ReportDataset,
   ReportDatasetJoin,
+  ReportExportFile,
+  ReportExportReq,
   ReportField,
   ReportLayoutConfig,
+  ReportPublishReq,
+  ReportPublishRes,
   ReportPreviewReq,
   ReportPreviewRes,
   ReportQueryConfig,
   ReportSaveReq,
+  ReportVersion,
 } from 'src/modules/report/types'
 
 export {
@@ -38,20 +44,29 @@ export type {
   ReportDatasetJoin,
   ReportDatasetJoinType,
   ReportDatasetType,
+  ReportExportFile,
+  ReportExportFormat,
+  ReportExportReq,
   ReportField,
   ReportKind,
   ReportLayoutConfig,
   ReportParameter,
   ReportParameterOperator,
   ReportParameterType,
+  ReportPreviewMeta,
   ReportPreviewReq,
   ReportPreviewRes,
+  ReportPublishReq,
+  ReportPublishRes,
+  ReportQuery,
   ReportQueryConfig,
   ReportRuntimeDisplayMode,
+  ReportRuntimeType,
   ReportSaveReq,
   ReportSheetCell,
   ReportSheetConfig,
   ReportStatus,
+  ReportVersion,
 } from 'src/modules/report/types'
 
 interface BackendReport extends Basic {
@@ -64,6 +79,8 @@ interface BackendReport extends Basic {
   source_code: string
   permission_menu_id?: number
   permission_table_code?: string
+  published_version_id?: number
+  published_version_no?: number
   query_config?: Partial<ReportQueryConfig>
   layout_config?: Partial<ReportLayoutConfig> & {
     widgets?: Array<{ fields?: Array<string | BackendReportColumn | ReportField> }>
@@ -186,6 +203,12 @@ const toReport = (item: BackendReport): Report => {
       parameters: item.query_config?.parameters || layout.parameters || [],
     },
     status: normalizeReportStatus(item.status || (item.remark === 'draft' ? 'draft' : 'published')),
+    ...(item.published_version_id !== undefined
+      ? { published_version_id: item.published_version_id }
+      : {}),
+    ...(item.published_version_no !== undefined
+      ? { published_version_no: item.published_version_no }
+      : {}),
     owner: item.modify_user_name || item.create_user_name || '',
     updated_at: item.gmt_modify || '',
   }
@@ -235,6 +258,54 @@ const toBackendReport = (req: ReportSaveReq) => {
     remark: req.status === 'draft' ? 'draft' : '',
     state: true,
   }
+}
+
+const toPreviewPayload = (req: ReportPreviewReq) => ({
+  menu_id: req.menu_id || 0,
+  dataset_id: req.dataset_id || '',
+  parameters: req.parameters || {},
+  query: {
+    page: req.page || 1,
+    num: req.num || 50,
+    table_code: String(req.data_source_id || ''),
+    expressions: req.expressions || [],
+    quick_query: {
+      keyword: req.keyword || '',
+    },
+    filters: req.filters || {},
+    include_deleted: false,
+  },
+})
+
+const getResponseHeader = (headers: unknown, name: string): string => {
+  const source = headers as
+    | {
+        get?: (header: string) => unknown
+        [key: string]: unknown
+      }
+    | undefined
+  const value =
+    source?.get?.(name) ??
+    source?.get?.(name.toLowerCase()) ??
+    source?.[name] ??
+    source?.[name.toLowerCase()] ??
+    source?.[name.toUpperCase()]
+
+  if (Array.isArray(value)) return value.map(String).join('; ')
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  if (value === undefined || value === null) return ''
+  return ''
+}
+
+const isBlob = (value: unknown): value is Blob =>
+  typeof Blob !== 'undefined' && value instanceof Blob
+
+const toBlob = (value: unknown, contentType: string): Blob => {
+  if (isBlob(value)) return value
+  return new Blob([value as BlobPart], contentType ? { type: contentType } : undefined)
 }
 
 const toPreview = (data: BackendReportPreview): ReportPreviewRes => ({
@@ -294,6 +365,15 @@ export const useReportApi = () => {
       .then((res) => res.data)
   }
 
+  const publishReport = async (
+    id: number,
+    req?: ReportPublishReq,
+  ): Promise<ReportPublishRes> => {
+    return instance
+      .post<ResponseData<ReportPublishRes>>(`/admin/report/${id}/publish`, req || {})
+      .then((res) => res.data.data)
+  }
+
   const queryDataSources = async () => {
     return instance
       .get<ResponseData<BackendReportDataSource[]>>('/admin/report/data-sources')
@@ -317,28 +397,90 @@ export const useReportApi = () => {
       throw new Error('report_id is required for backend preview')
     }
     return instance
-      .post<ResponseData<BackendReportPreview>>(`/admin/report/${req.report_id}/preview`, {
-        menu_id: req.menu_id || 0,
-        dataset_id: req.dataset_id || '',
-        parameters: req.parameters || {},
-        query: {
-          page: req.page || 1,
-          num: req.num || 50,
-          table_code: String(req.data_source_id || ''),
-          expressions: req.expressions || [],
-          quick_query: {
-            keyword: req.keyword || '',
-          },
-          filters: req.filters || {},
-          include_deleted: false,
-        },
-      })
+      .post<ResponseData<BackendReportPreview>>(
+        `/admin/report/${req.report_id}/preview`,
+        toPreviewPayload(req),
+      )
       .then((res) => {
         return {
           ...res.data,
           data: toPreview(res.data.data),
         } as ResponseData<ReportPreviewRes>
       })
+  }
+
+  const designPreviewReport = async (
+    id: number,
+    req: ReportPreviewReq,
+  ): Promise<ReportPreviewRes> => {
+    return instance
+      .post<ResponseData<BackendReportPreview>>(
+        `/admin/report/${id}/design-preview`,
+        toPreviewPayload(req),
+      )
+      .then((res) => toPreview(res.data.data))
+  }
+
+  const runReport = async (id: number, req: ReportPreviewReq): Promise<ReportPreviewRes> => {
+    return instance
+      .post<ResponseData<BackendReportPreview>>(`/admin/report/${id}/run`, toPreviewPayload(req))
+      .then((res) => toPreview(res.data.data))
+  }
+
+  const exportReport = async (
+    id: number,
+    req: ReportExportReq,
+  ): Promise<ReportExportFile> => {
+    const format = req.format || 'csv'
+    const fallbackFilename = `report_${id}.csv`
+
+    try {
+      const res = await instance.post<Blob>(
+        `/admin/report/${id}/export`,
+        {
+          ...req,
+          format,
+        },
+        {
+          responseType: 'blob',
+        },
+      )
+      const contentType =
+        getResponseHeader(res.headers, 'content-type') || res.data.type || 'text/csv;charset=utf-8'
+      const blob = toBlob(res.data, contentType)
+
+      if (contentType.toLowerCase().includes('json')) {
+        const errorMessage = await parseBlobJsonError(blob)
+        throw new Error(errorMessage || '导出失败')
+      }
+
+      const filename =
+        parseContentDispositionFilename(getResponseHeader(res.headers, 'content-disposition')) ||
+        fallbackFilename
+
+      return {
+        blob,
+        filename,
+        contentType,
+      }
+    } catch (error) {
+      const response = (error as { response?: { data?: unknown; headers?: unknown } }).response
+      if (response?.data) {
+        const contentType = getResponseHeader(response.headers, 'content-type')
+        const blob = toBlob(response.data, contentType)
+        const errorMessage = await parseBlobJsonError(blob)
+        if (errorMessage) {
+          throw new Error(errorMessage)
+        }
+      }
+      throw error
+    }
+  }
+
+  const queryReportVersions = async (id: number): Promise<ReportVersion[]> => {
+    return instance
+      .get<ResponseData<ReportVersion[]>>(`/admin/report/${id}/versions`)
+      .then((res) => res.data.data || [])
   }
 
   const inferSqlFields = async (sql: string) => {
@@ -362,9 +504,14 @@ export const useReportApi = () => {
     createReport,
     updateReport,
     updateReportStatus,
+    publishReport,
     deleteReport,
     queryDataSources,
     previewReport,
+    designPreviewReport,
+    runReport,
+    exportReport,
+    queryReportVersions,
     inferSqlFields,
     getSelectedFields,
   }

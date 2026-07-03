@@ -8,6 +8,9 @@ export type ReportParameterType = 'text' | 'select' | 'date' | 'date_range' | 'n
 export type ReportParameterOperator = 'eq' | 'like' | 'between' | 'gte' | 'lte'
 export type ReportDatasetJoinType = 'left' | 'inner'
 export type ReportRuntimeDisplayMode = 'paged' | 'all'
+export type ReportRuntimeType = 'design_preview' | 'runtime_run' | 'runtime_export'
+export type ReportExportFormat = 'csv' | 'xlsx'
+export type ReportQuery = Partial<Query>
 
 export interface ReportField {
   name: string
@@ -123,6 +126,8 @@ export interface Report extends Basic {
   data_source_id?: number | string
   data_source_name?: string
   status: ReportStatus
+  published_version_id?: number
+  published_version_no?: number
   owner?: string
   updated_at?: string
 }
@@ -156,6 +161,34 @@ export interface ReportSaveReq {
   status?: ReportStatus
 }
 
+export interface ReportPublishReq {
+  change_log?: string
+}
+
+export interface ReportPublishRes {
+  report_id: number
+  version_id: number
+  version_no: number
+  status: ReportStatus
+  published_at?: string
+}
+
+export interface ReportVersion {
+  id: number
+  report_id: number
+  version_no: number
+  status: 'published' | 'archived' | 'draft' | string
+  state?: boolean
+  published_at?: string
+  published_by?: number | string
+  published_name?: string
+  published_by_name?: string
+  change_log?: string
+  created_at?: string
+  updated_at?: string
+  is_current?: boolean
+}
+
 export interface ReportPreviewReq {
   report_id?: number | undefined
   dataset_id?: string | undefined
@@ -170,18 +203,39 @@ export interface ReportPreviewReq {
   expressions?: Query['expressions']
 }
 
+export interface ReportExportReq {
+  format?: ReportExportFormat
+  menu_id?: number | undefined
+  dataset_id?: string | undefined
+  parameters?: Record<string, unknown>
+  params?: Record<string, unknown>
+  query?: ReportQuery
+  max_rows?: number
+}
+
+export interface ReportExportFile {
+  blob: Blob
+  filename: string
+  contentType: string
+}
+
+export interface ReportPreviewMeta {
+  report_id?: number
+  report_code?: string
+  source_code?: string
+  dataset_id?: string
+  dataset_type?: ReportDatasetType | string
+  applied_menu_id?: number
+  runtime_type?: ReportRuntimeType
+  version_id?: number
+  version_no?: number
+}
+
 export interface ReportPreviewRes {
   columns: ReportField[]
   rows: Record<string, unknown>[]
   total?: number
   datasets?: ReportDataset[]
   joins?: ReportDatasetJoin[]
-  meta?: {
-    report_id?: number
-    report_code?: string
-    source_code?: string
-    dataset_id?: string
-    dataset_type?: string
-    applied_menu_id?: number
-  }
+  meta?: ReportPreviewMeta
 }

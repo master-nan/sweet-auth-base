@@ -4,7 +4,14 @@
       :report-name="form.report_name"
       :report-code="form.report_code"
       :primary-source-code="primaryDataset?.source_code"
+      :report-status="form.status || 'draft'"
+      :published-version-no="publishedVersionNo"
       :saving="saving"
+      :previewing="saving || previewLoading"
+      :publishing="saving || publishing"
+      :preview-disabled="form.status === 'disabled'"
+      :publish-disabled="form.status === 'disabled'"
+      :version-disabled="!form.id"
       @update:report-name="form.report_name = $event"
       @update:report-code="form.report_code = $event"
       @back="goBack"
@@ -13,6 +20,7 @@
       @validate="validateAndNotify"
       @save-draft="saveReport('draft')"
       @publish="publishReport"
+      @versions="openVersionDialog"
     />
 
     <main class="designer-workbench">
@@ -180,6 +188,15 @@
               {{ previewData.total }} 行
             </q-chip>
             <q-chip
+              v-if="previewData.meta?.version_no"
+              dense
+              square
+              outline
+              color="primary"
+            >
+              预览版本 V{{ previewData.meta.version_no }}
+            </q-chip>
+            <q-chip
               v-if="previewData.meta?.dataset_id"
               dense
               square
@@ -210,6 +227,13 @@
         </q-card-section>
       </q-card>
     </q-dialog>
+
+    <report-version-dialog
+      v-model="versionDialogVisible"
+      :report-id="form.id"
+      :current-version-id="publishedVersionId"
+      :current-version-no="publishedVersionNo"
+    />
   </div>
 </template>
 
@@ -247,6 +271,7 @@ import ReportParameterDialog from './components/ReportParameterDialog.vue'
 import ReportResourcePanel from './components/ReportResourcePanel.vue'
 import ReportSheetCanvas from './components/ReportSheetCanvas.vue'
 import ReportSheetPreview from '../components/ReportSheetPreview.vue'
+import ReportVersionDialog from '../components/ReportVersionDialog.vue'
 import {
   reportAlignOptions,
   reportDatasetJoinTypeOptions,
@@ -278,6 +303,7 @@ const reportApi = useReportApi()
 
 const reportId = computed(() => Number(route.query.id || 0))
 const saving = ref(false)
+const publishing = ref(false)
 const previewLoading = ref(false)
 const dataSources = ref<ReportDataSource[]>([])
 const datasets = ref<ReportDataset[]>([])
@@ -297,7 +323,10 @@ const parameterDialogVisible = ref(false)
 const editingParameterId = ref('')
 const joinDialogVisible = ref(false)
 const previewDialogVisible = ref(false)
+const versionDialogVisible = ref(false)
 const previewData = ref<ReportPreviewRes>({ columns: [], rows: [], total: 0 })
+const publishedVersionId = ref<number | undefined>(undefined)
+const publishedVersionNo = ref<number | undefined>(undefined)
 
 const form = reactive<ReportSaveReq>({
   report_name: '',
@@ -518,10 +547,13 @@ function applyReport(report: Report) {
   form.report_kind = report.report_kind
   form.category = report.category || ''
   form.description = report.description || ''
+  form.status = report.status || 'draft'
   form.permission_menu_id = report.permission_menu_id || 0
   form.permission_table_code = report.permission_table_code || report.source_code || ''
   form.runtime_display = report.layout_config?.runtime_display || 'paged'
   form.runtime_page_size = Number(report.layout_config?.runtime_page_size || 20)
+  publishedVersionId.value = report.published_version_id
+  publishedVersionNo.value = report.published_version_no
   datasets.value = enrichReportDatasets(
     report.layout_config?.datasets?.length
       ? report.layout_config.datasets
@@ -536,15 +568,19 @@ function applyReport(report: Report) {
 }
 
 function initNewReport() {
+  form.id = undefined
   form.report_name = ''
   form.report_code = `report_${Date.now().toString().slice(-6)}`
   form.report_kind = 'detail'
   form.category = ''
   form.description = ''
+  form.status = 'draft'
   form.permission_menu_id = 0
   form.permission_table_code = ''
   form.runtime_display = 'paged'
   form.runtime_page_size = 20
+  publishedVersionId.value = undefined
+  publishedVersionNo.value = undefined
   datasets.value = []
   datasetJoins.value = []
   sheet.value = defaultReportSheet()
@@ -1325,34 +1361,43 @@ function buildLocalPreview() {
 }
 
 async function preview() {
-  syncForm()
-  previewDialogVisible.value = true
-  if (!form.id) {
-    buildLocalPreview()
+  if (form.status === 'disabled') {
+    $q.notify({ type: 'warning', message: '已停用报表不能设计时预览' })
     return
   }
+  const id = await saveReport('draft', { strict: true, notify: false })
+  if (!id) return
+  previewDialogVisible.value = true
   previewLoading.value = true
   try {
-    const res = await reportApi.previewReport({
-      report_id: form.id,
+    const res = await reportApi.designPreviewReport(id, {
+      report_id: id,
       dataset_id: datasetJoins.value.length ? undefined : primaryDataset.value?.id,
       data_source_id: primaryDataset.value?.source_code,
       page: 1,
       num: form.runtime_display === 'all' ? 10000 : Number(form.runtime_page_size || 20),
     })
-    previewData.value = res.data
-  } catch {
+    previewData.value = res
+  } catch (error) {
     buildLocalPreview()
-    $q.notify({ type: 'negative', message: '真实数据预览失败，已显示本地结构预览' })
+    const message = error instanceof Error && error.message
+      ? error.message
+      : '设计时预览失败，已显示本地结构预览'
+    $q.notify({ type: 'negative', message })
   } finally {
     previewLoading.value = false
   }
 }
 
-async function saveReport(status: 'draft' | 'published' = 'draft') {
+async function saveReport(
+  status: 'draft' = 'draft',
+  options: { strict?: boolean; notify?: boolean } = {},
+): Promise<number | null> {
   syncForm()
-  if (!validateReport(status === 'published')) return false
-  form.status = status
+  const strict = options.strict ?? false
+  const shouldNotify = options.notify ?? true
+  if (!validateReport(strict)) return null
+  form.status = form.id ? form.status || status : status
   saving.value = true
   try {
     if (form.id) {
@@ -1360,22 +1405,80 @@ async function saveReport(status: 'draft' | 'published' = 'draft') {
     } else {
       const res = await reportApi.createReport(form)
       form.id = res.data
+      await router.replace({ name: 'report_design', query: { ...route.query, id: form.id } })
     }
-    $q.notify({ type: 'positive', message: '报表设计已保存' })
-    return true
-  } catch {
-    $q.notify({ type: 'negative', message: '报表保存失败' })
-    return false
+    if (shouldNotify) {
+      $q.notify({ type: 'positive', message: '报表设计已保存' })
+    }
+    return form.id || null
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : '报表保存失败'
+    $q.notify({ type: 'negative', message })
+    return null
   } finally {
     saving.value = false
   }
 }
 
 async function publishReport() {
-  const saved = await saveReport('published')
-  if (saved && form.id) {
-    $q.notify({ type: 'positive', message: '报表已发布，可在报表中心运行' })
+  if (form.status === 'disabled') {
+    $q.notify({ type: 'warning', message: '已停用报表不能发布' })
+    return
   }
+  const changeLog = await confirmPublishReport()
+  if (changeLog === null) return
+  const id = await saveReport('draft', { strict: true, notify: false })
+  if (!id) return
+  publishing.value = true
+  try {
+    const res = await reportApi.publishReport(id, changeLog ? { change_log: changeLog } : {})
+    form.status = res.status || 'published'
+    publishedVersionId.value = res.version_id
+    publishedVersionNo.value = res.version_no
+    await refreshCurrentReport(id)
+    $q.notify({ type: 'positive', message: '报表已发布，可在报表中心运行' })
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : '发布失败'
+    $q.notify({ type: 'negative', message })
+  } finally {
+    publishing.value = false
+  }
+}
+
+function confirmPublishReport() {
+  return new Promise<string | null>((resolve) => {
+    $q.dialog({
+      title: '发布报表',
+      message: '确认发布当前报表吗？发布后报表中心将运行新的发布版本。',
+      prompt: {
+        model: '',
+        type: 'textarea',
+        label: '发布说明（可选）',
+      },
+      cancel: true,
+      persistent: true,
+    })
+      .onOk((value) => resolve(String(value || '').trim()))
+      .onCancel(() => resolve(null))
+      .onDismiss(() => resolve(null))
+  })
+}
+
+async function refreshCurrentReport(id: number) {
+  try {
+    const res = await reportApi.queryReportById(id)
+    applyReport(res.data)
+  } catch {
+    $q.notify({ type: 'warning', message: '发布成功，但报表详情刷新失败，请稍后手动刷新' })
+  }
+}
+
+function openVersionDialog() {
+  if (!form.id) {
+    $q.notify({ type: 'warning', message: '请先保存报表后查看版本' })
+    return
+  }
+  versionDialogVisible.value = true
 }
 
 function syncForm() {

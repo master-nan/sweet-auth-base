@@ -168,7 +168,7 @@
               <q-td :props="props">
                 <div class="row no-wrap justify-center q-gutter-xs">
                   <q-btn
-                    v-if="props.row.status === 'published'"
+                    :disable="props.row.status !== 'published'"
                     flat
                     size="sm"
                     round
@@ -177,6 +177,18 @@
                     @click="openRuntime(props.row)"
                   >
                     <q-tooltip>运行</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    :disable="props.row.status !== 'published'"
+                    :loading="exportingReportId === props.row.id"
+                    flat
+                    size="sm"
+                    round
+                    color="primary"
+                    icon="download"
+                    @click="exportReportRow(props.row)"
+                  >
+                    <q-tooltip>导出</q-tooltip>
                   </q-btn>
                   <q-btn
                     flat
@@ -189,6 +201,7 @@
                     <q-tooltip>设计</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="props.row.status === 'published'"
                     flat
                     size="sm"
                     round
@@ -199,15 +212,26 @@
                     <q-tooltip>复制</q-tooltip>
                   </q-btn>
                   <q-btn
-                    v-if="props.row.status !== 'published'"
+                    :disable="props.row.status === 'disabled'"
                     flat
                     size="sm"
                     round
                     color="positive"
                     icon="publish"
-                    @click="changeReportStatus(props.row, 'published')"
+                    @click="publishReport(props.row)"
                   >
                     <q-tooltip>发布</q-tooltip>
+                  </q-btn>
+                  <q-btn
+                    :disable="!canViewVersions(props.row)"
+                    flat
+                    size="sm"
+                    round
+                    color="primary"
+                    icon="history"
+                    @click="openVersionDialog(props.row)"
+                  >
+                    <q-tooltip>版本</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="props.row.status === 'published'"
@@ -248,120 +272,19 @@
       </section>
     </div>
 
-    <q-dialog v-model="runtimeVisible" maximized>
-      <q-card class="runtime-dialog">
-        <q-card-section class="runtime-head">
-          <div>
-            <div class="report-title">{{ runtimeReport?.report_name || '报表运行' }}</div>
-            <div class="report-caption">
-              {{ runtimeReport?.data_source_name || '-' }} ·
-              {{ runtimeReport?.description || '运行预览会应用后端数据权限' }}
-            </div>
-          </div>
-          <q-space />
-          <q-btn
-            outline
-            color="primary"
-            icon="download"
-            label="导出 CSV"
-            :disable="!runtimeRows.length"
-            @click="exportRuntimeCsv"
-          />
-          <q-btn flat round icon="close" v-close-popup />
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="runtime-filters">
-          <q-input
-            v-model="runtimeKeyword"
-            dense
-            outlined
-            clearable
-            label="关键词"
-            class="runtime-filter"
-            @keyup.enter="loadRuntimePreview"
-          />
-          <template v-for="param in runtimeParameters" :key="param.id">
-            <sweet-date-time-picker
-              v-if="param.type === 'date'"
-              :model-value="runtimeScalarValue(param.id)"
-              type="date"
-              dense
-              :label="param.label"
-              class="runtime-filter"
-              @update:model-value="runtimeFilterValues[param.id] = $event"
-            />
-            <div v-else-if="param.type === 'date_range'" class="runtime-range-filter">
-              <sweet-date-time-picker
-                :model-value="runtimeRangeValue(param.id, 0)"
-                type="date"
-                dense
-                :label="`${param.label}开始`"
-                class="runtime-filter"
-                @update:model-value="setRuntimeRangeValue(param.id, 0, $event)"
-              />
-              <sweet-date-time-picker
-                :model-value="runtimeRangeValue(param.id, 1)"
-                type="date"
-                dense
-                :label="`${param.label}结束`"
-                class="runtime-filter"
-                @update:model-value="setRuntimeRangeValue(param.id, 1, $event)"
-              />
-            </div>
-            <q-input
-              v-else
-              :model-value="runtimeScalarValue(param.id)"
-              dense
-              outlined
-              clearable
-              :type="param.type === 'number' ? 'number' : 'text'"
-              :label="param.label"
-              :placeholder="param.placeholder"
-              class="runtime-filter"
-              @update:model-value="runtimeFilterValues[param.id] = $event"
-              @keyup.enter="loadRuntimePreview"
-            />
-          </template>
-          <q-select
-            dense
-            outlined
-            label="权限范围"
-            model-value="继承当前菜单数据权限"
-            class="runtime-filter"
-            :options="['继承当前菜单数据权限']"
-          />
-          <q-btn color="primary" icon="search" label="查询" @click="loadRuntimePreview" />
-          <q-btn
-            outline
-            color="primary"
-            icon="restart_alt"
-            label="重置"
-            @click="resetRuntimeFilters"
-          />
-        </q-card-section>
-        <q-card-section class="runtime-body">
-          <report-sheet-preview
-            :sheet="runtimeSheet"
-            :datasets="runtimeDatasets"
-            :preview-data="runtimeData"
-            :loading="runtimeLoading"
-            :report-kind="runtimeReport?.report_kind || 'detail'"
-          />
-          <div v-if="runtimeDisplayMode === 'paged'" class="runtime-pagination">
-            <table-pagination
-              v-model:page="runtimePagination.page"
-              v-model:page-size="runtimePagination.rowsPerPage"
-              :total="runtimePagination.rowsNumber"
-              @update:page="loadRuntimePreview"
-            />
-          </div>
-          <div v-else class="runtime-pagination">
-            <span>共 {{ runtimePagination.rowsNumber }} 行</span>
-            <q-badge color="primary" label="全部展示" />
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+    <report-runtime-dialog
+      v-model="runtimeVisible"
+      :report="runtimeReport"
+      mode="manage"
+      :allow-export="true"
+    />
+
+    <report-version-dialog
+      v-model="versionDialogVisible"
+      :report-id="versionDialogReport?.id"
+      :current-version-id="versionDialogReport?.published_version_id"
+      :current-version-no="versionDialogReport?.published_version_no"
+    />
   </base-content>
 </template>
 
@@ -370,7 +293,6 @@ defineOptions({ name: 'report_manage' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
-import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
@@ -379,16 +301,14 @@ import {
   defaultReportSheet,
   useReportApi,
   type Report,
-  type ReportDataset,
-  type ReportParameter,
-  type ReportPreviewRes,
   type ReportStatus,
   type ReportKind,
-  type ReportSheetConfig,
 } from 'src/api/services/report'
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
-import ReportSheetPreview from '../components/ReportSheetPreview.vue'
+import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
+import ReportVersionDialog from '../components/ReportVersionDialog.vue'
+import { useReportExport } from '../composables/useReportExport'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -420,17 +340,9 @@ const statusFilter = ref<'all' | ReportStatus>('all')
 const dataSourceCount = ref(0)
 const runtimeVisible = ref(false)
 const runtimeReport = ref<Report | null>(null)
-const runtimeData = ref<ReportPreviewRes>({ columns: [], rows: [] })
-const runtimeLoading = ref(false)
-const runtimeKeyword = ref('')
-const runtimeFilterValues = ref<
-  Record<string, string | number | Array<string | number> | null | undefined>
->({})
-const runtimePagination = ref({
-  page: 1,
-  rowsPerPage: 20,
-  rowsNumber: 0,
-})
+const versionDialogVisible = ref(false)
+const versionDialogReport = ref<Report | null>(null)
+const { exportingReportId, exportReportRow } = useReportExport()
 
 const statusOptions = [
   { label: '全部状态', value: 'all' },
@@ -474,35 +386,6 @@ const publishedCount = computed(
 const permissionCount = computed(
   () => rows.value.filter((item) => item.permission_table_code).length,
 )
-const runtimeColumns = computed<QTableProps['columns']>(() =>
-  runtimeData.value.columns.map((field) => ({
-    name: field.code,
-    field: field.code,
-    label: field.name,
-    align: 'left',
-  })),
-)
-const runtimeRows = computed(() => runtimeData.value.rows)
-const runtimeDatasets = computed<ReportDataset[]>(() =>
-  runtimeReport.value?.layout_config?.datasets?.length
-    ? runtimeReport.value.layout_config.datasets
-    : runtimeData.value.datasets || [],
-)
-const runtimeSheet = computed<ReportSheetConfig>(
-  () => runtimeReport.value?.layout_config?.sheet || defaultReportSheet(),
-)
-const runtimeDisplayMode = computed(
-  () => runtimeReport.value?.layout_config?.runtime_display || 'paged',
-)
-const runtimeConfiguredPageSize = computed(() =>
-  Number(runtimeReport.value?.layout_config?.runtime_page_size || 20),
-)
-const runtimeParameters = computed<ReportParameter[]>(() => {
-  const report = runtimeReport.value
-  return report?.layout_config?.parameters?.length
-    ? report.layout_config.parameters
-    : report?.query_config?.parameters || []
-})
 
 onMounted(() => {
   void Promise.all([fetchData(), loadDataSources()])
@@ -563,122 +446,9 @@ function openDesigner(row?: Report) {
   void router.push({ name: 'report_design', query: row?.id ? { id: row.id } : {} })
 }
 
-async function openRuntime(row: Report) {
+function openRuntime(row: Report) {
   runtimeReport.value = row
-  runtimeKeyword.value = ''
-  runtimeFilterValues.value = buildRuntimeDefaultFilters()
-  runtimePagination.value.page = 1
-  runtimePagination.value.rowsPerPage = runtimeConfiguredPageSize.value
   runtimeVisible.value = true
-  await loadRuntimePreview()
-}
-
-async function loadRuntimePreview() {
-  if (!runtimeReport.value?.id) return
-  runtimeLoading.value = true
-  try {
-    const res = await reportApi.previewReport({
-      report_id: runtimeReport.value.id,
-      data_source_id: runtimeReport.value.data_source_id,
-      page: runtimeDisplayMode.value === 'all' ? 1 : runtimePagination.value.page,
-      num: runtimeDisplayMode.value === 'all' ? 10000 : runtimePagination.value.rowsPerPage,
-      keyword: runtimeKeyword.value,
-      parameters: buildRuntimeParameterValues(),
-    })
-    runtimeData.value = res.data
-    runtimePagination.value.rowsNumber = res.data.total ?? res.data.rows.length
-  } catch {
-    runtimeData.value = { columns: [], rows: [], total: 0 }
-    runtimePagination.value.rowsNumber = 0
-    $q.notify({ type: 'negative', message: '报表运行失败，请检查报表配置、数据权限或后端接口' })
-  } finally {
-    runtimeLoading.value = false
-  }
-}
-
-function resetRuntimeFilters() {
-  runtimeKeyword.value = ''
-  runtimeFilterValues.value = buildRuntimeDefaultFilters()
-  runtimePagination.value.page = 1
-  void loadRuntimePreview()
-}
-
-function buildRuntimeDefaultFilters() {
-  const values: Record<string, string | number | Array<string | number> | null | undefined> = {}
-  runtimeParameters.value.forEach((param) => {
-    if (
-      param.default_value === null ||
-      param.default_value === undefined ||
-      param.default_value === ''
-    )
-      return
-    if (Array.isArray(param.default_value)) {
-      const next = param.default_value.filter(
-        (item) => item !== '' && item !== null && item !== undefined,
-      )
-      if (next.length) values[param.id] = next
-      return
-    }
-    values[param.id] = param.default_value
-  })
-  return values
-}
-
-function buildRuntimeParameterValues() {
-  const values: Record<string, unknown> = {}
-  runtimeParameters.value.forEach((param) => {
-    const value = runtimeFilterValues.value[param.id]
-    if (value === '' || value === null || value === undefined) return
-    if (
-      Array.isArray(value) &&
-      !value.some((item) => item !== '' && item !== null && item !== undefined)
-    )
-      return
-    values[param.id] = value
-  })
-  return values
-}
-
-function runtimeScalarValue(id: string) {
-  const value = runtimeFilterValues.value[id]
-  return Array.isArray(value) ? String(value[0] || '') : value === undefined ? null : String(value)
-}
-
-function runtimeRangeValue(id: string, index: number) {
-  const value = runtimeFilterValues.value[id]
-  return Array.isArray(value) ? String(value[index] || '') : ''
-}
-
-function setRuntimeRangeValue(id: string, index: number, value: string | null) {
-  const current = Array.isArray(runtimeFilterValues.value[id])
-    ? [...(runtimeFilterValues.value[id] as Array<string | number>)]
-    : ['', '']
-  current[index] = value || ''
-  runtimeFilterValues.value[id] = current
-}
-
-function exportRuntimeCsv() {
-  if (!runtimeRows.value.length) return
-  const columns = runtimeColumns.value || []
-  const headers = columns.map((column) => String(column.label || column.name))
-  const fields = columns.map((column) => String(column.field || column.name))
-  const lines = [
-    headers,
-    ...runtimeRows.value.map((row) => fields.map((field) => csvCell(row[field]))),
-  ]
-  const csv = lines.map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${runtimeReport.value?.report_code || 'report'}_${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-function csvCell(value: unknown) {
-  const text = value === null || value === undefined ? '' : String(value)
-  return `"${text.replaceAll('"', '""')}"`
 }
 
 async function copyReport(row: Report) {
@@ -710,8 +480,54 @@ async function copyReport(row: Report) {
   }
 }
 
+function canViewVersions(row: Report) {
+  return row.status !== 'draft' || Boolean(row.published_version_id || row.published_version_no)
+}
+
+function openVersionDialog(row: Report) {
+  versionDialogReport.value = row
+  versionDialogVisible.value = true
+}
+
+function confirmPublishReport(row: Report) {
+  return new Promise<string | null>((resolve) => {
+    $q.dialog({
+      title: '发布报表',
+      message: `确认发布「${row.report_name}」吗？发布后报表中心将运行新的发布版本。`,
+      prompt: {
+        model: '',
+        type: 'textarea',
+        label: '发布说明（可选）',
+      },
+      cancel: true,
+      persistent: true,
+    })
+      .onOk((value) => resolve(String(value || '').trim()))
+      .onCancel(() => resolve(null))
+      .onDismiss(() => resolve(null))
+  })
+}
+
+async function publishReport(row: Report) {
+  if (row.status === 'disabled') return
+  const changeLog = await confirmPublishReport(row)
+  if (changeLog === null) return
+  try {
+    await reportApi.publishReport(row.id, changeLog ? { change_log: changeLog } : {})
+    $q.notify({ type: 'positive', message: '报表已发布' })
+    await fetchData()
+  } catch (error) {
+    const message = error instanceof Error && error.message ? error.message : '发布失败'
+    $q.notify({ type: 'negative', message })
+  }
+}
+
 async function changeReportStatus(row: Report, status: ReportStatus) {
-  const actionText = status === 'published' ? '发布' : '停用'
+  if (status === 'published') {
+    await publishReport(row)
+    return
+  }
+  const actionText = status === 'draft' ? '改为草稿' : '停用'
   const confirmed = await new Promise<boolean>((resolve) => {
     $q.dialog({
       title: `${actionText}报表`,
@@ -1007,47 +823,6 @@ watch(
   display: grid;
   place-items: center;
   gap: 8px;
-  color: #71809a;
-}
-
-.runtime-dialog {
-  display: flex;
-  flex-direction: column;
-}
-
-.runtime-head,
-.runtime-filters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.runtime-filter {
-  width: 220px;
-}
-
-.runtime-range-filter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.runtime-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.runtime-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
   color: #71809a;
 }
 
