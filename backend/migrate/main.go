@@ -1478,6 +1478,7 @@ func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 	buttons := []model.SysMenuButton{
 		menuButtonWithAPI(702, menuID, "运行报表", "report_center_preview", enum.Line, "preview", "play_arrow", "primary", 1, "/admin/report/:id/preview", "POST"),
 		menuButtonWithAPI(703, menuID, "运行报表V1", "report_center_run", enum.Line, "run", "play_arrow", "primary", 2, "/admin/report/:id/run", "POST"),
+		menuButtonWithAPI(733, menuID, "导出报表", "report_center_export", enum.Line, "export", "download", "primary", 3, "/admin/report/:id/export", "POST"),
 		apiPermissionWithAPI(704, menuID, "报表列表", "report_center_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(705, menuID, "报表详情", "report_center_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(706, menuID, "数据源列表", "report_center_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
@@ -1495,6 +1496,7 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		menuButtonWithAPI(725, menuID, "运行预览", "report_manage_preview", enum.Line, "preview", "play_arrow", "primary", 5, "/admin/report/:id/preview", "POST"),
 		menuButtonWithAPI(730, menuID, "发布", "report_manage_publish", enum.Line, "publish", "published_with_changes", "primary", 6, "/admin/report/:id/publish", "POST"),
 		menuButtonWithAPI(731, menuID, "运行", "report_manage_run", enum.Line, "run", "play_arrow", "primary", 7, "/admin/report/:id/run", "POST"),
+		menuButtonWithAPI(734, menuID, "导出", "report_manage_export", enum.Line, "export", "download", "primary", 8, "/admin/report/:id/export", "POST"),
 		apiPermissionWithAPI(732, menuID, "版本列表", "report_manage_versions", enum.Line, "versions", "history", "primary", 94, "/admin/report/:id/versions", "GET"),
 		apiPermissionWithAPI(726, menuID, "报表列表", "report_manage_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
@@ -1914,6 +1916,7 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/report/:id/design-preview", "POST"},
 		{"/admin/report/:id/publish", "POST"},
 		{"/admin/report/:id/run", "POST"},
+		{"/admin/report/:id/export", "POST"},
 		{"/admin/report/:id/versions", "GET"},
 		{"/admin/report/sql-fields", "POST"},
 		{"/admin/file/upload", "POST"},

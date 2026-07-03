@@ -10,7 +10,9 @@ import (
 	"backend/model"
 	"backend/repository"
 	queryutil "backend/repository/util"
+	"bytes"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +37,11 @@ const (
 	reportVersionArchived      = "archived"
 	reportRuntimeDesignPreview = "design_preview"
 	reportRuntimeRun           = "runtime_run"
+	reportRuntimeExport        = "runtime_export"
+	reportExportFormatCSV      = "csv"
+
+	defaultReportExportMaxRows = 5000
+	maxReportExportRows        = 10000
 )
 
 var reportSQLForbiddenPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|replace|call|execute|exec|copy|vacuum|reindex|attach|detach|pragma|pg_sleep|benchmark|sleep)\b`)
@@ -53,6 +60,15 @@ type ReportExecutionSnapshot struct {
 	QueryConfig         datatypes.JSON
 	LayoutConfig        datatypes.JSON
 	RuntimeType         string
+}
+
+type ReportExecutionOptions struct {
+	MaxRows              int
+	PageSizeLimit        int
+	DefaultPageSize      int
+	ExportMode           bool
+	WriteLog             bool
+	DataPermissionAction enum.SysMenuButtonEventAction
 }
 
 type ReportService struct {
@@ -386,49 +402,103 @@ func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req reques
 
 func (s *ReportService) RunReport(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
 	start := time.Now()
-	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeRun}
-	report, err := s.GetReportDefinitionById(reportId)
+	snapshot, err := s.loadPublishedReportSnapshot(ctx, reportId, reportRuntimeRun)
 	if err != nil {
 		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
+	return s.executeReportSnapshot(ctx, snapshot, req, start)
+}
+
+func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request.ReportExportReq) (response.ReportExportFile, error) {
+	start := time.Now()
+	previewReq := reportExportPreviewReq(req)
+	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeExport}
+	fail := func(err error) (response.ReportExportFile, error) {
+		_ = s.writeExecutionLog(ctx, snapshot, previewReq, false, 0, start, err)
+		return response.ReportExportFile{}, err
+	}
+	format := strings.ToLower(strings.TrimSpace(req.Format))
+	if format == "" {
+		format = reportExportFormatCSV
+	}
+	if format == "xlsx" {
+		return fail(myerrors.NewBadRequestError("报表导出暂不支持 xlsx 格式，仅支持 csv"))
+	}
+	if format != reportExportFormatCSV {
+		return fail(myerrors.NewBadRequestError("报表导出格式不支持，仅支持 csv"))
+	}
+	effectiveMaxRows, err := normalizeReportExportMaxRows(req)
+	if err != nil {
+		return fail(err)
+	}
+	previewReq.Query.Page = 1
+	previewReq.Query.Num = effectiveMaxRows
+	snapshot, err = s.loadPublishedReportSnapshot(ctx, reportId, reportRuntimeExport)
+	if err != nil {
+		return fail(err)
+	}
+	preview, err := s.executeReportSnapshotWithOptions(ctx, snapshot, previewReq, start, ReportExecutionOptions{
+		MaxRows:              effectiveMaxRows,
+		PageSizeLimit:        effectiveMaxRows,
+		DefaultPageSize:      effectiveMaxRows,
+		ExportMode:           true,
+		WriteLog:             false,
+		DataPermissionAction: enum.ButtonActionExport,
+	})
+	if err != nil {
+		return fail(err)
+	}
+	if preview.Total > effectiveMaxRows {
+		return fail(myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试"))
+	}
+	content, err := buildReportCSV(preview.Columns, preview.Rows)
+	if err != nil {
+		return fail(err)
+	}
+	if err := s.writeExecutionLog(ctx, snapshot, previewReq, true, len(preview.Rows), start, nil); err != nil {
+		return response.ReportExportFile{}, err
+	}
+	return response.ReportExportFile{
+		FileName:    reportExportFileName(snapshot),
+		ContentType: "text/csv; charset=utf-8",
+		Content:     content,
+		RowCount:    len(preview.Rows),
+	}, nil
+}
+
+func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId int, runtimeType string) (ReportExecutionSnapshot, error) {
+	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: runtimeType}
+	report, err := s.GetReportDefinitionById(reportId)
+	if err != nil {
+		return snapshot, err
+	}
 	if report.Id == 0 {
-		err = myerrors.ErrDataNotFound
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, myerrors.ErrDataNotFound
 	}
 	snapshot.ReportId = report.Id
 	snapshot.Code = report.Code
 	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
-		err = myerrors.NewBadRequestError("报表已停用")
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, myerrors.NewBadRequestError("报表已停用")
 	}
 	if normalizeReportStatus(report.Status) != reportStatusPublished || report.PublishedVersionId <= 0 {
-		err = myerrors.NewBadRequestError("报表未发布，请先调用发布接口")
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, myerrors.NewBadRequestError("报表未发布，请先调用发布接口")
 	}
 	version, err := s.reportVersionRepo.FindByReportAndId(report.Id, report.PublishedVersionId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = myerrors.NewBadRequestError("报表发布版本不存在")
 		}
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, err
 	}
 	if !version.State {
-		err = myerrors.NewBadRequestError("报表发布版本不可用")
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, myerrors.NewBadRequestError("报表发布版本不可用")
 	}
 	if normalizeReportStatus(version.Status) != reportVersionPublished {
-		err = myerrors.NewBadRequestError("报表发布版本状态不可运行")
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return snapshot, myerrors.NewBadRequestError("报表发布版本状态不可运行")
 	}
-	snapshot = reportSnapshotFromVersion(version, reportRuntimeRun)
-	return s.executeReportSnapshot(ctx, snapshot, req, start)
+	snapshot = reportSnapshotFromVersion(version, runtimeType)
+	return snapshot, nil
 }
 
 func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
@@ -436,17 +506,37 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 }
 
 func (s *ReportService) executeReportSnapshot(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, start time.Time) (response.ReportPreviewRes, error) {
+	return s.executeReportSnapshotWithOptions(ctx, snapshot, req, start, ReportExecutionOptions{
+		PageSizeLimit:        200,
+		DefaultPageSize:      20,
+		WriteLog:             true,
+		DataPermissionAction: enum.ButtonActionQuery,
+	})
+}
+
+func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, start time.Time, options ReportExecutionOptions) (response.ReportPreviewRes, error) {
+	options = normalizeReportExecutionOptions(options)
+	writeFailure := func(err error) {
+		if options.WriteLog {
+			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		}
+	}
+	writeSuccess := func(rowCount int) {
+		if options.WriteLog {
+			_ = s.writeExecutionLog(ctx, snapshot, req, true, rowCount, start, nil)
+		}
+	}
 	config, err := reportconfig.Parse(snapshot.QueryConfig, snapshot.LayoutConfig)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	if err := validateReportSQLDatasets(config); err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	if err := ensureSQLDatasetRole(ctx, config); err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	var selectedDataset reportconfig.Dataset
@@ -455,59 +545,68 @@ func (s *ReportService) executeReportSnapshot(ctx *gin.Context, snapshot ReportE
 		selectedDataset, ok = config.DatasetByID(req.DatasetId)
 		if !ok {
 			err = myerrors.NewBadRequestError("报表数据集不存在")
-			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
 		if selectedDataset.Type == reportconfig.SourceTypeSQL {
-			preview, err := s.previewSQLDataset(ctx, snapshot, config, selectedDataset, req)
+			preview, err := s.previewSQLDataset(ctx, snapshot, config, selectedDataset, req, options)
 			if err != nil {
-				_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+				writeFailure(err)
 				return response.ReportPreviewRes{}, err
 			}
-			_ = s.writeExecutionLog(ctx, snapshot, req, true, len(preview.Rows), start, nil)
+			writeSuccess(len(preview.Rows))
 			return preview, nil
 		}
 	}
 	if selectedDataset.Id == "" && reportShouldUseJoinedPreview(config) {
-		preview, err := s.previewJoinedTableDatasets(ctx, snapshot, config, req)
+		preview, err := s.previewJoinedTableDatasets(ctx, snapshot, config, req, options)
 		if err != nil {
-			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
-		_ = s.writeExecutionLog(ctx, snapshot, req, true, len(preview.Rows), start, nil)
+		writeSuccess(len(preview.Rows))
 		return preview, nil
 	}
 	activeDatasetID := reportDatasetIdForPreview(config, selectedDataset)
 	sourceTable, permissionTable, err := s.resolveReportPreviewTable(snapshot, selectedDataset)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	sourceTable = reportTableWithPreviewFields(sourceTable, config, activeDatasetID)
 	query := req.Query
 	if err := applyReportParameterValues(&query, config, activeDatasetID, req.Parameters); err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	if query.Page <= 0 {
 		query.Page = 1
 	}
-	if query.Num <= 0 || query.Num > 200 {
-		query.Num = 20
-	}
+	query.Num = normalizeReportPageSize(query.Num, options)
 	query.TableCode = sourceTable.TableCode
 	query.MenuId = req.MenuId
 	if snapshot.PermissionMenuId > 0 {
 		query.MenuId = snapshot.PermissionMenuId
 	}
-	if err := s.injectReportDataScope(ctx, &query, permissionTable); err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+	if err := s.injectReportDataScopeForAction(ctx, &query, permissionTable, options.DataPermissionAction); err != nil {
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
 	result, err := s.generalizationService.Query(&query, sourceTable)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		writeFailure(err)
 		return response.ReportPreviewRes{}, err
+	}
+	if options.ExportMode {
+		if result.Total > options.MaxRows {
+			err = myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试")
+			writeFailure(err)
+			return response.ReportPreviewRes{}, err
+		}
+		if err := s.completeReportTableExportRows(query, sourceTable, &result, options.MaxRows); err != nil {
+			writeFailure(err)
+			return response.ReportPreviewRes{}, err
+		}
 	}
 	columns := reportPreviewColumnsFromConfig(sourceTable, snapshot.QueryConfig)
 	preview := response.ReportPreviewRes{
@@ -528,7 +627,7 @@ func (s *ReportService) executeReportSnapshot(ctx *gin.Context, snapshot ReportE
 		Datasets: reportPreviewDatasets(config, snapshot, columns),
 		Joins:    reportConfigDatasetJoins(config),
 	}
-	_ = s.writeExecutionLog(ctx, snapshot, req, true, len(result.Data), start, nil)
+	writeSuccess(len(result.Data))
 	return preview, nil
 }
 
@@ -717,7 +816,7 @@ func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) 
 	return nil
 }
 
-func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, dataset reportconfig.Dataset, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, dataset reportconfig.Dataset, req request.ReportPreviewReq, options ReportExecutionOptions) (response.ReportPreviewRes, error) {
 	sqlText, err := safeReportPreviewSQL(dataset.SQL)
 	if err != nil {
 		return response.ReportPreviewRes{}, err
@@ -726,10 +825,7 @@ func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecu
 	if err != nil {
 		return response.ReportPreviewRes{}, err
 	}
-	limit := req.Query.Num
-	if limit <= 0 || limit > 200 {
-		limit = 20
-	}
+	limit := normalizeReportPageSize(req.Query.Num, options)
 	page := req.Query.Page
 	if page <= 0 {
 		page = 1
@@ -758,7 +854,7 @@ func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecu
 	}, nil
 }
 
-func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, req request.ReportPreviewReq, options ReportExecutionOptions) (response.ReportPreviewRes, error) {
 	primaryDataset, ok := config.PrimaryTableDataset()
 	if !ok {
 		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表必须配置 primary table 数据集")
@@ -794,7 +890,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	if _, ok := reportFindTableField(primaryTable, "gmt_delete"); ok {
 		query = query.Where(fmt.Sprintf("%s IS NULL", reportDatasetFieldExpr(primaryDataset.Id, "gmt_delete", primaryDataset.Id, primaryTable.TableCode, aliasByDatasetID)))
 	}
-	if err := s.applyJoinedReportDataScope(ctx, &query, req, snapshot, primaryTable); err != nil {
+	if err := s.applyJoinedReportDataScope(ctx, &query, req, snapshot, primaryTable, options.DataPermissionAction); err != nil {
 		return response.ReportPreviewRes{}, err
 	}
 	joinedDatasetIDs := make(map[string]struct{})
@@ -837,10 +933,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	if page <= 0 {
 		page = 1
 	}
-	pageSize := req.Query.Num
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = 20
-	}
+	pageSize := normalizeReportPageSize(req.Query.Num, options)
 	var total int64
 	if err := query.Session(&gorm.Session{}).Count(&total).Error; err != nil {
 		return response.ReportPreviewRes{}, err
@@ -877,7 +970,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	}, nil
 }
 
-func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, req request.ReportPreviewReq, snapshot ReportExecutionSnapshot, primaryTable model.SysTable) error {
+func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, req request.ReportPreviewReq, snapshot ReportExecutionSnapshot, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
 	if s.dataPermissionService == nil {
 		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
 	}
@@ -890,7 +983,7 @@ func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gor
 		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
 	}
 	menuID := reportAppliedMenu(snapshot, req.MenuId)
-	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, menuID, primaryTable, enum.ButtonActionQuery)
+	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, menuID, primaryTable, action)
 	if err != nil {
 		return err
 	}
@@ -1562,6 +1655,10 @@ func normalizeReportSQLValue(value interface{}) interface{} {
 }
 
 func (s *ReportService) injectReportDataScope(ctx *gin.Context, query *request.Basic, permissionTable model.SysTable) error {
+	return s.injectReportDataScopeForAction(ctx, query, permissionTable, enum.ButtonActionQuery)
+}
+
+func (s *ReportService) injectReportDataScopeForAction(ctx *gin.Context, query *request.Basic, permissionTable model.SysTable, action enum.SysMenuButtonEventAction) error {
 	if s.dataPermissionService == nil || query == nil {
 		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
 	}
@@ -1573,12 +1670,176 @@ func (s *ReportService) injectReportDataScope(ctx *gin.Context, query *request.B
 	if !ok {
 		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
 	}
-	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, query.MenuId, permissionTable, enum.ButtonActionQuery)
+	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, query.MenuId, permissionTable, action)
 	if err != nil {
 		return err
 	}
 	query.DataScope = scope
 	return nil
+}
+
+func normalizeReportExecutionOptions(options ReportExecutionOptions) ReportExecutionOptions {
+	if options.PageSizeLimit <= 0 {
+		options.PageSizeLimit = 200
+	}
+	if options.DefaultPageSize <= 0 {
+		options.DefaultPageSize = 20
+	}
+	if options.DataPermissionAction == "" {
+		options.DataPermissionAction = enum.ButtonActionQuery
+	}
+	return options
+}
+
+func normalizeReportPageSize(raw int, options ReportExecutionOptions) int {
+	options = normalizeReportExecutionOptions(options)
+	if raw <= 0 || raw > options.PageSizeLimit {
+		return options.DefaultPageSize
+	}
+	return raw
+}
+
+func (s *ReportService) completeReportTableExportRows(query request.Basic, table model.SysTable, result *repository.GeneralizationListResult, maxRows int) error {
+	if result == nil || maxRows <= 0 || result.Total <= len(result.Data) || result.Total > maxRows {
+		return nil
+	}
+	pageSize := query.Num
+	if pageSize <= 0 || pageSize > 5000 {
+		pageSize = 5000
+	}
+	for len(result.Data) < result.Total {
+		nextQuery := query
+		nextQuery.Page = len(result.Data)/pageSize + 1
+		nextQuery.Num = pageSize
+		nextResult, err := s.generalizationService.Query(&nextQuery, table)
+		if err != nil {
+			return err
+		}
+		if len(nextResult.Data) == 0 {
+			return myerrors.NewBadRequestError("报表导出查询结果不完整")
+		}
+		result.Data = append(result.Data, nextResult.Data...)
+		if len(result.Data) > maxRows {
+			return myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试")
+		}
+	}
+	if len(result.Data) > result.Total {
+		result.Data = result.Data[:result.Total]
+	}
+	return nil
+}
+
+func normalizeReportExportMaxRows(req request.ReportExportReq) (int, error) {
+	hasSnake := req.MaxRows != nil
+	hasCamel := req.MaxRowsAlt != nil
+	if hasSnake && hasCamel && *req.MaxRows != *req.MaxRowsAlt {
+		return 0, myerrors.NewBadRequestError("max_rows 与 maxRows 不能同时传入不同值")
+	}
+	value := defaultReportExportMaxRows
+	switch {
+	case hasSnake:
+		value = *req.MaxRows
+	case hasCamel:
+		value = *req.MaxRowsAlt
+	}
+	if value <= 0 {
+		return defaultReportExportMaxRows, nil
+	}
+	if value > maxReportExportRows {
+		return 0, myerrors.NewBadRequestError("导出行数超过系统最大限制")
+	}
+	return value, nil
+}
+
+func reportExportPreviewReq(req request.ReportExportReq) request.ReportPreviewReq {
+	parameters := req.Parameters
+	if len(parameters) == 0 && len(req.Params) > 0 {
+		parameters = req.Params
+	}
+	return request.ReportPreviewReq{
+		MenuId:     req.MenuId,
+		DatasetId:  req.DatasetId,
+		Parameters: parameters,
+		Query:      req.Query,
+	}
+}
+
+func buildReportCSV(columns []response.ReportPreviewColumn, rows []map[string]interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString("\xEF\xBB\xBF")
+	writer := csv.NewWriter(&buf)
+	header := make([]string, 0, len(columns))
+	for _, column := range columns {
+		label := strings.TrimSpace(column.Label)
+		if label == "" {
+			label = strings.TrimSpace(column.Name)
+		}
+		if label == "" {
+			label = strings.TrimSpace(column.Field)
+		}
+		header = append(header, safeReportCSVCell(label))
+	}
+	if err := writer.Write(header); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		record := make([]string, 0, len(columns))
+		for _, column := range columns {
+			record = append(record, safeReportCSVCell(row[column.Field]))
+		}
+		if err := writer.Write(record); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func safeReportCSVCell(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+	var text string
+	switch v := value.(type) {
+	case string:
+		text = v
+	case []byte:
+		text = string(v)
+	default:
+		return fmt.Sprint(value)
+	}
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return text
+	}
+	switch trimmed[0] {
+	case '=', '+', '-', '@':
+		return "'" + text
+	default:
+		return text
+	}
+}
+
+func reportExportFileName(snapshot ReportExecutionSnapshot) string {
+	code := strings.TrimSpace(snapshot.Code)
+	if code == "" {
+		code = "report"
+	}
+	code = strings.Map(func(r rune) rune {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+			return '_'
+		default:
+			return r
+		}
+	}, code)
+	if snapshot.VersionNo > 0 {
+		return fmt.Sprintf("%s_v%d.csv", code, snapshot.VersionNo)
+	}
+	return code + ".csv"
 }
 
 func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, success bool, rowCount int, start time.Time, runErr error) error {
@@ -1615,7 +1876,14 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecu
 	if runErr != nil {
 		log.ErrorMessage = runErr.Error()
 	}
-	return s.reportLogRepo.Create(s.reportLogRepo.DBWithContext(ctx), &log)
+	db := s.reportLogRepo.DBWithContext(ctx)
+	if err := db.Create(&log).Error; err != nil {
+		return err
+	}
+	if !success {
+		return db.Model(&model.ReportExecutionLog{}).Where("id = ?", log.Id).Update("success", false).Error
+	}
+	return nil
 }
 
 func reportSnapshotFromDefinition(report model.ReportDefinition, runtimeType string) ReportExecutionSnapshot {

@@ -53,3 +53,14 @@ type ReportStatusUpdateReq struct {
 type ReportPublishReq struct {
 	ChangeLog string `json:"change_log" example:"首次发布"`
 }
+
+type ReportExportReq struct {
+	Format     string         `json:"format" example:"csv"`
+	MenuId     int            `json:"menu_id" example:"401"`
+	DatasetId  string         `json:"dataset_id" example:"main"`
+	Parameters map[string]any `json:"parameters"`
+	Params     map[string]any `json:"params"`
+	Query      Basic          `json:"query"`
+	MaxRows    *int           `json:"max_rows" example:"5000"`
+	MaxRowsAlt *int           `json:"maxRows" example:"5000"`
+}

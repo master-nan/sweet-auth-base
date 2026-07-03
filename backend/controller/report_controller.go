@@ -250,6 +250,28 @@ func (r *ReportController) RunReport(ctx *gin.Context) {
 	resp.SetData(result).SetTotal(result.Total)
 }
 
+func (r *ReportController) ExportReport(ctx *gin.Context) {
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportExportReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportExportReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	file, err := r.reportService.ExportReport(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	ctx.Header("Content-Type", file.ContentType)
+	ctx.Header("Content-Disposition", contentDisposition("attachment", file.FileName))
+	ctx.Data(200, file.ContentType, file.Content)
+}
+
 func (r *ReportController) PreviewReport(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

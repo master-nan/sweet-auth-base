@@ -73,3 +73,10 @@ type ReportDefinitionVersionRes struct {
 	ChangeLog     string `json:"change_log"`
 	IsCurrent     bool   `json:"is_current"`
 }
+
+type ReportExportFile struct {
+	FileName    string
+	ContentType string
+	Content     []byte
+	RowCount    int
+}

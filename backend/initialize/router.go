@@ -232,6 +232,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/report/:id/publish", app.ReportController.PublishReport)
 		adminGroup.POST("/report/:id/design-preview", app.ReportController.DesignPreviewReport)
 		adminGroup.POST("/report/:id/run", app.ReportController.RunReport)
+		adminGroup.POST("/report/:id/export", app.ReportController.ExportReport)
 		adminGroup.DELETE("/report/:id", app.ReportController.DeleteReportDefinitionById)
 		adminGroup.POST("/report/:id/preview", app.ReportController.PreviewReport)
 
