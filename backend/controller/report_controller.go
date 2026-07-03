@@ -168,6 +168,88 @@ func (r *ReportController) UpdateReportDefinitionStatus(ctx *gin.Context) {
 	resp.SetData(id)
 }
 
+func (r *ReportController) PublishReport(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportPublishReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportPublishReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.PublishReport(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+func (r *ReportController) GetReportVersions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.GetReportVersions(id)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result).SetTotal(len(result))
+}
+
+func (r *ReportController) DesignPreviewReport(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportPreviewReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportPreviewReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.DesignPreview(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result).SetTotal(result.Total)
+}
+
+func (r *ReportController) RunReport(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportPreviewReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportPreviewReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.RunReport(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result).SetTotal(result.Total)
+}
+
 func (r *ReportController) PreviewReport(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

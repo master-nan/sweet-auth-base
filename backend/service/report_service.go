@@ -22,20 +22,42 @@ import (
 	"github.com/jinzhu/copier"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
-	reportSourceTypeTable = "table"
-	reportSourceTypeView  = "view"
-	reportStatusDraft     = "draft"
-	reportStatusPublished = "published"
-	reportStatusDisabled  = "disabled"
+	reportSourceTypeTable      = "table"
+	reportSourceTypeView       = "view"
+	reportStatusDraft          = "draft"
+	reportStatusPublished      = "published"
+	reportStatusDisabled       = "disabled"
+	reportVersionPublished     = "published"
+	reportVersionArchived      = "archived"
+	reportRuntimeDesignPreview = "design_preview"
+	reportRuntimeRun           = "runtime_run"
 )
 
-var reportSQLForbiddenPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|replace|call|execute|exec|copy|vacuum|reindex|attach|detach|pragma)\b`)
+var reportSQLForbiddenPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|replace|call|execute|exec|copy|vacuum|reindex|attach|detach|pragma|pg_sleep|benchmark|sleep)\b`)
+var reportSQLForbiddenPhrasePattern = regexp.MustCompile(`(?i)\bexplain\s+analyze\b`)
+
+type ReportExecutionSnapshot struct {
+	ReportId            int
+	VersionId           int
+	VersionNo           int
+	Code                string
+	Name                string
+	SourceType          string
+	SourceCode          string
+	PermissionMenuId    int
+	PermissionTableCode string
+	QueryConfig         datatypes.JSON
+	LayoutConfig        datatypes.JSON
+	RuntimeType         string
+}
 
 type ReportService struct {
 	reportRepo            repository.ReportDefinitionRepository
+	reportVersionRepo     repository.ReportDefinitionVersionRepository
 	reportLogRepo         repository.ReportExecutionLogRepository
 	generalizationService *GeneralizationService
 	sysTableService       *SysTableService
@@ -45,6 +67,7 @@ type ReportService struct {
 
 func NewReportService(
 	reportRepo repository.ReportDefinitionRepository,
+	reportVersionRepo repository.ReportDefinitionVersionRepository,
 	reportLogRepo repository.ReportExecutionLogRepository,
 	generalizationService *GeneralizationService,
 	sysTableService *SysTableService,
@@ -53,6 +76,7 @@ func NewReportService(
 ) *ReportService {
 	return &ReportService{
 		reportRepo:            reportRepo,
+		reportVersionRepo:     reportVersionRepo,
 		reportLogRepo:         reportLogRepo,
 		generalizationService: generalizationService,
 		sysTableService:       sysTableService,
@@ -160,6 +184,16 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 	if existing.Id != 0 && existing.Id != req.Id {
 		return myerrors.NewBadRequestError("报表编码已存在")
 	}
+	current, err := s.reportRepo.FindById(req.Id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.ErrDataNotFound
+		}
+		return err
+	}
+	if report.Status == reportStatusPublished && current.PublishedVersionId <= 0 {
+		return myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
+	}
 	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", req.Id).Updates(map[string]any{
 		"code":                  report.Code,
 		"name":                  report.Name,
@@ -193,6 +227,9 @@ func (s *ReportService) UpdateReportDefinitionStatus(ctx *gin.Context, id int, s
 	if id <= 0 || !isValidReportStatus(status) {
 		return myerrors.ErrParamInvalid
 	}
+	if status == reportStatusPublished {
+		return myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
+	}
 	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", id).Updates(map[string]any{
 		"status":     status,
 		"state":      status != reportStatusDisabled,
@@ -207,26 +244,209 @@ func (s *ReportService) UpdateReportDefinitionStatus(ctx *gin.Context, id int, s
 	return nil
 }
 
-func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
-	start := time.Now()
+func (s *ReportService) PublishReport(ctx *gin.Context, reportId int, req request.ReportPublishReq) (response.ReportPublishRes, error) {
+	if reportId <= 0 {
+		return response.ReportPublishRes{}, myerrors.ErrParamInvalid
+	}
+	var published model.ReportDefinitionVersion
+	err := s.reportRepo.DBWithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var report model.ReportDefinition
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&report, reportId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrDataNotFound
+			}
+			return err
+		}
+		if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
+			return myerrors.NewBadRequestError("报表已停用，不能发布")
+		}
+		config, err := reportconfig.Parse(report.QueryConfig, report.LayoutConfig)
+		if err != nil {
+			return err
+		}
+		if err := s.validateReportTables(report); err != nil {
+			return err
+		}
+		if err := validateReportSQLDatasets(config); err != nil {
+			return err
+		}
+		if err := ensureSQLDatasetRole(ctx, config); err != nil {
+			return err
+		}
+		maxVersionNo, err := s.reportVersionRepo.GetMaxVersionNo(tx, report.Id)
+		if err != nil {
+			return err
+		}
+		id, err := s.sf.GenerateUniqueID()
+		if err != nil {
+			return err
+		}
+		user := reportUserFromContext(ctx)
+		publishedAt := model.CustomTime(model.Now())
+		version := model.ReportDefinitionVersion{
+			Basic:               model.Basic{Id: int(id), State: true},
+			ReportId:            report.Id,
+			VersionNo:           maxVersionNo + 1,
+			ReportCode:          report.Code,
+			ReportName:          report.Name,
+			Description:         report.Description,
+			Category:            report.Category,
+			SourceType:          report.SourceType,
+			SourceCode:          report.SourceCode,
+			PermissionMenuId:    report.PermissionMenuId,
+			PermissionTableCode: report.PermissionTableCode,
+			QueryConfig:         cloneReportJSON(report.QueryConfig),
+			LayoutConfig:        cloneReportJSON(report.LayoutConfig),
+			Status:              reportVersionPublished,
+			PublishedAt:         publishedAt,
+			PublishedBy:         user.Id,
+			PublishedName:       user.UserName,
+			ChangeLog:           strings.TrimSpace(req.ChangeLog),
+		}
+		if err := s.reportVersionRepo.ArchiveByReportId(tx, report.Id); err != nil {
+			return err
+		}
+		if err := s.reportVersionRepo.Create(tx, &version); err != nil {
+			return err
+		}
+		if err := tx.Model(&model.ReportDefinition{}).
+			Where("id = ?", report.Id).
+			Updates(map[string]any{
+				"published_version_id": version.Id,
+				"status":               reportStatusPublished,
+				"state":                true,
+				"gmt_modify":           model.Now(),
+			}).Error; err != nil {
+			return err
+		}
+		published = version
+		return nil
+	})
+	if err != nil {
+		return response.ReportPublishRes{}, err
+	}
+	return response.ReportPublishRes{
+		ReportId:  published.ReportId,
+		VersionId: published.Id,
+		VersionNo: published.VersionNo,
+		Status:    reportStatusPublished,
+	}, nil
+}
+
+func (s *ReportService) GetReportVersions(reportId int) ([]response.ReportDefinitionVersionRes, error) {
 	report, err := s.GetReportDefinitionById(reportId)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		return nil, err
+	}
+	if report.Id == 0 {
+		return nil, myerrors.ErrDataNotFound
+	}
+	versions, err := s.reportVersionRepo.ListByReportId(reportId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]response.ReportDefinitionVersionRes, 0, len(versions))
+	for _, version := range versions {
+		result = append(result, response.ReportDefinitionVersionRes{
+			Id:            version.Id,
+			ReportId:      version.ReportId,
+			VersionNo:     version.VersionNo,
+			Status:        version.Status,
+			PublishedAt:   version.PublishedAt.String(),
+			PublishedBy:   version.PublishedBy,
+			PublishedName: version.PublishedName,
+			ChangeLog:     version.ChangeLog,
+			IsCurrent:     version.Id == report.PublishedVersionId,
+		})
+	}
+	return result, nil
+}
+
+func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+	start := time.Now()
+	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeDesignPreview}
+	report, err := s.GetReportDefinitionById(reportId)
+	if err != nil {
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	if report.Id == 0 {
 		err = myerrors.ErrDataNotFound
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
+	snapshot = reportSnapshotFromDefinition(report, reportRuntimeDesignPreview)
 	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
 		err = myerrors.NewBadRequestError("报表已停用")
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
-	config, err := reportconfig.Parse(report.QueryConfig, report.LayoutConfig)
+	return s.executeReportSnapshot(ctx, snapshot, req, start)
+}
+
+func (s *ReportService) RunReport(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+	start := time.Now()
+	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeRun}
+	report, err := s.GetReportDefinitionById(reportId)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if report.Id == 0 {
+		err = myerrors.ErrDataNotFound
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	snapshot.ReportId = report.Id
+	snapshot.Code = report.Code
+	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
+		err = myerrors.NewBadRequestError("报表已停用")
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if normalizeReportStatus(report.Status) != reportStatusPublished || report.PublishedVersionId <= 0 {
+		err = myerrors.NewBadRequestError("报表未发布，请先调用发布接口")
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	version, err := s.reportVersionRepo.FindByReportAndId(report.Id, report.PublishedVersionId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = myerrors.NewBadRequestError("报表发布版本不存在")
+		}
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if !version.State {
+		err = myerrors.NewBadRequestError("报表发布版本不可用")
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if normalizeReportStatus(version.Status) != reportVersionPublished {
+		err = myerrors.NewBadRequestError("报表发布版本状态不可运行")
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	snapshot = reportSnapshotFromVersion(version, reportRuntimeRun)
+	return s.executeReportSnapshot(ctx, snapshot, req, start)
+}
+
+func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+	return s.DesignPreview(ctx, reportId, req)
+}
+
+func (s *ReportService) executeReportSnapshot(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, start time.Time) (response.ReportPreviewRes, error) {
+	config, err := reportconfig.Parse(snapshot.QueryConfig, snapshot.LayoutConfig)
+	if err != nil {
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if err := validateReportSQLDatasets(config); err != nil {
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		return response.ReportPreviewRes{}, err
+	}
+	if err := ensureSQLDatasetRole(ctx, config); err != nil {
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	var selectedDataset reportconfig.Dataset
@@ -235,38 +455,38 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 		selectedDataset, ok = config.DatasetByID(req.DatasetId)
 		if !ok {
 			err = myerrors.NewBadRequestError("报表数据集不存在")
-			_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 			return response.ReportPreviewRes{}, err
 		}
 		if selectedDataset.Type == reportconfig.SourceTypeSQL {
-			preview, err := s.previewSQLDataset(ctx, report, config, selectedDataset, req)
+			preview, err := s.previewSQLDataset(ctx, snapshot, config, selectedDataset, req)
 			if err != nil {
-				_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+				_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 				return response.ReportPreviewRes{}, err
 			}
-			_ = s.writeExecutionLog(ctx, report, "preview", req, true, len(preview.Rows), start, nil)
+			_ = s.writeExecutionLog(ctx, snapshot, req, true, len(preview.Rows), start, nil)
 			return preview, nil
 		}
 	}
 	if selectedDataset.Id == "" && reportShouldUseJoinedPreview(config) {
-		preview, err := s.previewJoinedTableDatasets(ctx, report, config, req)
+		preview, err := s.previewJoinedTableDatasets(ctx, snapshot, config, req)
 		if err != nil {
-			_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 			return response.ReportPreviewRes{}, err
 		}
-		_ = s.writeExecutionLog(ctx, report, "preview", req, true, len(preview.Rows), start, nil)
+		_ = s.writeExecutionLog(ctx, snapshot, req, true, len(preview.Rows), start, nil)
 		return preview, nil
 	}
 	activeDatasetID := reportDatasetIdForPreview(config, selectedDataset)
-	sourceTable, permissionTable, err := s.resolveReportPreviewTable(report, selectedDataset)
+	sourceTable, permissionTable, err := s.resolveReportPreviewTable(snapshot, selectedDataset)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	sourceTable = reportTableWithPreviewFields(sourceTable, config, activeDatasetID)
 	query := req.Query
 	if err := applyReportParameterValues(&query, config, activeDatasetID, req.Parameters); err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	if query.Page <= 0 {
@@ -277,35 +497,38 @@ func (s *ReportService) Preview(ctx *gin.Context, reportId int, req request.Repo
 	}
 	query.TableCode = sourceTable.TableCode
 	query.MenuId = req.MenuId
-	if report.PermissionMenuId > 0 {
-		query.MenuId = report.PermissionMenuId
+	if snapshot.PermissionMenuId > 0 {
+		query.MenuId = snapshot.PermissionMenuId
 	}
 	if err := s.injectReportDataScope(ctx, &query, permissionTable); err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	result, err := s.generalizationService.Query(&query, sourceTable)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, report, "preview", req, false, 0, start, err)
+		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
-	columns := reportPreviewColumnsFromConfig(sourceTable, report.QueryConfig)
+	columns := reportPreviewColumnsFromConfig(sourceTable, snapshot.QueryConfig)
 	preview := response.ReportPreviewRes{
 		Columns: columns,
 		Rows:    filterReportRows(result.Data, columns),
 		Total:   result.Total,
 		Meta: response.ReportPreviewMeta{
-			ReportId:    report.Id,
-			ReportCode:  report.Code,
+			ReportId:    snapshot.ReportId,
+			VersionId:   snapshot.VersionId,
+			VersionNo:   snapshot.VersionNo,
+			RuntimeType: snapshot.RuntimeType,
+			ReportCode:  snapshot.Code,
 			SourceCode:  sourceTable.TableCode,
 			DatasetId:   activeDatasetID,
 			DatasetType: reportSourceTypeTable,
 			AppliedMenu: query.MenuId,
 		},
-		Datasets: reportPreviewDatasets(config, report, columns),
+		Datasets: reportPreviewDatasets(config, snapshot, columns),
 		Joins:    reportConfigDatasetJoins(config),
 	}
-	_ = s.writeExecutionLog(ctx, report, "preview", req, true, len(result.Data), start, nil)
+	_ = s.writeExecutionLog(ctx, snapshot, req, true, len(result.Data), start, nil)
 	return preview, nil
 }
 
@@ -325,6 +548,9 @@ func (s *ReportService) reportFromCreateReq(req request.ReportDefinitionCreateRe
 	}
 	if !isValidReportStatus(report.Status) {
 		return report, myerrors.ErrParamInvalid
+	}
+	if report.Status == reportStatusPublished {
+		return report, myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
 	}
 	if len(report.QueryConfig) == 0 {
 		report.QueryConfig = datatypes.JSON([]byte("{}"))
@@ -446,9 +672,9 @@ func (s *ReportService) resolveReportTables(report model.ReportDefinition) (mode
 	return sourceTable, permissionTable, nil
 }
 
-func (s *ReportService) resolveReportPreviewTable(report model.ReportDefinition, selectedDataset reportconfig.Dataset) (model.SysTable, model.SysTable, error) {
+func (s *ReportService) resolveReportPreviewTable(snapshot ReportExecutionSnapshot, selectedDataset reportconfig.Dataset) (model.SysTable, model.SysTable, error) {
 	if selectedDataset.Id == "" {
-		return s.resolveReportTables(report)
+		return s.resolveReportTables(reportDefinitionFromSnapshot(snapshot))
 	}
 	sourceTable, err := s.sysTableService.GetTableByTableCode(strings.TrimSpace(selectedDataset.SourceCode))
 	if err != nil {
@@ -491,7 +717,7 @@ func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) 
 	return nil
 }
 
-func (s *ReportService) previewSQLDataset(ctx *gin.Context, report model.ReportDefinition, config reportconfig.Config, dataset reportconfig.Dataset, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, dataset reportconfig.Dataset, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
 	sqlText, err := safeReportPreviewSQL(dataset.SQL)
 	if err != nil {
 		return response.ReportPreviewRes{}, err
@@ -519,17 +745,20 @@ func (s *ReportService) previewSQLDataset(ctx *gin.Context, report model.ReportD
 		Datasets: reportConfigDatasetMetadata(config),
 		Joins:    reportConfigDatasetJoins(config),
 		Meta: response.ReportPreviewMeta{
-			ReportId:    report.Id,
-			ReportCode:  report.Code,
-			SourceCode:  report.SourceCode,
+			ReportId:    snapshot.ReportId,
+			VersionId:   snapshot.VersionId,
+			VersionNo:   snapshot.VersionNo,
+			RuntimeType: snapshot.RuntimeType,
+			ReportCode:  snapshot.Code,
+			SourceCode:  snapshot.SourceCode,
 			DatasetId:   dataset.Id,
 			DatasetType: reportconfig.SourceTypeSQL,
-			AppliedMenu: req.MenuId,
+			AppliedMenu: reportAppliedMenu(snapshot, req.MenuId),
 		},
 	}, nil
 }
 
-func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, report model.ReportDefinition, config reportconfig.Config, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
+func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
 	primaryDataset, ok := config.PrimaryTableDataset()
 	if !ok {
 		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表必须配置 primary table 数据集")
@@ -565,7 +794,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, report mode
 	if _, ok := reportFindTableField(primaryTable, "gmt_delete"); ok {
 		query = query.Where(fmt.Sprintf("%s IS NULL", reportDatasetFieldExpr(primaryDataset.Id, "gmt_delete", primaryDataset.Id, primaryTable.TableCode, aliasByDatasetID)))
 	}
-	if err := s.applyJoinedReportDataScope(ctx, &query, req, report, primaryTable); err != nil {
+	if err := s.applyJoinedReportDataScope(ctx, &query, req, snapshot, primaryTable); err != nil {
 		return response.ReportPreviewRes{}, err
 	}
 	joinedDatasetIDs := make(map[string]struct{})
@@ -635,17 +864,20 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, report mode
 		Datasets: reportConfigDatasetMetadata(config),
 		Joins:    reportConfigDatasetJoins(config),
 		Meta: response.ReportPreviewMeta{
-			ReportId:    report.Id,
-			ReportCode:  report.Code,
+			ReportId:    snapshot.ReportId,
+			VersionId:   snapshot.VersionId,
+			VersionNo:   snapshot.VersionNo,
+			RuntimeType: snapshot.RuntimeType,
+			ReportCode:  snapshot.Code,
 			SourceCode:  primaryTable.TableCode,
 			DatasetId:   primaryDataset.Id,
 			DatasetType: reportSourceTypeTable,
-			AppliedMenu: reportAppliedMenu(report, req.MenuId),
+			AppliedMenu: reportAppliedMenu(snapshot, req.MenuId),
 		},
 	}, nil
 }
 
-func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, req request.ReportPreviewReq, report model.ReportDefinition, primaryTable model.SysTable) error {
+func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, req request.ReportPreviewReq, snapshot ReportExecutionSnapshot, primaryTable model.SysTable) error {
 	if s.dataPermissionService == nil {
 		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
 	}
@@ -657,7 +889,7 @@ func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gor
 	if !ok {
 		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
 	}
-	menuID := reportAppliedMenu(report, req.MenuId)
+	menuID := reportAppliedMenu(snapshot, req.MenuId)
 	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, menuID, primaryTable, enum.ButtonActionQuery)
 	if err != nil {
 		return err
@@ -680,6 +912,9 @@ func safeReportPreviewSQL(raw string) (string, error) {
 	}
 	if reportSQLForbiddenPattern.MatchString(sqlText) {
 		return "", myerrors.NewBadRequestError("SQL 数据集预览禁止写操作或 DDL 关键字")
+	}
+	if reportSQLForbiddenPhrasePattern.MatchString(sqlText) {
+		return "", myerrors.NewBadRequestError("SQL 数据集预览禁止高风险分析语句")
 	}
 	return sqlText, nil
 }
@@ -1080,9 +1315,9 @@ func reportFindTableField(table model.SysTable, fieldCode string) (model.SysTabl
 	return model.SysTableField{}, false
 }
 
-func reportAppliedMenu(report model.ReportDefinition, requestMenuID int) int {
-	if report.PermissionMenuId > 0 {
-		return report.PermissionMenuId
+func reportAppliedMenu(snapshot ReportExecutionSnapshot, requestMenuID int) int {
+	if snapshot.PermissionMenuId > 0 {
+		return snapshot.PermissionMenuId
 	}
 	return requestMenuID
 }
@@ -1346,22 +1581,28 @@ func (s *ReportService) injectReportDataScope(ctx *gin.Context, query *request.B
 	return nil
 }
 
-func (s *ReportService) writeExecutionLog(ctx *gin.Context, report model.ReportDefinition, action string, req request.ReportPreviewReq, success bool, rowCount int, start time.Time, runErr error) error {
+func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, success bool, rowCount int, start time.Time, runErr error) error {
 	id, err := s.sf.GenerateUniqueID()
 	if err != nil {
 		return err
 	}
-	user := model.SysUser{}
-	if value, exists := ctx.Get("user"); exists {
-		if parsed, ok := value.(model.SysUser); ok {
-			user = parsed
-		}
+	user := reportUserFromContext(ctx)
+	action := snapshot.RuntimeType
+	if action == "" {
+		action = reportRuntimeDesignPreview
 	}
-	params, _ := json.Marshal(req)
+	params, _ := json.Marshal(map[string]any{
+		"request": req,
+		"runtime": map[string]any{
+			"runtime_type": action,
+			"version_id":   snapshot.VersionId,
+			"version_no":   snapshot.VersionNo,
+		},
+	})
 	log := model.ReportExecutionLog{
 		Basic:        model.Basic{Id: int(id), State: true},
-		ReportId:     report.Id,
-		ReportCode:   report.Code,
+		ReportId:     snapshot.ReportId,
+		ReportCode:   snapshot.Code,
 		UserId:       user.Id,
 		UserName:     user.UserName,
 		Action:       action,
@@ -1375,6 +1616,108 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, report model.ReportD
 		log.ErrorMessage = runErr.Error()
 	}
 	return s.reportLogRepo.Create(s.reportLogRepo.DBWithContext(ctx), &log)
+}
+
+func reportSnapshotFromDefinition(report model.ReportDefinition, runtimeType string) ReportExecutionSnapshot {
+	return ReportExecutionSnapshot{
+		ReportId:            report.Id,
+		VersionId:           0,
+		VersionNo:           0,
+		Code:                report.Code,
+		Name:                report.Name,
+		SourceType:          report.SourceType,
+		SourceCode:          report.SourceCode,
+		PermissionMenuId:    report.PermissionMenuId,
+		PermissionTableCode: report.PermissionTableCode,
+		QueryConfig:         cloneReportJSON(report.QueryConfig),
+		LayoutConfig:        cloneReportJSON(report.LayoutConfig),
+		RuntimeType:         runtimeType,
+	}
+}
+
+func reportSnapshotFromVersion(version model.ReportDefinitionVersion, runtimeType string) ReportExecutionSnapshot {
+	return ReportExecutionSnapshot{
+		ReportId:            version.ReportId,
+		VersionId:           version.Id,
+		VersionNo:           version.VersionNo,
+		Code:                version.ReportCode,
+		Name:                version.ReportName,
+		SourceType:          version.SourceType,
+		SourceCode:          version.SourceCode,
+		PermissionMenuId:    version.PermissionMenuId,
+		PermissionTableCode: version.PermissionTableCode,
+		QueryConfig:         cloneReportJSON(version.QueryConfig),
+		LayoutConfig:        cloneReportJSON(version.LayoutConfig),
+		RuntimeType:         runtimeType,
+	}
+}
+
+func reportDefinitionFromSnapshot(snapshot ReportExecutionSnapshot) model.ReportDefinition {
+	return model.ReportDefinition{
+		Basic:               model.Basic{Id: snapshot.ReportId, State: true},
+		Code:                snapshot.Code,
+		Name:                snapshot.Name,
+		SourceType:          snapshot.SourceType,
+		SourceCode:          snapshot.SourceCode,
+		PermissionMenuId:    snapshot.PermissionMenuId,
+		PermissionTableCode: snapshot.PermissionTableCode,
+		QueryConfig:         cloneReportJSON(snapshot.QueryConfig),
+		LayoutConfig:        cloneReportJSON(snapshot.LayoutConfig),
+	}
+}
+
+func cloneReportJSON(raw datatypes.JSON) datatypes.JSON {
+	if len(raw) == 0 {
+		return datatypes.JSON([]byte("{}"))
+	}
+	cloned := make([]byte, len(raw))
+	copy(cloned, raw)
+	return datatypes.JSON(cloned)
+}
+
+func reportUserFromContext(ctx *gin.Context) model.SysUser {
+	if ctx == nil {
+		return model.SysUser{}
+	}
+	if value, exists := ctx.Get("user"); exists {
+		if user, ok := value.(model.SysUser); ok {
+			return user
+		}
+	}
+	return model.SysUser{}
+}
+
+func validateReportSQLDatasets(config reportconfig.Config) error {
+	for _, dataset := range config.Datasets() {
+		dataset = reportconfig.NormalizeDataset(dataset)
+		if dataset.Type != reportconfig.SourceTypeSQL {
+			continue
+		}
+		if _, err := safeReportPreviewSQL(dataset.SQL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reportConfigHasSQLDataset(config reportconfig.Config) bool {
+	for _, dataset := range config.Datasets() {
+		if reportconfig.NormalizeDataset(dataset).Type == reportconfig.SourceTypeSQL {
+			return true
+		}
+	}
+	return false
+}
+
+func ensureSQLDatasetRole(ctx *gin.Context, config reportconfig.Config) error {
+	if !reportConfigHasSQLDataset(config) {
+		return nil
+	}
+	user := reportUserFromContext(ctx)
+	if utils.IsSuperAdmin(user) {
+		return nil
+	}
+	return myerrors.ErrPermissionDenied
 }
 
 func normalizeReportSourceType(raw string) string {
@@ -1546,7 +1889,7 @@ func reportDatasetIdForPreview(config reportconfig.Config, selectedDataset repor
 	return ""
 }
 
-func reportPreviewDatasets(config reportconfig.Config, report model.ReportDefinition, columns []response.ReportPreviewColumn) []response.ReportPreviewDataset {
+func reportPreviewDatasets(config reportconfig.Config, snapshot ReportExecutionSnapshot, columns []response.ReportPreviewColumn) []response.ReportPreviewDataset {
 	datasets := reportConfigDatasetMetadata(config)
 	if len(datasets) > 0 {
 		return datasets
@@ -1554,9 +1897,9 @@ func reportPreviewDatasets(config reportconfig.Config, report model.ReportDefini
 	return []response.ReportPreviewDataset{
 		{
 			Id:         "primary",
-			Name:       report.Name,
+			Name:       snapshot.Name,
 			Type:       reportSourceTypeTable,
-			SourceCode: report.SourceCode,
+			SourceCode: snapshot.SourceCode,
 			Primary:    true,
 			Fields:     columns,
 		},

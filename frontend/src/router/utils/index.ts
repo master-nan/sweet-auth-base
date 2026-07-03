@@ -48,12 +48,24 @@ function appendDynamicMenuRoutes(routes: Route[], menus: Menu[]) {
   const byName = new Map(routes.map((route) => [route.name, route]))
   for (const menu of menus) {
     const route = byName.get(menu.name)
+    if (route) mergeBackendMenuMeta(route, menu)
     if (route?.children?.length && menu.children?.length) {
       appendDynamicMenuRoutes(route.children, menu.children)
     }
     if (route) continue
     const dynamicRoute = menuToDynamicRoute(menu)
     if (dynamicRoute) routes.push(dynamicRoute)
+  }
+}
+
+function mergeBackendMenuMeta(route: Route, menu: Menu) {
+  route.meta = {
+    ...(route.meta || {}),
+    title: menu.title || route.meta?.title || String(route.name || ''),
+    ...(menu.icon ? { icon: menu.icon } : {}),
+    isHidden: menu.is_hidden,
+    menuId: menu.id,
+    ...(menu.table_code ? { tableCode: menu.table_code } : {}),
   }
 }
 

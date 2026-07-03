@@ -49,3 +49,7 @@ type ReportSQLFieldsReq struct {
 type ReportStatusUpdateReq struct {
 	Status string `json:"status" binding:"required" example:"published"`
 }
+
+type ReportPublishReq struct {
+	ChangeLog string `json:"change_log" example:"首次发布"`
+}

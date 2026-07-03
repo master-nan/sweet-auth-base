@@ -45,7 +45,10 @@
             option-label="name"
             option-value="code"
             label="来源表"
-            :options="dataSources"
+            use-input
+            input-debounce="80"
+            :options="tableSourceOptions"
+            @filter="filterDataSources"
             @update:model-value="$emit('update:sourceCode', String($event || ''))"
           />
           <q-input
@@ -128,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import type {
   ReportDataSource,
@@ -137,7 +140,7 @@ import type {
   ReportField,
 } from 'src/api/services/report'
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
   editingDataset?: ReportDataset | undefined
   draft: {
@@ -167,9 +170,60 @@ defineEmits<{
 const fieldColumns = computed<QTableProps['columns']>(() => [
   { name: 'name', field: 'name', label: '字段名称', align: 'left' },
   { name: 'code', field: 'code', label: '字段编码', align: 'left' },
-  { name: 'type', field: 'type', label: '类型', align: 'left' },
+  { name: 'type', field: (row: ReportField) => fieldTypeLabel(row.type), label: '类型', align: 'left' },
   { name: 'role', field: (row: ReportField) => row.role || '-', label: '角色', align: 'left' },
 ])
+
+const tableSourceOptions = ref<ReportDataSource[]>([])
+
+watch(
+  () => props.dataSources,
+  (items) => {
+    tableSourceOptions.value = [...items]
+  },
+  { immediate: true },
+)
+
+function filterDataSources(value: string, update: (callback: () => void) => void) {
+  const keyword = value.trim().toLowerCase()
+  update(() => {
+    if (!keyword) {
+      tableSourceOptions.value = [...props.dataSources]
+      return
+    }
+    tableSourceOptions.value = props.dataSources.filter((item) => {
+      return (
+        item.name.toLowerCase().includes(keyword) ||
+        item.code.toLowerCase().includes(keyword)
+      )
+    })
+  })
+}
+
+function fieldTypeLabel(type: string | number | undefined) {
+  const value = String(type || '').toLowerCase()
+  const labels: Record<string, string> = {
+    '1': '数字',
+    '2': '大数字',
+    '3': '字符串',
+    '4': '文本',
+    '5': '布尔',
+    '6': '日期',
+    '7': '时间',
+    number: '数字',
+    bigint: '大数字',
+    integer: '数字',
+    string: '字符串',
+    text: '文本',
+    boolean: '布尔',
+    bool: '布尔',
+    date: '日期',
+    time: '时间',
+    datetime: '日期时间',
+    timestamp: '日期时间',
+  }
+  return labels[value] || type || '-'
+}
 </script>
 
 <style scoped lang="scss">

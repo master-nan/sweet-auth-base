@@ -27,6 +27,9 @@ type ReportPreviewColumn struct {
 
 type ReportPreviewMeta struct {
 	ReportId    int    `json:"report_id"`
+	VersionId   int    `json:"version_id,omitempty"`
+	VersionNo   int    `json:"version_no,omitempty"`
+	RuntimeType string `json:"runtime_type,omitempty"`
 	ReportCode  string `json:"report_code"`
 	SourceCode  string `json:"source_code"`
 	DatasetId   string `json:"dataset_id,omitempty"`
@@ -50,4 +53,23 @@ type ReportPreviewJoin struct {
 	RightDatasetId string `json:"right_dataset_id"`
 	RightField     string `json:"right_field"`
 	JoinType       string `json:"join_type"`
+}
+
+type ReportPublishRes struct {
+	ReportId  int    `json:"report_id"`
+	VersionId int    `json:"version_id"`
+	VersionNo int    `json:"version_no"`
+	Status    string `json:"status"`
+}
+
+type ReportDefinitionVersionRes struct {
+	Id            int    `json:"id"`
+	ReportId      int    `json:"report_id"`
+	VersionNo     int    `json:"version_no"`
+	Status        string `json:"status"`
+	PublishedAt   string `json:"published_at"`
+	PublishedBy   int    `json:"published_by"`
+	PublishedName string `json:"published_name"`
+	ChangeLog     string `json:"change_log"`
+	IsCurrent     bool   `json:"is_current"`
 }

@@ -223,6 +223,7 @@ const asyncRoutesChildren: Route[] = [
           title: 'router.report.design',
           icon: 'design_services',
           keepAlive: false,
+          isHidden: true,
           fullscreen: true,
           showTag: true,
         },

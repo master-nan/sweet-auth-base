@@ -617,8 +617,8 @@ function openDatasetDialog(id = '') {
     return
   }
   datasetDraft.type = 'table'
-  datasetDraft.source_code = dataSources.value[0]?.code || ''
-  datasetDraft.name = dataSources.value[0]?.name || ''
+  datasetDraft.source_code = ''
+  datasetDraft.name = ''
   datasetDraft.sql = ''
   datasetDraft.fieldsText = ''
   sqlDraftFields.value = []
@@ -629,7 +629,7 @@ function handleDraftTypeChange(value: ReportDatasetType) {
   datasetDraft.type = value
   if (datasetDraft.type === 'table') {
     sqlDraftFields.value = []
-    handleDraftSourceChange(datasetDraft.source_code || dataSources.value[0]?.code || '')
+    handleDraftSourceChange(datasetDraft.source_code || '')
   } else {
     datasetDraft.name = 'SQL 数据集'
     datasetDraft.source_code = ''

@@ -9,6 +9,7 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -26,6 +27,11 @@ import (
 )
 
 const lowCodeCrudButtonTemplateScene = "lowcode_crud"
+
+const (
+	reportMigrationStatusPublished = "published"
+	reportMigrationStatusArchived  = "archived"
+)
 
 func main() {
 	command := migrationCommand(os.Args)
@@ -144,6 +150,7 @@ func migrateSchema(db *gorm.DB) error {
 		&model.SysUserDataScopeOverride{},
 		&model.SysUserDimensionValue{},
 		&model.ReportDefinition{},
+		&model.ReportDefinitionVersion{},
 		&model.ReportExecutionLog{},
 		&model.Application{},
 		&model.SmsTemplate{},
@@ -761,6 +768,9 @@ func insecureBootstrapAdminPassword(password string) bool {
 }
 
 func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
+	if err := normalizeReportMenus(db, sf); err != nil {
+		return err
+	}
 	reportDesignMenu := menuWithTable(menu(903, 900, "report_design", "design", "pages/report/design/Index.vue", "router.report.design", "design_services", 3), "report_definition")
 	reportDesignMenu.IsHidden = true
 	menus := []model.SysMenu{
@@ -813,7 +823,51 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 	if err := seedReportDefinitions(db, sf); err != nil {
 		return err
 	}
+	if err := backfillReportDefinitionVersions(db, sf); err != nil {
+		return err
+	}
 	if err := seedSuperAdminRoutePolicies(db, role.Name); err != nil {
+		return err
+	}
+	return nil
+}
+
+func normalizeReportMenus(db *gorm.DB, sf *utils.Snowflake) error {
+	var legacyDesign model.SysMenu
+	err := db.Where("id = ? AND name = ?", 902, "report_design").First(&legacyDesign).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var existingDesign model.SysMenu
+	err = db.Where("id = ?", 903).First(&existingDesign).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return err
+	}
+	if err == nil && existingDesign.Name != "report_design" {
+		newID, newIDErr := newMigrationID(sf)
+		if newIDErr != nil {
+			return newIDErr
+		}
+		if err := db.Model(&model.SysMenu{}).Where("id = ?", existingDesign.Id).Update("id", newID).Error; err != nil {
+			return err
+		}
+		if err := db.Model(&model.SysRoleMenu{}).Where("menu_id = ?", existingDesign.Id).Update("menu_id", newID).Error; err != nil {
+			return err
+		}
+		if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", existingDesign.Id).Update("menu_id", newID).Error; err != nil {
+			return err
+		}
+	}
+	if err := db.Model(&model.SysMenu{}).Where("id = ?", legacyDesign.Id).Update("id", 903).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&model.SysRoleMenu{}).Where("menu_id = ?", legacyDesign.Id).Update("menu_id", 903).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", legacyDesign.Id).Update("menu_id", 903).Error; err != nil {
 		return err
 	}
 	return nil
@@ -1052,6 +1106,112 @@ func seedReportDefinitions(db *gorm.DB, sf *utils.Snowflake) error {
 	seed.Id = id
 	seed.State = true
 	return db.Create(&seed).Error
+}
+
+func backfillReportDefinitionVersions(db *gorm.DB, sf *utils.Snowflake) error {
+	if !db.Migrator().HasTable(&model.ReportDefinition{}) || !db.Migrator().HasTable(&model.ReportDefinitionVersion{}) {
+		return nil
+	}
+	var reports []model.ReportDefinition
+	if err := db.Where("status = ? AND COALESCE(published_version_id, 0) = 0", "published").Find(&reports).Error; err != nil {
+		return err
+	}
+	for _, report := range reports {
+		if !json.Valid(report.QueryConfig) || !json.Valid(report.LayoutConfig) {
+			log.Printf("skip report version backfill: report_id=%d code=%s has invalid query_config/layout_config", report.Id, report.Code)
+			continue
+		}
+		existing, found, err := selectReportVersionForBackfill(db, report.Id)
+		if err != nil {
+			return err
+		}
+		if found {
+			if err := db.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Model(&model.ReportDefinitionVersion{}).
+					Where("report_id = ? AND id <> ?", report.Id, existing.Id).
+					Update("status", reportMigrationStatusArchived).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&model.ReportDefinitionVersion{}).
+					Where("id = ?", existing.Id).
+					Updates(map[string]any{
+						"status": reportMigrationStatusPublished,
+						"state":  true,
+					}).Error; err != nil {
+					return err
+				}
+				return tx.Model(&model.ReportDefinition{}).
+					Where("id = ? AND COALESCE(published_version_id, 0) = 0", report.Id).
+					Update("published_version_id", existing.Id).Error
+			}); err != nil {
+				return err
+			}
+			continue
+		}
+		id, err := newMigrationID(sf)
+		if err != nil {
+			return err
+		}
+		publishedAt := model.CustomTime(model.Now())
+		version := model.ReportDefinitionVersion{
+			Basic:               model.Basic{Id: id, State: true},
+			ReportId:            report.Id,
+			VersionNo:           1,
+			ReportCode:          report.Code,
+			ReportName:          report.Name,
+			Description:         report.Description,
+			Category:            report.Category,
+			SourceType:          report.SourceType,
+			SourceCode:          report.SourceCode,
+			PermissionMenuId:    report.PermissionMenuId,
+			PermissionTableCode: report.PermissionTableCode,
+			QueryConfig:         report.QueryConfig,
+			LayoutConfig:        report.LayoutConfig,
+			Status:              reportMigrationStatusPublished,
+			PublishedAt:         publishedAt,
+			PublishedBy:         0,
+			PublishedName:       "migration",
+			ChangeLog:           "历史 published 报表初始版本回填",
+		}
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(&version).Error; err != nil {
+				return err
+			}
+			return tx.Model(&model.ReportDefinition{}).
+				Where("id = ? AND COALESCE(published_version_id, 0) = 0", report.Id).
+				Update("published_version_id", version.Id).Error
+		}); err != nil {
+			if strings.Contains(err.Error(), "uni_report_definition_version_no") {
+				log.Printf("skip duplicate report version backfill: report_id=%d code=%s", report.Id, report.Code)
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func selectReportVersionForBackfill(db *gorm.DB, reportId int) (model.ReportDefinitionVersion, bool, error) {
+	var version model.ReportDefinitionVersion
+	err := db.Where("report_id = ? AND status = ?", reportId, reportMigrationStatusPublished).
+		Order("version_no DESC").
+		First(&version).Error
+	if err == nil {
+		return version, true, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return model.ReportDefinitionVersion{}, false, err
+	}
+	err = db.Where("report_id = ?", reportId).
+		Order("version_no DESC").
+		First(&version).Error
+	if err == nil {
+		return version, true, nil
+	}
+	if err == gorm.ErrRecordNotFound {
+		return model.ReportDefinitionVersion{}, false, nil
+	}
+	return model.ReportDefinitionVersion{}, false, err
 }
 
 func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.Snowflake) (int, error) {
@@ -1317,6 +1477,7 @@ func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 	}
 	buttons := []model.SysMenuButton{
 		menuButtonWithAPI(702, menuID, "运行报表", "report_center_preview", enum.Line, "preview", "play_arrow", "primary", 1, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(703, menuID, "运行报表V1", "report_center_run", enum.Line, "run", "play_arrow", "primary", 2, "/admin/report/:id/run", "POST"),
 		apiPermissionWithAPI(704, menuID, "报表列表", "report_center_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(705, menuID, "报表详情", "report_center_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(706, menuID, "数据源列表", "report_center_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
@@ -1332,6 +1493,9 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		menuButtonWithAPI(723, menuID, "发布状态", "report_manage_status", enum.Line, "update", "published_with_changes", "primary", 3, "/admin/report/:id/status", "POST"),
 		menuButtonWithAPI(724, menuID, "删除", "report_manage_delete", enum.Line, "delete", "delete", "negative", 4, "/admin/report/:id", "DELETE"),
 		menuButtonWithAPI(725, menuID, "运行预览", "report_manage_preview", enum.Line, "preview", "play_arrow", "primary", 5, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(730, menuID, "发布", "report_manage_publish", enum.Line, "publish", "published_with_changes", "primary", 6, "/admin/report/:id/publish", "POST"),
+		menuButtonWithAPI(731, menuID, "运行", "report_manage_run", enum.Line, "run", "play_arrow", "primary", 7, "/admin/report/:id/run", "POST"),
+		apiPermissionWithAPI(732, menuID, "版本列表", "report_manage_versions", enum.Line, "versions", "history", "primary", 94, "/admin/report/:id/versions", "GET"),
 		apiPermissionWithAPI(726, menuID, "报表列表", "report_manage_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(728, menuID, "数据源列表", "report_manage_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
@@ -1344,11 +1508,14 @@ func seedReportDesignMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 	buttons := []model.SysMenuButton{
 		menuButtonWithAPI(707, menuID, "保存", "report_design_save", enum.Top, "save", "save", "primary", 1, "/admin/report/:id", "PUT"),
 		menuButtonWithAPI(708, menuID, "预览", "report_design_preview", enum.Top, "preview", "preview", "primary", 2, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(714, menuID, "设计时预览", "report_design_design_preview", enum.Top, "preview", "preview", "primary", 3, "/admin/report/:id/design-preview", "POST"),
+		menuButtonWithAPI(715, menuID, "发布", "report_design_publish", enum.Top, "publish", "published_with_changes", "primary", 4, "/admin/report/:id/publish", "POST"),
 		apiPermissionWithAPI(709, menuID, "报表详情", "report_design_detail", enum.Top, "detail", "visibility", "primary", 90, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(710, menuID, "新建报表", "report_design_create", enum.Top, "create", "add", "primary", 91, "/admin/report", "POST"),
 		apiPermissionWithAPI(711, menuID, "报表更新", "report_design_update", enum.Top, "update", "edit", "primary", 92, "/admin/report/:id", "PUT"),
 		apiPermissionWithAPI(712, menuID, "数据源列表", "report_design_data_source", enum.Top, "metadata", "dataset", "primary", 93, "/admin/report/data-sources", "GET"),
 		apiPermissionWithAPI(713, menuID, "SQL字段解析", "report_design_sql_fields", enum.Top, "metadata", "schema", "primary", 94, "/admin/report/sql-fields", "POST"),
+		apiPermissionWithAPI(716, menuID, "版本列表", "report_design_versions", enum.Top, "versions", "history", "primary", 95, "/admin/report/:id/versions", "GET"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -1744,6 +1911,10 @@ func seedSuperAdminRoutePolicies(db *gorm.DB, roleName string) error {
 		{"/admin/report/:id/status", "POST"},
 		{"/admin/report/:id", "DELETE"},
 		{"/admin/report/:id/preview", "POST"},
+		{"/admin/report/:id/design-preview", "POST"},
+		{"/admin/report/:id/publish", "POST"},
+		{"/admin/report/:id/run", "POST"},
+		{"/admin/report/:id/versions", "GET"},
 		{"/admin/report/sql-fields", "POST"},
 		{"/admin/file/upload", "POST"},
 		{"/admin/file/:id", "GET"},
@@ -1900,6 +2071,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "sys_user_data_scope_override", name: "用户数据权限覆盖"},
 		{code: "sys_user_dimension_value", name: "用户维度归属"},
 		{code: "report_definition", name: "报表定义"},
+		{code: "report_definition_version", name: "报表定义版本"},
 		{code: "report_execution_log", name: "报表执行日志"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
