@@ -49,25 +49,13 @@ func main() {
 		if err := migrateSchema(db); err != nil {
 			log.Fatal(err)
 		}
-		if err := backfillSysMenuPageBinding(db); err != nil {
-			log.Fatal(err)
-		}
 		log.Println("schema migration completed")
 	case "seed":
 		sf, err := initialize.InitSnowflake(cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := seedBaseData(db, cfg, sf); err != nil {
-			log.Fatal(err)
-		}
-		if err := seedSystemTableMetadata(db, sf); err != nil {
-			log.Fatal(err)
-		}
-		if err := seedSystemTableRelations(db, sf); err != nil {
-			log.Fatal(err)
-		}
-		if err := flushMigrationCaches(cfg); err != nil {
+		if err := seedAllData(db, cfg, sf); err != nil {
 			log.Fatal(err)
 		}
 		log.Println("base seed completed")
@@ -125,44 +113,16 @@ func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
 }
 
 func migrateSchema(db *gorm.DB) error {
-	err := db.AutoMigrate(
-		&model.SysConfigure{},
-		&model.SysTable{},
-		&model.SysTableField{},
-		&model.SysTableRelation{},
-		&model.SysTableIndex{},
-		&model.SysTableIndexField{},
-		&model.SysDict{},
-		&model.SysDictItem{},
-		&model.AccessLog{},
-		&model.LoginLog{},
-		&model.SysUser{},
-		&model.SysUserRole{},
-		&model.SysMenu{},
-		&model.SysMenuButton{},
-		&model.SysMenuButtonTemplate{},
-		&model.SysRole{},
-		&model.SysRoleMenu{},
-		&model.SysRoleMenuButton{},
-		&model.SysDataDimension{},
-		&model.SysDataScopeBinding{},
-		&model.SysRoleDataScope{},
-		&model.SysUserDataScopeOverride{},
-		&model.SysUserDimensionValue{},
-		&model.ReportDefinition{},
-		&model.ReportDefinitionVersion{},
-		&model.ReportExecutionLog{},
-		&model.Application{},
-		&model.SmsTemplate{},
-		&model.SmsLog{},
-		&model.File{},
-		&model.FileChunk{},
-		&model.CasbinRule{},
-	)
-	if err != nil {
-		return err
+	return runMigrationSteps(db, migrationSteps())
+}
+
+func ensureSysMenuOptionText(db *gorm.DB) error {
+	if db.Dialector.Name() != "postgres" {
+		return nil
 	}
-	return ensureDataPermissionIndexes(db)
+	table := db.NamingStrategy.TableName("SysMenu")
+	sql := fmt.Sprintf(`ALTER TABLE "%s" ALTER COLUMN "option" TYPE text`, table)
+	return db.Exec(sql).Error
 }
 
 func ensureDataPermissionIndexes(db *gorm.DB) error {
@@ -309,25 +269,7 @@ func newMigrationID(sf *utils.Snowflake) (int, error) {
 }
 
 func seedBaseData(db *gorm.DB, cfg *config.Server, sf *utils.Snowflake) error {
-	if err := seedConfigure(db); err != nil {
-		return err
-	}
-	if err := seedDicts(db, sf); err != nil {
-		return err
-	}
-	if err := seedApplication(db); err != nil {
-		return err
-	}
-	if err := seedAdminUser(db, cfg); err != nil {
-		return err
-	}
-	if err := seedMenusAndRole(db, sf); err != nil {
-		return err
-	}
-	if err := seedLowCodeMenuButtonTemplates(db, sf); err != nil {
-		return err
-	}
-	return repairSeededMenuButtonDefaults(db)
+	return runSeedSteps(db, cfg, sf, baseSeedSteps())
 }
 
 func repairSeededMenuButtonDefaults(db *gorm.DB) error {

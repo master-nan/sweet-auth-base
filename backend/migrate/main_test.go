@@ -71,6 +71,54 @@ func TestInsecureBootstrapAdminPassword(t *testing.T) {
 	}
 }
 
+func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
+	got := migrationStepNames(migrationSteps())
+	want := []string{
+		"auto_migrate_core_schema",
+		"ensure_sys_menu_option_text",
+		"ensure_data_permission_indexes",
+		"backfill_sys_menu_page_binding",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("migration steps = %#v, want %#v", got, want)
+	}
+}
+
+func TestPlatformSeedStepsRegistersMetadataAndPermissionBaselineOrder(t *testing.T) {
+	got := seedStepNames(platformSeedSteps())
+	want := []string{
+		"sys_configure",
+		"sys_dict",
+		"application",
+		"admin_user",
+		"sys_menu_role_button",
+		"lowcode_button_templates",
+		"menu_button_defaults_repair",
+		"sys_table_and_field_metadata",
+		"sys_table_relation_metadata",
+		"rebuildable_cache_flush",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("platform seed steps = %#v, want %#v", got, want)
+	}
+}
+
+func migrationStepNames(steps []migrationStep) []string {
+	names := make([]string, 0, len(steps))
+	for _, step := range steps {
+		names = append(names, step.name)
+	}
+	return names
+}
+
+func seedStepNames(steps []seedStep) []string {
+	names := make([]string, 0, len(steps))
+	for _, step := range steps {
+		names = append(names, step.name)
+	}
+	return names
+}
+
 func TestSeedDictsCreatesSystemEnumDictionaries(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(&model.SysDict{}, &model.SysDictItem{}); err != nil {
