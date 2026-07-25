@@ -8,11 +8,23 @@ package repository
 import (
 	"backend/dto/request"
 	"backend/model"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
+var (
+	ErrInvalidField       = errors.New("repository: invalid field")
+	ErrInvalidFieldValues = errors.New("repository: field values must be a slice or array")
+)
+
+// BasicRepository defines the shared persistence baseline for typed repositories.
+//
+// Implementations may compose database queries, perform CRUD operations and
+// paginate results. Business rules, permission decisions and service calls do
+// not belong in repositories. Methods return validation or database errors to
+// the service layer without translating them into API errors.
 type BasicRepository[T any] interface {
 	ExecuteTx(ctx *gin.Context, fn func(tx *gorm.DB) error) error
 	DBWithContext(*gin.Context) *gorm.DB

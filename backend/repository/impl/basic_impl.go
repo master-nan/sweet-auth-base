@@ -12,6 +12,7 @@ import (
 	"backend/repository/util"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
@@ -58,7 +59,7 @@ func (b *BasicRepositoryImpl[T]) DBWithContext(ctx *gin.Context) *gorm.DB {
 }
 
 func (b *BasicRepositoryImpl[T]) QueryWhere(filter string) *gorm.DB {
-	return b.db.Model(b.model).Where(filter)
+	return b.baseQuery().Model(b.model).Where(filter)
 }
 
 func (b *BasicRepositoryImpl[T]) Count(query *gorm.DB) (int64, error) {
@@ -71,13 +72,7 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 	if basic == nil {
 		basic = &request.Basic{}
 	}
-	var (
-		db = b.db
-	)
-	if b.ctx != nil {
-		db = db.WithContext(b.ctx)
-	}
-	query := util.ExecuteQuery(db, basic, table)
+	query := util.ExecuteQuery(b.baseQuery(), basic, table)
 	query = util.ApplyDataScope(query, basic.DataScope, table)
 	query = query.Model(b.model)
 	if basic.IncludeDeleted {
@@ -102,16 +97,7 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 	// 分页查询
 	go func() {
 		// 为数据查询创建独立的 query 对象
-		dataQuery := query.Session(&gorm.Session{})
-		if len(b.selects) > 0 {
-			dataQuery = dataQuery.Select(b.selects)
-		}
-		if len(b.omits) > 0 {
-			dataQuery = dataQuery.Omit(b.omits...)
-		}
-		for _, preload := range b.preloads {
-			dataQuery = dataQuery.Preload(preload)
-		}
+		dataQuery := b.applyReadOptions(query.Session(&gorm.Session{}))
 		if e := dataQuery.Find(result).Error; e != nil {
 			zap.L().Error("数据查询出错", zap.Error(e))
 			dataErrChan <- e
@@ -166,6 +152,9 @@ func (b *BasicRepositoryImpl[T]) DeleteById(tx *gorm.DB, id int) error {
 }
 
 func (b *BasicRepositoryImpl[T]) DeleteByField(tx *gorm.DB, field string, value interface{}) error {
+	if err := validateRepositoryField(field); err != nil {
+		return err
+	}
 	return tx.Where(fmt.Sprintf("%s = ?", field), value).Delete(b.model).Error
 }
 
@@ -174,137 +163,165 @@ func (b *BasicRepositoryImpl[T]) DeleteByIds(tx *gorm.DB, ids []int) error {
 }
 
 func (b *BasicRepositoryImpl[T]) DeleteByFieldIn(tx *gorm.DB, field string, values []interface{}) error {
+	if err := validateRepositoryField(field); err != nil {
+		return err
+	}
 	return tx.Where(fmt.Sprintf("%s in ?", field), values).Delete(b.model).Error
 }
 
 func (b *BasicRepositoryImpl[T]) FindById(id int) (T, error) {
 	var entity T
-	query := b.db
-	if b.ctx != nil {
-		query = query.WithContext(b.ctx)
-	}
-	if b.unscoped {
-		query = query.Unscoped()
-	}
-	for _, preload := range b.preloads {
-		query = query.Preload(preload)
-	}
+	query := b.applyReadOptions(b.baseQuery())
 	err := query.First(&entity, id).Error
 	return entity, err
 }
 
 func (b *BasicRepositoryImpl[T]) FindListById(id int) ([]T, error) {
 	var entity []T
-	query := b.db
-	if b.ctx != nil {
-		query = query.WithContext(b.ctx)
-	}
-	if b.unscoped {
-		query = query.Unscoped()
-	}
-	for _, preload := range b.preloads {
-		query = query.Preload(preload)
-	}
+	query := b.applyReadOptions(b.baseQuery())
 	err := query.Find(&entity, id).Error
 	return entity, err
 }
 
 func (b *BasicRepositoryImpl[T]) FindByField(field string, value interface{}) (T, error) {
 	var entity T
-	query := b.db
-	if b.ctx != nil {
-		query = query.WithContext(b.ctx)
+	if err := validateRepositoryField(field); err != nil {
+		return entity, err
 	}
-	if b.unscoped {
-		query = query.Unscoped()
-	}
-	for _, preload := range b.preloads {
-		query = query.Preload(preload)
-	}
+	query := b.applyReadOptions(b.baseQuery())
 	err := query.Where(fmt.Sprintf("%s = ?", field), value).First(&entity).Error
 	return entity, err
 }
 
 func (b *BasicRepositoryImpl[T]) FindListByField(field string, value interface{}) ([]T, error) {
 	var entity []T
-	query := b.db
-	if b.ctx != nil {
-		query = query.WithContext(b.ctx)
+	if err := validateRepositoryField(field); err != nil {
+		return nil, err
 	}
-	if b.unscoped {
-		query = query.Unscoped()
-	}
-	for _, preload := range b.preloads {
-		query = query.Preload(preload)
-	}
+	query := b.applyReadOptions(b.baseQuery())
 	err := query.Where(fmt.Sprintf("%s = ?", field), value).Find(&entity).Error
 	return entity, err
 }
 
 func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interface{}) ([]T, error) {
 	var entities []T
-	query := b.db
-	if b.ctx != nil {
-		query = query.WithContext(b.ctx)
+	if err := validateRepositoryField(field); err != nil {
+		return nil, err
 	}
 	// 检查是否为切片类型
 	val := reflect.ValueOf(values)
 	if val.Kind() != reflect.Slice && val.Kind() != reflect.Array {
-		return nil, fmt.Errorf("expected slice or array type, got: %T", values)
+		return nil, fmt.Errorf("%w: got %T", repository.ErrInvalidFieldValues, values)
 	}
 	// 转换为[]interface{}
 	valueSlice := make([]interface{}, val.Len())
 	for i := 0; i < val.Len(); i++ {
 		valueSlice[i] = val.Index(i).Interface()
 	}
-	if b.unscoped {
-		query = query.Unscoped()
-	}
-	for _, preload := range b.preloads {
-		query = query.Preload(preload)
-	}
+	query := b.applyReadOptions(b.baseQuery())
 	err := query.Model(b.model).Where(fmt.Sprintf("%s IN ?", field), valueSlice).Find(&entities).Error
 	return entities, err
 }
 
 func (b *BasicRepositoryImpl[T]) WithPreload(preloads ...string) repository.BasicRepository[T] {
-	newImpl := *b
+	newImpl := b.clone()
 	// 判断perloads是否为空，如果为空则直接返回
 	if len(preloads) == 0 {
-		return &newImpl
+		return newImpl
 	}
 	newImpl.preloads = append(newImpl.preloads, preloads...)
-	return &newImpl
+	return newImpl
 }
 
 func (b *BasicRepositoryImpl[T]) WithUnscoped() repository.BasicRepository[T] {
-	newImpl := *b
+	newImpl := b.clone()
 	newImpl.unscoped = true
-	return &newImpl
+	return newImpl
 }
 
 func (b *BasicRepositoryImpl[T]) WithSelect(selects ...string) repository.BasicRepository[T] {
-	newImpl := *b
+	newImpl := b.clone()
 	// 判断selects是否为空，如果为空则直接返回
 	if len(selects) == 0 {
-		return &newImpl
+		return newImpl
 	}
 	newImpl.selects = append(newImpl.selects, selects...)
-	return &newImpl
+	return newImpl
 }
 
 func (b *BasicRepositoryImpl[T]) WithOmit(omits ...string) repository.BasicRepository[T] {
-	newImpl := *b
+	newImpl := b.clone()
 	// 判断omits是否为空，如果为空则直接返回
 	if len(omits) == 0 {
-		return &newImpl
+		return newImpl
 	}
 	newImpl.omits = append(newImpl.omits, omits...)
-	return &newImpl
+	return newImpl
 }
 
 func (b *BasicRepositoryImpl[T]) WithContext(ctx *gin.Context) repository.BasicRepository[T] {
-	newImpl := *b
+	newImpl := b.clone()
 	newImpl.ctx = ctx
+	return newImpl
+}
+
+func (b *BasicRepositoryImpl[T]) baseQuery() *gorm.DB {
+	query := b.db
+	if b.ctx != nil {
+		query = query.WithContext(b.ctx)
+	}
+	if b.unscoped {
+		query = query.Unscoped()
+	}
+	return query
+}
+
+func (b *BasicRepositoryImpl[T]) applyReadOptions(query *gorm.DB) *gorm.DB {
+	if len(b.selects) > 0 {
+		query = query.Select(b.selects)
+	}
+	if len(b.omits) > 0 {
+		query = query.Omit(b.omits...)
+	}
+	for _, preload := range b.preloads {
+		query = query.Preload(preload)
+	}
+	return query
+}
+
+func (b *BasicRepositoryImpl[T]) clone() *BasicRepositoryImpl[T] {
+	newImpl := *b
+	newImpl.preloads = append([]string(nil), b.preloads...)
+	newImpl.selects = append([]string(nil), b.selects...)
+	newImpl.omits = append([]string(nil), b.omits...)
 	return &newImpl
+}
+
+func validateRepositoryField(field string) error {
+	field = strings.TrimSpace(field)
+	if field == "" {
+		return fmt.Errorf("%w: field is empty", repository.ErrInvalidField)
+	}
+	for _, part := range strings.Split(field, ".") {
+		if !isRepositoryIdentifier(part) {
+			return fmt.Errorf("%w: %q", repository.ErrInvalidField, field)
+		}
+	}
+	return nil
+}
+
+func isRepositoryIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for i, char := range value {
+		if char == '_' || char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' {
+			continue
+		}
+		if i > 0 && char >= '0' && char <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
