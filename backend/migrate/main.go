@@ -594,7 +594,7 @@ func seedSystemDict(db *gorm.DB, sf *utils.Snowflake, seed systemDictSeed) error
 	}
 	for _, item := range seed.items {
 		var existing model.SysDictItem
-		err := db.Where("item_code = ?", item.code).First(&existing).Error
+		err := db.Where("dict_id = ? AND item_code = ?", dict.Id, item.code).First(&existing).Error
 		if err == nil {
 			continue
 		}

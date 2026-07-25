@@ -1,15 +1,19 @@
 package main
 
 import (
+	"backend/config"
 	"backend/enum"
 	"backend/internal/cache"
 	"backend/internal/utils"
 	"backend/model"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 func TestBootstrapAdminPasswordDefaultsForLocalUse(t *testing.T) {
@@ -117,6 +121,168 @@ func seedStepNames(steps []seedStep) []string {
 		names = append(names, step.name)
 	}
 	return names
+}
+
+func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := autoMigrateCoreSchema(db); err != nil {
+		t.Fatalf("migrate core schema: %v", err)
+	}
+	cfg := &config.Server{}
+	cfg.Conf.Salt = "seed-idempotency-test-salt"
+	sf := newMigrationTestSnowflake(t)
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("APP_BOOTSTRAP_ADMIN_PASSWORD", "Seed-Idempotency-2026!")
+
+	if err := seedAllData(db, cfg, sf); err != nil {
+		t.Fatalf("seed platform data: %v", err)
+	}
+	firstCounts := platformSeedCountSnapshot(t, db)
+	firstKeys := platformSeedKeySnapshot(t, db)
+
+	if err := db.Model(&model.SysConfigure{}).
+		Where("id = ?", 1).
+		Updates(map[string]interface{}{
+			"system_name": "用户维护平台名称",
+			"system_logo": "custom-logo",
+		}).Error; err != nil {
+		t.Fatalf("customize sys configure: %v", err)
+	}
+	if err := db.Model(&model.SysDict{}).
+		Where("dict_code = ?", "whether").
+		Update("dict_name", "用户维护是否字典").Error; err != nil {
+		t.Fatalf("customize dict name: %v", err)
+	}
+	var whether model.SysDict
+	if err := db.Where("dict_code = ?", "whether").First(&whether).Error; err != nil {
+		t.Fatalf("query whether dict: %v", err)
+	}
+	if err := db.Model(&model.SysDictItem{}).
+		Where("dict_id = ? AND item_code = ?", whether.Id, "whether_yes").
+		Update("item_name", "用户维护是").Error; err != nil {
+		t.Fatalf("customize dict item name: %v", err)
+	}
+
+	if err := seedAllData(db, cfg, sf); err != nil {
+		t.Fatalf("seed platform data twice: %v", err)
+	}
+	secondCounts := platformSeedCountSnapshot(t, db)
+	secondKeys := platformSeedKeySnapshot(t, db)
+
+	if !reflect.DeepEqual(secondCounts, firstCounts) {
+		t.Fatalf("platform seed counts changed after second run: first=%#v second=%#v", firstCounts, secondCounts)
+	}
+	if !reflect.DeepEqual(secondKeys, firstKeys) {
+		t.Fatalf("platform seed stable keys changed after second run: first=%#v second=%#v", firstKeys, secondKeys)
+	}
+
+	assertNoDuplicateGroups(t, db, "sys_dict", []string{"dict_code"})
+	assertNoDuplicateGroups(t, db, "sys_dict_item", []string{"dict_id", "item_code"})
+	assertNoDuplicateGroups(t, db, "sys_dict_item", []string{"dict_id", "item_value"})
+	assertNoDuplicateGroups(t, db, "sys_table", []string{"table_code"})
+	assertNoDuplicateGroups(t, db, "sys_table_field", []string{"table_id", "field_code"})
+	assertNoDuplicateGroups(t, db, "sys_menu", []string{"name"})
+	assertNoDuplicateGroups(t, db, "sys_menu_button", []string{"menu_id", "code"})
+	assertNoDuplicateGroups(t, db, "sys_menu_button_template", []string{"scene", "code_suffix"})
+	assertNoDuplicateGroups(t, db, "sys_role_menu", []string{"role_id", "menu_id"})
+	assertNoDuplicateGroups(t, db, "sys_role_menu_button", []string{"role_id", "menu_id", "button_id"})
+	assertNoDuplicateGroups(t, db, "casbin_rule", []string{"ptype", "v0", "v1", "v2"})
+	assertSeedUserMaintainedFieldsPreserved(t, db, whether.Id)
+}
+
+func platformSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {
+	t.Helper()
+	return map[string]int64{
+		"sys_dict":                 countRows(t, db, &model.SysDict{}),
+		"sys_dict_item":            countRows(t, db, &model.SysDictItem{}),
+		"sys_table":                countRows(t, db, &model.SysTable{}),
+		"sys_table_field":          countRows(t, db, &model.SysTableField{}),
+		"sys_menu":                 countRows(t, db, &model.SysMenu{}),
+		"sys_menu_button":          countRows(t, db, &model.SysMenuButton{}),
+		"sys_menu_button_template": countRows(t, db, &model.SysMenuButtonTemplate{}),
+		"sys_role_menu":            countRows(t, db, &model.SysRoleMenu{}),
+		"sys_role_menu_button":     countRows(t, db, &model.SysRoleMenuButton{}),
+		"casbin_rule":              countRows(t, db, &model.CasbinRule{}),
+	}
+}
+
+func countRows(t *testing.T, db *gorm.DB, modelValue interface{}) int64 {
+	t.Helper()
+	var count int64
+	if err := db.Model(modelValue).Count(&count).Error; err != nil {
+		t.Fatalf("count %T: %v", modelValue, err)
+	}
+	return count
+}
+
+func platformSeedKeySnapshot(t *testing.T, db *gorm.DB) map[string]map[string]int64 {
+	t.Helper()
+	return map[string]map[string]int64{
+		"sys_dict":                 keyIDSnapshot(t, db, "SELECT dict_code AS seed_key, id FROM sys_dict"),
+		"sys_dict_item":            keyIDSnapshot(t, db, "SELECT CAST(dict_id AS TEXT) || ':' || item_code AS seed_key, id FROM sys_dict_item"),
+		"sys_table":                keyIDSnapshot(t, db, "SELECT table_code AS seed_key, id FROM sys_table"),
+		"sys_table_field":          keyIDSnapshot(t, db, "SELECT CAST(table_id AS TEXT) || ':' || field_code AS seed_key, id FROM sys_table_field"),
+		"sys_menu":                 keyIDSnapshot(t, db, "SELECT name AS seed_key, id FROM sys_menu"),
+		"sys_menu_button":          keyIDSnapshot(t, db, "SELECT CAST(menu_id AS TEXT) || ':' || code AS seed_key, id FROM sys_menu_button"),
+		"sys_menu_button_template": keyIDSnapshot(t, db, "SELECT scene || ':' || code_suffix AS seed_key, id FROM sys_menu_button_template"),
+	}
+}
+
+func keyIDSnapshot(t *testing.T, db *gorm.DB, query string) map[string]int64 {
+	t.Helper()
+	type row struct {
+		SeedKey string `gorm:"column:seed_key"`
+		ID      int64  `gorm:"column:id"`
+	}
+	var rows []row
+	if err := db.Raw(query).Scan(&rows).Error; err != nil {
+		t.Fatalf("query key snapshot: %v", err)
+	}
+	snapshot := make(map[string]int64, len(rows))
+	for _, item := range rows {
+		snapshot[item.SeedKey] = item.ID
+	}
+	return snapshot
+}
+
+func assertNoDuplicateGroups(t *testing.T, db *gorm.DB, table string, columns []string) {
+	t.Helper()
+	groupBy := strings.Join(columns, ", ")
+	query := fmt.Sprintf("SELECT COUNT(*) FROM (SELECT 1 FROM %s GROUP BY %s HAVING COUNT(*) > 1) duplicate_groups", table, groupBy)
+	var count int64
+	if err := db.Raw(query).Scan(&count).Error; err != nil {
+		t.Fatalf("query duplicate groups for %s(%s): %v", table, groupBy, err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no duplicate groups for %s(%s), got %d", table, groupBy, count)
+	}
+}
+
+func assertSeedUserMaintainedFieldsPreserved(t *testing.T, db *gorm.DB, whetherDictID int) {
+	t.Helper()
+	var sysConfig model.SysConfigure
+	if err := db.First(&sysConfig, 1).Error; err != nil {
+		t.Fatalf("query sys configure: %v", err)
+	}
+	if sysConfig.SystemName != "用户维护平台名称" || sysConfig.SystemLogo != "custom-logo" {
+		t.Fatalf("seed overwrote user maintained sys_configure fields: system_name=%q system_logo=%q", sysConfig.SystemName, sysConfig.SystemLogo)
+	}
+
+	var dict model.SysDict
+	if err := db.Where("dict_code = ?", "whether").First(&dict).Error; err != nil {
+		t.Fatalf("query customized dict: %v", err)
+	}
+	if dict.DictName != "用户维护是否字典" {
+		t.Fatalf("seed overwrote user maintained dict name: %q", dict.DictName)
+	}
+
+	var item model.SysDictItem
+	if err := db.Where("dict_id = ? AND item_code = ?", whetherDictID, "whether_yes").First(&item).Error; err != nil {
+		t.Fatalf("query customized dict item: %v", err)
+	}
+	if item.ItemName != "用户维护是" {
+		t.Fatalf("seed overwrote user maintained dict item name: %q", item.ItemName)
+	}
 }
 
 func TestSeedDictsCreatesSystemEnumDictionaries(t *testing.T) {
@@ -466,7 +632,9 @@ func newMigrationTestSnowflake(t *testing.T) *utils.Snowflake {
 
 func migrateTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true},
+	})
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
