@@ -8,10 +8,10 @@ package middleware
 import (
 	"backend/dto/response"
 	error2 "backend/internal/errors"
-	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 func ResponseHandler() gin.HandlerFunc {
@@ -19,23 +19,25 @@ func ResponseHandler() gin.HandlerFunc {
 		zap.L().Info("ResponseHandler start")
 		c.Next()
 		if len(c.Errors) > 0 {
-			for _, e := range c.Errors {
-				var err *response.AdminError
-				switch {
-				case errors.As(e.Err, &err):
-					// 处理自定义API错误
-					err.Success = false
-					c.JSON(err.StatusCode, err)
-				default:
-					// 处理未知错误
-					c.JSON(error2.ErrInternalServer.(*response.AdminError).StatusCode, error2.NewBadRequestError(e.Err.Error()))
-				}
-				return
+			requestErr := c.Errors[0].Err
+			clientErr, classified := error2.ToClientError(requestErr)
+			category := error2.CategoryOf(requestErr)
+			if !classified ||
+				category == response.ErrorCategoryDatabase ||
+				category == response.ErrorCategorySystem {
+				zap.L().Error(
+					"request failed",
+					zap.Error(requestErr),
+					zap.String("method", c.Request.Method),
+					zap.String("path", c.Request.URL.Path),
+					zap.String("error_category", string(category)),
+				)
 			}
-		} else {
-			if resp, exists := c.Get("response"); exists {
-				c.JSON(http.StatusOK, resp)
-			}
+			c.JSON(clientErr.StatusCode, clientErr)
+			return
+		}
+		if resp, exists := c.Get("response"); exists {
+			c.JSON(http.StatusOK, resp)
 		}
 		zap.L().Info("ResponseHandler end")
 	}

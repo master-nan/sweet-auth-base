@@ -250,9 +250,9 @@ func ContainsToken(existingTokens string, newToken string) bool {
 func ValidatorBody[T any](ctx *gin.Context, data *T, translator ut.Translator) error {
 	err := ctx.ShouldBindBodyWith(data, binding.JSON)
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// 客户端请求体为空
-			return myerrors.ErrParamInvalid
+			return myerrors.WrapParameterError(err, "参数错误")
 		}
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
@@ -262,9 +262,9 @@ func ValidatorBody[T any](ctx *gin.Context, data *T, translator ut.Translator) e
 				errMsg := e.Translate(translator)
 				errorMessages = append(errorMessages, errMsg)
 			}
-			return myerrors.NewBadRequestError(strings.Join(errorMessages, ","))
+			return myerrors.WrapParameterError(err, strings.Join(errorMessages, ","))
 		}
-		return err
+		return myerrors.WrapParameterError(err, "参数错误")
 	}
 	SanitizeData(data)
 	return nil
@@ -273,9 +273,9 @@ func ValidatorBody[T any](ctx *gin.Context, data *T, translator ut.Translator) e
 func ValidatorQuery[T any](ctx *gin.Context, data *T, translator ut.Translator) error {
 	err := ctx.ShouldBindQuery(data)
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// 客户端请求体为空
-			return myerrors.ErrParamInvalid
+			return myerrors.WrapParameterError(err, "参数错误")
 		}
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
@@ -286,9 +286,9 @@ func ValidatorQuery[T any](ctx *gin.Context, data *T, translator ut.Translator) 
 				errorMessages = append(errorMessages, errMsg)
 			}
 
-			return myerrors.NewBadRequestError(strings.Join(errorMessages, ","))
+			return myerrors.WrapParameterError(err, strings.Join(errorMessages, ","))
 		}
-		return err
+		return myerrors.WrapParameterError(err, "参数错误")
 	}
 	SanitizeData(data)
 	return nil

@@ -7,20 +7,182 @@ package errors
 
 import (
 	"backend/dto/response"
+	"encoding/json"
+	stderrors "errors"
+	"io"
 	"net/http"
+	"strconv"
+)
+
+const (
+	ErrorCodeGeneric      = 10000
+	ErrorCodeParamInvalid = 20003
 )
 
 func NewError(statusCode, code int, message string) error {
+	return newAdminError(inferErrorCategory(statusCode, code), statusCode, code, message, nil)
+}
+
+func NewClassifiedError(category response.ErrorCategory, statusCode, code int, message string) error {
+	return newAdminError(category, statusCode, code, message, nil)
+}
+
+func WrapError(cause error, category response.ErrorCategory, statusCode, code int, message string) error {
+	return newAdminError(category, statusCode, code, message, cause)
+}
+
+func NewParameterError(message string) error {
+	return NewClassifiedError(
+		response.ErrorCategoryParameter,
+		http.StatusBadRequest,
+		ErrorCodeParamInvalid,
+		message,
+	)
+}
+
+func WrapParameterError(cause error, message string) error {
+	return WrapError(
+		cause,
+		response.ErrorCategoryParameter,
+		http.StatusBadRequest,
+		ErrorCodeParamInvalid,
+		message,
+	)
+}
+
+func NewPermissionError(statusCode, code int, message string) error {
+	return NewClassifiedError(response.ErrorCategoryPermission, statusCode, code, message)
+}
+
+func NewBusinessError(statusCode, code int, message string) error {
+	return NewClassifiedError(response.ErrorCategoryBusiness, statusCode, code, message)
+}
+
+func WrapBusinessError(cause error, statusCode, code int, message string) error {
+	return WrapError(cause, response.ErrorCategoryBusiness, statusCode, code, message)
+}
+
+func WrapDatabaseError(cause error) error {
+	return WrapError(
+		cause,
+		response.ErrorCategoryDatabase,
+		http.StatusInternalServerError,
+		ErrorCodeGeneric,
+		"系统异常",
+	)
+}
+
+func WrapSystemError(cause error) error {
+	return WrapError(
+		cause,
+		response.ErrorCategorySystem,
+		http.StatusInternalServerError,
+		ErrorCodeGeneric,
+		"系统异常",
+	)
+}
+
+func CategoryOf(err error) response.ErrorCategory {
+	var adminErr *response.AdminError
+	if stderrors.As(err, &adminErr) {
+		if adminErr.Category != "" {
+			return adminErr.Category
+		}
+		return inferErrorCategory(adminErr.StatusCode, adminErr.ErrorCode)
+	}
+	if isRawParameterError(err) {
+		return response.ErrorCategoryParameter
+	}
+	return response.ErrorCategorySystem
+}
+
+// ToClientError converts any error to the stable AdminError response contract.
+// The boolean reports whether the error was explicitly classified or recognized.
+func ToClientError(err error) (*response.AdminError, bool) {
+	if err == nil {
+		return nil, false
+	}
+
+	var adminErr *response.AdminError
+	if stderrors.As(err, &adminErr) {
+		clientErr := adminErr.ForClient()
+		if clientErr.Category == "" {
+			clientErr.Category = inferErrorCategory(clientErr.StatusCode, clientErr.ErrorCode)
+		}
+		return clientErr, true
+	}
+	if isRawParameterError(err) {
+		parameterErr := NewParameterError("参数错误")
+		if stderrors.As(parameterErr, &adminErr) {
+			return adminErr.ForClient(), true
+		}
+	}
+
+	internalErr := ErrInternalServer
+	if stderrors.As(internalErr, &adminErr) {
+		return adminErr.ForClient(), false
+	}
+	return &response.AdminError{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorCode:    ErrorCodeGeneric,
+		ErrorMessage: "系统异常",
+		Success:      false,
+		Category:     response.ErrorCategorySystem,
+	}, false
+}
+
+func newAdminError(
+	category response.ErrorCategory,
+	statusCode int,
+	code int,
+	message string,
+	cause error,
+) *response.AdminError {
 	return &response.AdminError{
 		StatusCode:   statusCode,
 		ErrorCode:    code,
 		ErrorMessage: message,
 		Success:      false,
+		Category:     category,
+		Cause:        cause,
 	}
 }
 
 func NewBadRequestError(msg string) error {
-	return NewError(http.StatusBadRequest, 10000, msg)
+	return NewBusinessError(http.StatusBadRequest, ErrorCodeGeneric, msg)
+}
+
+func inferErrorCategory(statusCode, code int) response.ErrorCategory {
+	switch {
+	case code == ErrorCodeParamInvalid:
+		return response.ErrorCategoryParameter
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		return response.ErrorCategoryPermission
+	case statusCode >= http.StatusInternalServerError:
+		return response.ErrorCategorySystem
+	default:
+		return response.ErrorCategoryBusiness
+	}
+}
+
+func isRawParameterError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if stderrors.Is(err, io.EOF) {
+		return true
+	}
+
+	var syntaxErr *json.SyntaxError
+	if stderrors.As(err, &syntaxErr) {
+		return true
+	}
+	var typeErr *json.UnmarshalTypeError
+	if stderrors.As(err, &typeErr) {
+		return true
+	}
+	var numberErr *strconv.NumError
+	return stderrors.As(err, &numberErr)
 }
 
 var (
@@ -52,7 +214,7 @@ var (
 	ErrAppUnauthorized = NewError(http.StatusUnauthorized, 40002, "应用未授权")
 	ErrAppExpired      = NewError(http.StatusUnauthorized, 40003, "应用已过期")
 	ErrAppTokenInvalid = NewError(http.StatusUnauthorized, 40004, "应用token无效")
-	ErrAppNameExist    = NewError(http.StatusUnauthorized, 40005, "应用名称已存在")
+	ErrAppNameExist    = NewBusinessError(http.StatusUnauthorized, 40005, "应用名称已存在")
 
 	ErrClientNotFound      = NewError(http.StatusBadRequest, 50001, "客户端不存在")
 	ErrSmsTemplateNotFound = NewError(http.StatusBadRequest, 50002, "短信模板不存在")

@@ -3,20 +3,57 @@ package response
 import (
 	"bytes"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+type ErrorCategory string
+
+const (
+	ErrorCategoryParameter  ErrorCategory = "parameter"
+	ErrorCategoryPermission ErrorCategory = "permission"
+	ErrorCategoryBusiness   ErrorCategory = "business"
+	ErrorCategoryDatabase   ErrorCategory = "database"
+	ErrorCategorySystem     ErrorCategory = "system"
 )
 
 // AdminError 失败返回值参数
 type AdminError struct {
-	StatusCode   int    `json:"status_code"`
-	ErrorCode    int    `json:"error_code"`
-	ErrorMessage string `json:"error_message"`
-	Success      bool   `json:"success"`
+	StatusCode   int           `json:"status_code"`
+	ErrorCode    int           `json:"error_code"`
+	ErrorMessage string        `json:"error_message"`
+	Success      bool          `json:"success"`
+	Category     ErrorCategory `json:"-"`
+	Cause        error         `json:"-"`
 }
 
 func (e *AdminError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
 	return fmt.Sprintf("ErrorCode: %d, ErrorMessage: %s", e.ErrorCode, e.ErrorMessage)
+}
+
+func (e *AdminError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+// ForClient returns a detached response without the internal error cause.
+func (e *AdminError) ForClient() *AdminError {
+	if e == nil {
+		return nil
+	}
+	return &AdminError{
+		StatusCode:   e.StatusCode,
+		ErrorCode:    e.ErrorCode,
+		ErrorMessage: e.ErrorMessage,
+		Success:      false,
+		Category:     e.Category,
+	}
 }
 
 type BufferedResponseWriter struct {
