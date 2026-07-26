@@ -122,7 +122,10 @@ func platformSeedSteps() []seedStep {
 	steps := append([]seedStep{}, baseSeedSteps()...)
 	steps = append(steps,
 		seedStep{name: "sys_table_and_field_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
-			return seedSystemTableMetadata(db, sf)
+			if err := seedSystemTableMetadata(db, sf); err != nil {
+				return err
+			}
+			return seedOrganizationFoundation(db, sf)
 		}},
 		seedStep{name: "sys_table_relation_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedSystemTableRelations(db, sf)
