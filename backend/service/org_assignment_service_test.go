@@ -208,31 +208,35 @@ func TestOrgServiceAssignmentHistoricalReferenceReplayAndWhitelist(t *testing.T)
 	unitOptions, err := orgService.QueryOrgUnitOptions(
 		nil,
 		request.OrgUnitOptionsReq{
-			Page:        1,
-			Num:         10,
-			Keyword:     "no-active-match",
-			SelectedIds: []int{unit.Id},
+			OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+				Page:        1,
+				Num:         10,
+				Keyword:     "no-active-match",
+				SelectedIds: []int{unit.Id},
+			},
 		},
 		orgEmployeePositionServiceTable("org_unit"),
 	)
-	if err != nil || len(unitOptions.Data) != 1 ||
-		unitOptions.Data[0].Value != unit.Id ||
-		!unitOptions.Data[0].Disabled {
+	if err != nil || len(unitOptions.Items) != 1 ||
+		unitOptions.Items[0].Value != unit.Id ||
+		!unitOptions.Items[0].Disabled {
 		t.Fatalf("historical org unit option replay=%+v err=%v", unitOptions, err)
 	}
 	positionOptions, err := orgService.QueryPositionOptions(
 		nil,
 		request.OrgPositionOptionsReq{
-			Page:        1,
-			Num:         10,
-			Keyword:     "no-active-match",
-			SelectedIds: []int{position.Id},
+			OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+				Page:        1,
+				Num:         10,
+				Keyword:     "no-active-match",
+				SelectedIds: []int{position.Id},
+			},
 		},
 		orgEmployeePositionServiceTable("org_position"),
 	)
-	if err != nil || len(positionOptions.Data) != 1 ||
-		positionOptions.Data[0].Value != position.Id ||
-		!positionOptions.Data[0].Disabled {
+	if err != nil || len(positionOptions.Items) != 1 ||
+		positionOptions.Items[0].Value != position.Id ||
+		!positionOptions.Items[0].Disabled {
 		t.Fatalf("historical position option replay=%+v err=%v", positionOptions, err)
 	}
 

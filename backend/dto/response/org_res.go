@@ -66,6 +66,14 @@ type OrgSelectorOptionRes struct {
 	Disabled bool   `json:"disabled"`
 }
 
+// OrgSelectorOptionsRes is the shared Service response for the four business
+// selectors. Controllers map Items to the platform Response.data field and
+// Total to Response.total without introducing a second API envelope.
+type OrgSelectorOptionsRes struct {
+	Items []OrgSelectorOptionRes `json:"items"`
+	Total int                    `json:"total"`
+}
+
 type OrgUnitListRes struct {
 	OrgBaseRes
 	Code                 string     `json:"code"`

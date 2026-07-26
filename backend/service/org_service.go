@@ -137,12 +137,12 @@ func (s *OrgService) QueryLegalEntityOptions(
 	ctx *gin.Context,
 	req request.OrgLegalEntityOptionsReq,
 	table model.SysTable,
-) (response.ListResult[response.OrgSelectorOptionRes], error) {
-	var result response.ListResult[response.OrgSelectorOptionRes]
+) (response.OrgSelectorOptionsRes, error) {
+	var result response.OrgSelectorOptionsRes
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	scope, err := normalizeLegalEntityReadScope(req.OrgLegalEntityReadScopeReq)
+	scope, err := normalizeLegalEntityReadScope(req.OrgReadScopeReq)
 	if err != nil {
 		return result, err
 	}
@@ -159,7 +159,7 @@ func (s *OrgService) QueryLegalEntityOptions(
 				Keyword: strings.TrimSpace(req.Keyword),
 			},
 		},
-		OrgLegalEntityReadScopeReq: req.OrgLegalEntityReadScopeReq,
+		OrgLegalEntityReadScopeReq: req.OrgReadScopeReq,
 	}
 	table.TableCode = "org_legal_entity"
 	rows, err := s.legalEntityRepo.Query(ctx, &queryReq, table, scope)
@@ -168,11 +168,11 @@ func (s *OrgService) QueryLegalEntityOptions(
 	}
 
 	result.Total = rows.Total
-	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	result.Items = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
 	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
 	for _, entity := range rows.Data {
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgLegalEntityOptionRes(entity, !isLegalEntityEffective(entity, scope.AsOf)),
 		)
 		seen[entity.Id] = struct{}{}
@@ -194,8 +194,8 @@ func (s *OrgService) QueryLegalEntityOptions(
 		if !exists {
 			continue
 		}
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgLegalEntityOptionRes(entity, !isLegalEntityEffective(entity, scope.AsOf)),
 		)
 		seen[id] = struct{}{}
@@ -405,8 +405,8 @@ func (s *OrgService) QueryOrgUnitOptions(
 	ctx *gin.Context,
 	req request.OrgUnitOptionsReq,
 	table model.SysTable,
-) (response.ListResult[response.OrgSelectorOptionRes], error) {
-	var result response.ListResult[response.OrgSelectorOptionRes]
+) (response.OrgSelectorOptionsRes, error) {
+	var result response.OrgSelectorOptionsRes
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
@@ -449,11 +449,11 @@ func (s *OrgService) QueryOrgUnitOptions(
 		return result, myerrors.WrapDatabaseError(err)
 	}
 	result.Total = rows.Total
-	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	result.Items = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
 	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
 	for _, unit := range rows.Data {
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgUnitOptionRes(unit, !isOrgUnitEffective(unit, scope.AsOf)),
 		)
 		seen[unit.Id] = struct{}{}
@@ -475,8 +475,8 @@ func (s *OrgService) QueryOrgUnitOptions(
 		if !exists {
 			continue
 		}
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgUnitOptionRes(unit, !isOrgUnitEffective(unit, scope.AsOf)),
 		)
 		seen[id] = struct{}{}
@@ -553,8 +553,8 @@ func (s *OrgService) QueryEmployeeOptions(
 	ctx *gin.Context,
 	req request.OrgEmployeeOptionsReq,
 	table model.SysTable,
-) (response.ListResult[response.OrgSelectorOptionRes], error) {
-	var result response.ListResult[response.OrgSelectorOptionRes]
+) (response.OrgSelectorOptionsRes, error) {
+	var result response.OrgSelectorOptionsRes
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
@@ -585,11 +585,11 @@ func (s *OrgService) QueryEmployeeOptions(
 	}
 
 	result.Total = rows.Total
-	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	result.Items = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
 	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
 	for _, employee := range rows.Data {
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgEmployeeOptionRes(employee, !isOrgEmployeeEffective(employee, scope.AsOf)),
 		)
 		seen[employee.Id] = struct{}{}
@@ -611,8 +611,8 @@ func (s *OrgService) QueryEmployeeOptions(
 		if !exists {
 			continue
 		}
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgEmployeeOptionRes(employee, !isOrgEmployeeEffective(employee, scope.AsOf)),
 		)
 		seen[id] = struct{}{}
@@ -821,8 +821,8 @@ func (s *OrgService) QueryPositionOptions(
 	ctx *gin.Context,
 	req request.OrgPositionOptionsReq,
 	table model.SysTable,
-) (response.ListResult[response.OrgSelectorOptionRes], error) {
-	var result response.ListResult[response.OrgSelectorOptionRes]
+) (response.OrgSelectorOptionsRes, error) {
+	var result response.OrgSelectorOptionsRes
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
@@ -852,11 +852,11 @@ func (s *OrgService) QueryPositionOptions(
 	}
 
 	result.Total = rows.Total
-	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	result.Items = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
 	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
 	for _, position := range rows.Data {
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgPositionOptionRes(position, !isOrgPositionEffective(position, scope.AsOf)),
 		)
 		seen[position.Id] = struct{}{}
@@ -878,8 +878,8 @@ func (s *OrgService) QueryPositionOptions(
 		if !exists {
 			continue
 		}
-		result.Data = append(
-			result.Data,
+		result.Items = append(
+			result.Items,
 			response.NewOrgPositionOptionRes(position, !isOrgPositionEffective(position, scope.AsOf)),
 		)
 		seen[id] = struct{}{}

@@ -9,6 +9,17 @@ type OrgReadScopeReq struct {
 	AsOfDate        string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
 
+// OrgSelectorOptionsReq is the shared request protocol for Organization
+// selector option APIs. SelectedIds are replay-only identifiers: inactive
+// records may be returned for display but remain disabled for new selection.
+type OrgSelectorOptionsReq struct {
+	OrgReadScopeReq
+	Page        int    `form:"page" json:"page"`
+	Num         int    `form:"num" json:"num"`
+	Keyword     string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	SelectedIds []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+}
+
 // OrgLegalEntityReadScopeReq is retained as the legal-entity API name for
 // compatibility with E02-S02-T001.
 type OrgLegalEntityReadScopeReq = OrgReadScopeReq
@@ -41,11 +52,7 @@ type OrgLegalEntityTreeReq struct {
 // already-persisted IDs. SelectedIds never changes the option value contract:
 // values are always internal legal_entity_id values.
 type OrgLegalEntityOptionsReq struct {
-	OrgLegalEntityReadScopeReq
-	Page        int    `form:"page" json:"page"`
-	Num         int    `form:"num" json:"num"`
-	Keyword     string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
-	SelectedIds []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+	OrgSelectorOptionsReq
 }
 
 // OrgUnitQueryReq defines the repository-safe query fields for management
@@ -68,13 +75,9 @@ type OrgUnitDetailReq struct {
 // OrgUnitOptionsReq supports remote search and replay of persisted org_unit_id
 // values. StructureId restricts candidates through org_structure_node.
 type OrgUnitOptionsReq struct {
-	OrgReadScopeReq
-	Page          int    `form:"page" json:"page"`
-	Num           int    `form:"num" json:"num"`
-	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
-	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
-	StructureId   *int   `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
-	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+	OrgSelectorOptionsReq
+	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	StructureId   *int `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
 }
 
 // OrgStructureQueryReq defines the repository-safe query fields for management
@@ -151,14 +154,10 @@ type OrgEmployeeDetailReq struct {
 // OrgEmployeeOptionsReq supports remote search and replay of persisted
 // employee_id values. Values never use user_id, names, or contact details.
 type OrgEmployeeOptionsReq struct {
-	OrgReadScopeReq
-	Page          int    `form:"page" json:"page"`
-	Num           int    `form:"num" json:"num"`
-	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
-	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
-	OrgUnitId     *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
-	PositionId    *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
-	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+	OrgSelectorOptionsReq
+	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId     *int `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
+	PositionId    *int `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
 }
 
 // OrgEmployeeBindUserReq binds one explicitly selected Sweet Platform account
@@ -194,13 +193,9 @@ type OrgPositionDetailReq struct {
 // OrgPositionOptionsReq supports remote search and replay of persisted
 // position_id values.
 type OrgPositionOptionsReq struct {
-	OrgReadScopeReq
-	Page          int    `form:"page" json:"page"`
-	Num           int    `form:"num" json:"num"`
-	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
-	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
-	OrgUnitId     *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
-	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+	OrgSelectorOptionsReq
+	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId     *int `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
 }
 
 const (

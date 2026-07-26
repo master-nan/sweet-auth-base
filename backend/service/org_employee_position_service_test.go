@@ -74,15 +74,17 @@ func TestOrgServiceEmployeeQueryKeepsAssignmentFiltersOnOneRow(t *testing.T) {
 	}
 
 	options, err := orgService.QueryEmployeeOptions(nil, request.OrgEmployeeOptionsReq{
-		Page:          1,
-		Num:           10,
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+			Page: 1,
+			Num:  10,
+		},
 		LegalEntityId: &legalA.Id,
 		OrgUnitId:     &unitA.Id,
 		PositionId:    &positionA.Id,
 	}, orgEmployeePositionServiceTable("org_employee"))
 	if err != nil || options.Total != 1 ||
-		len(options.Data) != 1 ||
-		options.Data[0].Value != employeeA.Id {
+		len(options.Items) != 1 ||
+		options.Items[0].Value != employeeA.Id {
 		t.Fatalf("assignment-filtered employee options=%+v err=%v", options, err)
 	}
 }
@@ -192,18 +194,20 @@ func TestOrgServiceEmployeeScopeBindingDetailAndOptions(t *testing.T) {
 	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgEmployeeNotFound)
 
 	options, err := orgService.QueryEmployeeOptions(nil, request.OrgEmployeeOptionsReq{
-		Page:        1,
-		Num:         10,
-		Keyword:     "EMP-A",
-		SelectedIds: []int{resigned.Id, expired.Id},
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+			Page:        1,
+			Num:         10,
+			Keyword:     "EMP-A",
+			SelectedIds: []int{resigned.Id, expired.Id},
+		},
 	}, table)
-	if err != nil || options.Total != 1 || len(options.Data) != 3 {
+	if err != nil || options.Total != 1 || len(options.Items) != 3 {
 		t.Fatalf("employee options=%+v err=%v", options, err)
 	}
-	if options.Data[0].Value != bound.Id || options.Data[0].Label != "EMP-A - 王一" {
-		t.Fatalf("employee option value/label invalid: %+v", options.Data[0])
+	if options.Items[0].Value != bound.Id || options.Items[0].Label != "EMP-A - 王一" {
+		t.Fatalf("employee option value/label invalid: %+v", options.Items[0])
 	}
-	for _, item := range options.Data[1:] {
+	for _, item := range options.Items[1:] {
 		if !item.Disabled {
 			t.Fatalf("historical employee replay must be disabled: %+v", item)
 		}
@@ -213,7 +217,7 @@ func TestOrgServiceEmployeeScopeBindingDetailAndOptions(t *testing.T) {
 		tooMany[index] = index + 1
 	}
 	_, err = orgService.QueryEmployeeOptions(nil, request.OrgEmployeeOptionsReq{
-		SelectedIds: tooMany,
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: tooMany},
 	}, table)
 	assertOrgServiceAdminError(t, err, response.ErrorCategoryParameter, apperrors.ErrorCodeParamInvalid)
 }
@@ -340,21 +344,23 @@ func TestOrgServicePositionQueryDetailAndOptions(t *testing.T) {
 	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgPositionNotFound)
 
 	options, err := orgService.QueryPositionOptions(nil, request.OrgPositionOptionsReq{
-		Page:          1,
-		Num:           10,
-		Keyword:       "POS-A",
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+			Page:        1,
+			Num:         10,
+			Keyword:     "POS-A",
+			SelectedIds: []int{positionB.Id, expired.Id},
+		},
 		LegalEntityId: &legalA.Id,
 		OrgUnitId:     &unitA.Id,
-		SelectedIds:   []int{positionB.Id, expired.Id},
 	}, table)
-	if err != nil || options.Total != 1 || len(options.Data) != 3 {
+	if err != nil || options.Total != 1 || len(options.Items) != 3 {
 		t.Fatalf("position options=%+v err=%v", options, err)
 	}
-	if options.Data[0].Value != positionA.Id ||
-		options.Data[0].Label != positionA.Code+" - "+positionA.Name {
-		t.Fatalf("position option value/label invalid: %+v", options.Data[0])
+	if options.Items[0].Value != positionA.Id ||
+		options.Items[0].Label != positionA.Code+" - "+positionA.Name {
+		t.Fatalf("position option value/label invalid: %+v", options.Items[0])
 	}
-	for _, item := range options.Data[1:] {
+	for _, item := range options.Items[1:] {
 		if !item.Disabled {
 			t.Fatalf("historical position replay must be disabled: %+v", item)
 		}

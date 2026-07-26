@@ -293,25 +293,27 @@ func TestOrgServiceLegalEntityOptionsUseInternalIDsAndReplayHistoricalSelection(
 	testutil.MustCreate(t, db, &[]model.OrgLegalEntity{enabled, other, disabled})
 
 	result, err := service.QueryLegalEntityOptions(nil, request.OrgLegalEntityOptionsReq{
-		Page:        1,
-		Num:         10,
-		Keyword:     "Alpha",
-		SelectedIds: []int{disabled.Id},
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+			Page:        1,
+			Num:         10,
+			Keyword:     "Alpha",
+			SelectedIds: []int{disabled.Id},
+		},
 	}, orgServiceLegalEntityTable())
 	if err != nil {
 		t.Fatalf("query legal entity options: %v", err)
 	}
-	if result.Total != 1 || len(result.Data) != 2 {
+	if result.Total != 1 || len(result.Items) != 2 {
 		t.Fatalf("unexpected legal entity options: %+v", result)
 	}
-	if result.Data[0].Value != enabled.Id || result.Data[0].Disabled {
-		t.Fatalf("enabled option is invalid: %+v", result.Data[0])
+	if result.Items[0].Value != enabled.Id || result.Items[0].Disabled {
+		t.Fatalf("enabled option is invalid: %+v", result.Items[0])
 	}
-	if result.Data[1].Value != disabled.Id || !result.Data[1].Disabled {
-		t.Fatalf("historical option replay is invalid: %+v", result.Data[1])
+	if result.Items[1].Value != disabled.Id || !result.Items[1].Disabled {
+		t.Fatalf("historical option replay is invalid: %+v", result.Items[1])
 	}
-	if result.Data[1].Value == 0 || result.Data[1].Label != "LE-003 - Legacy Legal" {
-		t.Fatalf("option value/label contract is invalid: %+v", result.Data[1])
+	if result.Items[1].Value == 0 || result.Items[1].Label != "LE-003 - Legacy Legal" {
+		t.Fatalf("option value/label contract is invalid: %+v", result.Items[1])
 	}
 }
 

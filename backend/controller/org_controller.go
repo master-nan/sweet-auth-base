@@ -169,7 +169,7 @@ func (o *OrgController) QueryLegalEntityOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(result.Data).SetTotal(result.Total)
+	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
 // QueryStructures godoc
@@ -371,7 +371,7 @@ func (o *OrgController) QueryOrgUnitOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(result.Data).SetTotal(result.Total)
+	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
 // GetStructureOrgTree godoc
@@ -498,7 +498,7 @@ func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(result.Data).SetTotal(result.Total)
+	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
 // BindEmployeeUser godoc
@@ -676,7 +676,7 @@ func (o *OrgController) QueryPositionOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(result.Data).SetTotal(result.Total)
+	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
 // QueryAssignments godoc

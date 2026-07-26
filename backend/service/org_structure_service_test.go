@@ -198,23 +198,25 @@ func TestOrgServiceOrgUnitQueriesAndOptionsUseBusinessIDs(t *testing.T) {
 	assertOrganizationResponseDoesNotLeakSourceFields(t, detail)
 
 	options, err := orgService.QueryOrgUnitOptions(nil, request.OrgUnitOptionsReq{
-		Page:          1,
-		Num:           10,
-		Keyword:       "中心",
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
+			Page:        1,
+			Num:         10,
+			Keyword:     "中心",
+			SelectedIds: []int{disabled.Id},
+		},
 		StructureId:   &structure.Id,
 		LegalEntityId: &legal.Id,
-		SelectedIds:   []int{disabled.Id},
 	}, managementUnitTable())
 	if err != nil {
 		t.Fatalf("query org unit options: %v", err)
 	}
-	if options.Total != 1 || len(options.Data) != 2 ||
-		options.Data[0].Value != current.Id ||
-		options.Data[1].Value != disabled.Id ||
-		!options.Data[1].Disabled {
+	if options.Total != 1 || len(options.Items) != 2 ||
+		options.Items[0].Value != current.Id ||
+		options.Items[1].Value != disabled.Id ||
+		!options.Items[1].Disabled {
 		t.Fatalf("unexpected org unit options: %+v", options)
 	}
-	for _, option := range options.Data {
+	for _, option := range options.Items {
 		if option.Value == 0 || option.Value == structure.Id {
 			t.Fatalf("option value is not an org_unit_id: %+v", option)
 		}

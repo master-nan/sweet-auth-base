@@ -9,6 +9,33 @@ import (
 	"gorm.io/datatypes"
 )
 
+func TestOrgSelectorOptionsResponseProtocol(t *testing.T) {
+	result := OrgSelectorOptionsRes{
+		Items: []OrgSelectorOptionRes{{
+			Value:    101,
+			Label:    "LE-101 - 法人一零一",
+			Code:     "LE-101",
+			Name:     "法人一零一",
+			Disabled: true,
+		}},
+		Total: 7,
+	}
+	object := marshalJSONObject(t, result)
+	if got := int(object["total"].(float64)); got != result.Total {
+		t.Fatalf("selector total=%d, want %d", got, result.Total)
+	}
+	items, ok := object["items"].([]interface{})
+	if !ok || len(items) != 1 {
+		t.Fatalf("selector items=%T(%v), want one item", object["items"], object["items"])
+	}
+	item := items[0].(map[string]interface{})
+	if int(item["value"].(float64)) != 101 ||
+		item["label"] != "LE-101 - 法人一零一" ||
+		item["disabled"] != true {
+		t.Fatalf("unexpected selector item protocol: %+v", item)
+	}
+}
+
 func TestOrgEmployeeResponseUsesSafeWhitelistAndMaskedContactFields(t *testing.T) {
 	userID := 77
 	employee := model.OrgEmployee{

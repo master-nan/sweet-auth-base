@@ -364,6 +364,7 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		method string
 		action string
 	}{
+		{path: "/admin/org/legal-entity/options", method: "POST", action: "query"},
 		{path: "/admin/org/structure/query", method: "POST", action: "query"},
 		{path: "/admin/org/structure/options", method: "POST", action: "query"},
 		{path: "/admin/org/structure/:id", method: "GET", action: "detail"},
@@ -371,6 +372,8 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		{path: "/admin/org/unit/options", method: "POST", action: "query"},
 		{path: "/admin/org/unit/tree", method: "POST", action: "query"},
 		{path: "/admin/org/unit/:id", method: "GET", action: "detail"},
+		{path: "/admin/org/employee/options", method: "POST", action: "query"},
+		{path: "/admin/org/position/options", method: "POST", action: "query"},
 		{path: "/admin/org/assignment/query", method: "POST", action: "query"},
 		{path: "/admin/org/assignment/:id", method: "GET", action: "detail"},
 		{path: "/admin/org/employee/:id/assignments/summary", method: "GET", action: "query"},

@@ -3,11 +3,60 @@ package request_test
 import (
 	"backend/dto/request"
 	"backend/internal/utils"
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
 )
+
+func TestOrganizationSelectorOptionsRequestsShareJSONProtocol(t *testing.T) {
+	payload := []byte(`{
+		"page": 2,
+		"num": 25,
+		"keyword": "中心",
+		"selected_ids": [11, 12],
+		"only_effective": false,
+		"include_history": true
+	}`)
+	assertProtocol := func(
+		name string,
+		target interface{},
+		common func() request.OrgSelectorOptionsReq,
+	) {
+		t.Helper()
+		if err := json.Unmarshal(payload, target); err != nil {
+			t.Fatalf("%s unmarshal shared selector protocol: %v", name, err)
+		}
+		value := common()
+		if value.Page != 2 ||
+			value.Num != 25 ||
+			value.Keyword != "中心" ||
+			len(value.SelectedIds) != 2 ||
+			value.OnlyEffective == nil ||
+			*value.OnlyEffective ||
+			!value.IncludeHistory {
+			t.Fatalf("%s shared selector request=%+v", name, value)
+		}
+	}
+
+	legal := request.OrgLegalEntityOptionsReq{}
+	assertProtocol("legal_entity", &legal, func() request.OrgSelectorOptionsReq {
+		return legal.OrgSelectorOptionsReq
+	})
+	unit := request.OrgUnitOptionsReq{}
+	assertProtocol("org_unit", &unit, func() request.OrgSelectorOptionsReq {
+		return unit.OrgSelectorOptionsReq
+	})
+	employee := request.OrgEmployeeOptionsReq{}
+	assertProtocol("employee", &employee, func() request.OrgSelectorOptionsReq {
+		return employee.OrgSelectorOptionsReq
+	})
+	position := request.OrgPositionOptionsReq{}
+	assertProtocol("position", &position, func() request.OrgSelectorOptionsReq {
+		return position.OrgSelectorOptionsReq
+	})
+}
 
 func TestOrganizationQueryDTOValidation(t *testing.T) {
 	validate := validator.New()
@@ -27,10 +76,14 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgEmployeeQueryReq{BoundStatus: "linked"}); err == nil {
 		t.Fatal("expected invalid bound_status to fail")
 	}
-	if err := validate.Struct(request.OrgEmployeeOptionsReq{SelectedIds: []int{1, 2}}); err != nil {
+	if err := validate.Struct(request.OrgEmployeeOptionsReq{
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: []int{1, 2}},
+	}); err != nil {
 		t.Fatalf("expected positive employee selected_ids: %v", err)
 	}
-	if err := validate.Struct(request.OrgPositionOptionsReq{SelectedIds: []int{0}}); err == nil {
+	if err := validate.Struct(request.OrgPositionOptionsReq{
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: []int{0}},
+	}); err == nil {
 		t.Fatal("expected non-positive position selected_ids to fail")
 	}
 	zero := 0
@@ -67,10 +120,14 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	}); err == nil {
 		t.Fatal("expected invalid as_of_date to fail")
 	}
-	if err := validate.Struct(request.OrgLegalEntityOptionsReq{SelectedIds: []int{1, 2}}); err != nil {
+	if err := validate.Struct(request.OrgLegalEntityOptionsReq{
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: []int{1, 2}},
+	}); err != nil {
 		t.Fatalf("expected positive selected_ids to pass: %v", err)
 	}
-	if err := validate.Struct(request.OrgLegalEntityOptionsReq{SelectedIds: []int{0}}); err == nil {
+	if err := validate.Struct(request.OrgLegalEntityOptionsReq{
+		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: []int{0}},
+	}); err == nil {
 		t.Fatal("expected non-positive selected_ids to fail")
 	}
 	if err := validate.Struct(request.OrgStructureOrgTreeReq{StructureId: 1}); err != nil {
