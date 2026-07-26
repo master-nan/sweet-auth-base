@@ -14,6 +14,8 @@ const (
 	ErrorCodeOrgTreeTooLarge         = 110009
 	ErrorCodeOrgEmployeeNotFound     = 110010
 	ErrorCodeOrgPositionNotFound     = 110011
+	ErrorCodeOrgAssignmentNotFound   = 110012
+	ErrorCodeOrgAssignmentTooLarge   = 110013
 )
 
 var (
@@ -71,5 +73,15 @@ var (
 		http.StatusNotFound,
 		ErrorCodeOrgPositionNotFound,
 		"岗位不存在",
+	)
+	ErrOrgAssignmentNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgAssignmentNotFound,
+		"任职记录不存在",
+	)
+	ErrOrgAssignmentResultTooLarge = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeOrgAssignmentTooLarge,
+		"当前任职数量超过单次摘要上限",
 	)
 )

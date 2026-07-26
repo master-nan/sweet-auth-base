@@ -77,6 +77,52 @@ func TestOrgEmployeeResponseUsesSafeWhitelistAndMaskedContactFields(t *testing.T
 	}
 }
 
+func TestOrgAssignmentResponseUsesSafeWhitelistAndReferenceSummaries(t *testing.T) {
+	positionID := 30
+	assignment := model.OrgAssignment{
+		Basic:            model.Basic{Id: 40, State: true},
+		SourceSystemCode: "authority",
+		SourceId:         "assignment-source-40",
+		EmployeeId:       10,
+		LegalEntityId:    20,
+		OrgUnitId:        25,
+		PositionId:       &positionID,
+		AssignmentType:   "part_time",
+		IsPrimary:        false,
+		IsManager:        true,
+		Status:           "enabled",
+		SourceVersion:    "source-version-secret",
+		SourceDeleted:    true,
+		SyncStatus:       "failed",
+	}
+	result := NewOrgAssignmentListRes(assignment, "history")
+	legal := NewOrgReferenceSummaryRes(20, "LE-20", "法人二十")
+	unit := NewOrgReferenceSummaryRes(25, "OU-25", "组织二十五")
+	position := NewOrgReferenceSummaryRes(30, "POS-30", "岗位三十")
+	result.SetReferences(&legal, &unit, &position)
+
+	object := marshalJSONObject(t, result)
+	assertJSONKeysAbsent(
+		t,
+		object,
+		"source_system_code",
+		"source_id",
+		"source_version",
+		"source_deleted",
+		"sync_status",
+	)
+	if got := int(object["employee_id"].(float64)); got != assignment.EmployeeId {
+		t.Fatalf("employee_id=%d, want %d", got, assignment.EmployeeId)
+	}
+	if object["time_scope"] != "history" {
+		t.Fatalf("time_scope=%v", object["time_scope"])
+	}
+	if object["org_unit"].(map[string]interface{})["name"] != unit.Name ||
+		object["position"].(map[string]interface{})["name"] != position.Name {
+		t.Fatalf("assignment reference summaries=%+v", object)
+	}
+}
+
 func TestOrgStructureNodeResponseOmitsInternalMaterializedPath(t *testing.T) {
 	node := model.OrgStructureNode{
 		Basic:            model.Basic{Id: 12, State: true},

@@ -241,6 +241,7 @@ func newOrgControllerTestRouter(
 		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
+		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
 	)
 	controller := &OrgController{
 		orgService: orgService,
@@ -251,6 +252,7 @@ func newOrgControllerTestRouter(
 				orgUnitTableCode:        orgControllerManagementTable(orgUnitTableCode),
 				orgEmployeeTableCode:    orgControllerManagementTable(orgEmployeeTableCode),
 				orgPositionTableCode:    orgControllerManagementTable(orgPositionTableCode),
+				orgAssignmentTableCode:  orgControllerManagementTable(orgAssignmentTableCode),
 			},
 		},
 	}
@@ -282,6 +284,9 @@ func newOrgControllerTestRouter(
 		{orgLegalEntityReaderRole, "/admin/org/position/query", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/position/options", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/position/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/assignment/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/assignment/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/employee/:id/assignments/summary", http.MethodGet},
 	} {
 		if _, err = enforcer.AddPolicy(policy[0], policy[1], policy[2]); err != nil {
 			t.Fatalf("add Casbin policy %v: %v", policy, err)
@@ -317,6 +322,9 @@ func newOrgControllerTestRouter(
 	router.POST("/admin/org/position/query", controller.QueryPositions)
 	router.POST("/admin/org/position/options", controller.QueryPositionOptions)
 	router.GET("/admin/org/position/:id", controller.GetPositionDetail)
+	router.POST("/admin/org/assignment/query", controller.QueryAssignments)
+	router.GET("/admin/org/assignment/:id", controller.GetAssignmentDetail)
+	router.GET("/admin/org/employee/:id/assignments/summary", controller.GetEmployeeCurrentAssignmentSummary)
 	return router, db, enforcer
 }
 
@@ -412,6 +420,20 @@ func orgControllerManagementTable(tableCode string) model.SysTable {
 			field("position_type", enum.VarcharFieldType, false),
 			field("is_manager_position", enum.BooleanFieldType, false),
 		)
+	case orgAssignmentTableCode:
+		fields = []model.SysTableField{
+			field("id", enum.BigIntFieldType, false),
+			field("employee_id", enum.BigIntFieldType, false),
+			field("legal_entity_id", enum.BigIntFieldType, false),
+			field("org_unit_id", enum.BigIntFieldType, false),
+			field("position_id", enum.BigIntFieldType, false),
+			field("assignment_type", enum.VarcharFieldType, false),
+			field("is_primary", enum.BooleanFieldType, false),
+			field("is_manager", enum.BooleanFieldType, false),
+			field("status", enum.VarcharFieldType, false),
+			field("valid_from", enum.DatetimeFieldType, false),
+			field("valid_to", enum.DatetimeFieldType, false),
+		}
 	}
 	return model.SysTable{
 		Basic:       model.Basic{Id: 1, State: true},

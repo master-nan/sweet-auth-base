@@ -19,6 +19,7 @@ const (
 	orgUnitTableCode        = "org_unit"
 	orgEmployeeTableCode    = "org_employee"
 	orgPositionTableCode    = "org_position"
+	orgAssignmentTableCode  = "org_assignment"
 )
 
 type orgTableProvider interface {
@@ -598,6 +599,108 @@ func (o *OrgController) QueryPositionOptions(ctx *gin.Context) {
 		return
 	}
 	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// QueryAssignments godoc
+// @Summary 企业人员任职列表
+// @Description 按员工和时间范围查询只读任职镜像
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgAssignmentQueryReq true "查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/assignment/query [post]
+func (o *OrgController) QueryAssignments(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgAssignmentQueryReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := utils.ValidatePagination(data.Page, data.Num); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgAssignmentTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryAssignments(ctx, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// GetAssignmentDetail godoc
+// @Summary 企业人员任职详情
+// @Description 按内部 assignment_id 查询只读任职详情
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "任职ID"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/assignment/{id} [get]
+func (o *OrgController) GetAssignmentDetail(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "assignment_id必须为正整数"))
+		return
+	}
+	var data request.OrgAssignmentDetailReq
+	if err = utils.ValidatorQuery(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.GetAssignmentDetail(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+// GetEmployeeCurrentAssignmentSummary godoc
+// @Summary 企业人员当前任职归属摘要
+// @Description 返回员工全部当前有效任职对应的法人、组织和岗位集合
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "企业人员ID"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/{id}/assignments/summary [get]
+func (o *OrgController) GetEmployeeCurrentAssignmentSummary(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "employee_id必须为正整数"))
+		return
+	}
+	var data request.OrgEmployeeCurrentAssignmentSummaryReq
+	if err = utils.ValidatorQuery(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgAssignmentTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.GetEmployeeCurrentAssignmentSummary(ctx, id, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
 }
 
 func (o *OrgController) legalEntityTable() (model.SysTable, error) {

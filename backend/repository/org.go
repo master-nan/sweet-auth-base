@@ -27,6 +27,13 @@ type OrgReadScope struct {
 	IncludeHistory  bool
 }
 
+// OrgAssignmentReadScope is decided by OrgService. Repositories translate the
+// selected temporal view into SQL without choosing a primary assignment.
+type OrgAssignmentReadScope struct {
+	AsOf      time.Time
+	TimeScope string
+}
+
 // OrgBoundUserSummary is the repository projection used by Organization
 // services. It deliberately contains no authentication or authorization data.
 type OrgBoundUserSummary struct {
@@ -108,6 +115,8 @@ type OrgEmployeeRepository interface {
 type OrgAssignmentRepository interface {
 	BasicRepository[model.OrgAssignment]
 	Query(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable) (response.ListResult[model.OrgAssignment], error)
+	QueryForRead(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable, OrgAssignmentReadScope) (response.ListResult[model.OrgAssignment], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgAssignment, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgAssignment, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 }

@@ -336,6 +336,7 @@ func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
 		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
+		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
 	), db
 }
 

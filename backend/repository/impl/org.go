@@ -730,19 +730,59 @@ func (r *OrgAssignmentRepositoryImpl) Query(ctx *gin.Context, req *request.OrgAs
 		ctx,
 		req.Basic,
 		map[string]any{
-			"source_system_code": optionalString(req.SourceSystemCode),
-			"employee_id":        optionalInt(req.EmployeeId),
-			"legal_entity_id":    optionalInt(req.LegalEntityId),
-			"org_unit_id":        optionalInt(req.OrgUnitId),
-			"position_id":        optionalInt(req.PositionId),
-			"assignment_type":    optionalString(req.AssignmentType),
-			"is_primary":         optionalBool(req.IsPrimary),
-			"is_manager":         optionalBool(req.IsManager),
-			"status":             optionalString(req.Status),
+			"employee_id":     optionalInt(req.EmployeeId),
+			"legal_entity_id": optionalInt(req.LegalEntityId),
+			"org_unit_id":     optionalInt(req.OrgUnitId),
+			"position_id":     optionalInt(req.PositionId),
+			"assignment_type": optionalString(req.AssignmentType),
+			"is_primary":      optionalBool(req.IsPrimary),
+			"is_manager":      optionalBool(req.IsManager),
+			"status":          optionalString(req.Status),
 		},
 		organizationQueryTable(table, "org_assignment"),
 		orgAssignmentListColumns(),
 	)
+}
+
+func (r *OrgAssignmentRepositoryImpl) QueryForRead(
+	ctx *gin.Context,
+	req *request.OrgAssignmentQueryReq,
+	table model.SysTable,
+	scope repository.OrgAssignmentReadScope,
+) (response.ListResult[model.OrgAssignment], error) {
+	if req == nil {
+		req = &request.OrgAssignmentQueryReq{}
+	}
+	basic := cloneOrganizationBasic(req.Basic)
+	basic.IncludeDeleted = false
+	query := organizationDB(r.db, ctx).Model(&model.OrgAssignment{})
+	query = applyOrganizationTypedFilters(query, map[string]any{
+		"org_assignment.employee_id":     optionalInt(req.EmployeeId),
+		"org_assignment.legal_entity_id": optionalInt(req.LegalEntityId),
+		"org_assignment.org_unit_id":     optionalInt(req.OrgUnitId),
+		"org_assignment.position_id":     optionalInt(req.PositionId),
+		"org_assignment.assignment_type": optionalString(req.AssignmentType),
+		"org_assignment.is_primary":      optionalBool(req.IsPrimary),
+		"org_assignment.is_manager":      optionalBool(req.IsManager),
+		"org_assignment.status":          optionalString(req.Status),
+	})
+	query = applyAssignmentReadScope(query, scope)
+	query, basic = applyAssignmentReadOrder(query, basic, scope.TimeScope)
+
+	return paginateOrganizationReadQuery[model.OrgAssignment](
+		query,
+		&basic,
+		organizationQueryTable(table, "org_assignment"),
+		orgAssignmentReadColumns(),
+	)
+}
+
+func (r *OrgAssignmentRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgAssignment, error) {
+	var assignment model.OrgAssignment
+	err := organizationDB(r.db, ctx).
+		Select(orgAssignmentReadColumns()).
+		First(&assignment, id).Error
+	return assignment, err
 }
 
 func (r *OrgAssignmentRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgAssignment, error) {
@@ -915,6 +955,65 @@ func applyEmployeeReadScope(
 		Where(tableName+".source_deleted = ?", false).
 		Where("("+tableName+".valid_from IS NULL OR "+tableName+".valid_from <= ?)", asOf).
 		Where("("+tableName+".valid_to IS NULL OR "+tableName+".valid_to >= ?)", asOf)
+}
+
+func applyAssignmentReadScope(
+	query *gorm.DB,
+	scope repository.OrgAssignmentReadScope,
+) *gorm.DB {
+	asOf := scope.AsOf
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	switch scope.TimeScope {
+	case request.OrgAssignmentScopeHistory:
+		return query.Where(
+			"(org_assignment.status <> ? OR org_assignment.source_deleted = ? OR "+
+				"(org_assignment.valid_to IS NOT NULL AND org_assignment.valid_to < ?))",
+			"enabled",
+			true,
+			asOf,
+		)
+	case request.OrgAssignmentScopeFuture:
+		return query.
+			Where("org_assignment.status = ?", "enabled").
+			Where("org_assignment.source_deleted = ?", false).
+			Where("org_assignment.valid_from IS NOT NULL AND org_assignment.valid_from > ?", asOf)
+	case request.OrgAssignmentScopeTimeline:
+		return query
+	default:
+		return query.
+			Where("org_assignment.status = ?", "enabled").
+			Where("org_assignment.source_deleted = ?", false).
+			Where("(org_assignment.valid_from IS NULL OR org_assignment.valid_from <= ?)", asOf).
+			Where("(org_assignment.valid_to IS NULL OR org_assignment.valid_to >= ?)", asOf)
+	}
+}
+
+func applyAssignmentReadOrder(
+	query *gorm.DB,
+	basic request.Basic,
+	timeScope string,
+) (*gorm.DB, request.Basic) {
+	if basic.Order.Field != "" && timeScope != request.OrgAssignmentScopeTimeline {
+		return query, basic
+	}
+	basic.Order = request.Order{}
+	switch timeScope {
+	case request.OrgAssignmentScopeFuture:
+		query = query.Order(
+			"CASE WHEN org_assignment.valid_from IS NULL THEN 1 ELSE 0 END ASC",
+		).Order("org_assignment.valid_from ASC").Order("org_assignment.id ASC")
+	case request.OrgAssignmentScopeHistory:
+		query = query.Order(
+			"CASE WHEN org_assignment.valid_to IS NULL THEN 1 ELSE 0 END ASC",
+		).Order("org_assignment.valid_to DESC").Order("org_assignment.id DESC")
+	default:
+		query = query.Order(
+			"CASE WHEN org_assignment.valid_from IS NULL THEN 1 ELSE 0 END ASC",
+		).Order("org_assignment.valid_from DESC").Order("org_assignment.id DESC")
+	}
+	return query, basic
 }
 
 func legalEntityScopedBasic(
@@ -1298,6 +1397,10 @@ func orgAssignmentListColumns() []string {
 		"org_unit_id", "position_id", "assignment_type", "is_primary", "is_manager",
 		"valid_from", "valid_to", "status",
 	}
+}
+
+func orgAssignmentReadColumns() []string {
+	return append(orgAssignmentListColumns(), "source_deleted")
 }
 
 func orgSyncBatchListColumns() []string {

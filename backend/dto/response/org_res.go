@@ -200,20 +200,35 @@ type OrgEmployeeDetailRes struct {
 
 type OrgAssignmentListRes struct {
 	OrgBaseRes
-	EmployeeId     int        `json:"employee_id"`
-	LegalEntityId  int        `json:"legal_entity_id"`
-	OrgUnitId      int        `json:"org_unit_id"`
-	PositionId     *int       `json:"position_id"`
-	AssignmentType string     `json:"assignment_type"`
-	IsPrimary      bool       `json:"is_primary"`
-	IsManager      bool       `json:"is_manager"`
-	ValidFrom      *time.Time `json:"valid_from"`
-	ValidTo        *time.Time `json:"valid_to"`
-	Status         string     `json:"status"`
+	EmployeeId     int                     `json:"employee_id"`
+	LegalEntityId  int                     `json:"legal_entity_id"`
+	OrgUnitId      int                     `json:"org_unit_id"`
+	PositionId     *int                    `json:"position_id"`
+	AssignmentType string                  `json:"assignment_type"`
+	IsPrimary      bool                    `json:"is_primary"`
+	IsManager      bool                    `json:"is_manager"`
+	ValidFrom      *time.Time              `json:"valid_from"`
+	ValidTo        *time.Time              `json:"valid_to"`
+	Status         string                  `json:"status"`
+	TimeScope      string                  `json:"time_scope"`
+	LegalEntity    *OrgReferenceSummaryRes `json:"legal_entity,omitempty"`
+	OrgUnit        *OrgReferenceSummaryRes `json:"org_unit,omitempty"`
+	Position       *OrgReferenceSummaryRes `json:"position,omitempty"`
 }
 
 type OrgAssignmentDetailRes struct {
 	OrgAssignmentListRes
+}
+
+// OrgEmployeeCurrentAssignmentSummaryRes aggregates every current assignment.
+// The collections deliberately have no primary/default item.
+type OrgEmployeeCurrentAssignmentSummaryRes struct {
+	EmployeeId      int                      `json:"employee_id"`
+	AsOfDate        string                   `json:"as_of_date"`
+	AssignmentCount int                      `json:"assignment_count"`
+	LegalEntities   []OrgReferenceSummaryRes `json:"legal_entities"`
+	OrgUnits        []OrgReferenceSummaryRes `json:"org_units"`
+	Positions       []OrgReferenceSummaryRes `json:"positions"`
 }
 
 type OrgSyncBatchListRes struct {
@@ -504,7 +519,7 @@ func (r *OrgEmployeeListRes) SetBoundAccount(account OrgBoundUserSummaryRes) {
 	r.BoundAccount = &account
 }
 
-func NewOrgAssignmentListRes(assignment model.OrgAssignment) OrgAssignmentListRes {
+func NewOrgAssignmentListRes(assignment model.OrgAssignment, timeScope string) OrgAssignmentListRes {
 	return OrgAssignmentListRes{
 		OrgBaseRes:     newOrgBaseRes(assignment.Basic),
 		EmployeeId:     assignment.EmployeeId,
@@ -517,11 +532,45 @@ func NewOrgAssignmentListRes(assignment model.OrgAssignment) OrgAssignmentListRe
 		ValidFrom:      assignment.ValidFrom,
 		ValidTo:        assignment.ValidTo,
 		Status:         assignment.Status,
+		TimeScope:      timeScope,
 	}
 }
 
-func NewOrgAssignmentDetailRes(assignment model.OrgAssignment) OrgAssignmentDetailRes {
-	return OrgAssignmentDetailRes{OrgAssignmentListRes: NewOrgAssignmentListRes(assignment)}
+func NewOrgAssignmentDetailRes(assignment model.OrgAssignment, timeScope string) OrgAssignmentDetailRes {
+	return OrgAssignmentDetailRes{
+		OrgAssignmentListRes: NewOrgAssignmentListRes(assignment, timeScope),
+	}
+}
+
+func (r *OrgAssignmentListRes) SetReferences(
+	legalEntity *OrgReferenceSummaryRes,
+	orgUnit *OrgReferenceSummaryRes,
+	position *OrgReferenceSummaryRes,
+) {
+	if r == nil {
+		return
+	}
+	r.LegalEntity = legalEntity
+	r.OrgUnit = orgUnit
+	r.Position = position
+}
+
+func NewOrgEmployeeCurrentAssignmentSummaryRes(
+	employeeId int,
+	asOfDate string,
+	assignmentCount int,
+	legalEntities []OrgReferenceSummaryRes,
+	orgUnits []OrgReferenceSummaryRes,
+	positions []OrgReferenceSummaryRes,
+) OrgEmployeeCurrentAssignmentSummaryRes {
+	return OrgEmployeeCurrentAssignmentSummaryRes{
+		EmployeeId:      employeeId,
+		AsOfDate:        asOfDate,
+		AssignmentCount: assignmentCount,
+		LegalEntities:   legalEntities,
+		OrgUnits:        orgUnits,
+		Positions:       positions,
+	}
 }
 
 func NewOrgSyncBatchListRes(batch model.OrgSyncBatch) OrgSyncBatchListRes {

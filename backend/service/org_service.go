@@ -20,6 +20,7 @@ import (
 const (
 	orgAsOfDateLayout            = time.DateOnly
 	orgStructureTreeMaxNodeCount = 5000
+	orgAssignmentSummaryMaxCount = 5000
 	orgEmployeeBound             = "bound"
 	orgEmployeeUnbound           = "unbound"
 )
@@ -33,6 +34,7 @@ type OrgService struct {
 	structureNodeRepo repository.OrgStructureNodeRepository
 	employeeRepo      repository.OrgEmployeeRepository
 	positionRepo      repository.OrgPositionRepository
+	assignmentRepo    repository.OrgAssignmentRepository
 }
 
 func NewOrgService(
@@ -42,6 +44,7 @@ func NewOrgService(
 	structureNodeRepo repository.OrgStructureNodeRepository,
 	employeeRepo repository.OrgEmployeeRepository,
 	positionRepo repository.OrgPositionRepository,
+	assignmentRepo repository.OrgAssignmentRepository,
 ) *OrgService {
 	return &OrgService{
 		legalEntityRepo:   legalEntityRepo,
@@ -50,6 +53,7 @@ func NewOrgService(
 		structureNodeRepo: structureNodeRepo,
 		employeeRepo:      employeeRepo,
 		positionRepo:      positionRepo,
+		assignmentRepo:    assignmentRepo,
 	}
 }
 
@@ -759,6 +763,143 @@ func (s *OrgService) QueryPositionOptions(
 	return result, nil
 }
 
+func (s *OrgService) QueryAssignments(
+	ctx *gin.Context,
+	req request.OrgAssignmentQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgAssignmentListRes], error) {
+	var result response.ListResult[response.OrgAssignmentListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	if req.EmployeeId == nil || *req.EmployeeId <= 0 {
+		return result, myerrors.NewParameterError("employee_id必须大于0")
+	}
+	if err := s.ensureEmployeeExists(ctx, *req.EmployeeId); err != nil {
+		return result, err
+	}
+	scope, err := normalizeAssignmentReadScope(req.TimeScope, req.AsOfDate)
+	if err != nil {
+		return result, err
+	}
+	req.TimeScope = scope.TimeScope
+	table.TableCode = "org_assignment"
+	rows, err := s.assignmentRepo.QueryForRead(ctx, &req, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+
+	result.Total = rows.Total
+	result.Data = make([]response.OrgAssignmentListRes, 0, len(rows.Data))
+	for _, assignment := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgAssignmentListRes(
+				assignment,
+				classifyAssignmentTimeScope(assignment, scope.AsOf),
+			),
+		)
+	}
+	if err = s.attachAssignmentReferences(ctx, result.Data); err != nil {
+		return response.ListResult[response.OrgAssignmentListRes]{}, err
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetAssignmentDetail(
+	ctx *gin.Context,
+	assignmentId int,
+	_ request.OrgAssignmentDetailReq,
+) (response.OrgAssignmentDetailRes, error) {
+	if assignmentId <= 0 {
+		return response.OrgAssignmentDetailRes{}, myerrors.NewParameterError(
+			"assignment_id必须大于0",
+		)
+	}
+	assignment, err := s.assignmentRepo.FindByIdForRead(ctx, assignmentId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgAssignmentDetailRes{}, myerrors.ErrOrgAssignmentNotFound
+		}
+		return response.OrgAssignmentDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	asOf := model.Now()
+	list := []response.OrgAssignmentListRes{
+		response.NewOrgAssignmentListRes(
+			assignment,
+			classifyAssignmentTimeScope(assignment, asOf),
+		),
+	}
+	if err = s.attachAssignmentReferences(ctx, list); err != nil {
+		return response.OrgAssignmentDetailRes{}, err
+	}
+	return response.OrgAssignmentDetailRes{OrgAssignmentListRes: list[0]}, nil
+}
+
+func (s *OrgService) GetEmployeeCurrentAssignmentSummary(
+	ctx *gin.Context,
+	employeeId int,
+	req request.OrgEmployeeCurrentAssignmentSummaryReq,
+	table model.SysTable,
+) (response.OrgEmployeeCurrentAssignmentSummaryRes, error) {
+	if employeeId <= 0 {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{},
+			myerrors.NewParameterError("employee_id必须大于0")
+	}
+	if err := s.ensureEmployeeExists(ctx, employeeId); err != nil {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{}, err
+	}
+	scope, err := normalizeAssignmentReadScope(
+		request.OrgAssignmentScopeCurrent,
+		req.AsOfDate,
+	)
+	if err != nil {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{}, err
+	}
+	queryReq := request.OrgAssignmentQueryReq{
+		Basic: request.Basic{
+			Page: 1,
+			Num:  orgAssignmentSummaryMaxCount,
+		},
+		EmployeeId: &employeeId,
+		TimeScope:  request.OrgAssignmentScopeCurrent,
+		AsOfDate:   req.AsOfDate,
+	}
+	table.TableCode = "org_assignment"
+	rows, err := s.assignmentRepo.QueryForRead(ctx, &queryReq, table, scope)
+	if err != nil {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{},
+			myerrors.WrapDatabaseError(err)
+	}
+	if rows.Total > len(rows.Data) {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{},
+			myerrors.ErrOrgAssignmentResultTooLarge
+	}
+
+	assignments := make([]response.OrgAssignmentListRes, 0, len(rows.Data))
+	for _, assignment := range rows.Data {
+		assignments = append(
+			assignments,
+			response.NewOrgAssignmentListRes(
+				assignment,
+				request.OrgAssignmentScopeCurrent,
+			),
+		)
+	}
+	if err = s.attachAssignmentReferences(ctx, assignments); err != nil {
+		return response.OrgEmployeeCurrentAssignmentSummaryRes{}, err
+	}
+	legalEntities, orgUnits, positions := collectAssignmentReferenceSummaries(assignments)
+	return response.NewOrgEmployeeCurrentAssignmentSummaryRes(
+		employeeId,
+		scope.AsOf.In(model.AppLocation()).Format(orgAsOfDateLayout),
+		len(assignments),
+		legalEntities,
+		orgUnits,
+		positions,
+	), nil
+}
+
 func (s *OrgService) GetStructureOrgTree(
 	ctx *gin.Context,
 	req request.OrgStructureOrgTreeReq,
@@ -842,6 +983,38 @@ func normalizeLegalEntityReadScope(
 	return normalizeOrganizationReadScope(req)
 }
 
+func normalizeAssignmentReadScope(
+	rawScope string,
+	rawAsOfDate string,
+) (repository.OrgAssignmentReadScope, error) {
+	timeScope := strings.TrimSpace(rawScope)
+	if timeScope == "" {
+		timeScope = request.OrgAssignmentScopeCurrent
+	}
+	switch timeScope {
+	case request.OrgAssignmentScopeCurrent,
+		request.OrgAssignmentScopeHistory,
+		request.OrgAssignmentScopeFuture,
+		request.OrgAssignmentScopeTimeline:
+	default:
+		return repository.OrgAssignmentReadScope{},
+			myerrors.NewParameterError("time_scope取值不合法")
+	}
+
+	asOf := model.Now()
+	if raw := strings.TrimSpace(rawAsOfDate); raw != "" {
+		parsed, err := time.ParseInLocation(orgAsOfDateLayout, raw, model.AppLocation())
+		if err != nil {
+			return repository.OrgAssignmentReadScope{}, myerrors.WrapParameterError(
+				err,
+				"as_of_date格式必须为YYYY-MM-DD",
+			)
+		}
+		asOf = parsed
+	}
+	return repository.OrgAssignmentReadScope{AsOf: asOf, TimeScope: timeScope}, nil
+}
+
 func normalizeOrganizationReadScope(
 	req request.OrgReadScopeReq,
 ) (repository.OrgReadScope, error) {
@@ -872,6 +1045,164 @@ func normalizeOrganizationReadScope(
 		scope.IncludeHistory = true
 	}
 	return scope, nil
+}
+
+func classifyAssignmentTimeScope(
+	assignment model.OrgAssignment,
+	asOf time.Time,
+) string {
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	if strings.TrimSpace(assignment.Status) == "enabled" && !assignment.SourceDeleted {
+		if assignment.ValidFrom != nil && assignment.ValidFrom.After(asOf) {
+			return request.OrgAssignmentScopeFuture
+		}
+		if organizationDateEffective(assignment.ValidFrom, assignment.ValidTo, asOf) {
+			return request.OrgAssignmentScopeCurrent
+		}
+	}
+	return request.OrgAssignmentScopeHistory
+}
+
+func (s *OrgService) ensureEmployeeExists(ctx *gin.Context, employeeId int) error {
+	_, err := s.employeeRepo.FindByIdForRead(ctx, employeeId)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return myerrors.ErrOrgEmployeeNotFound
+	}
+	return myerrors.WrapDatabaseError(err)
+}
+
+func (s *OrgService) attachAssignmentReferences(
+	ctx *gin.Context,
+	assignments []response.OrgAssignmentListRes,
+) error {
+	legalEntityIds := make([]int, 0, len(assignments))
+	orgUnitIds := make([]int, 0, len(assignments))
+	positionIds := make([]int, 0, len(assignments))
+	legalSeen := make(map[int]struct{}, len(assignments))
+	unitSeen := make(map[int]struct{}, len(assignments))
+	positionSeen := make(map[int]struct{}, len(assignments))
+	for _, assignment := range assignments {
+		if _, ok := legalSeen[assignment.LegalEntityId]; !ok {
+			legalSeen[assignment.LegalEntityId] = struct{}{}
+			legalEntityIds = append(legalEntityIds, assignment.LegalEntityId)
+		}
+		if _, ok := unitSeen[assignment.OrgUnitId]; !ok {
+			unitSeen[assignment.OrgUnitId] = struct{}{}
+			orgUnitIds = append(orgUnitIds, assignment.OrgUnitId)
+		}
+		if assignment.PositionId != nil {
+			if _, ok := positionSeen[*assignment.PositionId]; !ok {
+				positionSeen[*assignment.PositionId] = struct{}{}
+				positionIds = append(positionIds, *assignment.PositionId)
+			}
+		}
+	}
+
+	legalEntities, err := s.legalEntityRepo.FindByIdsForDisplay(ctx, legalEntityIds)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	orgUnits, err := s.orgUnitRepo.FindByIdsForDisplay(ctx, orgUnitIds)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	positions, err := s.positionRepo.FindByIdsForDisplay(ctx, positionIds)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+
+	legalById := make(map[int]response.OrgReferenceSummaryRes, len(legalEntities))
+	for _, entity := range legalEntities {
+		legalById[entity.Id] = response.NewOrgReferenceSummaryRes(
+			entity.Id,
+			entity.Code,
+			entity.Name,
+		)
+	}
+	unitById := make(map[int]response.OrgReferenceSummaryRes, len(orgUnits))
+	for _, unit := range orgUnits {
+		unitById[unit.Id] = response.NewOrgReferenceSummaryRes(unit.Id, unit.Code, unit.Name)
+	}
+	positionById := make(map[int]response.OrgReferenceSummaryRes, len(positions))
+	for _, position := range positions {
+		positionById[position.Id] = response.NewOrgReferenceSummaryRes(
+			position.Id,
+			position.Code,
+			position.Name,
+		)
+	}
+
+	for index := range assignments {
+		legalEntity := referenceSummaryPointer(legalById, assignments[index].LegalEntityId)
+		orgUnit := referenceSummaryPointer(unitById, assignments[index].OrgUnitId)
+		var position *response.OrgReferenceSummaryRes
+		if assignments[index].PositionId != nil {
+			position = referenceSummaryPointer(positionById, *assignments[index].PositionId)
+		}
+		assignments[index].SetReferences(legalEntity, orgUnit, position)
+	}
+	return nil
+}
+
+func referenceSummaryPointer(
+	summaries map[int]response.OrgReferenceSummaryRes,
+	id int,
+) *response.OrgReferenceSummaryRes {
+	summary, exists := summaries[id]
+	if !exists {
+		return nil
+	}
+	return &summary
+}
+
+func collectAssignmentReferenceSummaries(
+	assignments []response.OrgAssignmentListRes,
+) (
+	[]response.OrgReferenceSummaryRes,
+	[]response.OrgReferenceSummaryRes,
+	[]response.OrgReferenceSummaryRes,
+) {
+	legalEntities := make(map[int]response.OrgReferenceSummaryRes, len(assignments))
+	orgUnits := make(map[int]response.OrgReferenceSummaryRes, len(assignments))
+	positions := make(map[int]response.OrgReferenceSummaryRes, len(assignments))
+	for _, assignment := range assignments {
+		if assignment.LegalEntity != nil {
+			legalEntities[assignment.LegalEntity.Id] = *assignment.LegalEntity
+		}
+		if assignment.OrgUnit != nil {
+			orgUnits[assignment.OrgUnit.Id] = *assignment.OrgUnit
+		}
+		if assignment.Position != nil {
+			positions[assignment.Position.Id] = *assignment.Position
+		}
+	}
+	return sortedReferenceSummaries(legalEntities),
+		sortedReferenceSummaries(orgUnits),
+		sortedReferenceSummaries(positions)
+}
+
+func sortedReferenceSummaries(
+	summaries map[int]response.OrgReferenceSummaryRes,
+) []response.OrgReferenceSummaryRes {
+	result := make([]response.OrgReferenceSummaryRes, 0, len(summaries))
+	for _, summary := range summaries {
+		result = append(result, summary)
+	}
+	sort.Slice(result, func(left, right int) bool {
+		if result[left].Code != result[right].Code {
+			return result[left].Code < result[right].Code
+		}
+		if result[left].Name != result[right].Name {
+			return result[left].Name < result[right].Name
+		}
+		return result[left].Id < result[right].Id
+	})
+	return result
 }
 
 func legalEntityVisible(entity model.OrgLegalEntity, scope repository.OrgLegalEntityReadScope) bool {

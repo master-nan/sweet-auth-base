@@ -525,6 +525,9 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			menuButtonWithAPI(824, employeeMenu, "解绑账号", "organization_employee_unbind_user", enum.Line, "unbind_user", "link_off", "warning", 3, "/admin/org/employee/:id/unbind-user", "POST"),
 			menuButton(825, employeeMenu, "刷新", "organization_employee_refresh", enum.Top, "refresh", "refresh", "primary", 2),
 			menuButton(826, employeeMenu, "查看同步", "organization_employee_view_sync", enum.Line, "view_sync", "sync", "primary", 4),
+			apiPermissionWithAPI(827, employeeMenu, "任职查询", "organization_assignment_query", enum.Line, "query", "work_history", "primary", 5, "/admin/org/assignment/query", "POST"),
+			menuButtonWithAPI(828, employeeMenu, "任职详情", "organization_assignment_detail", enum.Line, "detail", "visibility", "primary", 6, "/admin/org/assignment/:id", "GET"),
+			apiPermissionWithAPI(829, employeeMenu, "当前任职摘要", "organization_assignment_summary", enum.Line, "query", "summarize", "primary", 7, "/admin/org/employee/:id/assignments/summary", "GET"),
 		}},
 		{menuName: "organization_position", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(830, positionMenu, "岗位查询", "organization_position_query", enum.Top, "query", "search", "primary", 0, "/admin/org/position/query", "POST"),

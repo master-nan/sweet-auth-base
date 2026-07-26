@@ -190,19 +190,38 @@ type OrgPositionOptionsReq struct {
 	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
-// OrgAssignmentQueryReq defines the repository-safe query fields for employee
-// assignments.
+const (
+	OrgAssignmentScopeCurrent  = "current"
+	OrgAssignmentScopeHistory  = "history"
+	OrgAssignmentScopeFuture   = "future"
+	OrgAssignmentScopeTimeline = "timeline"
+)
+
+// OrgAssignmentQueryReq defines the read-only employee assignment query.
+// TimeScope is normalized to current by OrgService. It never selects a
+// "primary" row or treats the first assignment as special.
 type OrgAssignmentQueryReq struct {
 	Basic
-	SourceSystemCode string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
-	EmployeeId       *int   `form:"employee_id" json:"employee_id" binding:"omitempty,gt=0"`
-	LegalEntityId    *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
-	OrgUnitId        *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
-	PositionId       *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
-	AssignmentType   string `form:"assignment_type" json:"assignment_type" binding:"omitempty,oneof=primary part_time temporary project"`
-	IsPrimary        *bool  `form:"is_primary" json:"is_primary"`
-	IsManager        *bool  `form:"is_manager" json:"is_manager"`
-	Status           string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
+	EmployeeId     *int   `form:"employee_id" json:"employee_id" binding:"required,gt=0"`
+	LegalEntityId  *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId      *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
+	PositionId     *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
+	AssignmentType string `form:"assignment_type" json:"assignment_type" binding:"omitempty,oneof=primary part_time temporary project"`
+	IsPrimary      *bool  `form:"is_primary" json:"is_primary"`
+	IsManager      *bool  `form:"is_manager" json:"is_manager"`
+	Status         string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
+	TimeScope      string `form:"time_scope" json:"time_scope" binding:"omitempty,oneof=current history future timeline"`
+	AsOfDate       string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
+}
+
+// OrgAssignmentDetailReq is intentionally empty: assignment detail is located
+// only by the Sweet Platform internal assignment_id.
+type OrgAssignmentDetailReq struct{}
+
+// OrgEmployeeCurrentAssignmentSummaryReq selects the effective-date snapshot
+// used to aggregate all current organizations and positions for an employee.
+type OrgEmployeeCurrentAssignmentSummaryReq struct {
+	AsOfDate string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
 
 // OrgSyncBatchQueryReq is a read-only query contract for organization-domain

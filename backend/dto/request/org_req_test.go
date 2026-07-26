@@ -37,6 +37,23 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgAssignmentQueryReq{EmployeeId: &zero}); err == nil {
 		t.Fatal("expected non-positive employee_id to fail")
 	}
+	employeeID := 1
+	if err := validate.Struct(request.OrgAssignmentQueryReq{
+		EmployeeId: &employeeID,
+		TimeScope:  request.OrgAssignmentScopeTimeline,
+		AsOfDate:   "2026-07-26",
+	}); err != nil {
+		t.Fatalf("expected valid assignment query to pass: %v", err)
+	}
+	if err := validate.Struct(request.OrgAssignmentQueryReq{
+		EmployeeId: &employeeID,
+		TimeScope:  "primary",
+	}); err == nil {
+		t.Fatal("expected invalid assignment time_scope to fail")
+	}
+	if err := validate.Struct(request.OrgAssignmentQueryReq{}); err == nil {
+		t.Fatal("expected assignment query without employee_id to fail")
+	}
 	if err := validate.Struct(request.OrgSyncRecordQueryReq{Action: "rewrite"}); err == nil {
 		t.Fatal("expected unsupported sync action to fail")
 	}
@@ -75,6 +92,9 @@ func TestOrganizationQueryDTOsExcludeRestrictedFields(t *testing.T) {
 	)
 	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgPositionQueryReq{}),
 		"SourceId", "SourceVersion", "SyncStatus",
+	)
+	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgAssignmentQueryReq{}),
+		"SourceSystemCode", "SourceId", "SourceVersion", "SyncStatus",
 	)
 	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgStructureNodeQueryReq{}),
 		"SourceId", "SourceParentId", "Path", "Level", "SyncStatus",
