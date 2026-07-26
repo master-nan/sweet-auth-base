@@ -1,30 +1,13 @@
 import { computed } from 'vue'
 import { useUserStore } from 'src/stores/user'
-import type { Menu, MenuButton } from 'src/api/services/sys-menu'
+import type { MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
-import { isPageButton } from 'src/utils/menu-button'
-
-function findMenuByName(menus: Menu[], name: string): Menu | null {
-  for (const menu of menus) {
-    if (menu.name === name) return menu
-    if (menu.children?.length) {
-      const found = findMenuByName(menu.children, name)
-      if (found) return found
-    }
-  }
-  return null
-}
+import { resolvePageButtons } from 'src/utils/menu-button'
 
 export function usePageButtons(route_name: string) {
   const userStore = useUserStore()
 
-  const all_buttons = computed(() => {
-    const menu = findMenuByName(userStore.menus, route_name)
-    if (!menu?.menu_buttons) return []
-    return menu.menu_buttons
-      .filter(isPageButton)
-      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
-  })
+  const all_buttons = computed(() => resolvePageButtons(userStore.menus, route_name))
 
   const line_buttons = computed(() =>
     all_buttons.value.filter((btn) => btn.position === SysMenuButtonPosition.LINE),

@@ -110,6 +110,40 @@ func TestCasbinHandlerAllowsNonAdminRolePolicy(t *testing.T) {
 	}
 }
 
+func TestCasbinHandlerDeniesAPIWithoutGrantedButtonPolicy(t *testing.T) {
+	enforcer := newTestEnforcer(t)
+	if _, err := enforcer.AddPolicy("example_operator", "/admin/example/:id", "PUT"); err != nil {
+		t.Fatalf("add policy: %v", err)
+	}
+
+	called := false
+	router := newRoleProtectedRouter(t, enforcer, "example_viewer", &called)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/example/7", nil)
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	if called {
+		t.Fatal("expected API call without granted button policy to be denied")
+	}
+}
+
+func TestCasbinHandlerAllowsAPIWithGrantedButtonPolicy(t *testing.T) {
+	enforcer := newTestEnforcer(t)
+	if _, err := enforcer.AddPolicy("example_operator", "/admin/example/:id", "PUT"); err != nil {
+		t.Fatalf("add policy: %v", err)
+	}
+
+	called := false
+	router := newRoleProtectedRouter(t, enforcer, "example_operator", &called)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/example/7", nil)
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	if !called {
+		t.Fatal("expected API call with granted button policy to pass")
+	}
+}
+
 func TestCasbinHandlerAllowsSelfPasswordChangeWithExistingPolicy(t *testing.T) {
 	enforcer := newTestEnforcer(t)
 	if _, err := enforcer.AddPolicy("password_admin", "/admin/user/password", "POST"); err != nil {
@@ -202,6 +236,22 @@ func newCasbinTestRouter(enforcer *casbin.Enforcer, options CasbinOptions, calle
 	})
 	router.Use(CasbinHandler(enforcer, options))
 	router.GET("/admin/uncovered", func(ctx *gin.Context) {
+		*called = true
+		ctx.Status(http.StatusNoContent)
+	})
+	return router
+}
+
+func newRoleProtectedRouter(t *testing.T, enforcer *casbin.Enforcer, roleName string, called *bool) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(ctx *gin.Context) {
+		ctx.Set("user", model.SysUser{UserName: "tester", Roles: []model.SysRole{{Name: roleName}}})
+		ctx.Next()
+	})
+	router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
+	router.PUT("/admin/example/:id", func(ctx *gin.Context) {
 		*called = true
 		ctx.Status(http.StatusNoContent)
 	})
