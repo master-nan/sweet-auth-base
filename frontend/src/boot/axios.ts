@@ -118,7 +118,7 @@ instance.interceptors.response.use(
     } else {
       const method = (response.config.method || '').toLowerCase()
       const url = response.config.url || ''
-      const isQueryApi = url.includes('/query')
+      const isQueryApi = url.includes('/query') || url.includes('/options')
       if (method !== 'get' && !isQueryApi) {
         Notify.create({
           position: 'top-right',
