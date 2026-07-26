@@ -5,6 +5,7 @@ import (
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
+	"backend/middleware"
 	"backend/model"
 	"backend/service"
 	"strconv"
@@ -498,6 +499,83 @@ func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
 		return
 	}
 	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// BindEmployeeUser godoc
+// @Summary 绑定企业人员账号
+// @Description 将企业人员绑定到明确指定的当前 Sweet Platform 登录账号
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "企业人员ID"
+// @Param data body request.OrgEmployeeBindUserReq true "账号绑定参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/{id}/bind-user [post]
+func (o *OrgController) BindEmployeeUser(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "employee_id必须为正整数"))
+		return
+	}
+	data := request.OrgEmployeeBindUserReq{EmployeeId: id}
+	middleware.SetAuditContext(ctx, middleware.AuditContext{
+		Action:       "bind_user",
+		ResourceType: "org_employee",
+		ResourceCode: "org_employee",
+		ResourceID:   strconv.Itoa(id),
+	})
+	if err = utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.BindEmployeeUser(ctx, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	middleware.MarkAccessAuditPersisted(ctx)
+	resp.SetData(result)
+}
+
+// UnbindEmployeeUser godoc
+// @Summary 解绑企业人员账号
+// @Description 清除企业人员与当前 Sweet Platform 登录账号的绑定
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "企业人员ID"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/{id}/unbind-user [post]
+func (o *OrgController) UnbindEmployeeUser(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "employee_id必须为正整数"))
+		return
+	}
+	data := request.OrgEmployeeUnbindUserReq{EmployeeId: id}
+	middleware.SetAuditContext(ctx, middleware.AuditContext{
+		Action:       "unbind_user",
+		ResourceType: "org_employee",
+		ResourceCode: "org_employee",
+		ResourceID:   strconv.Itoa(id),
+	})
+	if err = utils.ValidateStruct(data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.UnbindEmployeeUser(ctx, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	middleware.MarkAccessAuditPersisted(ctx)
+	resp.SetData(result)
 }
 
 // QueryPositions godoc

@@ -12,10 +12,11 @@ const (
 	RequestIDHeader = "X-Request-ID"
 	TraceIDHeader   = "X-Trace-ID"
 
-	requestIDContextKey    = "sweet_platform_request_id"
-	traceIDContextKey      = "sweet_platform_trace_id"
-	accessAuditContextKey  = "sweet_platform_access_audit"
-	maxCorrelationIDLength = 128
+	requestIDContextKey     = "sweet_platform_request_id"
+	traceIDContextKey       = "sweet_platform_trace_id"
+	accessAuditContextKey   = "sweet_platform_access_audit"
+	accessAuditPersistedKey = "sweet_platform_access_audit_persisted"
+	maxCorrelationIDLength  = 128
 )
 
 var correlationIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]*$`)
@@ -66,6 +67,23 @@ func RequestID(ctx *gin.Context) string {
 
 func TraceID(ctx *gin.Context) string {
 	return correlationIDValue(ctx, traceIDContextKey)
+}
+
+// MarkAccessAuditPersisted prevents the request middleware from duplicating a
+// business audit that a Service has already committed in its write transaction.
+func MarkAccessAuditPersisted(ctx *gin.Context) {
+	if ctx != nil {
+		ctx.Set(accessAuditPersistedKey, true)
+	}
+}
+
+func AccessAuditPersisted(ctx *gin.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	value, exists := ctx.Get(accessAuditPersistedKey)
+	persisted, ok := value.(bool)
+	return exists && ok && persisted
 }
 
 // SetAuditContext lets a controller or service-facing adapter describe the

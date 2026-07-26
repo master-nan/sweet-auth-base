@@ -164,6 +164,7 @@ var CacheProvider = wire.NewSet(
 // Service providers
 var ServiceProvider = wire.NewSet(
 	service.NewLogServer,
+	wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)),
 	service.NewSysConfigureService,
 	service.NewSysDictService,
 	service.NewSysRoleService,

@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type OrgLegalEntityRepositoryImpl struct {
@@ -689,6 +690,52 @@ func (r *OrgEmployeeRepositoryImpl) FindBoundUserSummaries(
 		Where("id IN ?", ids).
 		Find(&users).Error
 	return users, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindByIdForBinding(tx *gorm.DB, id int) (model.OrgEmployee, error) {
+	if tx == nil {
+		return model.OrgEmployee{}, repository.ErrOrganizationTxRequired
+	}
+	var employee model.OrgEmployee
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id", "user_id").
+		First(&employee, id).Error
+	return employee, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindUserForBinding(
+	tx *gorm.DB,
+	userId int,
+) (repository.OrgBoundUserSummary, error) {
+	if tx == nil {
+		return repository.OrgBoundUserSummary{}, repository.ErrOrganizationTxRequired
+	}
+	var user repository.OrgBoundUserSummary
+	err := tx.
+		Model(&model.SysUser{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id AS user_id", "user_name").
+		Where("id = ?", userId).
+		First(&user).Error
+	return user, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindByBoundUserIdForBinding(
+	tx *gorm.DB,
+	userId int,
+) (model.OrgEmployee, error) {
+	if tx == nil {
+		return model.OrgEmployee{}, repository.ErrOrganizationTxRequired
+	}
+	var employee model.OrgEmployee
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id", "user_id").
+		Where("user_id = ?", userId).
+		First(&employee).Error
+	return employee, err
 }
 
 func (r *OrgEmployeeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgEmployee, error) {

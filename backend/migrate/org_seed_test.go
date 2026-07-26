@@ -374,6 +374,8 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		{path: "/admin/org/assignment/query", method: "POST", action: "query"},
 		{path: "/admin/org/assignment/:id", method: "GET", action: "detail"},
 		{path: "/admin/org/employee/:id/assignments/summary", method: "GET", action: "query"},
+		{path: "/admin/org/employee/:id/bind-user", method: "POST", action: "bind_user"},
+		{path: "/admin/org/employee/:id/unbind-user", method: "POST", action: "unbind_user"},
 	} {
 		if got := countWhere(
 			t,

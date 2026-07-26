@@ -9,10 +9,12 @@ import (
 	"backend/repository"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -23,6 +25,8 @@ const (
 	orgAssignmentSummaryMaxCount = 5000
 	orgEmployeeBound             = "bound"
 	orgEmployeeUnbound           = "unbound"
+	orgEmployeeBindUserAction    = "bind_user"
+	orgEmployeeUnbindUserAction  = "unbind_user"
 )
 
 // OrgService is the public read boundary for Organization Master Data. Other
@@ -35,6 +39,7 @@ type OrgService struct {
 	employeeRepo      repository.OrgEmployeeRepository
 	positionRepo      repository.OrgPositionRepository
 	assignmentRepo    repository.OrgAssignmentRepository
+	auditWriter       TransactionalAuditWriter
 }
 
 func NewOrgService(
@@ -45,6 +50,7 @@ func NewOrgService(
 	employeeRepo repository.OrgEmployeeRepository,
 	positionRepo repository.OrgPositionRepository,
 	assignmentRepo repository.OrgAssignmentRepository,
+	auditWriter TransactionalAuditWriter,
 ) *OrgService {
 	return &OrgService{
 		legalEntityRepo:   legalEntityRepo,
@@ -54,6 +60,7 @@ func NewOrgService(
 		employeeRepo:      employeeRepo,
 		positionRepo:      positionRepo,
 		assignmentRepo:    assignmentRepo,
+		auditWriter:       auditWriter,
 	}
 }
 
@@ -611,6 +618,123 @@ func (s *OrgService) QueryEmployeeOptions(
 		seen[id] = struct{}{}
 	}
 	return result, nil
+}
+
+func (s *OrgService) BindEmployeeUser(
+	ctx *gin.Context,
+	req request.OrgEmployeeBindUserReq,
+) (response.OrgEmployeeUserBindingRes, error) {
+	if req.EmployeeId <= 0 {
+		return response.OrgEmployeeUserBindingRes{}, myerrors.NewParameterError("employee_id必须大于0")
+	}
+	if req.UserId <= 0 {
+		return response.OrgEmployeeUserBindingRes{}, myerrors.NewParameterError("user_id必须大于0")
+	}
+	if ctx == nil {
+		return response.OrgEmployeeUserBindingRes{}, myerrors.WrapSystemError(ErrTransactionContextRequired)
+	}
+
+	var account repository.OrgBoundUserSummary
+	err := RunInTransaction(ctx, s.employeeRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
+		employee, err := s.employeeRepo.FindByIdForBinding(tx, req.EmployeeId)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrOrgEmployeeNotFound
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		if employee.UserId != nil {
+			return myerrors.ErrOrgEmployeeAlreadyBound
+		}
+
+		account, err = s.employeeRepo.FindUserForBinding(tx, req.UserId)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrOrgUserNotFound
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		if _, err = s.employeeRepo.FindByBoundUserIdForBinding(tx, req.UserId); err == nil {
+			return myerrors.ErrOrgUserAlreadyBound
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.WrapDatabaseError(err)
+		}
+
+		if err = s.employeeRepo.UpdatePlatformFields(
+			tx,
+			req.EmployeeId,
+			map[string]any{"user_id": req.UserId},
+		); err != nil {
+			if isEmployeeUserBindingUniqueViolation(err) {
+				return myerrors.ErrOrgUserAlreadyBound
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		if err = s.recordEmployeeUserBindingAudit(
+			ctx,
+			tx,
+			orgEmployeeBindUserAction,
+			req.EmployeeId,
+			nil,
+			&req.UserId,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return response.OrgEmployeeUserBindingRes{}, err
+	}
+
+	accountRes := response.NewOrgBoundUserSummaryRes(account.UserId, account.UserName)
+	return response.NewOrgEmployeeUserBindingRes(req.EmployeeId, &accountRes), nil
+}
+
+func (s *OrgService) UnbindEmployeeUser(
+	ctx *gin.Context,
+	req request.OrgEmployeeUnbindUserReq,
+) (response.OrgEmployeeUserBindingRes, error) {
+	if req.EmployeeId <= 0 {
+		return response.OrgEmployeeUserBindingRes{}, myerrors.NewParameterError("employee_id必须大于0")
+	}
+	if ctx == nil {
+		return response.OrgEmployeeUserBindingRes{}, myerrors.WrapSystemError(ErrTransactionContextRequired)
+	}
+
+	err := RunInTransaction(ctx, s.employeeRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
+		employee, err := s.employeeRepo.FindByIdForBinding(tx, req.EmployeeId)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrOrgEmployeeNotFound
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		oldUserId := cloneOptionalInt(employee.UserId)
+		if employee.UserId != nil {
+			if err = s.employeeRepo.UpdatePlatformFields(
+				tx,
+				req.EmployeeId,
+				map[string]any{"user_id": nil},
+			); err != nil {
+				return myerrors.WrapDatabaseError(err)
+			}
+		}
+		if err = s.recordEmployeeUserBindingAudit(
+			ctx,
+			tx,
+			orgEmployeeUnbindUserAction,
+			req.EmployeeId,
+			oldUserId,
+			nil,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return response.OrgEmployeeUserBindingRes{}, err
+	}
+	return response.NewOrgEmployeeUserBindingRes(req.EmployeeId, nil), nil
 }
 
 func (s *OrgService) QueryPositions(
@@ -1776,4 +1900,58 @@ func normalizeOrganizationSelectedIds(ids []int) ([]int, error) {
 		result = append(result, id)
 	}
 	return result, nil
+}
+
+func (s *OrgService) recordEmployeeUserBindingAudit(
+	ctx *gin.Context,
+	tx *gorm.DB,
+	action string,
+	employeeId int,
+	oldUserId *int,
+	newUserId *int,
+) error {
+	if s.auditWriter == nil {
+		return myerrors.WrapSystemError(ErrTransactionalAuditRepositoryRequired)
+	}
+	err := s.auditWriter.RecordTransactionalAudit(ctx, tx, TransactionalAuditRecord{
+		Action:       action,
+		ResourceType: "org_employee",
+		ResourceCode: "org_employee",
+		ResourceId:   strconv.Itoa(employeeId),
+		Changes: map[string]TransactionalAuditChange{
+			"user_id": {
+				OldValue: optionalAuditInt(oldUserId),
+				NewValue: optionalAuditInt(newUserId),
+			},
+		},
+	})
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	return nil
+}
+
+func cloneOptionalInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
+}
+
+func optionalAuditInt(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func isEmployeeUserBindingUniqueViolation(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var pgError *pgconn.PgError
+	return errors.As(err, &pgError) &&
+		pgError.Code == "23505" &&
+		pgError.ConstraintName == "uni_org_employee_user"
 }

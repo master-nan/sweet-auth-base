@@ -13,10 +13,42 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
-	"github.com/gin-gonic/gin"
+	"encoding/json"
+	"errors"
+	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+var (
+	ErrTransactionalAuditRepositoryRequired = errors.New("transactional audit repository is required")
+	ErrTransactionalAuditGeneratorRequired  = errors.New("transactional audit id generator is required")
+)
+
+const (
+	transactionalAuditRequestIDContextKey = "sweet_platform_request_id"
+	transactionalAuditTraceIDContextKey   = "sweet_platform_trace_id"
+)
+
+type TransactionalAuditChange struct {
+	OldValue any `json:"old_value"`
+	NewValue any `json:"new_value"`
+}
+
+type TransactionalAuditRecord struct {
+	Action       string
+	ResourceType string
+	ResourceCode string
+	ResourceId   string
+	Changes      map[string]TransactionalAuditChange
+}
+
+type TransactionalAuditWriter interface {
+	RecordTransactionalAudit(*gin.Context, *gorm.DB, TransactionalAuditRecord) error
+}
 
 type LogService struct {
 	loginLogRepository  repository.LoginLogRepository
@@ -50,6 +82,96 @@ func (ls *LogService) CreateAccessLog(ctx *gin.Context, log model.AccessLog) err
 	log.Id = int(id)
 	err = ls.accessLogRepository.Create(ls.accessLogRepository.DBWithContext(ctx), &log)
 	return err
+}
+
+// RecordTransactionalAudit persists a successful sensitive operation with the
+// same transaction as the domain write. Failed requests remain recorded by the
+// request-wide LogHandler after the transaction rolls back.
+func (ls *LogService) RecordTransactionalAudit(
+	ctx *gin.Context,
+	tx *gorm.DB,
+	record TransactionalAuditRecord,
+) error {
+	if tx == nil {
+		return ErrTransactionDatabaseRequired
+	}
+	if ls == nil || ls.accessLogRepository == nil {
+		return ErrTransactionalAuditRepositoryRequired
+	}
+	if ls.sf == nil {
+		return ErrTransactionalAuditGeneratorRequired
+	}
+
+	id, err := ls.sf.GenerateUniqueID()
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal(map[string]any{
+		"resource_id": record.ResourceId,
+		"changes":     record.Changes,
+	})
+	if err != nil {
+		return err
+	}
+
+	userId, userName := transactionalAuditActor(ctx)
+	method, path, ip := transactionalAuditRequest(ctx)
+	return ls.accessLogRepository.Create(tx, &model.AccessLog{
+		Basic:        model.Basic{Id: int(id)},
+		UserId:       userId,
+		UserName:     userName,
+		RequestId:    transactionalAuditCorrelationID(ctx, transactionalAuditRequestIDContextKey),
+		TraceId:      transactionalAuditCorrelationID(ctx, transactionalAuditTraceIDContextKey),
+		Method:       method,
+		Ip:           ip,
+		Url:          path,
+		Action:       record.Action,
+		ResourceType: record.ResourceType,
+		ResourceCode: record.ResourceCode,
+		ResourceId:   record.ResourceId,
+		StatusCode:   http.StatusOK,
+		Success:      true,
+		Result:       "success",
+		Body:         string(body),
+	})
+}
+
+func transactionalAuditActor(ctx *gin.Context) (int, string) {
+	if ctx == nil {
+		return 0, ""
+	}
+	value, exists := ctx.Get("user")
+	if !exists {
+		return 0, ""
+	}
+	user, ok := value.(model.SysUser)
+	if !ok {
+		return 0, ""
+	}
+	return user.Id, user.UserName
+}
+
+func transactionalAuditRequest(ctx *gin.Context) (method, path, ip string) {
+	if ctx == nil || ctx.Request == nil {
+		return "AUDIT", "", ""
+	}
+	path = ctx.FullPath()
+	if path == "" && ctx.Request.URL != nil {
+		path = ctx.Request.URL.Path
+	}
+	return ctx.Request.Method, path, ctx.ClientIP()
+}
+
+func transactionalAuditCorrelationID(ctx *gin.Context, key string) string {
+	if ctx == nil {
+		return ""
+	}
+	value, exists := ctx.Get(key)
+	if !exists {
+		return ""
+	}
+	correlationID, _ := value.(string)
+	return correlationID
 }
 
 func (ls *LogService) QueryAccessLogs(ctx *gin.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {

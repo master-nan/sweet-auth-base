@@ -198,6 +198,16 @@ type OrgEmployeeDetailRes struct {
 	LocalTags    json.RawMessage `json:"local_tags,omitempty"`
 }
 
+// OrgEmployeeUserBindingRes is the complete response surface for bind and
+// unbind operations. Account credentials, roles, permissions, and security
+// state are intentionally outside this DTO.
+type OrgEmployeeUserBindingRes struct {
+	EmployeeId    int                     `json:"employee_id"`
+	UserId        *int                    `json:"user_id"`
+	BindingStatus string                  `json:"binding_status"`
+	BoundAccount  *OrgBoundUserSummaryRes `json:"bound_account,omitempty"`
+}
+
 type OrgAssignmentListRes struct {
 	OrgBaseRes
 	EmployeeId     int                     `json:"employee_id"`
@@ -510,6 +520,24 @@ func NewOrgEmployeeOptionRes(employee model.OrgEmployee, disabled bool) OrgSelec
 
 func NewOrgBoundUserSummaryRes(userId int, userName string) OrgBoundUserSummaryRes {
 	return OrgBoundUserSummaryRes{UserId: userId, UserName: userName}
+}
+
+func NewOrgEmployeeUserBindingRes(
+	employeeId int,
+	account *OrgBoundUserSummaryRes,
+) OrgEmployeeUserBindingRes {
+	result := OrgEmployeeUserBindingRes{
+		EmployeeId:    employeeId,
+		BindingStatus: "unbound",
+	}
+	if account == nil {
+		return result
+	}
+	userId := account.UserId
+	result.UserId = &userId
+	result.BindingStatus = "bound"
+	result.BoundAccount = account
+	return result
 }
 
 func (r *OrgEmployeeListRes) SetBoundAccount(account OrgBoundUserSummaryRes) {

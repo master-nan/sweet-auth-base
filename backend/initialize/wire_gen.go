@@ -121,7 +121,7 @@ func InitializeApp() (*App, error) {
 	orgEmployeeRepositoryImpl := impl.NewOrgEmployeeRepositoryImpl(primaryDB)
 	orgPositionRepositoryImpl := impl.NewOrgPositionRepositoryImpl(primaryDB)
 	orgAssignmentRepositoryImpl := impl.NewOrgAssignmentRepositoryImpl(primaryDB)
-	orgService := service.NewOrgService(orgLegalEntityRepositoryImpl, orgUnitRepositoryImpl, orgStructureRepositoryImpl, orgStructureNodeRepositoryImpl, orgEmployeeRepositoryImpl, orgPositionRepositoryImpl, orgAssignmentRepositoryImpl)
+	orgService := service.NewOrgService(orgLegalEntityRepositoryImpl, orgUnitRepositoryImpl, orgStructureRepositoryImpl, orgStructureNodeRepositoryImpl, orgEmployeeRepositoryImpl, orgPositionRepositoryImpl, orgAssignmentRepositoryImpl, logService)
 	orgController := controller.NewOrgController(orgService, sysTableService, v2)
 	smsLogImpl := impl.NewSmsLogImpl(primaryDB)
 	smsTemplateImpl := impl.NewSmsTemplateImpl(primaryDB)

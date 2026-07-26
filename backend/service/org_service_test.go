@@ -316,6 +316,13 @@ func TestOrgServiceLegalEntityOptionsUseInternalIDsAndReplayHistoricalSelection(
 }
 
 func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
+	return newOrgServiceTestSubjectWithAuditWriter(t, &testTransactionalAuditWriter{})
+}
+
+func newOrgServiceTestSubjectWithAuditWriter(
+	t *testing.T,
+	auditWriter TransactionalAuditWriter,
+) (*OrgService, *gorm.DB) {
 	t.Helper()
 	db := testutil.OpenSQLite(
 		t,
@@ -337,6 +344,7 @@ func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
 		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
+		auditWriter,
 	), db
 }
 

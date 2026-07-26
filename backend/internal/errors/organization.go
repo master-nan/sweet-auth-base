@@ -16,6 +16,9 @@ const (
 	ErrorCodeOrgPositionNotFound     = 110011
 	ErrorCodeOrgAssignmentNotFound   = 110012
 	ErrorCodeOrgAssignmentTooLarge   = 110013
+	ErrorCodeOrgUserNotFound         = 110014
+	ErrorCodeOrgEmployeeAlreadyBound = 110015
+	ErrorCodeOrgUserAlreadyBound     = 110016
 )
 
 var (
@@ -83,5 +86,20 @@ var (
 		http.StatusUnprocessableEntity,
 		ErrorCodeOrgAssignmentTooLarge,
 		"当前任职数量超过单次摘要上限",
+	)
+	ErrOrgUserNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgUserNotFound,
+		"系统账号不存在",
+	)
+	ErrOrgEmployeeAlreadyBound = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgEmployeeAlreadyBound,
+		"企业人员已绑定系统账号",
+	)
+	ErrOrgUserAlreadyBound = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgUserAlreadyBound,
+		"系统账号已绑定其他企业人员",
 	)
 )

@@ -161,6 +161,19 @@ type OrgEmployeeOptionsReq struct {
 	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
+// OrgEmployeeBindUserReq binds one explicitly selected Sweet Platform account
+// to one employee. No account property may be used for implicit matching.
+type OrgEmployeeBindUserReq struct {
+	EmployeeId int `form:"-" json:"-" binding:"required,gt=0"`
+	UserId     int `form:"user_id" json:"user_id" binding:"required,gt=0"`
+}
+
+// OrgEmployeeUnbindUserReq identifies the employee through the route. Unbind
+// never infers an employee from account names or contact fields.
+type OrgEmployeeUnbindUserReq struct {
+	EmployeeId int `form:"-" json:"-" binding:"required,gt=0"`
+}
+
 // OrgPositionQueryReq defines the repository-safe query fields for positions.
 type OrgPositionQueryReq struct {
 	Basic

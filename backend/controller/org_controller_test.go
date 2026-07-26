@@ -34,6 +34,16 @@ type orgControllerTableProviderStub struct {
 	err    error
 }
 
+type orgControllerAuditWriterStub struct{}
+
+func (orgControllerAuditWriterStub) RecordTransactionalAudit(
+	*gin.Context,
+	*gorm.DB,
+	service.TransactionalAuditRecord,
+) error {
+	return nil
+}
+
 func (s orgControllerTableProviderStub) GetTableByTableCode(tableCode string) (model.SysTable, error) {
 	if s.tables != nil {
 		return s.tables[tableCode], s.err
@@ -242,6 +252,7 @@ func newOrgControllerTestRouter(
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
 		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
+		orgControllerAuditWriterStub{},
 	)
 	controller := &OrgController{
 		orgService: orgService,
@@ -281,6 +292,8 @@ func newOrgControllerTestRouter(
 		{orgLegalEntityReaderRole, "/admin/org/employee/query", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/options", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/employee/:id/bind-user", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/employee/:id/unbind-user", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/position/query", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/position/options", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/position/:id", http.MethodGet},
@@ -319,6 +332,8 @@ func newOrgControllerTestRouter(
 	router.POST("/admin/org/employee/query", controller.QueryEmployees)
 	router.POST("/admin/org/employee/options", controller.QueryEmployeeOptions)
 	router.GET("/admin/org/employee/:id", controller.GetEmployeeDetail)
+	router.POST("/admin/org/employee/:id/bind-user", controller.BindEmployeeUser)
+	router.POST("/admin/org/employee/:id/unbind-user", controller.UnbindEmployeeUser)
 	router.POST("/admin/org/position/query", controller.QueryPositions)
 	router.POST("/admin/org/position/options", controller.QueryPositionOptions)
 	router.GET("/admin/org/position/:id", controller.GetPositionDetail)

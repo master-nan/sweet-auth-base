@@ -118,14 +118,16 @@ func LogHandler(logService accessLogWriter) gin.HandlerFunc {
 			Query:        sanitizeAccessLogPayload(c.Request.URL.Path, string(queryStr)),
 			Response:     sanitizeAccessLogPayload(c.Request.URL.Path, responseBody),
 		}
-		err := logService.CreateAccessLog(c, accessLog)
-		if err != nil {
-			zap.L().Error(
-				"access log storage failed",
-				zap.Error(err),
-				zap.String("request_id", accessLog.RequestId),
-				zap.String("trace_id", accessLog.TraceId),
-			)
+		if !AccessAuditPersisted(c) {
+			err := logService.CreateAccessLog(c, accessLog)
+			if err != nil {
+				zap.L().Error(
+					"access log storage failed",
+					zap.Error(err),
+					zap.String("request_id", accessLog.RequestId),
+					zap.String("trace_id", accessLog.TraceId),
+				)
+			}
 		}
 		zap.L().Info(
 			"access request completed",

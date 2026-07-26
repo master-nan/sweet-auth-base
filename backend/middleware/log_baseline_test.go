@@ -145,6 +145,31 @@ func TestLogHandlerGeneratesCorrelationIDsAndRejectsUnsafeHeader(t *testing.T) {
 	}
 }
 
+func TestLogHandlerDoesNotDuplicateCommittedTransactionalAudit(t *testing.T) {
+	writer := &captureAccessLogWriter{}
+	engine := newLogBaselineEngine(t, writer)
+	engine.POST("/baseline/transactional-audit", func(ctx *gin.Context) {
+		SetAuditContext(ctx, AuditContext{
+			Action:       "bind_user",
+			ResourceType: "org_employee",
+			ResourceID:   "88",
+		})
+		MarkAccessAuditPersisted(ctx)
+		ctx.Set("response", response.NewResponse().SetData(gin.H{"employee_id": 88}))
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/baseline/transactional-audit", nil)
+	engine.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if len(writer.logs) != 0 {
+		t.Fatalf("request middleware duplicated %d transactional audit records", len(writer.logs))
+	}
+}
+
 func newLogBaselineEngine(t *testing.T, writer accessLogWriter) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

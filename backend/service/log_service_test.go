@@ -3,7 +3,18 @@ package service
 import (
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/database"
+	testutil "backend/internal/test"
+	"backend/internal/utils"
+	"backend/model"
+	"backend/repository/impl"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func TestParseAccessLogQueryTime(t *testing.T) {
@@ -87,6 +98,71 @@ func TestBuildAccessLogQueryBasicRejectsReversedRange(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected reversed range to be rejected")
+	}
+}
+
+func TestLogServiceRecordTransactionalAuditUsesCallerTransactionAndSafeFields(t *testing.T) {
+	db := testutil.OpenSQLite(t, &model.AccessLog{})
+	primaryDB := &database.PrimaryDB{DB: db}
+	sf, err := utils.NewSnowflake(1)
+	if err != nil {
+		t.Fatalf("new snowflake: %v", err)
+	}
+	logService := NewLogServer(nil, impl.NewAccessLogRepositoryImpl(primaryDB), sf)
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/admin/org/employee/88/bind-user",
+		nil,
+	)
+	ctx.Set("user", model.SysUser{
+		Basic:        model.Basic{Id: 42},
+		UserName:     "binding_operator",
+		Password:     "password-must-not-leak",
+		AccessTokens: "token-must-not-leak",
+	})
+	ctx.Set(transactionalAuditRequestIDContextKey, "request-binding-audit")
+	ctx.Set(transactionalAuditTraceIDContextKey, "trace-binding-audit")
+
+	err = RunInTransaction(ctx, db.WithContext(ctx), func(tx *gorm.DB) error {
+		return logService.RecordTransactionalAudit(ctx, tx, TransactionalAuditRecord{
+			Action:       "bind_user",
+			ResourceType: "org_employee",
+			ResourceId:   "88",
+			Changes: map[string]TransactionalAuditChange{
+				"user_id": {OldValue: nil, NewValue: 501},
+			},
+		})
+	})
+	if err != nil {
+		t.Fatalf("record transactional audit: %v", err)
+	}
+
+	var stored model.AccessLog
+	if err = db.First(&stored).Error; err != nil {
+		t.Fatalf("load transactional audit: %v", err)
+	}
+	if stored.UserId != 42 ||
+		stored.UserName != "binding_operator" ||
+		stored.Action != "bind_user" ||
+		stored.ResourceType != "org_employee" ||
+		stored.ResourceId != "88" ||
+		!stored.Success {
+		t.Fatalf("unexpected transactional audit: %+v", stored)
+	}
+	if stored.RequestId == "" || stored.TraceId == "" {
+		t.Fatalf("transactional audit lost correlation ids: %+v", stored)
+	}
+	for _, forbidden := range []string{"password-must-not-leak", "token-must-not-leak", `"roles"`} {
+		if strings.Contains(stored.Body, forbidden) {
+			t.Fatalf("transactional audit leaked %q: %s", forbidden, stored.Body)
+		}
+	}
+	if !strings.Contains(stored.Body, `"old_value":null`) ||
+		!strings.Contains(stored.Body, `"new_value":501`) {
+		t.Fatalf("transactional audit lost old/new user_id: %s", stored.Body)
 	}
 }
 
