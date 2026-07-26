@@ -12,6 +12,8 @@ const (
 	ErrorCodeOrgStructureCycle       = 110007
 	ErrorCodeOrgTreeRootAmbiguous    = 110008
 	ErrorCodeOrgTreeTooLarge         = 110009
+	ErrorCodeOrgEmployeeNotFound     = 110010
+	ErrorCodeOrgPositionNotFound     = 110011
 )
 
 var (
@@ -59,5 +61,15 @@ var (
 		http.StatusUnprocessableEntity,
 		ErrorCodeOrgTreeTooLarge,
 		"组织树节点数量超过单次查询上限，请缩小查询范围",
+	)
+	ErrOrgEmployeeNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgEmployeeNotFound,
+		"企业人员不存在",
+	)
+	ErrOrgPositionNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgPositionNotFound,
+		"岗位不存在",
 	)
 )

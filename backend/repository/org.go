@@ -27,6 +27,13 @@ type OrgReadScope struct {
 	IncludeHistory  bool
 }
 
+// OrgBoundUserSummary is the repository projection used by Organization
+// services. It deliberately contains no authentication or authorization data.
+type OrgBoundUserSummary struct {
+	UserId   int
+	UserName string
+}
+
 type OrgLegalEntityReadScope = OrgReadScope
 
 type OrgLegalEntityRepository interface {
@@ -75,6 +82,9 @@ type OrgStructureNodeRepository interface {
 type OrgPositionRepository interface {
 	BasicRepository[model.OrgPosition]
 	Query(*gin.Context, *request.OrgPositionQueryReq, model.SysTable) (response.ListResult[model.OrgPosition], error)
+	QueryForRead(*gin.Context, *request.OrgPositionQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgPosition], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgPosition, error)
+	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgPosition, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgPosition, error)
 	FindByCode(*gin.Context, string, string) (model.OrgPosition, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
@@ -84,6 +94,10 @@ type OrgPositionRepository interface {
 type OrgEmployeeRepository interface {
 	BasicRepository[model.OrgEmployee]
 	Query(*gin.Context, *request.OrgEmployeeQueryReq, model.SysTable) (response.ListResult[model.OrgEmployee], error)
+	QueryForRead(*gin.Context, *request.OrgEmployeeQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgEmployee], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgEmployee, error)
+	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgEmployee, error)
+	FindBoundUserSummaries(*gin.Context, []int) ([]OrgBoundUserSummary, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgEmployee, error)
 	FindByEmployeeNo(*gin.Context, string, string) (model.OrgEmployee, error)
 	FindByBoundUserId(*gin.Context, int) (model.OrgEmployee, error)

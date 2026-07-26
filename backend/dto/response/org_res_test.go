@@ -36,6 +36,9 @@ func TestOrgEmployeeResponseUsesSafeWhitelistAndMaskedContactFields(t *testing.T
 	if got := int(listObject["user_id"].(float64)); got != userID {
 		t.Fatalf("expected bound account user_id %d, got %d", userID, got)
 	}
+	if listObject["binding_status"] != "bound" {
+		t.Fatalf("unexpected binding status: %v", listObject["binding_status"])
+	}
 
 	detailObject := marshalJSONObject(t, NewOrgEmployeeDetailRes(employee))
 	assertJSONKeysAbsent(t, detailObject,
@@ -57,6 +60,20 @@ func TestOrgEmployeeResponseUsesSafeWhitelistAndMaskedContactFields(t *testing.T
 		strings.Contains(string(serialized), employee.SourceId) ||
 		strings.Contains(string(serialized), employee.SourceVersion) {
 		t.Fatalf("sensitive or internal value leaked: %s", serialized)
+	}
+
+	detail := NewOrgEmployeeDetailRes(employee)
+	detail.SetBoundAccount(NewOrgBoundUserSummaryRes(userID, "alice"))
+	accountObject := marshalJSONObject(t, detail)["bound_account"].(map[string]interface{})
+	if accountObject["user_name"] != "alice" {
+		t.Fatalf("unexpected bound account summary: %+v", accountObject)
+	}
+	assertJSONKeysAbsent(t, accountObject,
+		"password", "roles", "access_tokens", "phone_number", "email",
+	)
+	option := NewOrgEmployeeOptionRes(employee, false)
+	if option.Value != employee.Id || option.Label != "EMP-10 - Alice" {
+		t.Fatalf("unexpected employee option: %+v", option)
 	}
 }
 

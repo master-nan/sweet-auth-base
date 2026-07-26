@@ -20,6 +20,8 @@ import (
 const (
 	orgAsOfDateLayout            = time.DateOnly
 	orgStructureTreeMaxNodeCount = 5000
+	orgEmployeeBound             = "bound"
+	orgEmployeeUnbound           = "unbound"
 )
 
 // OrgService is the public read boundary for Organization Master Data. Other
@@ -29,6 +31,8 @@ type OrgService struct {
 	orgUnitRepo       repository.OrgUnitRepository
 	structureRepo     repository.OrgStructureRepository
 	structureNodeRepo repository.OrgStructureNodeRepository
+	employeeRepo      repository.OrgEmployeeRepository
+	positionRepo      repository.OrgPositionRepository
 }
 
 func NewOrgService(
@@ -36,12 +40,16 @@ func NewOrgService(
 	orgUnitRepo repository.OrgUnitRepository,
 	structureRepo repository.OrgStructureRepository,
 	structureNodeRepo repository.OrgStructureNodeRepository,
+	employeeRepo repository.OrgEmployeeRepository,
+	positionRepo repository.OrgPositionRepository,
 ) *OrgService {
 	return &OrgService{
 		legalEntityRepo:   legalEntityRepo,
 		orgUnitRepo:       orgUnitRepo,
 		structureRepo:     structureRepo,
 		structureNodeRepo: structureNodeRepo,
+		employeeRepo:      employeeRepo,
+		positionRepo:      positionRepo,
 	}
 }
 
@@ -465,6 +473,292 @@ func (s *OrgService) QueryOrgUnitOptions(
 	return result, nil
 }
 
+func (s *OrgService) QueryEmployees(
+	ctx *gin.Context,
+	req request.OrgEmployeeQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgEmployeeListRes], error) {
+	var result response.ListResult[response.OrgEmployeeListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	if err := normalizeEmployeeBoundStatus(&req); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	table.TableCode = "org_employee"
+	rows, err := s.employeeRepo.QueryForRead(ctx, &req, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+
+	result.Total = rows.Total
+	result.Data = make([]response.OrgEmployeeListRes, 0, len(rows.Data))
+	for _, employee := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgEmployeeListRes(employee))
+	}
+	if err = s.attachEmployeeAccountSummaries(ctx, result.Data); err != nil {
+		return response.ListResult[response.OrgEmployeeListRes]{}, err
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetEmployeeDetail(
+	ctx *gin.Context,
+	employeeId int,
+	req request.OrgEmployeeDetailReq,
+) (response.OrgEmployeeDetailRes, error) {
+	if employeeId <= 0 {
+		return response.OrgEmployeeDetailRes{}, myerrors.NewParameterError("employee_id必须大于0")
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return response.OrgEmployeeDetailRes{}, err
+	}
+	employee, err := s.employeeRepo.FindByIdForRead(ctx, employeeId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgEmployeeDetailRes{}, myerrors.ErrOrgEmployeeNotFound
+		}
+		return response.OrgEmployeeDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	if !orgEmployeeVisible(employee, scope) {
+		return response.OrgEmployeeDetailRes{}, myerrors.ErrOrgEmployeeNotFound
+	}
+
+	result := response.NewOrgEmployeeDetailRes(employee)
+	list := []response.OrgEmployeeListRes{result.OrgEmployeeListRes}
+	if err = s.attachEmployeeAccountSummaries(ctx, list); err != nil {
+		return response.OrgEmployeeDetailRes{}, err
+	}
+	result.OrgEmployeeListRes = list[0]
+	return result, nil
+}
+
+func (s *OrgService) QueryEmployeeOptions(
+	ctx *gin.Context,
+	req request.OrgEmployeeOptionsReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSelectorOptionRes], error) {
+	var result response.ListResult[response.OrgSelectorOptionRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	selectedIds, err := normalizeOrganizationSelectedIds(req.SelectedIds)
+	if err != nil {
+		return result, err
+	}
+
+	queryReq := request.OrgEmployeeQueryReq{
+		Basic: request.Basic{
+			Page:       req.Page,
+			Num:        req.Num,
+			QuickQuery: &request.QuickQuery{Keyword: strings.TrimSpace(req.Keyword)},
+		},
+		OrgReadScopeReq: req.OrgReadScopeReq,
+		LegalEntityId:   req.LegalEntityId,
+		OrgUnitId:       req.OrgUnitId,
+		PositionId:      req.PositionId,
+	}
+	table.TableCode = "org_employee"
+	rows, err := s.employeeRepo.QueryForRead(ctx, &queryReq, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
+	for _, employee := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgEmployeeOptionRes(employee, !isOrgEmployeeEffective(employee, scope.AsOf)),
+		)
+		seen[employee.Id] = struct{}{}
+	}
+
+	selected, err := s.employeeRepo.FindByIdsForDisplay(ctx, selectedIds)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	selectedById := make(map[int]model.OrgEmployee, len(selected))
+	for _, employee := range selected {
+		selectedById[employee.Id] = employee
+	}
+	for _, id := range selectedIds {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		employee, exists := selectedById[id]
+		if !exists {
+			continue
+		}
+		result.Data = append(
+			result.Data,
+			response.NewOrgEmployeeOptionRes(employee, !isOrgEmployeeEffective(employee, scope.AsOf)),
+		)
+		seen[id] = struct{}{}
+	}
+	return result, nil
+}
+
+func (s *OrgService) QueryPositions(
+	ctx *gin.Context,
+	req request.OrgPositionQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgPositionListRes], error) {
+	var result response.ListResult[response.OrgPositionListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	table.TableCode = "org_position"
+	rows, err := s.positionRepo.QueryForRead(ctx, &req, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgPositionListRes, 0, len(rows.Data))
+	for _, position := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgPositionListRes(position))
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetPositionDetail(
+	ctx *gin.Context,
+	positionId int,
+	req request.OrgPositionDetailReq,
+) (response.OrgPositionDetailRes, error) {
+	if positionId <= 0 {
+		return response.OrgPositionDetailRes{}, myerrors.NewParameterError("position_id必须大于0")
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return response.OrgPositionDetailRes{}, err
+	}
+	position, err := s.positionRepo.FindByIdForRead(ctx, positionId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgPositionDetailRes{}, myerrors.ErrOrgPositionNotFound
+		}
+		return response.OrgPositionDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	if !orgPositionVisible(position, scope) {
+		return response.OrgPositionDetailRes{}, myerrors.ErrOrgPositionNotFound
+	}
+
+	result := response.NewOrgPositionDetailRes(position)
+	unit, unitErr := s.orgUnitRepo.FindByIdForRead(ctx, position.OrgUnitId)
+	switch {
+	case unitErr == nil:
+		unitSummary := response.NewOrgReferenceSummaryRes(unit.Id, unit.Code, unit.Name)
+		result.OrgUnit = &unitSummary
+		if unit.PrimaryLegalEntityId != nil {
+			legalEntity, legalErr := s.legalEntityRepo.FindByIdForRead(
+				ctx,
+				*unit.PrimaryLegalEntityId,
+			)
+			switch {
+			case legalErr == nil:
+				legalSummary := response.NewOrgReferenceSummaryRes(
+					legalEntity.Id,
+					legalEntity.Code,
+					legalEntity.Name,
+				)
+				result.LegalEntity = &legalSummary
+			case errors.Is(legalErr, gorm.ErrRecordNotFound):
+			default:
+				return response.OrgPositionDetailRes{}, myerrors.WrapDatabaseError(legalErr)
+			}
+		}
+	case errors.Is(unitErr, gorm.ErrRecordNotFound):
+	default:
+		return response.OrgPositionDetailRes{}, myerrors.WrapDatabaseError(unitErr)
+	}
+	return result, nil
+}
+
+func (s *OrgService) QueryPositionOptions(
+	ctx *gin.Context,
+	req request.OrgPositionOptionsReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSelectorOptionRes], error) {
+	var result response.ListResult[response.OrgSelectorOptionRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	selectedIds, err := normalizeOrganizationSelectedIds(req.SelectedIds)
+	if err != nil {
+		return result, err
+	}
+
+	queryReq := request.OrgPositionQueryReq{
+		Basic: request.Basic{
+			Page:       req.Page,
+			Num:        req.Num,
+			QuickQuery: &request.QuickQuery{Keyword: strings.TrimSpace(req.Keyword)},
+		},
+		OrgReadScopeReq: req.OrgReadScopeReq,
+		LegalEntityId:   req.LegalEntityId,
+		OrgUnitId:       req.OrgUnitId,
+	}
+	table.TableCode = "org_position"
+	rows, err := s.positionRepo.QueryForRead(ctx, &queryReq, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
+	for _, position := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgPositionOptionRes(position, !isOrgPositionEffective(position, scope.AsOf)),
+		)
+		seen[position.Id] = struct{}{}
+	}
+
+	selected, err := s.positionRepo.FindByIdsForDisplay(ctx, selectedIds)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	selectedById := make(map[int]model.OrgPosition, len(selected))
+	for _, position := range selected {
+		selectedById[position.Id] = position
+	}
+	for _, id := range selectedIds {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		position, exists := selectedById[id]
+		if !exists {
+			continue
+		}
+		result.Data = append(
+			result.Data,
+			response.NewOrgPositionOptionRes(position, !isOrgPositionEffective(position, scope.AsOf)),
+		)
+		seen[id] = struct{}{}
+	}
+	return result, nil
+}
+
 func (s *OrgService) GetStructureOrgTree(
 	ctx *gin.Context,
 	req request.OrgStructureOrgTreeReq,
@@ -641,6 +935,49 @@ func isOrgStructureNodeEffective(node model.OrgStructureNode, asOf time.Time) bo
 		organizationDateEffective(node.ValidFrom, node.ValidTo, asOf)
 }
 
+func orgEmployeeVisible(employee model.OrgEmployee, scope repository.OrgReadScope) bool {
+	if !scope.IncludeDisabled && !isCurrentEmploymentStatus(employee.EmploymentStatus) {
+		return false
+	}
+	if scope.IncludeHistory {
+		return true
+	}
+	return !employee.SourceDeleted &&
+		organizationDateEffective(employee.ValidFrom, employee.ValidTo, scope.AsOf)
+}
+
+func isOrgEmployeeEffective(employee model.OrgEmployee, asOf time.Time) bool {
+	return isCurrentEmploymentStatus(employee.EmploymentStatus) &&
+		!employee.SourceDeleted &&
+		organizationDateEffective(employee.ValidFrom, employee.ValidTo, asOf)
+}
+
+func isCurrentEmploymentStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "active", "probation":
+		return true
+	default:
+		return false
+	}
+}
+
+func orgPositionVisible(position model.OrgPosition, scope repository.OrgReadScope) bool {
+	if !scope.IncludeDisabled && strings.TrimSpace(position.Status) != "enabled" {
+		return false
+	}
+	if scope.IncludeHistory {
+		return true
+	}
+	return !position.SourceDeleted &&
+		organizationDateEffective(position.ValidFrom, position.ValidTo, scope.AsOf)
+}
+
+func isOrgPositionEffective(position model.OrgPosition, asOf time.Time) bool {
+	return strings.TrimSpace(position.Status) == "enabled" &&
+		!position.SourceDeleted &&
+		organizationDateEffective(position.ValidFrom, position.ValidTo, asOf)
+}
+
 func organizationDateEffective(validFrom, validTo *time.Time, asOf time.Time) bool {
 	if asOf.IsZero() {
 		asOf = model.Now()
@@ -666,6 +1003,60 @@ func normalizeOrgUnitLegalEntityFilter(req *request.OrgUnitQueryReq) error {
 	}
 	if req.LegalEntityId != nil {
 		req.PrimaryLegalEntityId = req.LegalEntityId
+	}
+	return nil
+}
+
+func normalizeEmployeeBoundStatus(req *request.OrgEmployeeQueryReq) error {
+	if req == nil {
+		return nil
+	}
+	switch req.BoundStatus {
+	case "", "all", orgEmployeeBound, orgEmployeeUnbound:
+		return nil
+	default:
+		return myerrors.NewParameterError("bound_status取值不合法")
+	}
+}
+
+func (s *OrgService) attachEmployeeAccountSummaries(
+	ctx *gin.Context,
+	employees []response.OrgEmployeeListRes,
+) error {
+	userIds := make([]int, 0, len(employees))
+	seen := make(map[int]struct{}, len(employees))
+	for _, employee := range employees {
+		if employee.BoundUserId == nil {
+			continue
+		}
+		if _, exists := seen[*employee.BoundUserId]; exists {
+			continue
+		}
+		seen[*employee.BoundUserId] = struct{}{}
+		userIds = append(userIds, *employee.BoundUserId)
+	}
+	if len(userIds) == 0 {
+		return nil
+	}
+	users, err := s.employeeRepo.FindBoundUserSummaries(ctx, userIds)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	usersById := make(map[int]repository.OrgBoundUserSummary, len(users))
+	for _, user := range users {
+		usersById[user.UserId] = user
+	}
+	for index := range employees {
+		if employees[index].BoundUserId == nil {
+			continue
+		}
+		user, exists := usersById[*employees[index].BoundUserId]
+		if !exists {
+			continue
+		}
+		employees[index].SetBoundAccount(
+			response.NewOrgBoundUserSummaryRes(user.UserId, user.UserName),
+		)
 	}
 	return nil
 }

@@ -21,6 +21,18 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgEmployeeQueryReq{EmploymentStatus: "unknown"}); err == nil {
 		t.Fatal("expected invalid employment status to fail")
 	}
+	if err := validate.Struct(request.OrgEmployeeQueryReq{BoundStatus: "bound"}); err != nil {
+		t.Fatalf("expected valid bound_status: %v", err)
+	}
+	if err := validate.Struct(request.OrgEmployeeQueryReq{BoundStatus: "linked"}); err == nil {
+		t.Fatal("expected invalid bound_status to fail")
+	}
+	if err := validate.Struct(request.OrgEmployeeOptionsReq{SelectedIds: []int{1, 2}}); err != nil {
+		t.Fatalf("expected positive employee selected_ids: %v", err)
+	}
+	if err := validate.Struct(request.OrgPositionOptionsReq{SelectedIds: []int{0}}); err == nil {
+		t.Fatal("expected non-positive position selected_ids to fail")
+	}
 	zero := 0
 	if err := validate.Struct(request.OrgAssignmentQueryReq{EmployeeId: &zero}); err == nil {
 		t.Fatal("expected non-positive employee_id to fail")
@@ -60,6 +72,9 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 func TestOrganizationQueryDTOsExcludeRestrictedFields(t *testing.T) {
 	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgEmployeeQueryReq{}),
 		"SourceId", "SourceVersion", "Mobile", "Email", "SyncStatus",
+	)
+	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgPositionQueryReq{}),
+		"SourceId", "SourceVersion", "SyncStatus",
 	)
 	assertStructFieldsAbsent(t, reflect.TypeOf(request.OrgStructureNodeQueryReq{}),
 		"SourceId", "SourceParentId", "Path", "Level", "SyncStatus",

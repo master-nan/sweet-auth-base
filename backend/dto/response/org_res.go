@@ -162,18 +162,30 @@ type OrgPositionListRes struct {
 
 type OrgPositionDetailRes struct {
 	OrgPositionListRes
-	LocalNote string `json:"local_note"`
+	OrgUnit     *OrgReferenceSummaryRes `json:"org_unit,omitempty"`
+	LegalEntity *OrgReferenceSummaryRes `json:"legal_entity,omitempty"`
+	LocalNote   string                  `json:"local_note"`
+}
+
+// OrgBoundUserSummaryRes is the complete account surface exposed by ordinary
+// organization reads. Passwords, tokens, roles, login counters, and other
+// security internals are intentionally absent.
+type OrgBoundUserSummaryRes struct {
+	UserId   int    `json:"user_id"`
+	UserName string `json:"user_name"`
 }
 
 type OrgEmployeeListRes struct {
 	OrgBaseRes
-	EmployeeNo           string     `json:"employee_no"`
-	Name                 string     `json:"name"`
-	EmploymentStatus     string     `json:"employment_status"`
-	PrimaryLegalEntityId *int       `json:"primary_legal_entity_id"`
-	BoundUserId          *int       `json:"user_id"`
-	ValidFrom            *time.Time `json:"valid_from"`
-	ValidTo              *time.Time `json:"valid_to"`
+	EmployeeNo           string                  `json:"employee_no"`
+	Name                 string                  `json:"name"`
+	EmploymentStatus     string                  `json:"employment_status"`
+	PrimaryLegalEntityId *int                    `json:"primary_legal_entity_id"`
+	BoundUserId          *int                    `json:"user_id"`
+	BindingStatus        string                  `json:"binding_status"`
+	BoundAccount         *OrgBoundUserSummaryRes `json:"bound_account,omitempty"`
+	ValidFrom            *time.Time              `json:"valid_from"`
+	ValidTo              *time.Time              `json:"valid_to"`
 }
 
 // OrgEmployeeDetailRes exposes only masked contact values. BoundUserId is the
@@ -437,6 +449,16 @@ func NewOrgPositionDetailRes(position model.OrgPosition) OrgPositionDetailRes {
 	}
 }
 
+func NewOrgPositionOptionRes(position model.OrgPosition, disabled bool) OrgSelectorOptionRes {
+	return OrgSelectorOptionRes{
+		Value:    position.Id,
+		Label:    organizationDisplayLabel(position.Code, position.Name),
+		Code:     position.Code,
+		Name:     position.Name,
+		Disabled: disabled,
+	}
+}
+
 func NewOrgEmployeeListRes(employee model.OrgEmployee) OrgEmployeeListRes {
 	return OrgEmployeeListRes{
 		OrgBaseRes:           newOrgBaseRes(employee.Basic),
@@ -445,6 +467,7 @@ func NewOrgEmployeeListRes(employee model.OrgEmployee) OrgEmployeeListRes {
 		EmploymentStatus:     employee.EmploymentStatus,
 		PrimaryLegalEntityId: employee.PrimaryLegalEntityId,
 		BoundUserId:          employee.UserId,
+		BindingStatus:        employeeBindingStatus(employee.UserId),
 		ValidFrom:            employee.ValidFrom,
 		ValidTo:              employee.ValidTo,
 	}
@@ -458,6 +481,27 @@ func NewOrgEmployeeDetailRes(employee model.OrgEmployee) OrgEmployeeDetailRes {
 		LocalNote:          employee.LocalNote,
 		LocalTags:          cloneRawJSON(employee.LocalTags),
 	}
+}
+
+func NewOrgEmployeeOptionRes(employee model.OrgEmployee, disabled bool) OrgSelectorOptionRes {
+	return OrgSelectorOptionRes{
+		Value:    employee.Id,
+		Label:    organizationDisplayLabel(employee.EmployeeNo, employee.Name),
+		Code:     employee.EmployeeNo,
+		Name:     employee.Name,
+		Disabled: disabled,
+	}
+}
+
+func NewOrgBoundUserSummaryRes(userId int, userName string) OrgBoundUserSummaryRes {
+	return OrgBoundUserSummaryRes{UserId: userId, UserName: userName}
+}
+
+func (r *OrgEmployeeListRes) SetBoundAccount(account OrgBoundUserSummaryRes) {
+	if r == nil {
+		return
+	}
+	r.BoundAccount = &account
 }
 
 func NewOrgAssignmentListRes(assignment model.OrgAssignment) OrgAssignmentListRes {
@@ -593,4 +637,11 @@ func maskEmail(value string) string {
 	}
 	local := []rune(value[:at])
 	return string(local[:1]) + "***" + value[at:]
+}
+
+func employeeBindingStatus(userId *int) string {
+	if userId == nil {
+		return "unbound"
+	}
+	return "bound"
 }

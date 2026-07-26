@@ -323,6 +323,10 @@ func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
 		&model.OrgUnit{},
 		&model.OrgStructure{},
 		&model.OrgStructureNode{},
+		&model.OrgPosition{},
+		&model.OrgEmployee{},
+		&model.OrgAssignment{},
+		&model.SysUser{},
 	)
 	primaryDB := &database.PrimaryDB{DB: db}
 	return NewOrgService(
@@ -330,6 +334,8 @@ func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
 		impl.NewOrgUnitRepositoryImpl(primaryDB),
 		impl.NewOrgStructureRepositoryImpl(primaryDB),
 		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
+		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
+		impl.NewOrgPositionRepositoryImpl(primaryDB),
 	), db
 }
 

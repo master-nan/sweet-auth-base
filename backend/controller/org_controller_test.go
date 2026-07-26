@@ -228,6 +228,10 @@ func newOrgControllerTestRouter(
 		&model.OrgUnit{},
 		&model.OrgStructure{},
 		&model.OrgStructureNode{},
+		&model.OrgPosition{},
+		&model.OrgEmployee{},
+		&model.OrgAssignment{},
+		&model.SysUser{},
 	)
 	primaryDB := &database.PrimaryDB{DB: db}
 	orgService := service.NewOrgService(
@@ -235,6 +239,8 @@ func newOrgControllerTestRouter(
 		impl.NewOrgUnitRepositoryImpl(primaryDB),
 		impl.NewOrgStructureRepositoryImpl(primaryDB),
 		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
+		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
+		impl.NewOrgPositionRepositoryImpl(primaryDB),
 	)
 	controller := &OrgController{
 		orgService: orgService,
@@ -243,6 +249,8 @@ func newOrgControllerTestRouter(
 				orgLegalEntityTableCode: orgControllerLegalEntityTable(),
 				orgStructureTableCode:   orgControllerManagementTable(orgStructureTableCode),
 				orgUnitTableCode:        orgControllerManagementTable(orgUnitTableCode),
+				orgEmployeeTableCode:    orgControllerManagementTable(orgEmployeeTableCode),
+				orgPositionTableCode:    orgControllerManagementTable(orgPositionTableCode),
 			},
 		},
 	}
@@ -268,6 +276,12 @@ func newOrgControllerTestRouter(
 		{orgManagementQueryRole, "/admin/org/unit/query", http.MethodPost},
 		{orgManagementQueryRole, "/admin/org/unit/options", http.MethodPost},
 		{orgManagementQueryRole, "/admin/org/unit/tree", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/employee/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/employee/options", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/employee/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/position/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/position/options", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/position/:id", http.MethodGet},
 	} {
 		if _, err = enforcer.AddPolicy(policy[0], policy[1], policy[2]); err != nil {
 			t.Fatalf("add Casbin policy %v: %v", policy, err)
@@ -297,6 +311,12 @@ func newOrgControllerTestRouter(
 	router.POST("/admin/org/unit/options", controller.QueryOrgUnitOptions)
 	router.POST("/admin/org/unit/tree", controller.GetStructureOrgTree)
 	router.GET("/admin/org/unit/:id", controller.GetOrgUnitDetail)
+	router.POST("/admin/org/employee/query", controller.QueryEmployees)
+	router.POST("/admin/org/employee/options", controller.QueryEmployeeOptions)
+	router.GET("/admin/org/employee/:id", controller.GetEmployeeDetail)
+	router.POST("/admin/org/position/query", controller.QueryPositions)
+	router.POST("/admin/org/position/options", controller.QueryPositionOptions)
+	router.GET("/admin/org/position/:id", controller.GetPositionDetail)
 	return router, db, enforcer
 }
 
@@ -364,15 +384,33 @@ func orgControllerManagementTable(tableCode string) model.SysTable {
 		field("valid_from", enum.DatetimeFieldType, false),
 		field("valid_to", enum.DatetimeFieldType, false),
 	}
-	if tableCode == orgStructureTableCode {
+	switch tableCode {
+	case orgStructureTableCode:
 		fields = append(fields,
 			field("structure_type", enum.VarcharFieldType, false),
 			field("is_default", enum.BooleanFieldType, false),
 		)
-	} else {
+	case orgUnitTableCode:
 		fields = append(fields,
 			field("unit_type", enum.VarcharFieldType, false),
 			field("primary_legal_entity_id", enum.BigIntFieldType, false),
+		)
+	case orgEmployeeTableCode:
+		fields = []model.SysTableField{
+			field("id", enum.BigIntFieldType, false),
+			field("employee_no", enum.VarcharFieldType, true),
+			field("name", enum.VarcharFieldType, true),
+			field("employment_status", enum.VarcharFieldType, false),
+			field("primary_legal_entity_id", enum.BigIntFieldType, false),
+			field("user_id", enum.BigIntFieldType, false),
+			field("valid_from", enum.DatetimeFieldType, false),
+			field("valid_to", enum.DatetimeFieldType, false),
+		}
+	case orgPositionTableCode:
+		fields = append(fields,
+			field("org_unit_id", enum.BigIntFieldType, false),
+			field("position_type", enum.VarcharFieldType, false),
+			field("is_manager_position", enum.BooleanFieldType, false),
 		)
 	}
 	return model.SysTable{

@@ -128,23 +128,66 @@ type OrgStructureNodeQueryReq struct {
 }
 
 // OrgEmployeeQueryReq never exposes mobile, email, source identity, or source
-// version as ordinary query fields.
+// version as ordinary advanced-query fields. Relationship filters are resolved
+// through one matching org_assignment row by the repository.
 type OrgEmployeeQueryReq struct {
 	Basic
+	OrgReadScopeReq
 	SourceSystemCode     string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
 	EmploymentStatus     string `form:"employment_status" json:"employment_status" binding:"omitempty,oneof=active probation suspended resigned retired"`
 	PrimaryLegalEntityId *int   `form:"primary_legal_entity_id" json:"primary_legal_entity_id" binding:"omitempty,gt=0"`
 	BoundUserId          *int   `form:"user_id" json:"user_id" binding:"omitempty,gt=0"`
+	LegalEntityId        *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId            *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
+	PositionId           *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
+	BoundStatus          string `form:"bound_status" json:"bound_status" binding:"omitempty,oneof=all bound unbound"`
+}
+
+// OrgEmployeeDetailReq controls visibility for one internal employee_id.
+type OrgEmployeeDetailReq struct {
+	OrgReadScopeReq
+}
+
+// OrgEmployeeOptionsReq supports remote search and replay of persisted
+// employee_id values. Values never use user_id, names, or contact details.
+type OrgEmployeeOptionsReq struct {
+	OrgReadScopeReq
+	Page          int    `form:"page" json:"page"`
+	Num           int    `form:"num" json:"num"`
+	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId     *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
+	PositionId    *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
+	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
 // OrgPositionQueryReq defines the repository-safe query fields for positions.
 type OrgPositionQueryReq struct {
 	Basic
+	OrgReadScopeReq
 	SourceSystemCode  string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
+	LegalEntityId     *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
 	OrgUnitId         *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
 	PositionType      string `form:"position_type" json:"position_type" binding:"omitempty,oneof=management professional technical operation service"`
 	IsManagerPosition *bool  `form:"is_manager_position" json:"is_manager_position"`
 	Status            string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
+}
+
+// OrgPositionDetailReq controls visibility for one internal position_id.
+type OrgPositionDetailReq struct {
+	OrgReadScopeReq
+}
+
+// OrgPositionOptionsReq supports remote search and replay of persisted
+// position_id values.
+type OrgPositionOptionsReq struct {
+	OrgReadScopeReq
+	Page          int    `form:"page" json:"page"`
+	Num           int    `form:"num" json:"num"`
+	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	OrgUnitId     *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
+	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
 // OrgAssignmentQueryReq defines the repository-safe query fields for employee

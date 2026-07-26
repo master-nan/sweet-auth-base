@@ -492,6 +492,71 @@ func (r *OrgPositionRepositoryImpl) Query(ctx *gin.Context, req *request.OrgPosi
 	)
 }
 
+func (r *OrgPositionRepositoryImpl) QueryForRead(
+	ctx *gin.Context,
+	req *request.OrgPositionQueryReq,
+	table model.SysTable,
+	scope repository.OrgReadScope,
+) (response.ListResult[model.OrgPosition], error) {
+	if req == nil {
+		req = &request.OrgPositionQueryReq{}
+	}
+	basic := cloneOrganizationBasic(req.Basic)
+	basic.IncludeDeleted = false
+	query := applyOrganizationReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgPosition{}),
+		"org_position",
+		scope,
+		true,
+	)
+	query = applyOrganizationTypedFilters(query, map[string]any{
+		"org_position.source_system_code":  optionalString(req.SourceSystemCode),
+		"org_position.org_unit_id":         optionalInt(req.OrgUnitId),
+		"org_position.position_type":       optionalString(req.PositionType),
+		"org_position.is_manager_position": optionalBool(req.IsManagerPosition),
+		"org_position.status":              optionalString(req.Status),
+	})
+	if req.LegalEntityId != nil {
+		unitScope := applyOrganizationReadScope(
+			organizationDB(r.db, ctx).
+				Model(&model.OrgUnit{}).
+				Select("1").
+				Where("org_unit.id = org_position.org_unit_id").
+				Where("org_unit.primary_legal_entity_id = ?", *req.LegalEntityId),
+			"org_unit",
+			scope,
+			true,
+		)
+		query = query.Where("EXISTS (?)", unitScope)
+	}
+	return paginateOrganizationReadQuery[model.OrgPosition](
+		query,
+		&basic,
+		organizationQueryTable(table, "org_position"),
+		orgPositionReadColumns(),
+	)
+}
+
+func (r *OrgPositionRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgPosition, error) {
+	var position model.OrgPosition
+	err := organizationDB(r.db, ctx).
+		Select(orgPositionDetailColumns()).
+		First(&position, id).Error
+	return position, err
+}
+
+func (r *OrgPositionRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgPosition, error) {
+	if len(ids) == 0 {
+		return []model.OrgPosition{}, nil
+	}
+	var positions []model.OrgPosition
+	err := organizationDB(r.db, ctx).
+		Select(orgPositionReadColumns()).
+		Where("id IN ?", ids).
+		Find(&positions).Error
+	return positions, err
+}
+
 func (r *OrgPositionRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgPosition, error) {
 	var position model.OrgPosition
 	err := organizationDB(r.db, ctx).
@@ -533,6 +598,97 @@ func (r *OrgEmployeeRepositoryImpl) Query(ctx *gin.Context, req *request.OrgEmpl
 		organizationQueryTable(table, "org_employee"),
 		orgEmployeeListColumns(),
 	)
+}
+
+func (r *OrgEmployeeRepositoryImpl) QueryForRead(
+	ctx *gin.Context,
+	req *request.OrgEmployeeQueryReq,
+	table model.SysTable,
+	scope repository.OrgReadScope,
+) (response.ListResult[model.OrgEmployee], error) {
+	if req == nil {
+		req = &request.OrgEmployeeQueryReq{}
+	}
+	basic := cloneOrganizationBasic(req.Basic)
+	basic.IncludeDeleted = false
+	query := applyEmployeeReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgEmployee{}),
+		"org_employee",
+		scope,
+	)
+	query = applyOrganizationTypedFilters(query, map[string]any{
+		"org_employee.source_system_code":      optionalString(req.SourceSystemCode),
+		"org_employee.employment_status":       optionalString(req.EmploymentStatus),
+		"org_employee.primary_legal_entity_id": optionalInt(req.PrimaryLegalEntityId),
+		"org_employee.user_id":                 optionalInt(req.BoundUserId),
+	})
+	switch req.BoundStatus {
+	case "bound":
+		query = query.Where("org_employee.user_id IS NOT NULL")
+	case "unbound":
+		query = query.Where("org_employee.user_id IS NULL")
+	}
+
+	if req.LegalEntityId != nil || req.OrgUnitId != nil || req.PositionId != nil {
+		assignmentScope := applyOrganizationReadScope(
+			organizationDB(r.db, ctx).
+				Model(&model.OrgAssignment{}).
+				Select("1").
+				Where("org_assignment.employee_id = org_employee.id"),
+			"org_assignment",
+			scope,
+			true,
+		)
+		assignmentScope = applyOrganizationTypedFilters(assignmentScope, map[string]any{
+			"org_assignment.legal_entity_id": optionalInt(req.LegalEntityId),
+			"org_assignment.org_unit_id":     optionalInt(req.OrgUnitId),
+			"org_assignment.position_id":     optionalInt(req.PositionId),
+		})
+		query = query.Where("EXISTS (?)", assignmentScope)
+	}
+
+	return paginateOrganizationReadQuery[model.OrgEmployee](
+		query,
+		&basic,
+		organizationEmployeeQueryTable(table),
+		orgEmployeeReadColumns(),
+	)
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgEmployee, error) {
+	var employee model.OrgEmployee
+	err := organizationDB(r.db, ctx).
+		Select(orgEmployeeDetailColumns()).
+		First(&employee, id).Error
+	return employee, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgEmployee, error) {
+	if len(ids) == 0 {
+		return []model.OrgEmployee{}, nil
+	}
+	var employees []model.OrgEmployee
+	err := organizationDB(r.db, ctx).
+		Select(orgEmployeeReadColumns()).
+		Where("id IN ?", ids).
+		Find(&employees).Error
+	return employees, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) FindBoundUserSummaries(
+	ctx *gin.Context,
+	ids []int,
+) ([]repository.OrgBoundUserSummary, error) {
+	if len(ids) == 0 {
+		return []repository.OrgBoundUserSummary{}, nil
+	}
+	var users []repository.OrgBoundUserSummary
+	err := organizationDB(r.db, ctx).
+		Model(&model.SysUser{}).
+		Select("id AS user_id", "user_name").
+		Where("id IN ?", ids).
+		Find(&users).Error
+	return users, err
 }
 
 func (r *OrgEmployeeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgEmployee, error) {
@@ -733,6 +889,30 @@ func applyOrganizationReadScope(
 		query = query.Where(tableName+".source_deleted = ?", false)
 	}
 	return query.
+		Where("("+tableName+".valid_from IS NULL OR "+tableName+".valid_from <= ?)", asOf).
+		Where("("+tableName+".valid_to IS NULL OR "+tableName+".valid_to >= ?)", asOf)
+}
+
+func applyEmployeeReadScope(
+	query *gorm.DB,
+	tableName string,
+	scope repository.OrgReadScope,
+) *gorm.DB {
+	if !scope.IncludeDisabled {
+		query = query.Where(
+			tableName+".employment_status IN ?",
+			[]string{"active", "probation"},
+		)
+	}
+	if scope.IncludeHistory {
+		return query
+	}
+	asOf := scope.AsOf
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	return query.
+		Where(tableName+".source_deleted = ?", false).
 		Where("("+tableName+".valid_from IS NULL OR "+tableName+".valid_from <= ?)", asOf).
 		Where("("+tableName+".valid_to IS NULL OR "+tableName+".valid_to >= ?)", asOf)
 }
@@ -1089,11 +1269,27 @@ func orgPositionListColumns() []string {
 	}
 }
 
+func orgPositionReadColumns() []string {
+	return append(orgPositionListColumns(), "source_deleted")
+}
+
+func orgPositionDetailColumns() []string {
+	return append(orgPositionReadColumns(), "local_note")
+}
+
 func orgEmployeeListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "employee_no", "name",
 		"employment_status", "primary_legal_entity_id", "user_id", "valid_from", "valid_to",
 	}
+}
+
+func orgEmployeeReadColumns() []string {
+	return append(orgEmployeeListColumns(), "source_deleted")
+}
+
+func orgEmployeeDetailColumns() []string {
+	return append(orgEmployeeReadColumns(), "mobile", "email", "local_note", "local_tags")
 }
 
 func orgAssignmentListColumns() []string {
@@ -1136,5 +1332,18 @@ func organizationQueryTable(table model.SysTable, tableCode string) model.SysTab
 		}
 	}
 	table.TableFields = fields
+	return table
+}
+
+// organizationEmployeeQueryTable follows the committed metadata boundary:
+// employee_no and name are ordinary quick-search fields, while contact and
+// source identity fields are never opened by this read service.
+func organizationEmployeeQueryTable(table model.SysTable) model.SysTable {
+	table = organizationQueryTable(table, "org_employee")
+	for index := range table.TableFields {
+		table.TableFields[index].IsQuickSearch =
+			table.TableFields[index].FieldCode == "employee_no" ||
+				table.TableFields[index].FieldCode == "name"
+	}
 	return table
 }

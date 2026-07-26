@@ -17,6 +17,8 @@ const (
 	orgLegalEntityTableCode = "org_legal_entity"
 	orgStructureTableCode   = "org_structure"
 	orgUnitTableCode        = "org_unit"
+	orgEmployeeTableCode    = "org_employee"
+	orgPositionTableCode    = "org_position"
 )
 
 type orgTableProvider interface {
@@ -394,6 +396,208 @@ func (o *OrgController) GetStructureOrgTree(ctx *gin.Context) {
 		return
 	}
 	resp.SetData(result).SetTotal(countStructureOrgTreeNodes(result))
+}
+
+// QueryEmployees godoc
+// @Summary 企业人员列表
+// @Description 分页查询组织镜像中的企业人员
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgEmployeeQueryReq true "查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/query [post]
+func (o *OrgController) QueryEmployees(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgEmployeeQueryReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := utils.ValidatePagination(data.Page, data.Num); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgEmployeeTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryEmployees(ctx, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// GetEmployeeDetail godoc
+// @Summary 企业人员详情
+// @Description 按内部 employee_id 查询企业人员及安全账号摘要
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "企业人员ID"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/{id} [get]
+func (o *OrgController) GetEmployeeDetail(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "employee_id必须为正整数"))
+		return
+	}
+	var data request.OrgEmployeeDetailReq
+	if err = utils.ValidatorQuery(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.GetEmployeeDetail(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+// QueryEmployeeOptions godoc
+// @Summary 企业人员选项
+// @Description 查询以 employee_id 为 value 的企业人员选项
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgEmployeeOptionsReq true "选项查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/options [post]
+func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgEmployeeOptionsReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := utils.ValidatePagination(data.Page, data.Num); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgEmployeeTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryEmployeeOptions(ctx, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// QueryPositions godoc
+// @Summary 岗位列表
+// @Description 分页查询组织镜像中的岗位
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgPositionQueryReq true "查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/position/query [post]
+func (o *OrgController) QueryPositions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgPositionQueryReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := utils.ValidatePagination(data.Page, data.Num); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgPositionTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryPositions(ctx, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
+// GetPositionDetail godoc
+// @Summary 岗位详情
+// @Description 按内部 position_id 查询岗位详情
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "岗位ID"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/position/{id} [get]
+func (o *OrgController) GetPositionDetail(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(myerrors.WrapParameterError(err, "position_id必须为正整数"))
+		return
+	}
+	var data request.OrgPositionDetailReq
+	if err = utils.ValidatorQuery(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.GetPositionDetail(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+// QueryPositionOptions godoc
+// @Summary 岗位选项
+// @Description 查询以 position_id 为 value 的岗位选项
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgPositionOptionsReq true "选项查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/position/options [post]
+func (o *OrgController) QueryPositionOptions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgPositionOptionsReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if err := utils.ValidatePagination(data.Page, data.Num); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	table, err := o.organizationTable(orgPositionTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryPositionOptions(ctx, data, table)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
 func (o *OrgController) legalEntityTable() (model.SysTable, error) {
