@@ -80,9 +80,10 @@ type OrgUnitListRes struct {
 
 type OrgUnitDetailRes struct {
 	OrgUnitListRes
-	LocalNote           string          `json:"local_note"`
-	LocalTags           json.RawMessage `json:"local_tags,omitempty"`
-	LocalHandlingStatus string          `json:"local_handling_status"`
+	PrimaryLegalEntity  *OrgReferenceSummaryRes `json:"primary_legal_entity,omitempty"`
+	LocalNote           string                  `json:"local_note"`
+	LocalTags           json.RawMessage         `json:"local_tags,omitempty"`
+	LocalHandlingStatus string                  `json:"local_handling_status"`
 }
 
 type OrgStructureListRes struct {
@@ -98,6 +99,34 @@ type OrgStructureListRes struct {
 
 type OrgStructureDetailRes struct {
 	OrgStructureListRes
+}
+
+// OrgReferenceSummaryRes is a source-safe organization reference used by
+// details. Id always refers to a Sweet Platform internal object ID.
+type OrgReferenceSummaryRes struct {
+	Id   int    `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// OrgStructureOrgTreeNodeRes keeps tree occurrence identity separate from the
+// business organization identity. Consumers locate a node with StructureNodeId
+// and persist OrgUnitId in business records.
+type OrgStructureOrgTreeNodeRes struct {
+	StructureNodeId int                          `json:"structure_node_id"`
+	StructureId     int                          `json:"structure_id"`
+	OrgUnitId       int                          `json:"org_unit_id"`
+	ParentNodeId    *int                         `json:"parent_node_id"`
+	Code            string                       `json:"code"`
+	Name            string                       `json:"name"`
+	UnitType        string                       `json:"unit_type"`
+	Status          string                       `json:"status"`
+	NodeStatus      string                       `json:"node_status"`
+	Level           int                          `json:"level"`
+	Sort            int                          `json:"sort"`
+	Disabled        bool                         `json:"disabled"`
+	Orphan          bool                         `json:"orphan,omitempty"`
+	Children        []OrgStructureOrgTreeNodeRes `json:"children,omitempty"`
 }
 
 // OrgStructureNodeListRes intentionally omits Path and source parent data.
@@ -306,6 +335,10 @@ func NewOrgUnitDetailRes(unit model.OrgUnit) OrgUnitDetailRes {
 	}
 }
 
+func NewOrgReferenceSummaryRes(id int, code, name string) OrgReferenceSummaryRes {
+	return OrgReferenceSummaryRes{Id: id, Code: code, Name: name}
+}
+
 func NewOrgStructureListRes(structure model.OrgStructure) OrgStructureListRes {
 	return OrgStructureListRes{
 		OrgBaseRes:    newOrgBaseRes(structure.Basic),
@@ -321,6 +354,47 @@ func NewOrgStructureListRes(structure model.OrgStructure) OrgStructureListRes {
 
 func NewOrgStructureDetailRes(structure model.OrgStructure) OrgStructureDetailRes {
 	return OrgStructureDetailRes{OrgStructureListRes: NewOrgStructureListRes(structure)}
+}
+
+func NewOrgStructureOptionRes(structure model.OrgStructure, disabled bool) OrgSelectorOptionRes {
+	return OrgSelectorOptionRes{
+		Value:    structure.Id,
+		Label:    organizationDisplayLabel(structure.Code, structure.Name),
+		Code:     structure.Code,
+		Name:     structure.Name,
+		Disabled: disabled,
+	}
+}
+
+func NewOrgUnitOptionRes(unit model.OrgUnit, disabled bool) OrgSelectorOptionRes {
+	return OrgSelectorOptionRes{
+		Value:    unit.Id,
+		Label:    organizationDisplayLabel(unit.Code, unit.Name),
+		Code:     unit.Code,
+		Name:     unit.Name,
+		Disabled: disabled,
+	}
+}
+
+func NewOrgStructureOrgTreeNodeRes(
+	node model.OrgStructureNode,
+	unit model.OrgUnit,
+	disabled bool,
+) OrgStructureOrgTreeNodeRes {
+	return OrgStructureOrgTreeNodeRes{
+		StructureNodeId: node.Id,
+		StructureId:     node.StructureId,
+		OrgUnitId:       unit.Id,
+		ParentNodeId:    node.ParentNodeId,
+		Code:            unit.Code,
+		Name:            unit.Name,
+		UnitType:        unit.UnitType,
+		Status:          unit.Status,
+		NodeStatus:      node.Status,
+		Level:           node.Level,
+		Sort:            node.Sort,
+		Disabled:        disabled,
+	}
 }
 
 func NewOrgStructureNodeListRes(node model.OrgStructureNode) OrgStructureNodeListRes {

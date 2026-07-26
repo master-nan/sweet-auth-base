@@ -359,6 +359,52 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.CasbinRule{}, "v0 = ? AND v1 LIKE ?", role.Name, "/admin/org/%"); got == 0 {
 		t.Fatal("super_admin organization Casbin policies were not seeded")
 	}
+	for _, permission := range []struct {
+		path   string
+		method string
+		action string
+	}{
+		{path: "/admin/org/structure/query", method: "POST", action: "query"},
+		{path: "/admin/org/structure/options", method: "POST", action: "query"},
+		{path: "/admin/org/structure/:id", method: "GET", action: "detail"},
+		{path: "/admin/org/unit/query", method: "POST", action: "query"},
+		{path: "/admin/org/unit/options", method: "POST", action: "query"},
+		{path: "/admin/org/unit/tree", method: "POST", action: "query"},
+		{path: "/admin/org/unit/:id", method: "GET", action: "detail"},
+	} {
+		if got := countWhere(
+			t,
+			db,
+			&model.SysMenuButton{},
+			"path = ? AND method = ? AND event_action = ?",
+			permission.path,
+			permission.method,
+			permission.action,
+		); got != 1 {
+			t.Fatalf(
+				"organization permission %s %s count = %d, want 1",
+				permission.method,
+				permission.path,
+				got,
+			)
+		}
+		if got := countWhere(
+			t,
+			db,
+			&model.CasbinRule{},
+			"v0 = ? AND v1 = ? AND v2 = ?",
+			role.Name,
+			permission.path,
+			permission.method,
+		); got != 1 {
+			t.Fatalf(
+				"organization Casbin policy %s %s count = %d, want 1",
+				permission.method,
+				permission.path,
+				got,
+			)
+		}
+	}
 }
 
 func customizeOrganizationSeedUserFields(t *testing.T, db *gorm.DB) {

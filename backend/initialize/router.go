@@ -202,6 +202,15 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/org/legal-entity/tree", app.OrgController.GetLegalEntityTree)
 		adminGroup.POST("/org/legal-entity/options", app.OrgController.QueryLegalEntityOptions)
 
+		// organization management structure and units (read-only mirror)
+		adminGroup.POST("/org/structure/query", app.OrgController.QueryStructures)
+		adminGroup.POST("/org/structure/options", app.OrgController.QueryStructureOptions)
+		adminGroup.GET("/org/structure/:id", app.OrgController.GetStructureDetail)
+		adminGroup.POST("/org/unit/query", app.OrgController.QueryOrgUnits)
+		adminGroup.POST("/org/unit/options", app.OrgController.QueryOrgUnitOptions)
+		adminGroup.POST("/org/unit/tree", app.OrgController.GetStructureOrgTree)
+		adminGroup.GET("/org/unit/:id", app.OrgController.GetOrgUnitDetail)
+
 		// application
 		adminGroup.GET("/application/:id", app.ApplicationController.GetApplicationById)
 		adminGroup.POST("/application/query", app.ApplicationController.QueryApplication)

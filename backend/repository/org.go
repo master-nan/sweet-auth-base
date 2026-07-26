@@ -18,14 +18,16 @@ var (
 	ErrOrganizationTxRequired    = errors.New("repository: organization update requires a transaction")
 )
 
-// OrgLegalEntityReadScope is normalized by OrgService before it reaches the
-// repository. The repository only translates the already-decided visibility
-// boundary into database predicates.
-type OrgLegalEntityReadScope struct {
+// OrgReadScope is normalized by OrgService before it reaches a repository.
+// Repositories only translate the already-decided visibility boundary into
+// database predicates.
+type OrgReadScope struct {
 	AsOf            time.Time
 	IncludeDisabled bool
 	IncludeHistory  bool
 }
+
+type OrgLegalEntityReadScope = OrgReadScope
 
 type OrgLegalEntityRepository interface {
 	BasicRepository[model.OrgLegalEntity]
@@ -42,6 +44,9 @@ type OrgLegalEntityRepository interface {
 type OrgUnitRepository interface {
 	BasicRepository[model.OrgUnit]
 	Query(*gin.Context, *request.OrgUnitQueryReq, model.SysTable) (response.ListResult[model.OrgUnit], error)
+	QueryForRead(*gin.Context, *request.OrgUnitQueryReq, model.SysTable, OrgReadScope, *int) (response.ListResult[model.OrgUnit], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgUnit, error)
+	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgUnit, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgUnit, error)
 	FindByCode(*gin.Context, string, string) (model.OrgUnit, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
@@ -51,6 +56,9 @@ type OrgUnitRepository interface {
 type OrgStructureRepository interface {
 	BasicRepository[model.OrgStructure]
 	Query(*gin.Context, *request.OrgStructureQueryReq, model.SysTable) (response.ListResult[model.OrgStructure], error)
+	QueryForRead(*gin.Context, *request.OrgStructureQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgStructure], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgStructure, error)
+	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgStructure, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgStructure, error)
 	FindByCode(*gin.Context, string) (model.OrgStructure, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
@@ -59,6 +67,7 @@ type OrgStructureRepository interface {
 type OrgStructureNodeRepository interface {
 	BasicRepository[model.OrgStructureNode]
 	Query(*gin.Context, *request.OrgStructureNodeQueryReq, model.SysTable) (response.ListResult[model.OrgStructureNode], error)
+	ListByStructureForRead(*gin.Context, int, OrgReadScope, int) ([]model.OrgStructureNode, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgStructureNode, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 }

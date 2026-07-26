@@ -1,14 +1,17 @@
 package request
 
-// OrgLegalEntityReadScopeReq defines the shared visibility controls for
-// legal-entity reads. A nil OnlyEffective is normalized to true by the
-// Organization Service.
-type OrgLegalEntityReadScopeReq struct {
+// OrgReadScopeReq defines the shared visibility controls for organization
+// mirror reads. A nil OnlyEffective is normalized to true by OrgService.
+type OrgReadScopeReq struct {
 	OnlyEffective   *bool  `form:"only_effective" json:"only_effective"`
 	IncludeDisabled bool   `form:"include_disabled" json:"include_disabled"`
 	IncludeHistory  bool   `form:"include_history" json:"include_history"`
 	AsOfDate        string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
+
+// OrgLegalEntityReadScopeReq is retained as the legal-entity API name for
+// compatibility with E02-S02-T001.
+type OrgLegalEntityReadScopeReq = OrgReadScopeReq
 
 // OrgLegalEntityQueryReq defines the repository-safe query fields for legal
 // entities. Source identity and synchronization internals are intentionally
@@ -49,20 +52,68 @@ type OrgLegalEntityOptionsReq struct {
 // organization units.
 type OrgUnitQueryReq struct {
 	Basic
+	OrgReadScopeReq
 	SourceSystemCode     string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
 	UnitType             string `form:"unit_type" json:"unit_type" binding:"omitempty,oneof=business_unit region center department team project_group"`
+	LegalEntityId        *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
 	PrimaryLegalEntityId *int   `form:"primary_legal_entity_id" json:"primary_legal_entity_id" binding:"omitempty,gt=0"`
 	Status               string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
+}
+
+// OrgUnitDetailReq controls visibility for one internal org_unit_id.
+type OrgUnitDetailReq struct {
+	OrgReadScopeReq
+}
+
+// OrgUnitOptionsReq supports remote search and replay of persisted org_unit_id
+// values. StructureId restricts candidates through org_structure_node.
+type OrgUnitOptionsReq struct {
+	OrgReadScopeReq
+	Page          int    `form:"page" json:"page"`
+	Num           int    `form:"num" json:"num"`
+	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	StructureId   *int   `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
+	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
 // OrgStructureQueryReq defines the repository-safe query fields for management
 // structure definitions.
 type OrgStructureQueryReq struct {
 	Basic
+	OrgReadScopeReq
 	SourceSystemCode string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
+	LegalEntityId    *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
 	StructureType    string `form:"structure_type" json:"structure_type" binding:"omitempty,oneof=management"`
 	Status           string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 	IsDefault        *bool  `form:"is_default" json:"is_default"`
+}
+
+// OrgStructureDetailReq controls visibility for one internal structure_id.
+type OrgStructureDetailReq struct {
+	OrgReadScopeReq
+}
+
+// OrgStructureOptionsReq supports remote option search and replay of persisted
+// structure_id values.
+type OrgStructureOptionsReq struct {
+	OrgReadScopeReq
+	Page          int    `form:"page" json:"page"`
+	Num           int    `form:"num" json:"num"`
+	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	LegalEntityId *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
+	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
+}
+
+// OrgStructureOrgTreeReq requests a management tree. RootNodeId identifies one
+// occurrence in the structure; RootOrgUnitId is a business-unit convenience
+// lookup and must resolve to exactly one visible node.
+type OrgStructureOrgTreeReq struct {
+	OrgReadScopeReq
+	StructureId   int    `form:"structure_id" json:"structure_id" binding:"required,gt=0"`
+	RootNodeId    *int   `form:"root_node_id" json:"root_node_id" binding:"omitempty,gt=0"`
+	RootOrgUnitId *int   `form:"root_org_unit_id" json:"root_org_unit_id" binding:"omitempty,gt=0"`
+	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
 }
 
 // OrgStructureNodeQueryReq defines the repository-safe query fields for

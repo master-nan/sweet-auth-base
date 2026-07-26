@@ -513,6 +513,9 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			apiPermissionWithAPI(815, structureMenu, "查询下级组织", "organization_unit_descendants", enum.Line, "detail", "vertical_align_bottom", "primary", 4, "/admin/org/unit/:id/descendants", "GET"),
 			menuButton(816, structureMenu, "刷新", "organization_structure_refresh", enum.Top, "refresh", "refresh", "primary", 3),
 			menuButton(817, structureMenu, "查看同步", "organization_structure_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
+			apiPermissionWithAPI(860, structureMenu, "管理架构查询", "organization_structure_query", enum.Top, "query", "search", "primary", 5, "/admin/org/structure/query", "POST"),
+			apiPermissionWithAPI(861, structureMenu, "管理架构选项查询", "organization_structure_options", enum.Top, "query", "list", "primary", 6, "/admin/org/structure/options", "POST"),
+			apiPermissionWithAPI(862, structureMenu, "管理架构详情", "organization_structure_detail", enum.Line, "detail", "visibility", "primary", 5, "/admin/org/structure/:id", "GET"),
 		}},
 		{menuName: "organization_employee", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(820, employeeMenu, "人员查询", "organization_employee_query", enum.Top, "query", "search", "primary", 0, "/admin/org/employee/query", "POST"),

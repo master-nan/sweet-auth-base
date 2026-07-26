@@ -25,14 +25,19 @@ import (
 const (
 	orgLegalEntityReaderRole = "organization_legal_entity_reader"
 	orgLegalEntityDeniedRole = "organization_legal_entity_denied"
+	orgManagementQueryRole   = "organization_management_query"
 )
 
 type orgControllerTableProviderStub struct {
-	table model.SysTable
-	err   error
+	table  model.SysTable
+	tables map[string]model.SysTable
+	err    error
 }
 
-func (s orgControllerTableProviderStub) GetTableByTableCode(string) (model.SysTable, error) {
+func (s orgControllerTableProviderStub) GetTableByTableCode(tableCode string) (model.SysTable, error) {
+	if s.tables != nil {
+		return s.tables[tableCode], s.err
+	}
 	return s.table, s.err
 }
 
@@ -217,13 +222,28 @@ func newOrgControllerTestRouter(
 	restoreLogger := zap.ReplaceGlobals(zap.NewNop())
 	t.Cleanup(restoreLogger)
 
-	db := testutil.OpenSQLite(t, &model.OrgLegalEntity{})
-	repository := impl.NewOrgLegalEntityRepositoryImpl(&database.PrimaryDB{DB: db})
-	orgService := service.NewOrgService(repository)
+	db := testutil.OpenSQLite(
+		t,
+		&model.OrgLegalEntity{},
+		&model.OrgUnit{},
+		&model.OrgStructure{},
+		&model.OrgStructureNode{},
+	)
+	primaryDB := &database.PrimaryDB{DB: db}
+	orgService := service.NewOrgService(
+		impl.NewOrgLegalEntityRepositoryImpl(primaryDB),
+		impl.NewOrgUnitRepositoryImpl(primaryDB),
+		impl.NewOrgStructureRepositoryImpl(primaryDB),
+		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
+	)
 	controller := &OrgController{
 		orgService: orgService,
 		sysTableProvider: orgControllerTableProviderStub{
-			table: orgControllerLegalEntityTable(),
+			tables: map[string]model.SysTable{
+				orgLegalEntityTableCode: orgControllerLegalEntityTable(),
+				orgStructureTableCode:   orgControllerManagementTable(orgStructureTableCode),
+				orgUnitTableCode:        orgControllerManagementTable(orgUnitTableCode),
+			},
 		},
 	}
 
@@ -236,6 +256,18 @@ func newOrgControllerTestRouter(
 		{orgLegalEntityReaderRole, "/admin/org/legal-entity/tree", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/legal-entity/options", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/legal-entity/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/structure/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/structure/options", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/structure/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/unit/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/unit/options", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/unit/tree", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/unit/:id", http.MethodGet},
+		{orgManagementQueryRole, "/admin/org/structure/query", http.MethodPost},
+		{orgManagementQueryRole, "/admin/org/structure/options", http.MethodPost},
+		{orgManagementQueryRole, "/admin/org/unit/query", http.MethodPost},
+		{orgManagementQueryRole, "/admin/org/unit/options", http.MethodPost},
+		{orgManagementQueryRole, "/admin/org/unit/tree", http.MethodPost},
 	} {
 		if _, err = enforcer.AddPolicy(policy[0], policy[1], policy[2]); err != nil {
 			t.Fatalf("add Casbin policy %v: %v", policy, err)
@@ -258,6 +290,13 @@ func newOrgControllerTestRouter(
 	router.GET("/admin/org/legal-entity/:id", controller.GetLegalEntityDetail)
 	router.POST("/admin/org/legal-entity/tree", controller.GetLegalEntityTree)
 	router.POST("/admin/org/legal-entity/options", controller.QueryLegalEntityOptions)
+	router.POST("/admin/org/structure/query", controller.QueryStructures)
+	router.POST("/admin/org/structure/options", controller.QueryStructureOptions)
+	router.GET("/admin/org/structure/:id", controller.GetStructureDetail)
+	router.POST("/admin/org/unit/query", controller.QueryOrgUnits)
+	router.POST("/admin/org/unit/options", controller.QueryOrgUnitOptions)
+	router.POST("/admin/org/unit/tree", controller.GetStructureOrgTree)
+	router.GET("/admin/org/unit/:id", controller.GetOrgUnitDetail)
 	return router, db, enforcer
 }
 
@@ -303,5 +342,42 @@ func orgControllerLegalEntityTable() model.SysTable {
 			field("valid_from", enum.DatetimeFieldType, false),
 			field("valid_to", enum.DatetimeFieldType, false),
 		},
+	}
+}
+
+func orgControllerManagementTable(tableCode string) model.SysTable {
+	field := func(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
+		return model.SysTableField{
+			FieldCode:        code,
+			FieldType:        fieldType,
+			IsListShow:       true,
+			IsQuickSearch:    quick,
+			IsAdvancedSearch: true,
+			IsSort:           true,
+		}
+	}
+	fields := []model.SysTableField{
+		field("id", enum.BigIntFieldType, false),
+		field("code", enum.VarcharFieldType, true),
+		field("name", enum.VarcharFieldType, true),
+		field("status", enum.VarcharFieldType, false),
+		field("valid_from", enum.DatetimeFieldType, false),
+		field("valid_to", enum.DatetimeFieldType, false),
+	}
+	if tableCode == orgStructureTableCode {
+		fields = append(fields,
+			field("structure_type", enum.VarcharFieldType, false),
+			field("is_default", enum.BooleanFieldType, false),
+		)
+	} else {
+		fields = append(fields,
+			field("unit_type", enum.VarcharFieldType, false),
+			field("primary_legal_entity_id", enum.BigIntFieldType, false),
+		)
+	}
+	return model.SysTable{
+		Basic:       model.Basic{Id: 1, State: true},
+		TableCode:   tableCode,
+		TableFields: fields,
 	}
 }

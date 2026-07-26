@@ -317,9 +317,20 @@ func TestOrgServiceLegalEntityOptionsUseInternalIDsAndReplayHistoricalSelection(
 
 func newOrgServiceTestSubject(t *testing.T) (*OrgService, *gorm.DB) {
 	t.Helper()
-	db := testutil.OpenSQLite(t, &model.OrgLegalEntity{})
-	repo := impl.NewOrgLegalEntityRepositoryImpl(&database.PrimaryDB{DB: db})
-	return NewOrgService(repo), db
+	db := testutil.OpenSQLite(
+		t,
+		&model.OrgLegalEntity{},
+		&model.OrgUnit{},
+		&model.OrgStructure{},
+		&model.OrgStructureNode{},
+	)
+	primaryDB := &database.PrimaryDB{DB: db}
+	return NewOrgService(
+		impl.NewOrgLegalEntityRepositoryImpl(primaryDB),
+		impl.NewOrgUnitRepositoryImpl(primaryDB),
+		impl.NewOrgStructureRepositoryImpl(primaryDB),
+		impl.NewOrgStructureNodeRepositoryImpl(primaryDB),
+	), db
 }
 
 func orgServiceLegalEntity(

@@ -17,16 +17,32 @@ import (
 	"gorm.io/gorm"
 )
 
-const orgAsOfDateLayout = time.DateOnly
+const (
+	orgAsOfDateLayout            = time.DateOnly
+	orgStructureTreeMaxNodeCount = 5000
+)
 
 // OrgService is the public read boundary for Organization Master Data. Other
 // modules call this service instead of reading Organization repositories.
 type OrgService struct {
-	legalEntityRepo repository.OrgLegalEntityRepository
+	legalEntityRepo   repository.OrgLegalEntityRepository
+	orgUnitRepo       repository.OrgUnitRepository
+	structureRepo     repository.OrgStructureRepository
+	structureNodeRepo repository.OrgStructureNodeRepository
 }
 
-func NewOrgService(legalEntityRepo repository.OrgLegalEntityRepository) *OrgService {
-	return &OrgService{legalEntityRepo: legalEntityRepo}
+func NewOrgService(
+	legalEntityRepo repository.OrgLegalEntityRepository,
+	orgUnitRepo repository.OrgUnitRepository,
+	structureRepo repository.OrgStructureRepository,
+	structureNodeRepo repository.OrgStructureNodeRepository,
+) *OrgService {
+	return &OrgService{
+		legalEntityRepo:   legalEntityRepo,
+		orgUnitRepo:       orgUnitRepo,
+		structureRepo:     structureRepo,
+		structureNodeRepo: structureNodeRepo,
+	}
 }
 
 func (s *OrgService) QueryLegalEntities(
@@ -168,9 +184,373 @@ func (s *OrgService) QueryLegalEntityOptions(
 	return result, nil
 }
 
+func (s *OrgService) QueryStructures(
+	ctx *gin.Context,
+	req request.OrgStructureQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgStructureListRes], error) {
+	var result response.ListResult[response.OrgStructureListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	table.TableCode = "org_structure"
+	rows, err := s.structureRepo.QueryForRead(ctx, &req, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgStructureListRes, 0, len(rows.Data))
+	for _, structure := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgStructureListRes(structure))
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetStructureDetail(
+	ctx *gin.Context,
+	structureId int,
+	req request.OrgStructureDetailReq,
+) (response.OrgStructureDetailRes, error) {
+	if structureId <= 0 {
+		return response.OrgStructureDetailRes{}, myerrors.NewParameterError("structure_id必须大于0")
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return response.OrgStructureDetailRes{}, err
+	}
+	structure, err := s.structureRepo.FindByIdForRead(ctx, structureId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureNotFound
+		}
+		return response.OrgStructureDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	if !orgStructureVisible(structure, scope) {
+		return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureInactive
+	}
+	return response.NewOrgStructureDetailRes(structure), nil
+}
+
+func (s *OrgService) QueryStructureOptions(
+	ctx *gin.Context,
+	req request.OrgStructureOptionsReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSelectorOptionRes], error) {
+	var result response.ListResult[response.OrgSelectorOptionRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	selectedIds, err := normalizeOrganizationSelectedIds(req.SelectedIds)
+	if err != nil {
+		return result, err
+	}
+
+	queryReq := request.OrgStructureQueryReq{
+		Basic: request.Basic{
+			Page:       req.Page,
+			Num:        req.Num,
+			QuickQuery: &request.QuickQuery{Keyword: strings.TrimSpace(req.Keyword)},
+		},
+		OrgReadScopeReq: req.OrgReadScopeReq,
+		LegalEntityId:   req.LegalEntityId,
+	}
+	table.TableCode = "org_structure"
+	rows, err := s.structureRepo.QueryForRead(ctx, &queryReq, table, scope)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
+	for _, structure := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgStructureOptionRes(
+				structure,
+				!isOrgStructureEffective(structure, scope.AsOf),
+			),
+		)
+		seen[structure.Id] = struct{}{}
+	}
+
+	selected, err := s.structureRepo.FindByIdsForDisplay(ctx, selectedIds)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	selectedById := make(map[int]model.OrgStructure, len(selected))
+	for _, structure := range selected {
+		selectedById[structure.Id] = structure
+	}
+	for _, id := range selectedIds {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		structure, exists := selectedById[id]
+		if !exists {
+			continue
+		}
+		result.Data = append(
+			result.Data,
+			response.NewOrgStructureOptionRes(
+				structure,
+				!isOrgStructureEffective(structure, scope.AsOf),
+			),
+		)
+		seen[id] = struct{}{}
+	}
+	return result, nil
+}
+
+func (s *OrgService) QueryOrgUnits(
+	ctx *gin.Context,
+	req request.OrgUnitQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgUnitListRes], error) {
+	var result response.ListResult[response.OrgUnitListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	if err := normalizeOrgUnitLegalEntityFilter(&req); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	table.TableCode = "org_unit"
+	rows, err := s.orgUnitRepo.QueryForRead(ctx, &req, table, scope, nil)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgUnitListRes, 0, len(rows.Data))
+	for _, unit := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgUnitListRes(unit))
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetOrgUnitDetail(
+	ctx *gin.Context,
+	orgUnitId int,
+	req request.OrgUnitDetailReq,
+) (response.OrgUnitDetailRes, error) {
+	if orgUnitId <= 0 {
+		return response.OrgUnitDetailRes{}, myerrors.NewParameterError("org_unit_id必须大于0")
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return response.OrgUnitDetailRes{}, err
+	}
+	unit, err := s.orgUnitRepo.FindByIdForRead(ctx, orgUnitId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgUnitDetailRes{}, myerrors.ErrOrgUnitNotFound
+		}
+		return response.OrgUnitDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	if !orgUnitVisible(unit, scope) {
+		return response.OrgUnitDetailRes{}, myerrors.ErrOrgUnitNotFound
+	}
+
+	result := response.NewOrgUnitDetailRes(unit)
+	if unit.PrimaryLegalEntityId != nil {
+		legalEntity, legalErr := s.legalEntityRepo.FindByIdForRead(ctx, *unit.PrimaryLegalEntityId)
+		switch {
+		case legalErr == nil:
+			summary := response.NewOrgReferenceSummaryRes(
+				legalEntity.Id,
+				legalEntity.Code,
+				legalEntity.Name,
+			)
+			result.PrimaryLegalEntity = &summary
+		case errors.Is(legalErr, gorm.ErrRecordNotFound):
+			// Preserve the stable foreign-key ID even if a historical display
+			// record is no longer available.
+		default:
+			return response.OrgUnitDetailRes{}, myerrors.WrapDatabaseError(legalErr)
+		}
+	}
+	return result, nil
+}
+
+func (s *OrgService) QueryOrgUnitOptions(
+	ctx *gin.Context,
+	req request.OrgUnitOptionsReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSelectorOptionRes], error) {
+	var result response.ListResult[response.OrgSelectorOptionRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return result, err
+	}
+	selectedIds, err := normalizeOrganizationSelectedIds(req.SelectedIds)
+	if err != nil {
+		return result, err
+	}
+	if req.StructureId != nil {
+		structure, findErr := s.structureRepo.FindByIdForRead(ctx, *req.StructureId)
+		if findErr != nil {
+			if errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return result, myerrors.ErrOrgStructureNotFound
+			}
+			return result, myerrors.WrapDatabaseError(findErr)
+		}
+		if !orgStructureVisible(structure, scope) {
+			return result, myerrors.ErrOrgStructureInactive
+		}
+	}
+
+	queryReq := request.OrgUnitQueryReq{
+		Basic: request.Basic{
+			Page:       req.Page,
+			Num:        req.Num,
+			QuickQuery: &request.QuickQuery{Keyword: strings.TrimSpace(req.Keyword)},
+		},
+		OrgReadScopeReq: req.OrgReadScopeReq,
+		LegalEntityId:   req.LegalEntityId,
+	}
+	if err = normalizeOrgUnitLegalEntityFilter(&queryReq); err != nil {
+		return result, err
+	}
+	table.TableCode = "org_unit"
+	rows, err := s.orgUnitRepo.QueryForRead(ctx, &queryReq, table, scope, req.StructureId)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSelectorOptionRes, 0, len(rows.Data)+len(selectedIds))
+	seen := make(map[int]struct{}, len(rows.Data)+len(selectedIds))
+	for _, unit := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgUnitOptionRes(unit, !isOrgUnitEffective(unit, scope.AsOf)),
+		)
+		seen[unit.Id] = struct{}{}
+	}
+
+	selected, err := s.orgUnitRepo.FindByIdsForDisplay(ctx, selectedIds)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	selectedById := make(map[int]model.OrgUnit, len(selected))
+	for _, unit := range selected {
+		selectedById[unit.Id] = unit
+	}
+	for _, id := range selectedIds {
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		unit, exists := selectedById[id]
+		if !exists {
+			continue
+		}
+		result.Data = append(
+			result.Data,
+			response.NewOrgUnitOptionRes(unit, !isOrgUnitEffective(unit, scope.AsOf)),
+		)
+		seen[id] = struct{}{}
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetStructureOrgTree(
+	ctx *gin.Context,
+	req request.OrgStructureOrgTreeReq,
+) ([]response.OrgStructureOrgTreeNodeRes, error) {
+	if req.StructureId <= 0 {
+		return nil, myerrors.NewParameterError("structure_id必须大于0")
+	}
+	if req.RootNodeId != nil && req.RootOrgUnitId != nil {
+		return nil, myerrors.NewParameterError(
+			"root_node_id与root_org_unit_id不能同时指定",
+		)
+	}
+	scope, err := normalizeOrganizationReadScope(req.OrgReadScopeReq)
+	if err != nil {
+		return nil, err
+	}
+	structure, err := s.structureRepo.FindByIdForRead(ctx, req.StructureId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, myerrors.ErrOrgStructureNotFound
+		}
+		return nil, myerrors.WrapDatabaseError(err)
+	}
+	if !orgStructureVisible(structure, scope) {
+		return nil, myerrors.ErrOrgStructureInactive
+	}
+
+	nodes, err := s.structureNodeRepo.ListByStructureForRead(
+		ctx,
+		req.StructureId,
+		scope,
+		orgStructureTreeMaxNodeCount+1,
+	)
+	if err != nil {
+		return nil, myerrors.WrapDatabaseError(err)
+	}
+	if len(nodes) > orgStructureTreeMaxNodeCount {
+		return nil, myerrors.ErrOrgTreeTooLarge
+	}
+
+	unitIds := uniqueStructureNodeUnitIds(nodes)
+	units, err := s.orgUnitRepo.FindByIdsForDisplay(ctx, unitIds)
+	if err != nil {
+		return nil, myerrors.WrapDatabaseError(err)
+	}
+	unitsById := make(map[int]model.OrgUnit, len(units))
+	for _, unit := range units {
+		unitsById[unit.Id] = unit
+	}
+
+	visibleNodes := make([]model.OrgStructureNode, 0, len(nodes))
+	for _, node := range nodes {
+		unit, exists := unitsById[node.OrgUnitId]
+		if !exists {
+			zap.L().Warn(
+				"organization structure node references a missing unit",
+				zap.Int("structure_id", req.StructureId),
+				zap.Int("structure_node_id", node.Id),
+				zap.Int("org_unit_id", node.OrgUnitId),
+			)
+			return nil, myerrors.ErrOrgUnitNotFound
+		}
+		if orgUnitVisible(unit, scope) {
+			visibleNodes = append(visibleNodes, node)
+		}
+	}
+	return buildStructureOrgTree(
+		structure,
+		visibleNodes,
+		unitsById,
+		scope,
+		req.RootNodeId,
+		req.RootOrgUnitId,
+		strings.TrimSpace(req.Keyword),
+	)
+}
+
 func normalizeLegalEntityReadScope(
 	req request.OrgLegalEntityReadScopeReq,
 ) (repository.OrgLegalEntityReadScope, error) {
+	return normalizeOrganizationReadScope(req)
+}
+
+func normalizeOrganizationReadScope(
+	req request.OrgReadScopeReq,
+) (repository.OrgReadScope, error) {
 	onlyEffective := true
 	if req.OnlyEffective != nil {
 		onlyEffective = *req.OnlyEffective
@@ -180,7 +560,7 @@ func normalizeLegalEntityReadScope(
 	if raw := strings.TrimSpace(req.AsOfDate); raw != "" {
 		parsed, err := time.ParseInLocation(orgAsOfDateLayout, raw, model.AppLocation())
 		if err != nil {
-			return repository.OrgLegalEntityReadScope{}, myerrors.WrapParameterError(
+			return repository.OrgReadScope{}, myerrors.WrapParameterError(
 				err,
 				"as_of_date格式必须为YYYY-MM-DD",
 			)
@@ -188,7 +568,7 @@ func normalizeLegalEntityReadScope(
 		asOf = parsed
 	}
 
-	scope := repository.OrgLegalEntityReadScope{
+	scope := repository.OrgReadScope{
 		AsOf:            asOf,
 		IncludeDisabled: req.IncludeDisabled,
 		IncludeHistory:  req.IncludeHistory,
@@ -220,16 +600,304 @@ func isLegalEntityEffective(entity model.OrgLegalEntity, asOf time.Time) bool {
 }
 
 func legalEntityDateEffective(entity model.OrgLegalEntity, asOf time.Time) bool {
+	return organizationDateEffective(entity.ValidFrom, entity.ValidTo, asOf)
+}
+
+func orgStructureVisible(structure model.OrgStructure, scope repository.OrgReadScope) bool {
+	if !scope.IncludeDisabled && strings.TrimSpace(structure.Status) != "enabled" {
+		return false
+	}
+	if scope.IncludeHistory {
+		return true
+	}
+	return organizationDateEffective(structure.ValidFrom, structure.ValidTo, scope.AsOf)
+}
+
+func isOrgStructureEffective(structure model.OrgStructure, asOf time.Time) bool {
+	return strings.TrimSpace(structure.Status) == "enabled" &&
+		organizationDateEffective(structure.ValidFrom, structure.ValidTo, asOf)
+}
+
+func orgUnitVisible(unit model.OrgUnit, scope repository.OrgReadScope) bool {
+	if !scope.IncludeDisabled && strings.TrimSpace(unit.Status) != "enabled" {
+		return false
+	}
+	if scope.IncludeHistory {
+		return true
+	}
+	return !unit.SourceDeleted &&
+		organizationDateEffective(unit.ValidFrom, unit.ValidTo, scope.AsOf)
+}
+
+func isOrgUnitEffective(unit model.OrgUnit, asOf time.Time) bool {
+	return strings.TrimSpace(unit.Status) == "enabled" &&
+		!unit.SourceDeleted &&
+		organizationDateEffective(unit.ValidFrom, unit.ValidTo, asOf)
+}
+
+func isOrgStructureNodeEffective(node model.OrgStructureNode, asOf time.Time) bool {
+	return strings.TrimSpace(node.Status) == "enabled" &&
+		!node.SourceDeleted &&
+		organizationDateEffective(node.ValidFrom, node.ValidTo, asOf)
+}
+
+func organizationDateEffective(validFrom, validTo *time.Time, asOf time.Time) bool {
 	if asOf.IsZero() {
 		asOf = model.Now()
 	}
-	if entity.ValidFrom != nil && entity.ValidFrom.After(asOf) {
+	if validFrom != nil && validFrom.After(asOf) {
 		return false
 	}
-	if entity.ValidTo != nil && entity.ValidTo.Before(asOf) {
+	if validTo != nil && validTo.Before(asOf) {
 		return false
 	}
 	return true
+}
+
+func normalizeOrgUnitLegalEntityFilter(req *request.OrgUnitQueryReq) error {
+	if req == nil {
+		return nil
+	}
+	if req.LegalEntityId != nil && req.PrimaryLegalEntityId != nil &&
+		*req.LegalEntityId != *req.PrimaryLegalEntityId {
+		return myerrors.NewParameterError(
+			"legal_entity_id与primary_legal_entity_id不能指定不同值",
+		)
+	}
+	if req.LegalEntityId != nil {
+		req.PrimaryLegalEntityId = req.LegalEntityId
+	}
+	return nil
+}
+
+func uniqueStructureNodeUnitIds(nodes []model.OrgStructureNode) []int {
+	result := make([]int, 0, len(nodes))
+	seen := make(map[int]struct{}, len(nodes))
+	for _, node := range nodes {
+		if _, exists := seen[node.OrgUnitId]; exists {
+			continue
+		}
+		seen[node.OrgUnitId] = struct{}{}
+		result = append(result, node.OrgUnitId)
+	}
+	return result
+}
+
+func buildStructureOrgTree(
+	structure model.OrgStructure,
+	nodes []model.OrgStructureNode,
+	unitsById map[int]model.OrgUnit,
+	scope repository.OrgReadScope,
+	rootNodeId *int,
+	rootOrgUnitId *int,
+	keyword string,
+) ([]response.OrgStructureOrgTreeNodeRes, error) {
+	nodesById := make(map[int]model.OrgStructureNode, len(nodes))
+	for _, node := range nodes {
+		nodesById[node.Id] = node
+	}
+	if structureNodeTreeHasCycle(nodesById) {
+		return nil, myerrors.ErrOrgStructureCycle
+	}
+
+	resolvedRootId := 0
+	if rootNodeId != nil {
+		if _, exists := nodesById[*rootNodeId]; !exists {
+			return nil, myerrors.ErrOrgStructureNodeMissing
+		}
+		resolvedRootId = *rootNodeId
+	}
+	if rootOrgUnitId != nil {
+		matches := make([]int, 0, 1)
+		for _, node := range nodes {
+			if node.OrgUnitId == *rootOrgUnitId {
+				matches = append(matches, node.Id)
+			}
+		}
+		switch len(matches) {
+		case 0:
+			return nil, myerrors.ErrOrgStructureNodeMissing
+		case 1:
+			resolvedRootId = matches[0]
+		default:
+			return nil, myerrors.ErrOrgTreeRootAmbiguous
+		}
+	}
+
+	allChildren := make(map[int][]int, len(nodes))
+	for _, node := range nodes {
+		if node.ParentNodeId != nil {
+			allChildren[*node.ParentNodeId] = append(allChildren[*node.ParentNodeId], node.Id)
+		}
+	}
+
+	selected := make(map[int]struct{}, len(nodes))
+	if resolvedRootId != 0 {
+		stack := []int{resolvedRootId}
+		for len(stack) > 0 {
+			index := len(stack) - 1
+			id := stack[index]
+			stack = stack[:index]
+			if _, exists := selected[id]; exists {
+				continue
+			}
+			selected[id] = struct{}{}
+			stack = append(stack, allChildren[id]...)
+		}
+	} else {
+		for id := range nodesById {
+			selected[id] = struct{}{}
+		}
+	}
+
+	if keyword != "" {
+		normalizedKeyword := strings.ToLower(keyword)
+		matchedWithAncestors := make(map[int]struct{})
+		for id := range selected {
+			unit := unitsById[nodesById[id].OrgUnitId]
+			if !structureOrgTreeKeywordMatch(unit, normalizedKeyword) {
+				continue
+			}
+			currentId := id
+			for {
+				if _, allowed := selected[currentId]; !allowed {
+					break
+				}
+				matchedWithAncestors[currentId] = struct{}{}
+				parentId := nodesById[currentId].ParentNodeId
+				if parentId == nil {
+					break
+				}
+				currentId = *parentId
+			}
+		}
+		selected = matchedWithAncestors
+	}
+
+	children := make(map[int][]int, len(selected))
+	roots := make([]int, 0)
+	orphanIds := make([]int, 0)
+	for id := range selected {
+		node := nodesById[id]
+		if node.ParentNodeId == nil {
+			roots = append(roots, id)
+			continue
+		}
+		if _, parentSelected := selected[*node.ParentNodeId]; parentSelected {
+			children[*node.ParentNodeId] = append(children[*node.ParentNodeId], id)
+			continue
+		}
+		roots = append(roots, id)
+		if id != resolvedRootId {
+			if _, parentVisible := nodesById[*node.ParentNodeId]; !parentVisible {
+				orphanIds = append(orphanIds, id)
+			}
+		}
+	}
+
+	sortStructureNodeIds(roots, nodesById, unitsById)
+	for parentId := range children {
+		sortStructureNodeIds(children[parentId], nodesById, unitsById)
+	}
+	orphanSet := make(map[int]struct{}, len(orphanIds))
+	if len(orphanIds) > 0 {
+		sort.Ints(orphanIds)
+		zap.L().Warn(
+			"management organization tree contains orphan nodes",
+			zap.Int("structure_id", structure.Id),
+			zap.Ints("structure_node_ids", orphanIds),
+		)
+		for _, id := range orphanIds {
+			orphanSet[id] = struct{}{}
+		}
+	}
+
+	structureEffective := isOrgStructureEffective(structure, scope.AsOf)
+	var buildNode func(int) response.OrgStructureOrgTreeNodeRes
+	buildNode = func(id int) response.OrgStructureOrgTreeNodeRes {
+		sourceNode := nodesById[id]
+		unit := unitsById[sourceNode.OrgUnitId]
+		node := response.NewOrgStructureOrgTreeNodeRes(
+			sourceNode,
+			unit,
+			!structureEffective ||
+				!isOrgStructureNodeEffective(sourceNode, scope.AsOf) ||
+				!isOrgUnitEffective(unit, scope.AsOf),
+		)
+		_, node.Orphan = orphanSet[id]
+		if childIds := children[id]; len(childIds) > 0 {
+			node.Children = make([]response.OrgStructureOrgTreeNodeRes, 0, len(childIds))
+			for _, childId := range childIds {
+				node.Children = append(node.Children, buildNode(childId))
+			}
+		}
+		return node
+	}
+
+	result := make([]response.OrgStructureOrgTreeNodeRes, 0, len(roots))
+	for _, id := range roots {
+		result = append(result, buildNode(id))
+	}
+	return result, nil
+}
+
+func structureNodeTreeHasCycle(nodes map[int]model.OrgStructureNode) bool {
+	const (
+		unvisited = iota
+		visiting
+		visited
+	)
+	state := make(map[int]int, len(nodes))
+	var visit func(int) bool
+	visit = func(id int) bool {
+		switch state[id] {
+		case visiting:
+			return true
+		case visited:
+			return false
+		}
+		state[id] = visiting
+		node := nodes[id]
+		if node.ParentNodeId != nil {
+			if _, exists := nodes[*node.ParentNodeId]; exists && visit(*node.ParentNodeId) {
+				return true
+			}
+		}
+		state[id] = visited
+		return false
+	}
+	for id := range nodes {
+		if state[id] == unvisited && visit(id) {
+			return true
+		}
+	}
+	return false
+}
+
+func structureOrgTreeKeywordMatch(unit model.OrgUnit, keyword string) bool {
+	return strings.Contains(strings.ToLower(unit.Code), keyword) ||
+		strings.Contains(strings.ToLower(unit.Name), keyword)
+}
+
+func sortStructureNodeIds(
+	ids []int,
+	nodes map[int]model.OrgStructureNode,
+	units map[int]model.OrgUnit,
+) {
+	sort.SliceStable(ids, func(left, right int) bool {
+		leftNode := nodes[ids[left]]
+		rightNode := nodes[ids[right]]
+		leftUnit := units[leftNode.OrgUnitId]
+		rightUnit := units[rightNode.OrgUnitId]
+		switch {
+		case leftNode.Sort != rightNode.Sort:
+			return leftNode.Sort < rightNode.Sort
+		case leftUnit.Code != rightUnit.Code:
+			return leftUnit.Code < rightUnit.Code
+		default:
+			return leftNode.Id < rightNode.Id
+		}
+	})
 }
 
 func buildLegalEntityTree(
@@ -366,6 +1034,10 @@ func sortLegalEntityIds(ids []int, entities map[int]model.OrgLegalEntity) {
 }
 
 func normalizeLegalEntitySelectedIds(ids []int) ([]int, error) {
+	return normalizeOrganizationSelectedIds(ids)
+}
+
+func normalizeOrganizationSelectedIds(ids []int) ([]int, error) {
 	if len(ids) > 100 {
 		return nil, myerrors.NewParameterError("selected_ids最多支持100项")
 	}

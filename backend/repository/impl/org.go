@@ -7,6 +7,7 @@ import (
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository"
+	queryutil "backend/repository/util"
 	"fmt"
 	"sort"
 
@@ -217,6 +218,70 @@ func (r *OrgUnitRepositoryImpl) Query(ctx *gin.Context, req *request.OrgUnitQuer
 	)
 }
 
+func (r *OrgUnitRepositoryImpl) QueryForRead(
+	ctx *gin.Context,
+	req *request.OrgUnitQueryReq,
+	table model.SysTable,
+	scope repository.OrgReadScope,
+	structureId *int,
+) (response.ListResult[model.OrgUnit], error) {
+	if req == nil {
+		req = &request.OrgUnitQueryReq{}
+	}
+	basic := cloneOrganizationBasic(req.Basic)
+	basic.IncludeDeleted = false
+	query := applyOrganizationReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgUnit{}),
+		"org_unit",
+		scope,
+		true,
+	)
+	query = applyOrganizationTypedFilters(query, map[string]any{
+		"org_unit.source_system_code":      optionalString(req.SourceSystemCode),
+		"org_unit.unit_type":               optionalString(req.UnitType),
+		"org_unit.primary_legal_entity_id": optionalInt(req.PrimaryLegalEntityId),
+		"org_unit.status":                  optionalString(req.Status),
+	})
+	if structureId != nil {
+		nodeScope := applyOrganizationReadScope(
+			organizationDB(r.db, ctx).Model(&model.OrgStructureNode{}).
+				Select("1").
+				Where("org_structure_node.structure_id = ?", *structureId).
+				Where("org_structure_node.org_unit_id = org_unit.id"),
+			"org_structure_node",
+			scope,
+			true,
+		)
+		query = query.Where("EXISTS (?)", nodeScope)
+	}
+	return paginateOrganizationReadQuery[model.OrgUnit](
+		query,
+		&basic,
+		organizationQueryTable(table, "org_unit"),
+		orgUnitListColumns(),
+	)
+}
+
+func (r *OrgUnitRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgUnit, error) {
+	var unit model.OrgUnit
+	err := organizationDB(r.db, ctx).
+		Select(orgUnitReadColumns()).
+		First(&unit, id).Error
+	return unit, err
+}
+
+func (r *OrgUnitRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgUnit, error) {
+	if len(ids) == 0 {
+		return []model.OrgUnit{}, nil
+	}
+	var units []model.OrgUnit
+	err := organizationDB(r.db, ctx).
+		Select(orgUnitReadColumns()).
+		Where("id IN ?", ids).
+		Find(&units).Error
+	return units, err
+}
+
 func (r *OrgUnitRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgUnit, error) {
 	var unit model.OrgUnit
 	err := organizationDB(r.db, ctx).
@@ -260,6 +325,78 @@ func (r *OrgStructureRepositoryImpl) Query(ctx *gin.Context, req *request.OrgStr
 	)
 }
 
+func (r *OrgStructureRepositoryImpl) QueryForRead(
+	ctx *gin.Context,
+	req *request.OrgStructureQueryReq,
+	table model.SysTable,
+	scope repository.OrgReadScope,
+) (response.ListResult[model.OrgStructure], error) {
+	if req == nil {
+		req = &request.OrgStructureQueryReq{}
+	}
+	basic := cloneOrganizationBasic(req.Basic)
+	basic.IncludeDeleted = false
+	query := applyOrganizationReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgStructure{}),
+		"org_structure",
+		scope,
+		false,
+	)
+	query = applyOrganizationTypedFilters(query, map[string]any{
+		"org_structure.source_system_code": optionalString(req.SourceSystemCode),
+		"org_structure.structure_type":     optionalString(req.StructureType),
+		"org_structure.status":             optionalString(req.Status),
+		"org_structure.is_default":         optionalBool(req.IsDefault),
+	})
+	if req.LegalEntityId != nil {
+		nodeAndUnitScope := applyOrganizationReadScope(
+			organizationDB(r.db, ctx).
+				Table("org_structure_node").
+				Select("1").
+				Joins("JOIN org_unit ON org_unit.id = org_structure_node.org_unit_id").
+				Where("org_structure_node.structure_id = org_structure.id").
+				Where("org_unit.primary_legal_entity_id = ?", *req.LegalEntityId).
+				Where("org_structure_node.gmt_delete IS NULL"),
+			"org_structure_node",
+			scope,
+			true,
+		)
+		nodeAndUnitScope = applyOrganizationReadScope(
+			nodeAndUnitScope,
+			"org_unit",
+			scope,
+			true,
+		).Where("org_unit.gmt_delete IS NULL")
+		query = query.Where("EXISTS (?)", nodeAndUnitScope)
+	}
+	return paginateOrganizationReadQuery[model.OrgStructure](
+		query,
+		&basic,
+		organizationQueryTable(table, "org_structure"),
+		orgStructureListColumns(),
+	)
+}
+
+func (r *OrgStructureRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgStructure, error) {
+	var structure model.OrgStructure
+	err := organizationDB(r.db, ctx).
+		Select(orgStructureReadColumns()).
+		First(&structure, id).Error
+	return structure, err
+}
+
+func (r *OrgStructureRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgStructure, error) {
+	if len(ids) == 0 {
+		return []model.OrgStructure{}, nil
+	}
+	var structures []model.OrgStructure
+	err := organizationDB(r.db, ctx).
+		Select(orgStructureReadColumns()).
+		Where("id IN ?", ids).
+		Find(&structures).Error
+	return structures, err
+}
+
 func (r *OrgStructureRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgStructure, error) {
 	var structure model.OrgStructure
 	err := organizationDB(r.db, ctx).
@@ -295,6 +432,32 @@ func (r *OrgStructureNodeRepositoryImpl) Query(ctx *gin.Context, req *request.Or
 		organizationQueryTable(table, "org_structure_node"),
 		orgStructureNodeListColumns(),
 	)
+}
+
+func (r *OrgStructureNodeRepositoryImpl) ListByStructureForRead(
+	ctx *gin.Context,
+	structureId int,
+	scope repository.OrgReadScope,
+	limit int,
+) ([]model.OrgStructureNode, error) {
+	if limit <= 0 {
+		return []model.OrgStructureNode{}, nil
+	}
+	var nodes []model.OrgStructureNode
+	query := applyOrganizationReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgStructureNode{}),
+		"org_structure_node",
+		scope,
+		true,
+	)
+	err := query.
+		Select(orgStructureNodeReadColumns()).
+		Where("org_structure_node.structure_id = ?", structureId).
+		Order("org_structure_node.sort ASC").
+		Order("org_structure_node.id ASC").
+		Limit(limit).
+		Find(&nodes).Error
+	return nodes, err
 }
 
 func (r *OrgStructureNodeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgStructureNode, error) {
@@ -512,6 +675,66 @@ func queryOrganization[T any](
 		WithSelect(columns...).
 		PaginateAndCountAsync(&query, &rows, table)
 	return response.ListResult[T]{Data: rows, Total: int(total)}, err
+}
+
+func paginateOrganizationReadQuery[T any](
+	query *gorm.DB,
+	basic *request.Basic,
+	table model.SysTable,
+	columns []string,
+) (response.ListResult[T], error) {
+	var result response.ListResult[T]
+	query = queryutil.ExecuteQuery(query, basic, table)
+
+	var total int64
+	if err := query.Session(&gorm.Session{}).
+		Limit(-1).
+		Offset(-1).
+		Count(&total).Error; err != nil {
+		return result, err
+	}
+	rows := make([]T, 0)
+	if err := query.Session(&gorm.Session{}).
+		Select(columns).
+		Find(&rows).Error; err != nil {
+		return result, err
+	}
+	result.Data = rows
+	result.Total = int(total)
+	return result, nil
+}
+
+func applyOrganizationTypedFilters(query *gorm.DB, filters map[string]any) *gorm.DB {
+	for field, value := range filters {
+		if value != nil {
+			query = query.Where(field+" = ?", value)
+		}
+	}
+	return query
+}
+
+func applyOrganizationReadScope(
+	query *gorm.DB,
+	tableName string,
+	scope repository.OrgReadScope,
+	hasSourceDeleted bool,
+) *gorm.DB {
+	if !scope.IncludeDisabled {
+		query = query.Where(tableName+".status = ?", "enabled")
+	}
+	if scope.IncludeHistory {
+		return query
+	}
+	asOf := scope.AsOf
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	if hasSourceDeleted {
+		query = query.Where(tableName+".source_deleted = ?", false)
+	}
+	return query.
+		Where("("+tableName+".valid_from IS NULL OR "+tableName+".valid_from <= ?)", asOf).
+		Where("("+tableName+".valid_to IS NULL OR "+tableName+".valid_to >= ?)", asOf)
 }
 
 func legalEntityScopedBasic(
@@ -827,6 +1050,16 @@ func orgUnitListColumns() []string {
 	}
 }
 
+func orgUnitReadColumns() []string {
+	return append(
+		orgUnitListColumns(),
+		"source_deleted",
+		"local_note",
+		"local_tags",
+		"local_handling_status",
+	)
+}
+
 func orgStructureListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "code", "name", "structure_type",
@@ -834,11 +1067,19 @@ func orgStructureListColumns() []string {
 	}
 }
 
+func orgStructureReadColumns() []string {
+	return orgStructureListColumns()
+}
+
 func orgStructureNodeListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "structure_id", "org_unit_id",
 		"parent_node_id", "path", "level", "sort", "valid_from", "valid_to", "status",
 	}
+}
+
+func orgStructureNodeReadColumns() []string {
+	return append(orgStructureNodeListColumns(), "source_deleted")
 }
 
 func orgPositionListColumns() []string {

@@ -212,6 +212,48 @@ func TestOrgLegalEntityTreeAndOptionUseInternalIDWithoutSourceIdentity(t *testin
 	}
 }
 
+func TestOrgStructureTreeKeepsNodeAndBusinessIdentitySeparate(t *testing.T) {
+	node := model.OrgStructureNode{
+		Basic:            model.Basic{Id: 51, State: true},
+		StructureId:      11,
+		OrgUnitId:        21,
+		SourceSystemCode: "authority",
+		SourceId:         "source-node-51",
+		Path:             "/51/",
+		Level:            2,
+		Sort:             3,
+		Status:           "enabled",
+		SyncStatus:       "synced",
+	}
+	unit := model.OrgUnit{
+		Basic:            model.Basic{Id: 21, State: true},
+		SourceSystemCode: "authority",
+		SourceId:         "source-unit-21",
+		Code:             "OU-21",
+		Name:             "运营中心",
+		UnitType:         "center",
+		Status:           "enabled",
+		SyncStatus:       "synced",
+	}
+
+	object := marshalJSONObject(t, NewOrgStructureOrgTreeNodeRes(node, unit, false))
+	if got := int(object["structure_node_id"].(float64)); got != node.Id {
+		t.Fatalf("structure_node_id = %d, want %d", got, node.Id)
+	}
+	if got := int(object["org_unit_id"].(float64)); got != unit.Id {
+		t.Fatalf("org_unit_id = %d, want %d", got, unit.Id)
+	}
+	assertJSONKeysAbsent(
+		t,
+		object,
+		"value",
+		"path",
+		"source_id",
+		"source_version",
+		"sync_status",
+	)
+}
+
 func marshalJSONObject(t *testing.T, value any) map[string]any {
 	t.Helper()
 	data, err := json.Marshal(value)

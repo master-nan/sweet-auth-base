@@ -44,6 +44,17 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgLegalEntityOptionsReq{SelectedIds: []int{0}}); err == nil {
 		t.Fatal("expected non-positive selected_ids to fail")
 	}
+	if err := validate.Struct(request.OrgStructureOrgTreeReq{StructureId: 1}); err != nil {
+		t.Fatalf("expected positive structure_id to pass: %v", err)
+	}
+	if err := validate.Struct(request.OrgStructureOrgTreeReq{}); err == nil {
+		t.Fatal("expected missing structure_id to fail")
+	}
+	if err := validate.Struct(request.OrgUnitOptionsReq{
+		StructureId: &zero,
+	}); err == nil {
+		t.Fatal("expected non-positive option structure_id to fail")
+	}
 }
 
 func TestOrganizationQueryDTOsExcludeRestrictedFields(t *testing.T) {
