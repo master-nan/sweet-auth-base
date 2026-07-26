@@ -7,9 +7,9 @@ package middleware
 
 import (
 	"backend/dto/response"
+	error2 "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
-	"backend/service"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -25,6 +25,13 @@ import (
 )
 
 const maxAuditPayloadLength = 64 * 1024
+const maxAuditErrorCodeLength = 64
+const maxAuditErrorMessageLength = 2048
+
+const (
+	accessAuditResultSuccess = "success"
+	accessAuditResultFailed  = "failed"
+)
 
 var (
 	sensitiveJSONStringPattern = regexp.MustCompile(`(?i)("([^"]*(password|token|secret|authorization|salt|captcha|otp|verify_code|verification_code|sms_code)[^"]*)"\s*:\s*)"[^"]*"`)
@@ -40,9 +47,20 @@ type accessAuditMeta struct {
 	MenuId       int
 }
 
-func LogHandler(logService *service.LogService) gin.HandlerFunc {
+type accessLogWriter interface {
+	CreateAccessLog(ctx *gin.Context, log model.AccessLog) error
+}
+
+type accessAuditResult struct {
+	Success      bool
+	Result       string
+	ErrorCode    string
+	ErrorMessage string
+}
+
+func LogHandler(logService accessLogWriter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		zap.L().Info("Access Log start")
+		EnsureLogContext(c)
 		startTime := time.Now()
 		var body interface{}
 		var query = c.Request.URL.Query()
@@ -67,14 +85,20 @@ func LogHandler(logService *service.LogService) gin.HandlerFunc {
 		sanitizedPath := sanitizeAccessLogURLPath(c.Request.URL.Path)
 		queryStr, _ := json.Marshal(query)
 		bodyStr, _ := json.Marshal(body)
-		meta := classifyAccessAudit(c.Request.Method, c.Request.URL.Path, body)
+		meta := mergeAccessAuditMeta(
+			classifyAccessAudit(c.Request.Method, c.Request.URL.Path, body),
+			auditContextFromGin(c),
+		)
 		userId, userName := currentAccessLogUser(c)
 		statusCode := c.Writer.Status()
+		auditResult := resolveAccessAuditResult(c, statusCode, responseBody)
 
 		var accessLog = model.AccessLog{
 			Basic:        model.Basic{},
 			UserId:       userId,
 			UserName:     userName,
+			RequestId:    RequestID(c),
+			TraceId:      TraceID(c),
 			Method:       c.Request.Method,
 			Ip:           c.ClientIP(),
 			Locality:     "",
@@ -85,7 +109,10 @@ func LogHandler(logService *service.LogService) gin.HandlerFunc {
 			ResourceId:   meta.ResourceId,
 			MenuId:       meta.MenuId,
 			StatusCode:   statusCode,
-			Success:      isSuccessfulAccess(statusCode, responseBody),
+			Success:      auditResult.Success,
+			Result:       auditResult.Result,
+			ErrorCode:    auditResult.ErrorCode,
+			ErrorMessage: auditResult.ErrorMessage,
 			DurationMs:   duration.Milliseconds(),
 			Body:         sanitizeAccessLogPayload(c.Request.URL.Path, string(bodyStr)),
 			Query:        sanitizeAccessLogPayload(c.Request.URL.Path, string(queryStr)),
@@ -93,17 +120,32 @@ func LogHandler(logService *service.LogService) gin.HandlerFunc {
 		}
 		err := logService.CreateAccessLog(c, accessLog)
 		if err != nil {
-			zap.L().Error("日志存储异常。。。。", zap.Error(err))
+			zap.L().Error(
+				"access log storage failed",
+				zap.Error(err),
+				zap.String("request_id", accessLog.RequestId),
+				zap.String("trace_id", accessLog.TraceId),
+			)
 		}
-		zap.L().Info("用户访问日志:",
-			zap.String("uri", sanitizedPath),
+		zap.L().Info(
+			"access request completed",
+			zap.String("request_id", accessLog.RequestId),
+			zap.String("trace_id", accessLog.TraceId),
+			zap.Int("user_id", accessLog.UserId),
+			zap.Int("menu_id", accessLog.MenuId),
+			zap.String("action", accessLog.Action),
+			zap.String("resource_type", accessLog.ResourceType),
+			zap.String("resource_code", accessLog.ResourceCode),
+			zap.String("resource_id", accessLog.ResourceId),
+			zap.String("path", sanitizedPath),
 			zap.String("method", c.Request.Method),
-			zap.Any("query", accessLog.Query),
-			zap.Any("body", accessLog.Body),
-			zap.String("response", accessLog.Response),
 			zap.String("ip", c.ClientIP()),
-			zap.String("duration", fmt.Sprintf("%.4f seconds", duration.Seconds())))
-		zap.L().Info("Access Log end")
+			zap.Int("status_code", accessLog.StatusCode),
+			zap.Bool("success", accessLog.Success),
+			zap.String("result", accessLog.Result),
+			zap.String("error_code", accessLog.ErrorCode),
+			zap.Int64("duration_ms", accessLog.DurationMs),
+		)
 	}
 }
 
@@ -133,17 +175,91 @@ func shouldCaptureRequestBody(c *gin.Context) bool {
 	return strings.Contains(contentType, binding.MIMEJSON)
 }
 
-func isSuccessfulAccess(statusCode int, responseBody string) bool {
-	if statusCode >= 400 {
-		return false
+func mergeAccessAuditMeta(meta accessAuditMeta, explicit AuditContext) accessAuditMeta {
+	if explicit.MenuID != 0 {
+		meta.MenuId = explicit.MenuID
 	}
-	var parsed struct {
-		Success bool `json:"success"`
+	if explicit.Action != "" {
+		meta.Action = explicit.Action
 	}
-	if err := json.Unmarshal([]byte(responseBody), &parsed); err == nil {
-		return parsed.Success
+	if explicit.ResourceType != "" {
+		meta.ResourceType = explicit.ResourceType
 	}
-	return true
+	if explicit.ResourceCode != "" {
+		meta.ResourceCode = explicit.ResourceCode
+	}
+	if explicit.ResourceID != "" {
+		meta.ResourceId = explicit.ResourceID
+	}
+	return meta
+}
+
+func resolveAccessAuditResult(c *gin.Context, statusCode int, responseBody string) accessAuditResult {
+	result := accessAuditResult{
+		Success: statusCode < 400 && len(c.Errors) == 0,
+	}
+
+	var payload struct {
+		Success      *bool           `json:"success"`
+		ErrorCode    json.RawMessage `json:"error_code"`
+		ErrorMessage string          `json:"error_message"`
+	}
+	if err := json.Unmarshal([]byte(responseBody), &payload); err == nil {
+		if payload.Success != nil {
+			result.Success = result.Success && *payload.Success
+		}
+		result.ErrorCode = truncateAuditErrorCode(
+			utils.SanitizeInput(parseAccessAuditErrorCode(payload.ErrorCode)),
+		)
+		result.ErrorMessage = payload.ErrorMessage
+	}
+
+	if result.Success {
+		result.Result = accessAuditResultSuccess
+		result.ErrorCode = ""
+		result.ErrorMessage = ""
+		return result
+	}
+
+	result.Result = accessAuditResultFailed
+	if len(c.Errors) > 0 && (result.ErrorCode == "" || result.ErrorMessage == "") {
+		clientErr, _ := error2.ToClientError(c.Errors[0].Err)
+		if clientErr != nil {
+			if result.ErrorCode == "" {
+				result.ErrorCode = strconv.Itoa(clientErr.ErrorCode)
+			}
+			if result.ErrorMessage == "" {
+				result.ErrorMessage = clientErr.ErrorMessage
+			}
+		}
+	}
+	result.ErrorMessage = truncateAuditErrorMessage(utils.SanitizeInput(result.ErrorMessage))
+	return result
+}
+
+func parseAccessAuditErrorCode(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var stringCode string
+	if err := json.Unmarshal(raw, &stringCode); err == nil {
+		return strings.TrimSpace(stringCode)
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func truncateAuditErrorCode(code string) string {
+	if len(code) <= maxAuditErrorCodeLength {
+		return code
+	}
+	return code[:maxAuditErrorCodeLength]
+}
+
+func truncateAuditErrorMessage(message string) string {
+	if len(message) <= maxAuditErrorMessageLength {
+		return message
+	}
+	return message[:maxAuditErrorMessageLength] + "...[truncated]"
 }
 
 func classifyAccessAudit(method, path string, body interface{}) accessAuditMeta {

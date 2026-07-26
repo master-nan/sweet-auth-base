@@ -9,6 +9,8 @@ type AccessLog struct {
 	Basic
 	UserId       int    `gorm:"index;comment:用户ID" json:"user_id"`
 	UserName     string `gorm:"size:128;index;comment:用户名" json:"user_name"`
+	RequestId    string `gorm:"size:128;index;comment:请求ID" json:"request_id"`
+	TraceId      string `gorm:"size:128;index;comment:追踪ID" json:"trace_id"`
 	Method       string `gorm:"size:64;comment:操作" json:"method"`
 	Ip           string `gorm:"size:128;comment:ip" json:"ip"`
 	Locality     string `gorm:"size:128;comment:用户名" json:"locality"`
@@ -20,6 +22,9 @@ type AccessLog struct {
 	MenuId       int    `gorm:"index;comment:菜单ID" json:"menu_id"`
 	StatusCode   int    `gorm:"comment:HTTP状态码" json:"status_code"`
 	Success      bool   `gorm:"index;comment:是否成功" json:"success"`
+	Result       string `gorm:"size:32;index;comment:审计结果" json:"result"`
+	ErrorCode    string `gorm:"size:64;index;comment:错误码" json:"error_code"`
+	ErrorMessage string `gorm:"type:text;comment:安全错误信息" json:"error_message"`
 	DurationMs   int64  `gorm:"comment:耗时毫秒" json:"duration_ms"`
 	Body         string `gorm:"type:text;comment:请求数据" json:"body"`
 	Query        string `gorm:"type:text;comment:查询" json:"query"`

@@ -21,6 +21,8 @@ func CustomRecovery() gin.HandlerFunc {
 				zap.L().Error(
 					"Recovered from panic",
 					zap.Any("errors", r),
+					zap.String("request_id", RequestID(c)),
+					zap.String("trace_id", TraceID(c)),
 					zap.String("path", c.FullPath()),
 					zap.String("method", c.Request.Method),
 					zap.String("stack", string(debug.Stack())),

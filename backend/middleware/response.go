@@ -16,7 +16,6 @@ import (
 
 func ResponseHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		zap.L().Info("ResponseHandler start")
 		c.Next()
 		if len(c.Errors) > 0 {
 			requestErr := c.Errors[0].Err
@@ -28,6 +27,8 @@ func ResponseHandler() gin.HandlerFunc {
 				zap.L().Error(
 					"request failed",
 					zap.Error(requestErr),
+					zap.String("request_id", RequestID(c)),
+					zap.String("trace_id", TraceID(c)),
 					zap.String("method", c.Request.Method),
 					zap.String("path", c.Request.URL.Path),
 					zap.String("error_category", string(category)),
@@ -39,6 +40,5 @@ func ResponseHandler() gin.HandlerFunc {
 		if resp, exists := c.Get("response"); exists {
 			c.JSON(http.StatusOK, resp)
 		}
-		zap.L().Info("ResponseHandler end")
 	}
 }
