@@ -63,6 +63,22 @@
                     @update:model-value="handleFieldInput(field.field_code)"
                   />
 
+                  <!-- 组织主数据选择器 -->
+                  <organization-select
+                    v-else-if="organizationSelectorConfigMap[field.field_code]"
+                    :model-value="formData[field.field_code]"
+                    :selector-type="requireOrganizationSelectorConfig(field).selectorType"
+                    :multiple="requireOrganizationSelectorConfig(field).multiple"
+                    :include-history="requireOrganizationSelectorConfig(field).includeHistory"
+                    :disabled="isReadonly || requireOrganizationSelectorConfig(field).disabled"
+                    :label="field.field_name"
+                    :clearable="!!field.is_null"
+                    :rules="getFieldRules(field)"
+                    :hint="getFieldHint(field)"
+                    :ref="setFieldRef(field.field_code)"
+                    @update:model-value="updateOrganizationSelectorValue(field, $event)"
+                  />
+
                   <!-- JSON 编辑器 -->
                   <json-editor
                     v-else-if="getFieldInputType(field) === 'json-editor'"
@@ -481,6 +497,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
 import { QForm } from 'quasar'
+import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import { type TableField } from 'src/api/services/sys-table'
 import { type MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
@@ -512,6 +529,7 @@ import {
   isBooleanFieldMetadata,
   metadataDictDefault,
   parseLinkageConfig,
+  resolveOrganizationSelectorConfig,
   selectLikeInputTypes,
 } from 'src/utils/field-metadata'
 import { resolveRelationMenuId } from 'src/utils/menu-context'
@@ -630,6 +648,50 @@ const booleanToggleOptions = [
   { label: '是', value: true },
 ]
 
+type OrganizationSelectorConfig = NonNullable<
+  ReturnType<typeof resolveOrganizationSelectorConfig>
+>
+
+const organizationSelectorConfigMap = computed<Record<string, OrganizationSelectorConfig>>(() => {
+  const configs: Record<string, OrganizationSelectorConfig> = {}
+  props.fields.forEach((field) => {
+    const config = resolveOrganizationSelectorConfig(field)
+    if (config) configs[field.field_code] = config
+  })
+  return configs
+})
+
+const getOrganizationSelectorConfig = (field: TableField) => {
+  return organizationSelectorConfigMap.value[field.field_code] || null
+}
+
+const requireOrganizationSelectorConfig = (field: TableField): OrganizationSelectorConfig => {
+  return organizationSelectorConfigMap.value[field.field_code] as OrganizationSelectorConfig
+}
+
+const normalizeOrganizationSelectorId = (value: unknown): number | null => {
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN
+  return Number.isSafeInteger(numericValue) && numericValue > 0 ? numericValue : null
+}
+
+const normalizeOrganizationSelectorValue = (
+  value: unknown,
+  config: OrganizationSelectorConfig,
+) => {
+  if (!config.multiple) return normalizeOrganizationSelectorId(value)
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map(normalizeOrganizationSelectorId)
+    .filter((item): item is number => item !== null)
+    .filter((item, index, values) => values.indexOf(item) === index)
+}
+
 const normalizeBooleanFormValue = (value: unknown, fallback = false): boolean => {
   if (value === undefined || value === null || value === '') return fallback
   if (typeof value === 'boolean') return value
@@ -676,6 +738,24 @@ const handleFieldInput = async (code: string) => {
   if (!validationActive.value && !touchedMap.value[code]) return
   await nextTick()
   fieldRefs.value[code]?.validate?.()
+}
+
+const updateOrganizationSelectorValue = (field: TableField, value: unknown) => {
+  const config = getOrganizationSelectorConfig(field)
+  if (!config) return
+  formData.value[field.field_code] = normalizeOrganizationSelectorValue(value, config)
+  void handleFieldInput(field.field_code)
+}
+
+const normalizeOrganizationSelectorFormFields = () => {
+  props.fields.forEach((field) => {
+    const config = getOrganizationSelectorConfig(field)
+    if (!config) return
+    formData.value[field.field_code] = normalizeOrganizationSelectorValue(
+      formData.value[field.field_code],
+      config,
+    )
+  })
 }
 
 const isFieldMetadataForm = computed(() => {
@@ -1262,6 +1342,7 @@ const loadCascaderOptions = async (field: TableField, cfg: any) => {
 }
 
 const resolveFieldOptions = async (field: TableField) => {
+  if (getOrganizationSelectorConfig(field)) return
   const linkage = parseLinkageConfig(field)
   if (!linkage) return
 
@@ -1437,10 +1518,16 @@ const initFormData = () => {
       }
       // 关键修改：只有当字段未被设置或为undefined时才应用默认值
       if (formData.value[field.field_code] === undefined) {
-        formData.value[field.field_code] = defaultValueForField(field)
+        const selectorConfig = getOrganizationSelectorConfig(field)
+        formData.value[field.field_code] = selectorConfig
+          ? selectorConfig.multiple
+            ? []
+            : null
+          : defaultValueForField(field)
       }
     })
   }
+  normalizeOrganizationSelectorFormFields()
   normalizeBooleanFormFields()
   loadingData.value = false
 }
@@ -1771,7 +1858,7 @@ const preloadDictionaries = async () => {
   const dictCodes = new Set<string>()
   // 收集所有需要的字典代码
   props.fields.forEach((field) => {
-    if (field.dict_code) {
+    if (field.dict_code && !getOrganizationSelectorConfig(field)) {
       dictCodes.add(field.dict_code)
     }
   })
