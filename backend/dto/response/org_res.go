@@ -38,6 +38,34 @@ type OrgLegalEntityDetailRes struct {
 	LocalHandlingStatus string          `json:"local_handling_status"`
 }
 
+// OrgLegalEntityTreeNodeRes is a presentation node for the legal-entity
+// hierarchy. Value is always the internal legal_entity_id. Orphan is set when
+// the referenced parent is absent from the visible result set.
+type OrgLegalEntityTreeNodeRes struct {
+	LegalEntityId int                         `json:"legal_entity_id"`
+	Value         int                         `json:"value"`
+	Label         string                      `json:"label"`
+	Code          string                      `json:"code"`
+	Name          string                      `json:"name"`
+	ShortName     string                      `json:"short_name"`
+	EntityType    string                      `json:"entity_type"`
+	ParentId      *int                        `json:"parent_id"`
+	Status        string                      `json:"status"`
+	Disabled      bool                        `json:"disabled"`
+	Orphan        bool                        `json:"orphan,omitempty"`
+	Children      []OrgLegalEntityTreeNodeRes `json:"children,omitempty"`
+}
+
+// OrgSelectorOptionRes is the shared Organization selector wire format.
+// Persisted values are platform internal IDs; labels are presentation only.
+type OrgSelectorOptionRes struct {
+	Value    int    `json:"value"`
+	Label    string `json:"label"`
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	Disabled bool   `json:"disabled"`
+}
+
 type OrgUnitListRes struct {
 	OrgBaseRes
 	Code                 string     `json:"code"`
@@ -227,6 +255,31 @@ func NewOrgLegalEntityDetailRes(entity model.OrgLegalEntity) OrgLegalEntityDetai
 		LocalTags:             cloneRawJSON(entity.LocalTags),
 		DisplayOrder:          entity.DisplayOrder,
 		LocalHandlingStatus:   entity.LocalHandlingStatus,
+	}
+}
+
+func NewOrgLegalEntityTreeNodeRes(entity model.OrgLegalEntity, disabled bool) OrgLegalEntityTreeNodeRes {
+	return OrgLegalEntityTreeNodeRes{
+		LegalEntityId: entity.Id,
+		Value:         entity.Id,
+		Label:         organizationDisplayLabel(entity.Code, entity.Name),
+		Code:          entity.Code,
+		Name:          entity.Name,
+		ShortName:     entity.ShortName,
+		EntityType:    entity.EntityType,
+		ParentId:      entity.ParentId,
+		Status:        entity.Status,
+		Disabled:      disabled,
+	}
+}
+
+func NewOrgLegalEntityOptionRes(entity model.OrgLegalEntity, disabled bool) OrgSelectorOptionRes {
+	return OrgSelectorOptionRes{
+		Value:    entity.Id,
+		Label:    organizationDisplayLabel(entity.Code, entity.Name),
+		Code:     entity.Code,
+		Name:     entity.Name,
+		Disabled: disabled,
 	}
 }
 
@@ -428,6 +481,19 @@ func cloneRawJSON(value []byte) json.RawMessage {
 	cloned := make([]byte, len(value))
 	copy(cloned, value)
 	return json.RawMessage(cloned)
+}
+
+func organizationDisplayLabel(code, name string) string {
+	code = strings.TrimSpace(code)
+	name = strings.TrimSpace(name)
+	switch {
+	case code == "":
+		return name
+	case name == "":
+		return code
+	default:
+		return code + " - " + name
+	}
 }
 
 func maskMobile(value string) string {

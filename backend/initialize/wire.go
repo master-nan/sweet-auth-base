@@ -44,6 +44,7 @@ type App struct {
 	ApplicationController    *controller.ApplicationController
 	GeneralizationController *controller.GeneralizationController
 	ReportController         *controller.ReportController
+	OrgController            *controller.OrgController
 	SmsController            *controller.SmsController
 	FileController           *controller.FileController
 	AuthApi                  *api.AuthApi
@@ -83,6 +84,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewReportDefinitionRepositoryImpl,
 	impl.NewReportDefinitionVersionRepositoryImpl,
 	impl.NewReportExecutionLogRepositoryImpl,
+	impl.NewOrgLegalEntityRepositoryImpl,
 	impl.NewCasbinRuleRepositoryImpl,
 	impl.NewSmsLogImpl,
 	impl.NewSmsTemplateImpl,
@@ -113,6 +115,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)),
 	wire.Bind(new(repository.ReportExecutionLogRepository), new(*impl.ReportExecutionLogRepositoryImpl)),
+	wire.Bind(new(repository.OrgLegalEntityRepository), new(*impl.OrgLegalEntityRepositoryImpl)),
 	wire.Bind(new(repository.CasbinRuleRepository), new(*impl.CasbinRuleRepositoryImpl)),
 	wire.Bind(new(repository.SmsLogRepository), new(*impl.SmsLogImpl)),
 	wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)),
@@ -158,6 +161,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewGeneralizationService,
 	service.NewDataPermissionService,
 	service.NewReportService,
+	service.NewOrgService,
 	service.NewCasbinRuleService,
 	service.NewApplicationService,
 	service.NewDingTalkService,
@@ -176,6 +180,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
 	controller.NewReportController,
+	controller.NewOrgController,
 	controller.NewApplicationController,
 	controller.NewSmsController,
 	controller.NewFileController,

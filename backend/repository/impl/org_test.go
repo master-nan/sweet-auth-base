@@ -47,7 +47,7 @@ func TestOrgLegalEntityRepositoryQueryPaginatesAndFilters(t *testing.T) {
 		"code":        enum.VarcharFieldType,
 		"entity_type": enum.VarcharFieldType,
 		"status":      enum.VarcharFieldType,
-	}))
+	}), repository.OrgLegalEntityReadScope{AsOf: model.Now()})
 	if err != nil {
 		t.Fatalf("query legal entities: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestOrgLegalEntityRepositoryQueryPaginatesAndFilters(t *testing.T) {
 	})
 	restrictedResult, err := repo.Query(nil, &request.OrgLegalEntityQueryReq{
 		Basic: request.Basic{Filters: map[string]any{"source_id": "src-1"}},
-	}, restrictedTable)
+	}, restrictedTable, repository.OrgLegalEntityReadScope{AsOf: model.Now()})
 	if err != nil {
 		t.Fatalf("query with restricted metadata field: %v", err)
 	}
@@ -379,7 +379,12 @@ func TestOrgRepositoryPropagatesCancelledContext(t *testing.T) {
 	ginContext.Request = httptest.NewRequest("POST", "/admin/org/legal-entity/query", nil).
 		WithContext(requestContext)
 
-	_, err := repo.Query(ginContext, &request.OrgLegalEntityQueryReq{}, model.SysTable{TableCode: "org_legal_entity"})
+	_, err := repo.Query(
+		ginContext,
+		&request.OrgLegalEntityQueryReq{},
+		model.SysTable{TableCode: "org_legal_entity"},
+		repository.OrgLegalEntityReadScope{AsOf: model.Now()},
+	)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation propagation, got %v", err)
 	}

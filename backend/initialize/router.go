@@ -196,6 +196,12 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/data-permission/bindings/menu/:menuId", app.DataPermissionController.SaveMenuBindings)
 		adminGroup.GET("/data-permission/debug", app.DataPermissionController.DebugDataScope)
 
+		// organization legal entity (read-only mirror)
+		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
+		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)
+		adminGroup.POST("/org/legal-entity/tree", app.OrgController.GetLegalEntityTree)
+		adminGroup.POST("/org/legal-entity/options", app.OrgController.QueryLegalEntityOptions)
+
 		// application
 		adminGroup.GET("/application/:id", app.ApplicationController.GetApplicationById)
 		adminGroup.POST("/application/query", app.ApplicationController.QueryApplication)

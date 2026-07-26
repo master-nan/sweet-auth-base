@@ -28,6 +28,22 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgSyncRecordQueryReq{Action: "rewrite"}); err == nil {
 		t.Fatal("expected unsupported sync action to fail")
 	}
+	if err := validate.Struct(request.OrgLegalEntityTreeReq{
+		OrgLegalEntityReadScopeReq: request.OrgLegalEntityReadScopeReq{AsOfDate: "2026-07-26"},
+	}); err != nil {
+		t.Fatalf("expected date-only as_of_date to pass: %v", err)
+	}
+	if err := validate.Struct(request.OrgLegalEntityTreeReq{
+		OrgLegalEntityReadScopeReq: request.OrgLegalEntityReadScopeReq{AsOfDate: "2026/07/26"},
+	}); err == nil {
+		t.Fatal("expected invalid as_of_date to fail")
+	}
+	if err := validate.Struct(request.OrgLegalEntityOptionsReq{SelectedIds: []int{1, 2}}); err != nil {
+		t.Fatalf("expected positive selected_ids to pass: %v", err)
+	}
+	if err := validate.Struct(request.OrgLegalEntityOptionsReq{SelectedIds: []int{0}}); err == nil {
+		t.Fatal("expected non-positive selected_ids to fail")
+	}
 }
 
 func TestOrganizationQueryDTOsExcludeRestrictedFields(t *testing.T) {

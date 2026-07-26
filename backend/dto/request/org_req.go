@@ -1,14 +1,48 @@
 package request
 
+// OrgLegalEntityReadScopeReq defines the shared visibility controls for
+// legal-entity reads. A nil OnlyEffective is normalized to true by the
+// Organization Service.
+type OrgLegalEntityReadScopeReq struct {
+	OnlyEffective   *bool  `form:"only_effective" json:"only_effective"`
+	IncludeDisabled bool   `form:"include_disabled" json:"include_disabled"`
+	IncludeHistory  bool   `form:"include_history" json:"include_history"`
+	AsOfDate        string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
+}
+
 // OrgLegalEntityQueryReq defines the repository-safe query fields for legal
 // entities. Source identity and synchronization internals are intentionally
 // excluded from user-facing query DTOs.
 type OrgLegalEntityQueryReq struct {
 	Basic
+	OrgLegalEntityReadScopeReq
 	SourceSystemCode string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
 	EntityType       string `form:"entity_type" json:"entity_type" binding:"omitempty,oneof=group legal_company branch accounting_unit"`
 	ParentId         *int   `form:"parent_id" json:"parent_id" binding:"omitempty,gt=0"`
 	Status           string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
+}
+
+// OrgLegalEntityDetailReq controls visibility for one internal legal_entity_id.
+type OrgLegalEntityDetailReq struct {
+	OrgLegalEntityReadScopeReq
+}
+
+// OrgLegalEntityTreeReq requests a legal-entity tree built exclusively from
+// org_legal_entity.parent_id.
+type OrgLegalEntityTreeReq struct {
+	OrgLegalEntityReadScopeReq
+	RootId *int `form:"root_id" json:"root_id" binding:"omitempty,gt=0"`
+}
+
+// OrgLegalEntityOptionsReq supports remote option search and replay of
+// already-persisted IDs. SelectedIds never changes the option value contract:
+// values are always internal legal_entity_id values.
+type OrgLegalEntityOptionsReq struct {
+	OrgLegalEntityReadScopeReq
+	Page        int    `form:"page" json:"page"`
+	Num         int    `form:"num" json:"num"`
+	Keyword     string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
+	SelectedIds []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
 // OrgUnitQueryReq defines the repository-safe query fields for management

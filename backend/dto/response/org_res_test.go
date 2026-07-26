@@ -174,6 +174,44 @@ func TestOrganizationDefaultResponsesOmitSourceAndSyncInternals(t *testing.T) {
 	}
 }
 
+func TestOrgLegalEntityTreeAndOptionUseInternalIDWithoutSourceIdentity(t *testing.T) {
+	entity := model.OrgLegalEntity{
+		Basic:            model.Basic{Id: 42, State: true},
+		SourceSystemCode: "authority",
+		SourceId:         "source-42",
+		SourceCode:       "external-code-42",
+		SourceVersion:    "version-42",
+		Code:             "LE-42",
+		Name:             "法人四十二",
+		EntityType:       "legal_company",
+		Status:           "enabled",
+	}
+
+	tree := marshalJSONObject(t, NewOrgLegalEntityTreeNodeRes(entity, false))
+	option := marshalJSONObject(t, NewOrgLegalEntityOptionRes(entity, false))
+	for name, object := range map[string]map[string]any{
+		"tree":   tree,
+		"option": option,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertJSONKeysAbsent(
+				t,
+				object,
+				"source_system_code",
+				"source_id",
+				"source_code",
+				"source_version",
+			)
+			if got := int(object["value"].(float64)); got != entity.Id {
+				t.Fatalf("value = %d, want legal_entity_id %d", got, entity.Id)
+			}
+			if object["label"] != "LE-42 - 法人四十二" {
+				t.Fatalf("unexpected selector label: %v", object["label"])
+			}
+		})
+	}
+}
+
 func marshalJSONObject(t *testing.T, value any) map[string]any {
 	t.Helper()
 	data, err := json.Marshal(value)

@@ -5,6 +5,7 @@ import (
 	"backend/dto/response"
 	"backend/model"
 	"errors"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,9 +18,21 @@ var (
 	ErrOrganizationTxRequired    = errors.New("repository: organization update requires a transaction")
 )
 
+// OrgLegalEntityReadScope is normalized by OrgService before it reaches the
+// repository. The repository only translates the already-decided visibility
+// boundary into database predicates.
+type OrgLegalEntityReadScope struct {
+	AsOf            time.Time
+	IncludeDisabled bool
+	IncludeHistory  bool
+}
+
 type OrgLegalEntityRepository interface {
 	BasicRepository[model.OrgLegalEntity]
-	Query(*gin.Context, *request.OrgLegalEntityQueryReq, model.SysTable) (response.ListResult[model.OrgLegalEntity], error)
+	Query(*gin.Context, *request.OrgLegalEntityQueryReq, model.SysTable, OrgLegalEntityReadScope) (response.ListResult[model.OrgLegalEntity], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgLegalEntity, error)
+	ListForTree(*gin.Context, OrgLegalEntityReadScope) ([]model.OrgLegalEntity, error)
+	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgLegalEntity, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgLegalEntity, error)
 	FindByCode(*gin.Context, string, string) (model.OrgLegalEntity, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error

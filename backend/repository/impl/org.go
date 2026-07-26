@@ -3,6 +3,7 @@ package impl
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository"
@@ -115,23 +116,62 @@ func NewOrgSyncRecordRepositoryImpl(primaryDB *database.PrimaryDB) *OrgSyncRecor
 	}
 }
 
-func (r *OrgLegalEntityRepositoryImpl) Query(ctx *gin.Context, req *request.OrgLegalEntityQueryReq, table model.SysTable) (response.ListResult[model.OrgLegalEntity], error) {
+func (r *OrgLegalEntityRepositoryImpl) Query(
+	ctx *gin.Context,
+	req *request.OrgLegalEntityQueryReq,
+	table model.SysTable,
+	scope repository.OrgLegalEntityReadScope,
+) (response.ListResult[model.OrgLegalEntity], error) {
 	if req == nil {
 		req = &request.OrgLegalEntityQueryReq{}
 	}
+	query := legalEntityScopedBasic(req.Basic, scope)
 	return queryOrganization(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.Basic,
+		query,
 		map[string]any{
 			"source_system_code": optionalString(req.SourceSystemCode),
 			"entity_type":        optionalString(req.EntityType),
 			"parent_id":          optionalInt(req.ParentId),
 			"status":             optionalString(req.Status),
 		},
-		organizationQueryTable(table, "org_legal_entity"),
+		legalEntityScopedTable(organizationQueryTable(table, "org_legal_entity")),
 		orgLegalEntityListColumns(),
 	)
+}
+
+func (r *OrgLegalEntityRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgLegalEntity, error) {
+	var entity model.OrgLegalEntity
+	err := organizationDB(r.db, ctx).
+		Select(orgLegalEntityDetailColumns()).
+		First(&entity, id).Error
+	return entity, err
+}
+
+func (r *OrgLegalEntityRepositoryImpl) ListForTree(
+	ctx *gin.Context,
+	scope repository.OrgLegalEntityReadScope,
+) ([]model.OrgLegalEntity, error) {
+	var entities []model.OrgLegalEntity
+	query := applyLegalEntityReadScope(
+		organizationDB(r.db, ctx).Model(&model.OrgLegalEntity{}),
+		scope,
+	)
+	err := query.Select(orgLegalEntityTreeColumns()).Find(&entities).Error
+	return entities, err
+}
+
+func (r *OrgLegalEntityRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgLegalEntity, error) {
+	if len(ids) == 0 {
+		return []model.OrgLegalEntity{}, nil
+	}
+	var entities []model.OrgLegalEntity
+	err := organizationDB(r.db, ctx).
+		Select(orgLegalEntityTreeColumns()).
+		Where("id IN ?", ids).
+		Find(&entities).Error
+	return entities, err
 }
 
 func (r *OrgLegalEntityRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgLegalEntity, error) {
@@ -474,6 +514,146 @@ func queryOrganization[T any](
 	return response.ListResult[T]{Data: rows, Total: int(total)}, err
 }
 
+func legalEntityScopedBasic(
+	source request.Basic,
+	scope repository.OrgLegalEntityReadScope,
+) request.Basic {
+	query := cloneOrganizationBasic(source)
+	// Legal-entity history is controlled only by the explicit organization
+	// visibility flags. The generic soft-delete switch is not part of this API.
+	query.IncludeDeleted = false
+	if legalEntityInternalFieldRequested(query, "source_deleted") {
+		query.Expressions = append(query.Expressions, request.ExpressionGroup{
+			Logic: enum.And,
+			Rules: []request.QueryRule{{
+				Field:          "id",
+				ExpressionType: enum.Eq,
+				Value:          -1,
+			}},
+		})
+	}
+
+	if !scope.IncludeDisabled {
+		query.Expressions = append(query.Expressions, request.ExpressionGroup{
+			Logic: enum.And,
+			Rules: []request.QueryRule{{
+				Field:          "status",
+				ExpressionType: enum.Eq,
+				Value:          "enabled",
+			}},
+		})
+	}
+	if scope.IncludeHistory {
+		return query
+	}
+
+	asOf := scope.AsOf
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	query.Expressions = append(
+		query.Expressions,
+		request.ExpressionGroup{
+			Logic: enum.And,
+			Rules: []request.QueryRule{{
+				Field:          "source_deleted",
+				ExpressionType: enum.Eq,
+				Value:          false,
+			}},
+		},
+		request.ExpressionGroup{
+			Logic: enum.Or,
+			Rules: []request.QueryRule{
+				{Field: "valid_from", ExpressionType: enum.IsNull},
+				{Field: "valid_from", ExpressionType: enum.Lte, Value: asOf},
+			},
+		},
+		request.ExpressionGroup{
+			Logic: enum.Or,
+			Rules: []request.QueryRule{
+				{Field: "valid_to", ExpressionType: enum.IsNull},
+				{Field: "valid_to", ExpressionType: enum.Gte, Value: asOf},
+			},
+		},
+	)
+	return query
+}
+
+func legalEntityScopedTable(table model.SysTable) model.SysTable {
+	table = ensureOrganizationQueryField(table, "id", enum.BigIntFieldType)
+	table = ensureOrganizationQueryField(table, "status", enum.VarcharFieldType)
+	table = ensureOrganizationQueryField(table, "source_deleted", enum.BooleanFieldType)
+	table = ensureOrganizationQueryField(table, "valid_from", enum.DatetimeFieldType)
+	table = ensureOrganizationQueryField(table, "valid_to", enum.DatetimeFieldType)
+	return table
+}
+
+func ensureOrganizationQueryField(
+	table model.SysTable,
+	fieldCode string,
+	fieldType enum.SysTableFieldType,
+) model.SysTable {
+	for _, field := range table.TableFields {
+		if field.FieldCode == fieldCode {
+			return table
+		}
+	}
+	table.TableFields = append(table.TableFields, model.SysTableField{
+		FieldCode: fieldCode,
+		FieldType: fieldType,
+	})
+	return table
+}
+
+func legalEntityInternalFieldRequested(query request.Basic, field string) bool {
+	if query.Order.Field == field {
+		return true
+	}
+	if _, exists := query.Filters[field]; exists {
+		return true
+	}
+	for _, group := range query.Expressions {
+		if expressionGroupReferencesField(group, field) {
+			return true
+		}
+	}
+	return false
+}
+
+func expressionGroupReferencesField(group request.ExpressionGroup, field string) bool {
+	for _, rule := range group.Rules {
+		if rule.Field == field {
+			return true
+		}
+	}
+	for _, nested := range group.Nested {
+		if expressionGroupReferencesField(nested, field) {
+			return true
+		}
+	}
+	return false
+}
+
+func applyLegalEntityReadScope(
+	query *gorm.DB,
+	scope repository.OrgLegalEntityReadScope,
+) *gorm.DB {
+	if !scope.IncludeDisabled {
+		query = query.Where("status = ?", "enabled")
+	}
+	if scope.IncludeHistory {
+		return query
+	}
+	asOf := scope.AsOf
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	return query.
+		Where("source_deleted = ?", false).
+		Where("(valid_from IS NULL OR valid_from <= ?)", asOf).
+		Where("(valid_to IS NULL OR valid_to >= ?)", asOf)
+}
+
 func cloneOrganizationBasic(source request.Basic) request.Basic {
 	cloned := source
 	if source.Filters != nil {
@@ -485,6 +665,24 @@ func cloneOrganizationBasic(source request.Basic) request.Basic {
 	if source.QuickQuery != nil {
 		quick := *source.QuickQuery
 		cloned.QuickQuery = &quick
+	}
+	if source.Expressions != nil {
+		cloned.Expressions = make([]request.ExpressionGroup, len(source.Expressions))
+		for index, group := range source.Expressions {
+			cloned.Expressions[index] = cloneExpressionGroup(group)
+		}
+	}
+	return cloned
+}
+
+func cloneExpressionGroup(source request.ExpressionGroup) request.ExpressionGroup {
+	cloned := source
+	cloned.Rules = append([]request.QueryRule(nil), source.Rules...)
+	if source.Nested != nil {
+		cloned.Nested = make([]request.ExpressionGroup, len(source.Nested))
+		for index, nested := range source.Nested {
+			cloned.Nested[index] = cloneExpressionGroup(nested)
+		}
 	}
 	return cloned
 }
@@ -606,6 +804,20 @@ func orgLegalEntityListColumns() []string {
 		"entity_type", "parent_id", "unified_social_credit_code", "accounting_code",
 		"status", "valid_from", "valid_to",
 	}
+}
+
+func orgLegalEntityDetailColumns() []string {
+	return append(
+		orgLegalEntityListColumns(),
+		"local_note",
+		"local_tags",
+		"display_order",
+		"local_handling_status",
+	)
+}
+
+func orgLegalEntityTreeColumns() []string {
+	return append(orgLegalEntityListColumns(), "display_order")
 }
 
 func orgUnitListColumns() []string {
