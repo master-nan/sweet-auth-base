@@ -87,6 +87,19 @@
           class="field-input"
           hide-bottom-space
         />
+        <organization-select
+          v-else-if="organizationSelectorConfigForRule(rule)"
+          :model-value="rule.value"
+          :selector-type="requireOrganizationSelectorConfig(rule).selectorType"
+          :multiple="isMultiValueRule(rule)"
+          :include-history="requireOrganizationSelectorConfig(rule).includeHistory"
+          :disabled="requireOrganizationSelectorConfig(rule).disabled"
+          clearable
+          label="值"
+          class="field-input"
+          :rules="valueRules(rule)"
+          @update:model-value="(value) => updateOrganizationSelectorValue(rule, value)"
+        />
         <q-select
           v-else-if="hasDictRule(rule)"
           dense
@@ -238,7 +251,9 @@
 import { ref, toRefs, watch } from 'vue'
 import type { QueryRule } from 'src/types/global'
 import { SysTableFieldInputTypeMap, SysTableFieldTypeMap } from 'src/types/enum'
+import type { OrganizationSelectorRuntimeConfig } from 'src/types/organization-selector'
 import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
+import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 
 defineOptions({ name: 'AdvancedQueryRuleRow' })
 
@@ -279,6 +294,10 @@ const props = defineProps<{
   expressionLogicOptions: SelectOption[]
   expressionTypeOptionsForRule: (rule: QueryRule) => SelectOption[]
   booleanOptions: SelectOption[]
+  organizationSelectorConfigForRule: (
+    rule: QueryRule,
+  ) => OrganizationSelectorRuntimeConfig | null
+  updateOrganizationSelectorValue: (rule: QueryRule, value: unknown) => void
   isNullOperator: (rule: QueryRule) => boolean
   hasDictRule: (rule: QueryRule) => boolean
   hasRelationRule: (rule: QueryRule) => boolean
@@ -314,6 +333,12 @@ const emit = defineEmits<{
 
 const hasValue = (value: unknown) => {
   return value !== null && value !== undefined && value !== ''
+}
+
+const requireOrganizationSelectorConfig = (
+  rule: QueryRule,
+): OrganizationSelectorRuntimeConfig => {
+  return props.organizationSelectorConfigForRule(rule) as OrganizationSelectorRuntimeConfig
 }
 
 const multiValueTooltip = (value: unknown, options: SelectOption[]) => {
@@ -401,6 +426,8 @@ const {
   expressionLogicOptions,
   expressionTypeOptionsForRule,
   booleanOptions,
+  organizationSelectorConfigForRule,
+  updateOrganizationSelectorValue,
   isNullOperator,
   hasDictRule,
   hasRelationRule,

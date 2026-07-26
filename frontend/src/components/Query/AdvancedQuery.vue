@@ -66,6 +66,8 @@
                       :expression-logic-options="expressionLogicOptions"
                       :expression-type-options-for-rule="expressionTypeOptionsForRule"
                       :boolean-options="booleanOptions"
+                      :organization-selector-config-for-rule="organizationSelectorConfigForRule"
+                      :update-organization-selector-value="updateOrganizationSelectorValue"
                       :is-null-operator="isNullOperator"
                       :has-dict-rule="hasDictRule"
                       :has-relation-rule="hasRelationRule"
@@ -160,6 +162,12 @@
                                   :expression-logic-options="expressionLogicOptions"
                                   :expression-type-options-for-rule="expressionTypeOptionsForRule"
                                   :boolean-options="booleanOptions"
+                                  :organization-selector-config-for-rule="
+                                    organizationSelectorConfigForRule
+                                  "
+                                  :update-organization-selector-value="
+                                    updateOrganizationSelectorValue
+                                  "
                                   :is-null-operator="isNullOperator"
                                   :has-dict-rule="hasDictRule"
                                   :has-relation-rule="hasRelationRule"
@@ -215,7 +223,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'AdvancedQuery' })
 import { ref, computed, watch } from 'vue'
-import { useQuasar, QForm } from 'quasar'
+import { useQuasar, type QForm } from 'quasar'
 import {
   ExpressionLogic,
   ExpressionLogicMap,
@@ -232,6 +240,7 @@ import {
   isBooleanFieldMetadata,
   parseLinkageConfig,
   queryValueHtmlInputType,
+  resolveOrganizationSelectorConfig,
 } from 'src/utils/field-metadata'
 import {
   isIncompleteQueryRule,
@@ -355,6 +364,7 @@ const expressionTypeOptions = computed(() => {
 })
 
 const nullableExpressionTypes = [ExpressionType.IS_NULL, ExpressionType.IS_NOT_NULL]
+const organizationSelectorExpressionTypes = [ExpressionType.EQ, ExpressionType.IN]
 const equalityExpressionTypes = [
   ExpressionType.EQ,
   ExpressionType.NE,
@@ -393,6 +403,14 @@ const findField = (fieldCode: string) => {
   return (props.fields as FieldRecord[]).find((field) => field[props.fieldValueKey] === fieldCode)
 }
 
+const organizationSelectorConfigForField = (field?: FieldRecord) => {
+  return field ? resolveOrganizationSelectorConfig(field) : null
+}
+
+const organizationSelectorConfigForRule = (rule: QueryRule) => {
+  return organizationSelectorConfigForField(findField(rule.field))
+}
+
 const updateRuleField = (rule: QueryRule, fieldCode: unknown) => {
   if (!fieldCode) {
     delete rule.type
@@ -425,7 +443,12 @@ const isRangeRule = (rule: QueryRule) => {
 }
 
 const hasOptionValueControl = (rule: QueryRule) => {
-  return hasDictRule(rule) || hasRelationRule(rule) || isBooleanRule(rule)
+  return (
+    !!organizationSelectorConfigForRule(rule) ||
+    hasDictRule(rule) ||
+    hasRelationRule(rule) ||
+    isBooleanRule(rule)
+  )
 }
 
 const isFreeInputMultiValueRule = (rule: QueryRule) => {
@@ -487,6 +510,7 @@ const updateRuleExpressionType = (rule: QueryRule) => {
 
 const recommendedExpressionTypeForField = (field?: FieldRecord) => {
   if (!field) return ExpressionType.EQ
+  if (organizationSelectorConfigForField(field)) return ExpressionType.EQ
   if (field.dict_code || isBooleanFieldMetadata(field) || parseLinkageConfig(field as TableField)) {
     return ExpressionType.EQ
   }
@@ -501,6 +525,7 @@ const recommendedExpressionTypeForField = (field?: FieldRecord) => {
 
 const expressionTypesForField = (field?: FieldRecord) => {
   if (!field) return Object.values(ExpressionType).filter((value) => typeof value === 'number')
+  if (organizationSelectorConfigForField(field)) return organizationSelectorExpressionTypes
   if (field.dict_code || isBooleanFieldMetadata(field) || parseLinkageConfig(field as TableField)) {
     return equalityExpressionTypes
   }
@@ -545,6 +570,9 @@ const normalizeRuleExpressionType = (rule: QueryRule) => {
     return
   }
   updateRuleExpressionType(rule)
+  if (organizationSelectorConfigForField(field)) {
+    updateOrganizationSelectorValue(rule, rule.value)
+  }
 }
 
 const normalizeQueryExpressionTypes = () => {
@@ -567,7 +595,7 @@ const resolveRuleFieldType = (rule: QueryRule) => {
 }
 
 const hasDictRule = (rule: QueryRule) => {
-  return !!findField(rule.field)?.dict_code
+  return !organizationSelectorConfigForRule(rule) && !!findField(rule.field)?.dict_code
 }
 
 const dictOptionsForRule = (rule: QueryRule) => {
@@ -582,6 +610,7 @@ const dictOptionsForRule = (rule: QueryRule) => {
 const isBooleanRule = (rule: QueryRule) => isBooleanFieldMetadata(findField(rule.field), rule.type)
 
 const relationLinkageForRule = (rule: QueryRule) => {
+  if (organizationSelectorConfigForRule(rule)) return null
   if (hasDictRule(rule)) return null
   const field = findField(rule.field)
   if (!field) return null
@@ -757,6 +786,7 @@ const loadRelationOptionsForField = async (
   loadOptions: RelationLoadOptions = {},
 ) => {
   if (!field?.[props.fieldValueKey]) return
+  if (organizationSelectorConfigForField(field)) return
   if (field.dict_code) return
 
   const fieldCode = String(field[props.fieldValueKey])
@@ -892,6 +922,30 @@ const hasValue = (value: unknown) => {
   return value !== null && value !== undefined && value !== ''
 }
 
+const normalizeOrganizationSelectorId = (value: unknown): number | null => {
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN
+  return Number.isSafeInteger(numericValue) && numericValue > 0 ? numericValue : null
+}
+
+const updateOrganizationSelectorValue = (rule: QueryRule, value: unknown) => {
+  if (!organizationSelectorConfigForRule(rule)) return
+  if (!isMultiValueRule(rule)) {
+    rule.value = normalizeOrganizationSelectorId(value)
+    return
+  }
+
+  const values = Array.isArray(value) ? value : []
+  rule.value = values
+    .map(normalizeOrganizationSelectorId)
+    .filter((item): item is number => item !== null)
+    .filter((item, index, items) => items.indexOf(item) === index)
+}
+
 const hasMultiValue = (value: unknown) => {
   if (Array.isArray(value)) return value.some(hasValue)
   if (typeof value === 'string') return splitMultiValueText(value).length > 0
@@ -974,6 +1028,7 @@ watch(
     const dictCodes = Array.from(
       new Set(
         (fields as FieldRecord[])
+          .filter((field) => !organizationSelectorConfigForField(field))
           .map((field) => field.dict_code)
           .filter((dictCode): dictCode is string => !!dictCode),
       ),
