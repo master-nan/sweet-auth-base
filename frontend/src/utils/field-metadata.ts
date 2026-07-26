@@ -1,5 +1,10 @@
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import type { TableField } from 'src/api/services/sys-table'
+import type {
+  OrganizationSelectorFieldMetadata,
+  OrganizationSelectorRuntimeConfig,
+  OrganizationSelectorType,
+} from 'src/types/organization-selector'
 
 export type FieldControlType =
   | 'input'
@@ -60,6 +65,79 @@ export const parseLinkageConfig = (field: Partial<TableField>) => {
   const cfg = typeof raw === 'string' ? parseJsonSafe(raw) : raw
   if (!cfg || !cfg.linkage?.enabled) return null
   return cfg.linkage
+}
+
+const organizationSelectorTypeAliases: Record<string, OrganizationSelectorType> = {
+  legal_entity: 'legal_entity',
+  legal_entity_select: 'legal_entity',
+  org_unit: 'org_unit',
+  org_unit_select: 'org_unit',
+  employee: 'employee',
+  employee_select: 'employee',
+  position: 'position',
+  position_select: 'position',
+}
+
+const metadataRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+const parseMetadataRecord = (value: unknown): Record<string, unknown> | null => {
+  if (typeof value !== 'string') return metadataRecord(value)
+  const parsed = parseJsonSafe(decodeHtmlEntities(value))
+  return metadataRecord(parsed)
+}
+
+const normalizeOrganizationSelectorType = (value: unknown): OrganizationSelectorType | null => {
+  if (typeof value !== 'string') return null
+  return organizationSelectorTypeAliases[value.trim().toLowerCase()] || null
+}
+
+const hasMetadataValue = (value: unknown) => {
+  if (typeof value === 'string') return value.trim() !== ''
+  return value !== undefined && value !== null
+}
+
+const metadataBoolean = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number' && (value === 0 || value === 1)) return value === 1
+    if (typeof value !== 'string') continue
+
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'true' || normalized === '1') return true
+    if (normalized === 'false' || normalized === '0') return false
+  }
+  return false
+}
+
+export const resolveOrganizationSelectorConfig = (
+  field: OrganizationSelectorFieldMetadata,
+): OrganizationSelectorRuntimeConfig | null => {
+  const linkageConfig = parseMetadataRecord(field.linkage_config)
+  const nestedSelector = metadataRecord(linkageConfig?.selector)
+  const directSelectorConfigured = hasMetadataValue(field.selector_type)
+  const directSelectorType = normalizeOrganizationSelectorType(field.selector_type)
+
+  if (directSelectorConfigured && !directSelectorType) return null
+
+  const linkageSelectorType = normalizeOrganizationSelectorType(
+    nestedSelector?.selector_type ?? linkageConfig?.selector_type,
+  )
+  const selectorType = directSelectorType || linkageSelectorType
+  if (!selectorType) return null
+
+  return {
+    selectorType,
+    multiple: metadataBoolean(field.multiple, nestedSelector?.multiple, linkageConfig?.multiple),
+    includeHistory: metadataBoolean(
+      field.include_history,
+      nestedSelector?.include_history,
+      linkageConfig?.include_history,
+    ),
+    disabled: metadataBoolean(field.disabled, nestedSelector?.disabled, linkageConfig?.disabled),
+  }
 }
 
 export const numericFieldTypes = new Set<SysTableFieldType>([
