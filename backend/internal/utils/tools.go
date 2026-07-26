@@ -2,25 +2,20 @@ package utils
 
 import (
 	"backend/enum"
-	myerrors "backend/internal/errors"
 	"backend/model"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"math/big"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	"errors"
-
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin/binding"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/go-playground/validator/v10"
 
 	"reflect"
 
@@ -136,16 +131,6 @@ func isZero(v reflect.Value) bool {
 	}
 }
 
-func TranslateError(err validator.FieldError) string {
-	// 你可以根据err.Tag()来判断是哪种验证错误，然后返回不同的错误信息
-	switch err.Tag() {
-	case "required":
-		return fmt.Sprintf("%s 是必填项", err.Field())
-	default:
-		return fmt.Sprintf("%s 验证错误", err.Field())
-	}
-}
-
 // BoolPtr 辅助函数用于创建各种类型的指针
 func BoolPtr(b bool) *bool {
 	return &b
@@ -250,21 +235,7 @@ func ContainsToken(existingTokens string, newToken string) bool {
 func ValidatorBody[T any](ctx *gin.Context, data *T, translator ut.Translator) error {
 	err := ctx.ShouldBindBodyWith(data, binding.JSON)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			// 客户端请求体为空
-			return myerrors.WrapParameterError(err, "参数错误")
-		}
-		var ve validator.ValidationErrors
-		if errors.As(err, &ve) {
-			// 如果是验证错误，则翻译错误信息
-			var errorMessages []string
-			for _, e := range ve {
-				errMsg := e.Translate(translator)
-				errorMessages = append(errorMessages, errMsg)
-			}
-			return myerrors.WrapParameterError(err, strings.Join(errorMessages, ","))
-		}
-		return myerrors.WrapParameterError(err, "参数错误")
+		return ToValidationParameterError(err, translator)
 	}
 	SanitizeData(data)
 	return nil
@@ -273,22 +244,7 @@ func ValidatorBody[T any](ctx *gin.Context, data *T, translator ut.Translator) e
 func ValidatorQuery[T any](ctx *gin.Context, data *T, translator ut.Translator) error {
 	err := ctx.ShouldBindQuery(data)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
-			// 客户端请求体为空
-			return myerrors.WrapParameterError(err, "参数错误")
-		}
-		var ve validator.ValidationErrors
-		if errors.As(err, &ve) {
-			// 如果是验证错误，则翻译错误信息
-			var errorMessages []string
-			for _, e := range ve {
-				errMsg := e.Translate(translator)
-				errorMessages = append(errorMessages, errMsg)
-			}
-
-			return myerrors.WrapParameterError(err, strings.Join(errorMessages, ","))
-		}
-		return myerrors.WrapParameterError(err, "参数错误")
+		return ToValidationParameterError(err, translator)
 	}
 	SanitizeData(data)
 	return nil
