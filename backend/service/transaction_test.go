@@ -1,15 +1,14 @@
 package service
 
 import (
+	testutil "backend/internal/test"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 type transactionFixture struct {
@@ -18,7 +17,7 @@ type transactionFixture struct {
 }
 
 func TestRunInTransactionCommitsOnSuccess(t *testing.T) {
-	db := newTransactionTestDB(t)
+	db := testutil.OpenSQLite(t, &transactionFixture{})
 
 	err := RunInTransaction(context.Background(), db, func(tx *gorm.DB) error {
 		return tx.Create(&transactionFixture{Name: "committed"}).Error
@@ -31,7 +30,7 @@ func TestRunInTransactionCommitsOnSuccess(t *testing.T) {
 }
 
 func TestRunInTransactionRollsBackAndPropagatesError(t *testing.T) {
-	db := newTransactionTestDB(t)
+	db := testutil.OpenSQLite(t, &transactionFixture{})
 	expectedErr := errors.New("write rejected")
 
 	err := RunInTransaction(context.Background(), db, func(tx *gorm.DB) error {
@@ -48,7 +47,7 @@ func TestRunInTransactionRollsBackAndPropagatesError(t *testing.T) {
 }
 
 func TestRunInTransactionNestedSavepoint(t *testing.T) {
-	db := newTransactionTestDB(t)
+	db := testutil.OpenSQLite(t, &transactionFixture{})
 	nestedErr := errors.New("nested write rejected")
 
 	err := RunInTransaction(context.Background(), db, func(tx *gorm.DB) error {
@@ -76,7 +75,7 @@ func TestRunInTransactionNestedSavepoint(t *testing.T) {
 }
 
 func TestRunInTransactionNestedErrorRollsBackOuterWhenPropagated(t *testing.T) {
-	db := newTransactionTestDB(t)
+	db := testutil.OpenSQLite(t, &transactionFixture{})
 	expectedErr := errors.New("nested failure")
 
 	err := RunInTransaction(context.Background(), db, func(tx *gorm.DB) error {
@@ -98,7 +97,7 @@ func TestRunInTransactionNestedErrorRollsBackOuterWhenPropagated(t *testing.T) {
 }
 
 func TestRunInTransactionValidatesRequiredInputs(t *testing.T) {
-	db := newTransactionTestDB(t)
+	db := testutil.OpenSQLite(t, &transactionFixture{})
 	callback := func(*gorm.DB) error { return nil }
 
 	tests := []struct {
@@ -135,32 +134,6 @@ func TestRunInTransactionValidatesRequiredInputs(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newTransactionTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	databaseName := strings.NewReplacer("/", "_", " ", "_").Replace(strings.ToLower(t.Name()))
-	db, err := gorm.Open(
-		sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", databaseName)),
-		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)},
-	)
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("open sqlite handle: %v", err)
-	}
-	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() {
-		_ = sqlDB.Close()
-	})
-
-	if err := db.AutoMigrate(&transactionFixture{}); err != nil {
-		t.Fatalf("migrate transaction fixture: %v", err)
-	}
-	return db
 }
 
 func assertTransactionFixtureNames(t *testing.T, db *gorm.DB, want ...string) {
