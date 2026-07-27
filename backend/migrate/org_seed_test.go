@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/enum"
 	"backend/model"
 	"fmt"
 	"reflect"
@@ -43,6 +44,133 @@ func TestOrganizationFoundationSeedIsIdempotentAndReadOnly(t *testing.T) {
 	assertOrganizationMetadataReadOnly(t, db)
 	assertOrganizationPermissions(t, db)
 	assertOrganizationSeedUserFieldsPreserved(t, db)
+}
+
+func TestOrganizationFoundationRetiresLegacyLegalEntityMenuAndMigratesGrants(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := autoMigrateCoreSchema(db); err != nil {
+		t.Fatalf("migrate core schema: %v", err)
+	}
+	sf := newMigrationTestSnowflake(t)
+	if err := seedDicts(db, sf); err != nil {
+		t.Fatalf("seed platform dictionaries: %v", err)
+	}
+	if err := seedOrganizationFoundation(db, sf); err != nil {
+		t.Fatalf("seed organization foundation: %v", err)
+	}
+
+	var rootMenu model.SysMenu
+	if err := db.Where("name = ?", organizationRootMenuName).First(&rootMenu).Error; err != nil {
+		t.Fatalf("query organization root menu: %v", err)
+	}
+	legacyMenu, err := seedMenu(
+		db,
+		sf,
+		menuWithTable(
+			menu(
+				1001,
+				rootMenu.Id,
+				"organization_legal_entity",
+				"legal-entity",
+				"pages/organization/legal-entity/Index.vue",
+				"法人主体",
+				"account_balance",
+				2,
+			),
+			"org_legal_entity",
+		),
+	)
+	if err != nil {
+		t.Fatalf("seed legacy legal entity menu: %v", err)
+	}
+
+	legacyRole := model.SysRole{
+		Basic: model.Basic{Id: 99, State: true},
+		Name:  "legacy_organization_reader",
+		Memo:  "legacy organization reader",
+	}
+	if err := db.Create(&legacyRole).Error; err != nil {
+		t.Fatalf("create legacy role: %v", err)
+	}
+	if err := db.Create(&model.SysRoleMenu{
+		RoleId: legacyRole.Id,
+		MenuId: legacyMenu.Id,
+	}).Error; err != nil {
+		t.Fatalf("grant legacy menu: %v", err)
+	}
+	legacyButtons := []model.SysMenuButton{
+		apiPermissionWithAPI(800, legacyMenu.Id, "法人查询", "organization_legal_entity_query", enum.Top, "query", "search", "primary", 0, "/admin/org/legal-entity/query", "POST"),
+		apiPermissionWithAPI(801, legacyMenu.Id, "法人树查询", "organization_legal_entity_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/legal-entity/tree", "POST"),
+		apiPermissionWithAPI(802, legacyMenu.Id, "法人选项查询", "organization_legal_entity_options", enum.Top, "query", "list", "primary", 2, "/admin/org/legal-entity/options", "POST"),
+		menuButtonWithAPI(803, legacyMenu.Id, "详情", "organization_legal_entity_detail", enum.Line, "detail", "visibility", "primary", 3, "/admin/org/legal-entity/:id", "GET"),
+		menuButton(804, legacyMenu.Id, "刷新", "organization_legal_entity_refresh", enum.Top, "refresh", "refresh", "primary", 4),
+		menuButton(805, legacyMenu.Id, "查看同步", "organization_legal_entity_view_sync", enum.Line, "view_sync", "sync", "primary", 5),
+	}
+	if err := seedMenuButtons(
+		db,
+		sf,
+		legacyRole.Id,
+		legacyRole.Name,
+		legacyButtons,
+	); err != nil {
+		t.Fatalf("seed legacy legal entity permissions: %v", err)
+	}
+
+	if err := seedOrganizationFoundation(db, sf); err != nil {
+		t.Fatalf("reseed organization foundation: %v", err)
+	}
+
+	if err := db.Where("id = ?", legacyMenu.Id).First(&legacyMenu).Error; err != nil {
+		t.Fatalf("query retired legacy menu: %v", err)
+	}
+	if legacyMenu.State || !legacyMenu.IsHidden {
+		t.Fatalf("legacy menu was not retired: %#v", legacyMenu)
+	}
+
+	var structureMenu model.SysMenu
+	if err := db.Where("name = ?", "organization_structure").First(&structureMenu).Error; err != nil {
+		t.Fatalf("query organization structure menu: %v", err)
+	}
+	if got := countWhere(
+		t,
+		db,
+		&model.SysRoleMenu{},
+		"role_id = ? AND menu_id = ?",
+		legacyRole.Id,
+		structureMenu.Id,
+	); got != 1 {
+		t.Fatalf("migrated structure menu grants = %d, want 1", got)
+	}
+	if got := countWhere(
+		t,
+		db,
+		&model.SysRoleMenu{},
+		"role_id = ? AND menu_id = ?",
+		legacyRole.Id,
+		rootMenu.Id,
+	); got != 1 {
+		t.Fatalf("migrated organization root grants = %d, want 1", got)
+	}
+	if got := countWhere(
+		t,
+		db,
+		&model.SysRoleMenu{},
+		"role_id = ? AND menu_id = ?",
+		legacyRole.Id,
+		legacyMenu.Id,
+	); got != 0 {
+		t.Fatalf("legacy menu grants = %d, want 0", got)
+	}
+	if got := countWhere(
+		t,
+		db,
+		&model.SysRoleMenuButton{},
+		"role_id = ? AND menu_id = ?",
+		legacyRole.Id,
+		structureMenu.Id,
+	); got != 6 {
+		t.Fatalf("migrated legal page grants = %d, want 6", got)
+	}
 }
 
 func organizationSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {
@@ -183,15 +311,14 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.SysTable{}, "table_code IN ?", organizationTableCodes()); got != 9 {
 		t.Fatalf("organization table metadata count = %d, want 9", got)
 	}
-	if got := countWhere(t, db, &model.SysMenu{}, "pid <> 0 AND name LIKE ?", "organization_%"); got != 6 {
-		t.Fatalf("organization functional menu count = %d, want 6", got)
+	if got := countWhere(t, db, &model.SysMenu{}, "pid <> 0 AND name LIKE ?", "organization_%"); got != 5 {
+		t.Fatalf("organization functional menu count = %d, want 5", got)
 	}
 	expectedMenuPresentation := map[string]struct {
 		title    string
 		sequence uint8
 	}{
-		"organization_structure":    {title: "组织架构", sequence: 1},
-		"organization_legal_entity": {title: "法人主体", sequence: 2},
+		"organization_structure": {title: "组织架构", sequence: 1},
 	}
 	for name, expected := range expectedMenuPresentation {
 		var menu model.SysMenu
@@ -204,6 +331,16 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 		if menu.Sequence != expected.sequence {
 			t.Fatalf("organization menu %s sequence = %d, want %d", name, menu.Sequence, expected.sequence)
 		}
+	}
+	var rootMenu model.SysMenu
+	if err := db.Where("name = ?", organizationRootMenuName).First(&rootMenu).Error; err != nil {
+		t.Fatalf("query organization root menu: %v", err)
+	}
+	if rootMenu.Title != "组织管理" {
+		t.Fatalf("organization root title = %q, want 组织管理", rootMenu.Title)
+	}
+	if got := countWhere(t, db, &model.SysMenu{}, "name = ?", "organization_legal_entity"); got != 0 {
+		t.Fatalf("legacy legal entity menu count = %d, want 0", got)
 	}
 
 	for _, code := range organizationTableCodes() {

@@ -11,47 +11,28 @@
       {{ error }}
     </q-banner>
 
-    <div v-else-if="groups.length" class="organization-detail-groups">
-      <q-card
-        v-for="group in groups"
-        :key="group.key"
-        flat
-        bordered
-        class="organization-detail-group"
+    <div v-else-if="fields.length" class="organization-detail-grid">
+      <article
+        v-for="field in fields"
+        :key="field.key"
+        class="organization-detail-field"
+        :class="{ 'organization-detail-field--wide': field.wide }"
       >
-        <q-card-section class="organization-detail-group__header">
-          <q-icon :name="group.icon || 'subject'" size="18px" />
-          <h3>{{ group.title }}</h3>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="organization-detail-grid">
-            <article
-              v-for="field in group.fields"
-              :key="field.key"
-              class="organization-detail-field"
-              :class="{ 'organization-detail-field--wide': field.wide }"
-            >
-              <div class="organization-detail-label">{{ field.label }}</div>
-              <div class="organization-detail-value">
-                <q-chip
-                  v-if="field.kind === 'status'"
-                  dense
-                  square
-                  outline
-                  :color="field.color || 'grey-6'"
-                >
-                  {{ field.value }}
-                </q-chip>
-                <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
-                <span v-else>{{ field.value }}</span>
-              </div>
-            </article>
-          </div>
-        </q-card-section>
-      </q-card>
+        <div class="organization-detail-label">{{ field.label }}</div>
+        <div class="organization-detail-value">
+          <q-chip
+            v-if="field.kind === 'status'"
+            dense
+            square
+            outline
+            :color="field.color || 'grey-6'"
+          >
+            {{ field.value }}
+          </q-chip>
+          <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
+          <span v-else>{{ field.value }}</span>
+        </div>
+      </article>
     </div>
 
     <div v-else-if="!loading" class="organization-detail-empty">
@@ -62,11 +43,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OrganizationDetailGroup } from './organization-read-only-detail'
 
 defineOptions({ name: 'OrganizationReadOnlyDetail' })
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     groups: OrganizationDetailGroup[]
     loading?: boolean
@@ -79,6 +61,8 @@ withDefaults(
     emptyText: '请选择一条记录',
   },
 )
+
+const fields = computed(() => props.groups.flatMap((group) => group.fields))
 </script>
 
 <style scoped lang="scss">
@@ -87,46 +71,18 @@ withDefaults(
   min-height: 240px;
 }
 
-.organization-detail-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 12px;
-  padding-bottom: 8px;
-}
-
-.organization-detail-group {
-  min-width: 0;
-  border-color: #dfe5ee;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.organization-detail-group__header {
-  min-height: 50px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  color: #40516c;
-}
-
-.organization-detail-group__header h3 {
-  margin: 0;
-  color: #26354d;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
 .organization-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 36px;
+  row-gap: 0;
 }
 
 .organization-detail-field {
   min-width: 0;
+  min-height: 78px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid #edf0f5;
 }
 
 .organization-detail-field--wide {
@@ -174,8 +130,12 @@ withDefaults(
 }
 
 @media (max-width: 1200px) {
-  .organization-detail-groups {
+  .organization-detail-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .organization-detail-field--wide {
+    grid-column: auto;
   }
 }
 </style>

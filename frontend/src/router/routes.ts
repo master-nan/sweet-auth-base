@@ -190,7 +190,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'organization',
     name: 'organization',
     meta: {
-      title: '组织主数据',
+      title: '组织管理',
       icon: 'account_tree',
       isOpen: false,
     },
@@ -206,13 +206,16 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/organization/legal-entity/Index.vue'),
         path: 'legal-entity',
-        name: 'organization_legal_entity',
+        name: 'organization_legal_entity_legacy',
+        redirect: {
+          name: 'organization_structure',
+          query: { architecture: 'legal' },
+        },
         meta: {
-          title: '法人主体',
+          title: '法人架构',
           icon: 'account_balance',
-          keepAlive: true,
+          isHidden: true,
         },
       },
     ],

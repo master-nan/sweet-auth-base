@@ -434,15 +434,14 @@ func seedOrganizationMenusAndPermissions(db *gorm.DB, sf *utils.Snowflake) error
 	root, err := seedMenu(
 		db,
 		sf,
-		directoryMenu(menu(1000, 0, organizationRootMenuName, "organization", "src/components/Layout/Layout.vue", "组织主数据", "account_tree", 5)),
+		directoryMenu(menu(1000, 0, organizationRootMenuName, "organization", "src/components/Layout/Layout.vue", "组织管理", "account_tree", 5)),
 	)
 	if err != nil {
 		return err
 	}
 
 	menuSeeds := []model.SysMenu{
-		menuWithOption(menuWithTable(menu(1002, root.Id, "organization_structure", "structure", "pages/organization/structure/Index.vue", "组织架构", "lan", 1), "org_unit"), "org_structure,org_structure_node,org_unit"),
-		menuWithTable(menu(1001, root.Id, "organization_legal_entity", "legal-entity", "pages/organization/legal-entity/Index.vue", "法人主体", "account_balance", 2), "org_legal_entity"),
+		menuWithOption(menuWithTable(menu(1002, root.Id, "organization_structure", "structure", "pages/organization/structure/Index.vue", "组织架构", "lan", 1), "org_unit"), "org_structure,org_structure_node,org_unit,org_legal_entity"),
 		menuWithOption(menuWithTable(menu(1003, root.Id, "organization_employee", "employee", "pages/organization/employee/Index.vue", "人员与任职", "badge", 3), "org_employee"), "org_employee,org_assignment"),
 		menuWithTable(menu(1004, root.Id, "organization_position", "position", "pages/organization/position/Index.vue", "岗位", "work", 4), "org_position"),
 		menuWithOption(menuWithTable(menu(1005, root.Id, "organization_sync_batch", "sync-batch", "pages/organization/sync-batch/Index.vue", "同步批次", "sync", 5), "org_sync_batch"), "org_sync_batch,org_sync_record"),
@@ -479,7 +478,7 @@ func seedOrganizationMenusAndPermissions(db *gorm.DB, sf *utils.Snowflake) error
 			return err
 		}
 	}
-	return nil
+	return retireLegacyOrganizationLegalEntityMenu(db, menuByName["organization_structure"].Id)
 }
 
 type organizationMenuButtonSeed struct {
@@ -488,7 +487,6 @@ type organizationMenuButtonSeed struct {
 }
 
 func organizationMenuButtons(menuByName map[string]model.SysMenu) []organizationMenuButtonSeed {
-	legalEntityMenu := menuByName["organization_legal_entity"].Id
 	structureMenu := menuByName["organization_structure"].Id
 	employeeMenu := menuByName["organization_employee"].Id
 	positionMenu := menuByName["organization_position"].Id
@@ -496,24 +494,20 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 	syncErrorMenu := menuByName["organization_sync_error"].Id
 
 	return []organizationMenuButtonSeed{
-		{menuName: "organization_legal_entity", buttons: []model.SysMenuButton{
-			apiPermissionWithAPI(800, legalEntityMenu, "法人查询", "organization_legal_entity_query", enum.Top, "query", "search", "primary", 0, "/admin/org/legal-entity/query", "POST"),
-			apiPermissionWithAPI(801, legalEntityMenu, "法人树查询", "organization_legal_entity_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/legal-entity/tree", "POST"),
-			apiPermissionWithAPI(802, legalEntityMenu, "法人选项查询", "organization_legal_entity_options", enum.Top, "query", "list", "primary", 2, "/admin/org/legal-entity/options", "POST"),
-			menuButtonWithAPI(803, legalEntityMenu, "详情", "organization_legal_entity_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/legal-entity/:id", "GET"),
-			menuButton(804, legalEntityMenu, "刷新", "organization_legal_entity_refresh", enum.Top, "refresh", "refresh", "primary", 3),
-			menuButton(805, legalEntityMenu, "查看同步", "organization_legal_entity_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
-		}},
 		{menuName: "organization_structure", buttons: []model.SysMenuButton{
+			apiPermissionWithAPI(800, structureMenu, "法人查询", "organization_legal_entity_query", enum.Top, "query", "search", "primary", 0, "/admin/org/legal-entity/query", "POST"),
+			apiPermissionWithAPI(801, structureMenu, "法人树查询", "organization_legal_entity_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/legal-entity/tree", "POST"),
+			apiPermissionWithAPI(802, structureMenu, "法人选项查询", "organization_legal_entity_options", enum.Top, "query", "list", "primary", 2, "/admin/org/legal-entity/options", "POST"),
+			apiPermissionWithAPI(803, structureMenu, "法人详情", "organization_legal_entity_detail", enum.Line, "detail", "visibility", "primary", 3, "/admin/org/legal-entity/:id", "GET"),
 			apiPermissionWithAPI(810, structureMenu, "管理组织查询", "organization_unit_query", enum.Top, "query", "search", "primary", 0, "/admin/org/unit/query", "POST"),
 			apiPermissionWithAPI(811, structureMenu, "管理组织树查询", "organization_unit_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/unit/tree", "POST"),
 			apiPermissionWithAPI(812, structureMenu, "管理组织选项查询", "organization_unit_options", enum.Top, "query", "list", "primary", 2, "/admin/org/unit/options", "POST"),
-			menuButtonWithAPI(813, structureMenu, "详情", "organization_unit_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/unit/:id", "GET"),
+			apiPermissionWithAPI(813, structureMenu, "管理组织详情", "organization_unit_detail", enum.Line, "detail", "visibility", "primary", 4, "/admin/org/unit/:id", "GET"),
 			menuButton(816, structureMenu, "刷新", "organization_structure_refresh", enum.Top, "refresh", "refresh", "primary", 3),
 			menuButton(817, structureMenu, "查看同步", "organization_structure_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
 			apiPermissionWithAPI(860, structureMenu, "管理架构查询", "organization_structure_query", enum.Top, "query", "search", "primary", 5, "/admin/org/structure/query", "POST"),
 			apiPermissionWithAPI(861, structureMenu, "管理架构选项查询", "organization_structure_options", enum.Top, "query", "list", "primary", 6, "/admin/org/structure/options", "POST"),
-			apiPermissionWithAPI(862, structureMenu, "管理架构详情", "organization_structure_detail", enum.Line, "detail", "visibility", "primary", 5, "/admin/org/structure/:id", "GET"),
+			apiPermissionWithAPI(862, structureMenu, "管理架构详情", "organization_structure_detail", enum.Line, "detail", "visibility", "primary", 7, "/admin/org/structure/:id", "GET"),
 		}},
 		{menuName: "organization_employee", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(820, employeeMenu, "人员查询", "organization_employee_query", enum.Top, "query", "search", "primary", 0, "/admin/org/employee/query", "POST"),
@@ -541,4 +535,121 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			menuButton(854, syncErrorMenu, "刷新", "organization_sync_error_refresh", enum.Top, "refresh", "refresh", "primary", 1),
 		}},
 	}
+}
+
+func retireLegacyOrganizationLegalEntityMenu(db *gorm.DB, structureMenuID int) error {
+	var legacyMenu model.SysMenu
+	err := db.Where("name = ?", "organization_legal_entity").First(&legacyMenu).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var structureMenu model.SysMenu
+		if err := tx.Where("id = ?", structureMenuID).First(&structureMenu).Error; err != nil {
+			return err
+		}
+
+		var roleMenus []model.SysRoleMenu
+		if err := tx.Where("menu_id = ?", legacyMenu.Id).Find(&roleMenus).Error; err != nil {
+			return err
+		}
+		for _, roleMenu := range roleMenus {
+			for _, menuID := range []int{structureMenu.Pid, structureMenuID} {
+				if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(
+					&model.SysRoleMenu{RoleId: roleMenu.RoleId, MenuId: menuID},
+				).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		type legacyButtonGrant struct {
+			RoleID int
+			Code   string
+		}
+		var legacyGrants []legacyButtonGrant
+		if err := tx.Table("sys_role_menu_button").
+			Select("sys_role_menu_button.role_id, sys_menu_button.code").
+			Joins("JOIN sys_menu_button ON sys_menu_button.id = sys_role_menu_button.button_id").
+			Where("sys_role_menu_button.menu_id = ?", legacyMenu.Id).
+			Scan(&legacyGrants).Error; err != nil {
+			return err
+		}
+
+		replacementCodeByLegacyCode := map[string]string{
+			"organization_legal_entity_query":     "organization_legal_entity_query",
+			"organization_legal_entity_tree":      "organization_legal_entity_tree",
+			"organization_legal_entity_options":   "organization_legal_entity_options",
+			"organization_legal_entity_detail":    "organization_legal_entity_detail",
+			"organization_legal_entity_refresh":   "organization_structure_refresh",
+			"organization_legal_entity_view_sync": "organization_structure_view_sync",
+		}
+		replacementCodes := make([]string, 0, len(replacementCodeByLegacyCode))
+		for _, code := range replacementCodeByLegacyCode {
+			replacementCodes = append(replacementCodes, code)
+		}
+
+		var replacementButtons []model.SysMenuButton
+		if err := tx.Where(
+			"menu_id = ? AND code IN ?",
+			structureMenuID,
+			replacementCodes,
+		).Find(&replacementButtons).Error; err != nil {
+			return err
+		}
+		replacementByCode := make(map[string]model.SysMenuButton, len(replacementButtons))
+		for _, button := range replacementButtons {
+			replacementByCode[button.Code] = button
+		}
+		for _, grant := range legacyGrants {
+			replacementCode, ok := replacementCodeByLegacyCode[grant.Code]
+			if !ok {
+				continue
+			}
+			button, ok := replacementByCode[replacementCode]
+			if !ok {
+				continue
+			}
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(
+				&model.SysRoleMenuButton{
+					RoleId:   grant.RoleID,
+					MenuId:   structureMenuID,
+					ButtonId: button.Id,
+				},
+			).Error; err != nil {
+				return err
+			}
+		}
+
+		if err := tx.Where("menu_id = ?", legacyMenu.Id).
+			Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("menu_id = ?", legacyMenu.Id).
+			Delete(&model.SysRoleMenu{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.SysMenuButton{}).
+			Where("menu_id = ?", legacyMenu.Id).
+			Updates(map[string]interface{}{
+				"is_button":   false,
+				"is_hidden":   true,
+				"is_disabled": true,
+				"state":       false,
+				"gmt_modify":  model.Now(),
+			}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&model.SysMenu{}).
+			Where("id = ?", legacyMenu.Id).
+			Updates(map[string]interface{}{
+				"is_hidden":  true,
+				"state":      false,
+				"gmt_modify": model.Now(),
+			}).Error
+	})
 }
