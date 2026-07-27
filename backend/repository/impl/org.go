@@ -10,6 +10,7 @@ import (
 	queryutil "backend/repository/util"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -824,6 +825,37 @@ func (r *OrgAssignmentRepositoryImpl) QueryForRead(
 	)
 }
 
+func (r *OrgAssignmentRepositoryImpl) ListEffectiveByEmployee(
+	ctx *gin.Context,
+	employeeId int,
+	asOf time.Time,
+	limit int,
+) ([]model.OrgAssignment, error) {
+	if asOf.IsZero() {
+		asOf = model.Now()
+	}
+	if limit <= 0 {
+		limit = 1
+	}
+	var assignments []model.OrgAssignment
+	err := organizationDB(r.db, ctx).
+		Model(&model.OrgAssignment{}).
+		Select(orgAssignmentReadColumns()).
+		Where("employee_id = ?", employeeId).
+		Where("status = ?", "enabled").
+		Where("source_deleted = ?", false).
+		Where("(valid_from IS NULL OR valid_from <= ?)", asOf).
+		Where("(valid_to IS NULL OR valid_to >= ?)", asOf).
+		Order("legal_entity_id ASC").
+		Order("org_unit_id ASC").
+		Order("CASE WHEN position_id IS NULL THEN 1 ELSE 0 END ASC").
+		Order("position_id ASC").
+		Order("id ASC").
+		Limit(limit).
+		Find(&assignments).Error
+	return assignments, err
+}
+
 func (r *OrgAssignmentRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgAssignment, error) {
 	var assignment model.OrgAssignment
 	err := organizationDB(r.db, ctx).
@@ -1366,7 +1398,7 @@ func orgLegalEntityDetailColumns() []string {
 }
 
 func orgLegalEntityTreeColumns() []string {
-	return append(orgLegalEntityListColumns(), "display_order")
+	return append(orgLegalEntityListColumns(), "display_order", "source_deleted")
 }
 
 func orgUnitListColumns() []string {

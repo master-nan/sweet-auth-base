@@ -119,6 +119,7 @@ type OrgAssignmentRepository interface {
 	BasicRepository[model.OrgAssignment]
 	Query(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable) (response.ListResult[model.OrgAssignment], error)
 	QueryForRead(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable, OrgAssignmentReadScope) (response.ListResult[model.OrgAssignment], error)
+	ListEffectiveByEmployee(*gin.Context, int, time.Time, int) ([]model.OrgAssignment, error)
 	FindByIdForRead(*gin.Context, int) (model.OrgAssignment, error)
 	FindBySourceIdentity(*gin.Context, string, string) (model.OrgAssignment, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error

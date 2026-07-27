@@ -19,6 +19,9 @@ const (
 	ErrorCodeOrgUserNotFound         = 110014
 	ErrorCodeOrgEmployeeAlreadyBound = 110015
 	ErrorCodeOrgUserAlreadyBound     = 110016
+	ErrorCodeOrgEmployeeInactive     = 110017
+	ErrorCodeOrgLegalEntityInactive  = 110018
+	ErrorCodeOrgUnitInactive         = 110019
 )
 
 var (
@@ -101,5 +104,20 @@ var (
 		http.StatusConflict,
 		ErrorCodeOrgUserAlreadyBound,
 		"系统账号已绑定其他企业人员",
+	)
+	ErrOrgEmployeeInactive = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgEmployeeInactive,
+		"企业人员在指定时间不可用",
+	)
+	ErrOrgLegalEntityInactive = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgLegalEntityInactive,
+		"法人主体在指定时间不可用",
+	)
+	ErrOrgUnitInactive = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgUnitInactive,
+		"组织单元在指定时间不可用",
 	)
 )
