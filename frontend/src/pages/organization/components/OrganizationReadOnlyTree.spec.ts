@@ -74,11 +74,12 @@ const mountTree = () =>
   })
 
 describe('OrganizationReadOnlyTree', () => {
-  it('renders organization identity without an operation column', () => {
+  it('renders the name as the primary identity and code/type as supporting metadata', () => {
     const wrapper = mountTree()
 
-    expect(wrapper.text()).toContain('集团总部')
-    expect(wrapper.text()).toContain('ROOT')
+    expect(wrapper.find('.organization-readonly-tree__name').text()).toBe('集团总部')
+    expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('ROOT')
+    expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('中心')
     expect(wrapper.text()).not.toContain('操作')
     expect(wrapper.text()).not.toContain('详情')
   })

@@ -20,11 +20,14 @@
           class="organization-readonly-tree__node"
           :class="{ 'organization-readonly-tree__node--muted': node.muted }"
         >
-          <q-icon :name="node.icon || 'apartment'" size="19px" color="primary" />
+          <span class="organization-readonly-tree__icon">
+            <q-icon :name="node.icon || 'apartment'" size="17px" />
+          </span>
           <div class="organization-readonly-tree__identity">
             <div class="organization-readonly-tree__name">{{ node.name }}</div>
             <div class="organization-readonly-tree__meta">
-              <span>{{ node.code }}</span>
+              <span class="organization-readonly-tree__code">{{ node.code }}</span>
+              <span v-if="node.typeLabel" class="organization-readonly-tree__separator">/</span>
               <span v-if="node.typeLabel">{{ node.typeLabel }}</span>
             </div>
           </div>
@@ -32,8 +35,8 @@
             v-if="node.statusLabel"
             dense
             square
+            outline
             :color="node.statusColor || 'grey-6'"
-            text-color="white"
             class="organization-readonly-tree__status"
           >
             {{ node.statusLabel }}
@@ -120,22 +123,33 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 .organization-readonly-tree__content {
-  min-width: 360px;
-  padding: 8px 10px 16px;
+  min-width: 340px;
+  padding: 10px 12px 18px;
 }
 
 .organization-readonly-tree__node {
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) max-content;
+  grid-template-columns: 28px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px 5px 2px;
+  gap: 9px;
+  padding: 6px 8px 6px 2px;
 }
 
 .organization-readonly-tree__node--muted {
   opacity: 0.68;
+}
+
+.organization-readonly-tree__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dbe5f2;
+  border-radius: 6px;
+  background: #f6f9fd;
+  color: #4673a9;
 }
 
 .organization-readonly-tree__identity {
@@ -144,10 +158,10 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 
 .organization-readonly-tree__name {
   overflow: hidden;
-  color: #1d2738;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  color: #1b2940;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 21px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -155,9 +169,10 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 .organization-readonly-tree__meta {
   min-width: 0;
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
-  color: #718096;
+  color: #7a879b;
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
@@ -168,8 +183,18 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
   text-overflow: ellipsis;
 }
 
+.organization-readonly-tree__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+
+.organization-readonly-tree__separator {
+  color: #b1bac8;
+}
+
 .organization-readonly-tree__status {
   margin: 0;
+  background: transparent;
   font-size: 11px;
 }
 
@@ -185,10 +210,13 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 :deep(.q-tree__node-header) {
-  min-height: 48px;
+  min-height: 54px;
   flex-wrap: nowrap;
   padding: 0 4px;
   border-radius: 6px;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 :deep(.q-tree__node-header-content) {
@@ -199,9 +227,26 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 :deep(.q-tree__arrow) {
   flex: 0 0 24px;
   margin-right: 2px;
+  color: #7b8798;
+}
+
+:deep(.q-tree__children) {
+  margin-left: 11px;
+  padding-left: 8px;
+  border-left: 1px solid #e2e8f1;
+}
+
+:deep(.q-tree__node-header:hover) {
+  background: #f7f9fc;
 }
 
 :deep(.q-tree__node--selected > .q-tree__node-header) {
   background: #eef5ff;
+  box-shadow: inset 3px 0 0 var(--q-primary);
+}
+
+:deep(.q-tree__node--selected > .q-tree__node-header .organization-readonly-tree__icon) {
+  border-color: #bfd3ef;
+  background: #fff;
 }
 </style>

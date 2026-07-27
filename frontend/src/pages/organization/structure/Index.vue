@@ -100,15 +100,14 @@
           <div class="organization-detail-heading">
             <div class="organization-detail-title">{{ selectedNode.name }}</div>
             <div class="organization-detail-meta">
-              <code>{{ selectedNode.code }}</code>
-              <q-chip dense square outline color="primary">
-                {{ selectedStructure?.name || '-' }}
-              </q-chip>
+              <span>{{ unitTypeLabel(selectedNode.unit_type) }}</span>
+              <span aria-hidden="true">·</span>
+              <span class="organization-detail-code">{{ selectedNode.code }}</span>
               <q-chip
                 dense
                 square
+                outline
                 :color="statusColor(selectedNode.status, selectedNode.disabled)"
-                text-color="white"
               >
                 {{ statusLabel(selectedNode.status) }}
               </q-chip>
@@ -123,7 +122,7 @@
 
       <template #detail-content>
         <organization-read-only-detail
-          :fields="detailFields"
+          :groups="detailGroups"
           :loading="detailLoading"
           :error="detailError"
           empty-text="请选择左侧组织单元"
@@ -141,6 +140,7 @@ import { date } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
+import type { OrganizationDetailGroup } from 'src/pages/organization/components/organization-read-only-detail'
 import OrganizationReadOnlyTree from 'src/pages/organization/components/OrganizationReadOnlyTree.vue'
 import type { OrganizationReadOnlyTreeNode } from 'src/pages/organization/components/organization-read-only-tree'
 import {
@@ -155,15 +155,6 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-
-interface DetailField {
-  key: string
-  label: string
-  value: string
-  kind?: 'text' | 'code' | 'status'
-  color?: string
-  wide?: boolean
-}
 
 const dictStore = useDictStore()
 const { all_buttons, top_buttons } = usePageButtons('organization_structure')
@@ -195,9 +186,11 @@ const canViewDetail = computed(() =>
 const displayTree = computed(() => mapStructureTree(tree.value))
 const treeSummary = computed(() => {
   if (!selectedStructure.value) {
-    return structures.value.length > 1 ? '请选择组织视图' : '暂无组织视图'
+    return structures.value.length > 1
+      ? '组织主数据镜像 · 请选择组织视图'
+      : '组织主数据镜像 · 暂无组织视图'
   }
-  return `${selectedStructure.value.name} · ${countTreeNodes(tree.value)} 个组织`
+  return `组织主数据镜像 · ${selectedStructure.value.name} · ${countTreeNodes(tree.value)} 个组织`
 })
 const treeEmptyText = computed(() => {
   if (!selectedStructure.value) {
@@ -206,7 +199,7 @@ const treeEmptyText = computed(() => {
   return treeKeyword.value ? '当前视图没有匹配的组织' : '当前视图暂无组织数据'
 })
 
-const detailFields = computed<DetailField[]>(() => {
+const detailGroups = computed<OrganizationDetailGroup[]>(() => {
   if (!detail.value || !selectedNode.value) return []
   const unit = detail.value
   const primaryLegalEntity = unit.primary_legal_entity
@@ -216,38 +209,70 @@ const detailFields = computed<DetailField[]>(() => {
       : '-'
 
   return [
-    { key: 'code', label: '组织编码', value: displayValue(unit.code), kind: 'code' },
-    { key: 'name', label: '组织名称', value: displayValue(unit.name) },
-    { key: 'unit_type', label: '组织类型', value: unitTypeLabel(unit.unit_type) },
+    {
+      key: 'basic',
+      title: '基础信息',
+      icon: 'domain',
+      fields: [
+        { key: 'name', label: '组织名称', value: displayValue(unit.name) },
+        { key: 'code', label: '组织编码', value: displayValue(unit.code), kind: 'code' },
+        { key: 'unit_type', label: '组织类型', value: unitTypeLabel(unit.unit_type) },
+      ],
+    },
+    {
+      key: 'ownership',
+      title: '归属信息',
+      icon: 'account_tree',
+      fields: [
+        {
+          key: 'structure',
+          label: '组织视图',
+          value: selectedStructure.value?.name || '-',
+        },
+        {
+          key: 'primary_legal_entity',
+          label: '主要法人',
+          value: primaryLegalEntity,
+        },
+      ],
+    },
     {
       key: 'status',
-      label: '状态',
-      value: statusLabel(unit.status),
-      kind: 'status',
-      color: statusColor(unit.status, false),
+      title: '状态信息',
+      icon: 'event_available',
+      fields: [
+        {
+          key: 'status',
+          label: '状态',
+          value: statusLabel(unit.status),
+          kind: 'status',
+          color: statusColor(unit.status, false),
+        },
+        { key: 'valid_from', label: '有效期开始', value: formatDate(unit.valid_from) },
+        {
+          key: 'valid_to',
+          label: '有效期结束',
+          value: formatDate(unit.valid_to, '长期有效'),
+        },
+      ],
     },
     {
-      key: 'structure',
-      label: '组织视图',
-      value: selectedStructure.value?.name || '-',
-    },
-    {
-      key: 'primary_legal_entity',
-      label: '主要法人',
-      value: primaryLegalEntity,
-    },
-    { key: 'valid_from', label: '有效期开始', value: formatDate(unit.valid_from) },
-    { key: 'valid_to', label: '有效期结束', value: formatDate(unit.valid_to, '长期有效') },
-    {
-      key: 'gmt_modify',
-      label: '镜像更新时间',
-      value: formatDateTime(unit.gmt_modify),
-    },
-    {
-      key: 'local_note',
-      label: '平台备注',
-      value: displayValue(unit.local_note),
-      wide: true,
+      key: 'mirror',
+      title: '镜像信息',
+      icon: 'sync',
+      fields: [
+        {
+          key: 'gmt_modify',
+          label: '更新时间',
+          value: formatDateTime(unit.gmt_modify),
+        },
+        {
+          key: 'local_note',
+          label: '平台备注',
+          value: displayValue(unit.local_note),
+          wide: true,
+        },
+      ],
     },
   ]
 })
@@ -512,6 +537,12 @@ function errorMessage(error: unknown, fallback: string): string {
   margin-top: 4px;
   color: #657189;
   font-size: 12px;
+}
+
+.organization-detail-code {
+  color: #7a879b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
 }
 
 @media (max-width: 1180px) {

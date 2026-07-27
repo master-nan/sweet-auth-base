@@ -107,7 +107,7 @@ const OrganizationTreeStub = defineComponent({
 const OrganizationDetailStub = defineComponent({
   name: 'OrganizationReadOnlyDetail',
   props: {
-    fields: {
+    groups: {
       type: Array,
       default: () => [],
     },
@@ -120,7 +120,7 @@ const OrganizationDetailStub = defineComponent({
     return () =>
       h('div', { 'data-testid': 'organization-detail' }, [
         props.error,
-        JSON.stringify(props.fields),
+        JSON.stringify(props.groups),
       ])
   },
 })
@@ -236,6 +236,7 @@ describe('Organization read-only center', () => {
     await flushPromises()
 
     expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('法人档案')
+    expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('组织主数据镜像')
     expect(wrapper.text()).not.toContain('法人架构')
     expect(apiMocks.getLegalEntityTree).toHaveBeenCalledWith({ only_effective: true })
     expect(apiMocks.getLegalEntityDetail).toHaveBeenCalledWith(10, {
@@ -251,6 +252,11 @@ describe('Organization read-only center', () => {
     expect(wrapper.find('[data-testid="organization-detail"]').text()).toContain(
       'LE-10 - 集团',
     )
+    expect(
+      (wrapper.findComponent(OrganizationDetailStub).props('groups') as Array<{
+        title: string
+      }>).map((group) => group.title),
+    ).toEqual(['基础信息', '归属信息', '状态信息', '镜像信息'])
     expect(wrapper.text()).not.toMatch(/新增|编辑|删除|调岗|离职/)
   })
 
@@ -275,6 +281,7 @@ describe('Organization read-only center', () => {
 
     expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('组织架构')
     expect(wrapper.findComponent(QSelectStub).exists()).toBe(false)
+    expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('组织主数据镜像')
     expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('集团组织视图')
     expect(apiMocks.getStructureOrgTree).toHaveBeenCalledWith({
       structure_id: 20,
@@ -356,6 +363,11 @@ describe('Organization read-only center', () => {
     await flushPromises()
 
     const detailText = wrapper.find('[data-testid="organization-detail"]').text()
+    expect(
+      (wrapper.findComponent(OrganizationDetailStub).props('groups') as Array<{
+        title: string
+      }>).map((group) => group.title),
+    ).toEqual(['基础信息', '归属信息', '状态信息', '镜像信息'])
     expect(detailText).not.toMatch(
       /structure_node_id|parent_node_id|path|source_id|架构层级|节点状态/,
     )
