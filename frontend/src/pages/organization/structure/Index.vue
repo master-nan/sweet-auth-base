@@ -47,17 +47,6 @@
             class="structure-select"
             @update:model-value="handleStructureChange"
           >
-            <template #option="{ itemProps, opt }">
-              <q-item v-bind="itemProps">
-                <q-item-section>
-                  <q-item-label>{{ opt.name }}</q-item-label>
-                  <q-item-label caption>{{ opt.code }}</q-item-label>
-                </q-item-section>
-                <q-item-section v-if="opt.is_default" side>
-                  <q-chip dense square outline color="primary">默认</q-chip>
-                </q-item-section>
-              </q-item>
-            </template>
             <template #no-option>
               <q-item>
                 <q-item-section class="text-grey-7">暂无组织视图</q-item-section>

@@ -196,22 +196,22 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/organization/legal-entity/Index.vue'),
-        path: 'legal-entity',
-        name: 'organization_legal_entity',
-        meta: {
-          title: '法人主体',
-          icon: 'account_balance',
-          keepAlive: true,
-        },
-      },
-      {
         component: () => import('pages/organization/structure/Index.vue'),
         path: 'structure',
         name: 'organization_structure',
         meta: {
           title: '组织架构',
           icon: 'lan',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/organization/legal-entity/Index.vue'),
+        path: 'legal-entity',
+        name: 'organization_legal_entity',
+        meta: {
+          title: '法人主体',
+          icon: 'account_balance',
           keepAlive: true,
         },
       },

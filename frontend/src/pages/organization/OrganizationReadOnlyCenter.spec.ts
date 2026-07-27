@@ -136,14 +136,24 @@ const QSelectStub = defineComponent({
       type: Array,
       default: () => [],
     },
+    optionLabel: {
+      type: String,
+      default: 'label',
+    },
   },
   emits: ['update:modelValue'],
   setup(props) {
+    const labels = () =>
+      props.options.map((option) => {
+        if (typeof option !== 'object' || option === null) return String(option)
+        const label = (option as Record<string, unknown>)[props.optionLabel]
+        return typeof label === 'string' || typeof label === 'number' ? String(label) : ''
+      })
     return () =>
       h(
         'div',
         { 'data-testid': 'structure-select' },
-        `${props.modelValue || ''}:${JSON.stringify(props.options)}`,
+        labels().join(','),
       )
   },
 })
@@ -175,7 +185,7 @@ describe('Organization read-only center', () => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
   })
 
-  it('renders the legal-entity hierarchy as 法人主体 and opens detail from node selection', async () => {
+  it('positions the legal-entity hierarchy as a legal-entity archive and opens detail from node selection', async () => {
     apiMocks.getLegalEntityTree.mockResolvedValue([
       {
         id: 10,
@@ -225,7 +235,7 @@ describe('Organization read-only center', () => {
     const wrapper = mountPage(LegalEntityPage)
     await flushPromises()
 
-    expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('法人主体')
+    expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('法人档案')
     expect(wrapper.text()).not.toContain('法人架构')
     expect(apiMocks.getLegalEntityTree).toHaveBeenCalledWith({ only_effective: true })
     expect(apiMocks.getLegalEntityDetail).toHaveBeenCalledWith(10, {
@@ -305,6 +315,9 @@ describe('Organization read-only center', () => {
       expect.objectContaining({ code: 'GROUP', name: '集团组织视图' }),
       expect.objectContaining({ code: 'REGION', name: '区域协作视图' }),
     ])
+    expect(selector.text()).toContain('集团组织视图')
+    expect(selector.text()).toContain('区域协作视图')
+    expect(selector.text()).not.toMatch(/GROUP|REGION|默认/)
     expect(apiMocks.getStructureOrgTree).toHaveBeenCalledWith({
       structure_id: 20,
       only_effective: true,

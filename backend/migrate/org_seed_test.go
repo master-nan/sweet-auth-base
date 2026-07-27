@@ -186,17 +186,23 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.SysMenu{}, "pid <> 0 AND name LIKE ?", "organization_%"); got != 6 {
 		t.Fatalf("organization functional menu count = %d, want 6", got)
 	}
-	expectedMenuTitles := map[string]string{
-		"organization_legal_entity": "法人主体",
-		"organization_structure":    "组织架构",
+	expectedMenuPresentation := map[string]struct {
+		title    string
+		sequence uint8
+	}{
+		"organization_structure":    {title: "组织架构", sequence: 1},
+		"organization_legal_entity": {title: "法人主体", sequence: 2},
 	}
-	for name, title := range expectedMenuTitles {
+	for name, expected := range expectedMenuPresentation {
 		var menu model.SysMenu
 		if err := db.Where("name = ?", name).First(&menu).Error; err != nil {
 			t.Fatalf("query organization menu %s: %v", name, err)
 		}
-		if menu.Title != title {
-			t.Fatalf("organization menu %s title = %q, want %q", name, menu.Title, title)
+		if menu.Title != expected.title {
+			t.Fatalf("organization menu %s title = %q, want %q", name, menu.Title, expected.title)
+		}
+		if menu.Sequence != expected.sequence {
+			t.Fatalf("organization menu %s sequence = %d, want %d", name, menu.Sequence, expected.sequence)
 		}
 	}
 

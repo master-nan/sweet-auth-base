@@ -2,10 +2,10 @@
   <base-content class="q-pa-sm organization-readonly-page">
     <master-detail-page
       :mode="SysMasterDetailMode.TABLE"
-      master-title="法人主体"
+      master-title="法人档案"
       :master-subtitle="treeSummary"
       :detail-title="selectedNode?.name || '法人详情'"
-      detail-subtitle="组织主数据镜像"
+      detail-subtitle="法人主数据镜像"
       master-width="minmax(420px, 42%)"
       min-width="960px"
       min-height="calc(100vh - 150px)"
