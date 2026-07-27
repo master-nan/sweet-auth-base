@@ -186,6 +186,19 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.SysMenu{}, "pid <> 0 AND name LIKE ?", "organization_%"); got != 6 {
 		t.Fatalf("organization functional menu count = %d, want 6", got)
 	}
+	expectedMenuTitles := map[string]string{
+		"organization_legal_entity": "法人主体",
+		"organization_structure":    "组织架构",
+	}
+	for name, title := range expectedMenuTitles {
+		var menu model.SysMenu
+		if err := db.Where("name = ?", name).First(&menu).Error; err != nil {
+			t.Fatalf("query organization menu %s: %v", name, err)
+		}
+		if menu.Title != title {
+			t.Fatalf("organization menu %s title = %q, want %q", name, menu.Title, title)
+		}
+	}
 
 	for _, code := range organizationTableCodes() {
 		var table model.SysTable

@@ -200,7 +200,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'legal-entity',
         name: 'organization_legal_entity',
         meta: {
-          title: '法人架构',
+          title: '法人主体',
           icon: 'account_balance',
           keepAlive: true,
         },
@@ -210,7 +210,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'structure',
         name: 'organization_structure',
         meta: {
-          title: '管理架构',
+          title: '组织架构',
           icon: 'lan',
           keepAlive: true,
         },

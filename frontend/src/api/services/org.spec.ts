@@ -18,6 +18,7 @@ import {
   organizationOptionsEndpoints,
   queryOrganizationOptions,
   queryStructureOptions,
+  queryStructures,
   type OrganizationSelectorType,
 } from 'src/api/services/org'
 
@@ -200,7 +201,7 @@ describe('organization read-only center API', () => {
     )
   })
 
-  it('loads structure options and preserves structure-node occurrence identity', async () => {
+  it('loads structure options from backend names and preserves structure-node occurrence identity', async () => {
     postMock
       .mockResolvedValueOnce({
         data: {
@@ -208,9 +209,9 @@ describe('organization read-only center API', () => {
           data: [
             {
               value: 30,
-              label: 'MGMT - 行政管理架构',
+              label: 'GROUP - 集团组织视图',
               code: 'MGMT',
-              name: '行政管理架构',
+              name: '集团组织视图',
               disabled: false,
             },
           ],
@@ -264,5 +265,50 @@ describe('organization read-only center API', () => {
     expect(structures.items[0]).toEqual(expect.objectContaining({ value: 30, code: 'MGMT' }))
     expect(tree.map((node) => node.id)).toEqual([301, 302])
     expect(tree.map((node) => node.org_unit_id)).toEqual([40, 40])
+  })
+
+  it('loads structure definitions with their backend default marker', async () => {
+    postMock.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: [
+          {
+            id: 30,
+            code: 'GROUP',
+            name: '集团组织视图',
+            structure_type: 'management',
+            status: 'enabled',
+            is_default: true,
+          },
+        ],
+        total: 1,
+      },
+    })
+
+    const result = await queryStructures({
+      page: 1,
+      num: 100,
+      only_effective: true,
+    })
+
+    expect(postMock).toHaveBeenCalledWith(
+      '/admin/org/structure/query',
+      {
+        page: 1,
+        num: 100,
+        only_effective: true,
+      },
+      expect.any(Object),
+    )
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 30,
+          name: '集团组织视图',
+          is_default: true,
+        }),
+      ],
+      total: 1,
+    })
   })
 })

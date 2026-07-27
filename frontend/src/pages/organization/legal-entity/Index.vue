@@ -2,12 +2,12 @@
   <base-content class="q-pa-sm organization-readonly-page">
     <master-detail-page
       :mode="SysMasterDetailMode.TABLE"
-      master-title="法人架构"
+      master-title="法人主体"
       :master-subtitle="treeSummary"
       :detail-title="selectedNode?.name || '法人详情'"
       detail-subtitle="组织主数据镜像"
-      master-width="minmax(560px, 46%)"
-      min-width="1080px"
+      master-width="minmax(420px, 42%)"
+      min-width="960px"
       min-height="calc(100vh - 150px)"
     >
       <template #master-actions>
@@ -49,55 +49,14 @@
       </template>
 
       <template #master-content>
-        <tree-table
-          v-if="filteredTree.length || treeLoading"
-          class="fit sticky-header-table"
-          :data="filteredTree"
-          :columns="treeColumns"
-          :selected-row-id="selectedNode?.id ?? null"
+        <organization-read-only-tree
+          :nodes="displayTree"
+          :selected-id="selectedNode?.legal_entity_id ?? null"
           :loading="treeLoading"
-          :dark="$q.dark.isActive"
-          bordered
-          flat
-          separator="horizontal"
-          @node-selected="handleNodeSelected"
-        >
-          <template #body-cell-name="{ row }">
-            <div class="row items-center no-wrap">
-              <q-icon name="account_balance" color="primary" size="18px" class="q-mr-sm" />
-              <div class="ellipsis">{{ row.name }}</div>
-            </div>
-          </template>
-          <template #body-cell-entity_type="{ row }">
-            {{ entityTypeLabel(row.entity_type) }}
-          </template>
-          <template #body-cell-status="{ row }">
-            <q-chip dense square :color="statusColor(row.status, row.disabled)" text-color="white">
-              {{ statusLabel(row.status) }}
-            </q-chip>
-          </template>
-          <template #body-cell-actions="{ row }">
-            <div class="text-center">
-              <q-btn
-                v-for="button in detailButtons"
-                :key="button.id || button.code"
-                v-bind="menuButtonDisplayProps(button)"
-                flat
-                dense
-                round
-                :color="button.color || 'primary'"
-                @click.stop="handleNodeSelected(row)"
-              >
-                <q-tooltip>{{ button.name }}</q-tooltip>
-              </q-btn>
-            </div>
-          </template>
-        </tree-table>
-
-        <div v-else-if="!treeError" class="organization-tree-empty">
-          <q-icon name="account_tree" size="44px" />
-          <div>{{ keyword ? '没有匹配的法人主体' : '暂无法人主体数据' }}</div>
-        </div>
+          :expand-all="Boolean(keyword.trim())"
+          :empty-text="keyword ? '没有匹配的法人主体' : '暂无法人主体数据'"
+          @select="handleNodeSelectedById"
+        />
       </template>
 
       <template #detail-context>
@@ -142,11 +101,12 @@
 defineOptions({ name: 'organization_legal_entity' })
 
 import { computed, onMounted, ref } from 'vue'
-import { date, useQuasar } from 'quasar'
+import { date } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
-import TreeTable from 'src/components/TreeTable/TreeTable.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
+import OrganizationReadOnlyTree from 'src/pages/organization/components/OrganizationReadOnlyTree.vue'
+import type { OrganizationReadOnlyTreeNode } from 'src/pages/organization/components/organization-read-only-tree'
 import {
   getLegalEntityDetail,
   getLegalEntityTree,
@@ -156,7 +116,6 @@ import {
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
 import { SysMasterDetailMode } from 'src/types/enum'
-import type { TableColumn } from 'src/types/global'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 interface DetailField {
@@ -169,8 +128,7 @@ interface DetailField {
 }
 
 const dictStore = useDictStore()
-const $q = useQuasar()
-const { all_buttons, top_buttons, line_buttons } = usePageButtons('organization_legal_entity')
+const { all_buttons, top_buttons } = usePageButtons('organization_legal_entity')
 
 const tree = ref<LegalEntityTreeNode[]>([])
 const selectedNode = ref<LegalEntityTreeNode | null>(null)
@@ -185,38 +143,20 @@ let detailRequestSequence = 0
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
-const detailButtons = computed(() =>
-  line_buttons.value.filter((button) => button.event_action === 'detail'),
-)
 const canViewDetail = computed(() =>
   all_buttons.value.some((button) => button.event_action === 'detail'),
 )
-
-const treeColumns = computed<TableColumn[]>(() => {
-  const columns: TableColumn[] = [
-    { name: 'name', label: '法人名称', field: 'name', align: 'left' },
-    { name: 'code', label: '法人编码', field: 'code', align: 'left' },
-    { name: 'entity_type', label: '主体类型', field: 'entity_type', align: 'left' },
-    { name: 'status', label: '状态', field: 'status', align: 'center' },
-  ]
-  if (detailButtons.value.length) {
-    columns.push({
-      name: 'actions',
-      label: '操作',
-      field: 'id',
-      align: 'center',
-      style: 'width: 64px',
-    })
-  }
-  return columns
-})
-
 const filteredTree = computed(() => filterLegalEntityTree(tree.value, keyword.value))
+const displayTree = computed(() => mapLegalEntityTree(filteredTree.value))
 const treeSummary = computed(() => `${countTreeNodes(tree.value)} 个法人主体`)
 
 const detailFields = computed<DetailField[]>(() => {
   if (!detail.value) return []
   const entity = detail.value
+  const parent = entity.parent_id
+    ? findLegalEntityNode(tree.value, entity.parent_id)
+    : null
+
   return [
     { key: 'code', label: '法人编码', value: displayValue(entity.code), kind: 'code' },
     { key: 'name', label: '法人名称', value: displayValue(entity.name) },
@@ -234,9 +174,9 @@ const detailFields = computed<DetailField[]>(() => {
       color: statusColor(entity.status, false),
     },
     {
-      key: 'parent_id',
-      label: '上级法人ID',
-      value: entity.parent_id ? String(entity.parent_id) : '-',
+      key: 'parent',
+      label: '上级法人',
+      value: parent ? `${parent.code} - ${parent.name}` : '-',
     },
     {
       key: 'unified_social_credit_code',
@@ -286,10 +226,15 @@ const loadTree = async () => {
     tree.value = []
     selectedNode.value = null
     detail.value = null
-    treeError.value = errorMessage(error, '法人架构加载失败')
+    treeError.value = errorMessage(error, '法人主体加载失败')
   } finally {
     treeLoading.value = false
   }
+}
+
+const handleNodeSelectedById = async (legalEntityId: number) => {
+  const node = findLegalEntityNode(filteredTree.value, legalEntityId)
+  if (node) await handleNodeSelected(node)
 }
 
 const handleNodeSelected = async (node: LegalEntityTreeNode) => {
@@ -327,6 +272,20 @@ onMounted(async () => {
   await dictStore.loadDicts(['org_legal_entity_type', 'org_object_status'])
   await loadTree()
 })
+
+function mapLegalEntityTree(nodes: LegalEntityTreeNode[]): OrganizationReadOnlyTreeNode[] {
+  return nodes.map((node) => ({
+    id: node.legal_entity_id,
+    code: node.code,
+    name: node.name,
+    icon: 'account_balance',
+    typeLabel: entityTypeLabel(node.entity_type),
+    statusLabel: statusLabel(node.status),
+    statusColor: statusColor(node.status, node.disabled),
+    muted: node.disabled,
+    children: mapLegalEntityTree(node.children || []),
+  }))
+}
 
 function filterLegalEntityTree(
   nodes: LegalEntityTreeNode[],
@@ -409,17 +368,6 @@ function errorMessage(error: unknown, fallback: string): string {
   border-bottom: 1px solid #ffcdd2;
   background: #fff5f5;
   color: #b71c1c;
-}
-
-.organization-tree-empty {
-  height: 100%;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #8792a6;
 }
 
 .organization-detail-context {

@@ -2,12 +2,12 @@
   <base-content class="q-pa-sm organization-readonly-page">
     <master-detail-page
       :mode="SysMasterDetailMode.TABLE"
-      master-title="管理架构"
+      master-title="组织架构"
       :master-subtitle="treeSummary"
       :detail-title="selectedNode?.name || '组织详情'"
       detail-subtitle="组织主数据镜像"
-      master-width="minmax(600px, 48%)"
-      min-width="1120px"
+      master-width="minmax(440px, 44%)"
+      min-width="980px"
       min-height="calc(100vh - 150px)"
     >
       <template #master-actions>
@@ -26,31 +26,45 @@
       </template>
 
       <template #master-toolbar>
-        <div class="organization-tree-toolbar">
+        <div
+          class="organization-tree-toolbar"
+          :class="{
+            'organization-tree-toolbar--with-switcher': showStructureSwitcher,
+          }"
+        >
           <q-select
+            v-if="showStructureSwitcher"
             v-model="selectedStructureCode"
-            :options="structureOptions"
+            :options="structures"
             option-value="code"
-            option-label="label"
+            option-label="name"
             emit-value
             map-options
-            use-input
-            hide-selected
-            fill-input
             outlined
             dense
             :loading="structureLoading"
-            label="管理架构"
+            label="组织视图"
             class="structure-select"
-            @filter="handleStructureFilter"
             @update:model-value="handleStructureChange"
           >
+            <template #option="{ itemProps, opt }">
+              <q-item v-bind="itemProps">
+                <q-item-section>
+                  <q-item-label>{{ opt.name }}</q-item-label>
+                  <q-item-label caption>{{ opt.code }}</q-item-label>
+                </q-item-section>
+                <q-item-section v-if="opt.is_default" side>
+                  <q-chip dense square outline color="primary">默认</q-chip>
+                </q-item-section>
+              </q-item>
+            </template>
             <template #no-option>
               <q-item>
-                <q-item-section class="text-grey-7">暂无管理架构</q-item-section>
+                <q-item-section class="text-grey-7">暂无组织视图</q-item-section>
               </q-item>
             </template>
           </q-select>
+
           <q-input
             v-model="treeKeyword"
             outlined
@@ -58,16 +72,18 @@
             clearable
             class="structure-tree-search"
             placeholder="搜索组织编码或名称"
+            :disable="!selectedStructure"
             @keyup.enter="loadTree"
             @clear="loadTree"
           >
             <template #append>
-              <q-btn flat dense round icon="search" @click="loadTree">
+              <q-btn flat dense round icon="search" :disable="!selectedStructure" @click="loadTree">
                 <q-tooltip>搜索组织</q-tooltip>
               </q-btn>
             </template>
           </q-input>
         </div>
+
         <q-banner v-if="treeError || structureError" class="organization-tree-error">
           <template #avatar>
             <q-icon name="error_outline" color="negative" />
@@ -77,55 +93,14 @@
       </template>
 
       <template #master-content>
-        <tree-table
-          v-if="tree.length || treeLoading"
-          class="fit sticky-header-table"
-          :data="tree"
-          :columns="treeColumns"
-          :selected-row-id="selectedNode?.id ?? null"
+        <organization-read-only-tree
+          :nodes="displayTree"
+          :selected-id="selectedNode?.structure_node_id ?? null"
           :loading="treeLoading"
-          :dark="$q.dark.isActive"
-          bordered
-          flat
-          separator="horizontal"
-          @node-selected="handleNodeSelected"
-        >
-          <template #body-cell-name="{ row }">
-            <div class="row items-center no-wrap">
-              <q-icon name="apartment" color="primary" size="18px" class="q-mr-sm" />
-              <div class="ellipsis">{{ row.name }}</div>
-            </div>
-          </template>
-          <template #body-cell-unit_type="{ row }">
-            {{ unitTypeLabel(row.unit_type) }}
-          </template>
-          <template #body-cell-status="{ row }">
-            <q-chip dense square :color="statusColor(row.status, row.disabled)" text-color="white">
-              {{ statusLabel(row.status) }}
-            </q-chip>
-          </template>
-          <template #body-cell-actions="{ row }">
-            <div class="text-center">
-              <q-btn
-                v-for="button in detailButtons"
-                :key="button.id || button.code"
-                v-bind="menuButtonDisplayProps(button)"
-                flat
-                dense
-                round
-                :color="button.color || 'primary'"
-                @click.stop="handleNodeSelected(row)"
-              >
-                <q-tooltip>{{ button.name }}</q-tooltip>
-              </q-btn>
-            </div>
-          </template>
-        </tree-table>
-
-        <div v-else-if="!treeError && !structureError" class="organization-tree-empty">
-          <q-icon name="account_tree" size="44px" />
-          <div>{{ selectedStructureCode ? '当前架构暂无组织数据' : '暂无可用管理架构' }}</div>
-        </div>
+          :expand-all="Boolean(treeKeyword.trim())"
+          :empty-text="treeEmptyText"
+          @select="handleNodeSelectedById"
+        />
       </template>
 
       <template #detail-context>
@@ -138,7 +113,7 @@
             <div class="organization-detail-meta">
               <code>{{ selectedNode.code }}</code>
               <q-chip dense square outline color="primary">
-                {{ selectedStructure?.code || '-' }}
+                {{ selectedStructure?.name || '-' }}
               </q-chip>
               <q-chip
                 dense
@@ -173,23 +148,23 @@
 defineOptions({ name: 'organization_structure' })
 
 import { computed, onMounted, ref } from 'vue'
-import { date, useQuasar } from 'quasar'
+import { date } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
-import TreeTable from 'src/components/TreeTable/TreeTable.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
+import OrganizationReadOnlyTree from 'src/pages/organization/components/OrganizationReadOnlyTree.vue'
+import type { OrganizationReadOnlyTreeNode } from 'src/pages/organization/components/organization-read-only-tree'
 import {
   getOrgUnitDetail,
   getStructureOrgTree,
-  queryStructureOptions,
-  type OrganizationSelectorOption,
+  queryStructures,
+  type OrganizationStructure,
   type OrgUnitDetail,
   type StructureOrgTreeNode,
 } from 'src/api/services/org'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
 import { SysMasterDetailMode } from 'src/types/enum'
-import type { TableColumn } from 'src/types/global'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 interface DetailField {
@@ -201,13 +176,10 @@ interface DetailField {
   wide?: boolean
 }
 
-type SelectFilterUpdate = (callback: () => void) => void
-
 const dictStore = useDictStore()
-const $q = useQuasar()
-const { all_buttons, top_buttons, line_buttons } = usePageButtons('organization_structure')
+const { all_buttons, top_buttons } = usePageButtons('organization_structure')
 
-const structureOptions = ref<OrganizationSelectorOption[]>([])
+const structures = ref<OrganizationStructure[]>([])
 const selectedStructureCode = ref<string | null>(null)
 const tree = ref<StructureOrgTreeNode[]>([])
 const selectedNode = ref<StructureOrgTreeNode | null>(null)
@@ -222,41 +194,27 @@ const detailError = ref('')
 let detailRequestSequence = 0
 
 const selectedStructure = computed(
-  () =>
-    structureOptions.value.find((option) => option.code === selectedStructureCode.value) || null,
+  () => structures.value.find((item) => item.code === selectedStructureCode.value) || null,
 )
+const showStructureSwitcher = computed(() => structures.value.length > 1)
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
-const detailButtons = computed(() =>
-  line_buttons.value.filter((button) => button.event_action === 'detail'),
 )
 const canViewDetail = computed(() =>
   all_buttons.value.some((button) => button.event_action === 'detail'),
 )
-
-const treeColumns = computed<TableColumn[]>(() => {
-  const columns: TableColumn[] = [
-    { name: 'name', label: '组织名称', field: 'name', align: 'left' },
-    { name: 'code', label: '组织编码', field: 'code', align: 'left' },
-    { name: 'unit_type', label: '组织类型', field: 'unit_type', align: 'left' },
-    { name: 'status', label: '状态', field: 'status', align: 'center' },
-  ]
-  if (detailButtons.value.length) {
-    columns.push({
-      name: 'actions',
-      label: '操作',
-      field: 'id',
-      align: 'center',
-      style: 'width: 64px',
-    })
-  }
-  return columns
-})
-
+const displayTree = computed(() => mapStructureTree(tree.value))
 const treeSummary = computed(() => {
-  const label = selectedStructure.value?.label || '请选择管理架构'
-  return `${label} · ${countTreeNodes(tree.value)} 个组织节点`
+  if (!selectedStructure.value) {
+    return structures.value.length > 1 ? '请选择组织视图' : '暂无组织视图'
+  }
+  return `${selectedStructure.value.name} · ${countTreeNodes(tree.value)} 个组织`
+})
+const treeEmptyText = computed(() => {
+  if (!selectedStructure.value) {
+    return structures.value.length > 1 ? '请选择组织视图' : '暂无可用组织视图'
+  }
+  return treeKeyword.value ? '当前视图没有匹配的组织' : '当前视图暂无组织数据'
 })
 
 const detailFields = computed<DetailField[]>(() => {
@@ -281,25 +239,13 @@ const detailFields = computed<DetailField[]>(() => {
     },
     {
       key: 'structure',
-      label: '管理架构',
-      value: selectedStructure.value?.label || '-',
-    },
-    {
-      key: 'level',
-      label: '架构层级',
-      value: String(selectedNode.value.level),
+      label: '组织视图',
+      value: selectedStructure.value?.name || '-',
     },
     {
       key: 'primary_legal_entity',
       label: '主要法人',
       value: primaryLegalEntity,
-    },
-    {
-      key: 'node_status',
-      label: '节点状态',
-      value: statusLabel(selectedNode.value.node_status),
-      kind: 'status',
-      color: statusColor(selectedNode.value.node_status, selectedNode.value.disabled),
     },
     { key: 'valid_from', label: '有效期开始', value: formatDate(unit.valid_from) },
     { key: 'valid_to', label: '有效期结束', value: formatDate(unit.valid_to, '长期有效') },
@@ -317,33 +263,33 @@ const detailFields = computed<DetailField[]>(() => {
   ]
 })
 
-const loadStructureOptions = async (keyword = '') => {
+const loadStructures = async () => {
   structureLoading.value = true
   structureError.value = ''
   try {
-    const previous = selectedStructure.value
-    const normalizedKeyword = keyword.trim()
-    const result = await queryStructureOptions({
+    const previousCode = selectedStructureCode.value
+    const result = await queryStructures({
       page: 1,
       num: 100,
       only_effective: true,
-      ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     })
-    const options = result.items
-    if (previous && !options.some((option) => option.code === previous.code)) {
-      options.unshift(previous)
+    structures.value = result.items
+
+    if (structures.value.length === 1) {
+      selectedStructureCode.value = structures.value[0]!.code
+      return
     }
-    structureOptions.value = options
-    if (
-      !selectedStructureCode.value ||
-      !structureOptions.value.some((option) => option.code === selectedStructureCode.value)
-    ) {
-      selectedStructureCode.value = structureOptions.value[0]?.code || null
+    if (previousCode && structures.value.some((item) => item.code === previousCode)) {
+      selectedStructureCode.value = previousCode
+      return
     }
+
+    const defaults = structures.value.filter((item) => item.is_default)
+    selectedStructureCode.value = defaults.length === 1 ? defaults[0]!.code : null
   } catch (error) {
-    structureOptions.value = []
+    structures.value = []
     selectedStructureCode.value = null
-    structureError.value = errorMessage(error, '管理架构加载失败')
+    structureError.value = errorMessage(error, '组织视图加载失败')
   } finally {
     structureLoading.value = false
   }
@@ -363,7 +309,7 @@ const loadTree = async () => {
   try {
     const normalizedKeyword = treeKeyword.value.trim()
     tree.value = await getStructureOrgTree({
-      structure_id: structure.value,
+      structure_id: structure.id,
       only_effective: true,
       ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     })
@@ -382,14 +328,14 @@ const loadTree = async () => {
     tree.value = []
     selectedNode.value = null
     detail.value = null
-    treeError.value = errorMessage(error, '管理组织树加载失败')
+    treeError.value = errorMessage(error, '组织树加载失败')
   } finally {
     treeLoading.value = false
   }
 }
 
 const refreshPage = async () => {
-  await loadStructureOptions()
+  await loadStructures()
   await loadTree()
 }
 
@@ -401,10 +347,9 @@ const handleStructureChange = async () => {
   await loadTree()
 }
 
-const handleStructureFilter = (value: string, update: SelectFilterUpdate, abort: () => void) => {
-  void loadStructureOptions(value)
-    .then(() => update(() => undefined))
-    .catch(() => abort())
+const handleNodeSelectedById = async (structureNodeId: number) => {
+  const node = findStructureNode(tree.value, structureNodeId)
+  if (node) await handleNodeSelected(node)
 }
 
 const handleNodeSelected = async (node: StructureOrgTreeNode) => {
@@ -439,10 +384,24 @@ const statusLabel = (value: string) =>
   dictStore.getDictLabel('org_object_status', value) || displayValue(value)
 
 onMounted(async () => {
-  await dictStore.loadDicts(['org_unit_type', 'org_object_status', 'org_structure_type'])
-  await loadStructureOptions()
+  await dictStore.loadDicts(['org_unit_type', 'org_object_status'])
+  await loadStructures()
   await loadTree()
 })
+
+function mapStructureTree(nodes: StructureOrgTreeNode[]): OrganizationReadOnlyTreeNode[] {
+  return nodes.map((node) => ({
+    id: node.structure_node_id,
+    code: node.code,
+    name: node.name,
+    icon: 'apartment',
+    typeLabel: unitTypeLabel(node.unit_type),
+    statusLabel: statusLabel(node.status),
+    statusColor: statusColor(node.status, node.disabled),
+    muted: node.disabled,
+    children: mapStructureTree(node.children || []),
+  }))
+}
 
 function firstStructureNode(nodes: StructureOrgTreeNode[]): StructureOrgTreeNode | null {
   for (const node of nodes) {
@@ -500,10 +459,14 @@ function errorMessage(error: unknown, fallback: string): string {
 
 .organization-tree-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(240px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 10px 12px;
   border-bottom: 1px solid #e3e8f2;
+}
+
+.organization-tree-toolbar--with-switcher {
+  grid-template-columns: minmax(190px, 0.8fr) minmax(220px, 1.2fr);
 }
 
 .structure-select,
@@ -515,17 +478,6 @@ function errorMessage(error: unknown, fallback: string): string {
   border-bottom: 1px solid #ffcdd2;
   background: #fff5f5;
   color: #b71c1c;
-}
-
-.organization-tree-empty {
-  height: 100%;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #8792a6;
 }
 
 .organization-detail-context {
@@ -573,8 +525,8 @@ function errorMessage(error: unknown, fallback: string): string {
   font-size: 12px;
 }
 
-@media (max-width: 1280px) {
-  .organization-tree-toolbar {
+@media (max-width: 1180px) {
+  .organization-tree-toolbar--with-switcher {
     grid-template-columns: minmax(0, 1fr);
   }
 }

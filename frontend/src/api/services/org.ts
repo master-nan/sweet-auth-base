@@ -83,6 +83,26 @@ export interface StructureOptionsRequest extends OrganizationReadScopeRequest {
   selected_ids?: number[]
 }
 
+export interface StructureQueryRequest extends OrganizationReadScopeRequest {
+  page: number
+  num: number
+}
+
+export interface OrganizationStructure extends OrganizationBaseRecord {
+  code: string
+  name: string
+  structure_type: string
+  status: string
+  is_default: boolean
+  valid_from?: string | null
+  valid_to?: string | null
+}
+
+export interface OrganizationStructureResult {
+  items: OrganizationStructure[]
+  total: number
+}
+
 export interface StructureOrgTreeRequest extends OrganizationReadScopeRequest {
   structure_id: number
   root_node_id?: number
@@ -233,6 +253,20 @@ export const queryStructureOptions = async (
     items: (response.data.data || [])
       .map(normalizeOption)
       .filter((option): option is OrganizationSelectorOption => option !== null),
+    total: response.data.total || 0,
+  }
+}
+
+export const queryStructures = async (
+  request: StructureQueryRequest,
+): Promise<OrganizationStructureResult> => {
+  const response = await instance.post<ResponseData<OrganizationStructure[]>>(
+    '/admin/org/structure/query',
+    request,
+    organizationReadRequestConfig,
+  )
+  return {
+    items: response.data.data || [],
     total: response.data.total || 0,
   }
 }
