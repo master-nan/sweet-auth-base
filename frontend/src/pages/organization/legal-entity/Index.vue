@@ -1,101 +1,117 @@
 <template>
   <base-content class="q-pa-sm organization-readonly-page">
-    <master-detail-page
-      :mode="SysMasterDetailMode.TABLE"
-      master-title="法人档案"
-      :master-subtitle="treeSummary"
-      :detail-title="selectedNode?.name || '法人详情'"
-      detail-subtitle="法人主数据镜像"
-      master-width="minmax(420px, 42%)"
-      min-width="960px"
-      min-height="calc(100vh - 150px)"
-    >
-      <template #master-actions>
-        <q-btn
-          v-for="button in refreshButtons"
-          :key="button.id || button.code"
-          v-bind="menuButtonDisplayProps(button)"
-          round
-          outline
-          :color="button.color || 'primary'"
-          :loading="treeLoading"
-          @click="loadTree"
-        >
-          <q-tooltip>{{ button.name }}</q-tooltip>
-        </q-btn>
-      </template>
+    <div class="organization-browser-page">
+      <header class="organization-page-header">
+        <div class="organization-page-heading">
+          <h1>法人主体</h1>
+          <p>法人主数据镜像浏览</p>
+        </div>
 
-      <template #master-toolbar>
-        <div class="organization-tree-toolbar">
-          <q-input
-            v-model="keyword"
-            outlined
-            dense
-            clearable
-            class="full-width"
-            placeholder="搜索法人编码、名称或简称"
+        <div class="organization-page-actions">
+          <q-btn
+            v-for="button in refreshButtons"
+            :key="button.id || button.code"
+            v-bind="menuButtonDisplayProps(button)"
+            round
+            outline
+            :color="button.color || 'primary'"
+            :loading="treeLoading"
+            @click="loadTree"
           >
-            <template #append>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+            <q-tooltip>{{ button.name }}</q-tooltip>
+          </q-btn>
         </div>
-        <q-banner v-if="treeError" class="organization-tree-error">
-          <template #avatar>
-            <q-icon name="error_outline" color="negative" />
-          </template>
-          {{ treeError }}
-        </q-banner>
-      </template>
+      </header>
 
-      <template #master-content>
-        <organization-read-only-tree
-          :nodes="displayTree"
-          :selected-id="selectedNode?.legal_entity_id ?? null"
-          :loading="treeLoading"
-          :expand-all="Boolean(keyword.trim())"
-          :empty-text="keyword ? '没有匹配的法人主体' : '暂无法人主体数据'"
-          @select="handleNodeSelectedById"
-        />
-      </template>
+      <q-banner v-if="treeError" class="organization-page-error">
+        <template #avatar>
+          <q-icon name="error_outline" color="negative" />
+        </template>
+        {{ treeError }}
+      </q-banner>
 
-      <template #detail-context>
-        <div v-if="selectedNode" class="organization-detail-context">
-          <div class="organization-detail-icon">
-            <q-icon name="account_balance" />
-          </div>
-          <div class="organization-detail-heading">
-            <div class="organization-detail-title">{{ selectedNode.name }}</div>
-            <div class="organization-detail-meta">
-              <span>{{ entityTypeLabel(selectedNode.entity_type) }}</span>
-              <span aria-hidden="true">·</span>
-              <span class="organization-detail-code">{{ selectedNode.code }}</span>
-              <q-chip
-                dense
-                square
-                outline
-                :color="statusColor(selectedNode.status, selectedNode.disabled)"
-              >
-                {{ statusLabel(selectedNode.status) }}
-              </q-chip>
+      <main class="organization-browser-workspace">
+        <q-card flat bordered class="organization-tree-panel">
+          <q-card-section class="organization-panel-header">
+            <div>
+              <div class="organization-panel-title">法人树</div>
+              <div class="organization-panel-subtitle">{{ treeSummary }}</div>
             </div>
-          </div>
-        </div>
-        <div v-else class="organization-detail-context organization-detail-context--empty">
-          <q-icon name="description" size="28px" />
-          <span>法人详情</span>
-        </div>
-      </template>
+          </q-card-section>
 
-      <template #detail-content>
-        <organization-read-only-detail
-          :groups="detailGroups"
-          :loading="detailLoading"
-          :error="detailError"
-          empty-text="请选择左侧法人主体"
-        />
-      </template>
-    </master-detail-page>
+          <q-separator />
+
+          <q-card-section class="organization-tree-toolbar">
+            <q-input
+              v-model="keyword"
+              outlined
+              dense
+              clearable
+              placeholder="搜索法人编码、名称或简称"
+            >
+              <template #append>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </q-card-section>
+
+          <q-separator />
+
+          <q-card-section class="organization-tree-content">
+            <organization-read-only-tree
+              :nodes="displayTree"
+              :selected-id="selectedNode?.legal_entity_id ?? null"
+              :loading="treeLoading"
+              :expand-all="Boolean(keyword.trim())"
+              :empty-text="keyword ? '没有匹配的法人主体' : '暂无法人主体数据'"
+              @select="handleNodeSelectedById"
+            />
+          </q-card-section>
+        </q-card>
+
+        <section class="organization-detail-panel" aria-label="法人详情">
+          <q-card flat bordered class="organization-detail-summary">
+            <q-card-section>
+              <div v-if="selectedNode" class="organization-detail-context">
+                <div class="organization-detail-icon">
+                  <q-icon name="account_balance" />
+                </div>
+                <div class="organization-detail-heading">
+                  <div class="organization-detail-title">{{ selectedNode.name }}</div>
+                  <div class="organization-detail-meta">
+                    <span>{{ entityTypeLabel(selectedNode.entity_type) }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span class="organization-detail-code">{{ selectedNode.code }}</span>
+                    <q-chip
+                      dense
+                      square
+                      outline
+                      :color="statusColor(selectedNode.status, selectedNode.disabled)"
+                    >
+                      {{ statusLabel(selectedNode.status) }}
+                    </q-chip>
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="organization-detail-context organization-detail-context--empty"
+              >
+                <q-icon name="description" size="28px" />
+                <span>请选择法人主体</span>
+              </div>
+            </q-card-section>
+          </q-card>
+
+          <organization-read-only-detail
+            :groups="detailGroups"
+            :loading="detailLoading"
+            :error="detailError"
+            empty-text="请选择左侧法人主体"
+          />
+        </section>
+      </main>
+    </div>
   </base-content>
 </template>
 
@@ -105,7 +121,6 @@ defineOptions({ name: 'organization_legal_entity' })
 import { computed, onMounted, ref } from 'vue'
 import { date } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
 import type { OrganizationDetailGroup } from 'src/pages/organization/components/organization-read-only-detail'
 import OrganizationReadOnlyTree from 'src/pages/organization/components/OrganizationReadOnlyTree.vue'
@@ -118,7 +133,6 @@ import {
 } from 'src/api/services/org'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
-import { SysMasterDetailMode } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const dictStore = useDictStore()
@@ -171,7 +185,7 @@ const detailGroups = computed<OrganizationDetailGroup[]>(() => {
     },
     {
       key: 'ownership',
-      title: '归属信息',
+      title: '主体信息',
       icon: 'corporate_fare',
       fields: [
         {
@@ -307,7 +321,6 @@ function mapLegalEntityTree(nodes: LegalEntityTreeNode[]): OrganizationReadOnlyT
     code: node.code,
     name: node.name,
     icon: 'account_balance',
-    typeLabel: entityTypeLabel(node.entity_type),
     statusLabel: statusLabel(node.status),
     statusColor: statusColor(node.status, node.disabled),
     muted: node.disabled,
@@ -360,7 +373,14 @@ function countTreeNodes(nodes: LegalEntityTreeNode[]): number {
 
 function displayValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-'
-  return String(value)
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value)
+  }
+  return '-'
 }
 
 function formatDate(value?: string | null, empty = '-'): string {
@@ -387,15 +407,118 @@ function errorMessage(error: unknown, fallback: string): string {
   overflow: auto;
 }
 
-.organization-tree-toolbar {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e3e8f2;
+.organization-browser-page {
+  min-width: 980px;
 }
 
-.organization-tree-error {
-  border-bottom: 1px solid #ffcdd2;
+.organization-page-header {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #dfe5ee;
+  background: #fff;
+}
+
+.organization-page-heading {
+  min-width: 0;
+}
+
+.organization-page-heading h1 {
+  margin: 0;
+  color: #172033;
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 28px;
+}
+
+.organization-page-heading p {
+  margin: 2px 0 0;
+  color: #718096;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.organization-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.organization-page-error {
+  margin-bottom: 12px;
+  border: 1px solid #ffcdd2;
   background: #fff5f5;
   color: #b71c1c;
+}
+
+.organization-browser-workspace {
+  height: calc(100vh - 184px);
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: minmax(370px, 40%) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.organization-tree-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-color: #dfe5ee;
+  border-radius: 8px;
+}
+
+.organization-panel-header {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.organization-panel-title {
+  color: #24324a;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.organization-panel-subtitle {
+  margin-top: 2px;
+  color: #7b8798;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.organization-tree-toolbar {
+  padding: 10px 12px;
+}
+
+.organization-tree-content {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.organization-detail-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.organization-detail-summary {
+  margin-bottom: 12px;
+  border-color: #dfe5ee;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .organization-detail-context {
@@ -447,5 +570,11 @@ function errorMessage(error: unknown, fallback: string): string {
   color: #7a879b;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
+}
+
+@media (max-width: 1180px) {
+  .organization-browser-workspace {
+    grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
+  }
 }
 </style>

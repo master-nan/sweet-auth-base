@@ -60,29 +60,16 @@ const SlotHostStub = defineComponent({
   },
 })
 
-const MasterDetailPageStub = defineComponent({
-  name: 'MasterDetailPage',
+const QBtnStub = defineComponent({
+  name: 'QBtn',
   props: {
-    masterTitle: {
-      type: String,
-      default: '',
-    },
-    masterSubtitle: {
+    icon: {
       type: String,
       default: '',
     },
   },
   setup(props, { slots }) {
-    return () =>
-      h('div', { 'data-testid': 'master-detail' }, [
-        h('div', { 'data-testid': 'master-title' }, props.masterTitle),
-        h('div', { 'data-testid': 'master-subtitle' }, props.masterSubtitle),
-        slots['master-actions']?.(),
-        slots['master-toolbar']?.(),
-        slots['master-content']?.(),
-        slots['detail-context']?.(),
-        slots['detail-content']?.(),
-      ])
+    return () => h('button', { 'data-icon': props.icon }, slots.default?.())
   },
 })
 
@@ -163,12 +150,14 @@ const mountPage = (component: Component) =>
     global: {
       stubs: {
         BaseContent: SlotHostStub,
-        MasterDetailPage: MasterDetailPageStub,
         OrganizationReadOnlyTree: OrganizationTreeStub,
         OrganizationReadOnlyDetail: OrganizationDetailStub,
         QSelect: QSelectStub,
         QInput: SlotHostStub,
-        QBtn: SlotHostStub,
+        QBtn: QBtnStub,
+        QCard: SlotHostStub,
+        QCardSection: SlotHostStub,
+        QSeparator: true,
         QTooltip: SlotHostStub,
         QIcon: true,
         QChip: SlotHostStub,
@@ -235,13 +224,28 @@ describe('Organization read-only center', () => {
     const wrapper = mountPage(LegalEntityPage)
     await flushPromises()
 
-    expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('法人档案')
-    expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('组织主数据镜像')
+    expect(wrapper.find('h1').text()).toBe('法人主体')
+    expect(wrapper.find('.organization-page-heading p').text()).toBe('法人主数据镜像浏览')
+    expect(wrapper.find('.organization-browser-workspace').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('法人架构')
     expect(apiMocks.getLegalEntityTree).toHaveBeenCalledWith({ only_effective: true })
     expect(apiMocks.getLegalEntityDetail).toHaveBeenCalledWith(10, {
       only_effective: true,
     })
+    expect(
+      (wrapper.findComponent(OrganizationTreeStub).props('nodes') as Array<{
+        name: string
+        code: string
+        typeLabel?: string
+      }>)[0],
+    ).toEqual(expect.objectContaining({ name: '集团', code: 'LE-10' }))
+    expect(
+      (wrapper.findComponent(OrganizationTreeStub).props('nodes') as Array<{
+        typeLabel?: string
+      }>)[0]?.typeLabel,
+    ).toBeUndefined()
+    expect(wrapper.find('[data-icon="visibility"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('操作')
 
     wrapper.findComponent(OrganizationTreeStub).vm.$emit('select', 11)
     await flushPromises()
@@ -256,7 +260,7 @@ describe('Organization read-only center', () => {
       (wrapper.findComponent(OrganizationDetailStub).props('groups') as Array<{
         title: string
       }>).map((group) => group.title),
-    ).toEqual(['基础信息', '归属信息', '状态信息', '镜像信息'])
+    ).toEqual(['基础信息', '主体信息', '状态信息', '镜像信息'])
     expect(wrapper.text()).not.toMatch(/新增|编辑|删除|调岗|离职/)
   })
 
@@ -279,10 +283,14 @@ describe('Organization read-only center', () => {
     const wrapper = mountPage(StructurePage)
     await flushPromises()
 
-    expect(wrapper.findComponent(MasterDetailPageStub).props('masterTitle')).toBe('组织架构')
+    expect(wrapper.find('h1').text()).toBe('组织架构')
+    expect(wrapper.find('.organization-page-heading p').text()).toBe('组织主数据镜像浏览')
+    expect(wrapper.find('.organization-browser-workspace').exists()).toBe(true)
     expect(wrapper.findComponent(QSelectStub).exists()).toBe(false)
-    expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('组织主数据镜像')
-    expect(wrapper.find('[data-testid="master-subtitle"]').text()).toContain('集团组织视图')
+    expect(wrapper.find('.organization-panel-subtitle').text()).toContain('组织主数据镜像')
+    expect(wrapper.find('.organization-panel-subtitle').text()).toContain('集团组织视图')
+    expect(wrapper.find('[data-icon="visibility"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('操作')
     expect(apiMocks.getStructureOrgTree).toHaveBeenCalledWith({
       structure_id: 20,
       only_effective: true,

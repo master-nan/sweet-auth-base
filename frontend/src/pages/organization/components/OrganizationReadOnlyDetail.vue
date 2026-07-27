@@ -12,40 +12,46 @@
     </q-banner>
 
     <div v-else-if="groups.length" class="organization-detail-groups">
-      <section
+      <q-card
         v-for="group in groups"
         :key="group.key"
+        flat
+        bordered
         class="organization-detail-group"
       >
-        <header class="organization-detail-group__header">
+        <q-card-section class="organization-detail-group__header">
           <q-icon :name="group.icon || 'subject'" size="18px" />
           <h3>{{ group.title }}</h3>
-        </header>
+        </q-card-section>
 
-        <div class="organization-detail-grid">
-          <article
-            v-for="field in group.fields"
-            :key="field.key"
-            class="organization-detail-field"
-            :class="{ 'organization-detail-field--wide': field.wide }"
-          >
-            <div class="organization-detail-label">{{ field.label }}</div>
-            <div class="organization-detail-value">
-              <q-chip
-                v-if="field.kind === 'status'"
-                dense
-                square
-                outline
-                :color="field.color || 'grey-6'"
-              >
-                {{ field.value }}
-              </q-chip>
-              <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
-              <span v-else>{{ field.value }}</span>
-            </div>
-          </article>
-        </div>
-      </section>
+        <q-separator />
+
+        <q-card-section>
+          <div class="organization-detail-grid">
+            <article
+              v-for="field in group.fields"
+              :key="field.key"
+              class="organization-detail-field"
+              :class="{ 'organization-detail-field--wide': field.wide }"
+            >
+              <div class="organization-detail-label">{{ field.label }}</div>
+              <div class="organization-detail-value">
+                <q-chip
+                  v-if="field.kind === 'status'"
+                  dense
+                  square
+                  outline
+                  :color="field.color || 'grey-6'"
+                >
+                  {{ field.value }}
+                </q-chip>
+                <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
+                <span v-else>{{ field.value }}</span>
+              </div>
+            </article>
+          </div>
+        </q-card-section>
+      </q-card>
     </div>
 
     <div v-else-if="!loading" class="organization-detail-empty">
@@ -78,29 +84,30 @@ withDefaults(
 <style scoped lang="scss">
 .organization-readonly-detail {
   position: relative;
-  height: 100%;
   min-height: 240px;
-  overflow: auto;
-  background: #fff;
 }
 
 .organization-detail-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
   padding-bottom: 8px;
 }
 
 .organization-detail-group {
-  padding: 0 18px;
-}
-
-.organization-detail-group + .organization-detail-group {
-  border-top: 1px solid #e7ebf2;
+  min-width: 0;
+  border-color: #dfe5ee;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .organization-detail-group__header {
+  min-height: 50px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 17px 0 13px;
+  padding: 12px 14px;
   color: #40516c;
 }
 
@@ -114,10 +121,8 @@ withDefaults(
 
 .organization-detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 32px;
-  row-gap: 16px;
-  padding: 0 0 19px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
 }
 
 .organization-detail-field {
@@ -169,12 +174,8 @@ withDefaults(
 }
 
 @media (max-width: 1200px) {
-  .organization-detail-grid {
+  .organization-detail-groups {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .organization-detail-field--wide {
-    grid-column: auto;
   }
 }
 </style>

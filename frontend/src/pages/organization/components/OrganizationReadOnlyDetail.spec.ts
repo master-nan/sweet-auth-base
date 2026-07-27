@@ -11,6 +11,13 @@ const SlotStub = defineComponent({
   },
 })
 
+const QCardStub = defineComponent({
+  name: 'QCard',
+  setup(_, { slots }) {
+    return () => h('article', { 'data-testid': 'detail-group-card' }, slots.default?.())
+  },
+})
+
 describe('OrganizationReadOnlyDetail', () => {
   it('renders business groups instead of a flat field collection', () => {
     const wrapper = mount(OrganizationReadOnlyDetail, {
@@ -48,6 +55,9 @@ describe('OrganizationReadOnlyDetail', () => {
           QBanner: SlotStub,
           QIcon: true,
           QChip: SlotStub,
+          QCard: QCardStub,
+          QCardSection: SlotStub,
+          QSeparator: true,
         },
       },
     })
@@ -61,5 +71,7 @@ describe('OrganizationReadOnlyDetail', () => {
     expect(wrapper.text()).toContain('财务中心')
     expect(wrapper.text()).toContain('FIN')
     expect(wrapper.text()).toContain('启用')
+    expect(wrapper.findAll('.organization-detail-grid')).toHaveLength(2)
+    expect(wrapper.findAll('[data-testid="detail-group-card"]')).toHaveLength(2)
   })
 })
