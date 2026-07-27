@@ -33,7 +33,7 @@ type App struct {
 	SF                       *utils.Snowflake
 	JwtGenerator             *token.JWTGenerator
 	HmacGenerator            *token.HMACGenerator
-	Enforcer                 *casbin.Enforcer
+	Enforcer                 *casbin.SyncedEnforcer
 	DictController           *controller.DictController
 	BasicController          *controller.BasicController
 	TableController          *controller.TableController

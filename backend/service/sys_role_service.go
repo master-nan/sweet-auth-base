@@ -203,25 +203,8 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 		}
 	}
 
-	// 先获取旧策略（用于回滚）
-	oldPolicies, _ := s.casbinRuleRepo.GetFilteredPolicy(0, role.Name)
-
-	// 删除旧策略
-	_, err = s.casbinRuleRepo.RemoveFilteredPolicy(0, role.Name)
-	if err != nil {
-		return err
-	}
-
-	// 添加新策略
-	for _, policy := range newPolicies {
-		_, err = s.casbinRuleRepo.AddPolicy(policy[0], policy[1], policy[2])
-		if err != nil {
-			// 回滚：尝试恢复旧策略
-			for _, old := range oldPolicies {
-				_, _ = s.casbinRuleRepo.AddPolicy(old[0], old[1], old[2])
-			}
-			return fmt.Errorf("casbin策略更新失败，已回滚: %w", err)
-		}
+	if err = s.casbinRuleRepo.ReplaceSubjectPolicies(role.Name, newPolicies); err != nil {
+		return fmt.Errorf("casbin策略更新失败: %w", err)
 	}
 
 	return nil

@@ -83,6 +83,7 @@ func AuthHandler(serverConfig *config.Server, tokenGenerator token.Generator, us
 		}
 		c.Set("user", user)
 		c.Set("id", i)
+		c.Set("token_subject", claims.ID)
 		c.Next()
 		zap.L().Info("AuthHandler end")
 	}

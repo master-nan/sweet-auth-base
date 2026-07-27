@@ -8,18 +8,18 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
+	"backend/repository"
 
-	"github.com/casbin/casbin/v2"
 	"gorm.io/gorm"
 )
 
 type CasbinRuleRepositoryImpl struct {
 	db *gorm.DB
 	*BasicRepositoryImpl[model.CasbinRule]
-	enforcer *casbin.Enforcer
+	enforcer repository.CasbinPolicyEnforcer
 }
 
-func NewCasbinRuleRepositoryImpl(PrimaryDB *database.PrimaryDB, enforcer *casbin.Enforcer) *CasbinRuleRepositoryImpl {
+func NewCasbinRuleRepositoryImpl(PrimaryDB *database.PrimaryDB, enforcer repository.CasbinPolicyEnforcer) *CasbinRuleRepositoryImpl {
 	return &CasbinRuleRepositoryImpl{
 		db:                  PrimaryDB.DB,
 		BasicRepositoryImpl: NewBasicRepositoryImpl(PrimaryDB.DB, &model.CasbinRule{}),
@@ -41,4 +41,9 @@ func (c CasbinRuleRepositoryImpl) RemoveFilteredPolicy(fieldIndex int, fieldValu
 
 func (c CasbinRuleRepositoryImpl) GetFilteredPolicy(fieldIndex int, fieldValues ...string) ([][]string, error) {
 	return c.enforcer.GetFilteredPolicy(fieldIndex, fieldValues...)
+}
+
+func (c CasbinRuleRepositoryImpl) ReplaceSubjectPolicies(subject string, policies [][]string) error {
+	_, err := c.enforcer.UpdateFilteredPolicies(policies, 0, subject)
+	return err
 }

@@ -11,12 +11,12 @@ import (
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 )
 
-func InitCasbin(PrimaryDB *database.PrimaryDB) (*casbin.Enforcer, error) {
+func InitCasbin(PrimaryDB *database.PrimaryDB) (*casbin.SyncedEnforcer, error) {
 	adapter, err := gormadapter.NewAdapterByDB(PrimaryDB.DB) // 使用GORM适配器
 	if err != nil {
 		return nil, err
 	}
-	enforcer, err := casbin.NewEnforcer("casbin_model.conf", adapter)
+	enforcer, err := casbin.NewSyncedEnforcer("casbin_model.conf", adapter)
 	if err != nil {
 		return nil, err
 	}

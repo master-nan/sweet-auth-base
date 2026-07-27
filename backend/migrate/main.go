@@ -1515,6 +1515,7 @@ func seedDataPermissionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int,
 
 func seedDictionaryMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
+		apiPermissionWithAPI(455, menuID, "字典编码查询", "develop_dictionary_code_query", enum.Top, "query", "search", "primary", 89, "/admin/dict/code/:code", "GET"),
 		apiPermissionWithAPI(456, menuID, "字典查询", "develop_dictionary_query", enum.Top, "query", "search", "primary", 90, "/admin/dict/query", "POST"),
 		apiPermissionWithAPI(457, menuID, "字典元数据", "develop_dictionary_metadata", enum.Top, "metadata", "data_object", "primary", 91, "/admin/table/code/:code", "GET"),
 		apiPermissionWithAPI(458, menuID, "字典项元数据", "develop_dictionary_item_metadata", enum.Top, "item_metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
