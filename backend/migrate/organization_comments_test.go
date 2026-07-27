@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -67,6 +68,59 @@ func TestOrganizationDatabaseCommentSpecsCoverEveryModelColumn(t *testing.T) {
 	}
 	if len(expectedTables) != 0 {
 		t.Fatalf("organization comment specs missing tables: %v", sortedStringSet(expectedTables))
+	}
+}
+
+func TestOrganizationDatabaseCommentsRemainConciseAndKeepPlatformBasicTerms(t *testing.T) {
+	expectedPlatformComments := map[string]string{
+		"id":          "主键ID",
+		"gmt_create":  "创建时间",
+		"create_user": "创建人ID",
+		"create_name": "创建人",
+		"gmt_modify":  "修改时间",
+		"modify_user": "修改人ID",
+		"modify_name": "修改人",
+		"gmt_delete":  "删除时间",
+		"delete_user": "删除人ID",
+		"delete_name": "删除人",
+	}
+	if !reflect.DeepEqual(platformBasicColumnComments, expectedPlatformComments) {
+		t.Fatalf(
+			"platform basic comments changed\nactual=%v\nexpected=%v",
+			platformBasicColumnComments,
+			expectedPlatformComments,
+		)
+	}
+
+	for _, spec := range organizationDatabaseCommentSpecs {
+		statement := &gorm.Statement{DB: migrateTestDB(t)}
+		if err := statement.Parse(spec.model); err != nil {
+			t.Fatalf("parse organization model: %v", err)
+		}
+		for columnName := range expectedPlatformComments {
+			if _, overridden := spec.columnComments[columnName]; overridden {
+				t.Fatalf(
+					"organization table %s overrides platform comment for %s",
+					statement.Schema.Table,
+					columnName,
+				)
+			}
+		}
+		comments, err := completeOrganizationColumnComments(
+			statement.Schema.DBNames,
+			spec.columnComments,
+		)
+		if err != nil {
+			t.Fatalf("validate organization comments for %s: %v", statement.Schema.Table, err)
+		}
+		assertConciseDatabaseComment(t, statement.Schema.Table, spec.tableComment)
+		for columnName, comment := range comments {
+			assertConciseDatabaseComment(
+				t,
+				statement.Schema.Table+"."+columnName,
+				comment,
+			)
+		}
 	}
 }
 
@@ -325,4 +379,30 @@ func sortedStringSet(values map[string]struct{}) []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+func assertConciseDatabaseComment(t *testing.T, field string, comment string) {
+	t.Helper()
+	if utf8.RuneCountInString(comment) > 24 {
+		t.Fatalf("database comment %s is too long: %q", field, comment)
+	}
+	for _, forbidden := range []string{
+		"。",
+		"；",
+		"\n",
+		"不得",
+		"不等同",
+		"不作为",
+		"权限",
+		"生命周期",
+	} {
+		if strings.Contains(comment, forbidden) {
+			t.Fatalf(
+				"database comment %s contains design rule %q: %q",
+				field,
+				forbidden,
+				comment,
+			)
+		}
+	}
 }
