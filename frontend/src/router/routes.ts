@@ -187,6 +187,38 @@ const asyncRoutesChildren: Route[] = [
   },
   {
     component: layout,
+    path: 'organization',
+    name: 'organization',
+    meta: {
+      title: '组织主数据',
+      icon: 'account_tree',
+      isOpen: false,
+    },
+    children: [
+      {
+        component: () => import('pages/organization/legal-entity/Index.vue'),
+        path: 'legal-entity',
+        name: 'organization_legal_entity',
+        meta: {
+          title: '法人架构',
+          icon: 'account_balance',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/organization/structure/Index.vue'),
+        path: 'structure',
+        name: 'organization_structure',
+        meta: {
+          title: '管理架构',
+          icon: 'lan',
+          keepAlive: true,
+        },
+      },
+    ],
+  },
+  {
+    component: layout,
     path: 'report',
     name: 'report',
     meta: {
