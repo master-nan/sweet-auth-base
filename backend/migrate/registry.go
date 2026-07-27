@@ -27,6 +27,7 @@ func migrationSteps() []migrationStep {
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
 		{name: "ensure_data_permission_indexes", run: ensureDataPermissionIndexes},
 		{name: "backfill_sys_menu_page_binding", run: backfillSysMenuPageBinding},
+		{name: "organization_database_comments", run: applyOrganizationDatabaseComments},
 	}
 }
 

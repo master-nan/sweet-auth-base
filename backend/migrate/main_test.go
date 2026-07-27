@@ -82,6 +82,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"ensure_sys_menu_option_text",
 		"ensure_data_permission_indexes",
 		"backfill_sys_menu_page_binding",
+		"organization_database_comments",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)
