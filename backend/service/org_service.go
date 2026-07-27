@@ -1040,6 +1040,14 @@ func (s *OrgService) GetStructureOrgTree(
 	if err != nil {
 		return nil, err
 	}
+	return s.getStructureOrgTreeForRead(ctx, req, scope)
+}
+
+func (s *OrgService) getStructureOrgTreeForRead(
+	ctx *gin.Context,
+	req request.OrgStructureOrgTreeReq,
+	scope repository.OrgReadScope,
+) ([]response.OrgStructureOrgTreeNodeRes, error) {
 	structure, err := s.structureRepo.FindByIdForRead(ctx, req.StructureId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

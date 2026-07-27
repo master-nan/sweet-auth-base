@@ -3,25 +3,27 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeOrgLegalEntityNotFound  = 110001
-	ErrorCodeOrgLegalEntityCycle     = 110002
-	ErrorCodeOrgStructureNotFound    = 110003
-	ErrorCodeOrgStructureInactive    = 110004
-	ErrorCodeOrgUnitNotFound         = 110005
-	ErrorCodeOrgStructureNodeMissing = 110006
-	ErrorCodeOrgStructureCycle       = 110007
-	ErrorCodeOrgTreeRootAmbiguous    = 110008
-	ErrorCodeOrgTreeTooLarge         = 110009
-	ErrorCodeOrgEmployeeNotFound     = 110010
-	ErrorCodeOrgPositionNotFound     = 110011
-	ErrorCodeOrgAssignmentNotFound   = 110012
-	ErrorCodeOrgAssignmentTooLarge   = 110013
-	ErrorCodeOrgUserNotFound         = 110014
-	ErrorCodeOrgEmployeeAlreadyBound = 110015
-	ErrorCodeOrgUserAlreadyBound     = 110016
-	ErrorCodeOrgEmployeeInactive     = 110017
-	ErrorCodeOrgLegalEntityInactive  = 110018
-	ErrorCodeOrgUnitInactive         = 110019
+	ErrorCodeOrgLegalEntityNotFound          = 110001
+	ErrorCodeOrgLegalEntityCycle             = 110002
+	ErrorCodeOrgStructureNotFound            = 110003
+	ErrorCodeOrgStructureInactive            = 110004
+	ErrorCodeOrgUnitNotFound                 = 110005
+	ErrorCodeOrgStructureNodeMissing         = 110006
+	ErrorCodeOrgStructureCycle               = 110007
+	ErrorCodeOrgTreeRootAmbiguous            = 110008
+	ErrorCodeOrgTreeTooLarge                 = 110009
+	ErrorCodeOrgEmployeeNotFound             = 110010
+	ErrorCodeOrgPositionNotFound             = 110011
+	ErrorCodeOrgAssignmentNotFound           = 110012
+	ErrorCodeOrgAssignmentTooLarge           = 110013
+	ErrorCodeOrgUserNotFound                 = 110014
+	ErrorCodeOrgEmployeeAlreadyBound         = 110015
+	ErrorCodeOrgUserAlreadyBound             = 110016
+	ErrorCodeOrgEmployeeInactive             = 110017
+	ErrorCodeOrgLegalEntityInactive          = 110018
+	ErrorCodeOrgUnitInactive                 = 110019
+	ErrorCodeOrgStructureMembershipNotFound  = 110020
+	ErrorCodeOrgStructureMembershipAmbiguous = 110021
 )
 
 var (
@@ -119,5 +121,15 @@ var (
 		http.StatusConflict,
 		ErrorCodeOrgUnitInactive,
 		"组织单元在指定时间不可用",
+	)
+	ErrOrgStructureMembershipNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgStructureMembershipNotFound,
+		"组织单元不在指定管理架构中",
+	)
+	ErrOrgStructureMembershipAmbiguous = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeOrgStructureMembershipAmbiguous,
+		"组织单元在指定管理架构中存在多个有效节点",
 	)
 )

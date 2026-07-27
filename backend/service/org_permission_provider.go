@@ -19,6 +19,9 @@ type OrgPermissionProvider interface {
 	GetEmployeeByUser(*gin.Context, int) (response.OrgEmployeeContextRes, error)
 	GetEffectiveAssignments(*gin.Context, int, string) ([]response.OrgEffectiveAssignmentRes, error)
 	GetEmployeeEffectiveOrganizationScope(*gin.Context, int, string) (response.OrgEffectiveOrganizationScopeRes, error)
+	GetOrgAncestors(*gin.Context, string, int, string, bool) (response.OrgAncestorsRes, error)
+	GetOrgDescendants(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
+	IsOrgDescendant(*gin.Context, string, int, int, string, bool) (response.OrgDescendantCheckRes, error)
 }
 
 var _ OrgPermissionProvider = (*OrgService)(nil)
@@ -58,7 +61,7 @@ func (s *OrgService) GetEffectiveAssignments(
 	if employeeId <= 0 {
 		return nil, myerrors.NewParameterError("employee_id必须大于0")
 	}
-	asOf, err := normalizeRequiredAssignmentDate(asOfDate)
+	asOf, err := normalizeRequiredOrganizationDate(asOfDate)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +117,7 @@ func (s *OrgService) GetEmployeeEffectiveOrganizationScope(
 	employeeId int,
 	asOfDate string,
 ) (response.OrgEffectiveOrganizationScopeRes, error) {
-	asOf, err := normalizeRequiredAssignmentDate(asOfDate)
+	asOf, err := normalizeRequiredOrganizationDate(asOfDate)
 	if err != nil {
 		return response.OrgEffectiveOrganizationScopeRes{}, err
 	}
@@ -147,15 +150,23 @@ func (s *OrgService) GetEmployeeEffectiveOrganizationScope(
 	return result, nil
 }
 
-func normalizeRequiredAssignmentDate(raw string) (time.Time, error) {
-	if strings.TrimSpace(raw) == "" {
+func normalizeRequiredOrganizationDate(raw string) (time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
 		return time.Time{}, myerrors.NewParameterError("as_of_date不能为空")
 	}
-	scope, err := normalizeAssignmentReadScope("current", raw)
+	asOf, err := time.ParseInLocation(
+		orgAsOfDateLayout,
+		value,
+		model.AppLocation(),
+	)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, myerrors.WrapParameterError(
+			err,
+			"as_of_date格式必须为YYYY-MM-DD",
+		)
 	}
-	return scope.AsOf, nil
+	return asOf, nil
 }
 
 func (s *OrgService) validateEffectiveAssignmentReferences(

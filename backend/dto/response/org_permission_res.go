@@ -52,3 +52,31 @@ type OrgEffectiveOrganizationScopeRes struct {
 	LegalEntityIds  []int  `json:"legal_entity_ids"`
 	OrgUnitIds      []int  `json:"org_unit_ids"`
 }
+
+type OrgRelationItemRes struct {
+	OrgUnitId int `json:"org_unit_id"`
+	Distance  int `json:"distance"`
+}
+
+type OrgAncestorsRes struct {
+	StructureCode string               `json:"structure_code"`
+	OrgUnitId     int                  `json:"org_unit_id"`
+	AsOfDate      string               `json:"as_of_date"`
+	Items         []OrgRelationItemRes `json:"items"`
+}
+
+type OrgDescendantsRes struct {
+	StructureCode string               `json:"structure_code"`
+	OrgUnitId     int                  `json:"org_unit_id"`
+	AsOfDate      string               `json:"as_of_date"`
+	Items         []OrgRelationItemRes `json:"items"`
+}
+
+type OrgDescendantCheckRes struct {
+	StructureCode       string `json:"structure_code"`
+	AncestorOrgUnitId   int    `json:"ancestor_org_unit_id"`
+	DescendantOrgUnitId int    `json:"descendant_org_unit_id"`
+	AsOfDate            string `json:"as_of_date"`
+	IsDescendant        bool   `json:"is_descendant"`
+	Distance            *int   `json:"distance"`
+}
