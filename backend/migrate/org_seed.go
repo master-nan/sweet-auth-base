@@ -509,8 +509,6 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			apiPermissionWithAPI(811, structureMenu, "管理组织树查询", "organization_unit_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/unit/tree", "POST"),
 			apiPermissionWithAPI(812, structureMenu, "管理组织选项查询", "organization_unit_options", enum.Top, "query", "list", "primary", 2, "/admin/org/unit/options", "POST"),
 			menuButtonWithAPI(813, structureMenu, "详情", "organization_unit_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/unit/:id", "GET"),
-			apiPermissionWithAPI(814, structureMenu, "查询上级组织", "organization_unit_ancestors", enum.Line, "detail", "vertical_align_top", "primary", 3, "/admin/org/unit/:id/ancestors", "GET"),
-			apiPermissionWithAPI(815, structureMenu, "查询下级组织", "organization_unit_descendants", enum.Line, "detail", "vertical_align_bottom", "primary", 4, "/admin/org/unit/:id/descendants", "GET"),
 			menuButton(816, structureMenu, "刷新", "organization_structure_refresh", enum.Top, "refresh", "refresh", "primary", 3),
 			menuButton(817, structureMenu, "查看同步", "organization_structure_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
 			apiPermissionWithAPI(860, structureMenu, "管理架构查询", "organization_structure_query", enum.Top, "query", "search", "primary", 5, "/admin/org/structure/query", "POST"),
@@ -537,15 +535,9 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			menuButton(834, positionMenu, "查看同步", "organization_position_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
 		}},
 		{menuName: "organization_sync_batch", buttons: []model.SysMenuButton{
-			apiPermissionWithAPI(840, syncBatchMenu, "同步批次查询", "organization_sync_batch_query", enum.Top, "query", "search", "primary", 0, "/admin/org/sync-batch/query", "POST"),
-			menuButtonWithAPI(841, syncBatchMenu, "详情", "organization_sync_batch_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/sync-batch/:id", "GET"),
 			menuButton(842, syncBatchMenu, "刷新", "organization_sync_batch_refresh", enum.Top, "refresh", "refresh", "primary", 1),
 		}},
 		{menuName: "organization_sync_error", buttons: []model.SysMenuButton{
-			apiPermissionWithAPI(850, syncErrorMenu, "同步异常查询", "organization_sync_error_query", enum.Top, "query", "search", "primary", 0, "/admin/org/sync-record/query", "POST"),
-			apiPermissionWithAPI(851, syncErrorMenu, "同步记录详情", "organization_sync_error_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/sync-record/:id", "GET"),
-			menuButtonWithAPI(852, syncErrorMenu, "查看错误", "organization_sync_error_view_error", enum.Line, "view_error", "error_outline", "negative", 1, "/admin/org/sync-record/:id", "GET"),
-			menuButtonWithAPI(853, syncErrorMenu, "重试", "organization_sync_error_retry", enum.Line, "retry", "replay", "warning", 2, "/admin/org/sync-record/:id/retry", "POST"),
 			menuButton(854, syncErrorMenu, "刷新", "organization_sync_error_refresh", enum.Top, "refresh", "refresh", "primary", 1),
 		}},
 	}

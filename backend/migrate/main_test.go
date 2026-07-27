@@ -100,6 +100,7 @@ func TestPlatformSeedStepsRegistersMetadataAndPermissionBaselineOrder(t *testing
 		"menu_button_defaults_repair",
 		"sys_table_and_field_metadata",
 		"sys_table_relation_metadata",
+		"functional_permission_projection",
 		"rebuildable_cache_flush",
 	}
 	if !reflect.DeepEqual(got, want) {

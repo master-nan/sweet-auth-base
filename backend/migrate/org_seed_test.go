@@ -279,8 +279,6 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		"bind_user":   {},
 		"unbind_user": {},
 		"view_sync":   {},
-		"retry":       {},
-		"view_error":  {},
 	}
 	var buttons []model.SysMenuButton
 	if err := db.Table("sys_menu_button").

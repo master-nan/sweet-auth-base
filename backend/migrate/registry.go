@@ -130,6 +130,9 @@ func platformSeedSteps() []seedStep {
 		seedStep{name: "sys_table_relation_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedSystemTableRelations(db, sf)
 		}},
+		seedStep{name: "functional_permission_projection", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
+			return seedFunctionalPermissionProjection(db, sf)
+		}},
 		seedStep{name: "rebuildable_cache_flush", run: func(_ *gorm.DB, cfg *config.Server, _ *utils.Snowflake) error {
 			return flushMigrationCaches(cfg)
 		}},
