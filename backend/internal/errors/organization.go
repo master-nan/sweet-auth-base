@@ -24,6 +24,8 @@ const (
 	ErrorCodeOrgUnitInactive                 = 110019
 	ErrorCodeOrgStructureMembershipNotFound  = 110020
 	ErrorCodeOrgStructureMembershipAmbiguous = 110021
+	ErrorCodeOrgSyncBatchNotFound            = 110022
+	ErrorCodeOrgSyncRecordNotFound           = 110023
 )
 
 var (
@@ -131,5 +133,15 @@ var (
 		http.StatusConflict,
 		ErrorCodeOrgStructureMembershipAmbiguous,
 		"组织单元在指定管理架构中存在多个有效节点",
+	)
+	ErrOrgSyncBatchNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgSyncBatchNotFound,
+		"组织同步批次不存在",
+	)
+	ErrOrgSyncRecordNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeOrgSyncRecordNotFound,
+		"组织同步记录不存在",
 	)
 )

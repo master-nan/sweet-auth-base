@@ -128,10 +128,12 @@ type OrgAssignmentRepository interface {
 type OrgSyncBatchRepository interface {
 	BasicRepository[model.OrgSyncBatch]
 	Query(*gin.Context, *request.OrgSyncBatchQueryReq, model.SysTable) (response.ListResult[model.OrgSyncBatch], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgSyncBatch, error)
 	FindByBatchNo(*gin.Context, string) (model.OrgSyncBatch, error)
 }
 
 type OrgSyncRecordRepository interface {
 	BasicRepository[model.OrgSyncRecord]
 	Query(*gin.Context, *request.OrgSyncRecordQueryReq, model.SysTable) (response.ListResult[model.OrgSyncRecord], error)
+	FindByIdForRead(*gin.Context, int) (model.OrgSyncRecord, error)
 }

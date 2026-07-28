@@ -435,6 +435,7 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		"bind_user":   {},
 		"unbind_user": {},
 		"view_sync":   {},
+		"view_error":  {},
 	}
 	var buttons []model.SysMenuButton
 	if err := db.Table("sys_menu_button").
@@ -533,6 +534,12 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		{path: "/admin/org/employee/:id/assignments/summary", method: "GET", action: "query"},
 		{path: "/admin/org/employee/:id/bind-user", method: "POST", action: "bind_user"},
 		{path: "/admin/org/employee/:id/unbind-user", method: "POST", action: "unbind_user"},
+		{path: "/admin/org/sync/batch/query", method: "POST", action: "query"},
+		{path: "/admin/org/sync/batch/:id", method: "GET", action: "detail"},
+		{path: "/admin/org/sync/batch/:id/error", method: "GET", action: "view_error"},
+		{path: "/admin/org/sync/record/query", method: "POST", action: "query"},
+		{path: "/admin/org/sync/record/:id", method: "GET", action: "detail"},
+		{path: "/admin/org/sync/record/:id/error", method: "GET", action: "view_error"},
 	} {
 		if got := countWhere(
 			t,

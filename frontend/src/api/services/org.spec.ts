@@ -11,14 +11,26 @@ vi.mock('boot/axios', () => ({
 }))
 
 import {
+  getEmployeeAssignmentSummary,
+  getEmployeeDetail,
   getLegalEntityDetail,
   getLegalEntityTree,
   getOrgUnitDetail,
+  getPositionDetail,
   getStructureOrgTree,
+  getSyncBatchDetail,
+  getSyncBatchError,
+  getSyncRecordDetail,
+  getSyncRecordError,
   organizationOptionsEndpoints,
+  queryAssignments,
+  queryEmployees,
   queryOrganizationOptions,
+  queryPositions,
   queryStructureOptions,
   queryStructures,
+  querySyncBatches,
+  querySyncRecords,
   type OrganizationSelectorType,
 } from 'src/api/services/org'
 
@@ -310,5 +322,113 @@ describe('organization read-only center API', () => {
       ],
       total: 1,
     })
+  })
+})
+
+describe('organization remaining read-only pages API', () => {
+  beforeEach(() => {
+    postMock.mockReset()
+    getMock.mockReset()
+  })
+
+  it('uses the employee, assignment, and position read-only endpoints', async () => {
+    postMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: [],
+        total: 0,
+      },
+    })
+    getMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: {},
+      },
+    })
+
+    await queryEmployees({ page: 1, num: 20, expressions: [] })
+    await getEmployeeDetail(21)
+    await queryAssignments({
+      page: 1,
+      num: 20,
+      expressions: [],
+      employee_id: 21,
+      time_scope: 'timeline',
+    })
+    await getEmployeeAssignmentSummary(21, '2026-07-29')
+    await queryPositions({ page: 1, num: 20, expressions: [] })
+    await getPositionDetail(31)
+
+    expect(postMock).toHaveBeenNthCalledWith(1, '/admin/org/employee/query', {
+      page: 1,
+      num: 20,
+      expressions: [],
+    })
+    expect(getMock).toHaveBeenCalledWith('/admin/org/employee/21')
+    expect(postMock).toHaveBeenNthCalledWith(2, '/admin/org/assignment/query', {
+      page: 1,
+      num: 20,
+      expressions: [],
+      employee_id: 21,
+      time_scope: 'timeline',
+    })
+    expect(getMock).toHaveBeenCalledWith('/admin/org/employee/21/assignments/summary', {
+      params: { as_of_date: '2026-07-29' },
+    })
+    expect(postMock).toHaveBeenNthCalledWith(3, '/admin/org/position/query', {
+      page: 1,
+      num: 20,
+      expressions: [],
+    })
+    expect(getMock).toHaveBeenCalledWith('/admin/org/position/31')
+  })
+
+  it('keeps synchronization summaries separate from protected error details', async () => {
+    postMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: [],
+        total: 0,
+      },
+    })
+    getMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: {},
+      },
+    })
+
+    await querySyncBatches({ page: 1, num: 20, expressions: [], status: 'failed' })
+    await getSyncBatchDetail(41)
+    await getSyncBatchError(41)
+    await querySyncRecords({
+      page: 1,
+      num: 20,
+      expressions: [],
+      object_type: 'employee',
+      local_id: 21,
+      status: 'failed',
+    })
+    await getSyncRecordDetail(51)
+    await getSyncRecordError(51)
+
+    expect(postMock).toHaveBeenNthCalledWith(1, '/admin/org/sync/batch/query', {
+      page: 1,
+      num: 20,
+      expressions: [],
+      status: 'failed',
+    })
+    expect(getMock).toHaveBeenCalledWith('/admin/org/sync/batch/41')
+    expect(getMock).toHaveBeenCalledWith('/admin/org/sync/batch/41/error')
+    expect(postMock).toHaveBeenNthCalledWith(2, '/admin/org/sync/record/query', {
+      page: 1,
+      num: 20,
+      expressions: [],
+      object_type: 'employee',
+      local_id: 21,
+      status: 'failed',
+    })
+    expect(getMock).toHaveBeenCalledWith('/admin/org/sync/record/51')
+    expect(getMock).toHaveBeenCalledWith('/admin/org/sync/record/51/error')
   })
 })

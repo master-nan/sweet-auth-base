@@ -182,6 +182,109 @@ func TestOrgControllerLegalEntityQueryRejectsRoleWithoutButtonPermission(t *test
 	}
 }
 
+func TestOrgControllerSyncReadRoutesKeepErrorDetailsBehindDedicatedPermission(t *testing.T) {
+	router, db, _ := newOrgControllerTestRouter(t, orgLegalEntityReaderRole)
+	batch := model.OrgSyncBatch{
+		Basic:        model.Basic{Id: 71, State: true},
+		BatchNo:      "ORG-SYNC-071",
+		SyncType:     "incremental",
+		ObjectScope:  "employee",
+		TotalCount:   1,
+		FailedCount:  1,
+		Status:       "failed",
+		ErrorSummary: "batch error detail",
+	}
+	record := model.OrgSyncRecord{
+		Basic:          model.Basic{Id: 72, State: true},
+		BatchId:        batch.Id,
+		ObjectType:     "employee",
+		SourceId:       "source-employee-72",
+		SourceCode:     "EMP-072",
+		Action:         "update",
+		Status:         "failed",
+		ErrorCode:      "org_employee_missing",
+		ErrorMessage:   "record error detail",
+		DependencyType: "employee",
+		DependencyKey:  "EMP-072",
+	}
+	testutil.MustCreate(t, db, &batch)
+	testutil.MustCreate(t, db, &record)
+
+	for _, testCase := range []struct {
+		method         string
+		target         string
+		body           string
+		contains       string
+		mustNotContain string
+	}{
+		{
+			method:         http.MethodPost,
+			target:         "/admin/org/sync/batch/query",
+			body:           `{"page":1,"num":10}`,
+			contains:       `"batch_no":"ORG-SYNC-071"`,
+			mustNotContain: "batch error detail",
+		},
+		{
+			method:         http.MethodGet,
+			target:         "/admin/org/sync/batch/71",
+			contains:       `"batch_no":"ORG-SYNC-071"`,
+			mustNotContain: "batch error detail",
+		},
+		{
+			method:   http.MethodGet,
+			target:   "/admin/org/sync/batch/71/error",
+			contains: "batch error detail",
+		},
+		{
+			method:         http.MethodPost,
+			target:         "/admin/org/sync/record/query",
+			body:           `{"page":1,"num":10}`,
+			contains:       `"source_code":"EMP-072"`,
+			mustNotContain: "record error detail",
+		},
+		{
+			method:         http.MethodGet,
+			target:         "/admin/org/sync/record/72",
+			contains:       `"source_code":"EMP-072"`,
+			mustNotContain: "record error detail",
+		},
+		{
+			method:   http.MethodGet,
+			target:   "/admin/org/sync/record/72/error",
+			contains: "record error detail",
+		},
+	} {
+		recorder := testutil.PerformRequest(t, router, testutil.HTTPRequest{
+			Method: testCase.method,
+			Target: testCase.target,
+			Body:   bytes.NewBufferString(testCase.body),
+			Header: http.Header{"Content-Type": []string{"application/json"}},
+		})
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s %s status = %d: %s", testCase.method, testCase.target, recorder.Code, recorder.Body.String())
+		}
+		if !strings.Contains(recorder.Body.String(), testCase.contains) {
+			t.Fatalf("%s %s response missing %q: %s", testCase.method, testCase.target, testCase.contains, recorder.Body.String())
+		}
+		if testCase.mustNotContain != "" && strings.Contains(recorder.Body.String(), testCase.mustNotContain) {
+			t.Fatalf("%s %s leaked %q: %s", testCase.method, testCase.target, testCase.mustNotContain, recorder.Body.String())
+		}
+	}
+}
+
+func TestOrgControllerSyncReadRoutesRejectRoleWithoutPermission(t *testing.T) {
+	router, _, _ := newOrgControllerTestRouter(t, orgLegalEntityDeniedRole)
+	recorder := testutil.PerformRequest(t, router, testutil.HTTPRequest{
+		Method: http.MethodPost,
+		Target: "/admin/org/sync/record/query",
+		Body:   bytes.NewBufferString(`{"page":1,"num":10}`),
+		Header: http.Header{"Content-Type": []string{"application/json"}},
+	})
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestOrgControllerLegalEntityDetailUsesStableErrorResponse(t *testing.T) {
 	router, _, _ := newOrgControllerTestRouter(t, orgLegalEntityReaderRole)
 
@@ -241,6 +344,8 @@ func newOrgControllerTestRouter(
 		&model.OrgPosition{},
 		&model.OrgEmployee{},
 		&model.OrgAssignment{},
+		&model.OrgSyncBatch{},
+		&model.OrgSyncRecord{},
 		&model.SysUser{},
 	)
 	primaryDB := &database.PrimaryDB{DB: db}
@@ -252,6 +357,8 @@ func newOrgControllerTestRouter(
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
 		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
+		impl.NewOrgSyncBatchRepositoryImpl(primaryDB),
+		impl.NewOrgSyncRecordRepositoryImpl(primaryDB),
 		orgControllerAuditWriterStub{},
 	)
 	controller := &OrgController{
@@ -264,6 +371,8 @@ func newOrgControllerTestRouter(
 				orgEmployeeTableCode:    orgControllerManagementTable(orgEmployeeTableCode),
 				orgPositionTableCode:    orgControllerManagementTable(orgPositionTableCode),
 				orgAssignmentTableCode:  orgControllerManagementTable(orgAssignmentTableCode),
+				orgSyncBatchTableCode:   orgControllerManagementTable(orgSyncBatchTableCode),
+				orgSyncRecordTableCode:  orgControllerManagementTable(orgSyncRecordTableCode),
 			},
 		},
 	}
@@ -300,6 +409,12 @@ func newOrgControllerTestRouter(
 		{orgLegalEntityReaderRole, "/admin/org/assignment/query", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/assignment/:id", http.MethodGet},
 		{orgLegalEntityReaderRole, "/admin/org/employee/:id/assignments/summary", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/sync/batch/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/sync/batch/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/sync/batch/:id/error", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/sync/record/query", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/sync/record/:id", http.MethodGet},
+		{orgLegalEntityReaderRole, "/admin/org/sync/record/:id/error", http.MethodGet},
 	} {
 		if _, err = enforcer.AddPolicy(policy[0], policy[1], policy[2]); err != nil {
 			t.Fatalf("add Casbin policy %v: %v", policy, err)
@@ -340,6 +455,12 @@ func newOrgControllerTestRouter(
 	router.POST("/admin/org/assignment/query", controller.QueryAssignments)
 	router.GET("/admin/org/assignment/:id", controller.GetAssignmentDetail)
 	router.GET("/admin/org/employee/:id/assignments/summary", controller.GetEmployeeCurrentAssignmentSummary)
+	router.POST("/admin/org/sync/batch/query", controller.QuerySyncBatches)
+	router.GET("/admin/org/sync/batch/:id", controller.GetSyncBatchDetail)
+	router.GET("/admin/org/sync/batch/:id/error", controller.GetSyncBatchError)
+	router.POST("/admin/org/sync/record/query", controller.QuerySyncRecords)
+	router.GET("/admin/org/sync/record/:id", controller.GetSyncRecordDetail)
+	router.GET("/admin/org/sync/record/:id/error", controller.GetSyncRecordError)
 	return router, db, enforcer
 }
 

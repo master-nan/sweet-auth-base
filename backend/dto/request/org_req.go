@@ -249,6 +249,7 @@ type OrgSyncRecordQueryReq struct {
 	BatchId             *int   `form:"batch_id" json:"batch_id" binding:"omitempty,gt=0"`
 	ExecutionId         *int   `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
 	ObjectType          string `form:"object_type" json:"object_type" binding:"omitempty,max=64"`
+	LocalId             *int   `form:"local_id" json:"local_id" binding:"omitempty,gt=0"`
 	Action              string `form:"action" json:"action" binding:"omitempty,oneof=insert update disable delete_to_disable skip no_change"`
 	Status              string `form:"status" json:"status" binding:"omitempty,oneof=pending processing success failed dependency_waiting ignored"`
 	DependencyType      string `form:"dependency_type" json:"dependency_type" binding:"omitempty,oneof=legal_entity org_unit structure_node employee position assignment"`

@@ -901,6 +901,15 @@ func (r *OrgSyncBatchRepositoryImpl) FindByBatchNo(ctx *gin.Context, batchNo str
 	return batch, err
 }
 
+func (r *OrgSyncBatchRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgSyncBatch, error) {
+	var batch model.OrgSyncBatch
+	err := organizationDB(r.db, ctx).
+		Select(orgSyncBatchListColumns()).
+		Where("id = ?", id).
+		First(&batch).Error
+	return batch, err
+}
+
 func (r *OrgSyncRecordRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSyncRecordQueryReq, table model.SysTable) (response.ListResult[model.OrgSyncRecord], error) {
 	if req == nil {
 		req = &request.OrgSyncRecordQueryReq{}
@@ -913,6 +922,7 @@ func (r *OrgSyncRecordRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSy
 			"batch_id":              optionalInt(req.BatchId),
 			"execution_id":          optionalInt(req.ExecutionId),
 			"object_type":           optionalString(req.ObjectType),
+			"local_id":              optionalInt(req.LocalId),
 			"action":                optionalString(req.Action),
 			"status":                optionalString(req.Status),
 			"dependency_type":       optionalString(req.DependencyType),
@@ -921,6 +931,15 @@ func (r *OrgSyncRecordRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSy
 		organizationQueryTable(table, "org_sync_record"),
 		orgSyncRecordListColumns(),
 	)
+}
+
+func (r *OrgSyncRecordRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgSyncRecord, error) {
+	var record model.OrgSyncRecord
+	err := organizationDB(r.db, ctx).
+		Select(append(orgSyncRecordListColumns(), "dependency_key")).
+		Where("id = ?", id).
+		First(&record).Error
+	return record, err
 }
 
 func queryOrganization[T any](
@@ -1486,7 +1505,7 @@ func orgSyncBatchListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "batch_no", "execution_id",
 		"sync_type", "object_scope", "started_at", "completed_at", "total_count",
-		"success_count", "failed_count", "skipped_count", "status",
+		"success_count", "failed_count", "skipped_count", "status", "error_summary",
 	}
 }
 
@@ -1494,7 +1513,8 @@ func orgSyncRecordListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "batch_id", "execution_id",
 		"object_type", "source_code", "local_id", "action", "status", "error_code",
-		"dependency_type", "retry_count", "last_retry_at", "local_handling_status",
+		"error_message", "dependency_type", "retry_count", "last_retry_at",
+		"local_handling_status",
 	}
 }
 

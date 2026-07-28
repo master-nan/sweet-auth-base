@@ -1,5 +1,5 @@
 import { instance } from 'boot/axios'
-import type { ResponseData } from 'src/types/global'
+import type { Query, ResponseData } from 'src/types/global'
 
 export type OrganizationSelectorType = 'legal_entity' | 'org_unit' | 'employee' | 'position'
 
@@ -148,6 +148,189 @@ export interface OrgUnitDetail extends OrganizationBaseRecord {
   local_handling_status: string
 }
 
+export interface OrganizationListResult<T> {
+  items: T[]
+  total: number
+}
+
+export interface OrganizationListQuery extends Query, OrganizationReadScopeRequest {}
+
+export interface EmployeeQueryRequest extends OrganizationListQuery {
+  employment_status?: string
+  primary_legal_entity_id?: number
+  user_id?: number
+  legal_entity_id?: number
+  org_unit_id?: number
+  position_id?: number
+  bound_status?: 'all' | 'bound' | 'unbound'
+}
+
+export interface BoundUserSummary {
+  user_id: number
+  user_name: string
+}
+
+export interface EmployeeListItem extends OrganizationBaseRecord {
+  employee_no: string
+  name: string
+  employment_status: string
+  primary_legal_entity_id?: number | null
+  user_id?: number | null
+  binding_status: string
+  bound_account?: BoundUserSummary | null
+  valid_from?: string | null
+  valid_to?: string | null
+}
+
+export interface EmployeeDetail extends EmployeeListItem {
+  mobile_masked?: string
+  email_masked?: string
+  local_note: string
+  local_tags?: unknown
+}
+
+export interface EmployeeUserBinding {
+  employee_id: number
+  user_id?: number | null
+  binding_status: string
+  bound_account?: BoundUserSummary | null
+}
+
+export interface PositionQueryRequest extends OrganizationListQuery {
+  legal_entity_id?: number
+  org_unit_id?: number
+  position_type?: string
+  is_manager_position?: boolean
+  status?: string
+}
+
+export interface PositionListItem extends OrganizationBaseRecord {
+  code: string
+  name: string
+  org_unit_id: number
+  position_type: string
+  job_level: string
+  is_manager_position: boolean
+  status: string
+  valid_from?: string | null
+  valid_to?: string | null
+}
+
+export interface PositionDetail extends PositionListItem {
+  org_unit?: OrganizationReferenceSummary | null
+  legal_entity?: OrganizationReferenceSummary | null
+  local_note: string
+}
+
+export type AssignmentTimeScope = 'current' | 'history' | 'future' | 'timeline'
+
+export interface AssignmentQueryRequest extends Query {
+  employee_id: number
+  legal_entity_id?: number
+  org_unit_id?: number
+  position_id?: number
+  assignment_type?: string
+  is_primary?: boolean
+  is_manager?: boolean
+  status?: string
+  time_scope?: AssignmentTimeScope
+  as_of_date?: string
+}
+
+export interface AssignmentListItem extends OrganizationBaseRecord {
+  employee_id: number
+  legal_entity_id: number
+  org_unit_id: number
+  position_id?: number | null
+  assignment_type: string
+  is_primary: boolean
+  is_manager: boolean
+  valid_from?: string | null
+  valid_to?: string | null
+  status: string
+  time_scope: AssignmentTimeScope
+  legal_entity?: OrganizationReferenceSummary | null
+  org_unit?: OrganizationReferenceSummary | null
+  position?: OrganizationReferenceSummary | null
+}
+
+export type AssignmentDetail = AssignmentListItem
+
+export interface EmployeeAssignmentSummary {
+  employee_id: number
+  as_of_date: string
+  assignment_count: number
+  legal_entities: OrganizationReferenceSummary[]
+  org_units: OrganizationReferenceSummary[]
+  positions: OrganizationReferenceSummary[]
+}
+
+export interface SyncBatchQueryRequest extends Query {
+  execution_id?: number
+  sync_type?: string
+  object_scope?: string
+  status?: string
+}
+
+export interface SyncBatchListItem extends OrganizationBaseRecord {
+  batch_no: string
+  execution_id?: number | null
+  sync_type: string
+  object_scope: string
+  started_at?: string | null
+  completed_at?: string | null
+  total_count: number
+  success_count: number
+  failed_count: number
+  skipped_count: number
+  status: string
+  has_error: boolean
+}
+
+export type SyncBatchDetail = SyncBatchListItem
+
+export interface SyncBatchError {
+  id: number
+  error_summary: string
+}
+
+export interface SyncRecordQueryRequest extends Query {
+  batch_id?: number
+  execution_id?: number
+  object_type?: string
+  local_id?: number
+  action?: string
+  status?: string
+  dependency_type?: string
+  local_handling_status?: string
+}
+
+export interface SyncRecordListItem extends OrganizationBaseRecord {
+  batch_id: number
+  execution_id?: number | null
+  object_type: string
+  source_code: string
+  local_id?: number | null
+  action: string
+  status: string
+  error_code: string
+  dependency_type: string
+  retry_count: number
+  last_retry_at?: string | null
+  local_handling_status: string
+  has_error: boolean
+}
+
+export type SyncRecordDetail = SyncRecordListItem
+
+export interface SyncRecordError {
+  id: number
+  error_code: string
+  error_message: string
+  dependency_type: string
+  dependency_key: string
+}
+
 export const organizationOptionsEndpoints: Record<OrganizationSelectorType, string> = {
   legal_entity: '/admin/org/legal-entity/options',
   org_unit: '/admin/org/unit/options',
@@ -290,5 +473,138 @@ export const getOrgUnitDetail = async (
     ...organizationReadRequestConfig,
     params: request,
   })
+  return response.data.data
+}
+
+const listResult = <T>(response: ResponseData<T[]>): OrganizationListResult<T> => ({
+  items: response.data || [],
+  total: response.total || 0,
+})
+
+export const queryEmployees = async (
+  request: EmployeeQueryRequest,
+): Promise<OrganizationListResult<EmployeeListItem>> => {
+  const response = await instance.post<ResponseData<EmployeeListItem[]>>(
+    '/admin/org/employee/query',
+    request,
+  )
+  return listResult(response.data)
+}
+
+export const getEmployeeDetail = async (employeeId: number): Promise<EmployeeDetail> => {
+  const response = await instance.get<ResponseData<EmployeeDetail>>(
+    `/admin/org/employee/${employeeId}`,
+  )
+  return response.data.data
+}
+
+export const bindEmployeeUser = async (
+  employeeId: number,
+  userId: number,
+): Promise<EmployeeUserBinding> => {
+  const response = await instance.post<ResponseData<EmployeeUserBinding>>(
+    `/admin/org/employee/${employeeId}/bind-user`,
+    { user_id: userId },
+  )
+  return response.data.data
+}
+
+export const unbindEmployeeUser = async (employeeId: number): Promise<EmployeeUserBinding> => {
+  const response = await instance.post<ResponseData<EmployeeUserBinding>>(
+    `/admin/org/employee/${employeeId}/unbind-user`,
+  )
+  return response.data.data
+}
+
+export const queryAssignments = async (
+  request: AssignmentQueryRequest,
+): Promise<OrganizationListResult<AssignmentListItem>> => {
+  const response = await instance.post<ResponseData<AssignmentListItem[]>>(
+    '/admin/org/assignment/query',
+    request,
+  )
+  return listResult(response.data)
+}
+
+export const getAssignmentDetail = async (assignmentId: number): Promise<AssignmentDetail> => {
+  const response = await instance.get<ResponseData<AssignmentDetail>>(
+    `/admin/org/assignment/${assignmentId}`,
+  )
+  return response.data.data
+}
+
+export const getEmployeeAssignmentSummary = async (
+  employeeId: number,
+  asOfDate?: string,
+): Promise<EmployeeAssignmentSummary> => {
+  const response = await instance.get<ResponseData<EmployeeAssignmentSummary>>(
+    `/admin/org/employee/${employeeId}/assignments/summary`,
+    asOfDate ? { params: { as_of_date: asOfDate } } : undefined,
+  )
+  return response.data.data
+}
+
+export const queryPositions = async (
+  request: PositionQueryRequest,
+): Promise<OrganizationListResult<PositionListItem>> => {
+  const response = await instance.post<ResponseData<PositionListItem[]>>(
+    '/admin/org/position/query',
+    request,
+  )
+  return listResult(response.data)
+}
+
+export const getPositionDetail = async (positionId: number): Promise<PositionDetail> => {
+  const response = await instance.get<ResponseData<PositionDetail>>(
+    `/admin/org/position/${positionId}`,
+  )
+  return response.data.data
+}
+
+export const querySyncBatches = async (
+  request: SyncBatchQueryRequest,
+): Promise<OrganizationListResult<SyncBatchListItem>> => {
+  const response = await instance.post<ResponseData<SyncBatchListItem[]>>(
+    '/admin/org/sync/batch/query',
+    request,
+  )
+  return listResult(response.data)
+}
+
+export const getSyncBatchDetail = async (batchId: number): Promise<SyncBatchDetail> => {
+  const response = await instance.get<ResponseData<SyncBatchDetail>>(
+    `/admin/org/sync/batch/${batchId}`,
+  )
+  return response.data.data
+}
+
+export const getSyncBatchError = async (batchId: number): Promise<SyncBatchError> => {
+  const response = await instance.get<ResponseData<SyncBatchError>>(
+    `/admin/org/sync/batch/${batchId}/error`,
+  )
+  return response.data.data
+}
+
+export const querySyncRecords = async (
+  request: SyncRecordQueryRequest,
+): Promise<OrganizationListResult<SyncRecordListItem>> => {
+  const response = await instance.post<ResponseData<SyncRecordListItem[]>>(
+    '/admin/org/sync/record/query',
+    request,
+  )
+  return listResult(response.data)
+}
+
+export const getSyncRecordDetail = async (recordId: number): Promise<SyncRecordDetail> => {
+  const response = await instance.get<ResponseData<SyncRecordDetail>>(
+    `/admin/org/sync/record/${recordId}`,
+  )
+  return response.data.data
+}
+
+export const getSyncRecordError = async (recordId: number): Promise<SyncRecordError> => {
+  const response = await instance.get<ResponseData<SyncRecordError>>(
+    `/admin/org/sync/record/${recordId}/error`,
+  )
   return response.data.data
 }

@@ -46,11 +46,6 @@ type retiredPermissionSpec struct {
 var retiredOrganizationPermissions = []retiredPermissionSpec{
 	{menuName: "organization_structure", code: "organization_unit_ancestors"},
 	{menuName: "organization_structure", code: "organization_unit_descendants"},
-	{menuName: "organization_sync_batch", code: "organization_sync_batch_query"},
-	{menuName: "organization_sync_batch", code: "organization_sync_batch_detail"},
-	{menuName: "organization_sync_error", code: "organization_sync_error_query"},
-	{menuName: "organization_sync_error", code: "organization_sync_error_detail"},
-	{menuName: "organization_sync_error", code: "organization_sync_error_view_error"},
 	{menuName: "organization_sync_error", code: "organization_sync_error_retry"},
 }
 

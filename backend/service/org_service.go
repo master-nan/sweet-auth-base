@@ -39,6 +39,8 @@ type OrgService struct {
 	employeeRepo      repository.OrgEmployeeRepository
 	positionRepo      repository.OrgPositionRepository
 	assignmentRepo    repository.OrgAssignmentRepository
+	syncBatchRepo     repository.OrgSyncBatchRepository
+	syncRecordRepo    repository.OrgSyncRecordRepository
 	auditWriter       TransactionalAuditWriter
 }
 
@@ -50,6 +52,8 @@ func NewOrgService(
 	employeeRepo repository.OrgEmployeeRepository,
 	positionRepo repository.OrgPositionRepository,
 	assignmentRepo repository.OrgAssignmentRepository,
+	syncBatchRepo repository.OrgSyncBatchRepository,
+	syncRecordRepo repository.OrgSyncRecordRepository,
 	auditWriter TransactionalAuditWriter,
 ) *OrgService {
 	return &OrgService{
@@ -60,6 +64,8 @@ func NewOrgService(
 		employeeRepo:      employeeRepo,
 		positionRepo:      positionRepo,
 		assignmentRepo:    assignmentRepo,
+		syncBatchRepo:     syncBatchRepo,
+		syncRecordRepo:    syncRecordRepo,
 		auditWriter:       auditWriter,
 	}
 }
@@ -1022,6 +1028,122 @@ func (s *OrgService) GetEmployeeCurrentAssignmentSummary(
 		orgUnits,
 		positions,
 	), nil
+}
+
+func (s *OrgService) QuerySyncBatches(
+	ctx *gin.Context,
+	req request.OrgSyncBatchQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSyncBatchListRes], error) {
+	var result response.ListResult[response.OrgSyncBatchListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	table.TableCode = "org_sync_batch"
+	rows, err := s.syncBatchRepo.Query(ctx, &req, table)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSyncBatchListRes, 0, len(rows.Data))
+	for _, batch := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgSyncBatchListRes(batch))
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetSyncBatchDetail(
+	ctx *gin.Context,
+	batchId int,
+) (response.OrgSyncBatchDetailRes, error) {
+	if batchId <= 0 {
+		return response.OrgSyncBatchDetailRes{},
+			myerrors.NewParameterError("batch_id必须大于0")
+	}
+	batch, err := s.syncBatchRepo.FindByIdForRead(ctx, batchId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgSyncBatchDetailRes{}, myerrors.ErrOrgSyncBatchNotFound
+		}
+		return response.OrgSyncBatchDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewOrgSyncBatchDetailRes(batch), nil
+}
+
+func (s *OrgService) GetSyncBatchError(
+	ctx *gin.Context,
+	batchId int,
+) (response.OrgSyncBatchErrorRes, error) {
+	if batchId <= 0 {
+		return response.OrgSyncBatchErrorRes{},
+			myerrors.NewParameterError("batch_id必须大于0")
+	}
+	batch, err := s.syncBatchRepo.FindByIdForRead(ctx, batchId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgSyncBatchErrorRes{}, myerrors.ErrOrgSyncBatchNotFound
+		}
+		return response.OrgSyncBatchErrorRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewOrgSyncBatchErrorRes(batch), nil
+}
+
+func (s *OrgService) QuerySyncRecords(
+	ctx *gin.Context,
+	req request.OrgSyncRecordQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.OrgSyncRecordListRes], error) {
+	var result response.ListResult[response.OrgSyncRecordListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	table.TableCode = "org_sync_record"
+	rows, err := s.syncRecordRepo.Query(ctx, &req, table)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgSyncRecordListRes, 0, len(rows.Data))
+	for _, record := range rows.Data {
+		result.Data = append(result.Data, response.NewOrgSyncRecordListRes(record))
+	}
+	return result, nil
+}
+
+func (s *OrgService) GetSyncRecordDetail(
+	ctx *gin.Context,
+	recordId int,
+) (response.OrgSyncRecordDetailRes, error) {
+	if recordId <= 0 {
+		return response.OrgSyncRecordDetailRes{},
+			myerrors.NewParameterError("record_id必须大于0")
+	}
+	record, err := s.syncRecordRepo.FindByIdForRead(ctx, recordId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgSyncRecordDetailRes{}, myerrors.ErrOrgSyncRecordNotFound
+		}
+		return response.OrgSyncRecordDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewOrgSyncRecordDetailRes(record), nil
+}
+
+func (s *OrgService) GetSyncRecordError(
+	ctx *gin.Context,
+	recordId int,
+) (response.OrgSyncRecordErrorRes, error) {
+	if recordId <= 0 {
+		return response.OrgSyncRecordErrorRes{},
+			myerrors.NewParameterError("record_id必须大于0")
+	}
+	record, err := s.syncRecordRepo.FindByIdForRead(ctx, recordId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.OrgSyncRecordErrorRes{}, myerrors.ErrOrgSyncRecordNotFound
+		}
+		return response.OrgSyncRecordErrorRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewOrgSyncRecordErrorRes(record), nil
 }
 
 func (s *OrgService) GetStructureOrgTree(

@@ -221,6 +221,12 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/org/position/:id", app.OrgController.GetPositionDetail)
 		adminGroup.POST("/org/assignment/query", app.OrgController.QueryAssignments)
 		adminGroup.GET("/org/assignment/:id", app.OrgController.GetAssignmentDetail)
+		adminGroup.POST("/org/sync/batch/query", app.OrgController.QuerySyncBatches)
+		adminGroup.GET("/org/sync/batch/:id", app.OrgController.GetSyncBatchDetail)
+		adminGroup.GET("/org/sync/batch/:id/error", app.OrgController.GetSyncBatchError)
+		adminGroup.POST("/org/sync/record/query", app.OrgController.QuerySyncRecords)
+		adminGroup.GET("/org/sync/record/:id", app.OrgController.GetSyncRecordDetail)
+		adminGroup.GET("/org/sync/record/:id/error", app.OrgController.GetSyncRecordError)
 
 		// application
 		adminGroup.GET("/application/:id", app.ApplicationController.GetApplicationById)

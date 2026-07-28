@@ -335,6 +335,8 @@ func newOrgServiceTestSubjectWithAuditWriter(
 		&model.OrgPosition{},
 		&model.OrgEmployee{},
 		&model.OrgAssignment{},
+		&model.OrgSyncBatch{},
+		&model.OrgSyncRecord{},
 		&model.SysUser{},
 	)
 	primaryDB := &database.PrimaryDB{DB: db}
@@ -346,6 +348,8 @@ func newOrgServiceTestSubjectWithAuditWriter(
 		impl.NewOrgEmployeeRepositoryImpl(primaryDB),
 		impl.NewOrgPositionRepositoryImpl(primaryDB),
 		impl.NewOrgAssignmentRepositoryImpl(primaryDB),
+		impl.NewOrgSyncBatchRepositoryImpl(primaryDB),
+		impl.NewOrgSyncRecordRepositoryImpl(primaryDB),
 		auditWriter,
 	), db
 }
