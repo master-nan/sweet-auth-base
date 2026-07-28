@@ -37,6 +37,19 @@ const QTreeStub = defineComponent({
   },
 })
 
+const QIconStub = defineComponent({
+  name: 'QIcon',
+  props: {
+    name: {
+      type: String,
+      default: '',
+    },
+  },
+  setup(props) {
+    return () => h('i', { 'data-icon': props.name })
+  },
+})
+
 const mountTree = () =>
   mount(OrganizationReadOnlyTree, {
     props: {
@@ -45,7 +58,7 @@ const mountTree = () =>
           id: 1,
           code: 'ROOT',
           name: '集团总部',
-          icon: 'apartment',
+          icon: 'corporate_fare',
           typeLabel: '中心',
           statusLabel: '启用',
           statusColor: 'positive',
@@ -67,7 +80,7 @@ const mountTree = () =>
       stubs: {
         QTree: QTreeStub,
         QLinearProgress: true,
-        QIcon: true,
+        QIcon: QIconStub,
         QChip: true,
       },
     },
@@ -80,6 +93,7 @@ describe('OrganizationReadOnlyTree', () => {
     expect(wrapper.find('.organization-readonly-tree__name').text()).toBe('集团总部')
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('ROOT')
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('中心')
+    expect(wrapper.find('[data-icon="corporate_fare"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('操作')
     expect(wrapper.text()).not.toContain('详情')
   })

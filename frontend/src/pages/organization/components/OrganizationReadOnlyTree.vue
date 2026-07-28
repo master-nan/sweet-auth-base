@@ -21,7 +21,7 @@
           :class="{ 'organization-readonly-tree__node--muted': node.muted }"
         >
           <span class="organization-readonly-tree__icon">
-            <q-icon :name="node.icon || 'apartment'" size="17px" />
+            <q-icon :name="node.icon || 'corporate_fare'" size="19px" />
           </span>
           <div class="organization-readonly-tree__identity">
             <div class="organization-readonly-tree__name">{{ node.name }}</div>
@@ -142,14 +142,11 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 .organization-readonly-tree__icon {
-  width: 28px;
+  width: 24px;
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1px solid #dbe5f2;
-  border-radius: 6px;
-  background: #f6f9fd;
-  color: #4673a9;
+  color: #667085;
 }
 
 .organization-readonly-tree__identity {
@@ -231,9 +228,7 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 :deep(.q-tree__children) {
-  margin-left: 11px;
-  padding-left: 8px;
-  border-left: 1px solid #e2e8f1;
+  color: #c4cbd5;
 }
 
 :deep(.q-tree__node-header:hover) {
@@ -246,7 +241,52 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 :deep(.q-tree__node--selected > .q-tree__node-header .organization-readonly-tree__icon) {
-  border-color: #bfd3ef;
-  background: #fff;
+  color: var(--q-primary);
+}
+
+:global(.body--dark .organization-readonly-tree) {
+  background: var(--app-dark-surface);
+}
+
+:global(.body--dark .organization-readonly-tree__name) {
+  color: var(--app-dark-heading);
+}
+
+:global(.body--dark .organization-readonly-tree__meta),
+:global(.body--dark .organization-readonly-tree__empty),
+:global(.body--dark .organization-readonly-tree__icon),
+:global(.body--dark .organization-readonly-tree .q-tree__arrow) {
+  color: var(--app-dark-muted);
+}
+
+:global(.body--dark .organization-readonly-tree__separator) {
+  color: var(--app-dark-border-strong);
+}
+
+:global(.body--dark .organization-readonly-tree .q-tree__children) {
+  color: var(--app-dark-border-strong);
+}
+
+:global(.body--dark .organization-readonly-tree .q-tree__node-header:hover) {
+  background: var(--app-dark-surface-soft);
+}
+
+:global(
+  .body--dark
+    .organization-readonly-tree
+    .q-tree__node--selected
+    > .q-tree__node-header
+) {
+  background: var(--app-dark-primary-soft);
+}
+
+:global(
+  .body--dark
+    .organization-readonly-tree
+    .q-tree__node--selected
+    > .q-tree__node-header
+    .organization-readonly-tree__icon
+) {
+  color: #a9a1ff;
 }
 </style>

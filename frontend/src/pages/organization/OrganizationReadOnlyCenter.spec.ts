@@ -48,10 +48,6 @@ vi.mock('src/composables/page-buttons', () => ({
   }),
 }))
 
-vi.mock('src/utils/menu-button-display', () => ({
-  menuButtonDisplayProps: (button: { icon?: string }) => ({ icon: button.icon }),
-}))
-
 import StructurePage from 'src/pages/organization/structure/Index.vue'
 
 const SlotHostStub = defineComponent({
@@ -68,9 +64,21 @@ const QBtnStub = defineComponent({
       type: String,
       default: '',
     },
+    label: {
+      type: String,
+      default: '',
+    },
   },
   setup(props, { slots }) {
-    return () => h('button', { 'data-icon': props.icon }, slots.default?.())
+    return () =>
+      h(
+        'button',
+        {
+          'data-icon': props.icon,
+          'data-label': props.label,
+        },
+        slots.default?.(),
+      )
   },
 })
 
@@ -200,6 +208,10 @@ describe('Organization read-only center', () => {
     expect(selectByLabel(wrapper, '架构类型').text()).toContain('法人架构')
     expect(wrapper.find('[data-testid="select-管理视图"]').exists()).toBe(false)
     expect(wrapper.find('.organization-panel-title').text()).toBe('管理组织树')
+    const refreshButton = wrapper.find('[data-icon="refresh"]')
+    expect(refreshButton.exists()).toBe(true)
+    expect(refreshButton.attributes('data-label')).toBe('')
+    expect(refreshButton.classes()).toContain('organization-refresh-button')
     expect(wrapper.text()).not.toMatch(/详情按钮|操作列|新增|编辑|删除|调岗|离职/)
     expect(wrapper.find('[data-icon="visibility"]').exists()).toBe(false)
     expect(apiMocks.getStructureOrgTree).toHaveBeenCalledWith({

@@ -47,11 +47,14 @@
           <q-btn
             v-for="button in refreshButtons"
             :key="button.id || button.code"
-            v-bind="menuButtonDisplayProps(button)"
+            :icon="button.icon || 'refresh'"
+            :aria-label="button.name"
             round
-            outline
+            flat
+            dense
             :color="button.color || 'primary'"
             :loading="treeLoading || structureLoading"
+            class="organization-refresh-button"
             @click="refreshPage"
           >
             <q-tooltip>{{ button.name }}</q-tooltip>
@@ -192,7 +195,6 @@ import {
 } from 'src/api/services/org'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 type ArchitectureMode = 'management' | 'legal'
 
@@ -308,7 +310,7 @@ const selectionSummary = computed<SelectionSummary | null>(() => {
     typeLabel: unitTypeLabel(node.unit_type),
     status: node.status,
     disabled: node.disabled,
-    icon: 'apartment',
+    icon: 'corporate_fare',
   }
 })
 const detailGroups = computed<OrganizationDetailGroup[]>(() =>
@@ -699,7 +701,7 @@ function mapStructureTree(
     id: node.structure_node_id,
     code: node.code,
     name: node.name,
-    icon: 'apartment',
+    icon: 'corporate_fare',
     typeLabel: unitTypeLabel(node.unit_type),
     statusLabel: statusLabel(node.status),
     statusColor: statusColor(node.status, node.disabled),
@@ -880,6 +882,14 @@ function errorMessage(error: unknown, fallback: string): string {
   gap: 10px;
 }
 
+.organization-refresh-button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  flex: 0 0 36px;
+}
+
 .architecture-mode-toggle {
   width: 168px;
 }
@@ -977,15 +987,13 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 .organization-detail-icon {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid #d9e2f1;
-  border-radius: 8px;
-  color: var(--q-primary);
-  font-size: 22px;
+  color: #667085;
+  font-size: 24px;
 }
 
 .organization-detail-heading {
@@ -1015,6 +1023,41 @@ function errorMessage(error: unknown, fallback: string): string {
   color: #7a879b;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
+}
+
+:global(.body--dark .organization-page-header) {
+  border-bottom-color: var(--app-dark-border);
+  background: var(--app-dark-surface);
+}
+
+:global(.body--dark .organization-page-heading h1),
+:global(.body--dark .organization-panel-title),
+:global(.body--dark .organization-detail-title) {
+  color: var(--app-dark-heading);
+}
+
+:global(.body--dark .organization-page-heading p),
+:global(.body--dark .organization-panel-subtitle),
+:global(.body--dark .organization-detail-meta),
+:global(.body--dark .organization-detail-code),
+:global(.body--dark .organization-detail-context--empty) {
+  color: var(--app-dark-muted);
+}
+
+:global(.body--dark .organization-tree-panel),
+:global(.body--dark .organization-detail-panel) {
+  border-color: var(--app-dark-border);
+  background: var(--app-dark-surface);
+}
+
+:global(.body--dark .organization-detail-icon) {
+  color: var(--app-dark-muted);
+}
+
+:global(.body--dark .organization-page-error) {
+  border-color: rgba(239, 83, 80, 0.45);
+  background: rgba(239, 83, 80, 0.12);
+  color: #ffb4b4;
 }
 
 @media (max-width: 1180px) {

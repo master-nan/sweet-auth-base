@@ -129,6 +129,26 @@ const fields = computed(() => props.groups.flatMap((group) => group.fields))
   color: #8792a6;
 }
 
+:global(.body--dark .organization-detail-field) {
+  border-bottom-color: var(--app-dark-border);
+}
+
+:global(.body--dark .organization-detail-label),
+:global(.body--dark .organization-detail-empty) {
+  color: var(--app-dark-muted);
+}
+
+:global(.body--dark .organization-detail-value),
+:global(.body--dark .organization-detail-value code) {
+  color: var(--app-dark-text);
+}
+
+:global(.body--dark .organization-detail-error) {
+  border-color: rgba(239, 83, 80, 0.45);
+  background: rgba(239, 83, 80, 0.12);
+  color: #ffb4b4;
+}
+
 @media (max-width: 1200px) {
   .organization-detail-grid {
     grid-template-columns: minmax(0, 1fr);
