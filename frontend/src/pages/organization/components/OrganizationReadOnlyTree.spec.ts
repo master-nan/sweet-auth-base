@@ -19,6 +19,10 @@ const QTreeStub = defineComponent({
       type: Array,
       default: () => [],
     },
+    noConnectors: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['update:selected', 'update:expanded'],
   setup(props, { slots }) {
@@ -89,11 +93,13 @@ const mountTree = () =>
 describe('OrganizationReadOnlyTree', () => {
   it('renders the name as the primary identity and code/type as supporting metadata', () => {
     const wrapper = mountTree()
+    const tree = wrapper.findComponent(QTreeStub)
 
     expect(wrapper.find('.organization-readonly-tree__name').text()).toBe('集团总部')
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('ROOT')
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('中心')
     expect(wrapper.find('[data-icon="corporate_fare"]').exists()).toBe(true)
+    expect(tree.props('noConnectors')).toBe(true)
     expect(wrapper.text()).not.toContain('操作')
     expect(wrapper.text()).not.toContain('详情')
   })

@@ -12,6 +12,7 @@
       children-key="children"
       selected-color="primary"
       no-selection-unset
+      no-connectors
       no-transition
       class="organization-readonly-tree__content"
     >
@@ -227,10 +228,6 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
   color: #7b8798;
 }
 
-:deep(.q-tree__children) {
-  color: #c4cbd5;
-}
-
 :deep(.q-tree__node-header:hover) {
   background: #f7f9fc;
 }
@@ -260,10 +257,6 @@ function rootBranchKeys(nodes: OrganizationReadOnlyTreeNode[]): number[] {
 }
 
 :global(.body--dark .organization-readonly-tree__separator) {
-  color: var(--app-dark-border-strong);
-}
-
-:global(.body--dark .organization-readonly-tree .q-tree__children) {
   color: var(--app-dark-border-strong);
 }
 
