@@ -211,7 +211,6 @@ describe('Organization read-only center', () => {
     const refreshButton = wrapper.find('[data-icon="refresh"]')
     expect(refreshButton.exists()).toBe(true)
     expect(refreshButton.attributes('data-label')).toBe('')
-    expect(refreshButton.classes()).toContain('organization-refresh-button')
     expect(wrapper.text()).not.toMatch(/详情按钮|操作列|新增|编辑|删除|调岗|离职/)
     expect(wrapper.find('[data-icon="visibility"]').exists()).toBe(false)
     expect(apiMocks.getStructureOrgTree).toHaveBeenCalledWith({

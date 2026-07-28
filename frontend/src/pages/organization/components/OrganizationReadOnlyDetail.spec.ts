@@ -48,6 +48,7 @@ describe('OrganizationReadOnlyDetail', () => {
           QBanner: SlotStub,
           QIcon: true,
           QChip: SlotStub,
+          QSeparator: true,
         },
       },
     })

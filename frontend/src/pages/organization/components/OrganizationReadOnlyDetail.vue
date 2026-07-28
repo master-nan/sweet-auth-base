@@ -1,10 +1,10 @@
 <template>
   <div class="organization-readonly-detail">
-    <q-inner-loading :showing="loading">
+    <q-inner-loading :showing="loading" :dark="Dark.isActive">
       <q-spinner color="primary" size="38px" />
     </q-inner-loading>
 
-    <q-banner v-if="error" class="organization-detail-error">
+    <q-banner v-if="error" :dark="Dark.isActive" rounded class="q-ma-md">
       <template #avatar>
         <q-icon name="error_outline" color="negative" />
       </template>
@@ -15,11 +15,11 @@
       <article
         v-for="field in fields"
         :key="field.key"
-        class="organization-detail-field"
+        class="organization-detail-field q-py-sm"
         :class="{ 'organization-detail-field--wide': field.wide }"
       >
-        <div class="organization-detail-label">{{ field.label }}</div>
-        <div class="organization-detail-value">
+        <div class="text-caption text-grey-7 q-mb-xs">{{ field.label }}</div>
+        <div class="text-body2 text-weight-medium">
           <q-chip
             v-if="field.kind === 'status'"
             dense
@@ -29,13 +29,16 @@
           >
             {{ field.value }}
           </q-chip>
-          <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
+          <code v-else-if="field.kind === 'code'" class="text-body2 text-weight-medium">
+            {{ field.value }}
+          </code>
           <span v-else>{{ field.value }}</span>
         </div>
+        <q-separator class="q-mt-sm" />
       </article>
     </div>
 
-    <div v-else-if="!loading" class="organization-detail-empty">
+    <div v-else-if="!loading" class="absolute-full column flex-center q-gutter-sm text-grey-6">
       <q-icon name="description" size="42px" />
       <div>{{ emptyText }}</div>
     </div>
@@ -44,6 +47,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Dark } from 'quasar'
 import type { OrganizationDetailGroup } from './organization-read-only-detail'
 
 defineOptions({ name: 'OrganizationReadOnlyDetail' })
@@ -80,73 +84,11 @@ const fields = computed(() => props.groups.flatMap((group) => group.fields))
 
 .organization-detail-field {
   min-width: 0;
-  min-height: 78px;
-  padding: 14px 0 12px;
-  border-bottom: 1px solid #edf0f5;
+  overflow-wrap: anywhere;
 }
 
 .organization-detail-field--wide {
   grid-column: 1 / -1;
-}
-
-.organization-detail-label {
-  margin-bottom: 5px;
-  color: #77839a;
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.organization-detail-value {
-  overflow-wrap: anywhere;
-  color: #1b2940;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.55;
-}
-
-.organization-detail-value code {
-  color: #3b4b63;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.organization-detail-error {
-  margin: 16px;
-  border: 1px solid #ffcdd2;
-  background: #fff5f5;
-  color: #b71c1c;
-}
-
-.organization-detail-empty {
-  height: 100%;
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: #8792a6;
-}
-
-:global(.body--dark .organization-detail-field) {
-  border-bottom-color: var(--app-dark-border);
-}
-
-:global(.body--dark .organization-detail-label),
-:global(.body--dark .organization-detail-empty) {
-  color: var(--app-dark-muted);
-}
-
-:global(.body--dark .organization-detail-value),
-:global(.body--dark .organization-detail-value code) {
-  color: var(--app-dark-text);
-}
-
-:global(.body--dark .organization-detail-error) {
-  border-color: rgba(239, 83, 80, 0.45);
-  background: rgba(239, 83, 80, 0.12);
-  color: #ffb4b4;
 }
 
 @media (max-width: 1200px) {

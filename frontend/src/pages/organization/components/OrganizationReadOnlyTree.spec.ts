@@ -23,6 +23,10 @@ const QTreeStub = defineComponent({
       type: Boolean,
       default: false,
     },
+    dark: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['update:selected', 'update:expanded'],
   setup(props, { slots }) {
@@ -99,7 +103,8 @@ describe('OrganizationReadOnlyTree', () => {
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('ROOT')
     expect(wrapper.find('.organization-readonly-tree__meta').text()).toContain('中心')
     expect(wrapper.find('[data-icon="corporate_fare"]').exists()).toBe(true)
-    expect(tree.props('noConnectors')).toBe(true)
+    expect(tree.props('noConnectors')).toBe(false)
+    expect(tree.props('dark')).toBe(false)
     expect(wrapper.text()).not.toContain('操作')
     expect(wrapper.text()).not.toContain('详情')
   })

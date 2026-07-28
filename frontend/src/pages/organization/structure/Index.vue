@@ -1,170 +1,180 @@
 <template>
   <base-content class="q-pa-sm organization-readonly-page">
     <div class="organization-browser-page">
-      <header class="organization-page-header">
-        <div class="organization-page-heading">
-          <h1>组织架构</h1>
-          <p>统一浏览管理组织与法人主体镜像</p>
-        </div>
+      <q-card flat bordered :dark="Dark.isActive" class="q-mb-md">
+        <q-card-section class="row items-center justify-between q-gutter-md q-py-sm">
+          <div class="organization-page-heading">
+            <h1 class="text-h6 text-weight-bold q-my-none">组织架构</h1>
+            <p class="text-caption text-grey-7 q-my-none">统一浏览管理组织与法人主体镜像</p>
+          </div>
 
-        <div class="organization-page-actions">
-          <q-select
-            v-model="architectureMode"
-            :options="architectureModeOptions"
-            option-value="value"
-            option-label="label"
-            emit-value
-            map-options
-            outlined
-            dense
-            label="架构类型"
-            class="architecture-mode-toggle"
-            @update:model-value="handleArchitectureModeChange"
-          />
+          <div class="row items-center justify-end q-gutter-sm">
+            <q-select
+              v-model="architectureMode"
+              :options="architectureModeOptions"
+              :dark="Dark.isActive"
+              option-value="value"
+              option-label="label"
+              emit-value
+              map-options
+              outlined
+              dense
+              label="架构类型"
+              class="architecture-mode-toggle"
+              @update:model-value="handleArchitectureModeChange"
+            />
 
-          <q-select
-            v-if="architectureMode === 'management' && showStructureSwitcher"
-            v-model="selectedStructureCode"
-            :options="structures"
-            option-value="code"
-            option-label="name"
-            emit-value
-            map-options
-            outlined
-            dense
-            :loading="structureLoading"
-            label="管理视图"
-            class="structure-select"
-            @update:model-value="handleStructureChange"
-          >
-            <template #no-option>
-              <q-item>
-                <q-item-section class="text-grey-7">暂无管理视图</q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+            <q-select
+              v-if="architectureMode === 'management' && showStructureSwitcher"
+              v-model="selectedStructureCode"
+              :options="structures"
+              :dark="Dark.isActive"
+              option-value="code"
+              option-label="name"
+              emit-value
+              map-options
+              outlined
+              dense
+              :loading="structureLoading"
+              label="管理视图"
+              class="structure-select"
+              @update:model-value="handleStructureChange"
+            >
+              <template #no-option>
+                <q-item>
+                  <q-item-section class="text-grey-7">暂无管理视图</q-item-section>
+                </q-item>
+              </template>
+            </q-select>
 
-          <q-btn
-            v-for="button in refreshButtons"
-            :key="button.id || button.code"
-            :icon="button.icon || 'refresh'"
-            :aria-label="button.name"
-            round
-            flat
-            dense
-            :color="button.color || 'primary'"
-            :loading="treeLoading || structureLoading"
-            class="organization-refresh-button"
-            @click="refreshPage"
-          >
-            <q-tooltip>{{ button.name }}</q-tooltip>
-          </q-btn>
-        </div>
-      </header>
+            <q-btn
+              v-for="button in refreshButtons"
+              :key="button.id || button.code"
+              :icon="button.icon || 'refresh'"
+              :aria-label="button.name"
+              round
+              flat
+              dense
+              :color="button.color || 'primary'"
+              :loading="treeLoading || structureLoading"
+              @click="refreshPage"
+            >
+              <q-tooltip>{{ button.name }}</q-tooltip>
+            </q-btn>
+          </div>
+        </q-card-section>
+      </q-card>
 
-      <q-banner v-if="pageError" class="organization-page-error">
+      <q-banner v-if="pageError" :dark="Dark.isActive" rounded class="q-mb-md">
         <template #avatar>
           <q-icon name="error_outline" color="negative" />
         </template>
         {{ pageError }}
       </q-banner>
 
-      <main class="organization-browser-workspace">
-        <q-card flat bordered class="organization-tree-panel">
-          <q-card-section class="organization-panel-header">
-            <div>
-              <div class="organization-panel-title">{{ treeTitle }}</div>
-              <div class="organization-panel-subtitle">{{ treeSummary }}</div>
-            </div>
-          </q-card-section>
-
-          <q-separator />
-
-          <q-card-section class="organization-tree-toolbar">
-            <q-input
-              v-model="treeKeyword"
-              outlined
-              dense
-              clearable
-              :placeholder="searchPlaceholder"
-              :disable="architectureMode === 'management' && !selectedStructure"
-              @keyup.enter="handleSearch"
-              @clear="handleSearch"
-            >
-              <template #append>
-                <q-btn
-                  flat
-                  dense
-                  round
-                  icon="search"
-                  :disable="architectureMode === 'management' && !selectedStructure"
-                  @click="handleSearch"
-                >
-                  <q-tooltip>搜索</q-tooltip>
-                </q-btn>
-              </template>
-            </q-input>
-          </q-card-section>
-
-          <q-separator />
-
-          <q-card-section class="organization-tree-content">
-            <organization-read-only-tree
-              :nodes="displayTree"
-              :selected-id="selectedTreeNodeId"
-              :loading="treeLoading"
-              :expand-all="Boolean(treeKeyword.trim())"
-              :empty-text="treeEmptyText"
-              @select="handleNodeSelectedById"
-            />
-          </q-card-section>
-        </q-card>
-
-        <q-card flat bordered class="organization-detail-panel">
-          <q-card-section class="organization-detail-summary">
-            <div v-if="selectionSummary" class="organization-detail-context">
-              <div class="organization-detail-icon">
-                <q-icon :name="selectionSummary.icon" />
+      <main class="row q-col-gutter-md organization-browser-workspace">
+        <div class="col-12 col-md-5 full-height">
+          <q-card
+            flat
+            bordered
+            :dark="Dark.isActive"
+            class="organization-tree-panel column no-wrap fit"
+          >
+            <q-card-section class="q-py-sm">
+              <div>
+                <div class="organization-panel-title text-subtitle2 text-weight-bold">
+                  {{ treeTitle }}
+                </div>
+                <div class="text-caption text-grey-7">{{ treeSummary }}</div>
               </div>
-              <div class="organization-detail-heading">
-                <div class="organization-detail-title">{{ selectionSummary.name }}</div>
-                <div class="organization-detail-meta">
-                  <span>{{ selectionSummary.typeLabel }}</span>
-                  <span aria-hidden="true">·</span>
-                  <span class="organization-detail-code">{{ selectionSummary.code }}</span>
-                  <q-chip
+            </q-card-section>
+
+            <q-separator />
+
+            <q-card-section class="q-pa-sm">
+              <q-input
+                v-model="treeKeyword"
+                :dark="Dark.isActive"
+                outlined
+                dense
+                clearable
+                :placeholder="searchPlaceholder"
+                :disable="architectureMode === 'management' && !selectedStructure"
+                @keyup.enter="handleSearch"
+                @clear="handleSearch"
+              >
+                <template #append>
+                  <q-btn
+                    flat
                     dense
-                    square
-                    outline
-                    :color="
-                      statusColor(selectionSummary.status, selectionSummary.disabled)
-                    "
+                    round
+                    icon="search"
+                    :disable="architectureMode === 'management' && !selectedStructure"
+                    @click="handleSearch"
                   >
-                    {{ statusLabel(selectionSummary.status) }}
-                  </q-chip>
+                    <q-tooltip>搜索</q-tooltip>
+                  </q-btn>
+                </template>
+              </q-input>
+            </q-card-section>
+
+            <q-separator />
+
+            <q-card-section class="organization-tree-content col q-pa-none overflow-hidden">
+              <organization-read-only-tree
+                :nodes="displayTree"
+                :selected-id="selectedTreeNodeId"
+                :loading="treeLoading"
+                :expand-all="Boolean(treeKeyword.trim())"
+                :empty-text="treeEmptyText"
+                @select="handleNodeSelectedById"
+              />
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div class="col-12 col-md-7 full-height">
+          <q-card flat bordered :dark="Dark.isActive" class="organization-detail-panel fit">
+            <q-card-section class="row items-center q-pa-md">
+              <div v-if="selectionSummary" class="row items-center no-wrap full-width">
+                <q-icon :name="selectionSummary.icon" size="28px" class="text-grey-6 q-mr-sm" />
+                <div class="organization-detail-heading">
+                  <div class="organization-detail-title text-subtitle1 text-weight-bold ellipsis">
+                    {{ selectionSummary.name }}
+                  </div>
+                  <div class="row items-center q-gutter-xs text-caption text-grey-7">
+                    <span>{{ selectionSummary.typeLabel }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{{ selectionSummary.code }}</span>
+                    <q-chip
+                      dense
+                      square
+                      outline
+                      :color="statusColor(selectionSummary.status, selectionSummary.disabled)"
+                    >
+                      {{ statusLabel(selectionSummary.status) }}
+                    </q-chip>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div
-              v-else
-              class="organization-detail-context organization-detail-context--empty"
-            >
-              <q-icon name="description" size="28px" />
-              <span>{{ detailEmptyText }}</span>
-            </div>
-          </q-card-section>
+              <div v-else class="row items-center q-gutter-sm text-grey-6">
+                <q-icon name="description" size="28px" />
+                <span>{{ detailEmptyText }}</span>
+              </div>
+            </q-card-section>
 
-          <q-separator />
+            <q-separator />
 
-          <q-card-section class="organization-detail-content">
-            <organization-read-only-detail
-              :groups="detailGroups"
-              :loading="detailLoading"
-              :error="detailError"
-              :empty-text="detailEmptyText"
-            />
-          </q-card-section>
-        </q-card>
+            <q-card-section class="q-px-md q-pb-md q-pt-sm">
+              <organization-read-only-detail
+                :groups="detailGroups"
+                :loading="detailLoading"
+                :error="detailError"
+                :empty-text="detailEmptyText"
+              />
+            </q-card-section>
+          </q-card>
+        </div>
       </main>
     </div>
   </base-content>
@@ -174,7 +184,7 @@
 defineOptions({ name: 'organization_structure' })
 
 import { computed, onMounted, ref } from 'vue'
-import { date } from 'quasar'
+import { Dark, date } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
@@ -839,55 +849,8 @@ function errorMessage(error: unknown, fallback: string): string {
   overflow: auto;
 }
 
-.organization-browser-page {
-  min-width: 0;
-}
-
-.organization-page-header {
-  min-height: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #dfe5ee;
-  background: #fff;
-}
-
 .organization-page-heading {
   min-width: 0;
-}
-
-.organization-page-heading h1 {
-  margin: 0;
-  color: #172033;
-  font-size: 20px;
-  font-weight: 750;
-  line-height: 28px;
-}
-
-.organization-page-heading p {
-  margin: 2px 0 0;
-  color: #718096;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.organization-page-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.organization-refresh-button {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
-  flex: 0 0 36px;
 }
 
 .architecture-mode-toggle {
@@ -898,171 +861,33 @@ function errorMessage(error: unknown, fallback: string): string {
   width: 240px;
 }
 
-.organization-page-error {
-  margin-bottom: 12px;
-  border: 1px solid #ffcdd2;
-  background: #fff5f5;
-  color: #b71c1c;
-}
-
 .organization-browser-workspace {
   height: calc(100vh - 188px);
   min-height: 560px;
-  display: grid;
-  grid-template-columns: minmax(390px, 40%) minmax(0, 1fr);
-  align-items: stretch;
-  gap: 14px;
 }
 
 .organization-tree-panel,
 .organization-detail-panel {
-  min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  border-color: #dfe5ee;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.organization-tree-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.organization-panel-header {
-  min-height: 62px;
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-}
-
-.organization-panel-title {
-  color: #24324a;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 22px;
-}
-
-.organization-panel-subtitle {
-  margin-top: 2px;
-  color: #7b8798;
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.organization-tree-toolbar {
-  padding: 10px 12px;
-}
-
-.organization-tree-content {
-  flex: 1;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
 }
 
 .organization-detail-panel {
   overflow: auto;
 }
 
-.organization-detail-summary {
-  min-height: 86px;
-  display: flex;
-  align-items: center;
-  padding: 16px 18px;
-}
-
-.organization-detail-content {
-  padding: 8px 18px 20px;
-}
-
-.organization-detail-context {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.organization-detail-context--empty {
-  color: #8792a6;
-}
-
-.organization-detail-icon {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  color: #667085;
-  font-size: 24px;
-}
-
 .organization-detail-heading {
   min-width: 0;
 }
 
-.organization-detail-title {
-  overflow: hidden;
-  color: #172033;
-  font-size: 17px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.organization-detail-meta {
-  min-height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  color: #657189;
-  font-size: 12px;
-}
-
-.organization-detail-code {
-  color: #7a879b;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-}
-
-:global(.body--dark .organization-page-header) {
-  border-bottom-color: var(--app-dark-border);
-  background: var(--app-dark-surface);
-}
-
-:global(.body--dark .organization-page-heading h1),
-:global(.body--dark .organization-panel-title),
-:global(.body--dark .organization-detail-title) {
-  color: var(--app-dark-heading);
-}
-
-:global(.body--dark .organization-page-heading p),
-:global(.body--dark .organization-panel-subtitle),
-:global(.body--dark .organization-detail-meta),
-:global(.body--dark .organization-detail-code),
-:global(.body--dark .organization-detail-context--empty) {
-  color: var(--app-dark-muted);
-}
-
-:global(.body--dark .organization-tree-panel),
-:global(.body--dark .organization-detail-panel) {
-  border-color: var(--app-dark-border);
-  background: var(--app-dark-surface);
-}
-
-:global(.body--dark .organization-detail-icon) {
-  color: var(--app-dark-muted);
-}
-
-:global(.body--dark .organization-page-error) {
-  border-color: rgba(239, 83, 80, 0.45);
-  background: rgba(239, 83, 80, 0.12);
-  color: #ffb4b4;
-}
-
-@media (max-width: 1180px) {
+@media (max-width: 1023px) {
   .organization-browser-workspace {
-    grid-template-columns: minmax(380px, 43%) minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+
+  .organization-tree-panel,
+  .organization-detail-panel {
+    min-height: 520px;
   }
 }
 </style>
