@@ -1,7 +1,4 @@
-export interface OrganizationDetailItem {
-  label: string
-  value?: string | number | boolean | null
-  chip?: boolean
-  color?: string
-  fullWidth?: boolean
-}
+import type { DetailFieldItem, DetailSection } from 'src/components/Detail/types'
+
+export type OrganizationDetailItem = DetailFieldItem
+export type OrganizationDetailSection = DetailSection

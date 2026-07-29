@@ -183,53 +183,22 @@
         </q-card-section>
 
         <q-card-section class="structure-body">
-          <aside class="structure-nav">
-            <button
-              type="button"
-              class="structure-nav-card"
-              :class="{ 'is-active': activeMetaTab === 'fields' }"
-              @click="setMetaTab('fields')"
-            >
-              <span>
-                <strong>字段</strong>
-                <small>列表、表单、查询能力</small>
-              </span>
-              <em>{{ fieldRows.length }}</em>
-            </button>
-            <button
-              type="button"
-              class="structure-nav-card"
-              :class="{ 'is-active': activeMetaTab === 'indexes' }"
-              @click="setMetaTab('indexes')"
-            >
-              <span>
-                <strong>索引</strong>
-                <small>唯一索引、组合索引</small>
-              </span>
-              <em>{{ indexRows.length }}</em>
-            </button>
-            <button
-              type="button"
-              class="structure-nav-card"
-              :class="{ 'is-active': activeMetaTab === 'relations' }"
-              @click="setMetaTab('relations')"
-            >
-              <span>
-                <strong>关联关系</strong>
-                <small>主子表、联动数据源</small>
-              </span>
-              <em>{{ relationRows.length }}</em>
-            </button>
-
-            <div class="structure-nav-meta">
+          <detail-section-navigation
+            :model-value="activeMetaTab"
+            :items="structureNavigationItems"
+            @update:model-value="setMetaTabValue"
+          >
+            <template #footer>
+              <div class="structure-nav-meta">
               <q-chip dense square color="deep-purple-1" text-color="primary">
                 {{ currentTable?.table_code || '-' }}
               </q-chip>
               <q-chip dense square color="grey-2" text-color="grey-8">
                 {{ tableKindLabel }}
               </q-chip>
-            </div>
-          </aside>
+              </div>
+            </template>
+          </detail-section-navigation>
 
           <section class="structure-list-panel">
             <div class="structure-list-toolbar">
@@ -885,6 +854,8 @@ import {
   SysTableTypeMap,
 } from 'src/types/enum'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import DetailSectionNavigation from 'src/components/Detail/DetailSectionNavigation.vue'
+import type { DetailSectionNavigationItem } from 'src/components/Detail/types'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import { useLoadingStore } from 'src/stores/loading'
@@ -976,6 +947,26 @@ const showFieldFormDialog = ref(false)
 const currentEditField = ref<TableField | null>(null)
 const indexRows = ref<TableIndex[]>([])
 const relationRows = ref<TableRelation[]>([])
+const structureNavigationItems = computed<DetailSectionNavigationItem[]>(() => [
+  {
+    key: 'fields',
+    label: '字段',
+    caption: '列表、表单、查询能力',
+    count: fieldRows.value.length,
+  },
+  {
+    key: 'indexes',
+    label: '索引',
+    caption: '唯一索引、组合索引',
+    count: indexRows.value.length,
+  },
+  {
+    key: 'relations',
+    label: '关联关系',
+    caption: '主子表、联动数据源',
+    count: relationRows.value.length,
+  },
+])
 const relationFieldMeta = ref<TableField[]>([])
 const showIndexFormDialog = ref(false)
 const currentEditIndex = ref<TableIndex | null>(null)
@@ -1453,6 +1444,12 @@ const selectRelation = (row: TableRelation) => {
 const setMetaTab = (tab: StructureTab) => {
   activeMetaTab.value = tab
   structureKeyword.value = ''
+}
+
+const setMetaTabValue = (tab: string) => {
+  if (tab === 'fields' || tab === 'indexes' || tab === 'relations') {
+    setMetaTab(tab)
+  }
 }
 
 const pagination = ref({
@@ -2543,72 +2540,7 @@ watch(
   background: #ffffff;
 }
 
-.structure-nav {
-  min-height: 0;
-  padding: 18px 14px;
-  border-right: 1px solid #e7edf7;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: #fbfcff;
-}
-
-.structure-nav-card {
-  width: 100%;
-  min-height: 76px;
-  padding: 12px 14px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: transparent;
-  color: #4a5870;
-  text-align: left;
-  cursor: pointer;
-}
-
-.structure-nav-card strong {
-  display: block;
-  margin-bottom: 5px;
-  color: #243047;
-  font-size: 16px;
-  line-height: 1.2;
-  font-weight: 800;
-}
-
-.structure-nav-card small {
-  color: #8390a6;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.structure-nav-card em {
-  min-width: 30px;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  background: #f0efff;
-  color: #6957ed;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.structure-nav-card.is-active {
-  border-color: #d8d4ff;
-  background: #ffffff;
-  box-shadow: 0 8px 18px rgb(105 87 237 / 10%);
-}
-
-.structure-nav-card.is-active strong {
-  color: #6957ed;
-}
-
 .structure-nav-meta {
-  margin-top: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

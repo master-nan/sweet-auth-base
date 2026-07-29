@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm">
+  <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
     <q-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
@@ -96,7 +96,12 @@
       v-model="showDetailDialog"
       title="同步记录详情"
       :subtitle="recordDetail?.source_code || ''"
-      :items="detailItems"
+      :sections="detailSections"
+      icon="sync_problem"
+      :status-label="
+        recordDetail ? dictLabel('org_sync_record_status', recordDetail.status) : ''
+      "
+      :status-color="recordDetail ? organizationStatusColor(recordDetail.status) : 'negative'"
       :loading="detailLoading"
       :error="detailError"
       :mode="detailMode"
@@ -111,6 +116,9 @@
       title="同步错误详情"
       :subtitle="currentRecord?.source_code || ''"
       :items="errorItems"
+      icon="error_outline"
+      status-label="失败"
+      status-color="negative"
       :loading="errorLoading"
       :error="errorLoadError"
     />
@@ -139,7 +147,10 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import type {
+  OrganizationDetailItem,
+  OrganizationDetailSection,
+} from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
@@ -235,24 +246,41 @@ const visibleRowButtons = (row?: SyncRecordListItem) => {
   return line_buttons.value.filter((button) => button.event_action === 'detail')
 }
 
-const detailItems = computed<OrganizationDetailItem[]>(() => {
+const detailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = recordDetail.value
   if (!detail) return []
   return [
-    { label: '批次ID', value: detail.batch_id },
-    { label: '集成执行ID', value: detail.execution_id ?? null },
-    { label: '对象类型', value: objectTypeLabel(detail.object_type) },
-    { label: '本地对象ID', value: detail.local_id ?? null },
-    { label: '同步动作', value: dictLabel('org_sync_action', detail.action) },
     {
-      label: '处理状态',
-      value: dictLabel('org_sync_record_status', detail.status),
-      chip: true,
-      color: organizationStatusColor(detail.status),
+      key: 'basic',
+      label: '基本信息',
+      caption: '对象与处理状态',
+      icon: 'info',
+      items: [
+        { label: '批次ID', value: detail.batch_id },
+        { label: '集成执行ID', value: detail.execution_id ?? null },
+        { label: '对象类型', value: objectTypeLabel(detail.object_type) },
+        { label: '源对象编码', value: detail.source_code },
+        { label: '本地对象ID', value: detail.local_id ?? null },
+        { label: '同步动作', value: dictLabel('org_sync_action', detail.action) },
+        {
+          label: '处理状态',
+          value: dictLabel('org_sync_record_status', detail.status),
+          chip: true,
+          color: organizationStatusColor(detail.status),
+        },
+      ],
     },
-    { label: '依赖类型', value: dictLabel('org_dependency_type', detail.dependency_type) },
-    { label: '重试次数', value: detail.retry_count },
-    { label: '最近重试时间', value: formatOrganizationDateTime(detail.last_retry_at) },
+    {
+      key: 'retry',
+      label: '重试与依赖',
+      caption: '依赖和重试信息',
+      icon: 'replay',
+      items: [
+        { label: '依赖类型', value: dictLabel('org_dependency_type', detail.dependency_type) },
+        { label: '重试次数', value: detail.retry_count },
+        { label: '最近重试时间', value: formatOrganizationDateTime(detail.last_retry_at) },
+      ],
+    },
   ]
 })
 

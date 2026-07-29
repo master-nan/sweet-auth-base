@@ -1,0 +1,121 @@
+<template>
+  <div
+    class="detail-field-grid"
+    :class="{
+      'detail-field-grid--plain': variant === 'plain',
+      'detail-field-grid--card': variant === 'card',
+    }"
+  >
+    <article
+      v-for="item in items"
+      :key="item.label"
+      class="detail-field-grid__item"
+      :class="{ 'detail-field-grid__item--full': item.fullWidth }"
+    >
+      <div class="detail-field-grid__label">
+        <span>{{ item.label }}</span>
+        <q-chip v-if="item.meta" dense square>{{ item.meta }}</q-chip>
+      </div>
+      <div class="detail-field-grid__value">
+        <q-chip
+          v-if="item.chip"
+          dense
+          square
+          :outline="variant === 'plain'"
+          :color="item.color || 'primary'"
+          :text-color="variant === 'card' ? 'white' : undefined"
+        >
+          {{ displayValue(item.value) }}
+        </q-chip>
+        <span v-else>{{ displayValue(item.value) }}</span>
+      </div>
+    </article>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { DetailFieldItem } from './types'
+
+withDefaults(
+  defineProps<{
+    items?: DetailFieldItem[]
+    variant?: 'plain' | 'card'
+  }>(),
+  {
+    items: () => [],
+    variant: 'plain',
+  },
+)
+
+const displayValue = (value: DetailFieldItem['value']) => {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  return String(value)
+}
+</script>
+
+<style scoped>
+.detail-field-grid {
+  display: grid;
+}
+
+.detail-field-grid--plain {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 38px 52px;
+}
+
+.detail-field-grid--card {
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.detail-field-grid__item {
+  min-width: 0;
+}
+
+.detail-field-grid--card .detail-field-grid__item {
+  padding: 12px;
+  border: 1px solid rgba(127, 143, 178, 0.22);
+  border-radius: 8px;
+}
+
+.detail-field-grid__item--full {
+  grid-column: 1 / -1;
+}
+
+.detail-field-grid__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7c879c;
+  font-size: 12px;
+}
+
+.detail-field-grid__value {
+  margin-top: 8px;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+body.body--dark .detail-field-grid__label {
+  color: #98a4ba;
+}
+
+body.body--dark .detail-field-grid__value {
+  color: #f1f4fa;
+}
+
+body.body--dark .detail-field-grid--card .detail-field-grid__item {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 700px) {
+  .detail-field-grid--plain,
+  .detail-field-grid--card {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

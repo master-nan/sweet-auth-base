@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm">
+  <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
     <q-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
@@ -119,7 +119,17 @@
       v-model="showDetailDialog"
       :title="employeeDetail?.name || '人员详情'"
       :subtitle="employeeDetail?.employee_no || ''"
-      :items="employeeDetailItems"
+      :sections="employeeDetailSections"
+      icon="badge"
+      :avatar-label="employeeDetail?.name?.slice(0, 1) || ''"
+      :status-label="
+        employeeDetail
+          ? dictLabel('org_employment_status', employeeDetail.employment_status)
+          : ''
+      "
+      :status-color="
+        employeeDetail ? organizationStatusColor(employeeDetail.employment_status) : 'positive'
+      "
       :loading="detailLoading"
       :error="detailError"
       :mode="detailMode"
@@ -128,46 +138,50 @@
       :record-context="employeeDetail"
       @button-click="handleDetailAction"
     >
-      <q-separator />
-      <q-card-section class="row items-center q-gutter-sm">
-        <div class="text-subtitle1 text-weight-medium">任职记录</div>
-        <q-space />
-        <q-btn-toggle
-          v-model="assignmentScope"
-          dense
-          unelevated
-          toggle-color="primary"
-          :options="assignmentScopeOptions"
-          @update:model-value="loadAssignments"
-        />
-      </q-card-section>
-      <q-table
-        flat
-        bordered
-        separator="cell"
-        :rows="assignments"
-        :columns="assignmentColumns"
-        row-key="id"
-        :loading="assignmentLoading"
-        :pagination="{ rowsPerPage: 0 }"
-        hide-bottom
-        class="q-mx-md q-mb-md"
-      >
-        <template #body-cell-assignment_type="props">
-          <q-td :props="props">
-            {{ dictLabel('org_assignment_type', props.row.assignment_type) }}
-          </q-td>
+      <template #section="{ sectionKey }">
+        <template v-if="sectionKey === 'assignments'">
+          <div class="row items-center q-mb-md">
+            <div class="text-caption text-grey-7">按时间范围查看员工全部任职，不自动选取主任职</div>
+            <q-space />
+            <q-btn-toggle
+              v-model="assignmentScope"
+              dense
+              unelevated
+              toggle-color="primary"
+              :options="assignmentScopeOptions"
+              @update:model-value="loadAssignments"
+            />
+          </div>
+          <q-table
+            flat
+            bordered
+            separator="cell"
+            :rows="assignments"
+            :columns="assignmentColumns"
+            row-key="id"
+            :loading="assignmentLoading"
+            :pagination="{ rowsPerPage: 0 }"
+            hide-bottom
+          >
+            <template #body-cell-assignment_type="props">
+              <q-td :props="props">
+                {{ dictLabel('org_assignment_type', props.row.assignment_type) }}
+              </q-td>
+            </template>
+            <template #body-cell-validity="props">
+              <q-td :props="props">
+                {{ formatOrganizationDate(props.row.valid_from) }} 至
+                {{ formatOrganizationDate(props.row.valid_to, '长期') }}
+              </q-td>
+            </template>
+            <template #no-data>
+              <div class="full-width text-center text-grey-7 q-pa-lg">
+                当前范围暂无任职记录
+              </div>
+            </template>
+          </q-table>
         </template>
-        <template #body-cell-validity="props">
-          <q-td :props="props">
-            {{ formatOrganizationDate(props.row.valid_from) }} 至
-            {{ formatOrganizationDate(props.row.valid_to, '长期') }}
-          </q-td>
-        </template>
-        <template #no-data>
-          <div class="full-width text-center text-grey-7 q-pa-lg">当前范围暂无任职记录</div>
-        </template>
-      </q-table>
+      </template>
     </organization-record-detail-dialog>
 
     <q-dialog v-model="showBindDialog">
@@ -248,12 +262,13 @@ import { useDictStore } from 'src/stores/dict'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDate,
+  formatOrganizationDateTime,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 
@@ -374,30 +389,74 @@ const advancedFields = [
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || String(value || '-')
 
-const employeeDetailItems = computed<OrganizationDetailItem[]>(() => {
+const employeeDetailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = employeeDetail.value
-  if (!detail) return []
+  const basicItems = detail
+    ? [
+        { label: '员工编号', value: detail.employee_no },
+        { label: '姓名', value: detail.name },
+        { label: '手机号', value: detail.mobile_masked ?? null },
+        { label: '邮箱', value: detail.email_masked ?? null },
+        {
+          label: '人员状态',
+          value: dictLabel('org_employment_status', detail.employment_status),
+          chip: true,
+          color: organizationStatusColor(detail.employment_status),
+        },
+        {
+          label: '有效期',
+          value: `${formatOrganizationDate(detail.valid_from)} 至 ${formatOrganizationDate(detail.valid_to, '长期')}`,
+        },
+      ]
+    : []
   return [
-    { label: '员工编号', value: detail.employee_no },
     {
-      label: '人员状态',
-      value: dictLabel('org_employment_status', detail.employment_status),
-      chip: true,
-      color: organizationStatusColor(detail.employment_status),
+      key: 'basic',
+      label: '基本资料',
+      caption: '人员身份与联系方式',
+      icon: 'badge',
+      items: basicItems,
     },
     {
-      label: '平台账号',
-      value:
-        detail.bound_account?.user_name ||
-        dictLabel('org_user_binding_status', detail.binding_status),
+      key: 'assignments',
+      label: '任职记录',
+      caption: '当前、历史与未来任职',
+      icon: 'work_history',
+      count: assignments.value.length,
+      items: [],
     },
-    { label: '手机号', value: detail.mobile_masked ?? null },
-    { label: '邮箱', value: detail.email_masked ?? null },
     {
-      label: '有效期',
-      value: `${formatOrganizationDate(detail.valid_from)} 至 ${formatOrganizationDate(detail.valid_to, '长期')}`,
+      key: 'account',
+      label: '账号信息',
+      caption: '当前平台账号绑定',
+      icon: 'manage_accounts',
+      items: detail
+        ? [
+            {
+              label: '绑定状态',
+              value: dictLabel('org_user_binding_status', detail.binding_status),
+              chip: true,
+              color: detail.binding_status === 'bound' ? 'positive' : 'grey-7',
+            },
+            {
+              label: '平台账号',
+              value: detail.bound_account?.user_name || '未绑定',
+            },
+          ]
+        : [],
     },
-    { label: '平台备注', value: detail.local_note, fullWidth: true },
+    {
+      key: 'mirror',
+      label: '镜像信息',
+      caption: '同步时间与平台备注',
+      icon: 'sync',
+      items: detail
+        ? [
+            { label: '最近更新时间', value: formatOrganizationDateTime(detail.gmt_modify) },
+            { label: '平台备注', value: detail.local_note, fullWidth: true },
+          ]
+        : [],
+    },
   ]
 })
 

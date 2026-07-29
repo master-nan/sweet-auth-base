@@ -16,7 +16,13 @@
       <q-btn icon="close" flat round dense class="form-dialog-shell__close" @click="show = false" />
     </q-card-section>
 
-    <q-card-section class="form-dialog-shell__body" :class="{ 'has-preview': hasPreview }">
+    <q-card-section
+      class="form-dialog-shell__body"
+      :class="{ 'has-navigation': hasNavigation, 'has-preview': hasPreview }"
+    >
+      <aside v-if="hasNavigation" class="form-dialog-shell__navigation">
+        <slot name="navigation" />
+      </aside>
       <main class="form-dialog-shell__main">
         <slot />
       </main>
@@ -33,6 +39,7 @@
         </div>
       </div>
       <q-space />
+      <slot name="footer-actions" />
       <q-btn
         :label="readonly ? '关闭' : cancelText"
         color="grey-7"
@@ -74,7 +81,13 @@
         <q-btn icon="close" flat round dense class="form-dialog-shell__close" v-close-popup />
       </q-card-section>
 
-      <q-card-section class="form-dialog-shell__body" :class="{ 'has-preview': hasPreview }">
+      <q-card-section
+        class="form-dialog-shell__body"
+        :class="{ 'has-navigation': hasNavigation, 'has-preview': hasPreview }"
+      >
+        <aside v-if="hasNavigation" class="form-dialog-shell__navigation">
+          <slot name="navigation" />
+        </aside>
         <main class="form-dialog-shell__main">
           <slot />
         </main>
@@ -91,6 +104,7 @@
           </div>
         </div>
         <q-space />
+        <slot name="footer-actions" />
         <q-btn
           :label="readonly ? '关闭' : cancelText"
           color="grey-7"
@@ -159,6 +173,7 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 const hasPreview = computed(() => props.showPreview && Boolean(slots.preview))
+const hasNavigation = computed(() => Boolean(slots.navigation))
 
 const show = computed({
   get: () => props.modelValue,
@@ -247,6 +262,21 @@ const show = computed({
   grid-template-columns: minmax(0, 1fr) 280px;
 }
 
+.form-dialog-shell__body.has-navigation {
+  grid-template-columns: 236px minmax(0, 1fr);
+}
+
+.form-dialog-shell__body.has-navigation.has-preview {
+  grid-template-columns: 236px minmax(0, 1fr) 280px;
+}
+
+.form-dialog-shell__navigation {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .form-dialog-shell__main {
   min-width: 0;
   min-height: 0;
@@ -291,6 +321,38 @@ const show = computed({
   box-shadow: 0 8px 18px rgba($primary, 0.28);
 }
 
+body.body--dark .form-dialog-shell--embedded,
+body.body--dark .form-dialog-shell__header,
+body.body--dark .form-dialog-shell__footer,
+body.body--dark .form-dialog-shell__preview {
+  background: #1d1f27;
+}
+
+body.body--dark .form-dialog-shell__body {
+  background: #181a21;
+}
+
+body.body--dark .form-dialog-shell__title {
+  color: #f1f4fa;
+}
+
+body.body--dark .form-dialog-shell__subtitle,
+body.body--dark .form-dialog-shell__status {
+  color: #98a4ba;
+}
+
+body.body--dark .form-dialog-shell__header,
+body.body--dark .form-dialog-shell__footer,
+body.body--dark .form-dialog-shell__preview {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.body--dark .form-dialog-shell__close {
+  color: #f1f4fa;
+  background: #252833;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 @media (max-width: 900px) {
   .form-dialog-shell {
     width: calc(100vw - 24px) !important;
@@ -299,6 +361,16 @@ const show = computed({
 
   .form-dialog-shell__body.has-preview {
     grid-template-columns: 1fr;
+  }
+
+  .form-dialog-shell__body.has-navigation,
+  .form-dialog-shell__body.has-navigation.has-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .form-dialog-shell__navigation {
+    max-height: 220px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   }
 
   .form-dialog-shell__preview {

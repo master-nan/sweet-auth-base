@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm">
+  <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
     <q-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
@@ -109,9 +109,16 @@
 
     <organization-record-detail-dialog
       v-model="showDetailDialog"
-      :title="batchDetail?.batch_no || '同步批次详情'"
+      :title="
+        batchDetail ? `同步批次详情：${batchDetail.batch_no}` : '同步批次详情'
+      "
       :subtitle="batchDetail ? dictLabel('org_sync_type', batchDetail.sync_type) : ''"
-      :items="batchDetailItems"
+      :sections="batchDetailSections"
+      icon="sync"
+      :status-label="
+        batchDetail ? dictLabel('org_sync_record_status', batchDetail.status) : ''
+      "
+      :status-color="batchDetail ? organizationStatusColor(batchDetail.status) : 'positive'"
       :loading="detailLoading"
       :error="detailError"
       :mode="detailMode"
@@ -120,32 +127,32 @@
       :record-context="currentBatch"
       @button-click="handleDetailAction"
     >
-      <q-separator />
-      <q-card-section class="text-subtitle1 text-weight-medium">对象处理记录</q-card-section>
-      <q-table
-        flat
-        bordered
-        separator="cell"
-        :rows="batchRecords"
-        :columns="recordColumns"
-        row-key="id"
-        :loading="recordLoading"
-        :pagination="{ rowsPerPage: 0 }"
-        hide-bottom
-        class="q-mx-md q-mb-md"
-      >
-        <template #body-cell-action="props">
-          <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
-        </template>
-        <template #body-cell-status="props">
-          <q-td :props="props">{{
-            dictLabel('org_sync_record_status', props.row.status)
-          }}</q-td>
-        </template>
-        <template #no-data>
-          <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
-        </template>
-      </q-table>
+      <template #section="{ sectionKey }">
+        <q-table
+          v-if="sectionKey === 'records'"
+          flat
+          bordered
+          separator="cell"
+          :rows="batchRecords"
+          :columns="recordColumns"
+          row-key="id"
+          :loading="recordLoading"
+          :pagination="{ rowsPerPage: 0 }"
+          hide-bottom
+        >
+          <template #body-cell-action="props">
+            <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
+          </template>
+          <template #body-cell-status="props">
+            <q-td :props="props">{{
+              dictLabel('org_sync_record_status', props.row.status)
+            }}</q-td>
+          </template>
+          <template #no-data>
+            <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
+          </template>
+        </q-table>
+      </template>
     </organization-record-detail-dialog>
 
     <organization-record-detail-dialog
@@ -153,6 +160,9 @@
       title="同步批次错误"
       :subtitle="currentBatch?.batch_no || ''"
       :items="errorItems"
+      icon="error_outline"
+      status-label="失败"
+      status-color="negative"
       :loading="errorLoading"
       :error="errorLoadError"
     />
@@ -181,7 +191,10 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import type {
+  OrganizationDetailItem,
+  OrganizationDetailSection,
+} from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
@@ -229,23 +242,41 @@ const refreshButtons = computed(() =>
 const errorItems = computed<OrganizationDetailItem[]>(() => [
   { label: '错误摘要', value: errorSummary.value, fullWidth: true },
 ])
-const batchDetailItems = computed<OrganizationDetailItem[]>(() => {
+const batchDetailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = batchDetail.value
   if (!detail) return []
   return [
-    { label: '对象范围', value: detail.object_scope },
     {
-      label: '状态',
-      value: dictLabel('org_sync_record_status', detail.status),
-      chip: true,
-      color: organizationStatusColor(detail.status),
+      key: 'basic',
+      label: '基础信息',
+      caption: '批次范围与执行结果',
+      icon: 'info',
+      items: [
+        { label: '批次号', value: detail.batch_no },
+        { label: '同步类型', value: dictLabel('org_sync_type', detail.sync_type) },
+        { label: '对象范围', value: detail.object_scope },
+        {
+          label: '状态',
+          value: dictLabel('org_sync_record_status', detail.status),
+          chip: true,
+          color: organizationStatusColor(detail.status),
+        },
+        { label: '集成执行ID', value: detail.execution_id ?? null },
+        { label: '开始时间', value: formatOrganizationDateTime(detail.started_at) },
+        { label: '完成时间', value: formatOrganizationDateTime(detail.completed_at) },
+        {
+          label: '成功 / 失败 / 跳过 / 总数',
+          value: `${detail.success_count} / ${detail.failed_count} / ${detail.skipped_count} / ${detail.total_count}`,
+        },
+      ],
     },
-    { label: '集成执行ID', value: detail.execution_id ?? null },
-    { label: '开始时间', value: formatOrganizationDateTime(detail.started_at) },
-    { label: '完成时间', value: formatOrganizationDateTime(detail.completed_at) },
     {
-      label: '成功 / 失败 / 跳过 / 总数',
-      value: `${detail.success_count} / ${detail.failed_count} / ${detail.skipped_count} / ${detail.total_count}`,
+      key: 'records',
+      label: '对象处理记录',
+      caption: '本批次对象处理明细',
+      icon: 'list_alt',
+      count: batchRecords.value.length,
+      items: [],
     },
   ]
 })

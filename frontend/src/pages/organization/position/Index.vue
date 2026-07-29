@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm">
+  <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
     <q-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
@@ -105,7 +105,12 @@
       v-model="showDetailDialog"
       :title="positionDetail?.name || '岗位详情'"
       :subtitle="positionDetail?.code || ''"
-      :items="detailItems"
+      :sections="detailSections"
+      icon="work"
+      :status-label="
+        positionDetail ? dictLabel('org_object_status', positionDetail.status) : ''
+      "
+      :status-color="positionDetail ? organizationStatusColor(positionDetail.status) : 'positive'"
       :loading="detailLoading"
       :error="detailError"
       :mode="detailMode"
@@ -137,7 +142,7 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
@@ -217,24 +222,48 @@ const advancedFields = [
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || String(value || '-')
 
-const detailItems = computed<OrganizationDetailItem[]>(() => {
+const detailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = positionDetail.value
   if (!detail) return []
   return [
-    { label: '岗位类型', value: dictLabel('org_position_type', detail.position_type) },
-    { label: '所属组织', value: referenceLabel(detail.org_unit) },
-    { label: '所属法人', value: referenceLabel(detail.legal_entity) },
-    { label: '职级', value: detail.job_level },
-    { label: '管理岗位', value: detail.is_manager_position },
     {
-      label: '状态',
-      value: dictLabel('org_object_status', detail.status),
-      chip: true,
-      color: organizationStatusColor(detail.status),
+      key: 'basic',
+      label: '基本信息',
+      caption: '岗位定义与有效状态',
+      icon: 'work',
+      items: [
+        { label: '岗位编码', value: detail.code },
+        { label: '岗位名称', value: detail.name },
+        { label: '岗位类型', value: dictLabel('org_position_type', detail.position_type) },
+        { label: '职级', value: detail.job_level },
+        { label: '管理岗位', value: detail.is_manager_position },
+        {
+          label: '状态',
+          value: dictLabel('org_object_status', detail.status),
+          chip: true,
+          color: organizationStatusColor(detail.status),
+        },
+        { label: '有效期开始', value: formatOrganizationDate(detail.valid_from) },
+        { label: '有效期结束', value: formatOrganizationDate(detail.valid_to, '长期') },
+      ],
     },
-    { label: '有效期开始', value: formatOrganizationDate(detail.valid_from) },
-    { label: '有效期结束', value: formatOrganizationDate(detail.valid_to, '长期') },
-    { label: '平台备注', value: detail.local_note, fullWidth: true },
+    {
+      key: 'ownership',
+      label: '归属信息',
+      caption: '法人和组织归属',
+      icon: 'account_tree',
+      items: [
+        { label: '所属组织', value: referenceLabel(detail.org_unit) },
+        { label: '所属法人', value: referenceLabel(detail.legal_entity) },
+      ],
+    },
+    {
+      key: 'mirror',
+      label: '镜像信息',
+      caption: '平台扩展信息',
+      icon: 'sync',
+      items: [{ label: '平台备注', value: detail.local_note, fullWidth: true }],
+    },
   ]
 })
 
