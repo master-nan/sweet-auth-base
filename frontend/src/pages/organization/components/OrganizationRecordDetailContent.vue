@@ -152,7 +152,6 @@ const isButtonDisabled = (button: MenuButton) =>
   gap: 14px;
   width: 100%;
   max-width: 1480px;
-  min-height: calc(100vh - 132px);
   margin: 0 auto;
 }
 

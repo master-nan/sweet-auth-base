@@ -1,7 +1,6 @@
 <template>
-  <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
+  <base-content class="q-pa-sm">
     <q-table
-      v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
       flat
       bordered
@@ -108,54 +107,6 @@
     />
 
     <organization-record-detail-dialog
-      v-model="showDetailDialog"
-      :title="
-        batchDetail ? `同步批次详情：${batchDetail.batch_no}` : '同步批次详情'
-      "
-      :subtitle="batchDetail ? dictLabel('org_sync_type', batchDetail.sync_type) : ''"
-      :sections="batchDetailSections"
-      icon="sync"
-      :status-label="
-        batchDetail ? dictLabel('org_sync_record_status', batchDetail.status) : ''
-      "
-      :status-color="batchDetail ? organizationStatusColor(batchDetail.status) : 'positive'"
-      :loading="detailLoading"
-      :error="detailError"
-      :mode="detailMode"
-      :top-buttons="record_detail_top_buttons"
-      :bottom-buttons="record_detail_bottom_buttons"
-      :record-context="currentBatch"
-      @button-click="handleDetailAction"
-    >
-      <template #section="{ sectionKey }">
-        <q-table
-          v-if="sectionKey === 'records'"
-          flat
-          bordered
-          separator="cell"
-          :rows="batchRecords"
-          :columns="recordColumns"
-          row-key="id"
-          :loading="recordLoading"
-          :pagination="{ rowsPerPage: 0 }"
-          hide-bottom
-        >
-          <template #body-cell-action="props">
-            <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
-          </template>
-          <template #body-cell-status="props">
-            <q-td :props="props">{{
-              dictLabel('org_sync_record_status', props.row.status)
-            }}</q-td>
-          </template>
-          <template #no-data>
-            <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
-          </template>
-        </q-table>
-      </template>
-    </organization-record-detail-dialog>
-
-    <organization-record-detail-dialog
       v-model="showErrorDialog"
       title="同步批次错误"
       :subtitle="currentBatch?.batch_no || ''"
@@ -175,45 +126,34 @@ defineOptions({ name: 'organization_sync_batch' })
 import cloneDeep from 'lodash/cloneDeep'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
+import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import {
-  getSyncBatchDetail,
   getSyncBatchError,
   querySyncBatches,
-  querySyncRecords,
-  type SyncBatchDetail,
   type SyncBatchListItem,
   type SyncBatchQueryRequest,
-  type SyncRecordListItem,
 } from 'src/api/services/org'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type {
-  OrganizationDetailItem,
-  OrganizationDetailSection,
-} from 'src/pages/organization/components/organization-record-detail'
-import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
+import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
 import {
   createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDateTime,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
+import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'
 import { useDictStore } from 'src/stores/dict'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const dictStore = useDictStore()
-const {
-  line_buttons,
-  top_buttons,
-  record_detail_top_buttons,
-  record_detail_bottom_buttons,
-} = usePageButtons('organization_sync_batch')
-const detailMode = useOrganizationDetailMode('organization_sync_batch', 'page')
+const router = useRouter()
+const { line_buttons, top_buttons } = usePageButtons('organization_sync_batch')
 
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
@@ -223,12 +163,6 @@ const query = ref<SyncBatchQueryRequest>(createOrganizationQuery('org_sync_batch
 const tempAdvancedQuery = ref<SyncBatchQueryRequest>(cloneDeep(query.value))
 const showAdvancedQuery = ref(false)
 
-const showDetailDialog = ref(false)
-const detailLoading = ref(false)
-const detailError = ref('')
-const batchDetail = ref<SyncBatchDetail | null>(null)
-const batchRecords = ref<SyncRecordListItem[]>([])
-const recordLoading = ref(false)
 const currentBatch = ref<SyncBatchListItem | null>(null)
 
 const showErrorDialog = ref(false)
@@ -242,45 +176,6 @@ const refreshButtons = computed(() =>
 const errorItems = computed<OrganizationDetailItem[]>(() => [
   { label: '错误摘要', value: errorSummary.value, fullWidth: true },
 ])
-const batchDetailSections = computed<OrganizationDetailSection[]>(() => {
-  const detail = batchDetail.value
-  if (!detail) return []
-  return [
-    {
-      key: 'basic',
-      label: '基础信息',
-      caption: '批次范围与执行结果',
-      icon: 'info',
-      items: [
-        { label: '批次号', value: detail.batch_no },
-        { label: '同步类型', value: dictLabel('org_sync_type', detail.sync_type) },
-        { label: '对象范围', value: detail.object_scope },
-        {
-          label: '状态',
-          value: dictLabel('org_sync_record_status', detail.status),
-          chip: true,
-          color: organizationStatusColor(detail.status),
-        },
-        { label: '集成执行ID', value: detail.execution_id ?? null },
-        { label: '开始时间', value: formatOrganizationDateTime(detail.started_at) },
-        { label: '完成时间', value: formatOrganizationDateTime(detail.completed_at) },
-        {
-          label: '成功 / 失败 / 跳过 / 总数',
-          value: `${detail.success_count} / ${detail.failed_count} / ${detail.skipped_count} / ${detail.total_count}`,
-        },
-      ],
-    },
-    {
-      key: 'records',
-      label: '对象处理记录',
-      caption: '本批次对象处理明细',
-      icon: 'list_alt',
-      count: batchRecords.value.length,
-      items: [],
-    },
-  ]
-})
-
 const columns: QTableProps['columns'] = [
   { name: 'batch_no', field: 'batch_no', label: '批次号', align: 'left', sortable: true },
   { name: 'sync_type', field: 'sync_type', label: '同步类型', align: 'center' },
@@ -290,14 +185,6 @@ const columns: QTableProps['columns'] = [
   { name: 'progress', field: 'progress', label: '成功 / 失败 / 总数', align: 'right' },
   { name: 'status', field: 'status', label: '状态', align: 'center' },
   { name: 'actions', field: 'actions', label: '操作', align: 'center' },
-]
-
-const recordColumns: QTableProps['columns'] = [
-  { name: 'object_type', field: 'object_type', label: '对象类型', align: 'left' },
-  { name: 'source_code', field: 'source_code', label: '源对象编码', align: 'left' },
-  { name: 'action', field: 'action', label: '动作', align: 'center' },
-  { name: 'status', field: 'status', label: '状态', align: 'center' },
-  { name: 'error_code', field: 'error_code', label: '错误码', align: 'left' },
 ]
 
 const advancedFields = [
@@ -365,31 +252,7 @@ const fetchData = async () => {
 }
 
 const openDetail = async (row: SyncBatchListItem) => {
-  currentBatch.value = row
-  batchDetail.value = null
-  batchRecords.value = []
-  detailError.value = ''
-  detailLoading.value = true
-  recordLoading.value = true
-  showDetailDialog.value = true
-  try {
-    const [detail, records] = await Promise.all([
-      getSyncBatchDetail(row.id),
-      querySyncRecords({
-        ...createOrganizationQuery('org_sync_record'),
-        batch_id: row.id,
-        order: { field: 'gmt_create', is_asc: true },
-        num: 100,
-      }),
-    ])
-    batchDetail.value = detail
-    batchRecords.value = records.items
-  } catch {
-    detailError.value = '同步批次详情加载失败'
-  } finally {
-    detailLoading.value = false
-    recordLoading.value = false
-  }
+  await router.push(buildOrganizationDetailRoute('org_sync_batch', row.id, row.batch_no))
 }
 
 const openError = async (row: SyncBatchListItem) => {
@@ -411,11 +274,6 @@ const openError = async (row: SyncBatchListItem) => {
 const handleRowAction = (button: MenuButton, row: SyncBatchListItem) => {
   if (button.event_action === 'detail') void openDetail(row)
   if (button.event_action === 'view_error') void openError(row)
-}
-
-const handleDetailAction = (button: MenuButton) => {
-  if (!currentBatch.value) return
-  if (button.event_action === 'view_error') void openError(currentBatch.value)
 }
 
 watch(

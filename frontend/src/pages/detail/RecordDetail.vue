@@ -1,5 +1,12 @@
 <template>
-  <base-content scrollable class="q-pa-sm record-detail-page">
+  <organization-sync-batch-detail
+    v-if="isOrganizationSyncBatch"
+    :record-id="recordId"
+    @close="goBackToList"
+    @title-change="syncPageChromeTitle"
+  />
+
+  <base-content v-else scrollable class="q-pa-sm record-detail-page">
     <div class="record-detail">
       <header class="record-detail-header">
         <div class="record-detail-title-wrap">
@@ -167,6 +174,7 @@ import { useQuasar } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
+import OrganizationSyncBatchDetail from 'src/pages/organization/sync-batch/Detail.vue'
 import { instance } from 'boot/axios'
 import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import { useFileApi } from 'src/api/services/file'
@@ -260,7 +268,12 @@ const tableCode = computed(() => String(route.params.table_code || ''))
 const recordId = computed(() => Number(route.params.id || 0))
 
 const isAudit = computed(() => source.value === 'audit' || tableCode.value === 'access_log')
-const sourceIcon = computed(() => (isAudit.value ? 'manage_search' : 'article'))
+const isOrganizationSyncBatch = computed(
+  () => source.value === 'organization' && tableCode.value === 'org_sync_batch',
+)
+const sourceIcon = computed(() =>
+  isAudit.value ? 'manage_search' : isOrganizationSyncBatch.value ? 'sync' : 'article',
+)
 
 const currentMenu = computed(() => {
   if (isAudit.value) return findMenuByName(userStore.menus, 'system_audit')
@@ -730,6 +743,7 @@ function handleParamsSubmit(formPayload: { data: Record<string, any> }) {
 }
 
 async function loadDetail() {
+  if (isOrganizationSyncBatch.value) return
   if (!recordId.value || !tableCode.value) {
     loadError.value = '详情路由缺少记录ID或表编码'
     return
@@ -880,7 +894,6 @@ watch(
   gap: 14px;
   width: 100%;
   max-width: 1480px;
-  min-height: calc(100vh - 132px);
   margin: 0 auto;
   box-sizing: border-box;
 }
