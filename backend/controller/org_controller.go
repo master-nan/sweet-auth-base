@@ -501,6 +501,32 @@ func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
 	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
+// QueryEmployeeUserOptions godoc
+// @Summary 可绑定平台账号选项
+// @Description 按账号名查询员工绑定所需的最小安全账号选项
+// @Tags 组织主数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param data body request.OrgEmployeeUserOptionsReq true "账号选项查询参数"
+// @Success 200 {object} response.Response "请求成功"
+// @Router /admin/org/employee/user-options [post]
+func (o *OrgController) QueryEmployeeUserOptions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+
+	var data request.OrgEmployeeUserOptionsReq
+	if err := utils.ValidatorBody(ctx, &data, o.translator()); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := o.orgService.QueryEmployeeUserOptions(ctx, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
+}
+
 // BindEmployeeUser godoc
 // @Summary 绑定企业人员账号
 // @Description 将企业人员绑定到明确指定的当前 Sweet Platform 登录账号

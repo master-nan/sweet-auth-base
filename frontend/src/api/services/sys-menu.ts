@@ -1,5 +1,9 @@
 import type { Basic, Query, ResponseData } from 'src/types/global'
-import type { SysMenuButtonDisplayMode, SysMenuButtonPosition } from 'src/types/enum'
+import type {
+  SysDetailOpenMode,
+  SysMenuButtonDisplayMode,
+  SysMenuButtonPosition,
+} from 'src/types/enum'
 import { type Role } from 'src/api/services/sys-role'
 import { instance } from 'boot/axios'
 
@@ -39,6 +43,7 @@ export interface Menu extends Basic {
   sequence: number
   page_type?: 'directory' | 'fixed' | 'low_code' | string
   table_code?: string
+  detail_open_mode?: SysDetailOpenMode
   option: string
   icon?: string
   redirect?: string

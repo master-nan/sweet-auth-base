@@ -196,6 +196,17 @@ export interface EmployeeUserBinding {
   bound_account?: BoundUserSummary | null
 }
 
+export interface EmployeeUserOption {
+  value: number
+  label: string
+  disabled: boolean
+}
+
+export interface EmployeeUserOptionsResult {
+  items: EmployeeUserOption[]
+  total: number
+}
+
 export interface PositionQueryRequest extends OrganizationListQuery {
   legal_entity_id?: number
   org_unit_id?: number
@@ -496,6 +507,21 @@ export const getEmployeeDetail = async (employeeId: number): Promise<EmployeeDet
     `/admin/org/employee/${employeeId}`,
   )
   return response.data.data
+}
+
+export const queryEmployeeUserOptions = async (
+  keyword: string,
+  page = 1,
+  num = 20,
+): Promise<EmployeeUserOptionsResult> => {
+  const response = await instance.post<ResponseData<EmployeeUserOption[]>>(
+    '/admin/org/employee/user-options',
+    { keyword, page, num },
+  )
+  return {
+    items: response.data.data || [],
+    total: response.data.total || 0,
+  }
 }
 
 export const bindEmployeeUser = async (

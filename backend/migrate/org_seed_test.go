@@ -460,6 +460,34 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 			t.Fatalf("organization permission action %s was not seeded", action)
 		}
 	}
+	for code, expected := range map[string]struct {
+		position    enum.SysMenuButtonPosition
+		disableWhen bool
+	}{
+		"organization_employee_bind_user":   {position: enum.DetailTop, disableWhen: true},
+		"organization_employee_unbind_user": {position: enum.DetailTop, disableWhen: true},
+		"organization_employee_view_sync":   {position: enum.DetailBottom},
+		"organization_position_view_sync":   {position: enum.DetailBottom},
+		"organization_sync_batch_view_error": {
+			position:    enum.DetailTop,
+			disableWhen: true,
+		},
+		"organization_sync_error_view_error": {
+			position:    enum.DetailTop,
+			disableWhen: true,
+		},
+	} {
+		var button model.SysMenuButton
+		if err := db.Where("code = ?", code).First(&button).Error; err != nil {
+			t.Fatalf("query organization detail button %s: %v", code, err)
+		}
+		if button.Position != expected.position {
+			t.Fatalf("%s position = %d, want %d", code, button.Position, expected.position)
+		}
+		if expected.disableWhen && button.DisableWhen == "" {
+			t.Fatalf("%s must define a detail disable condition", code)
+		}
+	}
 	for _, forbidden := range []string{"create", "update", "delete"} {
 		if got := countJoinedRows(
 			t,
@@ -528,6 +556,7 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 		{path: "/admin/org/unit/tree", method: "POST", action: "query"},
 		{path: "/admin/org/unit/:id", method: "GET", action: "detail"},
 		{path: "/admin/org/employee/options", method: "POST", action: "query"},
+		{path: "/admin/org/employee/user-options", method: "POST", action: "bind_user"},
 		{path: "/admin/org/position/options", method: "POST", action: "query"},
 		{path: "/admin/org/assignment/query", method: "POST", action: "query"},
 		{path: "/admin/org/assignment/:id", method: "GET", action: "detail"},

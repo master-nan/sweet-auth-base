@@ -38,22 +38,23 @@ type SysConfigure struct {
 
 type SysMenu struct {
 	Basic
-	Pid         int                  `gorm:"type:int" json:"pid"`
-	Name        string               `gorm:"size:32;comment:路由" json:"name"`
-	Path        string               `gorm:"size:128;comment:路径" json:"path"`
-	Component   string               `gorm:"size:64;comment:路由主体" json:"component"`
-	Title       string               `gorm:"size:64;comment:显示标题" json:"title"`
-	IsHidden    bool                 `gorm:"default:false;comment:是否隐藏" json:"is_hidden"`
-	Sequence    uint8                `gorm:"comment:排序;type:smallint" json:"sequence"`
-	PageType    enum.SysMenuPageType `gorm:"size:32;comment:页面类型" json:"page_type"`
-	TableCode   string               `gorm:"size:128;comment:绑定表编码" json:"table_code"`
-	Option      string               `gorm:"size:64;comment:扩展配置" json:"option"`
-	Icon        *string              `gorm:"size:32;comment:图标" json:"icon"`
-	Redirect    *string              `gorm:"size:128;comment:重定向地址" json:"redirect"`
-	IsUnfold    bool                 `gorm:"default:false;comment:默认展开" json:"is_unfold"`
-	MenuButtons []SysMenuButton      `gorm:"foreignKey:MenuId;references:Id" json:"menu_buttons"`
-	Roles       []SysRole            `gorm:"many2many:sys_role_menu" json:"roles"`
-	Children    []SysMenu            `gorm:"-" json:"children"` // 子菜单
+	Pid            int                    `gorm:"type:int" json:"pid"`
+	Name           string                 `gorm:"size:32;comment:路由" json:"name"`
+	Path           string                 `gorm:"size:128;comment:路径" json:"path"`
+	Component      string                 `gorm:"size:64;comment:路由主体" json:"component"`
+	Title          string                 `gorm:"size:64;comment:显示标题" json:"title"`
+	IsHidden       bool                   `gorm:"default:false;comment:是否隐藏" json:"is_hidden"`
+	Sequence       uint8                  `gorm:"comment:排序;type:smallint" json:"sequence"`
+	PageType       enum.SysMenuPageType   `gorm:"size:32;comment:页面类型" json:"page_type"`
+	TableCode      string                 `gorm:"size:128;comment:绑定表编码" json:"table_code"`
+	Option         string                 `gorm:"size:64;comment:扩展配置" json:"option"`
+	Icon           *string                `gorm:"size:32;comment:图标" json:"icon"`
+	Redirect       *string                `gorm:"size:128;comment:重定向地址" json:"redirect"`
+	IsUnfold       bool                   `gorm:"default:false;comment:默认展开" json:"is_unfold"`
+	DetailOpenMode enum.SysDetailOpenMode `gorm:"-" json:"detail_open_mode,omitempty"`
+	MenuButtons    []SysMenuButton        `gorm:"foreignKey:MenuId;references:Id" json:"menu_buttons"`
+	Roles          []SysRole              `gorm:"many2many:sys_role_menu" json:"roles"`
+	Children       []SysMenu              `gorm:"-" json:"children"` // 子菜单
 }
 
 type SysMenuButton struct {

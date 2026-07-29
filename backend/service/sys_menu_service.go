@@ -276,7 +276,54 @@ func (s *SysMenuService) GetUserMenus(userId int) ([]model.SysMenu, error) {
 	for i, menu := range myMenus {
 		myMenus[i].MenuButtons = filterGrantedMenuButtons(menu.MenuButtons, menuButtonMap[menu.Id])
 	}
+	if err := s.attachMenuDetailOpenModes(myMenus); err != nil {
+		return nil, err
+	}
 	return utils.BuildMenuTree(utils.SortMenuTree(myMenus), 0), nil
+}
+
+func (s *SysMenuService) attachMenuDetailOpenModes(menus []model.SysMenu) error {
+	tableCodes := make([]string, 0, len(menus))
+	seen := make(map[string]struct{}, len(menus))
+	for _, menu := range menus {
+		code := strings.TrimSpace(menu.TableCode)
+		if code == "" {
+			continue
+		}
+		if _, exists := seen[code]; exists {
+			continue
+		}
+		seen[code] = struct{}{}
+		tableCodes = append(tableCodes, code)
+	}
+	if len(tableCodes) == 0 {
+		return nil
+	}
+	tables, err := s.sysTableRepo.FindListByFieldIn("table_code", tableCodes)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	applyMenuDetailOpenModes(menus, tables)
+	return nil
+}
+
+func applyMenuDetailOpenModes(menus []model.SysMenu, tables []model.SysTable) {
+	modeByTableCode := make(map[string]enum.SysDetailOpenMode, len(tables))
+	for _, table := range tables {
+		mode, ok := enum.NormalizeSysDetailOpenMode(string(table.DetailOpenMode))
+		if !ok {
+			mode = enum.DetailOpenAuto
+		}
+		modeByTableCode[table.TableCode] = mode
+	}
+	for index := range menus {
+		if mode, exists := modeByTableCode[menus[index].TableCode]; exists {
+			menus[index].DetailOpenMode = mode
+		}
+	}
 }
 
 func filterGrantedMenuButtons(buttons []model.SysMenuButton, granted map[int]bool) []model.SysMenuButton {

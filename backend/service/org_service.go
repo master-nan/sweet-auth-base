@@ -626,6 +626,29 @@ func (s *OrgService) QueryEmployeeOptions(
 	return result, nil
 }
 
+func (s *OrgService) QueryEmployeeUserOptions(
+	ctx *gin.Context,
+	req request.OrgEmployeeUserOptionsReq,
+) (response.ListResult[response.OrgEmployeeUserOptionRes], error) {
+	var result response.ListResult[response.OrgEmployeeUserOptionRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	rows, err := s.employeeRepo.QueryUsersForBinding(ctx, req.Keyword, req.Page, req.Num)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.OrgEmployeeUserOptionRes, 0, len(rows.Data))
+	for _, user := range rows.Data {
+		result.Data = append(
+			result.Data,
+			response.NewOrgEmployeeUserOptionRes(user.UserId, user.UserName, user.Disabled),
+		)
+	}
+	return result, nil
+}
+
 func (s *OrgService) BindEmployeeUser(
 	ctx *gin.Context,
 	req request.OrgEmployeeBindUserReq,

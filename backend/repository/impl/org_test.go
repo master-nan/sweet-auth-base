@@ -299,6 +299,63 @@ func TestOrgEmployeeRepositoryQueryDoesNotLoadSensitiveOrInternalColumns(t *test
 	}
 }
 
+func TestOrgEmployeeRepositoryQueryUsersForBindingReturnsSafeStableOptions(t *testing.T) {
+	db := testutil.OpenSQLite(t, &model.SysUser{}, &model.OrgEmployee{})
+	repo := NewOrgEmployeeRepositoryImpl(&database.PrimaryDB{DB: db})
+	users := []model.SysUser{
+		{Basic: model.Basic{Id: 1, State: true}, UserName: "alpha"},
+		{Basic: model.Basic{Id: 2, State: true}, UserName: "beta", Password: "secret"},
+		{Basic: model.Basic{Id: 3, State: false}, UserName: "disabled"},
+		{Basic: model.Basic{Id: 4, State: true}, UserName: "gamma"},
+	}
+	for index := range users {
+		testutil.MustCreate(t, db, &users[index])
+	}
+	if err := db.Model(&model.SysUser{}).Where("id = ?", 3).Update("state", false).Error; err != nil {
+		t.Fatalf("disable user fixture: %v", err)
+	}
+	boundUserID := 2
+	testutil.MustCreate(t, db, &model.OrgEmployee{
+		Basic:            model.Basic{Id: 10, State: true},
+		SourceSystemCode: "authority",
+		SourceId:         "employee-10",
+		EmployeeNo:       "EMP-010",
+		Name:             "Bound Employee",
+		EmploymentStatus: "active",
+		UserId:           &boundUserID,
+	})
+
+	result, err := repo.QueryUsersForBinding(nil, "", 1, 20)
+	if err != nil {
+		t.Fatalf("query binding users: %v", err)
+	}
+	if result.Total != 2 || len(result.Data) != 2 {
+		t.Fatalf("binding user options total=%d rows=%d", result.Total, len(result.Data))
+	}
+	if result.Data[0].UserName != "alpha" || result.Data[0].Disabled {
+		t.Fatalf("unexpected first binding option: %+v", result.Data[0])
+	}
+	if result.Data[1].UserName != "gamma" || result.Data[1].Disabled {
+		t.Fatalf("unexpected second binding option: %+v", result.Data[1])
+	}
+
+	secondPage, err := repo.QueryUsersForBinding(nil, "", 2, 1)
+	if err != nil {
+		t.Fatalf("query second binding user page: %v", err)
+	}
+	if secondPage.Total != 2 || len(secondPage.Data) != 1 || secondPage.Data[0].UserId != 4 {
+		t.Fatalf("unexpected second binding user page: %+v", secondPage)
+	}
+
+	filtered, err := repo.QueryUsersForBinding(nil, "ALP", 1, 20)
+	if err != nil {
+		t.Fatalf("query binding users by keyword: %v", err)
+	}
+	if filtered.Total != 1 || len(filtered.Data) != 1 || filtered.Data[0].UserId != 1 {
+		t.Fatalf("unexpected keyword result: %+v", filtered)
+	}
+}
+
 func TestOrgEmployeeRepositorySeparatesSourceAndPlatformUpdates(t *testing.T) {
 	db := testutil.OpenSQLite(t, &model.OrgEmployee{})
 	repo := NewOrgEmployeeRepositoryImpl(&database.PrimaryDB{DB: db})

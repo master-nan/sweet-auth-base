@@ -206,6 +206,46 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
+        component: () => import('pages/organization/employee/Index.vue'),
+        path: 'employee',
+        name: 'organization_employee',
+        meta: {
+          title: '人员与任职',
+          icon: 'badge',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/organization/position/Index.vue'),
+        path: 'position',
+        name: 'organization_position',
+        meta: {
+          title: '岗位',
+          icon: 'work',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/organization/sync-batch/Index.vue'),
+        path: 'sync-batch',
+        name: 'organization_sync_batch',
+        meta: {
+          title: '同步批次',
+          icon: 'sync',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/organization/sync-error/Index.vue'),
+        path: 'sync-error',
+        name: 'organization_sync_error',
+        meta: {
+          title: '同步异常',
+          icon: 'error_outline',
+          keepAlive: true,
+        },
+      },
+      {
         path: 'legal-entity',
         name: 'organization_legal_entity_legacy',
         redirect: {

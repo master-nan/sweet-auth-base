@@ -400,6 +400,7 @@ func newOrgControllerTestRouter(
 		{orgManagementQueryRole, "/admin/org/unit/tree", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/query", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/options", http.MethodPost},
+		{orgLegalEntityReaderRole, "/admin/org/employee/user-options", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/:id", http.MethodGet},
 		{orgLegalEntityReaderRole, "/admin/org/employee/:id/bind-user", http.MethodPost},
 		{orgLegalEntityReaderRole, "/admin/org/employee/:id/unbind-user", http.MethodPost},
@@ -446,6 +447,7 @@ func newOrgControllerTestRouter(
 	router.GET("/admin/org/unit/:id", controller.GetOrgUnitDetail)
 	router.POST("/admin/org/employee/query", controller.QueryEmployees)
 	router.POST("/admin/org/employee/options", controller.QueryEmployeeOptions)
+	router.POST("/admin/org/employee/user-options", controller.QueryEmployeeUserOptions)
 	router.GET("/admin/org/employee/:id", controller.GetEmployeeDetail)
 	router.POST("/admin/org/employee/:id/bind-user", controller.BindEmployeeUser)
 	router.POST("/admin/org/employee/:id/unbind-user", controller.UnbindEmployeeUser)

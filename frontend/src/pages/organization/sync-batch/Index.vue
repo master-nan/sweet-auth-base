@@ -1,6 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
     <q-table
+      v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
       flat
       bordered
@@ -13,65 +14,33 @@
       hide-pagination
     >
       <template #top>
-        <div class="row q-col-gutter-sm items-center full-width">
-          <div class="col-12 col-md">
+        <div class="row q-gutter-xs full-width">
+          <div class="col-grow row q-gutter-xs">
             <q-input
               v-model="query.quick_query!.keyword"
               dense
               outlined
               debounce="300"
-              placeholder="搜索批次号或对象范围"
+              placeholder="搜索关键词"
               @keyup.enter="search"
             >
               <template #append><q-icon name="search" /></template>
             </q-input>
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.sync_type"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="syncTypeOptions"
-              label="同步类型"
-            />
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.status"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="syncStatusOptions"
-              label="批次状态"
-            />
-          </div>
-          <div class="col-auto">
-            <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
-          </div>
-          <div class="col-auto">
-            <q-btn flat round color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </div>
           <q-space />
-          <div class="col-auto">
+          <div class="row q-gutter-xs">
             <q-btn
               v-for="button in refreshButtons"
               :key="button.id || button.code"
-              flat
-              round
-              :icon="button.icon || 'refresh'"
+              v-bind="menuButtonDisplayProps(button)"
               :color="button.color || 'primary'"
-              :loading="loading"
+              :disable="loading"
               @click="fetchData"
-            >
-              <q-tooltip>{{ button.name }}</q-tooltip>
-            </q-btn>
+            />
           </div>
         </div>
       </template>
@@ -110,9 +79,9 @@
             v-for="button in visibleRowButtons(props.row)"
             :key="button.id || button.code"
             flat
-            dense
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
+            size="sm"
             @click="handleRowAction(button, props.row)"
           >
             <q-tooltip>{{ button.name }}</q-tooltip>
@@ -138,92 +107,46 @@
       @search="applyAdvancedQuery"
     />
 
-    <q-dialog v-model="showDetailDialog">
-      <q-card style="width: 1000px; max-width: 95vw">
-        <q-card-section class="row items-start no-wrap">
-          <div>
-            <div class="text-h6">{{ batchDetail?.batch_no || '同步批次详情' }}</div>
-            <div class="text-caption text-grey-7">
-              {{ batchDetail ? dictLabel('org_sync_type', batchDetail.sync_type) : '' }}
-            </div>
-          </div>
-          <q-space />
-          <q-btn v-close-popup flat round dense icon="close"><q-tooltip>关闭</q-tooltip></q-btn>
-        </q-card-section>
-        <q-separator />
-        <q-card-section v-if="detailLoading" class="row justify-center q-pa-xl">
-          <q-spinner color="primary" size="32px" />
-        </q-card-section>
-        <q-banner v-else-if="detailError" class="text-negative">{{ detailError }}</q-banner>
-        <template v-else-if="batchDetail">
-          <q-list separator>
-            <q-item>
-              <q-item-section>
-                <q-item-label caption>对象范围</q-item-label>
-                <q-item-label>{{ batchDetail.object_scope }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>状态</q-item-label>
-                <q-item-label>{{
-                  dictLabel('org_sync_record_status', batchDetail.status)
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>集成执行ID</q-item-label>
-                <q-item-label>{{ batchDetail.execution_id || '-' }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-item>
-              <q-item-section>
-                <q-item-label caption>开始时间</q-item-label>
-                <q-item-label>{{
-                  formatOrganizationDateTime(batchDetail.started_at)
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>完成时间</q-item-label>
-                <q-item-label>{{
-                  formatOrganizationDateTime(batchDetail.completed_at)
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>成功 / 失败 / 跳过 / 总数</q-item-label>
-                <q-item-label>
-                  {{ batchDetail.success_count }} / {{ batchDetail.failed_count }} /
-                  {{ batchDetail.skipped_count }} / {{ batchDetail.total_count }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-          <q-separator />
-          <q-card-section class="text-subtitle1 text-weight-medium">对象处理记录</q-card-section>
-          <q-table
-            flat
-            :rows="batchRecords"
-            :columns="recordColumns"
-            row-key="id"
-            :loading="recordLoading"
-            :pagination="{ rowsPerPage: 0 }"
-            hide-bottom
-          >
-            <template #body-cell-action="props">
-              <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
-            </template>
-            <template #body-cell-status="props">
-              <q-td :props="props">{{
-                dictLabel('org_sync_record_status', props.row.status)
-              }}</q-td>
-            </template>
-            <template #no-data>
-              <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
-            </template>
-          </q-table>
+    <organization-record-detail-dialog
+      v-model="showDetailDialog"
+      :title="batchDetail?.batch_no || '同步批次详情'"
+      :subtitle="batchDetail ? dictLabel('org_sync_type', batchDetail.sync_type) : ''"
+      :items="batchDetailItems"
+      :loading="detailLoading"
+      :error="detailError"
+      :mode="detailMode"
+      :top-buttons="record_detail_top_buttons"
+      :bottom-buttons="record_detail_bottom_buttons"
+      :record-context="currentBatch"
+      @button-click="handleDetailAction"
+    >
+      <q-separator />
+      <q-card-section class="text-subtitle1 text-weight-medium">对象处理记录</q-card-section>
+      <q-table
+        flat
+        bordered
+        separator="cell"
+        :rows="batchRecords"
+        :columns="recordColumns"
+        row-key="id"
+        :loading="recordLoading"
+        :pagination="{ rowsPerPage: 0 }"
+        hide-bottom
+        class="q-mx-md q-mb-md"
+      >
+        <template #body-cell-action="props">
+          <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
         </template>
-        <q-card-actions align="right">
-          <q-btn v-close-popup flat color="primary" label="关闭" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        <template #body-cell-status="props">
+          <q-td :props="props">{{
+            dictLabel('org_sync_record_status', props.row.status)
+          }}</q-td>
+        </template>
+        <template #no-data>
+          <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
+        </template>
+      </q-table>
+    </organization-record-detail-dialog>
 
     <organization-record-detail-dialog
       v-model="showErrorDialog"
@@ -258,7 +181,8 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
   createOrganizationQuery,
@@ -270,7 +194,13 @@ import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const dictStore = useDictStore()
-const { line_buttons, top_buttons } = usePageButtons('organization_sync_batch')
+const {
+  line_buttons,
+  top_buttons,
+  record_detail_top_buttons,
+  record_detail_bottom_buttons,
+} = usePageButtons('organization_sync_batch')
+const detailMode = useOrganizationDetailMode('organization_sync_batch', 'page')
 
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
@@ -296,11 +226,29 @@ const errorSummary = ref('')
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
-const syncTypeOptions = computed(() => dictStore.getDictOptions('org_sync_type'))
-const syncStatusOptions = computed(() => dictStore.getDictOptions('org_sync_record_status'))
 const errorItems = computed<OrganizationDetailItem[]>(() => [
-  { label: '错误摘要', value: errorSummary.value },
+  { label: '错误摘要', value: errorSummary.value, fullWidth: true },
 ])
+const batchDetailItems = computed<OrganizationDetailItem[]>(() => {
+  const detail = batchDetail.value
+  if (!detail) return []
+  return [
+    { label: '对象范围', value: detail.object_scope },
+    {
+      label: '状态',
+      value: dictLabel('org_sync_record_status', detail.status),
+      chip: true,
+      color: organizationStatusColor(detail.status),
+    },
+    { label: '集成执行ID', value: detail.execution_id ?? null },
+    { label: '开始时间', value: formatOrganizationDateTime(detail.started_at) },
+    { label: '完成时间', value: formatOrganizationDateTime(detail.completed_at) },
+    {
+      label: '成功 / 失败 / 跳过 / 总数',
+      value: `${detail.success_count} / ${detail.failed_count} / ${detail.skipped_count} / ${detail.total_count}`,
+    },
+  ]
+})
 
 const columns: QTableProps['columns'] = [
   { name: 'batch_no', field: 'batch_no', label: '批次号', align: 'left', sortable: true },
@@ -340,12 +288,10 @@ const advancedFields = [
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || String(value || '-')
 
-const visibleRowButtons = (row: SyncBatchListItem) =>
-  line_buttons.value.filter(
-    (button) =>
-      button.event_action === 'detail' ||
-      (button.event_action === 'view_error' && row.has_error),
-  )
+const visibleRowButtons = (row?: SyncBatchListItem) => {
+  void row
+  return line_buttons.value.filter((button) => button.event_action === 'detail')
+}
 
 const formatDuration = (startedAt?: string | null, completedAt?: string | null) => {
   if (!startedAt || !completedAt) return '-'
@@ -434,6 +380,11 @@ const openError = async (row: SyncBatchListItem) => {
 const handleRowAction = (button: MenuButton, row: SyncBatchListItem) => {
   if (button.event_action === 'detail') void openDetail(row)
   if (button.event_action === 'view_error') void openError(row)
+}
+
+const handleDetailAction = (button: MenuButton) => {
+  if (!currentBatch.value) return
+  if (button.event_action === 'view_error') void openError(currentBatch.value)
 }
 
 watch(

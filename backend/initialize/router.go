@@ -212,6 +212,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/org/unit/:id", app.OrgController.GetOrgUnitDetail)
 		adminGroup.POST("/org/employee/query", app.OrgController.QueryEmployees)
 		adminGroup.POST("/org/employee/options", app.OrgController.QueryEmployeeOptions)
+		adminGroup.POST("/org/employee/user-options", app.OrgController.QueryEmployeeUserOptions)
 		adminGroup.GET("/org/employee/:id", app.OrgController.GetEmployeeDetail)
 		adminGroup.POST("/org/employee/:id/bind-user", app.OrgController.BindEmployeeUser)
 		adminGroup.POST("/org/employee/:id/unbind-user", app.OrgController.UnbindEmployeeUser)

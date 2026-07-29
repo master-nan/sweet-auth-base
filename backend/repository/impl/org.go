@@ -10,6 +10,7 @@ import (
 	queryutil "backend/repository/util"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -691,6 +692,43 @@ func (r *OrgEmployeeRepositoryImpl) FindBoundUserSummaries(
 		Where("id IN ?", ids).
 		Find(&users).Error
 	return users, err
+}
+
+func (r *OrgEmployeeRepositoryImpl) QueryUsersForBinding(
+	ctx *gin.Context,
+	keyword string,
+	page int,
+	num int,
+) (response.ListResult[repository.OrgBindingUserOption], error) {
+	var result response.ListResult[repository.OrgBindingUserOption]
+	query := organizationDB(r.db, ctx).
+		Model(&model.SysUser{}).
+		Where("state = ?", true).
+		Where(
+			"NOT EXISTS (SELECT 1 FROM org_employee WHERE org_employee.user_id = sys_user.id AND org_employee.gmt_delete IS NULL)",
+		)
+	if normalized := strings.ToLower(strings.TrimSpace(keyword)); normalized != "" {
+		query = query.Where("LOWER(user_name) LIKE ?", "%"+normalized+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return result, err
+	}
+	result.Total = int(total)
+	result.Data = make([]repository.OrgBindingUserOption, 0, num)
+	err := query.
+		Select(
+			"id AS user_id",
+			"user_name",
+			"false AS disabled",
+		).
+		Order("user_name ASC").
+		Order("id ASC").
+		Offset((page - 1) * num).
+		Limit(num).
+		Scan(&result.Data).Error
+	return result, err
 }
 
 func (r *OrgEmployeeRepositoryImpl) FindByIdForBinding(tx *gorm.DB, id int) (model.OrgEmployee, error) {

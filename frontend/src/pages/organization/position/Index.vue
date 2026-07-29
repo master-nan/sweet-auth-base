@@ -1,6 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
     <q-table
+      v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
       flat
       bordered
@@ -13,65 +14,33 @@
       hide-pagination
     >
       <template #top>
-        <div class="row q-col-gutter-sm items-center full-width">
-          <div class="col-12 col-md">
+        <div class="row q-gutter-xs full-width">
+          <div class="col-grow row q-gutter-xs">
             <q-input
               v-model="query.quick_query!.keyword"
               dense
               outlined
               debounce="300"
-              placeholder="搜索岗位编码或名称"
+              placeholder="搜索关键词"
               @keyup.enter="search"
             >
               <template #append><q-icon name="search" /></template>
             </q-input>
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.position_type"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="positionTypeOptions"
-              label="岗位类型"
-            />
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.status"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="statusOptions"
-              label="状态"
-            />
-          </div>
-          <div class="col-auto">
-            <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
-          </div>
-          <div class="col-auto">
-            <q-btn flat round color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </div>
           <q-space />
-          <div class="col-auto">
+          <div class="row q-gutter-xs">
             <q-btn
               v-for="button in refreshButtons"
               :key="button.id || button.code"
-              flat
-              round
-              :icon="button.icon || 'refresh'"
+              v-bind="menuButtonDisplayProps(button)"
               :color="button.color || 'primary'"
-              :loading="loading"
+              :disable="loading"
               @click="fetchData"
-            >
-              <q-tooltip>{{ button.name }}</q-tooltip>
-            </q-btn>
+            />
           </div>
         </div>
       </template>
@@ -104,9 +73,9 @@
             v-for="button in rowButtons"
             :key="button.id || button.code"
             flat
-            dense
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
+            size="sm"
             @click="handleRowAction(button, props.row)"
           >
             <q-tooltip>{{ button.name }}</q-tooltip>
@@ -139,6 +108,11 @@
       :items="detailItems"
       :loading="detailLoading"
       :error="detailError"
+      :mode="detailMode"
+      :top-buttons="record_detail_top_buttons"
+      :bottom-buttons="record_detail_bottom_buttons"
+      :record-context="positionDetail"
+      @button-click="handleDetailAction"
     />
   </base-content>
 </template>
@@ -163,7 +137,8 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
   createOrganizationQuery,
@@ -177,7 +152,13 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const router = useRouter()
 const dictStore = useDictStore()
-const { line_buttons, top_buttons } = usePageButtons('organization_position')
+const {
+  line_buttons,
+  top_buttons,
+  record_detail_top_buttons,
+  record_detail_bottom_buttons,
+} = usePageButtons('organization_position')
+const detailMode = useOrganizationDetailMode('organization_position', 'dialog')
 
 const rows = ref<PositionListItem[]>([])
 const total = ref(0)
@@ -198,13 +179,8 @@ const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
 const rowButtons = computed(() =>
-  line_buttons.value.filter((button) =>
-    ['detail', 'view_sync'].includes(button.event_action || ''),
-  ),
+  line_buttons.value.filter((button) => button.event_action === 'detail'),
 )
-const positionTypeOptions = computed(() => dictStore.getDictOptions('org_position_type'))
-const statusOptions = computed(() => dictStore.getDictOptions('org_object_status'))
-
 const columns: QTableProps['columns'] = [
   { name: 'code', field: 'code', label: '岗位编码', align: 'left', sortable: true },
   { name: 'name', field: 'name', label: '岗位名称', align: 'left', sortable: true },
@@ -258,7 +234,7 @@ const detailItems = computed<OrganizationDetailItem[]>(() => {
     },
     { label: '有效期开始', value: formatOrganizationDate(detail.valid_from) },
     { label: '有效期结束', value: formatOrganizationDate(detail.valid_to, '长期') },
-    { label: '平台备注', value: detail.local_note },
+    { label: '平台备注', value: detail.local_note, fullWidth: true },
   ]
 })
 
@@ -316,6 +292,14 @@ const handleRowAction = (button: MenuButton, row: PositionListItem) => {
       query: { object_type: 'position', local_id: String(row.id) },
     })
   }
+}
+
+const handleDetailAction = (button: MenuButton) => {
+  if (!positionDetail.value || button.event_action !== 'view_sync') return
+  void router.push({
+    name: 'organization_sync_error',
+    query: { object_type: 'position', local_id: String(positionDetail.value.id) },
+  })
 }
 
 watch(

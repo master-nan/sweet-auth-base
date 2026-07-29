@@ -1,6 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
     <q-table
+      v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
       flat
       bordered
@@ -13,64 +14,33 @@
       hide-pagination
     >
       <template #top>
-        <div class="row q-col-gutter-sm items-center full-width">
-          <div class="col-12 col-md">
+        <div class="row q-gutter-xs full-width">
+          <div class="col-grow row q-gutter-xs">
             <q-input
               v-model="query.quick_query!.keyword"
               dense
               outlined
               debounce="300"
-              placeholder="搜索员工编号或姓名"
+              placeholder="搜索关键词"
               @keyup.enter="search"
             >
               <template #append><q-icon name="search" /></template>
             </q-input>
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.employment_status"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="employmentStatusOptions"
-              label="人员状态"
-            />
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.bound_status"
-              dense
-              outlined
-              emit-value
-              map-options
-              :options="bindingStatusOptions"
-              label="账号绑定"
-            />
-          </div>
-          <div class="col-auto">
-            <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
-          </div>
-          <div class="col-auto">
-            <q-btn flat round color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </div>
           <q-space />
-          <div class="col-auto">
+          <div class="row q-gutter-xs">
             <q-btn
               v-for="button in refreshButtons"
               :key="button.id || button.code"
-              flat
-              round
-              :icon="button.icon || 'refresh'"
+              v-bind="menuButtonDisplayProps(button)"
               :color="button.color || 'primary'"
-              :loading="loading"
+              :disable="loading"
               @click="fetchData"
-            >
-              <q-tooltip>{{ button.name }}</q-tooltip>
-            </q-btn>
+            />
           </div>
         </div>
       </template>
@@ -115,9 +85,9 @@
             v-for="button in visibleRowButtons(props.row)"
             :key="button.id || button.code"
             flat
-            dense
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
+            size="sm"
             @click="handleRowAction(button, props.row)"
           >
             <q-tooltip>{{ button.name }}</q-tooltip>
@@ -145,109 +115,60 @@
       @search="applyAdvancedQuery"
     />
 
-    <q-dialog v-model="showDetailDialog">
-      <q-card style="width: 960px; max-width: 94vw">
-        <q-card-section class="row items-start no-wrap">
-          <div>
-            <div class="text-h6">{{ employeeDetail?.name || '人员详情' }}</div>
-            <div class="text-caption text-grey-7">{{ employeeDetail?.employee_no || '' }}</div>
-          </div>
-          <q-space />
-          <q-btn v-close-popup flat round dense icon="close"><q-tooltip>关闭</q-tooltip></q-btn>
-        </q-card-section>
-        <q-separator />
-
-        <q-card-section v-if="detailLoading" class="row justify-center q-pa-xl">
-          <q-spinner color="primary" size="32px" />
-        </q-card-section>
-        <q-banner v-else-if="detailError" class="text-negative">{{ detailError }}</q-banner>
-        <template v-else-if="employeeDetail">
-          <q-list separator>
-            <q-item>
-              <q-item-section>
-                <q-item-label caption>人员状态</q-item-label>
-                <q-item-label>{{
-                  dictLabel('org_employment_status', employeeDetail.employment_status)
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>账号绑定</q-item-label>
-                <q-item-label>
-                  {{
-                    employeeDetail.bound_account?.user_name ||
-                    dictLabel('org_user_binding_status', employeeDetail.binding_status)
-                  }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-item>
-              <q-item-section>
-                <q-item-label caption>手机号</q-item-label>
-                <q-item-label>{{ employeeDetail.mobile_masked || '-' }}</q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>邮箱</q-item-label>
-                <q-item-label>{{ employeeDetail.email_masked || '-' }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-item>
-              <q-item-section>
-                <q-item-label caption>有效期</q-item-label>
-                <q-item-label>
-                  {{ formatOrganizationDate(employeeDetail.valid_from) }} 至
-                  {{ formatOrganizationDate(employeeDetail.valid_to, '长期') }}
-                </q-item-label>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label caption>平台备注</q-item-label>
-                <q-item-label>{{ employeeDetail.local_note || '-' }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-
-          <q-separator />
-          <q-card-section class="row items-center q-gutter-sm">
-            <div class="text-subtitle1 text-weight-medium">任职记录</div>
-            <q-space />
-            <q-btn-toggle
-              v-model="assignmentScope"
-              dense
-              unelevated
-              toggle-color="primary"
-              :options="assignmentScopeOptions"
-              @update:model-value="loadAssignments"
-            />
-          </q-card-section>
-          <q-table
-            flat
-            :rows="assignments"
-            :columns="assignmentColumns"
-            row-key="id"
-            :loading="assignmentLoading"
-            :pagination="{ rowsPerPage: 0 }"
-            hide-bottom
-          >
-            <template #body-cell-assignment_type="props">
-              <q-td :props="props">
-                {{ dictLabel('org_assignment_type', props.row.assignment_type) }}
-              </q-td>
-            </template>
-            <template #body-cell-validity="props">
-              <q-td :props="props">
-                {{ formatOrganizationDate(props.row.valid_from) }} 至
-                {{ formatOrganizationDate(props.row.valid_to, '长期') }}
-              </q-td>
-            </template>
-            <template #no-data>
-              <div class="full-width text-center text-grey-7 q-pa-lg">当前范围暂无任职记录</div>
-            </template>
-          </q-table>
+    <organization-record-detail-dialog
+      v-model="showDetailDialog"
+      :title="employeeDetail?.name || '人员详情'"
+      :subtitle="employeeDetail?.employee_no || ''"
+      :items="employeeDetailItems"
+      :loading="detailLoading"
+      :error="detailError"
+      :mode="detailMode"
+      :top-buttons="record_detail_top_buttons"
+      :bottom-buttons="record_detail_bottom_buttons"
+      :record-context="employeeDetail"
+      @button-click="handleDetailAction"
+    >
+      <q-separator />
+      <q-card-section class="row items-center q-gutter-sm">
+        <div class="text-subtitle1 text-weight-medium">任职记录</div>
+        <q-space />
+        <q-btn-toggle
+          v-model="assignmentScope"
+          dense
+          unelevated
+          toggle-color="primary"
+          :options="assignmentScopeOptions"
+          @update:model-value="loadAssignments"
+        />
+      </q-card-section>
+      <q-table
+        flat
+        bordered
+        separator="cell"
+        :rows="assignments"
+        :columns="assignmentColumns"
+        row-key="id"
+        :loading="assignmentLoading"
+        :pagination="{ rowsPerPage: 0 }"
+        hide-bottom
+        class="q-mx-md q-mb-md"
+      >
+        <template #body-cell-assignment_type="props">
+          <q-td :props="props">
+            {{ dictLabel('org_assignment_type', props.row.assignment_type) }}
+          </q-td>
         </template>
-        <q-card-actions align="right">
-          <q-btn v-close-popup flat color="primary" label="关闭" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        <template #body-cell-validity="props">
+          <q-td :props="props">
+            {{ formatOrganizationDate(props.row.valid_from) }} 至
+            {{ formatOrganizationDate(props.row.valid_to, '长期') }}
+          </q-td>
+        </template>
+        <template #no-data>
+          <div class="full-width text-center text-grey-7 q-pa-lg">当前范围暂无任职记录</div>
+        </template>
+      </q-table>
+    </organization-record-detail-dialog>
 
     <q-dialog v-model="showBindDialog">
       <q-card style="width: 480px; max-width: 92vw">
@@ -257,13 +178,26 @@
         </q-card-section>
         <q-separator />
         <q-card-section>
-          <q-input
-            v-model.number="bindingUserId"
-            type="number"
-            min="1"
+          <q-select
+            v-model="bindingUserId"
             outlined
             dense
-            label="平台账号ID"
+            clearable
+            use-input
+            fill-input
+            hide-selected
+            emit-value
+            map-options
+            input-debounce="300"
+            option-value="value"
+            option-label="label"
+            option-disable="disabled"
+            label="平台账号"
+            hint="输入账号名称搜索"
+            :options="bindingUserOptions"
+            :loading="bindingUserOptionsLoading"
+            @filter="filterBindingUsers"
+            @virtual-scroll="loadMoreBindingUsers"
           />
         </q-card-section>
         <q-card-actions align="right">
@@ -298,12 +232,14 @@ import {
   getEmployeeDetail,
   queryAssignments,
   queryEmployees,
+  queryEmployeeUserOptions,
   unbindEmployeeUser,
   type AssignmentListItem,
   type AssignmentTimeScope,
   type EmployeeDetail,
   type EmployeeListItem,
   type EmployeeQueryRequest,
+  type EmployeeUserOption,
 } from 'src/api/services/org'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
@@ -311,6 +247,9 @@ import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useDictStore } from 'src/stores/dict'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
   createOrganizationQuery,
@@ -322,7 +261,13 @@ const $q = useQuasar()
 const router = useRouter()
 const { confirmAction } = useConfirmDialog($q)
 const dictStore = useDictStore()
-const { line_buttons, top_buttons } = usePageButtons('organization_employee')
+const {
+  line_buttons,
+  top_buttons,
+  record_detail_top_buttons,
+  record_detail_bottom_buttons,
+} = usePageButtons('organization_employee')
+const detailMode = useOrganizationDetailMode('organization_employee', 'dialog')
 
 const rows = ref<EmployeeListItem[]>([])
 const total = ref(0)
@@ -348,19 +293,16 @@ const assignmentScope = ref<AssignmentTimeScope>('current')
 const showBindDialog = ref(false)
 const bindingUserId = ref<number | null>(null)
 const bindingLoading = ref(false)
+const bindingUserOptions = ref<EmployeeUserOption[]>([])
+const bindingUserOptionsLoading = ref(false)
+const bindingUserKeyword = ref('')
+const bindingUserPage = ref(1)
+const bindingUserTotal = ref(0)
+let bindingUserRequestId = 0
 
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
-const employmentStatusOptions = computed(() =>
-  dictStore.getDictOptions('org_employment_status'),
-)
-const bindingStatusOptions = computed(() => [
-  { label: '全部', value: 'all' },
-  ...dictStore.getDictOptions('org_user_binding_status').filter((item) =>
-    ['bound', 'unbound'].includes(String(item.value)),
-  ),
-])
 const assignmentScopeOptions = [
   { label: '当前', value: 'current' },
   { label: '历史', value: 'history' },
@@ -418,6 +360,9 @@ const advancedFields = [
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_employment_status',
   }),
+  createOrganizationField('账号绑定', 'user_id', SysTableFieldType.BIGINT, {
+    inputType: SysTableFieldInputType.INPUT_NUMBER,
+  }),
   createOrganizationField('有效期开始', 'valid_from', SysTableFieldType.DATETIME, {
     inputType: SysTableFieldInputType.DATE_PICKER,
   }),
@@ -429,12 +374,37 @@ const advancedFields = [
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || String(value || '-')
 
-const visibleRowButtons = (row: EmployeeListItem) =>
-  line_buttons.value.filter((button) => {
-    if (button.event_action === 'bind_user') return row.binding_status !== 'bound'
-    if (button.event_action === 'unbind_user') return row.binding_status === 'bound'
-    return ['detail', 'bind_user', 'unbind_user', 'view_sync'].includes(button.event_action || '')
-  })
+const employeeDetailItems = computed<OrganizationDetailItem[]>(() => {
+  const detail = employeeDetail.value
+  if (!detail) return []
+  return [
+    { label: '员工编号', value: detail.employee_no },
+    {
+      label: '人员状态',
+      value: dictLabel('org_employment_status', detail.employment_status),
+      chip: true,
+      color: organizationStatusColor(detail.employment_status),
+    },
+    {
+      label: '平台账号',
+      value:
+        detail.bound_account?.user_name ||
+        dictLabel('org_user_binding_status', detail.binding_status),
+    },
+    { label: '手机号', value: detail.mobile_masked ?? null },
+    { label: '邮箱', value: detail.email_masked ?? null },
+    {
+      label: '有效期',
+      value: `${formatOrganizationDate(detail.valid_from)} 至 ${formatOrganizationDate(detail.valid_to, '长期')}`,
+    },
+    { label: '平台备注', value: detail.local_note, fullWidth: true },
+  ]
+})
+
+const visibleRowButtons = (row?: EmployeeListItem) => {
+  void row
+  return line_buttons.value.filter((button) => button.event_action === 'detail')
+}
 
 const search = () => {
   if (query.value.page !== 1) query.value.page = 1
@@ -508,7 +478,80 @@ const loadAssignments = async () => {
 const openBind = (row: EmployeeListItem) => {
   currentEmployee.value = row
   bindingUserId.value = null
+  bindingUserOptions.value = []
+  bindingUserKeyword.value = ''
+  bindingUserPage.value = 1
+  bindingUserTotal.value = 0
   showBindDialog.value = true
+  void loadBindingUserOptions('', 1, false)
+}
+
+const loadBindingUserOptions = async (keyword: string, page: number, append: boolean) => {
+  const requestId = ++bindingUserRequestId
+  bindingUserOptionsLoading.value = true
+  try {
+    const normalizedKeyword = keyword.trim()
+    const result = await queryEmployeeUserOptions(normalizedKeyword, page, 20)
+    if (requestId !== bindingUserRequestId) return
+    bindingUserKeyword.value = normalizedKeyword
+    bindingUserPage.value = page
+    bindingUserTotal.value = result.total
+    if (append) {
+      const existingIds = new Set(bindingUserOptions.value.map((item) => item.value))
+      bindingUserOptions.value = [
+        ...bindingUserOptions.value,
+        ...result.items.filter((item) => !existingIds.has(item.value)),
+      ]
+    } else {
+      bindingUserOptions.value = result.items
+    }
+  } catch {
+    if (requestId === bindingUserRequestId && !append) {
+      bindingUserOptions.value = []
+      bindingUserTotal.value = 0
+    }
+  } finally {
+    if (requestId === bindingUserRequestId) bindingUserOptionsLoading.value = false
+  }
+}
+
+const filterBindingUsers = (
+  value: string,
+  update: (callback: () => void) => void,
+  abort: () => void,
+) => {
+  const requestId = ++bindingUserRequestId
+  const keyword = value.trim()
+  bindingUserOptionsLoading.value = true
+  queryEmployeeUserOptions(keyword, 1, 20)
+    .then((result) => {
+      update(() => {
+        if (requestId !== bindingUserRequestId) return
+        bindingUserKeyword.value = keyword
+        bindingUserPage.value = 1
+        bindingUserTotal.value = result.total
+        bindingUserOptions.value = result.items
+      })
+    })
+    .catch(() => {
+      abort()
+    })
+    .finally(() => {
+      if (requestId === bindingUserRequestId) {
+        bindingUserOptionsLoading.value = false
+      }
+    })
+}
+
+const loadMoreBindingUsers = (details: { to: number }) => {
+  if (
+    bindingUserOptionsLoading.value ||
+    bindingUserOptions.value.length >= bindingUserTotal.value ||
+    details.to < bindingUserOptions.value.length - 1
+  ) {
+    return
+  }
+  void loadBindingUserOptions(bindingUserKeyword.value, bindingUserPage.value + 1, true)
 }
 
 const submitBinding = async () => {
@@ -519,12 +562,13 @@ const submitBinding = async () => {
     showBindDialog.value = false
     $q.notify({ type: 'positive', position: 'top-right', message: '账号绑定成功' })
     await fetchData()
+    if (showDetailDialog.value) employeeDetail.value = await getEmployeeDetail(currentEmployee.value.id)
   } finally {
     bindingLoading.value = false
   }
 }
 
-const unbind = (row: EmployeeListItem) => {
+const unbind = (row: Pick<EmployeeListItem, 'id' | 'name'>) => {
   confirmAction({
     title: '解绑平台账号',
     message: `确认解除 ${row.name} 与当前平台账号的绑定吗？`,
@@ -533,8 +577,21 @@ const unbind = (row: EmployeeListItem) => {
       await unbindEmployeeUser(row.id)
       $q.notify({ type: 'positive', position: 'top-right', message: '账号解绑成功' })
       await fetchData()
+      if (showDetailDialog.value) employeeDetail.value = await getEmployeeDetail(row.id)
     })()
   })
+}
+
+const handleDetailAction = (button: MenuButton) => {
+  if (!currentEmployee.value) return
+  if (button.event_action === 'bind_user') openBind(currentEmployee.value)
+  if (button.event_action === 'unbind_user') unbind(currentEmployee.value)
+  if (button.event_action === 'view_sync') {
+    void router.push({
+      name: 'organization_sync_error',
+      query: { object_type: 'employee', local_id: String(currentEmployee.value.id) },
+    })
+  }
 }
 
 const handleRowAction = (button: MenuButton, row: EmployeeListItem) => {

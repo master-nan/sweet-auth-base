@@ -216,6 +216,14 @@ type OrgEmployeeUserBindingRes struct {
 	BoundAccount  *OrgBoundUserSummaryRes `json:"bound_account,omitempty"`
 }
 
+// OrgEmployeeUserOptionRes exposes only the account identity required by the
+// explicit employee-user binding UI.
+type OrgEmployeeUserOptionRes struct {
+	Value    int    `json:"value"`
+	Label    string `json:"label"`
+	Disabled bool   `json:"disabled"`
+}
+
 type OrgAssignmentListRes struct {
 	OrgBaseRes
 	EmployeeId     int                     `json:"employee_id"`
@@ -528,6 +536,14 @@ func NewOrgEmployeeOptionRes(employee model.OrgEmployee, disabled bool) OrgSelec
 
 func NewOrgBoundUserSummaryRes(userId int, userName string) OrgBoundUserSummaryRes {
 	return OrgBoundUserSummaryRes{UserId: userId, UserName: userName}
+}
+
+func NewOrgEmployeeUserOptionRes(userId int, userName string, disabled bool) OrgEmployeeUserOptionRes {
+	return OrgEmployeeUserOptionRes{
+		Value:    userId,
+		Label:    userName,
+		Disabled: disabled,
+	}
 }
 
 func NewOrgEmployeeUserBindingRes(

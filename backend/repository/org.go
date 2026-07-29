@@ -41,6 +41,12 @@ type OrgBoundUserSummary struct {
 	UserName string
 }
 
+type OrgBindingUserOption struct {
+	UserId   int
+	UserName string
+	Disabled bool
+}
+
 type OrgLegalEntityReadScope = OrgReadScope
 
 type OrgLegalEntityRepository interface {
@@ -105,6 +111,7 @@ type OrgEmployeeRepository interface {
 	FindByIdForRead(*gin.Context, int) (model.OrgEmployee, error)
 	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgEmployee, error)
 	FindBoundUserSummaries(*gin.Context, []int) ([]OrgBoundUserSummary, error)
+	QueryUsersForBinding(*gin.Context, string, int, int) (response.ListResult[OrgBindingUserOption], error)
 	FindByIdForBinding(*gorm.DB, int) (model.OrgEmployee, error)
 	FindUserForBinding(*gorm.DB, int) (OrgBoundUserSummary, error)
 	FindByBoundUserIdForBinding(*gorm.DB, int) (model.OrgEmployee, error)

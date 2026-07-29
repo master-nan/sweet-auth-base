@@ -1,6 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
     <q-table
+      v-if="!showDetailDialog || detailMode === 'dialog'"
       class="fit sticky-header-table"
       flat
       bordered
@@ -13,65 +14,33 @@
       hide-pagination
     >
       <template #top>
-        <div class="row q-col-gutter-sm items-center full-width">
-          <div class="col-12 col-md">
+        <div class="row q-gutter-xs full-width">
+          <div class="col-grow row q-gutter-xs">
             <q-input
               v-model="query.quick_query!.keyword"
               dense
               outlined
               debounce="300"
-              placeholder="搜索源对象编码或错误码"
+              placeholder="搜索关键词"
               @keyup.enter="search"
             >
               <template #append><q-icon name="search" /></template>
             </q-input>
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.object_type"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="objectTypeOptions"
-              label="对象类型"
-            />
-          </div>
-          <div class="col-6 col-sm-auto">
-            <q-select
-              v-model="query.status"
-              dense
-              outlined
-              clearable
-              emit-value
-              map-options
-              :options="syncStatusOptions"
-              label="处理状态"
-            />
-          </div>
-          <div class="col-auto">
-            <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
-          </div>
-          <div class="col-auto">
-            <q-btn flat round color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </div>
           <q-space />
-          <div class="col-auto">
+          <div class="row q-gutter-xs">
             <q-btn
               v-for="button in refreshButtons"
               :key="button.id || button.code"
-              flat
-              round
-              :icon="button.icon || 'refresh'"
+              v-bind="menuButtonDisplayProps(button)"
               :color="button.color || 'primary'"
-              :loading="loading"
+              :disable="loading"
               @click="fetchData"
-            >
-              <q-tooltip>{{ button.name }}</q-tooltip>
-            </q-btn>
+            />
           </div>
         </div>
       </template>
@@ -95,9 +64,9 @@
             v-for="button in visibleRowButtons(props.row)"
             :key="button.id || button.code"
             flat
-            dense
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
+            size="sm"
             @click="handleRowAction(button, props.row)"
           >
             <q-tooltip>{{ button.name }}</q-tooltip>
@@ -130,6 +99,11 @@
       :items="detailItems"
       :loading="detailLoading"
       :error="detailError"
+      :mode="detailMode"
+      :top-buttons="record_detail_top_buttons"
+      :bottom-buttons="record_detail_bottom_buttons"
+      :record-context="currentRecord"
+      @button-click="handleDetailAction"
     />
 
     <organization-record-detail-dialog
@@ -165,7 +139,8 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationField,
   createOrganizationQuery,
@@ -178,7 +153,13 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const route = useRoute()
 const dictStore = useDictStore()
-const { line_buttons, top_buttons } = usePageButtons('organization_sync_error')
+const {
+  line_buttons,
+  top_buttons,
+  record_detail_top_buttons,
+  record_detail_bottom_buttons,
+} = usePageButtons('organization_sync_error')
+const detailMode = useOrganizationDetailMode('organization_sync_error', 'dialog')
 
 const rows = ref<SyncRecordListItem[]>([])
 const total = ref(0)
@@ -205,7 +186,6 @@ const errorLoadError = ref('')
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
-const syncStatusOptions = computed(() => dictStore.getDictOptions('org_sync_record_status'))
 const objectTypeOptions = [
   { label: '法人主体', value: 'legal_entity' },
   { label: '组织单元', value: 'org_unit' },
@@ -250,12 +230,10 @@ const advancedFields = [
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || String(value || '-')
 
-const visibleRowButtons = (row: SyncRecordListItem) =>
-  line_buttons.value.filter(
-    (button) =>
-      button.event_action === 'detail' ||
-      (button.event_action === 'view_error' && row.has_error),
-  )
+const visibleRowButtons = (row?: SyncRecordListItem) => {
+  void row
+  return line_buttons.value.filter((button) => button.event_action === 'detail')
+}
 
 const detailItems = computed<OrganizationDetailItem[]>(() => {
   const detail = recordDetail.value
@@ -283,7 +261,7 @@ const errorItems = computed<OrganizationDetailItem[]>(() => {
   if (!error) return []
   return [
     { label: '错误码', value: error.error_code },
-    { label: '错误信息', value: error.error_message },
+    { label: '错误信息', value: error.error_message, fullWidth: true },
     { label: '依赖类型', value: dictLabel('org_dependency_type', error.dependency_type) },
     { label: '依赖对象', value: error.dependency_key },
   ]
@@ -364,6 +342,11 @@ const openError = async (row: SyncRecordListItem) => {
 const handleRowAction = (button: MenuButton, row: SyncRecordListItem) => {
   if (button.event_action === 'detail') void openDetail(row)
   if (button.event_action === 'view_error') void openError(row)
+}
+
+const handleDetailAction = (button: MenuButton) => {
+  if (!currentRecord.value) return
+  if (button.event_action === 'view_error') void openError(currentRecord.value)
 }
 
 watch(

@@ -160,6 +160,15 @@ type OrgEmployeeOptionsReq struct {
 	PositionId    *int `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
 }
 
+// OrgEmployeeUserOptionsReq supports remote account lookup for the explicit
+// employee-user binding flow. It never accepts contact fields or fuzzy
+// identity matching rules.
+type OrgEmployeeUserOptionsReq struct {
+	Page    int    `form:"page" json:"page" binding:"required,gt=0"`
+	Num     int    `form:"num" json:"num" binding:"required,gt=0,lte=50"`
+	Keyword string `form:"keyword" json:"keyword" binding:"omitempty,max=128"`
+}
+
 // OrgEmployeeBindUserReq binds one explicitly selected Sweet Platform account
 // to one employee. No account property may be used for implicit matching.
 type OrgEmployeeBindUserReq struct {
