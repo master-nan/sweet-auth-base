@@ -8,7 +8,19 @@
       </q-card-section>
       <q-separator />
       <q-card-section class="q-gutter-sm">
-        <div class="text-weight-bold text-subtitle2">{{ t('themeSetting.themeColor') }}</div>
+        <div class="row items-center justify-between no-wrap q-gutter-sm">
+          <div class="text-weight-bold text-subtitle2">{{ t('themeSetting.themeColor') }}</div>
+          <q-btn
+            outline
+            dense
+            no-caps
+            color="primary"
+            icon="restart_alt"
+            :label="t('themeSetting.resetColor')"
+            :disable="isDefaultThemeColor"
+            @click="resetThemeColor"
+          />
+        </div>
         <q-color v-model="hex" flat bordered no-header-tabs @change="handleColorChange" />
       </q-card-section>
       <q-separator />
@@ -79,7 +91,7 @@ import { useThemeStore } from 'src/stores/theme'
 import { useAppStore } from 'src/stores/app'
 import DarkMode from '../Toolbar/DarkMode.vue'
 import { useI18n } from 'vue-i18n'
-import type { LayoutMode } from 'src/utils/ui-preferences'
+import { DEFAULT_PRIMARY_COLOR, type LayoutMode } from 'src/utils/ui-preferences'
 
 const { t } = useI18n()
 const openSettingPanel = ref<boolean>(false)
@@ -89,6 +101,9 @@ const themeStore = useThemeStore()
 const appStore = useAppStore()
 
 const hex = ref<string>(themeStore.primaryColor)
+const isDefaultThemeColor = computed(
+  () => themeStore.primaryColor.toLowerCase() === DEFAULT_PRIMARY_COLOR.toLowerCase(),
+)
 const layoutMode = computed<LayoutMode>({
   get: () => themeStore.layoutMode,
   set: (value) => themeStore.setLayoutMode(value),
@@ -114,6 +129,11 @@ defineExpose({ toggleSettingPanel })
 
 const handleColorChange = (colorHex: string) => {
   themeStore.setThemeColor(colorHex)
+}
+
+const resetThemeColor = () => {
+  themeStore.resetThemeColor()
+  hex.value = DEFAULT_PRIMARY_COLOR
 }
 </script>
 

@@ -114,6 +114,7 @@ export default {
   themeSetting: {
     title: 'Theme Setting',
     themeColor: 'Theme Color',
+    resetColor: 'Reset',
     setting: 'Setting',
     layoutMode: 'Header Layout',
     layoutSplit: 'Split',

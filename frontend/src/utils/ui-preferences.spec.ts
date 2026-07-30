@@ -12,6 +12,7 @@ vi.mock('quasar', () => ({
 
 import { LocalStorage } from 'quasar'
 import {
+  DEFAULT_PRIMARY_COLOR,
   UI_PREFERENCES_KEY,
   defaultUIPreferences,
   readUIPreferences,
@@ -27,7 +28,7 @@ describe('ui preferences', () => {
     expect(defaultUIPreferences()).toEqual({
       version: 1,
       layoutMode: 'split',
-      primaryColor: '#7367f0',
+      primaryColor: DEFAULT_PRIMARY_COLOR,
       dark: false,
       locale: 'zh-CN',
       drawerMini: false,

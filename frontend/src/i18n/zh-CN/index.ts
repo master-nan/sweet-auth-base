@@ -114,6 +114,7 @@ export default {
   themeSetting: {
     title: '主题设定',
     themeColor: '主题颜色',
+    resetColor: '恢复默认',
     setting: '界面设置',
     layoutMode: '顶部布局',
     layoutSplit: '左右结构',

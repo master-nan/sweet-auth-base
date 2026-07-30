@@ -152,21 +152,13 @@ onMounted(() => {
 }
 
 .app-header__breadcrumbs {
-  display: flex;
-  height: 34px;
   min-width: 0;
-  align-items: center;
   color: var(--app-header-text);
-  line-height: 1;
 
   :deep(.q-breadcrumbs__el) {
-    display: inline-flex;
-    min-height: 34px;
-    align-items: center;
     color: inherit;
     font-size: 14px;
     font-weight: 800;
-    line-height: 1;
     letter-spacing: 0;
   }
 
@@ -175,12 +167,7 @@ onMounted(() => {
   }
 
   :deep(.q-breadcrumbs__separator) {
-    display: inline-flex;
-    min-height: 34px;
-    align-items: center;
     color: var(--app-header-muted);
-    line-height: 1;
-    margin: 0 9px;
   }
 }
 

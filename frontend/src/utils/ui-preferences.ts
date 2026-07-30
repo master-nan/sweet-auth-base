@@ -2,6 +2,7 @@ import { LocalStorage } from 'quasar'
 
 export const UI_PREFERENCES_KEY = 'sweet-admin.ui-preferences.v1'
 export const UI_PREFERENCES_VERSION = 1
+export const DEFAULT_PRIMARY_COLOR = '#7367f0'
 
 export type LayoutMode = 'split' | 'full'
 export type SupportedLocale = 'en-US' | 'zh-CN'
@@ -31,7 +32,7 @@ const isHexColor = (value: unknown): value is string =>
 export const defaultUIPreferences = (): UIPreferences => ({
   version: UI_PREFERENCES_VERSION,
   layoutMode: 'split',
-  primaryColor: '#7367f0',
+  primaryColor: DEFAULT_PRIMARY_COLOR,
   dark: (LocalStorage.getItem('dark') as boolean | null) ?? false,
   locale: (LocalStorage.getItem('lang') as SupportedLocale | null) ?? 'zh-CN',
   drawerMini: false,

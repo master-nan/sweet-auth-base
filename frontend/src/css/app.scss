@@ -8,8 +8,8 @@ $font-family_1:
 
 // app global css in SCSS form
 html {
-  --app-scrollbar-thumb: color-mix(in srgb, var(--q-primary) 38%, transparent);
-  --app-scrollbar-thumb-hover: color-mix(in srgb, var(--q-primary) 62%, transparent);
+  --app-scrollbar-thumb: rgba(100, 116, 139, 0.38);
+  --app-scrollbar-thumb-hover: rgba(71, 85, 105, 0.66);
 
   height: 100%;
   box-sizing: border-box;
@@ -27,12 +27,12 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  scrollbar-color: transparent transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 *::-webkit-scrollbar-track,
@@ -41,8 +41,17 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 999px;
+  background: transparent;
+  background-clip: padding-box;
+}
+
+*:hover {
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+}
+
+*:hover::-webkit-scrollbar-thumb {
   background: var(--app-scrollbar-thumb);
   background-clip: padding-box;
 }
@@ -69,6 +78,11 @@ body {
 
 .q-scrollarea__bar {
   background: transparent !important;
+}
+
+.q-table__middle {
+  overflow: overlay;
+  scrollbar-gutter: auto;
 }
 
 input[type='number'] {
@@ -120,8 +134,8 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .body--dark {
-  --app-scrollbar-thumb: color-mix(in srgb, var(--q-primary) 52%, transparent);
-  --app-scrollbar-thumb-hover: color-mix(in srgb, var(--q-primary) 76%, transparent);
+  --app-scrollbar-thumb: rgba(148, 163, 184, 0.48);
+  --app-scrollbar-thumb-hover: rgba(203, 213, 225, 0.74);
   --app-dark-page: #161b28;
   --app-dark-surface: #202638;
   --app-dark-surface-soft: #242b3d;

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { colors, setCssVar, Dark } from 'quasar'
 import {
+  DEFAULT_PRIMARY_COLOR,
   readUIPreferences,
   writeUIPreferences,
   type LayoutMode,
@@ -83,6 +84,9 @@ export const useThemeStore = defineStore('theme', {
     setThemeColor(color: string) {
       this.applyThemeColor(color)
       writeUIPreferences({ primaryColor: color })
+    },
+    resetThemeColor() {
+      this.setThemeColor(DEFAULT_PRIMARY_COLOR)
     },
     setLayoutMode(mode: LayoutMode) {
       this.layoutMode = mode
