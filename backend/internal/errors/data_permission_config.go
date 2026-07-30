@@ -27,6 +27,14 @@ const (
 	ErrorCodeDataOwnershipValueTypeMismatch      = 120022
 	ErrorCodeDataOwnershipReferenced             = 120023
 	ErrorCodeDataOwnershipFieldImmutable         = 120024
+	ErrorCodeDataOwnershipMetadataFieldNotFound  = 120025
+	ErrorCodeDataOwnershipMetadataFieldMismatch  = 120026
+	ErrorCodeDataOwnershipMetadataFieldForbidden = 120027
+	ErrorCodeDataOwnershipRegisteredFieldMissing = 120028
+	ErrorCodeDataOwnershipRegisteredResource     = 120029
+	ErrorCodeDataOwnershipRegisteredDimension    = 120030
+	ErrorCodeDataOwnershipRegisteredOperation    = 120031
+	ErrorCodeDataOwnershipMetadataDimension      = 120032
 )
 
 var (
@@ -149,5 +157,45 @@ var (
 		http.StatusConflict,
 		ErrorCodeDataOwnershipFieldImmutable,
 		"数据归属身份字段不可修改",
+	)
+	ErrDataOwnershipMetadataFieldNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataOwnershipMetadataFieldNotFound,
+		"数据归属元数据字段不存在或已删除",
+	)
+	ErrDataOwnershipMetadataFieldMismatch = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipMetadataFieldMismatch,
+		"数据归属元数据字段不属于当前资源",
+	)
+	ErrDataOwnershipMetadataFieldForbidden = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipMetadataFieldForbidden,
+		"该元数据字段不能作为数据归属字段",
+	)
+	ErrDataOwnershipRegisteredFieldMissing = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipRegisteredFieldMissing,
+		"数据归属注册项不存在",
+	)
+	ErrDataOwnershipRegisteredResource = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipRegisteredResource,
+		"数据归属注册项与当前资源不匹配",
+	)
+	ErrDataOwnershipRegisteredDimension = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipRegisteredDimension,
+		"数据归属注册项不支持当前维度",
+	)
+	ErrDataOwnershipRegisteredOperation = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipRegisteredOperation,
+		"数据归属注册项不支持当前操作",
+	)
+	ErrDataOwnershipMetadataDimension = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipMetadataDimension,
+		"元数据字段与数据权限维度不匹配",
 	)
 )

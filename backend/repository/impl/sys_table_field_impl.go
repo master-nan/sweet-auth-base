@@ -56,7 +56,8 @@ func (s *SysTableFieldRepositoryImpl) GetTableFieldsByTableId(id int) ([]model.S
 func (s *SysTableFieldRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.SysTableField, error) {
 	var field model.SysTableField
 	err := db.Select(
-		"id", "state", "table_id", "field_code", "field_type", "field_category", "expression",
+		"id", "state", "table_id", "field_code", "field_type", "field_category",
+		"expression", "is_primary_key",
 	).Where("id = ?", id).First(&field).Error
 	return field, err
 }

@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
@@ -27,16 +28,6 @@ const (
 
 var dataOwnershipCodePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$`)
 
-// RegisteredOwnershipFieldValidator is the extension point for the
-// server-side registered-field catalog delivered by DP-2-T003C.
-type RegisteredOwnershipFieldValidator interface {
-	ValidateRegisteredOwnershipField(
-		resource model.DataResource,
-		fieldCode string,
-		valueType string,
-	) error
-}
-
 // DataOwnershipConfigService owns ownership-definition configuration only.
 // It does not resolve subject scope, call providers, or build query filters.
 type DataOwnershipConfigService struct {
@@ -44,7 +35,7 @@ type DataOwnershipConfigService struct {
 	dimensionRepo            repository.DataDimensionDefinitionRepository
 	ownershipRepo            repository.DataOwnershipFieldRepository
 	tableFieldRepo           repository.SysTableFieldRepository
-	registeredFieldValidator RegisteredOwnershipFieldValidator
+	registeredFieldValidator datapermission.OwnershipFieldBindingValidator
 	sf                       *utils.Snowflake
 	auditWriter              TransactionalAuditWriter
 }
@@ -54,7 +45,7 @@ func NewDataOwnershipConfigService(
 	dimensionRepo repository.DataDimensionDefinitionRepository,
 	ownershipRepo repository.DataOwnershipFieldRepository,
 	tableFieldRepo repository.SysTableFieldRepository,
-	registeredFieldValidator RegisteredOwnershipFieldValidator,
+	registeredFieldValidator datapermission.OwnershipFieldBindingValidator,
 	sf *utils.Snowflake,
 	auditWriter TransactionalAuditWriter,
 ) *DataOwnershipConfigService {
@@ -423,30 +414,48 @@ func (s *DataOwnershipConfigService) validateOwnershipBinding(
 		}
 		field, err := s.tableFieldRepo.FindByIdForConfigDB(tx, *ownership.TableFieldId)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return myerrors.ErrDataOwnershipMetadataFieldInvalid
+			return myerrors.ErrDataOwnershipMetadataFieldNotFound
 		}
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
-		if !field.State || field.TableId != *resource.TableId || !isMetadataOwnershipField(field) {
-			return myerrors.ErrDataOwnershipMetadataFieldInvalid
+		if !field.State {
+			return myerrors.ErrDataOwnershipMetadataFieldNotFound
+		}
+		if field.TableId != *resource.TableId {
+			return myerrors.ErrDataOwnershipMetadataFieldMismatch
+		}
+		if !isMetadataOwnershipField(field) {
+			return myerrors.ErrDataOwnershipMetadataFieldForbidden
 		}
 		if !metadataFieldMatchesOwnershipValueType(field.FieldType, ownership.ValueType) {
 			return myerrors.ErrDataOwnershipValueTypeMismatch
+		}
+		if !metadataFieldMatchesDimension(field.FieldCode, dimension.Code) {
+			return myerrors.ErrDataOwnershipMetadataDimension
 		}
 	case model.DataOwnershipBindingTypeRegisteredField:
 		if ownership.AdapterFieldCode == nil ||
 			!dataOwnershipCodePattern.MatchString(*ownership.AdapterFieldCode) {
 			return myerrors.ErrDataOwnershipRegisteredFieldInvalid
 		}
-		if s.registeredFieldValidator != nil {
-			if err := s.registeredFieldValidator.ValidateRegisteredOwnershipField(
-				resource,
-				*ownership.AdapterFieldCode,
-				ownership.ValueType,
-			); err != nil {
-				return myerrors.ErrDataOwnershipRegisteredFieldInvalid
-			}
+		if resource.ResourceType != model.DataResourceTypeBusinessService ||
+			strings.TrimSpace(resource.AdapterCode) == "" {
+			return myerrors.ErrDataOwnershipBindingInvalid
+		}
+		if s.registeredFieldValidator == nil {
+			return myerrors.ErrDataOwnershipRegisteredFieldMissing
+		}
+		if err := s.registeredFieldValidator.ValidateBinding(
+			datapermission.OwnershipFieldBindingValidation{
+				ResourceCode:     resource.ResourceCode,
+				OwnershipCode:    ownership.OwnershipCode,
+				AdapterFieldCode: *ownership.AdapterFieldCode,
+				ValueType:        ownership.ValueType,
+				DimensionCode:    dimension.Code,
+			},
+		); err != nil {
+			return mapRegisteredOwnershipFieldValidationError(err)
 		}
 	default:
 		return myerrors.ErrDataOwnershipBindingInvalid
@@ -458,7 +467,13 @@ func isMetadataOwnershipField(field model.SysTableField) bool {
 	if field.Expression != nil && strings.TrimSpace(*field.Expression) != "" {
 		return false
 	}
-	return field.FieldCategory == "" || field.FieldCategory == enum.NormalField
+	if field.IsPrimaryKey {
+		return false
+	}
+	if field.FieldCategory != "" && field.FieldCategory != enum.NormalField {
+		return false
+	}
+	return !isForbiddenMetadataOwnershipFieldCode(field.FieldCode)
 }
 
 func metadataFieldMatchesOwnershipValueType(
@@ -474,6 +489,74 @@ func metadataFieldMatchesOwnershipValueType(
 		return fieldType == enum.VarcharFieldType || fieldType == enum.TextFieldType
 	default:
 		return false
+	}
+}
+
+func isForbiddenMetadataOwnershipFieldCode(fieldCode string) bool {
+	fieldCode = strings.ToLower(strings.TrimSpace(fieldCode))
+	if fieldCode == "" {
+		return true
+	}
+	for _, prefix := range []string{
+		"gmt_",
+		"source_",
+		"create_",
+		"modify_",
+		"delete_",
+	} {
+		if strings.HasPrefix(fieldCode, prefix) {
+			return true
+		}
+	}
+	switch fieldCode {
+	case "id",
+		"path",
+		"level",
+		"parent_id",
+		"parent_node_id",
+		"structure_node_id",
+		"tree_path",
+		"node_path",
+		"name",
+		"display_name",
+		"display_value",
+		"label":
+		return true
+	}
+	return strings.HasSuffix(fieldCode, "_name") ||
+		strings.HasSuffix(fieldCode, "_label") ||
+		strings.HasSuffix(fieldCode, "_display")
+}
+
+func metadataFieldMatchesDimension(fieldCode, dimensionCode string) bool {
+	fieldCode = strings.ToLower(strings.TrimSpace(fieldCode))
+	dimensionCode = strings.ToLower(strings.TrimSpace(dimensionCode))
+	var expectedDimension string
+	switch fieldCode {
+	case "legal_entity_id", "primary_legal_entity_id":
+		expectedDimension = "legal_entity"
+	case "org_unit_id", "owner_org_id", "management_org_id", "primary_org_unit_id":
+		expectedDimension = "management_org"
+	case "employee_id", "owner_employee_id":
+		expectedDimension = "employee"
+	}
+	return expectedDimension == "" || expectedDimension == dimensionCode
+}
+
+func mapRegisteredOwnershipFieldValidationError(err error) error {
+	switch {
+	case errors.Is(err, datapermission.ErrOwnershipFieldResourceMismatch):
+		return myerrors.ErrDataOwnershipRegisteredResource
+	case errors.Is(err, datapermission.ErrOwnershipFieldValueTypeMismatch):
+		return myerrors.ErrDataOwnershipValueTypeMismatch
+	case errors.Is(err, datapermission.ErrOwnershipFieldDimensionUnsupported):
+		return myerrors.ErrDataOwnershipRegisteredDimension
+	case errors.Is(err, datapermission.ErrOwnershipFieldOperationUnsupported):
+		return myerrors.ErrDataOwnershipRegisteredOperation
+	case errors.Is(err, datapermission.ErrOwnershipFieldRegistrationNotFound):
+		return myerrors.ErrDataOwnershipRegisteredFieldMissing
+	default:
+		return myerrors.ErrDataOwnershipRegisteredFieldInvalid
 	}
 }
 

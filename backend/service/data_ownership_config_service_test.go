@@ -3,6 +3,7 @@ package service
 import (
 	"backend/dto/request"
 	"backend/internal/database"
+	"backend/internal/datapermission"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
 	"backend/internal/utils"
@@ -22,10 +23,8 @@ type testRegisteredOwnershipFieldValidator struct {
 	calls int
 }
 
-func (validator *testRegisteredOwnershipFieldValidator) ValidateRegisteredOwnershipField(
-	_ model.DataResource,
-	_ string,
-	_ string,
+func (validator *testRegisteredOwnershipFieldValidator) ValidateBinding(
+	_ datapermission.OwnershipFieldBindingValidation,
 ) error {
 	validator.calls++
 	return validator.err
@@ -184,7 +183,7 @@ func TestDataOwnershipConfigServiceCreateValidation(t *testing.T) {
 
 		req := metadataOwnershipCreateRequest(resource.Id, dimension.Id, 999)
 		_, err := service.CreateOwnership(dataResourceConfigContext(), req)
-		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldInvalid)
+		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldNotFound)
 
 		otherTableId := *resource.TableId + 1
 		field.TableId = otherTableId
@@ -195,7 +194,7 @@ func TestDataOwnershipConfigServiceCreateValidation(t *testing.T) {
 		}
 		req.BindingTarget.ReferenceId = &field.Id
 		_, err = service.CreateOwnership(dataResourceConfigContext(), req)
-		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldInvalid)
+		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldMismatch)
 
 		if err = db.Model(&model.SysTableField{}).
 			Where("id = ?", field.Id).
@@ -203,7 +202,7 @@ func TestDataOwnershipConfigServiceCreateValidation(t *testing.T) {
 			t.Fatalf("disable metadata field: %v", err)
 		}
 		_, err = service.CreateOwnership(dataResourceConfigContext(), req)
-		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldInvalid)
+		assertDataOwnershipConfigError(t, err, apperrors.ErrorCodeDataOwnershipMetadataFieldNotFound)
 	})
 
 	t.Run("value type must match dimension and metadata field", func(t *testing.T) {
@@ -377,7 +376,7 @@ func TestDataOwnershipConfigServiceTransactionRollback(t *testing.T) {
 func newDataOwnershipConfigTestSubject(
 	t *testing.T,
 	auditWriter TransactionalAuditWriter,
-	validator RegisteredOwnershipFieldValidator,
+	validator datapermission.OwnershipFieldBindingValidator,
 ) (*DataOwnershipConfigService, *gorm.DB) {
 	t.Helper()
 	db := testutil.OpenSQLite(
