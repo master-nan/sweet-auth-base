@@ -1,6 +1,8 @@
 package impl
 
 import (
+	"time"
+
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/internal/database"
@@ -125,6 +127,18 @@ func (r *DataDimensionDefinitionRepositoryImpl) FindByCode(ctx *gin.Context, cod
 
 func (r *DataDimensionDefinitionRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataDimensionDefinition, error) {
 	return findDataPermissionConfigByIds[model.DataDimensionDefinition](r.db, ctx, ids, dataDimensionDefinitionColumns)
+}
+
+func (r *DataDimensionDefinitionRepositoryImpl) FindByIdForConfigDB(
+	db *gorm.DB,
+	id int,
+) (model.DataDimensionDefinition, error) {
+	return findDataPermissionConfigOneDB[model.DataDimensionDefinition](
+		db,
+		dataDimensionDefinitionColumns,
+		"id = ?",
+		id,
+	)
 }
 
 func (r *DataResourceRepositoryImpl) Query(
@@ -332,11 +346,83 @@ func (r *DataOwnershipFieldRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, 
 	return findDataPermissionConfigByIds[model.DataOwnershipField](r.db, ctx, ids, dataOwnershipFieldColumns)
 }
 
+func (r *DataOwnershipFieldRepositoryImpl) FindByIdForConfigDB(
+	db *gorm.DB,
+	id int,
+) (model.DataOwnershipField, error) {
+	return findDataPermissionConfigOneDB[model.DataOwnershipField](
+		db,
+		dataOwnershipFieldMutationColumns,
+		"id = ?",
+		id,
+	)
+}
+
+func (r *DataOwnershipFieldRepositoryImpl) FindByStableKeyForConfigDB(
+	db *gorm.DB,
+	resourceId int,
+	ownershipCode string,
+) (model.DataOwnershipField, error) {
+	return findDataPermissionConfigOneDB[model.DataOwnershipField](
+		db,
+		dataOwnershipFieldMutationColumns,
+		"resource_id = ? AND ownership_code = ?",
+		resourceId,
+		ownershipCode,
+	)
+}
+
+func (r *DataOwnershipFieldRepositoryImpl) ListByResourceForConfigDB(
+	db *gorm.DB,
+	resourceId int,
+) ([]model.DataOwnershipField, error) {
+	values := make([]model.DataOwnershipField, 0)
+	err := db.Select(dataOwnershipFieldMutationColumns).
+		Where("resource_id = ?", resourceId).
+		Order("ownership_code ASC, id ASC").
+		Find(&values).Error
+	return values, err
+}
+
+func (r *DataOwnershipFieldRepositoryImpl) UpdateFieldsForConfig(
+	db *gorm.DB,
+	id int,
+	fields map[string]any,
+) (bool, error) {
+	result := db.Model(&model.DataOwnershipField{}).Where("id = ?", id).Updates(fields)
+	return result.RowsAffected > 0, result.Error
+}
+
 func (r *DataOwnershipFieldRepositoryImpl) CountByResourceForConfig(db *gorm.DB, resourceId int) (int64, error) {
 	var count int64
 	err := db.Model(&model.DataOwnershipField{}).
 		Where("resource_id = ?", resourceId).
 		Count(&count).Error
+	return count, err
+}
+
+func (r *DataOwnershipFieldRepositoryImpl) CountPolicyRuleReferencesForConfig(
+	db *gorm.DB,
+	resourceId int,
+	ownershipCode string,
+	dimensionId int,
+	activeOnly bool,
+	asOf time.Time,
+) (int64, error) {
+	query := db.Table("sys_data_policy_rule AS rule").
+		Joins("JOIN sys_data_policy AS policy ON policy.id = rule.policy_id AND policy.gmt_delete IS NULL").
+		Joins("JOIN sys_data_grant AS grant_record ON grant_record.policy_id = policy.id AND grant_record.gmt_delete IS NULL").
+		Where("rule.gmt_delete IS NULL").
+		Where("grant_record.resource_id = ?", resourceId).
+		Where("rule.ownership_code = ? AND rule.dimension_id = ?", ownershipCode, dimensionId)
+	if activeOnly {
+		query = query.
+			Where("rule.state = ? AND policy.state = ? AND grant_record.state = ?", true, true, true).
+			Where("(grant_record.valid_from IS NULL OR grant_record.valid_from <= ?)", asOf).
+			Where("(grant_record.valid_to IS NULL OR grant_record.valid_to >= ?)", asOf)
+	}
+	var count int64
+	err := query.Distinct("rule.id").Count(&count).Error
 	return count, err
 }
 
@@ -689,6 +775,10 @@ var (
 		"id", "gmt_create", "gmt_modify", "state", "resource_id", "ownership_code",
 		"dimension_id", "binding_type", "table_field_id", "adapter_field_code", "value_type",
 	}
+	dataOwnershipFieldMutationColumns = append(
+		append([]string(nil), dataOwnershipFieldColumns...),
+		"description",
+	)
 	dataPolicyColumns = []string{
 		"id", "gmt_create", "gmt_modify", "state", "code", "name", "policy_type",
 	}

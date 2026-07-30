@@ -7,9 +7,12 @@ package repository
 
 import (
 	"backend/model"
+
+	"gorm.io/gorm"
 )
 
 type SysTableFieldRepository interface {
 	BasicRepository[model.SysTableField]
 	GetTableFieldsByTableId(int) ([]model.SysTableField, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.SysTableField, error)
 }

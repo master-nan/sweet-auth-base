@@ -3,20 +3,30 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeDataResourceNotFound               = 120001
-	ErrorCodeDataResourceCodeDuplicate          = 120002
-	ErrorCodeDataResourceCodeInvalid            = 120003
-	ErrorCodeDataResourceReferenced             = 120004
-	ErrorCodeDataResourceStateInvalid           = 120005
-	ErrorCodeDataResourceOperationDuplicate     = 120006
-	ErrorCodeDataResourceOperationInvalid       = 120007
-	ErrorCodeDataResourceFieldImmutable         = 120008
-	ErrorCodeDataResourcePermissionEnableDenied = 120009
-	ErrorCodeDataResourceOperationReferenced    = 120010
-	ErrorCodeDataResourceNameRequired           = 120011
-	ErrorCodeDataResourceTypeInvalid            = 120012
-	ErrorCodeDataResourceTargetInvalid          = 120013
-	ErrorCodeDataResourceOperationNotFound      = 120014
+	ErrorCodeDataResourceNotFound                = 120001
+	ErrorCodeDataResourceCodeDuplicate           = 120002
+	ErrorCodeDataResourceCodeInvalid             = 120003
+	ErrorCodeDataResourceReferenced              = 120004
+	ErrorCodeDataResourceStateInvalid            = 120005
+	ErrorCodeDataResourceOperationDuplicate      = 120006
+	ErrorCodeDataResourceOperationInvalid        = 120007
+	ErrorCodeDataResourceFieldImmutable          = 120008
+	ErrorCodeDataResourcePermissionEnableDenied  = 120009
+	ErrorCodeDataResourceOperationReferenced     = 120010
+	ErrorCodeDataResourceNameRequired            = 120011
+	ErrorCodeDataResourceTypeInvalid             = 120012
+	ErrorCodeDataResourceTargetInvalid           = 120013
+	ErrorCodeDataResourceOperationNotFound       = 120014
+	ErrorCodeDataDimensionNotFound               = 120015
+	ErrorCodeDataOwnershipNotFound               = 120016
+	ErrorCodeDataOwnershipDuplicate              = 120017
+	ErrorCodeDataOwnershipCodeInvalid            = 120018
+	ErrorCodeDataOwnershipBindingInvalid         = 120019
+	ErrorCodeDataOwnershipMetadataFieldInvalid   = 120020
+	ErrorCodeDataOwnershipRegisteredFieldInvalid = 120021
+	ErrorCodeDataOwnershipValueTypeMismatch      = 120022
+	ErrorCodeDataOwnershipReferenced             = 120023
+	ErrorCodeDataOwnershipFieldImmutable         = 120024
 )
 
 var (
@@ -89,5 +99,55 @@ var (
 		http.StatusNotFound,
 		ErrorCodeDataResourceOperationNotFound,
 		"数据资源操作不存在",
+	)
+	ErrDataDimensionNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataDimensionNotFound,
+		"数据权限维度不存在或已停用",
+	)
+	ErrDataOwnershipNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataOwnershipNotFound,
+		"数据归属定义不存在",
+	)
+	ErrDataOwnershipDuplicate = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataOwnershipDuplicate,
+		"数据归属编码在当前资源中已存在",
+	)
+	ErrDataOwnershipCodeInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipCodeInvalid,
+		"数据归属编码格式不合法",
+	)
+	ErrDataOwnershipBindingInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipBindingInvalid,
+		"数据归属绑定配置不合法",
+	)
+	ErrDataOwnershipMetadataFieldInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipMetadataFieldInvalid,
+		"数据归属元数据字段不存在或不可用",
+	)
+	ErrDataOwnershipRegisteredFieldInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipRegisteredFieldInvalid,
+		"数据归属注册字段不合法",
+	)
+	ErrDataOwnershipValueTypeMismatch = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataOwnershipValueTypeMismatch,
+		"数据归属值类型与维度不兼容",
+	)
+	ErrDataOwnershipReferenced = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataOwnershipReferenced,
+		"数据归属定义已被策略引用",
+	)
+	ErrDataOwnershipFieldImmutable = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataOwnershipFieldImmutable,
+		"数据归属身份字段不可修改",
 	)
 )

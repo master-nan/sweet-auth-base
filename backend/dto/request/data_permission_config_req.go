@@ -107,6 +107,34 @@ type DataOwnershipFieldQueryReq struct {
 	State       *bool  `form:"state" json:"state"`
 }
 
+type DataOwnershipBindingTargetReq struct {
+	ReferenceId   *int    `form:"reference_id" json:"reference_id" binding:"omitempty,gt=0"`
+	ReferenceCode *string `form:"reference_code" json:"reference_code" binding:"omitempty,max=128"`
+}
+
+type DataOwnershipFieldCreateReq struct {
+	ResourceId    int                           `form:"resource_id" json:"resource_id" binding:"required,gt=0"`
+	OwnershipCode string                        `form:"ownership_code" json:"ownership_code" binding:"required,max=64"`
+	DimensionId   int                           `form:"dimension_id" json:"dimension_id" binding:"required,gt=0"`
+	BindingType   string                        `form:"binding_type" json:"binding_type" binding:"required,oneof=metadata_field registered_field"`
+	BindingTarget DataOwnershipBindingTargetReq `form:"binding_target" json:"binding_target"`
+	ValueType     string                        `form:"value_type" json:"value_type" binding:"required,oneof=bigint string"`
+	State         *bool                         `form:"state" json:"state"`
+}
+
+// DataOwnershipFieldUpdateReq includes immutable identity fields so the
+// service can reject attempted changes instead of silently ignoring them.
+type DataOwnershipFieldUpdateReq struct {
+	Id            int                            `form:"id" json:"id" binding:"required,gt=0"`
+	ResourceId    *int                           `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
+	OwnershipCode *string                        `form:"ownership_code" json:"ownership_code" binding:"omitempty,max=64"`
+	DimensionId   *int                           `form:"dimension_id" json:"dimension_id" binding:"omitempty,gt=0"`
+	BindingType   *string                        `form:"binding_type" json:"binding_type" binding:"omitempty,oneof=metadata_field registered_field"`
+	BindingTarget *DataOwnershipBindingTargetReq `form:"binding_target" json:"binding_target"`
+	ValueType     *string                        `form:"value_type" json:"value_type" binding:"omitempty,oneof=bigint string"`
+	State         *bool                          `form:"state" json:"state"`
+}
+
 type DataPolicyQueryReq struct {
 	DataPermissionConfigQueryReq
 	PolicyType string `form:"policy_type" json:"policy_type" binding:"omitempty,oneof=all none rule_set"`

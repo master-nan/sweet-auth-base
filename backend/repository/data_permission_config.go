@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
@@ -15,6 +17,7 @@ type DataDimensionDefinitionRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataDimensionDefinition, error)
 	FindByCode(*gin.Context, string) (model.DataDimensionDefinition, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataDimensionDefinition, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataDimensionDefinition, error)
 }
 
 type DataResourceRepository interface {
@@ -48,7 +51,12 @@ type DataOwnershipFieldRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataOwnershipField, error)
 	FindByStableKey(*gin.Context, int, string) (model.DataOwnershipField, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataOwnershipField, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataOwnershipField, error)
+	FindByStableKeyForConfigDB(*gorm.DB, int, string) (model.DataOwnershipField, error)
+	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataOwnershipField, error)
+	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)
+	CountPolicyRuleReferencesForConfig(*gorm.DB, int, string, int, bool, time.Time) (int64, error)
 }
 
 type DataPolicyRepository interface {

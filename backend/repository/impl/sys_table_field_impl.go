@@ -53,6 +53,14 @@ func (s *SysTableFieldRepositoryImpl) GetTableFieldsByTableId(id int) ([]model.S
 	return items, err
 }
 
+func (s *SysTableFieldRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.SysTableField, error) {
+	var field model.SysTableField
+	err := db.Select(
+		"id", "state", "table_id", "field_code", "field_type", "field_category", "expression",
+	).Where("id = ?", id).First(&field).Error
+	return field, err
+}
+
 func sysTableFieldCreateMap(tx *gorm.DB, field *model.SysTableField) map[string]interface{} {
 	now := model.Now()
 	gmtCreate := field.GmtCreate
