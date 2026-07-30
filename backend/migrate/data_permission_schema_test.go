@@ -186,6 +186,7 @@ func TestDataPermissionDomainMigrationPostgreSQLConstraints(t *testing.T) {
 
 	assertPostgresDataPermissionConstraints(t, db, schemaName)
 	assertPostgresDataPermissionConstraintBehavior(t, db)
+	assertPostgresDataPermissionIntegrity(t, db)
 }
 
 func createDataPermissionPostgresPrerequisites(t *testing.T, db *gorm.DB, schemaName string) {
