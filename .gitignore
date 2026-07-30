@@ -13,3 +13,5 @@ frontend/.quasar/
 node_modules/
 .DS_Store
 AGENTS.md
+docs/*/
+work/
