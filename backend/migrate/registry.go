@@ -129,6 +129,9 @@ func platformSeedSteps() []seedStep {
 			}
 			return seedOrganizationFoundation(db, sf)
 		}},
+		seedStep{name: "data_permission_dictionary_and_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
+			return seedDataPermissionFoundation(db, sf)
+		}},
 		seedStep{name: "sys_table_relation_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedSystemTableRelations(db, sf)
 		}},

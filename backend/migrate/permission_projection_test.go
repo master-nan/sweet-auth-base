@@ -111,6 +111,9 @@ func TestFunctionalPermissionProjectionSeedIsIdempotentAndCoversStrictRoutes(t *
 	if err := autoMigrateCoreSchema(db); err != nil {
 		t.Fatalf("migrate core schema: %v", err)
 	}
+	if err := migrateDataPermissionSchema(db); err != nil {
+		t.Fatalf("migrate data permission schema: %v", err)
+	}
 	cfg := &config.Server{}
 	cfg.Conf.Salt = "permission-projection-test-salt"
 	sf := newMigrationTestSnowflake(t)
@@ -357,6 +360,9 @@ func TestLowCodeFilePermissionsRequireExplicitRoleGrant(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := autoMigrateCoreSchema(db); err != nil {
 		t.Fatalf("migrate core schema: %v", err)
+	}
+	if err := migrateDataPermissionSchema(db); err != nil {
+		t.Fatalf("migrate data permission schema: %v", err)
 	}
 	cfg := &config.Server{}
 	cfg.Conf.Salt = "low-code-file-permission-test-salt"

@@ -101,6 +101,7 @@ func TestPlatformSeedStepsRegistersMetadataAndPermissionBaselineOrder(t *testing
 		"lowcode_button_templates",
 		"menu_button_defaults_repair",
 		"sys_table_and_field_metadata",
+		"data_permission_dictionary_and_metadata",
 		"sys_table_relation_metadata",
 		"functional_permission_projection",
 		"rebuildable_cache_flush",
@@ -130,6 +131,9 @@ func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := autoMigrateCoreSchema(db); err != nil {
 		t.Fatalf("migrate core schema: %v", err)
+	}
+	if err := migrateDataPermissionSchema(db); err != nil {
+		t.Fatalf("migrate data permission schema: %v", err)
 	}
 	cfg := &config.Server{}
 	cfg.Conf.Salt = "seed-idempotency-test-salt"
@@ -187,6 +191,7 @@ func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
 	assertNoDuplicateGroups(t, db, "sys_menu", []string{"name"})
 	assertNoDuplicateGroups(t, db, "sys_menu_button", []string{"menu_id", "code"})
 	assertNoDuplicateGroups(t, db, "sys_menu_button_template", []string{"scene", "code_suffix"})
+	assertNoDuplicateGroups(t, db, "sys_data_dimension_definition", []string{"code"})
 	assertNoDuplicateGroups(t, db, "sys_role_menu", []string{"role_id", "menu_id"})
 	assertNoDuplicateGroups(t, db, "sys_role_menu_button", []string{"role_id", "menu_id", "button_id"})
 	assertNoDuplicateGroups(t, db, "casbin_rule", []string{"ptype", "v0", "v1", "v2"})
@@ -203,6 +208,7 @@ func platformSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {
 		"sys_menu":                 countRows(t, db, &model.SysMenu{}),
 		"sys_menu_button":          countRows(t, db, &model.SysMenuButton{}),
 		"sys_menu_button_template": countRows(t, db, &model.SysMenuButtonTemplate{}),
+		"sys_data_dimension":       countRows(t, db, &model.DataDimensionDefinition{}),
 		"sys_role_menu":            countRows(t, db, &model.SysRoleMenu{}),
 		"sys_role_menu_button":     countRows(t, db, &model.SysRoleMenuButton{}),
 		"casbin_rule":              countRows(t, db, &model.CasbinRule{}),
@@ -228,6 +234,7 @@ func platformSeedKeySnapshot(t *testing.T, db *gorm.DB) map[string]map[string]in
 		"sys_menu":                 keyIDSnapshot(t, db, "SELECT name AS seed_key, id FROM sys_menu"),
 		"sys_menu_button":          keyIDSnapshot(t, db, "SELECT CAST(menu_id AS TEXT) || ':' || code AS seed_key, id FROM sys_menu_button"),
 		"sys_menu_button_template": keyIDSnapshot(t, db, "SELECT scene || ':' || code_suffix AS seed_key, id FROM sys_menu_button_template"),
+		"sys_data_dimension":       keyIDSnapshot(t, db, "SELECT code AS seed_key, id FROM sys_data_dimension_definition"),
 	}
 }
 
