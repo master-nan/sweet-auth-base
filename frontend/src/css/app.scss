@@ -83,21 +83,6 @@ body {
 .q-table__middle {
   overflow: auto;
   scrollbar-gutter: auto;
-  scrollbar-width: none;
-}
-
-.q-table__middle::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.q-table__middle:hover {
-  scrollbar-width: thin;
-}
-
-.q-table__middle:hover::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
 }
 
 input[type='number'] {

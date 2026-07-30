@@ -229,97 +229,97 @@
               </q-btn>
             </div>
 
-            <q-table
-              ref="menuButtonTableRef"
-              class="menu-button-table sticky-header-table"
-              :rows="activeButtonRows"
-              :columns="buttonDisplayColumns"
-              row-key="id"
-              bordered
-              flat
-              :dark="$q.dark.isActive"
-              :loading="loading"
-              :pagination="{ rowsPerPage: 0 }"
-              hide-pagination
-            >
-              <template #body-cell-feature="props">
-                <q-td :props="props">
-                  <div class="menu-button-feature">
-                    <q-avatar
-                      class="menu-icon-tile"
-                      size="30px"
-                      color="deep-purple-1"
-                      text-color="primary"
-                      :icon="props.row.icon || 'touch_app'"
-                    />
-                    <div>
-                      <div class="menu-button-name">{{ props.row.name }}</div>
-                      <div class="menu-button-code">{{ props.row.code }}</div>
+            <q-scroll-area ref="menuButtonScrollAreaRef" class="menu-button-table-scroll" visible>
+              <q-table
+                class="menu-button-table sticky-header-table"
+                :rows="activeButtonRows"
+                :columns="buttonDisplayColumns"
+                row-key="id"
+                flat
+                :dark="$q.dark.isActive"
+                :loading="loading"
+                :pagination="{ rowsPerPage: 0 }"
+                hide-pagination
+              >
+                <template #body-cell-feature="props">
+                  <q-td :props="props">
+                    <div class="menu-button-feature">
+                      <q-avatar
+                        class="menu-icon-tile"
+                        size="30px"
+                        color="deep-purple-1"
+                        text-color="primary"
+                        :icon="props.row.icon || 'touch_app'"
+                      />
+                      <div>
+                        <div class="menu-button-name">{{ props.row.name }}</div>
+                        <div class="menu-button-code">{{ props.row.code }}</div>
+                      </div>
                     </div>
-                  </div>
-                </q-td>
-              </template>
-              <template #body-cell-position="props">
-                <q-td :props="props">
-                  <q-badge color="grey-3" text-color="grey-8">
-                    {{ menuButtonPositionLabel(props.row.position) }}
-                  </q-badge>
-                </q-td>
-              </template>
-              <template #body-cell-event_action="props">
-                <q-td :props="props">
-                  <span class="menu-button-action">{{ props.row.event_action || '-' }}</span>
-                </q-td>
-              </template>
-              <template #body-cell-permission="props">
-                <q-td :props="props">
-                  <div class="menu-button-permission">
-                    <q-badge
-                      v-if="props.row.http_method"
-                      :color="httpMethodColor(props.row.http_method)"
-                    >
-                      {{ props.row.http_method.toUpperCase() }}
+                  </q-td>
+                </template>
+                <template #body-cell-position="props">
+                  <q-td :props="props">
+                    <q-badge color="grey-3" text-color="grey-8">
+                      {{ menuButtonPositionLabel(props.row.position) }}
                     </q-badge>
-                    <span class="menu-button-api-path">{{ props.row.api_path || '-' }}</span>
+                  </q-td>
+                </template>
+                <template #body-cell-event_action="props">
+                  <q-td :props="props">
+                    <span class="menu-button-action">{{ props.row.event_action || '-' }}</span>
+                  </q-td>
+                </template>
+                <template #body-cell-permission="props">
+                  <q-td :props="props">
+                    <div class="menu-button-permission">
+                      <q-badge
+                        v-if="props.row.http_method"
+                        :color="httpMethodColor(props.row.http_method)"
+                      >
+                        {{ props.row.http_method.toUpperCase() }}
+                      </q-badge>
+                      <span class="menu-button-api-path">{{ props.row.api_path || '-' }}</span>
+                    </div>
+                  </q-td>
+                </template>
+                <template #body-cell-state="props">
+                  <q-td :props="props">
+                    <q-badge outline :color="isMenuButtonEnabled(props.row) ? 'positive' : 'grey'">
+                      {{ isMenuButtonEnabled(props.row) ? '启用' : '停用' }}
+                    </q-badge>
+                  </q-td>
+                </template>
+                <template #body-cell-actions="props">
+                  <q-td :props="props">
+                    <div class="row items-center no-wrap q-gutter-xs">
+                      <q-btn
+                        v-for="btn in detailRowButtons"
+                        :key="btn.id"
+                        v-bind="menuButtonDisplayProps(btn)"
+                        flat
+                        dense
+                        round
+                        size="sm"
+                        :color="btn.color || 'primary'"
+                        @click="handleButtonClick(btn, props.row)"
+                      >
+                        <q-tooltip>{{ btn.name }}</q-tooltip>
+                      </q-btn>
+                    </div>
+                  </q-td>
+                </template>
+                <template #no-data>
+                  <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
+                    <q-icon
+                      :name="activeTab === 'page_buttons' ? 'touch_app' : 'verified_user'"
+                      size="28px"
+                    />
+                    <span>{{ activeButtonEmptyText }}</span>
                   </div>
-                </q-td>
-              </template>
-              <template #body-cell-state="props">
-                <q-td :props="props">
-                  <q-badge outline :color="isMenuButtonEnabled(props.row) ? 'positive' : 'grey'">
-                    {{ isMenuButtonEnabled(props.row) ? '启用' : '停用' }}
-                  </q-badge>
-                </q-td>
-              </template>
-              <template #body-cell-actions="props">
-                <q-td :props="props">
-                  <div class="row items-center no-wrap q-gutter-xs">
-                    <q-btn
-                      v-for="btn in detailRowButtons"
-                      :key="btn.id"
-                      v-bind="menuButtonDisplayProps(btn)"
-                      flat
-                      dense
-                      round
-                      size="sm"
-                      :color="btn.color || 'primary'"
-                      @click="handleButtonClick(btn, props.row)"
-                    >
-                      <q-tooltip>{{ btn.name }}</q-tooltip>
-                    </q-btn>
-                  </div>
-                </q-td>
-              </template>
-              <template #no-data>
-                <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
-                  <q-icon
-                    :name="activeTab === 'page_buttons' ? 'touch_app' : 'verified_user'"
-                    size="28px"
-                  />
-                  <span>{{ activeButtonEmptyText }}</span>
-                </div>
-              </template>
-            </q-table>
+                </template>
+              </q-table>
+            </q-scroll-area>
           </div>
 
           <div v-else class="preview-container">
@@ -466,8 +466,8 @@ const selectedMenu = ref<Menu | null>(null)
 const activeTab = ref<'page_buttons' | 'api_permissions' | 'preview'>('page_buttons')
 const expandedMenuIds = ref<number[]>([])
 type ButtonTableTab = 'page_buttons' | 'api_permissions'
-type ButtonTableRef = { $el?: HTMLElement }
-const menuButtonTableRef = ref<ButtonTableRef | null>(null)
+type ButtonTableScrollAreaRef = { getScrollTarget?: () => HTMLElement }
+const menuButtonScrollAreaRef = ref<ButtonTableScrollAreaRef | null>(null)
 const buttonTableScrollPositions: Record<ButtonTableTab, number> = {
   page_buttons: 0,
   api_permissions: 0,
@@ -476,8 +476,7 @@ const buttonTableScrollPositions: Record<ButtonTableTab, number> = {
 const isButtonTableTab = (tab: typeof activeTab.value): tab is ButtonTableTab =>
   tab === 'page_buttons' || tab === 'api_permissions'
 
-const getButtonTableScrollElement = () =>
-  menuButtonTableRef.value?.$el?.querySelector<HTMLElement>('.q-table__middle') || null
+const getButtonTableScrollElement = () => menuButtonScrollAreaRef.value?.getScrollTarget?.() || null
 
 const resetButtonTableScroll = () => {
   buttonTableScrollPositions.page_buttons = 0
@@ -1783,14 +1782,25 @@ onMounted(async () => {
   font-size: 11px;
 }
 
-.menu-button-table.sticky-header-table {
-  height: 100%;
+.menu-button-table-scroll {
+  min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 4px;
+}
+
+.menu-button-table.sticky-header-table {
+  min-height: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
 }
 
 .menu-button-table :deep(.q-table__middle) {
-  flex: 1 1 auto;
-  max-height: 100%;
+  max-height: none;
+  overflow: visible;
 }
 
 .menu-button-table :deep(th) {
