@@ -229,7 +229,12 @@
               </q-btn>
             </div>
 
-            <q-scroll-area ref="menuButtonScrollAreaRef" class="menu-button-table-scroll" visible>
+            <q-scroll-area
+              ref="menuButtonScrollAreaRef"
+              class="menu-button-table-scroll"
+              :delay="0"
+              :vertical-offset="[6, 6]"
+            >
               <q-table
                 class="menu-button-table sticky-header-table"
                 :rows="activeButtonRows"
