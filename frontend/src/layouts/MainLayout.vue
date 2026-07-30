@@ -1,5 +1,9 @@
 <template>
-  <q-layout view="lHr LpR lFr">
+  <q-layout
+    :view="layoutView"
+    class="app-layout"
+    :class="`app-layout--${layoutMode}`"
+  >
     <q-header v-if="!isFullscreenRoute" class="app-header">
       <q-toolbar class="app-header__toolbar">
         <q-btn
@@ -49,6 +53,7 @@ defineOptions({ name: 'MainLayout' })
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { storeToRefs } from 'pinia'
 import Drawer from 'src/components/Drawer/Drawer.vue'
 import Breadcrumbs from 'src/components/Breadcrumbs/Breadcrumbs.vue'
 import ToolbarItem from 'src/components/Toolbar/ToolbarItem.vue'
@@ -60,14 +65,21 @@ const toggleLeftDrawer = () => {
 }
 import { useAppStore } from 'src/stores/app'
 import { useKeepAliveStore } from 'src/stores/keep-alive'
+import { useThemeStore } from 'src/stores/theme'
 import { useConfigureStore } from 'stores/configure'
 import TagView from 'components/TagView/TagView.vue'
 
 const appStore = useAppStore()
+const themeStore = useThemeStore()
 const keepAliveStore = useKeepAliveStore()
 const configureStore = useConfigureStore()
+const { layoutMode } = storeToRefs(themeStore)
+themeStore.applyPreferences()
 const route = useRoute()
 const isFullscreenRoute = computed(() => route.meta.fullscreen === true)
+const layoutView = computed(() =>
+  layoutMode.value === 'full' ? 'hHh LpR lFr' : 'lHr LpR lFr',
+)
 const drawerMenuIcon = computed(() => {
   if (!isDrawerOpen.value) return 'menu'
   return appStore.is_drawer_mini ? 'keyboard_double_arrow_right' : 'menu_open'
@@ -103,54 +115,93 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .app-header {
-  color: #fff;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 44%),
-    linear-gradient(90deg, $primary 0%, #665be7 62%, #5d55db 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 10px 28px rgba(64, 54, 180, 0.18);
+  --app-header-bg: #ffffff;
+  --app-header-surface: #fbfcff;
+  --app-header-text: #172033;
+  --app-header-muted: #6f7d96;
+  --app-header-border: #e2e7f1;
+  --app-header-control-bg: #f7f8fc;
+  --app-header-control-hover: var(--app-primary-soft);
+
+  color: var(--app-header-text);
+  border-top: 3px solid var(--q-primary);
+  border-bottom: 1px solid var(--app-header-border);
+  background: var(--app-header-bg);
+  box-shadow: 0 6px 18px rgba(31, 38, 54, 0.08);
 }
 
 .app-header__toolbar {
   min-height: 48px;
   padding: 0 14px 0 10px;
+  align-items: center;
+  background: var(--app-header-bg);
 }
 
 .app-header__menu {
   width: 34px;
   height: 34px;
   margin-right: 6px;
-  color: #fff;
-  border-radius: 10px;
+  color: #ffffff;
+  border-radius: 8px;
+  background: var(--q-primary);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--q-primary);
+    box-shadow: 0 5px 12px var(--app-primary-shadow);
   }
 }
 
 .app-header__breadcrumbs {
+  display: flex;
+  height: 34px;
   min-width: 0;
-  color: rgba(255, 255, 255, 0.96);
+  align-items: center;
+  color: var(--app-header-text);
+  line-height: 1;
 
   :deep(.q-breadcrumbs__el) {
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
     color: inherit;
     font-size: 14px;
     font-weight: 800;
+    line-height: 1;
     letter-spacing: 0;
   }
 
+  :deep(.q-breadcrumbs__el:last-child) {
+    color: var(--q-primary);
+  }
+
   :deep(.q-breadcrumbs__separator) {
-    color: rgba(255, 255, 255, 0.48);
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
+    color: var(--app-header-muted);
+    line-height: 1;
     margin: 0 9px;
   }
 }
 
 .app-header__tabs {
-  min-height: 47px;
-  padding: 7px 10px 8px;
+  min-height: 43px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(44, 35, 170, 0.1);
+  border-top: 1px solid var(--app-header-border);
+  background: var(--app-header-surface);
+}
+
+:global(.body--dark .app-header) {
+  --app-header-bg: #171d2b;
+  --app-header-surface: #1d2434;
+  --app-header-text: #edf1f8;
+  --app-header-muted: #9da9bd;
+  --app-header-border: rgba(148, 163, 184, 0.22);
+  --app-header-control-bg: rgba(255, 255, 255, 0.05);
+  --app-header-control-hover: var(--app-primary-soft-strong);
+
+  box-shadow: 0 7px 20px rgba(0, 0, 0, 0.28);
 }
 </style>

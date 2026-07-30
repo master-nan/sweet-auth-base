@@ -54,9 +54,10 @@ interface scrollPosition {
 }
 
 const thumbStyle = {
-  right: '2px',
-  borderRadius: '3px',
-  width: '7px',
+  right: '3px',
+  borderRadius: '999px',
+  backgroundColor: 'var(--app-scrollbar-thumb)',
+  width: '4px',
 }
 
 interface Props {

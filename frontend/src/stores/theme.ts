@@ -1,18 +1,28 @@
 import { defineStore } from 'pinia'
 import { colors, setCssVar, Dark } from 'quasar'
+import {
+  readUIPreferences,
+  writeUIPreferences,
+  type LayoutMode,
+} from 'src/utils/ui-preferences'
 
-const { getPaletteColor, lighten, luminosity } = colors
-const primaryColor = getPaletteColor('primary')
+const { changeAlpha, getPaletteColor, lighten, luminosity } = colors
+const preferences = readUIPreferences()
+const primaryColor = preferences.primaryColor || getPaletteColor('primary')
 const darkColor = '#202638'
 const darkPageColor = '#161b28'
 
 interface ThemeColor {
   primary: string
+  layoutMode: LayoutMode
+  dark: boolean
 }
 
 export const useThemeStore = defineStore('theme', {
   state: (): ThemeColor => ({
     primary: primaryColor,
+    layoutMode: preferences.layoutMode,
+    dark: preferences.dark,
   }),
 
   getters: {
@@ -55,9 +65,33 @@ export const useThemeStore = defineStore('theme', {
   },
 
   actions: {
-    setThemeColor(color: string) {
+    applyPreferences() {
+      this.applyThemeColor(this.primary)
+      Dark.set(this.dark)
+    },
+    applyThemeColor(color: string) {
       this.primary = color
       setCssVar('primary', color)
+      document.documentElement.style.setProperty('--app-primary-soft', changeAlpha(color, 0.08))
+      document.documentElement.style.setProperty(
+        '--app-primary-soft-strong',
+        changeAlpha(color, 0.16),
+      )
+      document.documentElement.style.setProperty('--app-primary-border', changeAlpha(color, 0.28))
+      document.documentElement.style.setProperty('--app-primary-shadow', changeAlpha(color, 0.2))
+    },
+    setThemeColor(color: string) {
+      this.applyThemeColor(color)
+      writeUIPreferences({ primaryColor: color })
+    },
+    setLayoutMode(mode: LayoutMode) {
+      this.layoutMode = mode
+      writeUIPreferences({ layoutMode: mode })
+    },
+    setDarkMode(dark: boolean) {
+      this.dark = dark
+      Dark.set(dark)
+      writeUIPreferences({ dark })
     },
   },
 })

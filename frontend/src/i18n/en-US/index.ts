@@ -115,6 +115,13 @@ export default {
     title: 'Theme Setting',
     themeColor: 'Theme Color',
     setting: 'Setting',
+    layoutMode: 'Header Layout',
+    layoutSplit: 'Split',
+    layoutFull: 'Full Width',
+    darkMode: 'Dark Mode',
+    darkModeHint: 'Switch between light and dark appearance',
+    drawerMini: 'Compact Sidebar',
+    drawerMiniHint: 'Show menu icons only',
   },
 
   button: {

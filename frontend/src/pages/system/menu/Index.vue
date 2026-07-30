@@ -1,145 +1,239 @@
 <template>
-  <base-content class="q-pa-sm menu-page">
-    <master-detail-page
-      class="menu-master-detail"
-      :mode="SysMasterDetailMode.TABLE"
-      master-title="菜单结构"
-      :master-subtitle="menuSummaryText"
-      :detail-title="selectedMenuTitle"
-      :detail-subtitle="selectedMenuSubtitle"
-      master-width="minmax(620px, 44%)"
-      min-width="1180px"
-      min-height="calc(100vh - 150px)"
-    >
-      <template #master-actions>
-        <q-btn
-          v-for="btn in master_top_buttons"
-          :key="btn.id"
-          v-bind="menuButtonDisplayProps(btn)"
-          unelevated
-          :color="btn.color || 'primary'"
-          @click="handleButtonClick(btn)"
-          :disable="loading"
-        >
-          <q-tooltip>{{ btn.name }}</q-tooltip>
-        </q-btn>
-        <q-btn round outline color="primary" icon="refresh" @click="fetchMenus" :loading="loading">
-          <q-tooltip>刷新菜单</q-tooltip>
-        </q-btn>
-      </template>
-
-      <template #master-toolbar>
-        <div class="menu-master-toolbar">
-          <q-input
-            class="full-width"
-            outlined
-            v-model="searchText"
-            placeholder="搜索菜单名称 / 编码 / 路径 / 组件"
-            clearable
-          >
-            <template v-slot:append>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+  <base-content class="q-pa-sm menu-page" :class="{ 'menu-page--dark': $q.dark.isActive }">
+    <q-card flat bordered class="menu-page-header-card">
+      <q-card-section class="menu-page-header">
+        <q-avatar
+          class="menu-icon-tile"
+          color="primary"
+          text-color="white"
+          icon="account_tree"
+        />
+        <div>
+          <div class="menu-page-title">菜单管理</div>
+          <div class="menu-page-subtitle">统一维护页面导航、操作按钮与接口权限</div>
         </div>
-      </template>
+        <q-space />
+        <div class="menu-page-description">菜单定义页面入口，按钮定义功能操作</div>
+      </q-card-section>
+    </q-card>
 
-      <template #master-content>
-        <tree-table
-          class="fit sticky-header-table menu-tree-table"
-          :data="filteredMenuData"
-          :columns="columns"
-          :selected-row-id="selectedMenu?.id ?? null"
-          :loading="loading"
-          :dark="$q.dark.isActive"
-          :indent="!is_drawer_mini"
-          bordered
-          separator="cell"
-          flat
-          @node-selected="handleNodeSelected"
-        >
-          <template v-slot:body-cell-icon="props">
-            <q-icon :name="(props as any).row.icon || 'folder'" size="sm" class="q-mr-xs" />
-          </template>
-          <template v-slot:body-cell-actions="props">
-            <div class="q-gutter-xs text-center">
-              <q-btn
-                v-for="btn in master_line_buttons"
-                :key="btn.id"
-                v-bind="menuButtonDisplayProps(btn)"
-                flat
-                dense
-                :color="btn.color || 'primary'"
-                @click.stop="handleButtonClick(btn, props.row)"
-                :loading="loading"
-                size="sm"
-              >
-                <q-tooltip>{{ btn.name }}</q-tooltip>
-              </q-btn>
-            </div>
-          </template>
-        </tree-table>
-      </template>
-
-      <template #detail-context>
-        <div v-if="selectedMenu" class="menu-detail-context">
-          <div class="menu-icon-tile">
-            <q-icon :name="selectedMenu.icon || 'menu'" />
-          </div>
-          <div class="menu-detail-main">
-            <div class="menu-detail-title">{{ t(selectedMenu.title) }}</div>
-            <div class="menu-detail-meta">
-              <q-chip dense square color="primary" text-color="white">
-                {{ selectedMenu.name }}
-              </q-chip>
-              <span v-if="selectedMenu.path">{{ selectedMenu.path }}</span>
-              <span v-if="selectedMenu.component">{{ selectedMenu.component }}</span>
-            </div>
-          </div>
-        </div>
-        <div v-else class="menu-detail-context menu-detail-context--empty">
-          <q-icon name="menu_open" size="28px" />
-          <div>
-            <div class="menu-detail-title">请选择菜单</div>
-            <div class="menu-detail-meta">左侧选择一个菜单后维护它的按钮子表</div>
-          </div>
-        </div>
-      </template>
-
-      <template #detail-toolbar>
-        <div v-if="selectedMenu" class="menu-detail-toolbar">
-          <q-tabs
-            v-model="activeTab"
-            class="menu-detail-tabs"
-            active-color="primary"
-            indicator-color="primary"
-            align="left"
-            narrow-indicator
-          >
-            <q-tab name="buttons" label="按钮管理" icon="touch_app" />
-            <q-tab name="preview" label="菜单预览" icon="visibility" />
-          </q-tabs>
-          <q-space />
-          <div v-if="activeTab === 'buttons'" class="menu-detail-actions">
+    <div class="menu-workbench">
+      <div class="menu-workbench-body">
+        <section class="menu-tree-pane">
+          <div class="menu-pane-header">
+            <div class="menu-pane-title">菜单结构</div>
+            <q-badge rounded color="deep-purple-1" text-color="primary">
+              {{ countMenus(filteredMenuData) }}
+            </q-badge>
+            <q-space />
             <q-btn
-              v-for="btn in detailToolbarButtons"
+              round
+              outline
+              color="primary"
+              icon="refresh"
+              size="sm"
+              :loading="loading"
+              @click="fetchMenus"
+            >
+              <q-tooltip>刷新菜单</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-for="btn in master_top_buttons"
               :key="btn.id"
               v-bind="menuButtonDisplayProps(btn)"
-              unelevated
               :color="btn.color || 'primary'"
+              size="sm"
+              :disable="loading"
               @click="handleButtonClick(btn)"
-            />
+            >
+              <q-tooltip>{{ btn.name }}</q-tooltip>
+            </q-btn>
           </div>
-        </div>
-      </template>
 
-      <template #detail-content>
-        <q-tab-panels v-if="selectedMenu" v-model="activeTab" animated class="menu-tab-panels">
-          <q-tab-panel name="buttons" class="q-pa-none">
+          <div class="menu-tree-search">
+            <q-input
+              v-model="searchText"
+              outlined
+              dense
+              clearable
+              placeholder="搜索菜单名称、编码或路径"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          </div>
+
+          <q-scroll-area class="menu-tree-scroll">
+            <q-tree
+              v-model:expanded="expandedMenuIds"
+              :selected="selectedMenu?.id ?? null"
+              :nodes="filteredMenuData"
+              node-key="id"
+              children-key="children"
+              no-connectors
+              class="menu-tree"
+            >
+              <template #default-header="{ node }">
+                <div
+                  class="menu-tree-node"
+                  :class="{ 'menu-tree-node--selected': selectedMenu?.id === node.id }"
+                  @click.stop="handleNodeSelected(node)"
+                >
+                  <q-icon
+                    :name="node.icon || (node.children?.length ? 'folder' : 'insert_drive_file')"
+                    class="menu-tree-node-icon"
+                  />
+                  <div class="menu-tree-node-main">
+                    <div class="menu-tree-node-title">{{ t(node.title) }}</div>
+                    <div class="menu-tree-node-meta">{{ menuNodeMeta(node) }}</div>
+                  </div>
+                  <span
+                    v-if="selectedMenu?.id !== node.id"
+                    class="menu-tree-state"
+                    :class="{ 'menu-tree-state--disabled': !isMenuEnabled(node) }"
+                  />
+                  <div class="menu-tree-node-actions">
+                    <q-btn
+                      v-for="btn in treeLineButtons"
+                      :key="btn.id"
+                      v-bind="menuButtonDisplayProps(btn)"
+                      :icon="treeActionIcon(btn)"
+                      flat
+                      dense
+                      round
+                      size="xs"
+                      color="primary"
+                      :loading="loading"
+                      @click.stop="handleButtonClick(btn, node)"
+                    >
+                      <q-tooltip>{{ btn.name }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                </div>
+              </template>
+            </q-tree>
+          </q-scroll-area>
+        </section>
+
+        <section v-if="selectedMenu" class="menu-detail-pane">
+          <div class="menu-detail-header">
+            <q-avatar
+              class="menu-icon-tile"
+              color="deep-purple-1"
+              text-color="primary"
+              :icon="selectedMenu.icon || 'menu'"
+            />
+            <div class="menu-detail-heading">
+              <div class="menu-detail-title-row">
+                <div class="menu-detail-title">{{ t(selectedMenu.title) }}</div>
+                <div
+                  class="menu-detail-status"
+                  :class="{ 'menu-detail-status--disabled': !isMenuEnabled(selectedMenu) }"
+                >
+                  {{ isMenuEnabled(selectedMenu) ? '正常显示' : '已隐藏' }}
+                </div>
+              </div>
+              <div class="menu-detail-meta">
+                <q-badge color="deep-purple-1" text-color="primary">
+                  {{ selectedMenu.name }}
+                </q-badge>
+                <span>{{ selectedMenu.path || '-' }}</span>
+              </div>
+            </div>
+            <q-space />
+            <q-btn
+              v-if="selectedMenuUpdateButton"
+              v-bind="menuButtonDisplayProps(selectedMenuUpdateButton)"
+              icon="edit"
+              label="编辑菜单"
+              :round="false"
+              :color="selectedMenuUpdateButton.color || 'primary'"
+              size="sm"
+              @click="handleButtonClick(selectedMenuUpdateButton, selectedMenu)"
+            >
+              <q-tooltip>{{ selectedMenuUpdateButton.name }}</q-tooltip>
+            </q-btn>
+          </div>
+
+          <div class="menu-detail-summary">
+            <div class="menu-summary-item menu-summary-item--wide">
+              <div class="menu-summary-label">页面组件</div>
+              <div class="menu-summary-value">{{ selectedMenu.component || '-' }}</div>
+            </div>
+            <div class="menu-summary-item">
+              <div class="menu-summary-label">页面类型</div>
+              <div class="menu-summary-value">{{ menuPageTypeLabel(selectedMenu.page_type) }}</div>
+            </div>
+            <div class="menu-summary-item">
+              <div class="menu-summary-label">父级菜单</div>
+              <div class="menu-summary-value">{{ selectedParentMenuTitle }}</div>
+            </div>
+            <div class="menu-summary-item">
+              <div class="menu-summary-label">排序</div>
+              <div class="menu-summary-value">{{ selectedMenu.sequence ?? '-' }}</div>
+            </div>
+          </div>
+
+          <q-tabs
+            v-model="activeTab"
+            dense
+            align="left"
+            active-color="primary"
+            indicator-color="primary"
+            narrow-indicator
+            class="menu-detail-tabs"
+          >
+            <q-tab name="page_buttons">
+              <div class="menu-tab-label">
+                <q-icon name="touch_app" />
+                <span>页面按钮</span>
+                <q-badge rounded color="deep-purple-1" text-color="primary">
+                  {{ pageMenuButtons.length }}
+                </q-badge>
+              </div>
+            </q-tab>
+            <q-tab name="api_permissions">
+              <div class="menu-tab-label">
+                <q-icon name="verified_user" />
+                <span>接口权限</span>
+                <q-badge rounded color="deep-purple-1" text-color="primary">
+                  {{ apiPermissionButtons.length }}
+                </q-badge>
+              </div>
+            </q-tab>
+            <q-tab name="preview">
+              <div class="menu-tab-label">
+                <q-icon name="visibility" />
+                <span>菜单预览</span>
+              </div>
+            </q-tab>
+          </q-tabs>
+
+          <div v-if="activeTab !== 'preview'" class="menu-button-panel">
+            <div class="menu-button-toolbar">
+              <div>
+                <div class="menu-button-toolbar-title">{{ activeButtonPanelTitle }}</div>
+                <div class="menu-button-toolbar-subtitle">{{ activeButtonPanelSubtitle }}</div>
+              </div>
+              <q-space />
+              <q-btn
+                v-for="btn in detailToolbarButtons"
+                :key="btn.id"
+                v-bind="menuButtonDisplayProps(btn)"
+                :label="activeToolbarButtonLabel(btn)"
+                :color="btn.color || 'primary'"
+                @click="handleButtonClick(btn)"
+              >
+                <q-tooltip>{{ activeToolbarButtonLabel(btn) }}</q-tooltip>
+              </q-btn>
+            </div>
+
             <q-table
-              class="fit sticky-header-table menu-button-table"
-              :rows="menuButtons"
-              :columns="buttonColumns"
+              ref="menuButtonTableRef"
+              class="menu-button-table sticky-header-table"
+              :rows="activeButtonRows"
+              :columns="buttonDisplayColumns"
               row-key="id"
               bordered
               flat
@@ -148,93 +242,148 @@
               :pagination="{ rowsPerPage: 0 }"
               hide-pagination
             >
-              <template v-slot:body-cell-actions="props">
-                <q-td :props="props" class="q-gutter-xs">
-                  <q-btn
-                    v-for="btn in detailRowButtons"
-                    :key="btn.id"
-                    flat
-                    v-bind="menuButtonDisplayProps(btn)"
-                    :color="btn.color || 'primary'"
-                    size="sm"
-                    @click="handleButtonClick(btn, props.row)"
-                  >
-                    <q-tooltip>{{ btn.name }}</q-tooltip>
-                  </q-btn>
+              <template #body-cell-feature="props">
+                <q-td :props="props">
+                  <div class="menu-button-feature">
+                    <q-avatar
+                      class="menu-icon-tile"
+                      size="30px"
+                      color="deep-purple-1"
+                      text-color="primary"
+                      :icon="props.row.icon || 'touch_app'"
+                    />
+                    <div>
+                      <div class="menu-button-name">{{ props.row.name }}</div>
+                      <div class="menu-button-code">{{ props.row.code }}</div>
+                    </div>
+                  </div>
                 </q-td>
               </template>
-              <template v-slot:no-data>
-                <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-lg">
-                  <q-icon name="touch_app" size="28px" />
-                  <span>当前菜单还没有配置按钮</span>
+              <template #body-cell-position="props">
+                <q-td :props="props">
+                  <q-badge color="grey-3" text-color="grey-8">
+                    {{ menuButtonPositionLabel(props.row.position) }}
+                  </q-badge>
+                </q-td>
+              </template>
+              <template #body-cell-event_action="props">
+                <q-td :props="props">
+                  <span class="menu-button-action">{{ props.row.event_action || '-' }}</span>
+                </q-td>
+              </template>
+              <template #body-cell-permission="props">
+                <q-td :props="props">
+                  <div class="menu-button-permission">
+                    <q-badge
+                      v-if="props.row.http_method"
+                      :color="httpMethodColor(props.row.http_method)"
+                    >
+                      {{ props.row.http_method.toUpperCase() }}
+                    </q-badge>
+                    <span class="menu-button-api-path">{{ props.row.api_path || '-' }}</span>
+                  </div>
+                </q-td>
+              </template>
+              <template #body-cell-state="props">
+                <q-td :props="props">
+                  <q-badge outline :color="isMenuButtonEnabled(props.row) ? 'positive' : 'grey'">
+                    {{ isMenuButtonEnabled(props.row) ? '启用' : '停用' }}
+                  </q-badge>
+                </q-td>
+              </template>
+              <template #body-cell-actions="props">
+                <q-td :props="props">
+                  <div class="row items-center no-wrap q-gutter-xs">
+                    <q-btn
+                      v-for="btn in detailRowButtons"
+                      :key="btn.id"
+                      v-bind="menuButtonDisplayProps(btn)"
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      :color="btn.color || 'primary'"
+                      @click="handleButtonClick(btn, props.row)"
+                    >
+                      <q-tooltip>{{ btn.name }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                </q-td>
+              </template>
+              <template #no-data>
+                <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
+                  <q-icon
+                    :name="activeTab === 'page_buttons' ? 'touch_app' : 'verified_user'"
+                    size="28px"
+                  />
+                  <span>{{ activeButtonEmptyText }}</span>
                 </div>
               </template>
             </q-table>
-          </q-tab-panel>
+          </div>
 
-          <q-tab-panel name="preview" class="q-pa-none">
-            <div class="preview-container">
-              <div class="preview-sidebar">
-                <div class="preview-header">应用导航</div>
-                <q-scroll-area class="preview-scroll">
-                  <q-list bordered separator>
-                    <q-item-label header>菜单视图</q-item-label>
-                    <template v-for="menu in previewMenus" :key="menu.id">
-                      <q-expansion-item
-                        v-if="menu.children && menu.children.length > 0"
-                        :icon="menu.icon || 'folder'"
-                        :label="t(menu.title)"
-                        :default-opened="
-                          selectedMenu &&
-                          (selectedMenu.id === menu.id || selectedMenu.pid === menu.id)
-                        "
-                      >
-                        <q-list padding>
-                          <q-item
-                            v-for="subMenu in menu.children"
-                            :key="subMenu.id"
-                            clickable
-                            :active="selectedMenu && selectedMenu.id === subMenu.id"
-                            active-class="bg-primary text-white"
-                          >
-                            <q-item-section avatar>
-                              <q-icon :name="subMenu.icon || 'subdirectory_arrow_right'" />
-                            </q-item-section>
-                            <q-item-section>{{ t(subMenu.title) }}</q-item-section>
-                          </q-item>
-                        </q-list>
-                      </q-expansion-item>
+          <div v-else class="preview-container">
+            <div class="preview-sidebar">
+              <div class="preview-header">应用导航</div>
+              <q-scroll-area class="preview-scroll">
+                <q-list bordered separator :dark="$q.dark.isActive">
+                  <q-item-label header>菜单视图</q-item-label>
+                  <template v-for="menu in previewMenus" :key="menu.id">
+                    <q-expansion-item
+                      v-if="menu.children && menu.children.length > 0"
+                      :icon="menu.icon || 'folder'"
+                      :label="t(menu.title)"
+                      :default-opened="
+                        selectedMenu &&
+                        (selectedMenu.id === menu.id || selectedMenu.pid === menu.id)
+                      "
+                    >
+                      <q-list padding :dark="$q.dark.isActive">
+                        <q-item
+                          v-for="subMenu in menu.children"
+                          :key="subMenu.id"
+                          class="q-pl-xl"
+                          clickable
+                          :active="selectedMenu && selectedMenu.id === subMenu.id"
+                          active-class="bg-primary text-white"
+                        >
+                          <q-item-section avatar>
+                            <q-icon :name="subMenu.icon || 'subdirectory_arrow_right'" />
+                          </q-item-section>
+                          <q-item-section>{{ t(subMenu.title) }}</q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-expansion-item>
 
-                      <q-item
-                        v-else
-                        clickable
-                        :active="selectedMenu && selectedMenu.id === menu.id"
-                        active-class="bg-primary text-white"
-                      >
-                        <q-item-section avatar>
-                          <q-icon :name="menu.icon || 'folder'" />
-                        </q-item-section>
-                        <q-item-section>{{ t(menu.title) }}</q-item-section>
-                      </q-item>
-                    </template>
-                  </q-list>
-                </q-scroll-area>
-              </div>
-
-              <div class="preview-content">
-                <menu-route-preview :selectedMenu="selectedMenu" :menuTree="menuData" />
-              </div>
+                    <q-item
+                      v-else
+                      clickable
+                      :active="selectedMenu && selectedMenu.id === menu.id"
+                      active-class="bg-primary text-white"
+                    >
+                      <q-item-section avatar>
+                        <q-icon :name="menu.icon || 'folder'" />
+                      </q-item-section>
+                      <q-item-section>{{ t(menu.title) }}</q-item-section>
+                    </q-item>
+                  </template>
+                </q-list>
+              </q-scroll-area>
             </div>
-          </q-tab-panel>
-        </q-tab-panels>
 
-        <div v-else class="menu-empty-state">
-          <q-icon name="account_tree" size="76px" />
+            <div class="preview-content">
+              <menu-route-preview :selectedMenu="selectedMenu" :menuTree="menuData" />
+            </div>
+          </div>
+        </section>
+
+        <section v-else class="menu-detail-empty">
+          <q-icon name="account_tree" size="72px" />
           <div class="menu-empty-title">选择左侧菜单</div>
-          <div class="menu-empty-desc">菜单是主表，按钮是当前菜单下的子表。</div>
-        </div>
-      </template>
-    </master-detail-page>
+          <div class="menu-empty-desc">选择菜单后维护页面按钮与接口权限</div>
+        </section>
+      </div>
+    </div>
 
     <!-- 菜单表单对话框 -->
     <dynamic-form-dialog
@@ -262,16 +411,13 @@
 
 <script setup lang="ts">
 defineOptions({ name: 'system_menu' })
-import { ref, computed, onMounted } from 'vue'
-import { useQuasar } from 'quasar'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { useQuasar, type QTableProps } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'components/BaseContent/BaseContent.vue'
-import TreeTable from 'components/TreeTable/TreeTable.vue'
-import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import MenuRoutePreview from 'src/components/MenuPreview/MenuRoutePreview.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import { useLoadingStore } from 'src/stores/loading'
-import { useAppStore } from 'src/stores/app'
 import { storeToRefs } from 'pinia'
 import {
   useMenuApi,
@@ -283,20 +429,19 @@ import {
 } from 'src/api/services/sys-menu'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import {
-  SysMasterDetailMode,
   SysMenuButtonEventAction,
   SysMenuButtonEventActionMap,
   SysMenuButtonPosition,
+  SysMenuButtonPositionMap,
   SysTableFieldInputType,
   SysTableFieldType,
 } from 'src/types/enum'
-import { type QTableProps } from 'quasar'
-import type { Query, TableColumn } from 'src/types/global'
+import type { Query } from 'src/types/global'
 import { useI18n } from 'vue-i18n'
 import { useDictStore } from 'src/stores/dict'
-import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { useMasterDetailPageButtons } from 'src/composables/page-buttons'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { isApiPermission, isPageButton } from 'src/utils/menu-button'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 
 const { t } = useI18n()
@@ -304,8 +449,6 @@ const { t } = useI18n()
 // 全局状态
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
-const appStore = useAppStore()
-const { is_drawer_mini } = storeToRefs(appStore)
 
 // API 和工具
 const $q = useQuasar()
@@ -320,7 +463,43 @@ const dictStore = useDictStore()
 const menuData = ref<Menu[]>([])
 const searchText = ref('')
 const selectedMenu = ref<Menu | null>(null)
-const activeTab = ref('buttons')
+const activeTab = ref<'page_buttons' | 'api_permissions' | 'preview'>('page_buttons')
+const expandedMenuIds = ref<number[]>([])
+type ButtonTableTab = 'page_buttons' | 'api_permissions'
+type ButtonTableRef = { $el?: HTMLElement }
+const menuButtonTableRef = ref<ButtonTableRef | null>(null)
+const buttonTableScrollPositions: Record<ButtonTableTab, number> = {
+  page_buttons: 0,
+  api_permissions: 0,
+}
+
+const isButtonTableTab = (tab: typeof activeTab.value): tab is ButtonTableTab =>
+  tab === 'page_buttons' || tab === 'api_permissions'
+
+const getButtonTableScrollElement = () =>
+  menuButtonTableRef.value?.$el?.querySelector<HTMLElement>('.q-table__middle') || null
+
+const resetButtonTableScroll = () => {
+  buttonTableScrollPositions.page_buttons = 0
+  buttonTableScrollPositions.api_permissions = 0
+  const scrollElement = getButtonTableScrollElement()
+  if (scrollElement) scrollElement.scrollTop = 0
+}
+
+watch(activeTab, async (nextTab, previousTab) => {
+  const scrollElement = getButtonTableScrollElement()
+  if (scrollElement && isButtonTableTab(previousTab)) {
+    buttonTableScrollPositions[previousTab] = scrollElement.scrollTop
+  }
+
+  await nextTick()
+
+  if (!isButtonTableTab(nextTab)) return
+  const nextScrollElement = getButtonTableScrollElement()
+  if (nextScrollElement) {
+    nextScrollElement.scrollTop = buttonTableScrollPositions[nextTab]
+  }
+})
 
 const isMenuButtonChildAction = (btn: MenuButton) => {
   return (
@@ -337,7 +516,6 @@ const isMenuButtonChildAction = (btn: MenuButton) => {
 const {
   master_line_buttons,
   master_top_buttons,
-  master_has_line_buttons,
   detail_line_buttons,
   detail_top_buttons,
   detail_form_top_buttons,
@@ -354,6 +532,33 @@ const detailRowButtons = computed(() => [
   ...detail_form_bottom_buttons.value,
 ])
 
+const selectedMenuUpdateButton = computed(() =>
+  master_line_buttons.value.find((btn) => btn.event_action === 'update'),
+)
+
+const treeActionOrder: Record<string, number> = {
+  create_child: 10,
+  update: 20,
+  duplicate: 30,
+  delete: 40,
+}
+
+const treeLineButtons = computed(() =>
+  [...master_line_buttons.value].sort(
+    (a, b) => (treeActionOrder[a.event_action] ?? 100) - (treeActionOrder[b.event_action] ?? 100),
+  ),
+)
+
+const treeActionIcon = (button: MenuButton) => {
+  const iconMap: Record<string, string> = {
+    create_child: 'add',
+    update: 'edit',
+    duplicate: 'content_copy',
+    delete: 'delete_outline',
+  }
+  return iconMap[button.event_action] || button.icon || 'more_horiz'
+}
+
 const countMenus = (menus: Menu[]): number =>
   menus.reduce((total, menu) => total + 1 + countMenus(menu.children || []), 0)
 
@@ -361,6 +566,15 @@ const findMenu = (menus: Menu[], id: number): Menu | undefined => {
   for (const menu of menus) {
     if (menu.id === id) return menu
     const found = findMenu(menu.children || [], id)
+    if (found) return found
+  }
+  return undefined
+}
+
+const findParentMenu = (menus: Menu[], id: number): Menu | undefined => {
+  for (const menu of menus) {
+    if (menu.children?.some((child) => child.id === id)) return menu
+    const found = findParentMenu(menu.children || [], id)
     if (found) return found
   }
   return undefined
@@ -375,6 +589,51 @@ const findMenuByName = (menus: Menu[], name: string): Menu | undefined => {
   return undefined
 }
 
+const collectExpandableMenuIds = (menus: Menu[]): number[] =>
+  menus.flatMap((menu) => [
+    ...(menu.children?.length ? [menu.id] : []),
+    ...collectExpandableMenuIds(menu.children || []),
+  ])
+
+const menuNodeMeta = (menu: Menu) => {
+  if (menu.children?.length) return `${menu.name} · ${menu.children.length} 个子菜单`
+  return [menu.name, menu.path].filter(Boolean).join(' · ') || '-'
+}
+
+const isMenuEnabled = (menu: Menu) => menu.state !== false && !menu.is_hidden
+
+const isMenuButtonEnabled = (button: MenuButton) =>
+  button.state !== false && button.is_hidden !== true && button.is_disabled !== true
+
+const menuPageTypeLabel = (pageType?: string) => {
+  const labels: Record<string, string> = {
+    directory: '目录',
+    fixed: '固定页面',
+    low_code: '低代码页面',
+  }
+  return pageType ? labels[pageType] || pageType : '-'
+}
+
+const menuButtonPositionLabel = (position: SysMenuButtonPosition) =>
+  SysMenuButtonPositionMap[position] || '-'
+
+const httpMethodColor = (method: string) => {
+  const colors: Record<string, string> = {
+    GET: 'blue-7',
+    POST: 'primary',
+    PUT: 'orange-7',
+    PATCH: 'deep-orange-7',
+    DELETE: 'negative',
+  }
+  return colors[method.toUpperCase()] || 'grey-7'
+}
+
+const selectedParentMenuTitle = computed(() => {
+  if (!selectedMenu.value) return '-'
+  const parent = findParentMenu(menuData.value, selectedMenu.value.id)
+  return parent ? t(parent.title) : '顶级菜单'
+})
+
 const firstMenu = (menus: Menu[]): Menu | null => {
   for (const menu of menus) {
     return menu
@@ -387,21 +646,6 @@ const findCurrentRouteMenu = (menus: Menu[]) => {
   if (!routeName) return undefined
   return findMenuByName(menus, routeName)
 }
-
-const menuSummaryText = computed(() => {
-  const total = countMenus(menuData.value)
-  const visible = countMenus(filteredMenuData.value)
-  return searchText.value ? `${visible} / ${total} 个菜单` : `${total} 个菜单`
-})
-
-const selectedMenuTitle = computed(() =>
-  selectedMenu.value ? t(selectedMenu.value.title) : '按钮子表',
-)
-
-const selectedMenuSubtitle = computed(() => {
-  if (!selectedMenu.value) return '选择一个菜单后维护按钮配置'
-  return selectedMenu.value.path || selectedMenu.value.component || selectedMenu.value.name
-})
 
 const action_handlers: Record<string, (row?: any) => void> = {
   create: () => openAddDialog(0),
@@ -465,18 +709,56 @@ const buttonEditData = ref<MenuButtonFormData>({
   is_button: true,
   is_disabled: false,
 })
-const isButtonEdit = computed(() => 'id' in buttonEditData.value && Boolean(buttonEditData.value.id))
-const currentButtonIsPageButton = computed(() => normalizeBooleanValue(buttonEditData.value.is_button, true))
+const isButtonEdit = computed(
+  () => 'id' in buttonEditData.value && Boolean(buttonEditData.value.id),
+)
+const currentButtonIsPageButton = computed(() =>
+  normalizeBooleanValue(buttonEditData.value.is_button, true),
+)
 const buttonDialogTitle = computed(() => {
   const kind = currentButtonIsPageButton.value ? '页面按钮' : '接口权限'
   return `${isButtonEdit.value ? '编辑' : '新增'}${kind}`
 })
 
+const pageMenuButtons = computed(() =>
+  menuButtons.value.filter(isPageButton).sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
+)
+
+const apiPermissionButtons = computed(() =>
+  menuButtons.value.filter(isApiPermission).sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
+)
+
+const activeButtonRows = computed(() =>
+  activeTab.value === 'api_permissions' ? apiPermissionButtons.value : pageMenuButtons.value,
+)
+
+const activeButtonPanelTitle = computed(() =>
+  activeTab.value === 'api_permissions' ? '接口权限' : '页面按钮',
+)
+
+const activeButtonPanelSubtitle = computed(() =>
+  activeTab.value === 'api_permissions'
+    ? '维护当前页面使用但不直接显示为按钮的接口权限'
+    : '控制当前页面中可见的操作及其接口权限',
+)
+
+const activeButtonEmptyText = computed(() =>
+  activeTab.value === 'api_permissions'
+    ? '当前菜单还没有配置接口权限'
+    : '当前菜单还没有配置页面按钮',
+)
+
+const activeToolbarButtonLabel = (button: MenuButton) =>
+  activeTab.value === 'api_permissions' && button.event_action === 'create_button'
+    ? '新增接口权限'
+    : button.name
+
 const normalizeBooleanValue = (value: unknown, fallback = false): boolean => {
   if (value === undefined || value === null || value === '') return fallback
   if (typeof value === 'boolean') return value
   if (typeof value === 'number') return value !== 0
-  const normalized = String(value).trim().toLowerCase()
+  if (typeof value !== 'string') return fallback
+  const normalized = value.trim().toLowerCase()
   if (['true', '1', 't', 'yes', 'y', '是'].includes(normalized)) return true
   if (['false', '0', 'f', 'no', 'n', '否'].includes(normalized)) return false
   return fallback
@@ -510,16 +792,54 @@ const query = ref<Query>({
   include_deleted: false,
 })
 
-// 保存查询到的表字段，供表单使用
-const tableFields = ref<TableField[]>([])
-
-// 表格列定义 - 修改这部分
-const columns = ref<TableColumn[]>([])
-
-const table_fields_advanced = ref<TableField[]>([])
-const visibleColumns = ref<string[]>([])
-
-const buttonColumns = ref<QTableProps['columns']>([])
+const buttonDisplayColumns: QTableProps['columns'] = [
+  {
+    name: 'feature',
+    label: '功能按钮',
+    field: 'name',
+    align: 'left',
+    style: 'width: 22%',
+    headerStyle: 'width: 22%',
+  },
+  {
+    name: 'position',
+    label: '展示位置',
+    field: 'position',
+    align: 'left',
+    style: 'width: 13%',
+    headerStyle: 'width: 13%',
+  },
+  {
+    name: 'event_action',
+    label: '触发动作',
+    field: 'event_action',
+    align: 'left',
+    style: 'width: 16%',
+    headerStyle: 'width: 16%',
+  },
+  {
+    name: 'permission',
+    label: '接口权限',
+    field: 'api_path',
+    align: 'left',
+  },
+  {
+    name: 'state',
+    label: '状态',
+    field: 'state',
+    align: 'left',
+    style: 'width: 9%',
+    headerStyle: 'width: 9%',
+  },
+  {
+    name: 'actions',
+    label: '操作',
+    field: 'id',
+    align: 'left',
+    style: 'width: 90px',
+    headerStyle: 'width: 90px',
+  },
+]
 
 const normalizeMenuFields = (fields: TableField[] = []) => {
   const labelMap: Record<string, string> = {
@@ -638,35 +958,10 @@ const fetchMenuTableFields = async () => {
     allDictCodes.push(...menuFields_.map((f) => f.dict_code).filter((c): c is string => !!c))
   }
 
-  // 并行加载字典和关联表查找映射
-  const [, btnRelationLookups, menuRelationLookups] = await Promise.all([
-    dictStore.loadDicts([...new Set(allDictCodes)]),
-    btnFields ? buildRelationLookups(btnFields) : Promise.resolve({}),
-    menuFields_ ? buildRelationLookups(menuFields_) : Promise.resolve({}),
-  ])
-
-  // 用 buildTableColumns 从元数据自动构建按钮列
-  if (btnFields) {
-    const { columns: btnCols } = buildTableColumns(btnFields, {
-      getDictLabel: dictStore.getDictLabel,
-      relationLookups: btnRelationLookups,
-    })
-    buttonColumns.value = detailRowButtons.value.length
-      ? btnCols
-      : btnCols.filter((c) => c.name !== 'actions')
-  }
+  await dictStore.loadDicts([...new Set(allDictCodes)])
 
   // 处理菜单字段元数据
   if (menuFields_) {
-    tableFields.value = menuFields_
-
-    const { columns: cols, advancedFields } = buildTableColumns(menuFields_, {
-      getDictLabel: dictStore.getDictLabel,
-      relationLookups: menuRelationLookups,
-    })
-    columns.value = master_has_line_buttons.value ? cols : cols.filter((c) => c.name !== 'actions')
-    table_fields_advanced.value = advancedFields
-    visibleColumns.value = columns.value.map((c) => c.name)
     menuFields.value = menuFields_.filter((field) => field.is_insert_show || field.is_update_show)
   }
 }
@@ -676,6 +971,11 @@ const fetchMenus = async () => {
   const res = await menuApi.queryMenu(query.value)
   if (res.success) {
     menuData.value = Array.isArray(res.data) ? res.data : []
+    if (expandedMenuIds.value.length === 0) {
+      expandedMenuIds.value = menuData.value
+        .filter((menu) => Boolean(menu.children?.length))
+        .map((menu) => menu.id)
+    }
     const routeMenu = findCurrentRouteMenu(menuData.value)
     const nextSelected = selectedMenu.value
       ? findMenu(menuData.value, selectedMenu.value.id) || routeMenu || firstMenu(menuData.value)
@@ -697,8 +997,10 @@ const filteredMenuData = computed(() => {
   const searchLower = searchText.value.toLowerCase()
   const filterNodes = (nodes: Menu[]): Menu[] => {
     return nodes.filter((node) => {
+      const translatedTitle = t(node.title).toLowerCase()
       const matches =
         node.title.toLowerCase().includes(searchLower) ||
+        translatedTitle.includes(searchLower) ||
         node.name.toLowerCase().includes(searchLower) ||
         node.path.toLowerCase().includes(searchLower) ||
         (node.component && node.component.toLowerCase().includes(searchLower))
@@ -714,6 +1016,11 @@ const filteredMenuData = computed(() => {
   return filterNodes([...menuData.value])
 })
 
+watch(searchText, (value) => {
+  if (!value.trim()) return
+  expandedMenuIds.value = collectExpandableMenuIds(filteredMenuData.value)
+})
+
 // 获取按钮列表
 const fetchMenuButtons = async (menuId: number) => {
   const res = await menuApi.queryMenuButtons(menuId)
@@ -724,8 +1031,10 @@ const fetchMenuButtons = async (menuId: number) => {
 
 // 选择菜单节点
 const handleNodeSelected = (menu: Menu) => {
+  if (selectedMenu.value?.id === menu.id) return
   selectedMenu.value = menu
-  fetchMenuButtons(menu.id)
+  resetButtonTableScroll()
+  void fetchMenuButtons(menu.id)
 }
 
 // 获取下一个序号
@@ -846,6 +1155,7 @@ const handleFormSubmit = async (formPayload: { data: Menu; isEdit: boolean; id?:
 // 添加按钮
 const openAddButtonDialog = () => {
   if (!selectedMenu.value) return
+  const createAsPageButton = activeTab.value !== 'api_permissions'
 
   buttonEditData.value = {
     menu_id: selectedMenu.value.id,
@@ -864,7 +1174,7 @@ const openAddButtonDialog = () => {
     params_schema: '',
     confirm_text: '',
     is_hidden: false,
-    is_button: true,
+    is_button: createAsPageButton,
     is_disabled: false,
     display_mode: 'auto',
   }
@@ -941,7 +1251,11 @@ const validateMenuButtonPayload = (button: MenuButtonCreateReq | MenuButtonUpdat
     $q.notify({ type: 'warning', position: 'top-right', message: '请选择事件动作' })
     return false
   }
-  if (!Object.values(SysMenuButtonEventAction).includes(button.event_action as SysMenuButtonEventAction)) {
+  if (
+    !Object.values(SysMenuButtonEventAction).includes(
+      button.event_action as SysMenuButtonEventAction,
+    )
+  ) {
     $q.notify({ type: 'warning', position: 'top-right', message: '事件动作不在系统枚举范围内' })
     return false
   }
@@ -953,9 +1267,10 @@ const handleButtonFormSubmit = async (formPayload: {
   isEdit: boolean
   id?: number
 }) => {
-  const data = formPayload.isEdit && formPayload.id
-    ? { ...formPayload.data, id: formPayload.id }
-    : formPayload.data
+  const data =
+    formPayload.isEdit && formPayload.id
+      ? { ...formPayload.data, id: formPayload.id }
+      : formPayload.data
   await saveButton(data)
 }
 
@@ -1003,132 +1318,538 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-.menu-master-toolbar {
-  padding: 12px 14px;
-  border-bottom: 1px solid #e3e8f2;
-  background: #fbfcff;
+.menu-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  --menu-surface: #fff;
+  --menu-subtle: #fbfcff;
+  --menu-border: #e3e8f2;
+  --menu-text: #172033;
+  --menu-muted: #738097;
+  --menu-hover: #f5f6fb;
+  --menu-selected: #f0edff;
+  --menu-header-bg:
+    linear-gradient(135deg, rgba(115, 103, 240, 0.08), rgba(0, 184, 169, 0.05)), #fff;
 }
 
-.menu-tree-table,
-.menu-button-table {
-  :deep(.q-table__top) {
-    padding: 0;
-  }
-
-  :deep(th) {
-    height: 48px;
-    background: #fbfcff;
-    color: #172033;
-    font-weight: 800;
-  }
-
-  :deep(td) {
-    height: 48px;
-  }
+.menu-page--dark {
+  --menu-surface: #1f2636;
+  --menu-subtle: #232b3d;
+  --menu-border: #39445a;
+  --menu-text: #f1f4fa;
+  --menu-muted: #aab5c9;
+  --menu-hover: #293247;
+  --menu-selected: #343158;
+  --menu-header-bg:
+    linear-gradient(135deg, rgba(115, 103, 240, 0.16), rgba(0, 184, 169, 0.06)), #1f2636;
 }
 
-.menu-detail-context {
-  min-height: 78px;
+.menu-page--dark :deep(.bg-deep-purple-1) {
+  background: #343158 !important;
+}
+
+.menu-page-header-card {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-color: var(--menu-border);
+  border-radius: 8px;
+  color: var(--menu-text);
+  background: var(--menu-header-bg);
+}
+
+.menu-workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--menu-text);
+}
+
+.menu-page-header {
+  min-height: 70px;
   display: flex;
   align-items: center;
   gap: 14px;
+  padding: 12px 20px;
 }
 
-.menu-detail-context--empty {
-  color: #657189;
+.menu-page-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.menu-page-subtitle,
+.menu-page-description {
+  color: var(--menu-muted);
+  font-size: 12px;
+}
+
+.menu-page-subtitle {
+  margin-top: 4px;
 }
 
 .menu-icon-tile {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #4f6fe8, #7664f6);
-  color: #fff;
-  font-size: 24px;
-  box-shadow: 0 10px 24px rgba(79, 111, 232, 0.25);
+  border-radius: 7px !important;
 }
 
-.menu-detail-main {
-  min-width: 0;
+.menu-workbench-body {
   flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(380px, 420px) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.menu-tree-pane {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 58px 58px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--menu-subtle);
+}
+
+.menu-pane-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--menu-border);
+  background: var(--menu-surface);
+}
+
+.menu-pane-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.menu-tree-search {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.menu-tree-scroll {
+  min-height: 0;
+  height: 100%;
+}
+
+.menu-tree {
+  padding: 8px 0;
+}
+
+.menu-tree :deep(.q-tree__node-header) {
+  position: relative;
+  min-height: 0;
+  padding: 2px 0;
+  border-radius: 0;
+  transition: background-color 0.15s ease;
+}
+
+.menu-tree :deep(.q-tree__node-header:hover) {
+  background: var(--menu-hover);
+}
+
+.menu-tree :deep(.q-tree__node-header.q-tree__node--selected) {
+  color: var(--menu-text);
+  background: var(--menu-selected);
+}
+
+.menu-tree :deep(.q-tree__node-header.q-tree__node--selected::before) {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: var(--q-primary);
+  content: '';
+}
+
+.menu-tree
+  :deep(.q-tree__children > .q-tree__node > .q-tree__node-header) {
+  width: calc(100% + 47px);
+  margin-left: -47px;
+  padding-left: 51px;
+}
+
+.menu-tree
+  :deep(
+    .q-tree__children
+      .q-tree__children
+      > .q-tree__node
+      > .q-tree__node-header
+  ) {
+  width: calc(100% + 94px);
+  margin-left: -94px;
+  padding-left: 98px;
+}
+
+.menu-tree
+  :deep(
+    .q-tree__children
+      .q-tree__children
+      .q-tree__children
+      > .q-tree__node
+      > .q-tree__node-header
+  ) {
+  width: calc(100% + 141px);
+  margin-left: -141px;
+  padding-left: 145px;
+}
+
+.menu-tree :deep(.q-tree__node-header-content) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.menu-tree :deep(.q-tree__arrow) {
+  color: var(--menu-muted);
+  font-size: 20px;
+}
+
+.menu-tree-node {
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.menu-tree-node:hover {
+  background: transparent;
+}
+
+.menu-tree-node--selected {
+  background: transparent;
+}
+
+.menu-tree-node--selected .menu-tree-node-title {
+  color: var(--menu-text);
+}
+
+.menu-tree-node-icon {
+  flex: 0 0 auto;
+  color: var(--menu-muted);
+  font-size: 21px;
+}
+
+.menu-tree-node--selected .menu-tree-node-icon {
+  color: var(--q-primary);
+}
+
+.menu-tree-node-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-tree-node-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-tree-node-meta {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--menu-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-tree-state {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--q-positive);
+  transition: opacity 0.15s ease;
+}
+
+.menu-tree-state--disabled {
+  background: var(--q-grey-6);
+}
+
+.menu-tree-node-actions {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+}
+
+.menu-tree-node:hover .menu-tree-node-actions,
+.menu-tree-node--selected .menu-tree-node-actions {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.menu-tree-node:hover .menu-tree-state {
+  opacity: 0;
+}
+
+.menu-tree-node:hover .menu-tree-node-main,
+.menu-tree-node--selected .menu-tree-node-main {
+  padding-right: 94px;
+}
+
+.menu-tree-node-actions :deep(.q-btn) {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+}
+
+.menu-tree-node-actions :deep(.q-icon) {
+  font-size: 15px;
+}
+
+.menu-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 102px 68px 44px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  background: var(--menu-surface);
+}
+
+.menu-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--menu-border);
+}
+
+.menu-detail-heading {
+  min-width: 0;
+}
+
+.menu-detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .menu-detail-title {
   overflow: hidden;
-  color: #172033;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
-  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.menu-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--q-positive);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.menu-detail-status::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.menu-detail-status--disabled {
+  color: var(--q-grey-6);
 }
 
 .menu-detail-meta {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 7px;
-  overflow: hidden;
-  color: #657189;
+  margin-top: 8px;
+  color: var(--menu-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  white-space: nowrap;
 }
 
 .menu-detail-meta span {
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.menu-detail-toolbar {
-  min-height: 56px;
+.menu-detail-summary {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.6fr;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--menu-border);
+  background: var(--menu-subtle);
+}
+
+.menu-summary-item {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px;
-  border-bottom: 1px solid #e3e8f2;
-  background: #fbfcff;
+  flex-direction: column;
+  justify-content: center;
+  margin: 10px 0;
+  padding: 0 18px;
+  border-right: 1px solid var(--menu-border);
+}
+
+.menu-summary-item:first-child {
+  padding-left: 0;
+}
+
+.menu-summary-item:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.menu-summary-label {
+  color: var(--menu-muted);
+  font-size: 11px;
+}
+
+.menu-summary-value {
+  margin-top: 5px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-detail-tabs {
-  min-width: 260px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--menu-border);
 }
 
-.menu-detail-actions {
+.menu-detail-tabs :deep(.q-tab) {
+  min-height: 44px;
+}
+
+.menu-tab-label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-.menu-tab-panels {
-  height: 100%;
-  background: #fff;
+.menu-tab-label > .q-icon {
+  font-size: 19px;
 }
 
-.menu-tab-panels :deep(.q-panel),
-.menu-tab-panels :deep(.q-tab-panel) {
+.menu-button-panel {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 68px minmax(0, 1fr);
+  padding: 0 20px 18px;
+}
+
+.menu-button-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.menu-button-toolbar-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.menu-button-toolbar-subtitle {
+  margin-top: 4px;
+  color: var(--menu-muted);
+  font-size: 11px;
+}
+
+.menu-button-table.sticky-header-table {
   height: 100%;
   min-height: 0;
 }
 
-.menu-empty-state {
-  height: 100%;
+.menu-button-table :deep(.q-table__middle) {
+  flex: 1 1 auto;
+  max-height: 100%;
+}
+
+.menu-button-table :deep(th) {
+  height: 46px;
+  color: var(--menu-muted);
+  background: var(--menu-subtle);
+  font-weight: 800;
+}
+
+.menu-button-table :deep(td) {
+  height: 58px;
+}
+
+.menu-button-feature,
+.menu-button-permission {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-button-name {
+  font-weight: 750;
+}
+
+.menu-button-code,
+.menu-button-action,
+.menu-button-api-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.menu-button-code {
+  margin-top: 2px;
+  color: var(--menu-muted);
+  font-size: 10px;
+}
+
+.menu-button-api-path {
+  overflow: hidden;
+  color: var(--menu-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-detail-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #7b8498;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  color: var(--menu-muted);
+  background: var(--menu-surface);
   text-align: center;
 }
 
 .menu-empty-title {
   margin-top: 14px;
-  color: #172033;
+  color: var(--menu-text);
   font-size: 18px;
   font-weight: 800;
 }
@@ -1139,28 +1860,24 @@ onMounted(async () => {
 }
 
 .preview-container {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
   min-height: 0;
-  border: 1px solid #e3e8f2;
+  display: flex;
   overflow: hidden;
 }
 
 .preview-sidebar {
   width: 280px;
-  border-right: 1px solid #e3e8f2;
-  background-color: #fbfcff;
   display: flex;
   flex-direction: column;
+  border-right: 1px solid var(--menu-border);
+  background: var(--menu-subtle);
 }
 
 .preview-header {
   padding: 12px 16px;
-  color: #172033;
+  border-bottom: 1px solid var(--menu-border);
   font-weight: 800;
-  background-color: #fff;
-  border-bottom: 1px solid #e3e8f2;
+  background: var(--menu-surface);
 }
 
 .preview-scroll {
@@ -1170,11 +1887,20 @@ onMounted(async () => {
 
 .preview-content {
   flex: 1;
-  background-color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  background: var(--menu-surface);
 }
 
+@media (max-width: 1280px) {
+  .menu-workbench-body {
+    grid-template-columns: minmax(350px, 390px) minmax(0, 1fr);
+  }
+
+  .menu-page-description {
+    display: none;
+  }
+}
 </style>

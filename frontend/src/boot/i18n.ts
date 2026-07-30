@@ -2,6 +2,7 @@ import { defineBoot } from '#q-app/wrappers'
 import { createI18n } from 'vue-i18n'
 
 import messages from 'src/i18n'
+import { readUIPreferences } from 'src/utils/ui-preferences'
 
 export type MessageLanguages = keyof typeof messages
 // Type-define 'en-US' as the master schema for the resource
@@ -22,8 +23,9 @@ declare module 'vue-i18n' {
 /* eslint-enable @typescript-eslint/no-empty-object-type */
 
 export default defineBoot(({ app }) => {
+  const preferences = readUIPreferences()
   const i18n = createI18n<{ message: MessageSchema }, MessageLanguages>({
-    locale: 'zh-CN',
+    locale: preferences.locale,
     legacy: false,
     messages,
   })

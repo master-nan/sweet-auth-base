@@ -1,5 +1,8 @@
 <template>
-  <div class="menu-route-preview">
+  <div
+    class="menu-route-preview"
+    :class="{ 'menu-route-preview--dark': $q.dark.isActive }"
+  >
     <div class="route-header">
       <div class="route-breadcrumbs">
         <q-breadcrumbs separator="/">
@@ -16,7 +19,7 @@
         <div class="text-h6 q-mt-sm">
           {{ selectedMenu?.title ? t(selectedMenu?.title) : '页面内容' }}
         </div>
-        <div class="text-grey-7 q-mt-xs">{{ routeDescription }}</div>
+        <div class="route-description q-mt-xs">{{ routeDescription }}</div>
       </div>
     </div>
   </div>
@@ -27,8 +30,10 @@ defineOptions({ name: 'MenuRoutePreview' })
 import { ref, computed, watchEffect } from 'vue'
 import type { Menu } from 'src/api/services/sys-menu'
 import { useI18n } from 'vue-i18n'
+import { useQuasar } from 'quasar'
 
 const { t } = useI18n()
+const $q = useQuasar()
 
 const props = defineProps({
   selectedMenu: {
@@ -89,23 +94,42 @@ watchEffect(() => {
 
 <style scoped lang="scss">
 .menu-route-preview {
+  --preview-surface: #fff;
+  --preview-subtle: #fafafa;
+  --preview-border: #e4e9f2;
+  --preview-text: #172033;
+  --preview-muted: #738097;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid #eaeaea;
-  border-radius: 8px;
   overflow: hidden;
+  border: 1px solid var(--preview-border);
+  border-radius: 8px;
+  color: var(--preview-text);
+  background: var(--preview-surface);
+}
+
+.menu-route-preview--dark {
+  --preview-surface: #1f2636;
+  --preview-subtle: #232b3d;
+  --preview-border: #39445a;
+  --preview-text: #f1f4fa;
+  --preview-muted: #aab5c9;
 }
 
 .route-header {
   padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  background-color: #fafafa;
+  border-bottom: 1px solid var(--preview-border);
+  background: var(--preview-subtle);
 }
 
 .route-breadcrumbs {
   font-size: 14px;
+}
+
+.route-breadcrumbs :deep(.q-breadcrumbs__el) {
+  color: var(--preview-muted);
 }
 
 .route-content {
@@ -114,10 +138,15 @@ watchEffect(() => {
   align-items: center;
   justify-content: center;
   padding: 20px;
+  background: var(--preview-surface);
 }
 
 .route-placeholder {
   text-align: center;
   max-width: 400px;
+}
+
+.route-description {
+  color: var(--preview-muted);
 }
 </style>

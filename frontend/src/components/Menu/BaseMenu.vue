@@ -44,7 +44,7 @@ defineOptions({ name: 'BaseMenu' })
 const thumbStyle = {
   right: '3px',
   borderRadius: '999px',
-  backgroundColor: 'rgba(115, 103, 240, 0.35)',
+  backgroundColor: 'var(--app-primary-border)',
   width: '4px',
 }
 

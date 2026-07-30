@@ -8,6 +8,9 @@ $font-family_1:
 
 // app global css in SCSS form
 html {
+  --app-scrollbar-thumb: color-mix(in srgb, var(--q-primary) 38%, transparent);
+  --app-scrollbar-thumb-hover: color-mix(in srgb, var(--q-primary) 62%, transparent);
+
   height: 100%;
   box-sizing: border-box;
 }
@@ -20,6 +23,52 @@ body {
   text-rendering: optimizeLegibility;
   //overflow: hidden;
   font-family: $font-family_1 !important;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--app-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--app-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.q-scrollarea__thumb {
+  border-radius: 999px !important;
+  background: var(--app-scrollbar-thumb) !important;
+}
+
+.q-scrollarea__thumb--v {
+  right: 3px !important;
+  width: 4px !important;
+}
+
+.q-scrollarea__thumb--h {
+  bottom: 3px !important;
+  height: 4px !important;
+}
+
+.q-scrollarea__bar {
+  background: transparent !important;
 }
 
 input[type='number'] {
@@ -71,6 +120,8 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .body--dark {
+  --app-scrollbar-thumb: color-mix(in srgb, var(--q-primary) 52%, transparent);
+  --app-scrollbar-thumb-hover: color-mix(in srgb, var(--q-primary) 76%, transparent);
   --app-dark-page: #161b28;
   --app-dark-surface: #202638;
   --app-dark-surface-soft: #242b3d;
@@ -283,27 +334,25 @@ input[type='number']::-webkit-inner-spin-button {
 
   .app-drawer {
     border-right-color: var(--app-dark-border);
-    background:
-      linear-gradient(180deg, rgba(115, 103, 240, 0.12) 0%, rgba(115, 103, 240, 0) 180px),
-      #1b2130;
+    background: #1b2130;
     color: var(--app-dark-text);
   }
 
   .app-drawer__close {
-    color: #c7d2fe;
-    border-color: rgba(167, 139, 250, 0.28);
-    background: rgba(115, 103, 240, 0.16);
+    color: var(--q-primary);
+    border-color: var(--app-primary-border);
+    background: var(--app-primary-soft);
   }
 
   .toolbar-title {
     color: #eef2ff;
     border-color: rgba(148, 163, 184, 0.24);
-    background: rgba(30, 35, 53, 0.86);
+    background: #20283a;
   }
 
   .toolbar-title:hover {
-    background: rgba(38, 44, 65, 0.96);
-    border-color: rgba(115, 103, 240, 0.36);
+    background: #262e41;
+    border-color: var(--app-primary-border);
   }
 
   .toolbar-title__name {

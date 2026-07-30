@@ -1,7 +1,7 @@
 <template>
   <base-content class="q-pa-sm organization-readonly-page">
-    <div class="organization-browser-page">
-      <q-card flat bordered :dark="Dark.isActive" class="q-mb-md">
+    <div class="organization-browser-page column no-wrap fit">
+      <q-card flat bordered :dark="Dark.isActive" class="organization-page-toolbar">
         <q-card-section class="row items-center justify-between q-gutter-md q-py-sm">
           <div class="organization-page-heading">
             <h1 class="text-h6 text-weight-bold q-my-none">组织架构</h1>
@@ -65,14 +65,14 @@
         </q-card-section>
       </q-card>
 
-      <q-banner v-if="pageError" :dark="Dark.isActive" rounded class="q-mb-md">
+      <q-banner v-if="pageError" :dark="Dark.isActive" rounded class="organization-page-error">
         <template #avatar>
           <q-icon name="error_outline" color="negative" />
         </template>
         {{ pageError }}
       </q-banner>
 
-      <main class="row q-col-gutter-md organization-browser-workspace">
+      <main class="row q-col-gutter-sm organization-browser-workspace">
         <div class="col-12 col-md-5 full-height">
           <q-card
             flat
@@ -134,7 +134,12 @@
         </div>
 
         <div class="col-12 col-md-7 full-height">
-          <q-card flat bordered :dark="Dark.isActive" class="organization-detail-panel fit">
+          <q-card
+            flat
+            bordered
+            :dark="Dark.isActive"
+            class="organization-detail-panel column no-wrap fit"
+          >
             <q-card-section class="row items-center q-pa-md">
               <div v-if="selectionSummary" class="row items-center no-wrap full-width">
                 <q-icon :name="selectionSummary.icon" size="28px" class="text-grey-6 q-mr-sm" />
@@ -165,7 +170,7 @@
 
             <q-separator />
 
-            <q-card-section class="q-px-md q-pb-md q-pt-sm">
+            <q-card-section class="organization-detail-content col q-px-md q-pb-md q-pt-sm">
               <organization-read-only-detail
                 :groups="detailGroups"
                 :loading="detailLoading"
@@ -846,7 +851,18 @@ function errorMessage(error: unknown, fallback: string): string {
 
 <style scoped lang="scss">
 .organization-readonly-page {
-  overflow: auto;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.organization-browser-page {
+  min-height: 0;
+  gap: 10px;
+}
+
+.organization-page-toolbar,
+.organization-page-error {
+  flex: 0 0 auto;
 }
 
 .organization-page-heading {
@@ -862,8 +878,8 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 .organization-browser-workspace {
-  height: calc(100vh - 188px);
-  min-height: 560px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .organization-tree-panel,
@@ -872,6 +888,11 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 .organization-detail-panel {
+  overflow: hidden;
+}
+
+.organization-detail-content {
+  min-height: 0;
   overflow: auto;
 }
 
@@ -880,7 +901,16 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 @media (max-width: 1023px) {
+  .organization-readonly-page {
+    overflow: auto;
+  }
+
+  .organization-browser-page {
+    height: auto !important;
+  }
+
   .organization-browser-workspace {
+    flex: 0 0 auto;
     height: auto;
     min-height: 0;
   }

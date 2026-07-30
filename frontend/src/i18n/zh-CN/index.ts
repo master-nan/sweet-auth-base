@@ -114,7 +114,14 @@ export default {
   themeSetting: {
     title: '主题设定',
     themeColor: '主题颜色',
-    setting: '设定'
+    setting: '界面设置',
+    layoutMode: '顶部布局',
+    layoutSplit: '左右结构',
+    layoutFull: '贯穿结构',
+    darkMode: '深色模式',
+    darkModeHint: '切换浅色或深色界面',
+    drawerMini: '收起侧栏',
+    drawerMiniHint: '仅显示菜单图标',
   },
 
   button: {

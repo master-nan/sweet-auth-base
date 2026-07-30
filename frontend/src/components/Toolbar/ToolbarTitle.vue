@@ -40,7 +40,7 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; lo
   border: 1px solid #e8ecf7;
   border-radius: 16px;
   color: #111827;
-  background: rgba(255, 255, 255, 0.84);
+  background: #ffffff;
 
   :deep(.q-btn__content) {
     justify-content: flex-start;
@@ -49,7 +49,7 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; lo
 
   &:hover {
     background: #ffffff;
-    border-color: rgba($primary, 0.22);
+    border-color: var(--app-primary-border);
   }
 }
 
@@ -62,7 +62,7 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; lo
   overflow: hidden;
   border-radius: 12px;
   color: #111827;
-  background: rgba($primary, 0.1);
+  background: var(--app-primary-soft);
 
   .q-icon {
     font-size: 24px;

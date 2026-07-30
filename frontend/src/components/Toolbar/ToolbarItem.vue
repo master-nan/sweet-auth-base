@@ -93,40 +93,65 @@ const logout = () => {
   gap: 8px;
 
   :deep(.q-btn) {
-    color: #fff;
+    color: var(--app-header-text);
   }
 }
 
 .toolbar-actions__separator {
-  opacity: 0.28;
+  color: var(--app-header-border);
+  opacity: 1;
 }
 
 .toolbar-actions__btn {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-header-border);
+  border-radius: 8px;
+  background: var(--app-header-control-bg);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.16);
+    color: var(--q-primary);
+    background: var(--app-header-control-hover);
   }
+}
+
+.toolbar-actions :deep(.dark-mode-btn) {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--app-header-border);
+  border-radius: 8px;
+  background: var(--app-header-control-bg);
+
+  &:hover {
+    color: var(--q-primary);
+    background: var(--app-header-control-hover);
+  }
+}
+
+.toolbar-actions :deep(.language-selector) {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--app-header-border);
+  border-radius: 8px;
+  background: var(--app-header-control-bg);
 }
 
 .toolbar-actions__avatar-btn {
   width: 38px;
   height: 38px;
   padding: 2px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--app-header-border);
+  border-radius: 10px;
+  background: var(--app-header-control-bg);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--app-header-control-hover);
   }
 }
 
 .toolbar-actions__avatar {
   width: 32px;
   height: 32px;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.38);
+  box-shadow: 0 0 0 1px var(--app-primary-border);
 }
 </style>

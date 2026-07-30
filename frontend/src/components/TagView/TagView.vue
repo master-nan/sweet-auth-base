@@ -155,37 +155,33 @@ const unSubscribe = tagViewStore.$subscribe((mutation, state) => {
 }
 
 .tagViewBase {
-  min-height: 34px;
+  min-height: 42px;
 
   :deep(.q-tabs__content) {
-    gap: 6px;
+    gap: 0;
   }
 
   .tagView {
     margin: 0;
-    min-height: 20px;
-    padding: 0 11px;
-    border-style: solid;
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.28);
-    border-radius: 8px;
-    height: 32px;
+    min-height: 42px;
+    height: 42px;
+    padding: 0 14px;
+    border-right: 1px solid var(--app-header-border);
+    border-radius: 0;
     max-width: 210px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.82);
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--app-header-muted);
+    background: transparent;
     transition:
       color 0.18s ease,
-      border-color 0.18s ease,
       background-color 0.18s ease,
       box-shadow 0.18s ease;
 
     &:hover {
-      color: #fff;
-      border-color: rgba(255, 255, 255, 0.48);
-      background: rgba(255, 255, 255, 0.14);
+      color: var(--app-header-text);
+      background: var(--app-primary-soft);
     }
 
     :deep(.q-tab__content) {
@@ -200,10 +196,9 @@ const unSubscribe = tagViewStore.$subscribe((mutation, state) => {
 
   .tagActive {
     font-weight: 800;
-    color: $primary !important;
-    border-color: rgba(255, 255, 255, 0.9);
-    background: #fff !important;
-    box-shadow: 0 8px 18px rgba(36, 31, 128, 0.16);
+    color: var(--q-primary) !important;
+    background: var(--app-primary-soft) !important;
+    box-shadow: inset 0 -3px 0 var(--q-primary);
   }
 }
 

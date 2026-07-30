@@ -242,15 +242,37 @@ const expansionItemOpen = (basePath: string, item: Route) => {
 .base-menu-item {
   .base-menu-expansion--active {
     :deep(.q-expansion-item__container > .q-item) {
-      color: v-bind(activeTextColor);
-      background: v-bind(activeBgColor);
+      color: v-bind(primaryColor) !important;
+      background: transparent !important;
     }
   }
 
   .baseItemActive {
-    color: v-bind(activeTextColor);
-    background: v-bind(activeBgColor);
+    color: v-bind(primaryColor) !important;
+    background: color-mix(in srgb, v-bind(primaryColor) 18%, transparent) !important;
+    box-shadow: inset 3px 0 0 v-bind(primaryColor);
   }
+}
+
+:global(
+  .body--dark
+    .app-drawer
+    .base-menu-expansion--active
+    > .q-expansion-item__container
+    > .q-item
+) {
+  color: #c7d2fe !important;
+  background: transparent !important;
+}
+
+:global(.body--dark .app-drawer .baseItemActive) {
+  color: #ffffff !important;
+  background: var(--app-primary-soft-strong) !important;
+  box-shadow: inset 3px 0 0 var(--q-primary);
+}
+
+:global(.body--dark .app-drawer .base-menu-expansion .q-expansion-item__content) {
+  background: transparent !important;
 }
 
 :global(.app-drawer--mini .base-menu-item .q-item) {
@@ -298,7 +320,7 @@ const expansionItemOpen = (basePath: string, item: Route) => {
   min-width: 56px !important;
   max-width: 56px !important;
   padding: 7px !important;
-  border: 1px solid rgba(115, 103, 240, 0.16);
+  border: 1px solid var(--app-primary-border);
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
 }
@@ -347,7 +369,7 @@ const expansionItemOpen = (basePath: string, item: Route) => {
   background: v-bind(primaryColor) !important;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 10px 20px rgba($primary, 0.24);
+    0 10px 20px var(--app-primary-shadow);
 }
 
 :global(.app-drawer--mini .baseItemActive .q-icon),
