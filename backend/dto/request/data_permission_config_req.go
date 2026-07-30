@@ -1,0 +1,152 @@
+package request
+
+const (
+	DataPermissionConfigObjectDimension = "dimension"
+	DataPermissionConfigObjectResource  = "resource"
+	DataPermissionConfigObjectOperation = "resource_operation"
+	DataPermissionConfigObjectOwnership = "ownership_field"
+	DataPermissionConfigObjectPolicy    = "policy"
+	DataPermissionConfigObjectRule      = "policy_rule"
+	DataPermissionConfigObjectGrant     = "grant"
+)
+
+// DataPermissionConfigQueryReq exposes the platform query protocol without
+// accepting table names, free-form filters, delete visibility, or data scope
+// from the client.
+type DataPermissionConfigQueryReq struct {
+	Page        int               `form:"page" json:"page" binding:"omitempty,gte=1"`
+	Num         int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
+	Order       Order             `form:"order" json:"order"`
+	Expressions []ExpressionGroup `form:"expressions" json:"expressions" binding:"omitempty,max=8"`
+	QuickQuery  *QuickQuery       `form:"quick_query" json:"quick_query"`
+}
+
+func (r DataPermissionConfigQueryReq) ToBasic() Basic {
+	return Basic{
+		Page:        r.Page,
+		Num:         r.Num,
+		Order:       r.Order,
+		Expressions: r.Expressions,
+		QuickQuery:  r.QuickQuery,
+	}
+}
+
+type DataPermissionConfigIdReq struct {
+	Id int `form:"id" json:"id" binding:"required,gt=0"`
+}
+
+type DataDimensionDefinitionQueryReq struct {
+	DataPermissionConfigQueryReq
+	Category  string `form:"category" json:"category" binding:"omitempty,oneof=organization employee user business system"`
+	ValueType string `form:"value_type" json:"value_type" binding:"omitempty,oneof=bigint string"`
+	State     *bool  `form:"state" json:"state"`
+}
+
+type DataResourceQueryReq struct {
+	DataPermissionConfigQueryReq
+	ResourceType      string `form:"resource_type" json:"resource_type" binding:"omitempty,oneof=low_code_table business_service report"`
+	PermissionEnabled *bool  `form:"permission_enabled" json:"permission_enabled"`
+	State             *bool  `form:"state" json:"state"`
+}
+
+type DataResourceOperationQueryReq struct {
+	DataPermissionConfigQueryReq
+	ResourceId        *int   `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
+	Operation         string `form:"operation" json:"operation" binding:"omitempty,oneof=query detail create update delete export run"`
+	PermissionEnabled *bool  `form:"permission_enabled" json:"permission_enabled"`
+	State             *bool  `form:"state" json:"state"`
+}
+
+type DataOwnershipFieldQueryReq struct {
+	DataPermissionConfigQueryReq
+	ResourceId  *int   `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
+	DimensionId *int   `form:"dimension_id" json:"dimension_id" binding:"omitempty,gt=0"`
+	BindingType string `form:"binding_type" json:"binding_type" binding:"omitempty,oneof=metadata_field registered_field"`
+	ValueType   string `form:"value_type" json:"value_type" binding:"omitempty,oneof=bigint string"`
+	State       *bool  `form:"state" json:"state"`
+}
+
+type DataPolicyQueryReq struct {
+	DataPermissionConfigQueryReq
+	PolicyType string `form:"policy_type" json:"policy_type" binding:"omitempty,oneof=all none rule_set"`
+	State      *bool  `form:"state" json:"state"`
+}
+
+type DataPolicyRuleQueryReq struct {
+	DataPermissionConfigQueryReq
+	PolicyId    *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
+	DimensionId *int   `form:"dimension_id" json:"dimension_id" binding:"omitempty,gt=0"`
+	ScopeSource string `form:"scope_source" json:"scope_source" binding:"omitempty,oneof=current_user current_employee effective_legal_entities effective_org_units specified_values provider_subject_scope"`
+	Relation    string `form:"relation" json:"relation" binding:"omitempty,oneof=exact self_and_descendants"`
+	Operator    string `form:"operator" json:"operator" binding:"omitempty,oneof=eq in"`
+	State       *bool  `form:"state" json:"state"`
+}
+
+type DataGrantQueryReq struct {
+	DataPermissionConfigQueryReq
+	SubjectType string `form:"subject_type" json:"subject_type" binding:"omitempty,oneof=role user"`
+	SubjectId   *int   `form:"subject_id" json:"subject_id" binding:"omitempty,gt=0"`
+	ResourceId  *int   `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
+	Operation   string `form:"operation" json:"operation" binding:"omitempty,oneof=query detail create update delete export run"`
+	PolicyId    *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
+	State       *bool  `form:"state" json:"state"`
+}
+
+// DataPermissionFieldBoundary declares DTO field ownership for the future
+// configuration service. Returned slices are copies and may be safely changed
+// by callers.
+type DataPermissionFieldBoundary struct {
+	Create            []string
+	Update            []string
+	ImmutableAfterUse []string
+}
+
+var dataPermissionFieldBoundaries = map[string]DataPermissionFieldBoundary{
+	DataPermissionConfigObjectDimension: {
+		Create:            []string{"dimension_code", "name", "category", "value_type", "provider_code", "selector_type", "state"},
+		Update:            []string{"name", "selector_type", "state"},
+		ImmutableAfterUse: []string{"dimension_code", "category", "value_type", "provider_code"},
+	},
+	DataPermissionConfigObjectResource: {
+		Create:            []string{"resource_code", "name", "resource_type", "target", "adapter_code", "permission_enabled", "state"},
+		Update:            []string{"name", "permission_enabled", "state"},
+		ImmutableAfterUse: []string{"resource_code", "resource_type", "target", "adapter_code"},
+	},
+	DataPermissionConfigObjectOperation: {
+		Create:            []string{"resource_id", "operation", "permission_enabled", "state"},
+		Update:            []string{"permission_enabled", "state"},
+		ImmutableAfterUse: []string{"resource_id", "operation"},
+	},
+	DataPermissionConfigObjectOwnership: {
+		Create:            []string{"resource_id", "ownership_code", "dimension_id", "binding_type", "binding_target", "value_type", "state"},
+		Update:            []string{"state"},
+		ImmutableAfterUse: []string{"resource_id", "ownership_code", "dimension_id", "binding_type", "binding_target", "value_type"},
+	},
+	DataPermissionConfigObjectPolicy: {
+		Create:            []string{"policy_code", "name", "policy_type", "state"},
+		Update:            []string{"name", "state"},
+		ImmutableAfterUse: []string{"policy_code", "policy_type"},
+	},
+	DataPermissionConfigObjectRule: {
+		Create:            []string{"policy_id", "sequence", "dimension_id", "ownership_code", "scope_source", "relation", "operator", "specified_values", "structure_code", "state"},
+		Update:            []string{"scope_source", "relation", "operator", "specified_values", "structure_code", "state"},
+		ImmutableAfterUse: []string{"policy_id", "sequence", "dimension_id", "ownership_code"},
+	},
+	DataPermissionConfigObjectGrant: {
+		Create:            []string{"subject_type", "subject_id", "resource_id", "operation", "policy_id", "valid_from", "valid_to", "state"},
+		Update:            []string{"valid_from", "valid_to", "state"},
+		ImmutableAfterUse: []string{"subject_type", "subject_id", "resource_id", "operation", "policy_id"},
+	},
+}
+
+func GetDataPermissionFieldBoundary(object string) (DataPermissionFieldBoundary, bool) {
+	boundary, ok := dataPermissionFieldBoundaries[object]
+	if !ok {
+		return DataPermissionFieldBoundary{}, false
+	}
+	return DataPermissionFieldBoundary{
+		Create:            append([]string(nil), boundary.Create...),
+		Update:            append([]string(nil), boundary.Update...),
+		ImmutableAfterUse: append([]string(nil), boundary.ImmutableAfterUse...),
+	}, true
+}
