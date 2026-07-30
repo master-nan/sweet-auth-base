@@ -83,6 +83,20 @@ body {
 .q-table__middle {
   overflow: auto;
   scrollbar-gutter: auto;
+  scrollbar-color: transparent transparent;
+}
+
+.q-table__middle::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.q-table__middle:hover {
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+}
+
+.q-table__middle:hover::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
+  background-clip: padding-box;
 }
 
 input[type='number'] {
