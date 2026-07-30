@@ -79,6 +79,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 	got := migrationStepNames(migrationSteps())
 	want := []string{
 		"auto_migrate_core_schema",
+		"data_permission_domain_schema",
 		"ensure_sys_menu_option_text",
 		"ensure_data_permission_indexes",
 		"backfill_sys_menu_page_binding",

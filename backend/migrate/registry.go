@@ -24,6 +24,7 @@ type seedStep struct {
 func migrationSteps() []migrationStep {
 	return []migrationStep{
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
+		{name: "data_permission_domain_schema", run: migrateDataPermissionSchema},
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
 		{name: "ensure_data_permission_indexes", run: ensureDataPermissionIndexes},
 		{name: "backfill_sys_menu_page_binding", run: backfillSysMenuPageBinding},
