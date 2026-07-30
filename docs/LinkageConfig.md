@@ -15,7 +15,7 @@
 5. `valueKey` 通常选择 `id`。
 6. 如果需要父子联动，配置筛选映射：左边是关联表字段，右边是当前表单字段。
 
-按钮参数表单里的关联下拉优先使用 `relation` 或 `cascader` 简写，写法见 [low-code-manual.md](low-code-manual.md)。前端会把简写转换成同一套联动配置。
+按钮参数表单里的关联下拉优先使用 `relation` 或 `cascader` 简写，写法见 [LowCodeManual.md](LowCodeManual.md)。前端会把简写转换成同一套联动配置。
 
 ## 2. JSON 存储格式参考
 
@@ -186,4 +186,4 @@ relation 模式会按需加载：
 3. **选项回退**：`labelKey` 找不到时会依次尝试 `label` → `name` → `title` → `code`；`valueKey` 找不到时回退到 `id`
 4. **分页限制**：字段管理编辑器默认 `pageSize=200`；relation 按页加载并在运行时限制为 20-200，cascader 通常一次加载树形数据，建议控制在 1000 条以内
 5. **联动刷新**：使用 `filterMapping` 时，父字段值变化会自动触发子字段选项重新加载
-6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [low-code-manual.md](low-code-manual.md)
+6. **更多示例**：按钮参数 Schema、静态选项、字典选项、关联表下拉的完整写法见 [LowCodeManual.md](LowCodeManual.md)

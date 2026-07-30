@@ -6,7 +6,7 @@
 make help
 ```
 
-低代码发布、字段配置、按钮动作、参数 Schema、关联下拉、权限排查和常用模板见 [low-code-manual.md](low-code-manual.md)。
+低代码发布、字段配置、按钮动作、参数 Schema、关联下拉、权限排查和常用模板见 [LowCodeManual.md](LowCodeManual.md)。
 
 ## 1. 本地开发
 
