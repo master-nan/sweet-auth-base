@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"backend/internal/utils"
+	"backend/model"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -29,6 +30,22 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 			Operator:    "in",
 		},
 		DataGrantQueryReq{SubjectType: "role", Operation: "detail"},
+		DataResourceCreateReq{
+			ResourceCode: "service:tms.dispatch",
+			Name:         "调度服务",
+			ResourceType: model.DataResourceTypeBusinessService,
+			Target: DataResourceTargetReq{
+				ReferenceCode: dataPermissionConfigStringPointer("tms.dispatch"),
+			},
+			AdapterCode: "registered_filter",
+		},
+		DataResourceUpdateReq{Id: 1, Name: dataPermissionConfigStringPointer("调度服务")},
+		DataResourceOperationBatchReq{
+			ResourceId: 1,
+			Items: []DataResourceOperationCreateItemReq{
+				{Operation: model.DataPermissionOperationQuery},
+			},
+		},
 	}
 	for _, value := range valid {
 		if err := validate.Struct(value); err != nil {
@@ -47,6 +64,15 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 		DataPolicyQueryReq{PolicyType: "deny"},
 		DataPolicyRuleQueryReq{ScopeSource: "client_provider"},
 		DataGrantQueryReq{SubjectType: "position"},
+		DataResourceCreateReq{},
+		DataResourceUpdateReq{},
+		DataResourceOperationBatchReq{ResourceId: 1},
+		DataResourceOperationBatchReq{
+			ResourceId: 1,
+			Items: []DataResourceOperationCreateItemReq{
+				{Operation: "free_operation"},
+			},
+		},
 	}
 	for _, value := range invalid {
 		if err := validate.Struct(value); err == nil {
@@ -56,20 +82,26 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 }
 
 func TestDataPermissionConfigQueryDTOExcludesUnsafeClientFields(t *testing.T) {
-	queryType := reflect.TypeOf(DataPermissionConfigQueryReq{})
-	for _, forbidden := range []string{
-		"table_code",
-		"table_name",
-		"sql",
-		"join",
-		"filters",
-		"include_deleted",
-		"menu_id",
-		"data_scope",
-		"provider",
+	for _, dtoType := range []reflect.Type{
+		reflect.TypeOf(DataPermissionConfigQueryReq{}),
+		reflect.TypeOf(DataResourceCreateReq{}),
+		reflect.TypeOf(DataResourceUpdateReq{}),
+		reflect.TypeOf(DataResourceOperationBatchReq{}),
 	} {
-		if hasJSONField(queryType, forbidden) {
-			t.Fatalf("query DTO exposes forbidden client field %q", forbidden)
+		for _, forbidden := range []string{
+			"table_code",
+			"table_name",
+			"sql",
+			"join",
+			"filters",
+			"include_deleted",
+			"menu_id",
+			"data_scope",
+			"provider",
+		} {
+			if hasJSONField(dtoType, forbidden) {
+				t.Fatalf("%s exposes forbidden client field %q", dtoType.Name(), forbidden)
+			}
 		}
 	}
 
@@ -115,13 +147,13 @@ func TestDataPermissionConfigFieldBoundaries(t *testing.T) {
 		{
 			object:       DataPermissionConfigObjectResource,
 			immutable:    []string{"resource_code"},
-			mutable:      []string{"name", "permission_enabled"},
+			mutable:      []string{"name", "resource_type", "description", "permission_enabled"},
 			neverExposed: []string{"menu_id", "sql", "join"},
 		},
 		{
 			object:       DataPermissionConfigObjectOperation,
 			immutable:    []string{"resource_id", "operation"},
-			mutable:      []string{"permission_enabled"},
+			mutable:      []string{"description", "permission_enabled"},
 			neverExposed: []string{"sql"},
 		},
 		{
@@ -177,6 +209,10 @@ func TestDataPermissionConfigFieldBoundaries(t *testing.T) {
 	if _, ok := GetDataPermissionFieldBoundary("unknown"); ok {
 		t.Fatal("unknown object unexpectedly returned a field boundary")
 	}
+}
+
+func dataPermissionConfigStringPointer(value string) *string {
+	return &value
 }
 
 func hasJSONField(value reflect.Type, target string) bool {

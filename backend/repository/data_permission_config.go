@@ -6,6 +6,7 @@ import (
 	"backend/model"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type DataDimensionDefinitionRepository interface {
@@ -22,6 +23,9 @@ type DataResourceRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataResource, error)
 	FindByCode(*gin.Context, string) (model.DataResource, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataResource, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataResource, error)
+	FindByCodeForConfigDB(*gorm.DB, string) (model.DataResource, error)
+	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 }
 
 type DataResourceOperationRepository interface {
@@ -30,6 +34,12 @@ type DataResourceOperationRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataResourceOperation, error)
 	FindByStableKey(*gin.Context, int, string) (model.DataResourceOperation, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataResourceOperation, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataResourceOperation, error)
+	FindByStableKeyForConfigDB(*gorm.DB, int, string) (model.DataResourceOperation, error)
+	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataResourceOperation, error)
+	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
+	UpdateFieldsByResourceForConfig(*gorm.DB, int, map[string]any) error
+	CountByResourceForConfig(*gorm.DB, int) (int64, error)
 }
 
 type DataOwnershipFieldRepository interface {
@@ -38,6 +48,7 @@ type DataOwnershipFieldRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataOwnershipField, error)
 	FindByStableKey(*gin.Context, int, string) (model.DataOwnershipField, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataOwnershipField, error)
+	CountByResourceForConfig(*gorm.DB, int) (int64, error)
 }
 
 type DataPolicyRepository interface {
@@ -62,4 +73,6 @@ type DataGrantRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataGrant, error)
 	FindByStableKey(*gin.Context, string, int, int, string, int) (model.DataGrant, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataGrant, error)
+	CountByResourceForConfig(*gorm.DB, int) (int64, error)
+	CountByResourceOperationForConfig(*gorm.DB, int, string) (int64, error)
 }

@@ -57,6 +57,47 @@ type DataResourceOperationQueryReq struct {
 	State             *bool  `form:"state" json:"state"`
 }
 
+type DataResourceTargetReq struct {
+	ReferenceId   *int    `form:"reference_id" json:"reference_id" binding:"omitempty,gt=0"`
+	ReferenceCode *string `form:"reference_code" json:"reference_code" binding:"omitempty,max=128"`
+}
+
+type DataResourceCreateReq struct {
+	ResourceCode      string                               `form:"resource_code" json:"resource_code" binding:"required,max=128"`
+	Name              string                               `form:"name" json:"name" binding:"required,max=128"`
+	ResourceType      string                               `form:"resource_type" json:"resource_type" binding:"required,oneof=low_code_table business_service report"`
+	Target            DataResourceTargetReq                `form:"target" json:"target"`
+	AdapterCode       string                               `form:"adapter_code" json:"adapter_code" binding:"required,max=64"`
+	PermissionEnabled *bool                                `form:"permission_enabled" json:"permission_enabled"`
+	Description       string                               `form:"description" json:"description" binding:"omitempty,max=256"`
+	State             *bool                                `form:"state" json:"state"`
+	Operations        []DataResourceOperationCreateItemReq `form:"operations" json:"operations" binding:"omitempty,max=7,dive"`
+}
+
+type DataResourceUpdateReq struct {
+	Id                int                    `form:"id" json:"id" binding:"required,gt=0"`
+	ResourceCode      *string                `form:"resource_code" json:"resource_code" binding:"omitempty,max=128"`
+	Name              *string                `form:"name" json:"name" binding:"omitempty,max=128"`
+	ResourceType      *string                `form:"resource_type" json:"resource_type" binding:"omitempty,oneof=low_code_table business_service report"`
+	Target            *DataResourceTargetReq `form:"target" json:"target"`
+	AdapterCode       *string                `form:"adapter_code" json:"adapter_code" binding:"omitempty,max=64"`
+	PermissionEnabled *bool                  `form:"permission_enabled" json:"permission_enabled"`
+	Description       *string                `form:"description" json:"description" binding:"omitempty,max=256"`
+	State             *bool                  `form:"state" json:"state"`
+}
+
+type DataResourceOperationCreateItemReq struct {
+	Operation         string `form:"operation" json:"operation" binding:"required,oneof=query detail create update delete export run"`
+	PermissionEnabled *bool  `form:"permission_enabled" json:"permission_enabled"`
+	Description       string `form:"description" json:"description" binding:"omitempty,max=256"`
+	State             *bool  `form:"state" json:"state"`
+}
+
+type DataResourceOperationBatchReq struct {
+	ResourceId int                                  `form:"resource_id" json:"resource_id" binding:"required,gt=0"`
+	Items      []DataResourceOperationCreateItemReq `form:"items" json:"items" binding:"required,min=1,max=7,dive"`
+}
+
 type DataOwnershipFieldQueryReq struct {
 	DataPermissionConfigQueryReq
 	ResourceId  *int   `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
@@ -108,13 +149,13 @@ var dataPermissionFieldBoundaries = map[string]DataPermissionFieldBoundary{
 		ImmutableAfterUse: []string{"dimension_code", "category", "value_type", "provider_code"},
 	},
 	DataPermissionConfigObjectResource: {
-		Create:            []string{"resource_code", "name", "resource_type", "target", "adapter_code", "permission_enabled", "state"},
-		Update:            []string{"name", "permission_enabled", "state"},
+		Create:            []string{"resource_code", "name", "resource_type", "target", "adapter_code", "permission_enabled", "description", "state"},
+		Update:            []string{"name", "resource_type", "target", "adapter_code", "permission_enabled", "description", "state"},
 		ImmutableAfterUse: []string{"resource_code", "resource_type", "target", "adapter_code"},
 	},
 	DataPermissionConfigObjectOperation: {
-		Create:            []string{"resource_id", "operation", "permission_enabled", "state"},
-		Update:            []string{"permission_enabled", "state"},
+		Create:            []string{"resource_id", "operation", "permission_enabled", "description", "state"},
+		Update:            []string{"permission_enabled", "description", "state"},
 		ImmutableAfterUse: []string{"resource_id", "operation"},
 	},
 	DataPermissionConfigObjectOwnership: {
