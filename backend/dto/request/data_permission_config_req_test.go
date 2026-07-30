@@ -25,9 +25,10 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 		DataOwnershipFieldQueryReq{BindingType: "metadata_field", ValueType: "bigint"},
 		DataPolicyQueryReq{PolicyType: "rule_set"},
 		DataPolicyRuleQueryReq{
-			ScopeSource: "effective_org_units",
-			Relation:    "self_and_descendants",
-			Operator:    "in",
+			OwnershipCode: "owner_org",
+			ScopeSource:   "effective_org_units",
+			Relation:      "self_and_descendants",
+			Operator:      "in",
 		},
 		DataGrantQueryReq{SubjectType: "role", Operation: "detail"},
 		DataResourceCreateReq{
@@ -44,6 +45,46 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 			ResourceId: 1,
 			Items: []DataResourceOperationCreateItemReq{
 				{Operation: model.DataPermissionOperationQuery},
+			},
+		},
+		DataPolicyCreateReq{
+			PolicyCode: "own_org",
+			Name:       "本组织",
+			Rules: []DataPolicyRuleCreateItemReq{
+				{
+					Sequence:      1,
+					DimensionId:   1,
+					OwnershipCode: "owner_org",
+					ScopeSource:   model.DataPolicyScopeSourceEffectiveOrgUnits,
+					Relation:      model.DataPolicyRelationExact,
+					Operator:      model.DataPolicyOperatorIn,
+				},
+			},
+		},
+		DataPolicyUpdateReq{Id: 1, Name: dataPermissionConfigStringPointer("本组织及下级")},
+		DataPolicyRuleCreateReq{
+			PolicyId: 1,
+			DataPolicyRuleCreateItemReq: DataPolicyRuleCreateItemReq{
+				Sequence:        1,
+				DimensionId:     1,
+				OwnershipCode:   "owner_org",
+				ScopeSource:     model.DataPolicyScopeSourceSpecifiedValues,
+				Relation:        model.DataPolicyRelationExact,
+				Operator:        model.DataPolicyOperatorIn,
+				SpecifiedValues: json.RawMessage(`[1,2]`),
+			},
+		},
+		DataPolicyRuleBatchReq{
+			PolicyId: 1,
+			Items: []DataPolicyRuleCreateItemReq{
+				{
+					Sequence:      1,
+					DimensionId:   1,
+					OwnershipCode: "owner_org",
+					ScopeSource:   model.DataPolicyScopeSourceEffectiveOrgUnits,
+					Relation:      model.DataPolicyRelationExact,
+					Operator:      model.DataPolicyOperatorIn,
+				},
 			},
 		},
 	}
@@ -73,6 +114,30 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 				{Operation: "free_operation"},
 			},
 		},
+		DataPolicyCreateReq{},
+		DataPolicyCreateReq{
+			PolicyCode: "too_many_rules",
+			Name:       "规则过多",
+			Rules:      make([]DataPolicyRuleCreateItemReq, 9),
+		},
+		DataPolicyUpdateReq{},
+		DataPolicyRuleCreateReq{},
+		DataPolicyRuleCreateReq{
+			PolicyId: 1,
+			DataPolicyRuleCreateItemReq: DataPolicyRuleCreateItemReq{
+				Sequence:      1,
+				DimensionId:   1,
+				OwnershipCode: "owner_org",
+				ScopeSource:   model.DataPolicyScopeSourceCurrentUser,
+				Relation:      model.DataPolicyRelationExact,
+				Operator:      model.DataPolicyOperatorEqual,
+			},
+		},
+		DataPolicyRuleBatchReq{PolicyId: 1},
+		DataPolicyRuleBatchReq{
+			PolicyId: 1,
+			Items:    make([]DataPolicyRuleCreateItemReq, 9),
+		},
 	}
 	for _, value := range invalid {
 		if err := validate.Struct(value); err == nil {
@@ -87,6 +152,10 @@ func TestDataPermissionConfigQueryDTOExcludesUnsafeClientFields(t *testing.T) {
 		reflect.TypeOf(DataResourceCreateReq{}),
 		reflect.TypeOf(DataResourceUpdateReq{}),
 		reflect.TypeOf(DataResourceOperationBatchReq{}),
+		reflect.TypeOf(DataPolicyCreateReq{}),
+		reflect.TypeOf(DataPolicyUpdateReq{}),
+		reflect.TypeOf(DataPolicyRuleCreateReq{}),
+		reflect.TypeOf(DataPolicyRuleBatchReq{}),
 	} {
 		for _, forbidden := range []string{
 			"table_code",
@@ -165,13 +234,13 @@ func TestDataPermissionConfigFieldBoundaries(t *testing.T) {
 		{
 			object:       DataPermissionConfigObjectPolicy,
 			immutable:    []string{"policy_code"},
-			mutable:      []string{"name", "state"},
+			mutable:      []string{"name", "description", "state"},
 			neverExposed: []string{"sql"},
 		},
 		{
 			object:       DataPermissionConfigObjectRule,
-			immutable:    []string{"dimension_id", "ownership_code"},
-			mutable:      []string{"scope_source", "state"},
+			immutable:    []string{"dimension_id", "ownership_code", "scope_source", "relation", "operator"},
+			mutable:      []string{"state"},
 			neverExposed: []string{"sql", "expression"},
 		},
 		{

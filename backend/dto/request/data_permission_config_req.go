@@ -1,5 +1,7 @@
 package request
 
+import "encoding/json"
+
 const (
 	DataPermissionConfigObjectDimension = "dimension"
 	DataPermissionConfigObjectResource  = "resource"
@@ -141,14 +143,56 @@ type DataPolicyQueryReq struct {
 	State      *bool  `form:"state" json:"state"`
 }
 
+type DataPolicyCreateReq struct {
+	PolicyCode  string                        `form:"policy_code" json:"policy_code" binding:"required,max=128"`
+	Name        string                        `form:"name" json:"name" binding:"required,max=128"`
+	Description string                        `form:"description" json:"description" binding:"omitempty,max=512"`
+	State       *bool                         `form:"state" json:"state"`
+	Rules       []DataPolicyRuleCreateItemReq `form:"rules" json:"rules" binding:"omitempty,max=8,dive"`
+}
+
+// DataPolicyUpdateReq includes policy_code so immutable identity changes are
+// rejected explicitly rather than ignored.
+type DataPolicyUpdateReq struct {
+	Id          int     `form:"id" json:"id" binding:"required,gt=0"`
+	PolicyCode  *string `form:"policy_code" json:"policy_code" binding:"omitempty,max=128"`
+	Name        *string `form:"name" json:"name" binding:"omitempty,max=128"`
+	Description *string `form:"description" json:"description" binding:"omitempty,max=512"`
+	State       *bool   `form:"state" json:"state"`
+}
+
 type DataPolicyRuleQueryReq struct {
 	DataPermissionConfigQueryReq
-	PolicyId    *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
-	DimensionId *int   `form:"dimension_id" json:"dimension_id" binding:"omitempty,gt=0"`
-	ScopeSource string `form:"scope_source" json:"scope_source" binding:"omitempty,oneof=current_user current_employee effective_legal_entities effective_org_units specified_values provider_subject_scope"`
-	Relation    string `form:"relation" json:"relation" binding:"omitempty,oneof=exact self_and_descendants"`
-	Operator    string `form:"operator" json:"operator" binding:"omitempty,oneof=eq in"`
-	State       *bool  `form:"state" json:"state"`
+	PolicyId      *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
+	DimensionId   *int   `form:"dimension_id" json:"dimension_id" binding:"omitempty,gt=0"`
+	OwnershipCode string `form:"ownership_code" json:"ownership_code" binding:"omitempty,max=64"`
+	ScopeSource   string `form:"scope_source" json:"scope_source" binding:"omitempty,oneof=current_user current_employee effective_legal_entities effective_org_units specified_values provider_subject_scope"`
+	Relation      string `form:"relation" json:"relation" binding:"omitempty,oneof=exact self_and_descendants"`
+	Operator      string `form:"operator" json:"operator" binding:"omitempty,oneof=eq in"`
+	State         *bool  `form:"state" json:"state"`
+}
+
+type DataPolicyRuleCreateItemReq struct {
+	Sequence        int             `form:"sequence" json:"sequence" binding:"required,gt=0"`
+	DimensionId     int             `form:"dimension_id" json:"dimension_id" binding:"required,gt=0"`
+	OwnershipCode   string          `form:"ownership_code" json:"ownership_code" binding:"required,max=64"`
+	ScopeSource     string          `form:"scope_source" json:"scope_source" binding:"required,oneof=effective_legal_entities effective_org_units current_employee specified_values"`
+	Relation        string          `form:"relation" json:"relation" binding:"required,oneof=exact self_and_descendants"`
+	Operator        string          `form:"operator" json:"operator" binding:"required,oneof=eq in"`
+	SpecifiedValues json.RawMessage `form:"specified_values" json:"specified_values"`
+	StructureCode   *string         `form:"structure_code" json:"structure_code" binding:"omitempty,max=64"`
+	Description     string          `form:"description" json:"description" binding:"omitempty,max=256"`
+	State           *bool           `form:"state" json:"state"`
+}
+
+type DataPolicyRuleCreateReq struct {
+	PolicyId int `form:"policy_id" json:"policy_id" binding:"required,gt=0"`
+	DataPolicyRuleCreateItemReq
+}
+
+type DataPolicyRuleBatchReq struct {
+	PolicyId int                           `form:"policy_id" json:"policy_id" binding:"required,gt=0"`
+	Items    []DataPolicyRuleCreateItemReq `form:"items" json:"items" binding:"required,min=1,max=8,dive"`
 }
 
 type DataGrantQueryReq struct {
@@ -192,14 +236,14 @@ var dataPermissionFieldBoundaries = map[string]DataPermissionFieldBoundary{
 		ImmutableAfterUse: []string{"resource_id", "ownership_code", "dimension_id", "binding_type", "binding_target", "value_type"},
 	},
 	DataPermissionConfigObjectPolicy: {
-		Create:            []string{"policy_code", "name", "policy_type", "state"},
-		Update:            []string{"name", "state"},
+		Create:            []string{"policy_code", "name", "description", "state"},
+		Update:            []string{"name", "description", "state"},
 		ImmutableAfterUse: []string{"policy_code", "policy_type"},
 	},
 	DataPermissionConfigObjectRule: {
-		Create:            []string{"policy_id", "sequence", "dimension_id", "ownership_code", "scope_source", "relation", "operator", "specified_values", "structure_code", "state"},
-		Update:            []string{"scope_source", "relation", "operator", "specified_values", "structure_code", "state"},
-		ImmutableAfterUse: []string{"policy_id", "sequence", "dimension_id", "ownership_code"},
+		Create:            []string{"policy_id", "sequence", "dimension_id", "ownership_code", "scope_source", "relation", "operator", "specified_values", "structure_code", "description", "state"},
+		Update:            []string{"state"},
+		ImmutableAfterUse: []string{"policy_id", "sequence", "dimension_id", "ownership_code", "scope_source", "relation", "operator", "specified_values", "structure_code"},
 	},
 	DataPermissionConfigObjectGrant: {
 		Create:            []string{"subject_type", "subject_id", "resource_id", "operation", "policy_id", "valid_from", "valid_to", "state"},

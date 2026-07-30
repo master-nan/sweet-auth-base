@@ -401,6 +401,25 @@ func (r *DataOwnershipFieldRepositoryImpl) CountByResourceForConfig(db *gorm.DB,
 	return count, err
 }
 
+func (r *DataOwnershipFieldRepositoryImpl) CountByIdentityForConfig(
+	db *gorm.DB,
+	ownershipCode string,
+	dimensionId *int,
+	activeOnly bool,
+) (int64, error) {
+	query := db.Model(&model.DataOwnershipField{}).
+		Where("ownership_code = ?", ownershipCode)
+	if dimensionId != nil {
+		query = query.Where("dimension_id = ?", *dimensionId)
+	}
+	if activeOnly {
+		query = query.Where("state = ?", true)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
+}
+
 func (r *DataOwnershipFieldRepositoryImpl) CountPolicyRuleReferencesForConfig(
 	db *gorm.DB,
 	resourceId int,
@@ -461,6 +480,23 @@ func (r *DataPolicyRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []in
 	return findDataPermissionConfigByIds[model.DataPolicy](r.db, ctx, ids, dataPolicyColumns)
 }
 
+func (r *DataPolicyRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataPolicy, error) {
+	return findDataPermissionConfigOneDB[model.DataPolicy](db, dataPolicyColumns, "id = ?", id)
+}
+
+func (r *DataPolicyRepositoryImpl) FindByCodeForConfigDB(db *gorm.DB, code string) (model.DataPolicy, error) {
+	return findDataPermissionConfigOneDB[model.DataPolicy](db, dataPolicyColumns, "code = ?", code)
+}
+
+func (r *DataPolicyRepositoryImpl) UpdateFieldsForConfig(
+	db *gorm.DB,
+	id int,
+	fields map[string]any,
+) (bool, error) {
+	result := db.Model(&model.DataPolicy{}).Where("id = ?", id).Updates(fields)
+	return result.RowsAffected > 0, result.Error
+}
+
 func (r *DataPolicyRuleRepositoryImpl) Query(
 	ctx *gin.Context,
 	req *request.DataPolicyRuleQueryReq,
@@ -474,12 +510,13 @@ func (r *DataPolicyRuleRepositoryImpl) Query(
 		ctx,
 		req.DataPermissionConfigQueryReq,
 		map[string]any{
-			"policy_id":    optionalConfigInt(req.PolicyId),
-			"dimension_id": optionalConfigInt(req.DimensionId),
-			"scope_source": optionalConfigString(req.ScopeSource),
-			"relation":     optionalConfigString(req.Relation),
-			"operator":     optionalConfigString(req.Operator),
-			"state":        optionalConfigBool(req.State),
+			"policy_id":      optionalConfigInt(req.PolicyId),
+			"dimension_id":   optionalConfigInt(req.DimensionId),
+			"ownership_code": optionalConfigString(req.OwnershipCode),
+			"scope_source":   optionalConfigString(req.ScopeSource),
+			"relation":       optionalConfigString(req.Relation),
+			"operator":       optionalConfigString(req.Operator),
+			"state":          optionalConfigBool(req.State),
 		},
 		table,
 		"sys_data_policy_rule",
@@ -505,6 +542,45 @@ func (r *DataPolicyRuleRepositoryImpl) FindByStableKey(
 
 func (r *DataPolicyRuleRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataPolicyRule, error) {
 	return findDataPermissionConfigByIds[model.DataPolicyRule](r.db, ctx, ids, dataPolicyRuleColumns)
+}
+
+func (r *DataPolicyRuleRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataPolicyRule, error) {
+	return findDataPermissionConfigOneDB[model.DataPolicyRule](db, dataPolicyRuleColumns, "id = ?", id)
+}
+
+func (r *DataPolicyRuleRepositoryImpl) FindByStableKeyForConfigDB(
+	db *gorm.DB,
+	policyId int,
+	sequence int,
+) (model.DataPolicyRule, error) {
+	return findDataPermissionConfigOneDB[model.DataPolicyRule](
+		db,
+		dataPolicyRuleColumns,
+		"policy_id = ? AND sequence = ?",
+		policyId,
+		sequence,
+	)
+}
+
+func (r *DataPolicyRuleRepositoryImpl) ListByPolicyForConfigDB(
+	db *gorm.DB,
+	policyId int,
+) ([]model.DataPolicyRule, error) {
+	values := make([]model.DataPolicyRule, 0)
+	err := db.Select(dataPolicyRuleColumns).
+		Where("policy_id = ?", policyId).
+		Order("sequence ASC, id ASC").
+		Find(&values).Error
+	return values, err
+}
+
+func (r *DataPolicyRuleRepositoryImpl) UpdateFieldsForConfig(
+	db *gorm.DB,
+	id int,
+	fields map[string]any,
+) (bool, error) {
+	result := db.Model(&model.DataPolicyRule{}).Where("id = ?", id).Updates(fields)
+	return result.RowsAffected > 0, result.Error
 }
 
 func (r *DataGrantRepositoryImpl) Query(
@@ -781,11 +857,12 @@ var (
 	)
 	dataPolicyColumns = []string{
 		"id", "gmt_create", "gmt_modify", "state", "code", "name", "policy_type",
+		"description",
 	}
 	dataPolicyRuleColumns = []string{
 		"id", "gmt_create", "gmt_modify", "state", "policy_id", "sequence",
 		"dimension_id", "ownership_code", "scope_source", "relation", "operator",
-		"specified_values", "structure_code",
+		"specified_values", "structure_code", "description",
 	}
 	dataGrantColumns = []string{
 		"id", "gmt_create", "gmt_modify", "state", "subject_type", "subject_id",

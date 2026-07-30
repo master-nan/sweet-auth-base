@@ -3,38 +3,53 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeDataResourceNotFound                = 120001
-	ErrorCodeDataResourceCodeDuplicate           = 120002
-	ErrorCodeDataResourceCodeInvalid             = 120003
-	ErrorCodeDataResourceReferenced              = 120004
-	ErrorCodeDataResourceStateInvalid            = 120005
-	ErrorCodeDataResourceOperationDuplicate      = 120006
-	ErrorCodeDataResourceOperationInvalid        = 120007
-	ErrorCodeDataResourceFieldImmutable          = 120008
-	ErrorCodeDataResourcePermissionEnableDenied  = 120009
-	ErrorCodeDataResourceOperationReferenced     = 120010
-	ErrorCodeDataResourceNameRequired            = 120011
-	ErrorCodeDataResourceTypeInvalid             = 120012
-	ErrorCodeDataResourceTargetInvalid           = 120013
-	ErrorCodeDataResourceOperationNotFound       = 120014
-	ErrorCodeDataDimensionNotFound               = 120015
-	ErrorCodeDataOwnershipNotFound               = 120016
-	ErrorCodeDataOwnershipDuplicate              = 120017
-	ErrorCodeDataOwnershipCodeInvalid            = 120018
-	ErrorCodeDataOwnershipBindingInvalid         = 120019
-	ErrorCodeDataOwnershipMetadataFieldInvalid   = 120020
-	ErrorCodeDataOwnershipRegisteredFieldInvalid = 120021
-	ErrorCodeDataOwnershipValueTypeMismatch      = 120022
-	ErrorCodeDataOwnershipReferenced             = 120023
-	ErrorCodeDataOwnershipFieldImmutable         = 120024
-	ErrorCodeDataOwnershipMetadataFieldNotFound  = 120025
-	ErrorCodeDataOwnershipMetadataFieldMismatch  = 120026
-	ErrorCodeDataOwnershipMetadataFieldForbidden = 120027
-	ErrorCodeDataOwnershipRegisteredFieldMissing = 120028
-	ErrorCodeDataOwnershipRegisteredResource     = 120029
-	ErrorCodeDataOwnershipRegisteredDimension    = 120030
-	ErrorCodeDataOwnershipRegisteredOperation    = 120031
-	ErrorCodeDataOwnershipMetadataDimension      = 120032
+	ErrorCodeDataResourceNotFound                 = 120001
+	ErrorCodeDataResourceCodeDuplicate            = 120002
+	ErrorCodeDataResourceCodeInvalid              = 120003
+	ErrorCodeDataResourceReferenced               = 120004
+	ErrorCodeDataResourceStateInvalid             = 120005
+	ErrorCodeDataResourceOperationDuplicate       = 120006
+	ErrorCodeDataResourceOperationInvalid         = 120007
+	ErrorCodeDataResourceFieldImmutable           = 120008
+	ErrorCodeDataResourcePermissionEnableDenied   = 120009
+	ErrorCodeDataResourceOperationReferenced      = 120010
+	ErrorCodeDataResourceNameRequired             = 120011
+	ErrorCodeDataResourceTypeInvalid              = 120012
+	ErrorCodeDataResourceTargetInvalid            = 120013
+	ErrorCodeDataResourceOperationNotFound        = 120014
+	ErrorCodeDataDimensionNotFound                = 120015
+	ErrorCodeDataOwnershipNotFound                = 120016
+	ErrorCodeDataOwnershipDuplicate               = 120017
+	ErrorCodeDataOwnershipCodeInvalid             = 120018
+	ErrorCodeDataOwnershipBindingInvalid          = 120019
+	ErrorCodeDataOwnershipMetadataFieldInvalid    = 120020
+	ErrorCodeDataOwnershipRegisteredFieldInvalid  = 120021
+	ErrorCodeDataOwnershipValueTypeMismatch       = 120022
+	ErrorCodeDataOwnershipReferenced              = 120023
+	ErrorCodeDataOwnershipFieldImmutable          = 120024
+	ErrorCodeDataOwnershipMetadataFieldNotFound   = 120025
+	ErrorCodeDataOwnershipMetadataFieldMismatch   = 120026
+	ErrorCodeDataOwnershipMetadataFieldForbidden  = 120027
+	ErrorCodeDataOwnershipRegisteredFieldMissing  = 120028
+	ErrorCodeDataOwnershipRegisteredResource      = 120029
+	ErrorCodeDataOwnershipRegisteredDimension     = 120030
+	ErrorCodeDataOwnershipRegisteredOperation     = 120031
+	ErrorCodeDataOwnershipMetadataDimension       = 120032
+	ErrorCodeDataPolicyNotFound                   = 120033
+	ErrorCodeDataPolicyCodeDuplicate              = 120034
+	ErrorCodeDataPolicyCodeInvalid                = 120035
+	ErrorCodeDataPolicyNameRequired               = 120036
+	ErrorCodeDataPolicyFieldImmutable             = 120037
+	ErrorCodeDataPolicyStateInvalid               = 120038
+	ErrorCodeDataPolicyRuleNotFound               = 120039
+	ErrorCodeDataPolicyRuleDuplicate              = 120040
+	ErrorCodeDataPolicyRuleOwnershipNotFound      = 120041
+	ErrorCodeDataPolicyRuleDimensionMismatch      = 120042
+	ErrorCodeDataPolicyRuleScopeSourceInvalid     = 120043
+	ErrorCodeDataPolicyRuleRelationInvalid        = 120044
+	ErrorCodeDataPolicyRuleOperatorInvalid        = 120045
+	ErrorCodeDataPolicyRuleSpecifiedValuesInvalid = 120046
+	ErrorCodeDataPolicyRuleCountInvalid           = 120047
 )
 
 var (
@@ -197,5 +212,80 @@ var (
 		http.StatusBadRequest,
 		ErrorCodeDataOwnershipMetadataDimension,
 		"元数据字段与数据权限维度不匹配",
+	)
+	ErrDataPolicyNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataPolicyNotFound,
+		"数据权限策略不存在",
+	)
+	ErrDataPolicyCodeDuplicate = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPolicyCodeDuplicate,
+		"数据权限策略编码已存在",
+	)
+	ErrDataPolicyCodeInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyCodeInvalid,
+		"数据权限策略编码格式不合法",
+	)
+	ErrDataPolicyNameRequired = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyNameRequired,
+		"数据权限策略名称不能为空",
+	)
+	ErrDataPolicyFieldImmutable = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPolicyFieldImmutable,
+		"数据权限策略身份字段不可修改",
+	)
+	ErrDataPolicyStateInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPolicyStateInvalid,
+		"数据权限策略当前状态不允许执行该操作",
+	)
+	ErrDataPolicyRuleNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataPolicyRuleNotFound,
+		"数据权限策略规则不存在",
+	)
+	ErrDataPolicyRuleDuplicate = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPolicyRuleDuplicate,
+		"数据权限策略规则序号已存在",
+	)
+	ErrDataPolicyRuleOwnershipNotFound = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleOwnershipNotFound,
+		"数据权限策略规则未匹配到有效归属定义",
+	)
+	ErrDataPolicyRuleDimensionMismatch = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleDimensionMismatch,
+		"数据权限策略规则的归属编码与维度不匹配",
+	)
+	ErrDataPolicyRuleScopeSourceInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleScopeSourceInvalid,
+		"数据权限策略规则的范围来源与维度不兼容",
+	)
+	ErrDataPolicyRuleRelationInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleRelationInvalid,
+		"数据权限策略规则的关系类型不合法",
+	)
+	ErrDataPolicyRuleOperatorInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleOperatorInvalid,
+		"数据权限策略规则的操作符不合法",
+	)
+	ErrDataPolicyRuleSpecifiedValuesInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleSpecifiedValuesInvalid,
+		"数据权限策略规则的指定值不合法",
+	)
+	ErrDataPolicyRuleCountInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataPolicyRuleCountInvalid,
+		"数据权限策略规则数量超过限制",
 	)
 )

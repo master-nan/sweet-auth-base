@@ -90,6 +90,7 @@ type DataPolicyListRes struct {
 
 type DataPolicyDetailRes struct {
 	DataPolicyListRes
+	Rules []DataPolicyRuleDetailRes `json:"rules"`
 }
 
 type DataPolicyRuleListRes struct {
@@ -212,6 +213,13 @@ func NewDataPolicyListRes(value model.DataPolicy) DataPolicyListRes {
 		PolicyCode:                  value.Code,
 		Name:                        value.Name,
 		PolicyType:                  value.PolicyType,
+	}
+}
+
+func NewDataPolicyDetailRes(value model.DataPolicy) DataPolicyDetailRes {
+	return DataPolicyDetailRes{
+		DataPolicyListRes: NewDataPolicyListRes(value),
+		Rules:             []DataPolicyRuleDetailRes{},
 	}
 }
 

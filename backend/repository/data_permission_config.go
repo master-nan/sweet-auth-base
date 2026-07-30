@@ -56,6 +56,7 @@ type DataOwnershipFieldRepository interface {
 	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataOwnershipField, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)
+	CountByIdentityForConfig(*gorm.DB, string, *int, bool) (int64, error)
 	CountPolicyRuleReferencesForConfig(*gorm.DB, int, string, int, bool, time.Time) (int64, error)
 }
 
@@ -65,6 +66,9 @@ type DataPolicyRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataPolicy, error)
 	FindByCode(*gin.Context, string) (model.DataPolicy, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataPolicy, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataPolicy, error)
+	FindByCodeForConfigDB(*gorm.DB, string) (model.DataPolicy, error)
+	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 }
 
 type DataPolicyRuleRepository interface {
@@ -73,6 +77,10 @@ type DataPolicyRuleRepository interface {
 	FindByIdForConfig(*gin.Context, int) (model.DataPolicyRule, error)
 	FindByStableKey(*gin.Context, int, int) (model.DataPolicyRule, error)
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataPolicyRule, error)
+	FindByIdForConfigDB(*gorm.DB, int) (model.DataPolicyRule, error)
+	FindByStableKeyForConfigDB(*gorm.DB, int, int) (model.DataPolicyRule, error)
+	ListByPolicyForConfigDB(*gorm.DB, int) ([]model.DataPolicyRule, error)
+	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 }
 
 type DataGrantRepository interface {
