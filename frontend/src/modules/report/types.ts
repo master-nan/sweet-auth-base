@@ -11,6 +11,25 @@ export type ReportRuntimeDisplayMode = 'paged' | 'all'
 export type ReportRuntimeType = 'design_preview' | 'runtime_run' | 'runtime_export'
 export type ReportExportFormat = 'csv' | 'xlsx'
 export type ReportQuery = Partial<Query>
+export type ReportDesignerMode = 'layout' | 'legacy_sheet'
+export type ReportLayoutAreaType =
+  | 'title'
+  | 'parameter_summary'
+  | 'header'
+  | 'detail'
+  | 'group'
+  | 'summary'
+  | 'footer'
+export type ReportLayoutAreaItemType = 'static_text' | 'parameter' | 'field' | 'summary' | 'runtime'
+export type ReportLayoutAreaItemAlign = 'left' | 'center' | 'right'
+export type ReportLayoutAreaItemFormat =
+  | 'text'
+  | 'number'
+  | 'amount'
+  | 'date'
+  | 'datetime'
+  | 'dict'
+export type ReportLayoutAreaAggregate = 'none' | 'sum' | 'count'
 
 export interface ReportField {
   name: string
@@ -87,12 +106,39 @@ export interface ReportSheetConfig {
   cells: ReportSheetCell[]
 }
 
+export interface ReportLayoutAreaItem {
+  id: string
+  type: ReportLayoutAreaItemType
+  label?: string
+  dataset_id?: string
+  field?: string
+  parameter_id?: string
+  value?: string
+  width?: number
+  align?: ReportLayoutAreaItemAlign
+  format?: ReportLayoutAreaItemFormat
+  aggregate?: ReportLayoutAreaAggregate
+  visible?: boolean
+  order?: number
+}
+
+export interface ReportLayoutArea {
+  id: string
+  type: ReportLayoutAreaType
+  title: string
+  visible: boolean
+  order: number
+  items: ReportLayoutAreaItem[]
+}
+
 export interface ReportLayoutConfig {
   version: number
   view: 'sheet'
   title?: string
   subtitle?: string
   kind?: ReportKind
+  designer_mode?: ReportDesignerMode
+  layout_areas?: ReportLayoutArea[]
   datasets: ReportDataset[]
   dataset_joins?: ReportDatasetJoin[] | undefined
   parameters: ReportParameter[]
@@ -128,6 +174,14 @@ export interface Report extends Basic {
   status: ReportStatus
   published_version_id?: number
   published_version_no?: number
+  menu_id?: number
+  menu_name?: string
+  menu_title?: string
+  menu_path?: string
+  menu_component?: string
+  menu_page_type?: string
+  menu_visible?: boolean
+  published_to_menu?: boolean
   owner?: string
   updated_at?: string
 }
@@ -159,6 +213,8 @@ export interface ReportSaveReq {
   runtime_display?: ReportRuntimeDisplayMode
   runtime_page_size?: number
   status?: ReportStatus
+  query_config?: ReportQueryConfig
+  layout_config?: ReportLayoutConfig
 }
 
 export interface ReportPublishReq {
@@ -171,6 +227,29 @@ export interface ReportPublishRes {
   version_no: number
   status: ReportStatus
   published_at?: string
+}
+
+export interface ReportPublishMenuReq {
+  parent_menu_id: number
+  title: string
+  path?: string
+  icon?: string
+  sort?: number
+  visible?: boolean
+  permission_role_ids?: number[]
+}
+
+export interface ReportPublishMenuRes {
+  report_id: number
+  report_code: string
+  menu_id: number
+  menu_name: string
+  menu_title: string
+  path: string
+  component: string
+  page_type: string
+  visible: boolean
+  published_to_menu: boolean
 }
 
 export interface ReportVersion {

@@ -62,6 +62,19 @@ type ReportPublishRes struct {
 	Status    string `json:"status"`
 }
 
+type ReportPublishMenuRes struct {
+	ReportId        int    `json:"report_id"`
+	ReportCode      string `json:"report_code"`
+	MenuId          int    `json:"menu_id"`
+	MenuName        string `json:"menu_name"`
+	MenuTitle       string `json:"menu_title"`
+	Path            string `json:"path"`
+	Component       string `json:"component"`
+	PageType        string `json:"page_type"`
+	Visible         bool   `json:"visible"`
+	PublishedToMenu bool   `json:"published_to_menu"`
+}
+
 type ReportDefinitionVersionRes struct {
 	Id            int    `json:"id"`
 	ReportId      int    `json:"report_id"`

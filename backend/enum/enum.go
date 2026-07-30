@@ -27,6 +27,7 @@ const (
 	MenuPageTypeDirectory SysMenuPageType = "directory"
 	MenuPageTypeFixed     SysMenuPageType = "fixed"
 	MenuPageTypeLowCode   SysMenuPageType = "low_code"
+	MenuPageTypeReport    SysMenuPageType = "report"
 )
 
 // SysMenuButtonPosition 按钮位置字典
@@ -108,6 +109,11 @@ const (
 	ButtonActionRotateSecret     SysMenuButtonEventAction = "rotate_secret"
 	ButtonActionPublish          SysMenuButtonEventAction = "publish"
 	ButtonActionUnpublish        SysMenuButtonEventAction = "unpublish"
+	ButtonActionRun              SysMenuButtonEventAction = "run"
+	ButtonActionVersion          SysMenuButtonEventAction = "version"
+	ButtonActionDisable          SysMenuButtonEventAction = "disable"
+	ButtonActionPublishMenu      SysMenuButtonEventAction = "publish_menu"
+	ButtonActionUnpublishMenu    SysMenuButtonEventAction = "unpublish_menu"
 	ButtonActionInitMeta         SysMenuButtonEventAction = "init_meta"
 	ButtonActionSyncFields       SysMenuButtonEventAction = "sync_fields"
 	ButtonActionSyncIndex        SysMenuButtonEventAction = "sync_index"
@@ -171,6 +177,11 @@ func NormalizeSysMenuButtonEventAction(value string) (SysMenuButtonEventAction, 
 		ButtonActionRotateSecret,
 		ButtonActionPublish,
 		ButtonActionUnpublish,
+		ButtonActionRun,
+		ButtonActionVersion,
+		ButtonActionDisable,
+		ButtonActionPublishMenu,
+		ButtonActionUnpublishMenu,
 		ButtonActionInitMeta,
 		ButtonActionSyncFields,
 		ButtonActionSyncIndex,
@@ -197,7 +208,7 @@ func NormalizeSysMenuButtonEventAction(value string) (SysMenuButtonEventAction, 
 }
 
 func IsReadMenuButtonAction(action SysMenuButtonEventAction) bool {
-	return action == ButtonActionQuery || action == ButtonActionDetail
+	return action == ButtonActionQuery || action == ButtonActionDetail || action == ButtonActionRun || action == ButtonActionVersion
 }
 
 // SysMasterDetailMode 主子表展示模式字典

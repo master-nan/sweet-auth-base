@@ -480,6 +480,42 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "报表状态",
+			code: "report_status",
+			items: []systemDictItemSeed{
+				{name: "草稿", code: "report_status_draft", value: "draft"},
+				{name: "已发布", code: "report_status_published", value: "published"},
+				{name: "已停用", code: "report_status_disabled", value: "disabled"},
+			},
+		},
+		{
+			name: "报表分类",
+			code: "report_category",
+			items: []systemDictItemSeed{
+				{name: "系统审计", code: "report_category_system_audit", value: "system_audit"},
+				{name: "财务报表", code: "report_category_finance", value: "finance"},
+				{name: "运营报表", code: "report_category_operation", value: "operation"},
+				{name: "TMS 报表", code: "report_category_tms", value: "tms"},
+			},
+		},
+		{
+			name: "报表数据源类型",
+			code: "report_source_type",
+			items: []systemDictItemSeed{
+				{name: "系统表", code: "report_source_type_table", value: "table"},
+				{name: "SQL / 聚合", code: "report_source_type_sql", value: "sql"},
+			},
+		},
+		{
+			name: "报表类型",
+			code: "report_kind",
+			items: []systemDictItemSeed{
+				{name: "明细报表", code: "report_kind_detail", value: "detail"},
+				{name: "汇总报表", code: "report_kind_summary", value: "summary"},
+				{name: "版式报表", code: "report_kind_layout", value: "layout"},
+			},
+		},
+		{
 			name: "字段类别",
 			code: "sys_table_field_category",
 			items: []systemDictItemSeed{
@@ -538,6 +574,11 @@ func menuButtonEventActionDictItems() []systemDictItemSeed {
 		{name: "轮换密钥", code: "sys_menu_button_event_action_rotate_secret", value: string(enum.ButtonActionRotateSecret)},
 		{name: "发布", code: "sys_menu_button_event_action_publish", value: string(enum.ButtonActionPublish)},
 		{name: "取消发布", code: "sys_menu_button_event_action_unpublish", value: string(enum.ButtonActionUnpublish)},
+		{name: "运行", code: "sys_menu_button_event_action_run", value: string(enum.ButtonActionRun)},
+		{name: "版本", code: "sys_menu_button_event_action_version", value: string(enum.ButtonActionVersion)},
+		{name: "停用", code: "sys_menu_button_event_action_disable", value: string(enum.ButtonActionDisable)},
+		{name: "发布到菜单", code: "sys_menu_button_event_action_publish_menu", value: string(enum.ButtonActionPublishMenu)},
+		{name: "取消发布菜单", code: "sys_menu_button_event_action_unpublish_menu", value: string(enum.ButtonActionUnpublishMenu)},
 		{name: "初始化元数据", code: "sys_menu_button_event_action_init_meta", value: string(enum.ButtonActionInitMeta)},
 		{name: "同步字段", code: "sys_menu_button_event_action_sync_fields", value: string(enum.ButtonActionSyncFields)},
 		{name: "同步索引", code: "sys_menu_button_event_action_sync_index", value: string(enum.ButtonActionSyncIndex)},
@@ -734,6 +775,7 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
 		menuWithTable(menu(902, 900, "report_manage", "manage", "pages/report/manage/Index.vue", "router.report.manage", "build", 2), "report_definition"),
 		reportDesignMenu,
+		menuWithTable(menu(904, 900, "report_v2_workbench", "report-v2/workbench", "pages/report-v2/workbench/ReportWorkbenchPage.vue", "报表工作台", "space_dashboard", 4), "report_definition"),
 	}
 	menuByName := make(map[string]model.SysMenu, len(menus))
 	for _, item := range menus {
@@ -895,6 +937,13 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 		return fmt.Errorf("report_manage menu missing after seed")
 	}
 	if err := seedReportManageMenuButtons(db, sf, roleID, roleName, reportManageMenu.Id); err != nil {
+		return err
+	}
+	reportV2WorkbenchMenu, ok := menuByName["report_v2_workbench"]
+	if !ok {
+		return fmt.Errorf("report_v2_workbench menu missing after seed")
+	}
+	if err := seedReportV2WorkbenchMenuButtons(db, sf, roleID, roleName, reportV2WorkbenchMenu.Id); err != nil {
 		return err
 	}
 	reportDesignMenu, ok := menuByName["report_design"]
@@ -1415,7 +1464,7 @@ func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		return err
 	}
 	buttons := []model.SysMenuButton{
-		menuButtonWithAPI(702, menuID, "运行报表", "report_center_preview", enum.Line, "preview", "play_arrow", "primary", 1, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(702, menuID, "运行报表", "report_center_preview", enum.Line, "run", "play_arrow", "primary", 1, "/admin/report/:id/preview", "POST"),
 		menuButtonWithAPI(703, menuID, "运行报表V1", "report_center_run", enum.Line, "run", "play_arrow", "primary", 2, "/admin/report/:id/run", "POST"),
 		menuButtonWithAPI(733, menuID, "导出报表", "report_center_export", enum.Line, "export", "download", "primary", 3, "/admin/report/:id/export", "POST"),
 		apiPermissionWithAPI(704, menuID, "报表列表", "report_center_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
@@ -1432,11 +1481,13 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		menuButtonWithAPI(722, menuID, "复制", "report_manage_copy", enum.Line, "duplicate", "content_copy", "primary", 2, "/admin/report", "POST"),
 		menuButtonWithAPI(723, menuID, "发布状态", "report_manage_status", enum.Line, "update", "published_with_changes", "primary", 3, "/admin/report/:id/status", "POST"),
 		menuButtonWithAPI(724, menuID, "删除", "report_manage_delete", enum.Line, "delete", "delete", "negative", 4, "/admin/report/:id", "DELETE"),
-		menuButtonWithAPI(725, menuID, "运行预览", "report_manage_preview", enum.Line, "preview", "play_arrow", "primary", 5, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(725, menuID, "运行预览", "report_manage_preview", enum.Line, "run", "play_arrow", "primary", 5, "/admin/report/:id/preview", "POST"),
 		menuButtonWithAPI(730, menuID, "发布", "report_manage_publish", enum.Line, "publish", "published_with_changes", "primary", 6, "/admin/report/:id/publish", "POST"),
 		menuButtonWithAPI(731, menuID, "运行", "report_manage_run", enum.Line, "run", "play_arrow", "primary", 7, "/admin/report/:id/run", "POST"),
 		menuButtonWithAPI(734, menuID, "导出", "report_manage_export", enum.Line, "export", "download", "primary", 8, "/admin/report/:id/export", "POST"),
-		apiPermissionWithAPI(732, menuID, "版本列表", "report_manage_versions", enum.Line, "versions", "history", "primary", 94, "/admin/report/:id/versions", "GET"),
+		menuButtonWithAPI(735, menuID, "发布到菜单", "report_manage_publish_menu", enum.Line, "publish_menu", "add_to_queue", "primary", 9, "/admin/report/:id/publish-menu", "POST"),
+		menuButtonWithAPI(736, menuID, "取消发布菜单", "report_manage_unpublish_menu", enum.Line, "unpublish_menu", "remove_from_queue", "warning", 10, "/admin/report/:id/publish-menu", "DELETE"),
+		apiPermissionWithAPI(732, menuID, "版本列表", "report_manage_versions", enum.Line, "version", "history", "primary", 94, "/admin/report/:id/versions", "GET"),
 		apiPermissionWithAPI(726, menuID, "报表列表", "report_manage_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
 		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(728, menuID, "数据源列表", "report_manage_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
@@ -1445,18 +1496,37 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
 
+func seedReportV2WorkbenchMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		apiPermissionWithAPI(740, menuID, "报表列表", "report_v2_workbench_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
+		apiPermissionWithAPI(741, menuID, "报表详情", "report_v2_workbench_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
+		apiPermissionWithAPI(742, menuID, "页面元数据", "report_v2_workbench_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
+		menuButtonWithAPI(743, menuID, "新建报表", "report_v2_workbench_create", enum.Top, "create", "add", "primary", 1, "/admin/report", "POST"),
+		menuButton(744, menuID, "刷新", "report_v2_workbench_refresh", enum.Top, "refresh", "refresh", "primary", 2),
+		menuButtonWithAPI(745, menuID, "设计", "report_v2_workbench_design", enum.Line, "update", "design_services", "primary", 1, "/admin/report/:id", "GET"),
+		menuButtonWithAPI(746, menuID, "运行", "report_v2_workbench_run", enum.Line, "run", "play_circle", "primary", 2, "/admin/report/:id/run", "POST"),
+		menuButtonWithAPI(747, menuID, "发布版本", "report_v2_workbench_publish", enum.Line, "publish", "published_with_changes", "primary", 3, "/admin/report/:id/publish", "POST"),
+		menuButtonWithAPI(748, menuID, "发布到菜单", "report_v2_workbench_publish_menu", enum.Line, "publish_menu", "add_to_queue", "primary", 4, "/admin/report/:id/publish-menu", "POST"),
+		menuButtonWithAPI(749, menuID, "取消发布菜单", "report_v2_workbench_unpublish_menu", enum.Line, "unpublish_menu", "remove_from_queue", "warning", 5, "/admin/report/:id/publish-menu", "DELETE"),
+		menuButtonWithAPI(750, menuID, "版本", "report_v2_workbench_version", enum.Line, "version", "history", "primary", 6, "/admin/report/:id/versions", "GET"),
+		menuButtonWithAPI(751, menuID, "停用", "report_v2_workbench_disable", enum.Line, "disable", "block", "negative", 7, "/admin/report/:id/status", "POST"),
+		menuButtonWithAPI(752, menuID, "删除", "report_v2_workbench_delete", enum.Line, "delete", "delete", "negative", 8, "/admin/report/:id", "DELETE"),
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
+}
+
 func seedReportDesignMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
 		menuButtonWithAPI(707, menuID, "保存", "report_design_save", enum.Top, "save", "save", "primary", 1, "/admin/report/:id", "PUT"),
-		menuButtonWithAPI(708, menuID, "预览", "report_design_preview", enum.Top, "preview", "preview", "primary", 2, "/admin/report/:id/preview", "POST"),
-		menuButtonWithAPI(714, menuID, "设计时预览", "report_design_design_preview", enum.Top, "preview", "preview", "primary", 3, "/admin/report/:id/design-preview", "POST"),
+		menuButtonWithAPI(708, menuID, "预览", "report_design_preview", enum.Top, "run", "preview", "primary", 2, "/admin/report/:id/preview", "POST"),
+		menuButtonWithAPI(714, menuID, "设计时预览", "report_design_design_preview", enum.Top, "run", "preview", "primary", 3, "/admin/report/:id/design-preview", "POST"),
 		menuButtonWithAPI(715, menuID, "发布", "report_design_publish", enum.Top, "publish", "published_with_changes", "primary", 4, "/admin/report/:id/publish", "POST"),
 		apiPermissionWithAPI(709, menuID, "报表详情", "report_design_detail", enum.Top, "detail", "visibility", "primary", 90, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(710, menuID, "新建报表", "report_design_create", enum.Top, "create", "add", "primary", 91, "/admin/report", "POST"),
 		apiPermissionWithAPI(711, menuID, "报表更新", "report_design_update", enum.Top, "update", "edit", "primary", 92, "/admin/report/:id", "PUT"),
 		apiPermissionWithAPI(712, menuID, "数据源列表", "report_design_data_source", enum.Top, "metadata", "dataset", "primary", 93, "/admin/report/data-sources", "GET"),
 		apiPermissionWithAPI(713, menuID, "SQL字段解析", "report_design_sql_fields", enum.Top, "metadata", "schema", "primary", 94, "/admin/report/sql-fields", "POST"),
-		apiPermissionWithAPI(716, menuID, "版本列表", "report_design_versions", enum.Top, "versions", "history", "primary", 95, "/admin/report/:id/versions", "GET"),
+		apiPermissionWithAPI(716, menuID, "版本列表", "report_design_versions", enum.Top, "version", "history", "primary", 95, "/admin/report/:id/versions", "GET"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -2050,6 +2120,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	}
 	applyMigrationSensitiveFieldDefaults(&field)
 	applyMigrationManagedFieldDefaults(&field)
+	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
 
@@ -2174,10 +2245,122 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 	case "state", "success", "is_hidden", "is_button", "is_disabled", "is_unfold", "required":
 		return "whether"
 	}
+	if tableCode == "report_definition" {
+		switch fieldCode {
+		case "status":
+			return "report_status"
+		case "category":
+			return "report_category"
+		case "source_type":
+			return "report_source_type"
+		}
+	}
 	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
 		return "whether"
 	}
 	return ""
+}
+
+func applyReportDefinitionFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != "report_definition" {
+		return
+	}
+
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+
+	switch field.FieldCode {
+	case "name":
+		field.FieldName = "报表名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 1
+	case "code":
+		field.FieldName = "报表编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 2
+	case "category":
+		field.FieldName = "分类"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("report_category")
+		field.Sequence = 3
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("report_status")
+		field.Sequence = 4
+	case "source_type":
+		field.FieldName = "数据源类型"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("report_source_type")
+		field.Sequence = 5
+	case "source_code":
+		field.FieldName = "数据源编码"
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 6
+	case "published_version_id":
+		field.FieldName = "当前发布版本"
+		field.IsListShow = true
+		field.Sequence = 7
+	case "permission_menu_id":
+		field.FieldName = "运行菜单"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 8
+	case "permission_table_code":
+		field.FieldName = "权限表编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 9
+	case "description":
+		field.FieldName = "描述"
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.TextareaInputType
+		field.Sequence = 10
+	case "gmt_create":
+		field.FieldName = "创建时间"
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 98
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 99
+	case "query_config", "layout_config":
+		field.FieldName = map[string]string{
+			"query_config":  "查询配置",
+			"layout_config": "布局配置",
+		}[field.FieldCode]
+	case "remark":
+		field.FieldName = "备注"
+	}
 }
 
 func applyMigrationSensitiveFieldDefaults(field *model.SysTableField) {
@@ -2238,6 +2421,20 @@ var systemTableFieldDisplayNameMap = map[string]map[string]string{
 		"ding_key":    "钉钉Key",
 		"ding_secret": "钉钉Secret",
 		"ding_app_id": "钉钉AppID",
+	},
+	"report_definition": {
+		"code":                  "报表编码",
+		"name":                  "报表名称",
+		"description":           "描述",
+		"category":              "分类",
+		"status":                "状态",
+		"published_version_id":  "当前发布版本",
+		"source_type":           "数据源类型",
+		"source_code":           "数据源编码",
+		"permission_menu_id":    "运行菜单",
+		"permission_table_code": "权限表编码",
+		"query_config":          "查询配置",
+		"layout_config":         "布局配置",
 	},
 	"sms_template": {
 		"sign_name":       "短信签名",

@@ -12,6 +12,10 @@ declare module 'vue-router' {
     isHidden?: boolean
     tableCode?: string
     menuId?: number
+    pageType?: string
+    reportId?: number
+    reportCode?: string
+    permissionTableCode?: string
     showTag?: boolean
     fullscreen?: boolean
   }
@@ -300,6 +304,67 @@ const asyncRoutesChildren: Route[] = [
           keepAlive: false,
           isHidden: true,
           fullscreen: true,
+          showTag: true,
+        },
+      },
+    ],
+  },
+  {
+    component: layout,
+    path: 'report-v2',
+    name: 'report_v2',
+    meta: {
+      title: 'Report V2 Prototype',
+      icon: 'assessment',
+      isHidden: true,
+      isOpen: false,
+    },
+    children: [
+      {
+        component: () => import('pages/report-v2/workbench/ReportWorkbenchPage.vue'),
+        path: 'workbench',
+        name: 'report_v2_workbench',
+        meta: {
+          title: 'Report V2 Workbench',
+          icon: 'dashboard',
+          keepAlive: false,
+          isHidden: true,
+          showTag: true,
+        },
+      },
+      {
+        component: () => import('pages/report-v2/runtime/ReportRuntimePage.vue'),
+        path: 'runtime/:id',
+        name: 'report_v2_runtime',
+        meta: {
+          title: 'Report V2 Runtime',
+          icon: 'play_circle',
+          keepAlive: false,
+          isHidden: true,
+          showTag: true,
+        },
+      },
+      {
+        component: () => import('pages/report-v2/designer/ReportDesignerPage.vue'),
+        path: 'designer/:id',
+        name: 'report_v2_designer',
+        meta: {
+          title: 'Report V2 Designer',
+          icon: 'design_services',
+          keepAlive: false,
+          isHidden: true,
+          showTag: true,
+        },
+      },
+      {
+        component: () => import('pages/report-v2/prototype/ReportV2Prototype.vue'),
+        path: 'prototype',
+        name: 'report_v2_prototype',
+        meta: {
+          title: 'Report V2 Prototype',
+          icon: 'dashboard_customize',
+          keepAlive: false,
+          isHidden: true,
           showTag: true,
         },
       },

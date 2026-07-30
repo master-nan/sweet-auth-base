@@ -20,6 +20,8 @@ import type {
   ReportExportReq,
   ReportField,
   ReportLayoutConfig,
+  ReportPublishMenuReq,
+  ReportPublishMenuRes,
   ReportPublishReq,
   ReportPublishRes,
   ReportPreviewReq,
@@ -44,11 +46,19 @@ export type {
   ReportDatasetJoin,
   ReportDatasetJoinType,
   ReportDatasetType,
+  ReportDesignerMode,
   ReportExportFile,
   ReportExportFormat,
   ReportExportReq,
   ReportField,
   ReportKind,
+  ReportLayoutArea,
+  ReportLayoutAreaAggregate,
+  ReportLayoutAreaItem,
+  ReportLayoutAreaItemAlign,
+  ReportLayoutAreaItemFormat,
+  ReportLayoutAreaItemType,
+  ReportLayoutAreaType,
   ReportLayoutConfig,
   ReportParameter,
   ReportParameterOperator,
@@ -56,6 +66,8 @@ export type {
   ReportPreviewMeta,
   ReportPreviewReq,
   ReportPreviewRes,
+  ReportPublishMenuReq,
+  ReportPublishMenuRes,
   ReportPublishReq,
   ReportPublishRes,
   ReportQuery,
@@ -79,6 +91,15 @@ interface BackendReport extends Basic {
   source_code: string
   permission_menu_id?: number
   permission_table_code?: string
+  menu_id?: number
+  menu_name?: string
+  menu_title?: string
+  menu_path?: string
+  menu_component?: string
+  menu_page_type?: string
+  menu_visible?: boolean
+  published_to_menu?: boolean
+  path?: string
   published_version_id?: number
   published_version_no?: number
   query_config?: Partial<ReportQueryConfig>
@@ -209,6 +230,16 @@ const toReport = (item: BackendReport): Report => {
     ...(item.published_version_no !== undefined
       ? { published_version_no: item.published_version_no }
       : {}),
+    ...(item.menu_id !== undefined ? { menu_id: item.menu_id } : {}),
+    ...(item.menu_name !== undefined ? { menu_name: item.menu_name } : {}),
+    ...(item.menu_title !== undefined ? { menu_title: item.menu_title } : {}),
+    ...(item.menu_path !== undefined || item.path !== undefined
+      ? { menu_path: item.menu_path || item.path }
+      : {}),
+    ...(item.menu_component !== undefined ? { menu_component: item.menu_component } : {}),
+    ...(item.menu_page_type !== undefined ? { menu_page_type: item.menu_page_type } : {}),
+    ...(item.menu_visible !== undefined ? { menu_visible: item.menu_visible } : {}),
+    ...(item.published_to_menu !== undefined ? { published_to_menu: item.published_to_menu } : {}),
     owner: item.modify_user_name || item.create_user_name || '',
     updated_at: item.gmt_modify || '',
   }
@@ -223,18 +254,22 @@ const toBackendReport = (req: ReportSaveReq) => {
   const datasets = ensureOnePrimaryDataset(req.datasets || [])
   const primary = primaryTableDataset(datasets)
   const sourceCode = primary?.source_code || String(req.data_source_id || '')
+  const sourceLayout = req.layout_config
+  const datasetJoins = req.dataset_joins || req.query_config?.dataset_joins || sourceLayout?.dataset_joins || []
+  const parameters = req.parameters || req.query_config?.parameters || sourceLayout?.parameters || []
   const layoutConfig: ReportLayoutConfig = {
-    version: REPORT_SCHEMA_VERSION,
-    view: 'sheet',
-    title: req.report_name,
-    subtitle: req.description || '',
-    kind: req.report_kind,
+    ...(sourceLayout || {}),
+    version: sourceLayout?.version || REPORT_SCHEMA_VERSION,
+    view: sourceLayout?.view || 'sheet',
+    title: sourceLayout?.title || req.report_name,
+    subtitle: sourceLayout?.subtitle || req.description || '',
+    kind: sourceLayout?.kind || req.report_kind,
     datasets,
-    dataset_joins: req.dataset_joins || [],
-    parameters: req.parameters || [],
-    sheet: normalizeReportSheet(req.sheet || defaultReportSheet()),
-    runtime_display: req.runtime_display || 'paged',
-    runtime_page_size: Number(req.runtime_page_size || 20),
+    dataset_joins: datasetJoins,
+    parameters,
+    sheet: normalizeReportSheet(req.sheet || sourceLayout?.sheet || defaultReportSheet()),
+    runtime_display: req.runtime_display || sourceLayout?.runtime_display || 'paged',
+    runtime_page_size: Number(req.runtime_page_size || sourceLayout?.runtime_page_size || 20),
   }
   return {
     id: req.id,
@@ -248,11 +283,12 @@ const toBackendReport = (req: ReportSaveReq) => {
     permission_menu_id: req.permission_menu_id || 0,
     permission_table_code: req.permission_table_code || sourceCode,
     query_config: {
-      version: REPORT_SCHEMA_VERSION,
+      ...(req.query_config || {}),
+      version: req.query_config?.version || REPORT_SCHEMA_VERSION,
       datasets,
-      dataset_joins: req.dataset_joins || [],
+      dataset_joins: datasetJoins,
       fields: req.fields || [],
-      parameters: req.parameters || [],
+      parameters,
     },
     layout_config: layoutConfig,
     remark: req.status === 'draft' ? 'draft' : '',
@@ -483,6 +519,21 @@ export const useReportApi = () => {
       .then((res) => res.data.data || [])
   }
 
+  const publishReportMenu = async (
+    id: number,
+    req: ReportPublishMenuReq,
+  ): Promise<ReportPublishMenuRes> => {
+    return instance
+      .post<ResponseData<ReportPublishMenuRes>>(`/admin/report/${id}/publish-menu`, req)
+      .then((res) => res.data.data)
+  }
+
+  const unpublishReportMenu = async (id: number): Promise<ReportPublishMenuRes> => {
+    return instance
+      .delete<ResponseData<ReportPublishMenuRes>>(`/admin/report/${id}/publish-menu`)
+      .then((res) => res.data.data)
+  }
+
   const inferSqlFields = async (sql: string) => {
     return instance
       .post<ResponseData<BackendReportColumn[]>>('/admin/report/sql-fields', { sql })
@@ -512,6 +563,8 @@ export const useReportApi = () => {
     runReport,
     exportReport,
     queryReportVersions,
+    publishReportMenu,
+    unpublishReportMenu,
     inferSqlFields,
     getSelectedFields,
   }

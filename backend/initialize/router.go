@@ -263,6 +263,8 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/report/:id", app.ReportController.UpdateReportDefinition)
 		adminGroup.POST("/report/:id/status", app.ReportController.UpdateReportDefinitionStatus)
 		adminGroup.POST("/report/:id/publish", app.ReportController.PublishReport)
+		adminGroup.POST("/report/:id/publish-menu", app.ReportController.PublishReportMenu)
+		adminGroup.DELETE("/report/:id/publish-menu", app.ReportController.UnpublishReportMenu)
 		adminGroup.POST("/report/:id/design-preview", app.ReportController.DesignPreviewReport)
 		adminGroup.POST("/report/:id/run", app.ReportController.RunReport)
 		adminGroup.POST("/report/:id/export", app.ReportController.ExportReport)

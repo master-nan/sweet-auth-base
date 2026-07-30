@@ -32,8 +32,10 @@ func (s *SysRoleMenuButtonRepositoryImpl) GetRoleMenuButtons(roleId, menuId int)
 
 func (s *SysRoleMenuButtonRepositoryImpl) CountActiveButtonPolicy(tx *gorm.DB, roleId int, path string, method string) (int64, error) {
 	var count int64
-	err := tx.Table("sys_role_menu_button AS rmb").
-		Joins("JOIN sys_menu_button AS b ON b.id = rmb.button_id").
+	roleMenuButtonTable := tx.NamingStrategy.TableName("SysRoleMenuButton")
+	menuButtonTable := tx.NamingStrategy.TableName("SysMenuButton")
+	err := tx.Table(roleMenuButtonTable+" AS rmb").
+		Joins("JOIN "+menuButtonTable+" AS b ON b.id = rmb.button_id").
 		Where("rmb.role_id = ?", roleId).
 		Where("b.gmt_delete IS NULL").
 		Where("b.state = ? AND b.is_disabled = ?", true, false).

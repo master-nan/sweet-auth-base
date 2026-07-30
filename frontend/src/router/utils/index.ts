@@ -37,10 +37,18 @@ export default function constructionRouters(router: Route[], backendMenus?: Menu
   })
 }
 
+const reportRuntimeComponent = 'pages/report-v2/runtime/ReportRuntimePage.vue'
+
 const componentMap: Record<string, any> = {
   'src/components/Layout/Layout.vue': layout,
   'pages/develop/generalization/Index.vue': () => import('pages/develop/generalization/Index.vue'),
   'pages/system/data-permission/Index.vue': () => import('pages/system/data-permission/Index.vue'),
+  [reportRuntimeComponent]: () => import('pages/report-v2/runtime/ReportRuntimePage.vue'),
+}
+
+type ReportMenuOption = {
+  report_id: number
+  report_code?: string
 }
 
 function appendDynamicMenuRoutes(routes: Route[], menus: Menu[]) {
@@ -59,6 +67,7 @@ function appendDynamicMenuRoutes(routes: Route[], menus: Menu[]) {
 }
 
 function mergeBackendMenuMeta(route: Route, menu: Menu) {
+  const reportOption = isReportMenu(menu) ? parseReportMenuOption(menu.option) : null
   route.meta = {
     ...(route.meta || {}),
     title: menu.title || route.meta?.title || String(route.name || ''),
@@ -66,11 +75,27 @@ function mergeBackendMenuMeta(route: Route, menu: Menu) {
     isHidden: menu.is_hidden,
     menuId: menu.id,
     ...(menu.table_code ? { tableCode: menu.table_code } : {}),
+    ...(menu.page_type ? { pageType: menu.page_type } : {}),
+    ...(reportOption
+      ? {
+          reportId: reportOption.report_id,
+          ...(reportOption.report_code ? { reportCode: reportOption.report_code } : {}),
+          ...(menu.table_code ? { permissionTableCode: menu.table_code } : {}),
+        }
+      : {}),
   }
 }
 
 function isLowCodeMenu(menu: Menu) {
   return menu.page_type === 'low_code' && !!menu.table_code
+}
+
+function isReportMenu(menu: Menu) {
+  return (
+    menu.page_type === 'report' &&
+    menu.component === reportRuntimeComponent &&
+    !!parseReportMenuOption(menu.option)
+  )
 }
 
 function isDirectoryMenu(menu: Menu) {
@@ -79,6 +104,7 @@ function isDirectoryMenu(menu: Menu) {
 
 function menuToDynamicRoute(menu: Menu): Route | null {
   if (isLowCodeMenu(menu)) return menuToLowCodeRoute(menu)
+  if (menu.page_type === 'report') return menuToReportRoute(menu)
   if (!isDirectoryMenu(menu)) return null
   const children = (menu.children || [])
     .map((child) => menuToDynamicRoute(child))
@@ -96,6 +122,73 @@ function menuToDynamicRoute(menu: Menu): Route | null {
     },
     children,
   }
+}
+
+function parseReportMenuOption(option: unknown): ReportMenuOption | null {
+  if (!option) return null
+  let source: unknown = option
+  if (typeof option === 'string') {
+    if (!option.trim()) return null
+    try {
+      source = JSON.parse(option)
+    } catch (error) {
+      console.warn('报表菜单 option 不是合法 JSON，已跳过动态路由生成:', option, error)
+      return null
+    }
+  }
+  if (!source || typeof source !== 'object') return null
+  const raw = source as Record<string, unknown>
+  const reportId = Number(raw.report_id)
+  if (!Number.isFinite(reportId) || reportId <= 0) return null
+  const reportCode = raw.report_code
+  return {
+    report_id: reportId,
+    ...(typeof reportCode === 'string' ||
+    typeof reportCode === 'number' ||
+    typeof reportCode === 'boolean'
+      ? { report_code: String(reportCode) }
+      : {}),
+  }
+}
+
+function menuToReportRoute(menu: Menu): Route | null {
+  const option = parseReportMenuOption(menu.option)
+  if (!option) {
+    console.warn('报表菜单缺少有效 report_id，已跳过动态路由生成:', menu)
+    return null
+  }
+  if (menu.component !== reportRuntimeComponent) {
+    console.warn('报表菜单 component 不是 V2 RuntimePage，已跳过动态路由生成:', menu.component, menu)
+    return null
+  }
+  const component = componentMap[menu.component]
+  if (!component) {
+    console.warn('报表菜单 component 未注册，已跳过动态路由生成:', menu.component, menu)
+    return null
+  }
+  return {
+    path: reportMenuRoutePath(menu.path),
+    name: menu.name,
+    component,
+    meta: {
+      title: menu.title,
+      ...(menu.icon ? { icon: menu.icon } : {}),
+      keepAlive: false,
+      isHidden: menu.is_hidden,
+      pageType: 'report',
+      menuId: menu.id,
+      reportId: option.report_id,
+      ...(option.report_code ? { reportCode: option.report_code } : {}),
+      ...(menu.table_code ? { permissionTableCode: menu.table_code } : {}),
+    },
+  }
+}
+
+function reportMenuRoutePath(path: string) {
+  const normalized = path.trim().replace(/^\/+/, '')
+  if (!normalized) return '/admin/report/runtime'
+  if (normalized.startsWith('admin/')) return `/${normalized}`
+  return `/admin/${normalized}`
 }
 
 function menuToLowCodeRoute(menu: Menu): Route {

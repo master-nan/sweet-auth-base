@@ -112,7 +112,7 @@ func InitializeApp() (*App, error) {
 	reportDefinitionRepositoryImpl := impl.NewReportDefinitionRepositoryImpl(primaryDB)
 	reportDefinitionVersionRepositoryImpl := impl.NewReportDefinitionVersionRepositoryImpl(primaryDB)
 	reportExecutionLogRepositoryImpl := impl.NewReportExecutionLogRepositoryImpl(primaryDB)
-	reportService := service.NewReportService(reportDefinitionRepositoryImpl, reportDefinitionVersionRepositoryImpl, reportExecutionLogRepositoryImpl, generalizationService, sysTableService, dataPermissionService, snowflake)
+	reportService := service.NewReportService(reportDefinitionRepositoryImpl, reportDefinitionVersionRepositoryImpl, reportExecutionLogRepositoryImpl, sysMenuRepositoryImpl, sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, generalizationService, sysTableService, dataPermissionService, snowflake)
 	reportController := controller.NewReportController(reportService, sysTableService, v2)
 	orgLegalEntityRepositoryImpl := impl.NewOrgLegalEntityRepositoryImpl(primaryDB)
 	orgUnitRepositoryImpl := impl.NewOrgUnitRepositoryImpl(primaryDB)

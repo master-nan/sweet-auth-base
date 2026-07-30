@@ -54,6 +54,16 @@ type ReportPublishReq struct {
 	ChangeLog string `json:"change_log" example:"首次发布"`
 }
 
+type ReportPublishMenuReq struct {
+	ParentMenuId      int    `json:"parent_menu_id" binding:"required" example:"300"`
+	Title             string `json:"title" example:"供应商月度对账单"`
+	Path              string `json:"path" example:"report/runtime/supplier_monthly_statement"`
+	Icon              string `json:"icon" example:"assessment"`
+	Sort              int    `json:"sort" example:"30"`
+	Visible           *bool  `json:"visible" example:"true"`
+	PermissionRoleIds []int  `json:"permission_role_ids"`
+}
+
 type ReportExportReq struct {
 	Format     string         `json:"format" example:"csv"`
 	MenuId     int            `json:"menu_id" example:"401"`

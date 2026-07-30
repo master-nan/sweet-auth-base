@@ -348,6 +348,35 @@ func TestSeedDictsCreatesSystemEnumDictionaries(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("expected http method dict item, got %d", count)
 	}
+
+	if err := db.Model(&model.SysDict{}).
+		Where("dict_code IN ?", []string{"report_status", "report_category", "report_source_type", "report_kind"}).
+		Count(&count).Error; err != nil {
+		t.Fatalf("count report dicts: %v", err)
+	}
+	if count != 4 {
+		t.Fatalf("expected report dictionaries, got %d", count)
+	}
+
+	for _, item := range []struct {
+		code  string
+		value string
+	}{
+		{"report_status_published", "published"},
+		{"report_category_finance", "finance"},
+		{"report_source_type_sql", "sql"},
+		{"report_kind_layout", "layout"},
+		{"sys_menu_button_event_action_publish_menu", string(enum.ButtonActionPublishMenu)},
+		{"sys_menu_button_event_action_unpublish_menu", string(enum.ButtonActionUnpublishMenu)},
+		{"sys_menu_button_event_action_version", string(enum.ButtonActionVersion)},
+	} {
+		if err := db.Model(&model.SysDictItem{}).Where("item_code = ? AND item_value = ?", item.code, item.value).Count(&count).Error; err != nil {
+			t.Fatalf("count dict item %s: %v", item.code, err)
+		}
+		if count != 1 {
+			t.Fatalf("expected dict item %s=%s, got %d", item.code, item.value, count)
+		}
+	}
 }
 
 func TestSeedAuditMenuButtonsIncludesDetailRefresh(t *testing.T) {
@@ -438,6 +467,121 @@ func TestSeedSystemTableFieldRepairsGeneratedChineseName(t *testing.T) {
 	}
 	if got.FieldName != "是否页面按钮" {
 		t.Fatalf("expected field name repaired, got %q", got.FieldName)
+	}
+}
+
+func TestSeedSystemTableMetadataConfiguresReportDefinition(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysTable{}, &model.SysTableField{}, &model.SysTableIndex{}, &model.SysTableIndexField{}); err != nil {
+		t.Fatalf("migrate metadata tables: %v", err)
+	}
+	if err := db.Table("report_definition").AutoMigrate(&model.ReportDefinition{}); err != nil {
+		t.Fatalf("migrate report_definition: %v", err)
+	}
+
+	if err := seedSystemTableMetadata(db, newMigrationTestSnowflake(t)); err != nil {
+		t.Fatalf("seed system table metadata: %v", err)
+	}
+
+	var table model.SysTable
+	if err := db.Where("table_code = ?", "report_definition").First(&table).Error; err != nil {
+		t.Fatalf("query report_definition sys table: %v", err)
+	}
+
+	fields := map[string]model.SysTableField{}
+	var result []model.SysTableField
+	if err := db.Where("table_id = ?", table.Id).Find(&result).Error; err != nil {
+		t.Fatalf("query report_definition fields: %v", err)
+	}
+	for _, field := range result {
+		fields[field.FieldCode] = field
+	}
+
+	assertReportField := func(code string, list, advanced, quick bool, dictCode string) {
+		t.Helper()
+		field, ok := fields[code]
+		if !ok {
+			t.Fatalf("expected report_definition field %s", code)
+		}
+		if field.IsListShow != list || field.IsAdvancedSearch != advanced || field.IsQuickSearch != quick {
+			t.Fatalf("unexpected field flags for %s: list=%v advanced=%v quick=%v", code, field.IsListShow, field.IsAdvancedSearch, field.IsQuickSearch)
+		}
+		if dictCode == "" {
+			return
+		}
+		if field.DictCode == nil || *field.DictCode != dictCode {
+			t.Fatalf("expected field %s dict %s, got %+v", code, dictCode, field.DictCode)
+		}
+	}
+
+	assertReportField("name", true, true, true, "")
+	assertReportField("code", true, true, true, "")
+	assertReportField("category", true, true, true, "report_category")
+	assertReportField("status", true, true, false, "report_status")
+	assertReportField("source_type", true, true, false, "report_source_type")
+	assertReportField("permission_table_code", true, true, true, "")
+	assertReportField("gmt_modify", true, true, false, "")
+	assertReportField("query_config", false, false, false, "")
+	assertReportField("layout_config", false, false, false, "")
+}
+
+func TestSeedReportV2WorkbenchMenuButtons(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.CasbinRule{}); err != nil {
+		t.Fatalf("migrate report workbench buttons: %v", err)
+	}
+
+	sf := newMigrationTestSnowflake(t)
+	if err := seedReportV2WorkbenchMenuButtons(db, sf, 1, "super_admin", 904); err != nil {
+		t.Fatalf("seed report workbench buttons: %v", err)
+	}
+	if err := seedReportV2WorkbenchMenuButtons(db, sf, 1, "super_admin", 904); err != nil {
+		t.Fatalf("seed report workbench buttons twice: %v", err)
+	}
+
+	expected := map[string]string{
+		"report_v2_workbench_query":          string(enum.ButtonActionQuery),
+		"report_v2_workbench_create":         string(enum.ButtonActionCreate),
+		"report_v2_workbench_refresh":        string(enum.ButtonActionRefresh),
+		"report_v2_workbench_design":         string(enum.ButtonActionUpdate),
+		"report_v2_workbench_run":            string(enum.ButtonActionRun),
+		"report_v2_workbench_publish":        string(enum.ButtonActionPublish),
+		"report_v2_workbench_publish_menu":   string(enum.ButtonActionPublishMenu),
+		"report_v2_workbench_unpublish_menu": string(enum.ButtonActionUnpublishMenu),
+		"report_v2_workbench_version":        string(enum.ButtonActionVersion),
+		"report_v2_workbench_disable":        string(enum.ButtonActionDisable),
+		"report_v2_workbench_delete":         string(enum.ButtonActionDelete),
+	}
+
+	for code, action := range expected {
+		var button model.SysMenuButton
+		if err := db.Where("menu_id = ? AND code = ?", 904, code).First(&button).Error; err != nil {
+			t.Fatalf("query report workbench button %s: %v", code, err)
+		}
+		if button.EventAction != action {
+			t.Fatalf("expected %s action %s, got %s", code, action, button.EventAction)
+		}
+		var count int64
+		if err := db.Model(&model.SysRoleMenuButton{}).Where("role_id = ? AND menu_id = ? AND button_id = ?", 1, 904, button.Id).Count(&count).Error; err != nil {
+			t.Fatalf("count report workbench role binding %s: %v", code, err)
+		}
+		if count != 1 {
+			t.Fatalf("expected one role binding for %s, got %d", code, count)
+		}
+	}
+
+	var count int64
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND code = ?", 904, "report_v2_workbench_run").Count(&count).Error; err != nil {
+		t.Fatalf("count report workbench run button: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected idempotent run button seed, got %d", count)
+	}
+	if err := db.Model(&model.CasbinRule{}).Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "p", "super_admin", "/admin/report/:id/run", "POST").Count(&count).Error; err != nil {
+		t.Fatalf("count run casbin policy: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected run casbin policy, got %d", count)
 	}
 }
 

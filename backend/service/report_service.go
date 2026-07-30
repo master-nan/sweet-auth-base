@@ -16,7 +16,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -39,6 +41,9 @@ const (
 	reportRuntimeRun           = "runtime_run"
 	reportRuntimeExport        = "runtime_export"
 	reportExportFormatCSV      = "csv"
+	reportRuntimeComponent     = "pages/report-v2/runtime/ReportRuntimePage.vue"
+	reportDefaultMenuIcon      = "assessment"
+	reportSuperAdminRoleName   = "super_admin"
 
 	defaultReportExportMaxRows = 5000
 	maxReportExportRows        = 10000
@@ -75,6 +80,12 @@ type ReportService struct {
 	reportRepo            repository.ReportDefinitionRepository
 	reportVersionRepo     repository.ReportDefinitionVersionRepository
 	reportLogRepo         repository.ReportExecutionLogRepository
+	sysMenuRepo           repository.SysMenuRepository
+	sysMenuButtonRepo     repository.SysMenuButtonRepository
+	sysRoleRepo           repository.SysRoleRepository
+	sysRoleMenuRepo       repository.SysRoleMenuRepository
+	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository
+	casbinRuleRepo        repository.CasbinRuleRepository
 	generalizationService *GeneralizationService
 	sysTableService       *SysTableService
 	dataPermissionService *DataPermissionService
@@ -85,6 +96,12 @@ func NewReportService(
 	reportRepo repository.ReportDefinitionRepository,
 	reportVersionRepo repository.ReportDefinitionVersionRepository,
 	reportLogRepo repository.ReportExecutionLogRepository,
+	sysMenuRepo repository.SysMenuRepository,
+	sysMenuButtonRepo repository.SysMenuButtonRepository,
+	sysRoleRepo repository.SysRoleRepository,
+	sysRoleMenuRepo repository.SysRoleMenuRepository,
+	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
+	casbinRuleRepo repository.CasbinRuleRepository,
 	generalizationService *GeneralizationService,
 	sysTableService *SysTableService,
 	dataPermissionService *DataPermissionService,
@@ -94,6 +111,12 @@ func NewReportService(
 		reportRepo:            reportRepo,
 		reportVersionRepo:     reportVersionRepo,
 		reportLogRepo:         reportLogRepo,
+		sysMenuRepo:           sysMenuRepo,
+		sysMenuButtonRepo:     sysMenuButtonRepo,
+		sysRoleRepo:           sysRoleRepo,
+		sysRoleMenuRepo:       sysRoleMenuRepo,
+		sysRoleMenuButtonRepo: sysRoleMenuButtonRepo,
+		casbinRuleRepo:        casbinRuleRepo,
 		generalizationService: generalizationService,
 		sysTableService:       sysTableService,
 		dataPermissionService: dataPermissionService,
@@ -374,6 +397,161 @@ func (s *ReportService) GetReportVersions(reportId int) ([]response.ReportDefini
 			ChangeLog:     version.ChangeLog,
 			IsCurrent:     version.Id == report.PublishedVersionId,
 		})
+	}
+	return result, nil
+}
+
+func (s *ReportService) PublishReportAsMenu(ctx *gin.Context, reportId int, req request.ReportPublishMenuReq) (response.ReportPublishMenuRes, error) {
+	if reportId <= 0 {
+		return response.ReportPublishMenuRes{}, myerrors.ErrParamInvalid
+	}
+	var result response.ReportPublishMenuRes
+	var policies []reportMenuPolicy
+	err := s.reportRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		var report model.ReportDefinition
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&report, reportId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrDataNotFound
+			}
+			return err
+		}
+		if normalizeReportStatus(report.Status) != reportStatusPublished || !report.State {
+			return myerrors.NewBadRequestError("报表未发布，不能发布到菜单")
+		}
+		if report.PublishedVersionId <= 0 {
+			return myerrors.NewBadRequestError("报表缺少发布版本，不能发布到菜单")
+		}
+		var version model.ReportDefinitionVersion
+		if err := tx.First(&version, "id = ? AND report_id = ?", report.PublishedVersionId, report.Id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.NewBadRequestError("报表发布版本不存在")
+			}
+			return err
+		}
+		if !version.State || normalizeReportStatus(version.Status) != reportVersionPublished {
+			return myerrors.NewBadRequestError("报表发布版本状态不可发布到菜单")
+		}
+		parent, err := s.validateReportMenuParent(tx, req.ParentMenuId)
+		if err != nil {
+			return err
+		}
+		menuPath := normalizeReportMenuPath(req.Path, report.Code)
+		existingMenu, err := s.findReportMenuForUpdate(tx, report)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		existingMenuID := 0
+		if err == nil {
+			existingMenuID = existingMenu.Id
+		}
+		if err := s.ensureReportMenuPathAvailable(tx, menuPath, existingMenuID); err != nil {
+			return err
+		}
+		menu, err := s.upsertReportMenu(tx, report, parent.Id, existingMenu, req, menuPath)
+		if err != nil {
+			return err
+		}
+		buttons, err := s.ensureReportRuntimeButtons(tx, report, menu.Id)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&model.ReportDefinition{}).
+			Where("id = ?", report.Id).
+			Updates(map[string]any{
+				"permission_menu_id": menu.Id,
+				"gmt_modify":         model.Now(),
+			}).Error; err != nil {
+			return err
+		}
+		policies, err = s.grantReportMenuRoles(tx, menu.Id, buttons, req.PermissionRoleIds)
+		if err != nil {
+			return err
+		}
+		result = reportMenuResponse(report, menu, true)
+		return nil
+	})
+	if err != nil {
+		return response.ReportPublishMenuRes{}, err
+	}
+	if err := s.addReportMenuPolicies(policies); err != nil {
+		return response.ReportPublishMenuRes{}, err
+	}
+	return result, nil
+}
+
+func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (response.ReportPublishMenuRes, error) {
+	if reportId <= 0 {
+		return response.ReportPublishMenuRes{}, myerrors.ErrParamInvalid
+	}
+	var result response.ReportPublishMenuRes
+	var cleanups []reportMenuPolicy
+	err := s.reportRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		var report model.ReportDefinition
+		if err := tx.First(&report, reportId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return myerrors.ErrDataNotFound
+			}
+			return err
+		}
+		result = response.ReportPublishMenuRes{
+			ReportId:        report.Id,
+			ReportCode:      report.Code,
+			MenuId:          report.PermissionMenuId,
+			PublishedToMenu: false,
+		}
+		if report.PermissionMenuId <= 0 {
+			return nil
+		}
+		var menu model.SysMenu
+		if err := tx.First(&menu, report.PermissionMenuId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		if menu.PageType != enum.MenuPageTypeReport {
+			return myerrors.NewBadRequestError("报表运行菜单类型不匹配")
+		}
+		if option, ok := parseReportMenuOption(menu.Option); ok && option.ReportId != report.Id {
+			return myerrors.NewBadRequestError("报表运行菜单绑定信息不匹配")
+		}
+		buttons, err := s.reportMenuButtons(tx, menu.Id)
+		if err != nil {
+			return err
+		}
+		candidates, err := s.reportButtonPolicyCandidates(tx, buttons)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&model.SysMenu{}).
+			Where("id = ?", menu.Id).
+			Updates(map[string]any{
+				"is_hidden":  true,
+				"state":      false,
+				"gmt_modify": model.Now(),
+			}).Error; err != nil {
+			return err
+		}
+		if err := s.sysRoleMenuRepo.DeleteByMenuIds(tx, []int{menu.Id}); err != nil {
+			return err
+		}
+		if err := s.sysRoleMenuButtonRepo.DeleteByMenuIds(tx, []int{menu.Id}); err != nil {
+			return err
+		}
+		cleanups, err = s.reportOrphanRolePolicyCleanups(tx, candidates)
+		if err != nil {
+			return err
+		}
+		result = reportMenuResponse(report, menu, false)
+		result.Visible = false
+		result.PublishedToMenu = false
+		return nil
+	})
+	if err != nil {
+		return response.ReportPublishMenuRes{}, err
+	}
+	if err := s.removeReportMenuPolicies(cleanups); err != nil {
+		return response.ReportPublishMenuRes{}, err
 	}
 	return result, nil
 }
@@ -2268,5 +2446,481 @@ func reportTableTypeLabel(tableType enum.SysTableType) string {
 		return reportSourceTypeView
 	default:
 		return reportSourceTypeTable
+	}
+}
+
+type reportMenuOption struct {
+	ReportId   int    `json:"report_id"`
+	ReportCode string `json:"report_code"`
+}
+
+type reportMenuPolicy struct {
+	RoleID   int
+	RoleName string
+	Path     string
+	Method   string
+}
+
+func (s *ReportService) validateReportMenuParent(tx *gorm.DB, parentID int) (model.SysMenu, error) {
+	if parentID <= 0 {
+		return model.SysMenu{}, myerrors.NewBadRequestError("请选择发布父级菜单")
+	}
+	var menu model.SysMenu
+	if err := tx.First(&menu, parentID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.SysMenu{}, myerrors.NewBadRequestError("发布父级菜单不存在")
+		}
+		return model.SysMenu{}, err
+	}
+	if !isReportPublishParentMenu(menu) {
+		return model.SysMenu{}, myerrors.NewBadRequestError("报表只能发布到目录菜单下")
+	}
+	return menu, nil
+}
+
+func isReportPublishParentMenu(menu model.SysMenu) bool {
+	if menu.IsHidden || !menu.State || strings.TrimSpace(menu.TableCode) != "" {
+		return false
+	}
+	if menu.PageType == "" {
+		return true
+	}
+	return menu.PageType == enum.MenuPageTypeDirectory
+}
+
+func (s *ReportService) findReportMenuForUpdate(tx *gorm.DB, report model.ReportDefinition) (model.SysMenu, error) {
+	if report.PermissionMenuId > 0 {
+		var menu model.SysMenu
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&menu, report.PermissionMenuId).Error
+		if err == nil {
+			return menu, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.SysMenu{}, err
+		}
+	}
+	var menus []model.SysMenu
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("page_type = ?", enum.MenuPageTypeReport).
+		Find(&menus).Error; err != nil {
+		return model.SysMenu{}, err
+	}
+	for _, menu := range menus {
+		option, ok := parseReportMenuOption(menu.Option)
+		if ok && option.ReportId == report.Id {
+			return menu, nil
+		}
+	}
+	return model.SysMenu{}, gorm.ErrRecordNotFound
+}
+
+func parseReportMenuOption(raw string) (reportMenuOption, bool) {
+	var option reportMenuOption
+	if strings.TrimSpace(raw) == "" {
+		return option, false
+	}
+	if err := json.Unmarshal([]byte(raw), &option); err != nil {
+		return reportMenuOption{}, false
+	}
+	return option, option.ReportId > 0
+}
+
+func (s *ReportService) ensureReportMenuPathAvailable(tx *gorm.DB, path string, currentMenuID int) error {
+	var existing model.SysMenu
+	query := tx.Where("path = ?", path)
+	if currentMenuID > 0 {
+		query = query.Where("id <> ?", currentMenuID)
+	}
+	err := query.First(&existing).Error
+	if err == nil {
+		return myerrors.NewBadRequestError("菜单路径已被占用")
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	return err
+}
+
+func (s *ReportService) upsertReportMenu(tx *gorm.DB, report model.ReportDefinition, parentID int, existing model.SysMenu, req request.ReportPublishMenuReq, path string) (model.SysMenu, error) {
+	optionBytes, err := json.Marshal(reportMenuOption{ReportId: report.Id, ReportCode: report.Code})
+	if err != nil {
+		return model.SysMenu{}, err
+	}
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = strings.TrimSpace(report.Name)
+	}
+	icon := strings.TrimSpace(req.Icon)
+	if icon == "" {
+		icon = reportDefaultMenuIcon
+	}
+	visible := true
+	if req.Visible != nil {
+		visible = *req.Visible
+	}
+	menu := model.SysMenu{
+		Basic:     model.Basic{Id: existing.Id, State: true},
+		Pid:       parentID,
+		Name:      reportMenuName(report.Code),
+		Path:      path,
+		Component: reportRuntimeComponent,
+		Title:     title,
+		IsHidden:  !visible,
+		Sequence:  normalizeReportMenuSequence(req.Sort, report.Id),
+		PageType:  enum.MenuPageTypeReport,
+		TableCode: strings.TrimSpace(report.PermissionTableCode),
+		Option:    string(optionBytes),
+		Icon:      utils.StringPtr(icon),
+	}
+	if existing.Id > 0 {
+		updates := map[string]any{
+			"pid":        menu.Pid,
+			"name":       menu.Name,
+			"path":       menu.Path,
+			"component":  menu.Component,
+			"title":      menu.Title,
+			"is_hidden":  menu.IsHidden,
+			"sequence":   menu.Sequence,
+			"page_type":  menu.PageType,
+			"table_code": menu.TableCode,
+			"option":     menu.Option,
+			"icon":       menu.Icon,
+			"state":      true,
+			"gmt_delete": nil,
+			"gmt_modify": model.Now(),
+		}
+		if err := tx.Model(&model.SysMenu{}).Unscoped().Where("id = ?", existing.Id).Updates(updates).Error; err != nil {
+			return model.SysMenu{}, err
+		}
+		menu.Basic.Id = existing.Id
+		return menu, nil
+	}
+	id, err := s.sf.GenerateUniqueID()
+	if err != nil {
+		return model.SysMenu{}, err
+	}
+	menu.Basic.Id = int(id)
+	if err := s.sysMenuRepo.Create(tx, &menu); err != nil {
+		return model.SysMenu{}, err
+	}
+	return menu, nil
+}
+
+func normalizeReportMenuPath(path string, reportCode string) string {
+	path = strings.TrimSpace(path)
+	path = strings.TrimPrefix(path, "/")
+	if path != "" {
+		return path
+	}
+	return "report/runtime/" + strings.TrimSpace(reportCode)
+}
+
+func reportMenuName(reportCode string) string {
+	raw := strings.TrimSpace(reportCode)
+	name := "report_" + raw
+	if len(name) <= 32 {
+		return name
+	}
+	hash := shortHash(raw)
+	prefixLen := 32 - len("report_") - len("_") - len(hash)
+	if prefixLen < 1 {
+		prefixLen = 1
+	}
+	prefix := raw
+	if len(prefix) > prefixLen {
+		prefix = prefix[:prefixLen]
+	}
+	return "report_" + prefix + "_" + hash
+}
+
+func reportMenuButtonCode(reportCode string, action string) string {
+	raw := strings.TrimSpace(reportCode)
+	suffix := "_" + strings.TrimSpace(action)
+	code := raw + suffix
+	if len(code) <= 128 {
+		return code
+	}
+	hash := shortHash(raw + suffix)
+	prefixLen := 128 - len(suffix) - len("_") - len(hash)
+	if prefixLen < 1 {
+		prefixLen = 1
+	}
+	if len(raw) > prefixLen {
+		raw = raw[:prefixLen]
+	}
+	return raw + "_" + hash + suffix
+}
+
+func shortHash(value string) string {
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(value))
+	return fmt.Sprintf("%08x", hasher.Sum32())
+}
+
+func normalizeReportMenuSequence(sortValue int, reportID int) uint8 {
+	if sortValue < 0 {
+		return 0
+	}
+	if sortValue > 255 {
+		return 255
+	}
+	if sortValue > 0 {
+		return uint8(sortValue)
+	}
+	return uint8(30 + (reportID % 100))
+}
+
+func (s *ReportService) ensureReportRuntimeButtons(tx *gorm.DB, report model.ReportDefinition, menuID int) ([]model.SysMenuButton, error) {
+	defaults := reportRuntimeDefaultButtons(report.Code)
+	buttons := make([]model.SysMenuButton, 0, len(defaults))
+	for _, item := range defaults {
+		button, err := s.sysMenuButtonRepo.FindByMenuIdAndCode(tx, menuID, item.Code)
+		if err == nil {
+			updates := map[string]any{
+				"name":         item.Name,
+				"memo":         item.Memo,
+				"position":     item.Position,
+				"event_type":   item.EventType,
+				"event_action": item.EventAction,
+				"icon":         item.Icon,
+				"color":        item.Color,
+				"display_mode": item.DisplayMode,
+				"sequence":     item.Sequence,
+				"path":         item.Path,
+				"method":       strings.ToUpper(item.Method),
+				"is_button":    item.IsButton,
+				"is_hidden":    false,
+				"is_disabled":  false,
+				"state":        true,
+				"gmt_modify":   model.Now(),
+			}
+			if err := s.sysMenuButtonRepo.UpdateMenuButtonFields(tx, button.Id, updates); err != nil {
+				return nil, err
+			}
+			item.Basic.Id = button.Id
+			item.MenuId = menuID
+			buttons = append(buttons, item)
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		id, err := s.sf.GenerateUniqueID()
+		if err != nil {
+			return nil, err
+		}
+		item.Basic = model.Basic{Id: int(id), State: true}
+		item.MenuId = menuID
+		if err := s.sysMenuButtonRepo.Create(tx, &item); err != nil {
+			return nil, err
+		}
+		buttons = append(buttons, item)
+	}
+	return buttons, nil
+}
+
+func reportRuntimeDefaultButtons(reportCode string) []model.SysMenuButton {
+	return []model.SysMenuButton{
+		{
+			Name:        "查询",
+			Code:        reportMenuButtonCode(reportCode, "query"),
+			Position:    enum.Top,
+			EventAction: string(enum.ButtonActionQuery),
+			Icon:        "search",
+			Color:       "primary",
+			DisplayMode: enum.ButtonDisplayIconText,
+			Sequence:    0,
+			Path:        "/admin/report/:id/run",
+			Method:      "POST",
+			IsButton:    true,
+		},
+		{
+			Name:        "导出",
+			Code:        reportMenuButtonCode(reportCode, "export"),
+			Position:    enum.Top,
+			EventAction: string(enum.ButtonActionExport),
+			Icon:        "file_download",
+			Color:       "primary",
+			DisplayMode: enum.ButtonDisplayIconText,
+			Sequence:    1,
+			Path:        "/admin/report/:id/export",
+			Method:      "POST",
+			IsButton:    true,
+		},
+		{
+			Name:        "刷新",
+			Code:        reportMenuButtonCode(reportCode, "refresh"),
+			Position:    enum.Top,
+			EventAction: string(enum.ButtonActionRefresh),
+			Icon:        "refresh",
+			Color:       "primary",
+			DisplayMode: enum.ButtonDisplayIconText,
+			Sequence:    2,
+			IsButton:    true,
+		},
+	}
+}
+
+func (s *ReportService) grantReportMenuRoles(tx *gorm.DB, menuID int, buttons []model.SysMenuButton, permissionRoleIDs []int) ([]reportMenuPolicy, error) {
+	roles, err := s.reportMenuGrantRoles(permissionRoleIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(roles) == 0 {
+		return nil, nil
+	}
+	policies := make([]reportMenuPolicy, 0, len(roles)*len(buttons))
+	for _, role := range roles {
+		if err := s.sysRoleMenuRepo.CreateIfNotExists(tx, model.SysRoleMenu{RoleId: role.Id, MenuId: menuID}); err != nil {
+			return nil, err
+		}
+		for _, button := range buttons {
+			if err := s.sysRoleMenuButtonRepo.CreateIfNotExists(tx, model.SysRoleMenuButton{RoleId: role.Id, MenuId: menuID, ButtonId: button.Id}); err != nil {
+				return nil, err
+			}
+			path := strings.TrimSpace(button.Path)
+			method := strings.ToUpper(strings.TrimSpace(button.Method))
+			if path == "" || method == "" {
+				continue
+			}
+			policies = append(policies, reportMenuPolicy{RoleID: role.Id, RoleName: role.Name, Path: path, Method: method})
+		}
+	}
+	return uniqueReportMenuPolicies(policies), nil
+}
+
+func (s *ReportService) reportMenuGrantRoles(permissionRoleIDs []int) ([]model.SysRole, error) {
+	roleMap := make(map[int]model.SysRole)
+	superAdmin, err := s.sysRoleRepo.FindByField("name", reportSuperAdminRoleName)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if superAdmin.Id > 0 {
+		roleMap[superAdmin.Id] = superAdmin
+	}
+	for _, roleID := range permissionRoleIDs {
+		if roleID <= 0 {
+			continue
+		}
+		if _, ok := roleMap[roleID]; ok {
+			continue
+		}
+		role, err := s.sysRoleRepo.FindById(roleID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, myerrors.NewBadRequestError("授权角色不存在")
+			}
+			return nil, err
+		}
+		roleMap[role.Id] = role
+	}
+	ids := make([]int, 0, len(roleMap))
+	for id := range roleMap {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	roles := make([]model.SysRole, 0, len(ids))
+	for _, id := range ids {
+		roles = append(roles, roleMap[id])
+	}
+	return roles, nil
+}
+
+func uniqueReportMenuPolicies(policies []reportMenuPolicy) []reportMenuPolicy {
+	seen := make(map[string]struct{}, len(policies))
+	result := make([]reportMenuPolicy, 0, len(policies))
+	for _, policy := range policies {
+		if policy.RoleName == "" || policy.Path == "" || policy.Method == "" {
+			continue
+		}
+		key := fmt.Sprintf("%s|%s|%s", policy.RoleName, policy.Path, policy.Method)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, policy)
+	}
+	return result
+}
+
+func (s *ReportService) addReportMenuPolicies(policies []reportMenuPolicy) error {
+	for _, policy := range uniqueReportMenuPolicies(policies) {
+		if _, err := s.casbinRuleRepo.AddPolicy(policy.RoleName, policy.Path, policy.Method); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *ReportService) removeReportMenuPolicies(policies []reportMenuPolicy) error {
+	for _, policy := range uniqueReportMenuPolicies(policies) {
+		if _, err := s.casbinRuleRepo.RemovePolicy(policy.RoleName, policy.Path, policy.Method); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *ReportService) reportMenuButtons(tx *gorm.DB, menuID int) ([]model.SysMenuButton, error) {
+	var buttons []model.SysMenuButton
+	if err := tx.Where("menu_id = ?", menuID).Find(&buttons).Error; err != nil {
+		return nil, err
+	}
+	return buttons, nil
+}
+
+func (s *ReportService) reportButtonPolicyCandidates(tx *gorm.DB, buttons []model.SysMenuButton) (map[buttonPolicyKey]struct{}, error) {
+	candidates := make(map[buttonPolicyKey]struct{})
+	for _, button := range buttons {
+		path := strings.TrimSpace(button.Path)
+		method := strings.ToUpper(strings.TrimSpace(button.Method))
+		if path == "" || method == "" {
+			continue
+		}
+		var roleButtons []model.SysRoleMenuButton
+		if err := tx.Where("button_id = ?", button.Id).Find(&roleButtons).Error; err != nil {
+			return nil, err
+		}
+		for _, roleButton := range roleButtons {
+			candidates[buttonPolicyKey{RoleID: roleButton.RoleId, Path: path, Method: method}] = struct{}{}
+		}
+	}
+	return candidates, nil
+}
+
+func (s *ReportService) reportOrphanRolePolicyCleanups(tx *gorm.DB, candidates map[buttonPolicyKey]struct{}) ([]reportMenuPolicy, error) {
+	cleanups := make([]reportMenuPolicy, 0, len(candidates))
+	for candidate := range candidates {
+		remaining, err := s.sysRoleMenuButtonRepo.CountActiveButtonPolicy(tx, candidate.RoleID, candidate.Path, candidate.Method)
+		if err != nil {
+			return nil, err
+		}
+		if remaining > 0 {
+			continue
+		}
+		var role model.SysRole
+		if err := tx.First(&role, candidate.RoleID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		cleanups = append(cleanups, reportMenuPolicy{RoleID: role.Id, RoleName: role.Name, Path: candidate.Path, Method: candidate.Method})
+	}
+	return cleanups, nil
+}
+
+func reportMenuResponse(report model.ReportDefinition, menu model.SysMenu, published bool) response.ReportPublishMenuRes {
+	return response.ReportPublishMenuRes{
+		ReportId:        report.Id,
+		ReportCode:      report.Code,
+		MenuId:          menu.Id,
+		MenuName:        menu.Name,
+		MenuTitle:       menu.Title,
+		Path:            menu.Path,
+		Component:       menu.Component,
+		PageType:        string(menu.PageType),
+		Visible:         !menu.IsHidden && menu.State,
+		PublishedToMenu: published && !menu.IsHidden && menu.State,
 	}
 }

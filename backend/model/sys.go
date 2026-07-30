@@ -47,7 +47,7 @@ type SysMenu struct {
 	Sequence       uint8                  `gorm:"comment:排序;type:smallint" json:"sequence"`
 	PageType       enum.SysMenuPageType   `gorm:"size:32;comment:页面类型" json:"page_type"`
 	TableCode      string                 `gorm:"size:128;comment:绑定表编码" json:"table_code"`
-	Option         string                 `gorm:"size:64;comment:扩展配置" json:"option"`
+	Option         string                 `gorm:"type:text;comment:扩展配置" json:"option"`
 	Icon           *string                `gorm:"size:32;comment:图标" json:"icon"`
 	Redirect       *string                `gorm:"size:128;comment:重定向地址" json:"redirect"`
 	IsUnfold       bool                   `gorm:"default:false;comment:默认展开" json:"is_unfold"`

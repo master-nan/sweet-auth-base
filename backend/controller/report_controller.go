@@ -190,6 +190,44 @@ func (r *ReportController) PublishReport(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
+func (r *ReportController) PublishReportMenu(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var data request.ReportPublishMenuReq
+	translator := r.translators["zh"]
+	if err := utils.ValidatorBody[request.ReportPublishMenuReq](ctx, &data, translator); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.PublishReportAsMenu(ctx, id, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
+func (r *ReportController) UnpublishReportMenu(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	result, err := r.reportService.UnpublishReportMenu(ctx, id)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
+}
+
 func (r *ReportController) GetReportVersions(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
