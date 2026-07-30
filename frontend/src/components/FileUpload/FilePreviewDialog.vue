@@ -27,8 +27,19 @@
           <q-spinner color="primary" size="42px" />
         </q-inner-loading>
 
-        <open-file-viewer
-          v-if="previewUrl && currentFile"
+        <div
+          v-if="previewUrl && currentFile && (designPreviewDisabled || viewerLoadError)"
+          :key="previewKey"
+          class="file-preview-dialog__unsupported"
+        >
+          <q-icon name="insert_drive_file" size="56px" color="grey-5" />
+          <div class="text-subtitle2">{{ unsupportedPreviewMessage }}</div>
+          <div class="text-caption text-grey-7">可以点击右上角下载后在本地应用中查看。</div>
+        </div>
+
+        <component
+          :is="OpenFileViewerComponent"
+          v-else-if="previewUrl && currentFile && OpenFileViewerComponent"
           :key="previewKey"
           :file="previewUrl"
           :file-name="currentFile.file_name"
@@ -44,6 +55,17 @@
           @unsupported="handlePreviewUnsupported"
         />
 
+        <div v-else-if="previewUrl && currentFile && !loading" class="file-preview-dialog__empty">
+          <template v-if="viewerLoading">
+            <q-spinner color="primary" size="42px" />
+            <div>正在加载文件预览组件</div>
+          </template>
+          <template v-else>
+            <q-icon name="insert_drive_file" size="56px" color="grey-5" />
+            <div>暂无可预览文件</div>
+          </template>
+        </div>
+
         <div v-else-if="!loading" class="file-preview-dialog__empty">
           <q-icon name="insert_drive_file" size="56px" color="grey-5" />
           <div>暂无可预览文件</div>
@@ -54,21 +76,10 @@
 </template>
 
 <script setup lang="ts">
-import { markRaw, ref } from 'vue'
+import { computed, markRaw, ref, shallowRef, type Component } from 'vue'
 import { useQuasar } from 'quasar'
-import { OpenFileViewer } from '@open-file-viewer/vue'
-import {
-  audioPlugin,
-  fallbackPlugin,
-  imagePlugin,
-  officePlugin,
-  pdfPlugin,
-  type PreviewToolbarOptions,
-  textPlugin,
-  videoPlugin,
-} from '@open-file-viewer/core'
+import type { PreviewPlugin, PreviewToolbarOptions } from '@open-file-viewer/core'
 import '@open-file-viewer/core/style.css'
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useFileApi, type FileBusinessContext, type FileInfo } from 'src/api/services/file'
 
 const $q = useQuasar()
@@ -80,16 +91,10 @@ const currentFile = ref<FileInfo | null>(null)
 const previewUrl = ref('')
 const downloadUrl = ref('')
 const previewKey = ref(0)
-
-const viewerPlugins = markRaw([
-  imagePlugin(),
-  videoPlugin(),
-  audioPlugin(),
-  textPlugin(),
-  pdfPlugin({ workerSrc: pdfWorkerSrc, useFetchData: true }),
-  officePlugin(),
-  fallbackPlugin(),
-])
+const viewerLoading = ref(false)
+const viewerLoadError = ref(false)
+const OpenFileViewerComponent = shallowRef<Component | null>(null)
+const viewerPlugins = shallowRef<PreviewPlugin[]>([])
 
 const toolbarOptions: PreviewToolbarOptions = {
   zoom: true,
@@ -119,6 +124,25 @@ const toolbarOptions: PreviewToolbarOptions = {
   },
 }
 
+const extension = computed(() => {
+  const file = currentFile.value
+  const raw = file?.file_ext || file?.file_name?.split('.').pop() || ''
+  return raw.replace(/^\./, '').toLowerCase()
+})
+
+const mimeType = computed(() => String(currentFile.value?.file_type || '').toLowerCase())
+
+const designPreviewDisabled = computed(() => isDesignPreviewDisabled(extension.value, mimeType.value))
+
+const unsupportedPreviewMessage = computed(() => {
+  const ext = extension.value
+  if (viewerLoadError.value) return '文件预览组件加载失败'
+  if (designExtensions.has(ext)) return `${ext.toUpperCase() || '设计'} 文件暂不支持在线预览`
+  return '当前文件类型暂不支持在线预览'
+})
+
+const designExtensions = new Set(['psd', 'psb', 'abr', 'ai', 'eps'])
+
 const open = async (file: FileInfo, context?: FileBusinessContext) => {
   if (!file.file_uuid) {
     $q.notify({ type: 'warning', position: 'top-right', message: '文件缺少访问标识' })
@@ -130,6 +154,7 @@ const open = async (file: FileInfo, context?: FileBusinessContext) => {
   downloadUrl.value = ''
   visible.value = true
   loading.value = true
+  viewerLoadError.value = false
 
   try {
     const [previewRes, downloadRes] = await Promise.all([
@@ -141,6 +166,9 @@ const open = async (file: FileInfo, context?: FileBusinessContext) => {
     }
     previewUrl.value = previewRes.data.url
     downloadUrl.value = downloadRes.success && downloadRes.data?.url ? downloadRes.data.url : ''
+    if (!isDesignPreviewDisabled(extension.value, mimeType.value)) {
+      await ensureOpenFileViewer()
+    }
     previewKey.value += 1
   } catch (error: any) {
     $q.notify({
@@ -170,8 +198,40 @@ const handlePreviewError = (error: Error) => {
   $q.notify({
     type: 'negative',
     position: 'top-right',
-    message: error.message || '文件预览失败',
+    message: error?.message || '文件预览失败',
   })
+}
+
+const ensureOpenFileViewer = async () => {
+  if (OpenFileViewerComponent.value && viewerPlugins.value.length > 0) return
+  viewerLoading.value = true
+  try {
+    const [viewerModule, coreModule, pdfWorkerModule] = await Promise.all([
+      import('@open-file-viewer/vue'),
+      import('@open-file-viewer/core'),
+      import('pdfjs-dist/build/pdf.worker.mjs?url'),
+    ])
+    const pdfWorkerSrc = String(pdfWorkerModule.default)
+    OpenFileViewerComponent.value = markRaw(viewerModule.OpenFileViewer)
+    viewerPlugins.value = markRaw([
+      coreModule.imagePlugin(),
+      coreModule.videoPlugin(),
+      coreModule.audioPlugin(),
+      coreModule.textPlugin(),
+      coreModule.pdfPlugin({ workerSrc: pdfWorkerSrc, useFetchData: true }),
+      coreModule.officePlugin({ pdf: { workerSrc: pdfWorkerSrc, useFetchData: true } }),
+      coreModule.fallbackPlugin(),
+    ])
+  } catch (error) {
+    viewerLoadError.value = true
+    throw error
+  } finally {
+    viewerLoading.value = false
+  }
+}
+
+function isDesignPreviewDisabled(ext: string, mime: string) {
+  return designExtensions.has(ext) || mime.includes('photoshop')
 }
 
 const formatFileSize = (size: number) => {
@@ -211,5 +271,16 @@ defineExpose({ open })
   justify-content: center;
   color: $grey-6;
   gap: 12px;
+}
+
+.file-preview-dialog__unsupported {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: $grey-7;
+  gap: 8px;
+  text-align: center;
 }
 </style>

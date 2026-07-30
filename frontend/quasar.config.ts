@@ -2,6 +2,10 @@
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
 import { defineConfig } from '#q-app/wrappers'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig((ctx) => {
   return {
@@ -60,6 +64,22 @@ export default defineConfig((ctx) => {
       // distDir
 
       extendViteConf(viteConf) {
+        viteConf.resolve = viteConf.resolve || {}
+        const disabledAgPsdPath = path.resolve(
+          projectRoot,
+          'src/utils/open-file-viewer-ag-psd-disabled.ts',
+        )
+        if (Array.isArray(viteConf.resolve.alias)) {
+          viteConf.resolve.alias = [
+            ...viteConf.resolve.alias,
+            { find: 'ag-psd', replacement: disabledAgPsdPath },
+          ]
+        } else {
+          viteConf.resolve.alias = {
+            ...viteConf.resolve.alias,
+            'ag-psd': disabledAgPsdPath,
+          }
+        }
         viteConf.build = viteConf.build || {}
         viteConf.build.chunkSizeWarningLimit = 900
         viteConf.build.rollupOptions = viteConf.build.rollupOptions || {}
@@ -70,6 +90,7 @@ export default defineConfig((ctx) => {
             : {}),
           manualChunks(id: string) {
             if (!id.includes('node_modules')) return undefined
+            if (id.includes('/@open-file-viewer/')) return 'vendor-file-preview'
             if (id.includes('/quasar/') || id.includes('@quasar/extras')) return 'vendor-quasar'
             if (id.includes('/vue') || id.includes('/pinia/') || id.includes('/vue-router/')) {
               return 'vendor-vue'

@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import {
   useFileApi,
@@ -56,7 +56,14 @@ import {
   type FileInfo,
 } from 'src/api/services/file'
 import { parseFileIds } from 'src/utils/file-value'
-import FilePreviewDialog from 'src/components/FileUpload/FilePreviewDialog.vue'
+
+type FilePreviewDialogExpose = {
+  open: (file: FileInfo, context?: FileBusinessContext) => void | Promise<void>
+}
+
+const FilePreviewDialog = defineAsyncComponent(
+  () => import('src/components/FileUpload/FilePreviewDialog.vue'),
+)
 
 interface FileDisplayProps {
   modelValue?: unknown
@@ -84,7 +91,7 @@ const fileApi = useFileApi()
 const loading = ref(false)
 const files = ref<FileInfo[]>([])
 const fileInfoCache = new Map<number, FileInfo>()
-const previewDialogRef = ref<InstanceType<typeof FilePreviewDialog> | null>(null)
+const previewDialogRef = ref<FilePreviewDialogExpose | null>(null)
 
 const visibleFiles = computed(() => files.value.slice(0, props.maxVisible))
 const hiddenCount = computed(() => Math.max(files.value.length - visibleFiles.value.length, 0))

@@ -100,12 +100,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
 import { Notify } from 'quasar'
 import SparkMD5 from 'spark-md5'
 import { parseFileIds } from 'src/utils/file-value'
-import FilePreviewDialog from 'src/components/FileUpload/FilePreviewDialog.vue'
+
+type FilePreviewDialogExpose = {
+  open: (file: FileInfo) => void | Promise<void>
+}
+
+const FilePreviewDialog = defineAsyncComponent(
+  () => import('src/components/FileUpload/FilePreviewDialog.vue'),
+)
 
 interface FileUploadProps {
   modelValue?: string | string[] | null
@@ -154,7 +161,7 @@ const {
   getFileDownloadAccessUrl,
 } = useFileApi()
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const previewDialogRef = ref<InstanceType<typeof FilePreviewDialog> | null>(null)
+const previewDialogRef = ref<FilePreviewDialogExpose | null>(null)
 const uploading = ref(false)
 const errorMessage = ref('')
 const fileList = ref<FileInfo[]>([])

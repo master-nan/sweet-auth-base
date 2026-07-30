@@ -495,7 +495,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  nextTick,
+  defineAsyncComponent,
+  type PropType,
+} from 'vue'
 import { QForm } from 'quasar'
 import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import { type TableField } from 'src/api/services/sys-table'
@@ -514,7 +522,6 @@ import KeyValueEditor from 'src/components/JsonEditor/KeyValueEditor.vue'
 import JsonEditor from 'src/components/JsonEditor/JsonEditor.vue'
 import CascaderSelect from 'src/components/Cascader/CascaderSelect.vue'
 import FileUpload from 'src/components/FileUpload/FileUpload.vue'
-import RichTextEditor from 'src/components/RichTextEditor/RichTextEditor.vue'
 import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
@@ -548,6 +555,10 @@ type FieldGroup = {
   description: string
   fields: TableField[]
 }
+
+const RichTextEditor = defineAsyncComponent(
+  () => import('src/components/RichTextEditor/RichTextEditor.vue'),
+)
 
 const props = defineProps({
   modelValue: {
