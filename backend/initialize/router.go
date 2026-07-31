@@ -196,6 +196,20 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/data-permission/bindings/menu/:menuId", app.DataPermissionController.SaveMenuBindings)
 		adminGroup.GET("/data-permission/debug", app.DataPermissionController.DebugDataScope)
 
+		// data permission DP-2 configuration queries and preflight
+		adminGroup.POST("/data-permission/config/resource/query", app.DataPermissionConfigController.QueryResources)
+		adminGroup.GET("/data-permission/config/resource/:id", app.DataPermissionConfigController.GetResource)
+		adminGroup.GET("/data-permission/config/resource/:id/ownerships", app.DataPermissionConfigController.ListOwnershipsByResource)
+		adminGroup.GET("/data-permission/config/ownership/:id", app.DataPermissionConfigController.GetOwnership)
+		adminGroup.POST("/data-permission/config/policy/query", app.DataPermissionConfigController.QueryPolicies)
+		adminGroup.GET("/data-permission/config/policy/:id", app.DataPermissionConfigController.GetPolicy)
+		adminGroup.POST("/data-permission/config/policy/rule/query", app.DataPermissionConfigController.QueryPolicyRules)
+		adminGroup.POST("/data-permission/config/grant/query", app.DataPermissionConfigController.QueryGrants)
+		adminGroup.GET("/data-permission/config/grant/:id", app.DataPermissionConfigController.GetGrant)
+		adminGroup.GET("/data-permission/config/preflight/resource/:id", app.DataPermissionConfigController.PreflightResource)
+		adminGroup.GET("/data-permission/config/preflight/policy/:id", app.DataPermissionConfigController.PreflightPolicy)
+		adminGroup.GET("/data-permission/config/preflight/grant/:id", app.DataPermissionConfigController.PreflightGrant)
+
 		// organization legal entity (read-only mirror)
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
 		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)

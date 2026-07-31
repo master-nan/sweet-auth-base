@@ -13,6 +13,7 @@ import (
 	"backend/controller"
 	"backend/internal/cache"
 	"backend/internal/database"
+	"backend/internal/datapermission"
 	"backend/internal/storage"
 	"backend/internal/token"
 	"backend/internal/utils"
@@ -27,35 +28,36 @@ import (
 )
 
 type App struct {
-	Config                   *config.Server
-	DBs                      map[string]*gorm.DB
-	Redis                    *redis.Client
-	SF                       *utils.Snowflake
-	JwtGenerator             *token.JWTGenerator
-	HmacGenerator            *token.HMACGenerator
-	Enforcer                 *casbin.SyncedEnforcer
-	DictController           *controller.DictController
-	BasicController          *controller.BasicController
-	TableController          *controller.TableController
-	MenuController           *controller.MenuController
-	RoleController           *controller.RoleController
-	UserController           *controller.UserController
-	DataPermissionController *controller.DataPermissionController
-	ApplicationController    *controller.ApplicationController
-	GeneralizationController *controller.GeneralizationController
-	ReportController         *controller.ReportController
-	OrgController            *controller.OrgController
-	SmsController            *controller.SmsController
-	FileController           *controller.FileController
-	AuthApi                  *api.AuthApi
-	SysUserApi               *api.SysUserApi
-	DingTalkApi              *api.DingTalkApi
-	LogService               *service.LogService
-	UserService              *service.SysUserService
-	ApplicationService       *service.ApplicationService
-	BlackCache               *cache.BlackUserCache
-	TokenBlackCache          *cache.TokenBlackCache
-	ApplicationCache         *cache.ApplicationCache
+	Config                         *config.Server
+	DBs                            map[string]*gorm.DB
+	Redis                          *redis.Client
+	SF                             *utils.Snowflake
+	JwtGenerator                   *token.JWTGenerator
+	HmacGenerator                  *token.HMACGenerator
+	Enforcer                       *casbin.SyncedEnforcer
+	DictController                 *controller.DictController
+	BasicController                *controller.BasicController
+	TableController                *controller.TableController
+	MenuController                 *controller.MenuController
+	RoleController                 *controller.RoleController
+	UserController                 *controller.UserController
+	DataPermissionController       *controller.DataPermissionController
+	DataPermissionConfigController *controller.DataPermissionConfigController
+	ApplicationController          *controller.ApplicationController
+	GeneralizationController       *controller.GeneralizationController
+	ReportController               *controller.ReportController
+	OrgController                  *controller.OrgController
+	SmsController                  *controller.SmsController
+	FileController                 *controller.FileController
+	AuthApi                        *api.AuthApi
+	SysUserApi                     *api.SysUserApi
+	DingTalkApi                    *api.DingTalkApi
+	LogService                     *service.LogService
+	UserService                    *service.SysUserService
+	ApplicationService             *service.ApplicationService
+	BlackCache                     *cache.BlackUserCache
+	TokenBlackCache                *cache.TokenBlackCache
+	ApplicationCache               *cache.ApplicationCache
 }
 
 // Repository providers
@@ -84,6 +86,13 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewReportDefinitionRepositoryImpl,
 	impl.NewReportDefinitionVersionRepositoryImpl,
 	impl.NewReportExecutionLogRepositoryImpl,
+	impl.NewDataDimensionDefinitionRepositoryImpl,
+	impl.NewDataResourceRepositoryImpl,
+	impl.NewDataResourceOperationRepositoryImpl,
+	impl.NewDataOwnershipFieldRepositoryImpl,
+	impl.NewDataPolicyRepositoryImpl,
+	impl.NewDataPolicyRuleRepositoryImpl,
+	impl.NewDataGrantRepositoryImpl,
 	impl.NewOrgLegalEntityRepositoryImpl,
 	impl.NewOrgUnitRepositoryImpl,
 	impl.NewOrgStructureRepositoryImpl,
@@ -123,6 +132,13 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)),
 	wire.Bind(new(repository.ReportExecutionLogRepository), new(*impl.ReportExecutionLogRepositoryImpl)),
+	wire.Bind(new(repository.DataDimensionDefinitionRepository), new(*impl.DataDimensionDefinitionRepositoryImpl)),
+	wire.Bind(new(repository.DataResourceRepository), new(*impl.DataResourceRepositoryImpl)),
+	wire.Bind(new(repository.DataResourceOperationRepository), new(*impl.DataResourceOperationRepositoryImpl)),
+	wire.Bind(new(repository.DataOwnershipFieldRepository), new(*impl.DataOwnershipFieldRepositoryImpl)),
+	wire.Bind(new(repository.DataPolicyRepository), new(*impl.DataPolicyRepositoryImpl)),
+	wire.Bind(new(repository.DataPolicyRuleRepository), new(*impl.DataPolicyRuleRepositoryImpl)),
+	wire.Bind(new(repository.DataGrantRepository), new(*impl.DataGrantRepositoryImpl)),
 	wire.Bind(new(repository.OrgLegalEntityRepository), new(*impl.OrgLegalEntityRepositoryImpl)),
 	wire.Bind(new(repository.OrgUnitRepository), new(*impl.OrgUnitRepositoryImpl)),
 	wire.Bind(new(repository.OrgStructureRepository), new(*impl.OrgStructureRepositoryImpl)),
@@ -177,6 +193,20 @@ var ServiceProvider = wire.NewSet(
 	service.NewSysUserService,
 	service.NewGeneralizationService,
 	service.NewDataPermissionService,
+	service.NewDataResourceConfigService,
+	service.NewDataOwnershipConfigService,
+	service.NewDataPolicyConfigService,
+	service.NewDataGrantConfigService,
+	service.NewDataPermissionConfigPreflightService,
+	ProvideOwnershipFieldRegistry,
+	wire.Bind(
+		new(datapermission.OwnershipFieldBindingValidator),
+		new(*datapermission.OwnershipFieldRegistry),
+	),
+	wire.Bind(
+		new(datapermission.OwnershipFieldOperationValidator),
+		new(*datapermission.OwnershipFieldRegistry),
+	),
 	service.NewReportService,
 	service.NewOrgService,
 	service.NewCasbinRuleService,
@@ -194,6 +224,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewRoleController,
 	controller.NewUserController,
 	controller.NewDataPermissionController,
+	controller.NewDataPermissionConfigController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
 	controller.NewReportController,
@@ -214,6 +245,12 @@ func ProvidePrimaryDB(db map[string]*gorm.DB) *database.PrimaryDB {
 	return &database.PrimaryDB{DB: db["primary"]}
 }
 
+// ProvideOwnershipFieldRegistry creates the process-local registry. Reviewed
+// business modules can add declarations when their data resources are enabled.
+func ProvideOwnershipFieldRegistry() (*datapermission.OwnershipFieldRegistry, error) {
+	return datapermission.NewOwnershipFieldRegistry()
+}
+
 // ProvideJWTToken 提供 JWT 生成器
 func ProvideJWTToken() token.JWTToken {
 	return token.JWTToken{Generator: token.NewJWTGenerator()}
@@ -232,6 +269,7 @@ var Providers = wire.NewSet(
 
 	InitRedis,
 	InitCasbin,
+	wire.Bind(new(repository.CasbinPolicyEnforcer), new(*casbin.SyncedEnforcer)),
 	InitSnowflake,
 	InitValidators,
 

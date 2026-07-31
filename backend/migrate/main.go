@@ -1576,6 +1576,18 @@ func seedDataPermissionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int,
 		apiPermissionWithAPI(619, menuID, "用户归属查询", "system_data_permission_user_dimension_query", enum.Line, "query", "person_search", "primary", 99, "/admin/user/:id/dimension-values", "GET"),
 		apiPermissionWithAPI(620, menuID, "用户归属保存", "system_data_permission_user_dimension_save", enum.Line, "save", "badge", "primary", 100, "/admin/user/:id/dimension-values", "PUT"),
 		apiPermissionWithAPI(614, menuID, "权限排查", "system_data_permission_debug", enum.Line, "debug", "manage_search", "primary", 101, "/admin/data-permission/debug", "GET"),
+		apiPermissionWithAPI(621, menuID, "数据资源列表", "system_data_permission_config_resource_query", enum.Line, "query", "dataset", "primary", 102, "/admin/data-permission/config/resource/query", "POST"),
+		apiPermissionWithAPI(622, menuID, "数据资源详情", "system_data_permission_config_resource_detail", enum.Line, "detail", "visibility", "primary", 103, "/admin/data-permission/config/resource/:id", "GET"),
+		apiPermissionWithAPI(623, menuID, "资源归属查询", "system_data_permission_config_resource_ownership_query", enum.Line, "query", "account_tree", "primary", 104, "/admin/data-permission/config/resource/:id/ownerships", "GET"),
+		apiPermissionWithAPI(624, menuID, "归属定义详情", "system_data_permission_config_ownership_detail", enum.Line, "detail", "visibility", "primary", 105, "/admin/data-permission/config/ownership/:id", "GET"),
+		apiPermissionWithAPI(625, menuID, "策略列表", "system_data_permission_config_policy_query", enum.Line, "query", "policy", "primary", 106, "/admin/data-permission/config/policy/query", "POST"),
+		apiPermissionWithAPI(626, menuID, "策略详情", "system_data_permission_config_policy_detail", enum.Line, "detail", "visibility", "primary", 107, "/admin/data-permission/config/policy/:id", "GET"),
+		apiPermissionWithAPI(627, menuID, "策略规则查询", "system_data_permission_config_policy_rule_query", enum.Line, "query", "rule", "primary", 108, "/admin/data-permission/config/policy/rule/query", "POST"),
+		apiPermissionWithAPI(628, menuID, "授权列表", "system_data_permission_config_grant_query", enum.Line, "query", "verified_user", "primary", 109, "/admin/data-permission/config/grant/query", "POST"),
+		apiPermissionWithAPI(629, menuID, "授权详情", "system_data_permission_config_grant_detail", enum.Line, "detail", "visibility", "primary", 110, "/admin/data-permission/config/grant/:id", "GET"),
+		apiPermissionWithAPI(630, menuID, "资源配置预检", "system_data_permission_config_resource_preflight", enum.Line, "preflight", "fact_check", "primary", 111, "/admin/data-permission/config/preflight/resource/:id", "GET"),
+		apiPermissionWithAPI(631, menuID, "策略配置预检", "system_data_permission_config_policy_preflight", enum.Line, "preflight", "fact_check", "primary", 112, "/admin/data-permission/config/preflight/policy/:id", "GET"),
+		apiPermissionWithAPI(632, menuID, "授权配置预检", "system_data_permission_config_grant_preflight", enum.Line, "preflight", "fact_check", "primary", 113, "/admin/data-permission/config/preflight/grant/:id", "GET"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }

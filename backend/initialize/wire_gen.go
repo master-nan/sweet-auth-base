@@ -12,6 +12,7 @@ import (
 	"backend/controller"
 	"backend/internal/cache"
 	"backend/internal/database"
+	"backend/internal/datapermission"
 	"backend/internal/storage"
 	"backend/internal/token"
 	"backend/internal/utils"
@@ -51,7 +52,7 @@ func InitializeApp() (*App, error) {
 	jwtGenerator := token.NewJWTGenerator()
 	hmacGenerator := token.NewHMACGenerator()
 	primaryDB := ProvidePrimaryDB(v)
-	enforcer, err := InitCasbin(primaryDB)
+	syncedEnforcer, err := InitCasbin(primaryDB)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func InitializeApp() (*App, error) {
 	tokenBlackCache := cache.NewTokenBlackCache(redisUtil)
 	loginAttemptCache := cache.NewLoginAttemptCache(redisUtil)
 	basicController := controller.NewBasicController(jwtToken, server, sysConfigureService, logService, sysUserService, sysTableService, dataPermissionService, tokenBlackCache, loginAttemptCache, v2)
-	casbinRuleRepositoryImpl := impl.NewCasbinRuleRepositoryImpl(primaryDB, enforcer)
+	casbinRuleRepositoryImpl := impl.NewCasbinRuleRepositoryImpl(primaryDB, syncedEnforcer)
 	sysMenuService := service.NewSysMenuService(sysMenuRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuButtonRepositoryImpl, sysUserRoleRepositoryImpl, sysMenuButtonRepositoryImpl, sysTableRepositoryImpl, casbinRuleRepositoryImpl, dataPermissionService, snowflake)
 	tableController := controller.NewTableController(sysTableService, sysMenuService, dataPermissionService, v2)
 	menuController := controller.NewMenuController(sysMenuService, v2)
@@ -102,6 +103,23 @@ func InitializeApp() (*App, error) {
 	roleController := controller.NewRoleController(sysRoleService, sysTableService, dataPermissionService, v2)
 	userController := controller.NewUserController(sysUserService, sysConfigureService, v2, server, sysTableService, dataPermissionService, loginAttemptCache)
 	dataPermissionController := controller.NewDataPermissionController(dataPermissionService, v2)
+	dataResourceRepositoryImpl := impl.NewDataResourceRepositoryImpl(primaryDB)
+	dataResourceOperationRepositoryImpl := impl.NewDataResourceOperationRepositoryImpl(primaryDB)
+	dataOwnershipFieldRepositoryImpl := impl.NewDataOwnershipFieldRepositoryImpl(primaryDB)
+	dataGrantRepositoryImpl := impl.NewDataGrantRepositoryImpl(primaryDB)
+	dataResourceConfigService := service.NewDataResourceConfigService(dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataGrantRepositoryImpl, snowflake, logService)
+	dataDimensionDefinitionRepositoryImpl := impl.NewDataDimensionDefinitionRepositoryImpl(primaryDB)
+	ownershipFieldRegistry, err := ProvideOwnershipFieldRegistry()
+	if err != nil {
+		return nil, err
+	}
+	dataOwnershipConfigService := service.NewDataOwnershipConfigService(dataResourceRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataOwnershipFieldRepositoryImpl, sysTableFieldRepositoryImpl, ownershipFieldRegistry, snowflake, logService)
+	dataPolicyRepositoryImpl := impl.NewDataPolicyRepositoryImpl(primaryDB)
+	dataPolicyRuleRepositoryImpl := impl.NewDataPolicyRuleRepositoryImpl(primaryDB)
+	dataPolicyConfigService := service.NewDataPolicyConfigService(dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataOwnershipFieldRepositoryImpl, snowflake, logService)
+	dataGrantConfigService := service.NewDataGrantConfigService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, ownershipFieldRegistry, snowflake, logService)
+	dataPermissionConfigPreflightService := service.NewDataPermissionConfigPreflightService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, ownershipFieldRegistry, logService)
+	dataPermissionConfigController := controller.NewDataPermissionConfigController(dataResourceConfigService, dataOwnershipConfigService, dataPolicyConfigService, dataGrantConfigService, dataPermissionConfigPreflightService, v2)
 	applicationRepositoryImpl := impl.NewApplicationRepositoryImpl(primaryDB)
 	applicationCache := cache.NewApplicationCache(redisUtil)
 	applicationService := service.NewApplicationService(applicationRepositoryImpl, applicationCache, snowflake)
@@ -148,35 +166,36 @@ func InitializeApp() (*App, error) {
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
 	blackUserCache := cache.NewBlackCache(redisUtil)
 	app := &App{
-		Config:                   server,
-		DBs:                      v,
-		Redis:                    client,
-		SF:                       snowflake,
-		JwtGenerator:             jwtGenerator,
-		HmacGenerator:            hmacGenerator,
-		Enforcer:                 enforcer,
-		DictController:           dictController,
-		BasicController:          basicController,
-		TableController:          tableController,
-		MenuController:           menuController,
-		RoleController:           roleController,
-		UserController:           userController,
-		DataPermissionController: dataPermissionController,
-		ApplicationController:    applicationController,
-		GeneralizationController: generalizationController,
-		ReportController:         reportController,
-		OrgController:            orgController,
-		SmsController:            smsController,
-		FileController:           fileController,
-		AuthApi:                  authApi,
-		SysUserApi:               sysUserApi,
-		DingTalkApi:              dingTalkApi,
-		LogService:               logService,
-		UserService:              sysUserService,
-		ApplicationService:       applicationService,
-		BlackCache:               blackUserCache,
-		TokenBlackCache:          tokenBlackCache,
-		ApplicationCache:         applicationCache,
+		Config:                         server,
+		DBs:                            v,
+		Redis:                          client,
+		SF:                             snowflake,
+		JwtGenerator:                   jwtGenerator,
+		HmacGenerator:                  hmacGenerator,
+		Enforcer:                       syncedEnforcer,
+		DictController:                 dictController,
+		BasicController:                basicController,
+		TableController:                tableController,
+		MenuController:                 menuController,
+		RoleController:                 roleController,
+		UserController:                 userController,
+		DataPermissionController:       dataPermissionController,
+		DataPermissionConfigController: dataPermissionConfigController,
+		ApplicationController:          applicationController,
+		GeneralizationController:       generalizationController,
+		ReportController:               reportController,
+		OrgController:                  orgController,
+		SmsController:                  smsController,
+		FileController:                 fileController,
+		AuthApi:                        authApi,
+		SysUserApi:                     sysUserApi,
+		DingTalkApi:                    dingTalkApi,
+		LogService:                     logService,
+		UserService:                    sysUserService,
+		ApplicationService:             applicationService,
+		BlackCache:                     blackUserCache,
+		TokenBlackCache:                tokenBlackCache,
+		ApplicationCache:               applicationCache,
 	}
 	return app, nil
 }
@@ -184,54 +203,68 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 type App struct {
-	Config                   *config.Server
-	DBs                      map[string]*gorm.DB
-	Redis                    *redis.Client
-	SF                       *utils.Snowflake
-	JwtGenerator             *token.JWTGenerator
-	HmacGenerator            *token.HMACGenerator
-	Enforcer                 *casbin.SyncedEnforcer
-	DictController           *controller.DictController
-	BasicController          *controller.BasicController
-	TableController          *controller.TableController
-	MenuController           *controller.MenuController
-	RoleController           *controller.RoleController
-	UserController           *controller.UserController
-	DataPermissionController *controller.DataPermissionController
-	ApplicationController    *controller.ApplicationController
-	GeneralizationController *controller.GeneralizationController
-	ReportController         *controller.ReportController
-	OrgController            *controller.OrgController
-	SmsController            *controller.SmsController
-	FileController           *controller.FileController
-	AuthApi                  *api.AuthApi
-	SysUserApi               *api.SysUserApi
-	DingTalkApi              *api.DingTalkApi
-	LogService               *service.LogService
-	UserService              *service.SysUserService
-	ApplicationService       *service.ApplicationService
-	BlackCache               *cache.BlackUserCache
-	TokenBlackCache          *cache.TokenBlackCache
-	ApplicationCache         *cache.ApplicationCache
+	Config                         *config.Server
+	DBs                            map[string]*gorm.DB
+	Redis                          *redis.Client
+	SF                             *utils.Snowflake
+	JwtGenerator                   *token.JWTGenerator
+	HmacGenerator                  *token.HMACGenerator
+	Enforcer                       *casbin.SyncedEnforcer
+	DictController                 *controller.DictController
+	BasicController                *controller.BasicController
+	TableController                *controller.TableController
+	MenuController                 *controller.MenuController
+	RoleController                 *controller.RoleController
+	UserController                 *controller.UserController
+	DataPermissionController       *controller.DataPermissionController
+	DataPermissionConfigController *controller.DataPermissionConfigController
+	ApplicationController          *controller.ApplicationController
+	GeneralizationController       *controller.GeneralizationController
+	ReportController               *controller.ReportController
+	OrgController                  *controller.OrgController
+	SmsController                  *controller.SmsController
+	FileController                 *controller.FileController
+	AuthApi                        *api.AuthApi
+	SysUserApi                     *api.SysUserApi
+	DingTalkApi                    *api.DingTalkApi
+	LogService                     *service.LogService
+	UserService                    *service.SysUserService
+	ApplicationService             *service.ApplicationService
+	BlackCache                     *cache.BlackUserCache
+	TokenBlackCache                *cache.TokenBlackCache
+	ApplicationCache               *cache.ApplicationCache
 }
 
 // Repository providers
-var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLoginLogRepositoryImpl, impl.NewSysConfigureRepositoryImpl, impl.NewSysDictRepositoryImpl, impl.NewSysDictItemRepositoryImpl, impl.NewSysTableIndexFieldRepositoryImpl, impl.NewSysTableIndexRepositoryImpl, impl.NewSysTableRelationRepositoryImpl, impl.NewSysTableFieldRepositoryImpl, impl.NewSysTableRepositoryImpl, impl.NewSysUserRepositoryImpl, impl.NewSysMenuRepositoryImpl, impl.NewSysMenuButtonRepositoryImpl, impl.NewSysMenuButtonTemplateRepositoryImpl, impl.NewSysRoleRepositoryImpl, impl.NewSysRoleMenuButtonRepositoryImpl, impl.NewSysRoleMenuRepositoryImpl, impl.NewSysUserRoleRepositoryImpl, impl.NewApplicationRepositoryImpl, impl.NewGeneralizationRepositoryImpl, impl.NewReportDefinitionRepositoryImpl, impl.NewReportDefinitionVersionRepositoryImpl, impl.NewReportExecutionLogRepositoryImpl, impl.NewOrgLegalEntityRepositoryImpl, impl.NewOrgUnitRepositoryImpl, impl.NewOrgStructureRepositoryImpl, impl.NewOrgStructureNodeRepositoryImpl, impl.NewOrgEmployeeRepositoryImpl, impl.NewOrgPositionRepositoryImpl, impl.NewCasbinRuleRepositoryImpl, impl.NewSmsLogImpl, impl.NewSmsTemplateImpl, impl.NewFileRepositoryImpl, impl.NewFileChunkRepositoryImpl, wire.Bind(new(repository.AccessLogRepository), new(*impl.AccessLogRepositoryImpl)), wire.Bind(new(repository.LoginLogRepository), new(*impl.LoginLogRepositoryImpl)), wire.Bind(new(repository.SysConfigureRepository), new(*impl.SysConfigureRepositoryImpl)), wire.Bind(new(repository.SysDictRepository), new(*impl.SysDictRepositoryImpl)), wire.Bind(new(repository.SysDictItemRepository), new(*impl.SysDictItemRepositoryImpl)), wire.Bind(new(repository.SysTableIndexFieldRepository), new(*impl.SysTableIndexFieldRepositoryImpl)), wire.Bind(new(repository.SysTableIndexRepository), new(*impl.SysTableIndexRepositoryImpl)), wire.Bind(new(repository.SysTableRelationRepository), new(*impl.SysTableRelationRepositoryImpl)), wire.Bind(new(repository.SysTableFieldRepository), new(*impl.SysTableFieldRepositoryImpl)), wire.Bind(new(repository.SysTableRepository), new(*impl.SysTableRepositoryImpl)), wire.Bind(new(repository.SysUserRepository), new(*impl.SysUserRepositoryImpl)), wire.Bind(new(repository.SysMenuRepository), new(*impl.SysMenuRepositoryImpl)), wire.Bind(new(repository.SysMenuButtonRepository), new(*impl.SysMenuButtonRepositoryImpl)), wire.Bind(new(repository.SysMenuButtonTemplateRepository), new(*impl.SysMenuButtonTemplateRepositoryImpl)), wire.Bind(new(repository.SysRoleRepository), new(*impl.SysRoleRepositoryImpl)), wire.Bind(new(repository.SysRoleMenuButtonRepository), new(*impl.SysRoleMenuButtonRepositoryImpl)), wire.Bind(new(repository.SysRoleMenuRepository), new(*impl.SysRoleMenuRepositoryImpl)), wire.Bind(new(repository.SysUserRoleRepository), new(*impl.SysUserRoleRepositoryImpl)), wire.Bind(new(repository.ApplicationRepository), new(*impl.ApplicationRepositoryImpl)), wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)), wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)), wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)), wire.Bind(new(repository.ReportExecutionLogRepository), new(*impl.ReportExecutionLogRepositoryImpl)), wire.Bind(new(repository.OrgLegalEntityRepository), new(*impl.OrgLegalEntityRepositoryImpl)), wire.Bind(new(repository.OrgUnitRepository), new(*impl.OrgUnitRepositoryImpl)), wire.Bind(new(repository.OrgStructureRepository), new(*impl.OrgStructureRepositoryImpl)), wire.Bind(new(repository.OrgStructureNodeRepository), new(*impl.OrgStructureNodeRepositoryImpl)), wire.Bind(new(repository.OrgEmployeeRepository), new(*impl.OrgEmployeeRepositoryImpl)), wire.Bind(new(repository.OrgPositionRepository), new(*impl.OrgPositionRepositoryImpl)), wire.Bind(new(repository.CasbinRuleRepository), new(*impl.CasbinRuleRepositoryImpl)), wire.Bind(new(repository.SmsLogRepository), new(*impl.SmsLogImpl)), wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)), wire.Bind(new(repository.FileRepository), new(*impl.FileRepositoryImpl)), wire.Bind(new(repository.FileChunkRepository), new(*impl.FileChunkRepositoryImpl)))
+var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLoginLogRepositoryImpl, impl.NewSysConfigureRepositoryImpl, impl.NewSysDictRepositoryImpl, impl.NewSysDictItemRepositoryImpl, impl.NewSysTableIndexFieldRepositoryImpl, impl.NewSysTableIndexRepositoryImpl, impl.NewSysTableRelationRepositoryImpl, impl.NewSysTableFieldRepositoryImpl, impl.NewSysTableRepositoryImpl, impl.NewSysUserRepositoryImpl, impl.NewSysMenuRepositoryImpl, impl.NewSysMenuButtonRepositoryImpl, impl.NewSysMenuButtonTemplateRepositoryImpl, impl.NewSysRoleRepositoryImpl, impl.NewSysRoleMenuButtonRepositoryImpl, impl.NewSysRoleMenuRepositoryImpl, impl.NewSysUserRoleRepositoryImpl, impl.NewApplicationRepositoryImpl, impl.NewGeneralizationRepositoryImpl, impl.NewReportDefinitionRepositoryImpl, impl.NewReportDefinitionVersionRepositoryImpl, impl.NewReportExecutionLogRepositoryImpl, impl.NewDataDimensionDefinitionRepositoryImpl, impl.NewDataResourceRepositoryImpl, impl.NewDataResourceOperationRepositoryImpl, impl.NewDataOwnershipFieldRepositoryImpl, impl.NewDataPolicyRepositoryImpl, impl.NewDataPolicyRuleRepositoryImpl, impl.NewDataGrantRepositoryImpl, impl.NewOrgLegalEntityRepositoryImpl, impl.NewOrgUnitRepositoryImpl, impl.NewOrgStructureRepositoryImpl, impl.NewOrgStructureNodeRepositoryImpl, impl.NewOrgEmployeeRepositoryImpl, impl.NewOrgPositionRepositoryImpl, impl.NewOrgAssignmentRepositoryImpl, impl.NewOrgSyncBatchRepositoryImpl, impl.NewOrgSyncRecordRepositoryImpl, impl.NewCasbinRuleRepositoryImpl, impl.NewSmsLogImpl, impl.NewSmsTemplateImpl, impl.NewFileRepositoryImpl, impl.NewFileChunkRepositoryImpl, wire.Bind(new(repository.AccessLogRepository), new(*impl.AccessLogRepositoryImpl)), wire.Bind(new(repository.LoginLogRepository), new(*impl.LoginLogRepositoryImpl)), wire.Bind(new(repository.SysConfigureRepository), new(*impl.SysConfigureRepositoryImpl)), wire.Bind(new(repository.SysDictRepository), new(*impl.SysDictRepositoryImpl)), wire.Bind(new(repository.SysDictItemRepository), new(*impl.SysDictItemRepositoryImpl)), wire.Bind(new(repository.SysTableIndexFieldRepository), new(*impl.SysTableIndexFieldRepositoryImpl)), wire.Bind(new(repository.SysTableIndexRepository), new(*impl.SysTableIndexRepositoryImpl)), wire.Bind(new(repository.SysTableRelationRepository), new(*impl.SysTableRelationRepositoryImpl)), wire.Bind(new(repository.SysTableFieldRepository), new(*impl.SysTableFieldRepositoryImpl)), wire.Bind(new(repository.SysTableRepository), new(*impl.SysTableRepositoryImpl)), wire.Bind(new(repository.SysUserRepository), new(*impl.SysUserRepositoryImpl)), wire.Bind(new(repository.SysMenuRepository), new(*impl.SysMenuRepositoryImpl)), wire.Bind(new(repository.SysMenuButtonRepository), new(*impl.SysMenuButtonRepositoryImpl)), wire.Bind(new(repository.SysMenuButtonTemplateRepository), new(*impl.SysMenuButtonTemplateRepositoryImpl)), wire.Bind(new(repository.SysRoleRepository), new(*impl.SysRoleRepositoryImpl)), wire.Bind(new(repository.SysRoleMenuButtonRepository), new(*impl.SysRoleMenuButtonRepositoryImpl)), wire.Bind(new(repository.SysRoleMenuRepository), new(*impl.SysRoleMenuRepositoryImpl)), wire.Bind(new(repository.SysUserRoleRepository), new(*impl.SysUserRoleRepositoryImpl)), wire.Bind(new(repository.ApplicationRepository), new(*impl.ApplicationRepositoryImpl)), wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)), wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)), wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)), wire.Bind(new(repository.ReportExecutionLogRepository), new(*impl.ReportExecutionLogRepositoryImpl)), wire.Bind(new(repository.DataDimensionDefinitionRepository), new(*impl.DataDimensionDefinitionRepositoryImpl)), wire.Bind(new(repository.DataResourceRepository), new(*impl.DataResourceRepositoryImpl)), wire.Bind(new(repository.DataResourceOperationRepository), new(*impl.DataResourceOperationRepositoryImpl)), wire.Bind(new(repository.DataOwnershipFieldRepository), new(*impl.DataOwnershipFieldRepositoryImpl)), wire.Bind(new(repository.DataPolicyRepository), new(*impl.DataPolicyRepositoryImpl)), wire.Bind(new(repository.DataPolicyRuleRepository), new(*impl.DataPolicyRuleRepositoryImpl)), wire.Bind(new(repository.DataGrantRepository), new(*impl.DataGrantRepositoryImpl)), wire.Bind(new(repository.OrgLegalEntityRepository), new(*impl.OrgLegalEntityRepositoryImpl)), wire.Bind(new(repository.OrgUnitRepository), new(*impl.OrgUnitRepositoryImpl)), wire.Bind(new(repository.OrgStructureRepository), new(*impl.OrgStructureRepositoryImpl)), wire.Bind(new(repository.OrgStructureNodeRepository), new(*impl.OrgStructureNodeRepositoryImpl)), wire.Bind(new(repository.OrgEmployeeRepository), new(*impl.OrgEmployeeRepositoryImpl)), wire.Bind(new(repository.OrgPositionRepository), new(*impl.OrgPositionRepositoryImpl)), wire.Bind(new(repository.OrgAssignmentRepository), new(*impl.OrgAssignmentRepositoryImpl)), wire.Bind(new(repository.OrgSyncBatchRepository), new(*impl.OrgSyncBatchRepositoryImpl)), wire.Bind(new(repository.OrgSyncRecordRepository), new(*impl.OrgSyncRecordRepositoryImpl)), wire.Bind(new(repository.CasbinRuleRepository), new(*impl.CasbinRuleRepositoryImpl)), wire.Bind(new(repository.SmsLogRepository), new(*impl.SmsLogImpl)), wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)), wire.Bind(new(repository.FileRepository), new(*impl.FileRepositoryImpl)), wire.Bind(new(repository.FileChunkRepository), new(*impl.FileChunkRepositoryImpl)))
 
 // Cache providers
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserRoleCache, cache.NewSysUserCache, cache.NewSysMenuButtonCache, cache.NewSysDictCache, cache.NewSysMenuCache, cache.NewSysRoleCache, cache.NewSysRoleMenuButtonCache, cache.NewSysRoleMenuCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewGeneralizationCache, cache.NewBlackCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSmsLogCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service providers
-var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewReportService, service.NewOrgService, service.NewCasbinRuleService, service.NewApplicationService, service.NewDingTalkService, service.NewSmsService, service.NewFileService)
+var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, ProvideOwnershipFieldRegistry, wire.Bind(
+	new(datapermission.OwnershipFieldBindingValidator),
+	new(*datapermission.OwnershipFieldRegistry),
+), wire.Bind(
+	new(datapermission.OwnershipFieldOperationValidator),
+	new(*datapermission.OwnershipFieldRegistry),
+), service.NewReportService, service.NewOrgService, service.NewCasbinRuleService, service.NewApplicationService, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
+)
 
 // Controller providers
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionController, controller.NewDataPermissionConfigController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
 
 // Api providers
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)
 
 func ProvidePrimaryDB(db map[string]*gorm.DB) *database.PrimaryDB {
 	return &database.PrimaryDB{DB: db["primary"]}
+}
+
+// ProvideOwnershipFieldRegistry creates the process-local registry. Reviewed
+// business modules can add declarations when their data resources are enabled.
+func ProvideOwnershipFieldRegistry() (*datapermission.OwnershipFieldRegistry, error) {
+	return datapermission.NewOwnershipFieldRegistry()
 }
 
 // ProvideJWTToken 提供 JWT 生成器
@@ -251,8 +284,7 @@ var Providers = wire.NewSet(
 	ProvidePrimaryDB,
 
 	InitRedis,
-	InitCasbin,
-	InitSnowflake,
+	InitCasbin, wire.Bind(new(repository.CasbinPolicyEnforcer), new(*casbin.SyncedEnforcer)), InitSnowflake,
 	InitValidators, cache.NewRedisUtil, wire.Bind(new(cache.Cacher), new(*cache.RedisUtil)), ProvideJWTToken,
 	ProvideHMACToken, token.NewJWTGenerator, token.NewHMACGenerator, storage.NewStorage, RepositoryProvider,
 	CacheProvider,
