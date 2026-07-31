@@ -60,6 +60,27 @@ func NewDataOwnershipConfigService(
 	}
 }
 
+func (s *DataOwnershipConfigService) PageDimensions(
+	ctx *gin.Context,
+	req request.DataDimensionDefinitionQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
+	var result response.ListResult[response.DataDimensionDefinitionListRes]
+	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
+		return result, err
+	}
+	rows, err := s.dimensionRepo.Query(ctx, &req, table)
+	if err != nil {
+		return result, myerrors.WrapDatabaseError(err)
+	}
+	result.Total = rows.Total
+	result.Data = make([]response.DataDimensionDefinitionListRes, 0, len(rows.Data))
+	for _, dimension := range rows.Data {
+		result.Data = append(result.Data, response.NewDataDimensionDefinitionListRes(dimension))
+	}
+	return result, nil
+}
+
 func (s *DataOwnershipConfigService) CreateOwnership(
 	ctx *gin.Context,
 	req request.DataOwnershipFieldCreateReq,

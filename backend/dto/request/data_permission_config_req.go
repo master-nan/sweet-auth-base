@@ -40,6 +40,14 @@ type DataPermissionConfigIdReq struct {
 	Id int `form:"id" json:"id" binding:"required,gt=0"`
 }
 
+type DataPermissionConfigStateReq struct {
+	State *bool `form:"state" json:"state" binding:"required"`
+}
+
+type DataResourcePermissionStateReq struct {
+	PermissionEnabled *bool `form:"permission_enabled" json:"permission_enabled" binding:"required"`
+}
+
 type DataDimensionDefinitionQueryReq struct {
 	DataPermissionConfigQueryReq
 	Category  string `form:"category" json:"category" binding:"omitempty,oneof=organization employee user business system"`

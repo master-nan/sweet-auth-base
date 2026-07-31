@@ -25,11 +25,37 @@ const (
 )
 
 type dataPermissionConfigResourceStub struct {
-	pageReq    request.DataResourceQueryReq
-	pageTable  model.SysTable
-	pageResult response.ListResult[response.DataResourceListRes]
-	detail     response.DataResourceDetailRes
-	err        error
+	createReq      request.DataResourceCreateReq
+	updateReq      request.DataResourceUpdateReq
+	replaceReq     request.DataResourceOperationBatchReq
+	pageReq        request.DataResourceQueryReq
+	pageTable      model.SysTable
+	pageResult     response.ListResult[response.DataResourceListRes]
+	detail         response.DataResourceDetailRes
+	operations     []response.DataResourceOperationListRes
+	createCalls    int
+	updateCalls    int
+	replaceCalls   int
+	operationCalls int
+	err            error
+}
+
+func (s *dataPermissionConfigResourceStub) CreateResource(
+	_ *gin.Context,
+	req request.DataResourceCreateReq,
+) (response.DataResourceDetailRes, error) {
+	s.createReq = req
+	s.createCalls++
+	return s.detail, s.err
+}
+
+func (s *dataPermissionConfigResourceStub) UpdateResource(
+	_ *gin.Context,
+	req request.DataResourceUpdateReq,
+) (response.DataResourceDetailRes, error) {
+	s.updateReq = req
+	s.updateCalls++
+	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigResourceStub) GetResource(
@@ -49,10 +75,58 @@ func (s *dataPermissionConfigResourceStub) PageResources(
 	return s.pageResult, s.err
 }
 
+func (s *dataPermissionConfigResourceStub) ListResourceOperations(
+	*gin.Context,
+	int,
+) ([]response.DataResourceOperationListRes, error) {
+	s.operationCalls++
+	return s.operations, s.err
+}
+
+func (s *dataPermissionConfigResourceStub) ReplaceResourceOperations(
+	_ *gin.Context,
+	req request.DataResourceOperationBatchReq,
+) ([]response.DataResourceOperationListRes, error) {
+	s.replaceReq = req
+	s.replaceCalls++
+	return s.operations, s.err
+}
+
 type dataPermissionConfigOwnershipStub struct {
-	list   []response.DataOwnershipFieldListRes
-	detail response.DataOwnershipFieldDetailRes
-	err    error
+	dimensionPage      response.ListResult[response.DataDimensionDefinitionListRes]
+	ownershipPage      response.ListResult[response.DataOwnershipFieldListRes]
+	createReq          request.DataOwnershipFieldCreateReq
+	updateReq          request.DataOwnershipFieldUpdateReq
+	dimensionPageTable model.SysTable
+	ownershipPageTable model.SysTable
+	list               []response.DataOwnershipFieldListRes
+	detail             response.DataOwnershipFieldDetailRes
+	err                error
+}
+
+func (s *dataPermissionConfigOwnershipStub) PageDimensions(
+	_ *gin.Context,
+	_ request.DataDimensionDefinitionQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
+	s.dimensionPageTable = table
+	return s.dimensionPage, s.err
+}
+
+func (s *dataPermissionConfigOwnershipStub) CreateOwnership(
+	_ *gin.Context,
+	req request.DataOwnershipFieldCreateReq,
+) (response.DataOwnershipFieldDetailRes, error) {
+	s.createReq = req
+	return s.detail, s.err
+}
+
+func (s *dataPermissionConfigOwnershipStub) UpdateOwnership(
+	_ *gin.Context,
+	req request.DataOwnershipFieldUpdateReq,
+) (response.DataOwnershipFieldDetailRes, error) {
+	s.updateReq = req
+	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigOwnershipStub) GetOwnership(
@@ -69,11 +143,39 @@ func (s *dataPermissionConfigOwnershipStub) ListOwnershipsByResource(
 	return s.list, s.err
 }
 
+func (s *dataPermissionConfigOwnershipStub) PageOwnerships(
+	_ *gin.Context,
+	_ request.DataOwnershipFieldQueryReq,
+	table model.SysTable,
+) (response.ListResult[response.DataOwnershipFieldListRes], error) {
+	s.ownershipPageTable = table
+	return s.ownershipPage, s.err
+}
+
 type dataPermissionConfigPolicyStub struct {
 	pageResult     response.ListResult[response.DataPolicyListRes]
 	rulePageResult response.ListResult[response.DataPolicyRuleListRes]
+	createReq      request.DataPolicyCreateReq
+	updateReq      request.DataPolicyUpdateReq
+	replaceReq     request.DataPolicyRuleBatchReq
 	detail         response.DataPolicyDetailRes
 	err            error
+}
+
+func (s *dataPermissionConfigPolicyStub) CreatePolicy(
+	_ *gin.Context,
+	req request.DataPolicyCreateReq,
+) (response.DataPolicyDetailRes, error) {
+	s.createReq = req
+	return s.detail, s.err
+}
+
+func (s *dataPermissionConfigPolicyStub) UpdatePolicy(
+	_ *gin.Context,
+	req request.DataPolicyUpdateReq,
+) (response.DataPolicyDetailRes, error) {
+	s.updateReq = req
+	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigPolicyStub) GetPolicy(
@@ -99,10 +201,27 @@ func (s *dataPermissionConfigPolicyStub) PagePolicyRules(
 	return s.rulePageResult, s.err
 }
 
+func (s *dataPermissionConfigPolicyStub) ReplacePolicyRules(
+	_ *gin.Context,
+	req request.DataPolicyRuleBatchReq,
+) ([]response.DataPolicyRuleListRes, error) {
+	s.replaceReq = req
+	return s.rulePageResult.Data, s.err
+}
+
 type dataPermissionConfigGrantStub struct {
 	pageResult response.ListResult[response.DataGrantListRes]
+	createReq  request.DataGrantCreateReq
 	detail     response.DataGrantDetailRes
 	err        error
+}
+
+func (s *dataPermissionConfigGrantStub) CreateGrant(
+	_ *gin.Context,
+	req request.DataGrantCreateReq,
+) (response.DataGrantDetailRes, error) {
+	s.createReq = req
+	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigGrantStub) GetGrant(
@@ -121,10 +240,19 @@ func (s *dataPermissionConfigGrantStub) PageGrants(
 }
 
 type dataPermissionConfigPreflightStub struct {
-	resource response.DataPermissionValidationResultRes
-	policy   response.DataPermissionValidationResultRes
-	grant    response.DataPermissionValidationResultRes
-	err      error
+	resource             response.DataPermissionValidationResultRes
+	policy               response.DataPermissionValidationResultRes
+	grant                response.DataPermissionValidationResultRes
+	enableResourceCalls  int
+	disableResourceCalls int
+	enablePolicyCalls    int
+	disablePolicyCalls   int
+	enableGrantCalls     int
+	disableGrantCalls    int
+	lastResourceStateID  int
+	lastPolicyStateID    int
+	lastGrantStateID     int
+	err                  error
 }
 
 func (s *dataPermissionConfigPreflightStub) PreflightResource(
@@ -145,6 +273,60 @@ func (s *dataPermissionConfigPreflightStub) PreflightGrant(
 	*gin.Context,
 	int,
 ) (response.DataPermissionValidationResultRes, error) {
+	return s.grant, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) EnableResource(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.enableResourceCalls++
+	s.lastResourceStateID = id
+	return s.resource, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) DisableResource(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.disableResourceCalls++
+	s.lastResourceStateID = id
+	return s.resource, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) EnablePolicy(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.enablePolicyCalls++
+	s.lastPolicyStateID = id
+	return s.policy, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) DisablePolicy(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.disablePolicyCalls++
+	s.lastPolicyStateID = id
+	return s.policy, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) EnableGrant(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.enableGrantCalls++
+	s.lastGrantStateID = id
+	return s.grant, s.err
+}
+
+func (s *dataPermissionConfigPreflightStub) DisableGrant(
+	_ *gin.Context,
+	id int,
+) (response.DataPermissionValidationResultRes, error) {
+	s.disableGrantCalls++
+	s.lastGrantStateID = id
 	return s.grant, s.err
 }
 
@@ -175,8 +357,31 @@ func TestDataPermissionConfigControllerQueriesUseDTOsAndUnifiedResponse(t *testi
 			},
 			AdapterCode: "tms.transport_order",
 		},
+		operations: []response.DataResourceOperationListRes{{
+			DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{
+				Id:    102,
+				State: true,
+			},
+			ResourceId:        101,
+			Operation:         model.DataPermissionOperationQuery,
+			PermissionEnabled: false,
+		}},
 	}
 	ownershipStub := &dataPermissionConfigOwnershipStub{
+		dimensionPage: response.ListResult[response.DataDimensionDefinitionListRes]{
+			Data: []response.DataDimensionDefinitionListRes{{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{
+					Id:    301,
+					State: true,
+				},
+				DimensionCode: "management_organization",
+				Name:          "管理组织",
+				Category:      model.DataDimensionCategoryOrganization,
+				ValueType:     model.DataDimensionValueTypeBigint,
+				ProviderCode:  "organization_provider",
+			}},
+			Total: 1,
+		},
 		list: []response.DataOwnershipFieldListRes{{
 			DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{
 				Id:    201,
@@ -201,6 +406,10 @@ func TestDataPermissionConfigControllerQueriesUseDTOsAndUnifiedResponse(t *testi
 				ValueType:     model.DataDimensionValueTypeBigint,
 			},
 		},
+	}
+	ownershipStub.ownershipPage = response.ListResult[response.DataOwnershipFieldListRes]{
+		Data:  append([]response.DataOwnershipFieldListRes(nil), ownershipStub.list...),
+		Total: len(ownershipStub.list),
 	}
 	policyStub := &dataPermissionConfigPolicyStub{
 		pageResult: response.ListResult[response.DataPolicyListRes]{
@@ -298,9 +507,12 @@ func TestDataPermissionConfigControllerQueriesUseDTOsAndUnifiedResponse(t *testi
 		target string
 		body   string
 	}{
+		{"dimension query", http.MethodPost, "/admin/data-permission/config/dimension/query", `{"page":1,"num":20}`},
 		{"resource query", http.MethodPost, "/admin/data-permission/config/resource/query", `{"page":1,"num":20}`},
 		{"resource detail", http.MethodGet, "/admin/data-permission/config/resource/101", ""},
+		{"resource operation list", http.MethodGet, "/admin/data-permission/config/resource/101/operations", ""},
 		{"ownership list", http.MethodGet, "/admin/data-permission/config/resource/101/ownerships", ""},
+		{"ownership query", http.MethodPost, "/admin/data-permission/config/ownership/query", `{"page":1,"num":20}`},
 		{"ownership detail", http.MethodGet, "/admin/data-permission/config/ownership/201", ""},
 		{"policy query", http.MethodPost, "/admin/data-permission/config/policy/query", `{"page":1,"num":20}`},
 		{"policy detail", http.MethodGet, "/admin/data-permission/config/policy/401", ""},
@@ -347,6 +559,241 @@ func TestDataPermissionConfigControllerQueriesUseDTOsAndUnifiedResponse(t *testi
 	}
 	if resourceStub.pageTable.TableCode != dataResourceConfigTableCode {
 		t.Fatalf("resource table code = %q", resourceStub.pageTable.TableCode)
+	}
+	if ownershipStub.dimensionPageTable.TableCode != dataDimensionConfigTableCode {
+		t.Fatalf("dimension table code = %q", ownershipStub.dimensionPageTable.TableCode)
+	}
+	if ownershipStub.ownershipPageTable.TableCode != dataOwnershipConfigTableCode {
+		t.Fatalf("ownership table code = %q", ownershipStub.ownershipPageTable.TableCode)
+	}
+}
+
+func TestDataPermissionConfigControllerPublishesConfigurationWrites(t *testing.T) {
+	resourceStub := &dataPermissionConfigResourceStub{
+		detail: response.DataResourceDetailRes{
+			DataResourceListRes: response.DataResourceListRes{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 101, State: true},
+				ResourceCode:                "transport_order",
+				Name:                        "运输订单",
+				ResourceType:                model.DataResourceTypeBusinessService,
+			},
+		},
+		operations: []response.DataResourceOperationListRes{{
+			DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 102, State: true},
+			ResourceId:                  101,
+			Operation:                   model.DataPermissionOperationQuery,
+		}},
+	}
+	ownershipStub := &dataPermissionConfigOwnershipStub{
+		detail: response.DataOwnershipFieldDetailRes{
+			DataOwnershipFieldListRes: response.DataOwnershipFieldListRes{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 201, State: true},
+				ResourceId:                  101,
+				OwnershipCode:               "owner_org",
+				DimensionId:                 301,
+				BindingType:                 model.DataOwnershipBindingTypeRegisteredField,
+				ValueType:                   model.DataDimensionValueTypeBigint,
+			},
+		},
+	}
+	policyStub := &dataPermissionConfigPolicyStub{
+		detail: response.DataPolicyDetailRes{
+			DataPolicyListRes: response.DataPolicyListRes{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 401, State: true},
+				PolicyCode:                  "own_org",
+				Name:                        "本组织",
+				PolicyType:                  model.DataPolicyTypeRuleSet,
+			},
+		},
+		rulePageResult: response.ListResult[response.DataPolicyRuleListRes]{
+			Data: []response.DataPolicyRuleListRes{{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 402, State: true},
+				PolicyId:                    401,
+				Sequence:                    1,
+				DimensionId:                 301,
+				OwnershipCode:               "owner_org",
+				ScopeSource:                 model.DataPolicyScopeSourceEffectiveOrgUnits,
+				Relation:                    model.DataPolicyRelationExact,
+				Operator:                    model.DataPolicyOperatorIn,
+			}},
+		},
+	}
+	grantStub := &dataPermissionConfigGrantStub{
+		detail: response.DataGrantDetailRes{
+			DataGrantListRes: response.DataGrantListRes{
+				DataPermissionConfigBaseRes: response.DataPermissionConfigBaseRes{Id: 501, State: true},
+				SubjectType:                 model.DataGrantSubjectTypeRole,
+				SubjectId:                   1,
+				ResourceId:                  101,
+				Operation:                   model.DataPermissionOperationQuery,
+				PolicyId:                    401,
+			},
+		},
+	}
+	preflightStub := &dataPermissionConfigPreflightStub{
+		resource: response.DataPermissionValidationResultRes{Valid: true, Errors: []response.DataPermissionValidationErrorRes{}},
+		policy:   response.DataPermissionValidationResultRes{Valid: true, Errors: []response.DataPermissionValidationErrorRes{}},
+		grant:    response.DataPermissionValidationResultRes{Valid: true, Errors: []response.DataPermissionValidationErrorRes{}},
+	}
+	controller := newDataPermissionConfigController(
+		resourceStub,
+		ownershipStub,
+		policyStub,
+		grantStub,
+		preflightStub,
+		nil,
+	)
+	router, _ := newDataPermissionConfigControllerTestRouter(
+		t,
+		controller,
+		dataPermissionConfigReaderRole,
+	)
+
+	requests := []struct {
+		name   string
+		method string
+		target string
+		body   string
+	}{
+		{
+			"create resource",
+			http.MethodPost,
+			"/admin/data-permission/config/resource",
+			`{"resource_code":"transport_order","name":"运输订单","resource_type":"business_service","target":{"reference_code":"tms.transport_order"},"adapter_code":"tms"}`,
+		},
+		{
+			"update resource",
+			http.MethodPut,
+			"/admin/data-permission/config/resource/101",
+			`{"id":999,"name":"运输订单配置"}`,
+		},
+		{
+			"replace operations",
+			http.MethodPut,
+			"/admin/data-permission/config/resource/101/operations",
+			`{"resource_id":999,"items":[{"operation":"query"}]}`,
+		},
+		{
+			"enable resource permission",
+			http.MethodPut,
+			"/admin/data-permission/config/resource/101/permission",
+			`{"permission_enabled":true}`,
+		},
+		{
+			"disable resource permission",
+			http.MethodPut,
+			"/admin/data-permission/config/resource/101/permission",
+			`{"permission_enabled":false}`,
+		},
+		{
+			"create ownership",
+			http.MethodPost,
+			"/admin/data-permission/config/ownership",
+			`{"resource_id":101,"ownership_code":"owner_org","dimension_id":301,"binding_type":"registered_field","binding_target":{"reference_code":"tms.transport_order.owner_org"},"value_type":"bigint"}`,
+		},
+		{
+			"update ownership",
+			http.MethodPut,
+			"/admin/data-permission/config/ownership/201",
+			`{"id":999,"state":false}`,
+		},
+		{
+			"create policy",
+			http.MethodPost,
+			"/admin/data-permission/config/policy",
+			`{"policy_code":"own_org","name":"本组织","state":false}`,
+		},
+		{
+			"update policy",
+			http.MethodPut,
+			"/admin/data-permission/config/policy/401",
+			`{"id":999,"name":"本组织范围"}`,
+		},
+		{
+			"replace policy rules",
+			http.MethodPut,
+			"/admin/data-permission/config/policy/401/rules",
+			`{"policy_id":999,"items":[{"sequence":1,"dimension_id":301,"ownership_code":"owner_org","scope_source":"effective_org_units","relation":"exact","operator":"in"}]}`,
+		},
+		{
+			"enable policy",
+			http.MethodPut,
+			"/admin/data-permission/config/policy/401/state",
+			`{"state":true}`,
+		},
+		{
+			"disable policy",
+			http.MethodPut,
+			"/admin/data-permission/config/policy/401/state",
+			`{"state":false}`,
+		},
+		{
+			"create grant",
+			http.MethodPost,
+			"/admin/data-permission/config/grant",
+			`{"subject_type":"role","subject_id":1,"resource_id":101,"operation":"query","policy_id":401}`,
+		},
+		{
+			"enable grant",
+			http.MethodPut,
+			"/admin/data-permission/config/grant/501/state",
+			`{"state":true}`,
+		},
+		{
+			"disable grant",
+			http.MethodPut,
+			"/admin/data-permission/config/grant/501/state",
+			`{"state":false}`,
+		},
+	}
+	for _, item := range requests {
+		t.Run(item.name, func(t *testing.T) {
+			recorder := testutil.PerformRequest(t, router, testutil.HTTPRequest{
+				Method: item.method,
+				Target: item.target,
+				Body:   bytes.NewBufferString(item.body),
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			})
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200: %s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+
+	if resourceStub.createCalls != 1 || resourceStub.updateCalls != 1 ||
+		resourceStub.replaceCalls != 1 {
+		t.Fatalf(
+			"resource write calls create=%d update=%d replace=%d",
+			resourceStub.createCalls,
+			resourceStub.updateCalls,
+			resourceStub.replaceCalls,
+		)
+	}
+	if resourceStub.updateReq.Id != 101 || resourceStub.replaceReq.ResourceId != 101 {
+		t.Fatalf(
+			"path IDs did not win: update=%d replace=%d",
+			resourceStub.updateReq.Id,
+			resourceStub.replaceReq.ResourceId,
+		)
+	}
+	if ownershipStub.updateReq.Id != 201 || policyStub.updateReq.Id != 401 ||
+		policyStub.replaceReq.PolicyId != 401 {
+		t.Fatalf(
+			"configuration path IDs did not win: ownership=%d policy=%d rules=%d",
+			ownershipStub.updateReq.Id,
+			policyStub.updateReq.Id,
+			policyStub.replaceReq.PolicyId,
+		)
+	}
+	if preflightStub.enableResourceCalls != 1 || preflightStub.disableResourceCalls != 1 ||
+		preflightStub.enablePolicyCalls != 1 || preflightStub.disablePolicyCalls != 1 ||
+		preflightStub.enableGrantCalls != 1 || preflightStub.disableGrantCalls != 1 {
+		t.Fatalf("state changes bypassed preflight service: %#v", preflightStub)
+	}
+	if preflightStub.lastResourceStateID != 101 ||
+		preflightStub.lastPolicyStateID != 401 ||
+		preflightStub.lastGrantStateID != 501 {
+		t.Fatalf("unexpected state IDs: %#v", preflightStub)
 	}
 }
 
@@ -504,15 +951,30 @@ type dataPermissionConfigControllerRoute struct {
 
 func dataPermissionConfigControllerRoutes() []dataPermissionConfigControllerRoute {
 	return []dataPermissionConfigControllerRoute{
+		{http.MethodPost, "/admin/data-permission/config/dimension/query"},
+		{http.MethodPost, "/admin/data-permission/config/resource"},
 		{http.MethodPost, "/admin/data-permission/config/resource/query"},
 		{http.MethodGet, "/admin/data-permission/config/resource/:id"},
+		{http.MethodPut, "/admin/data-permission/config/resource/:id"},
+		{http.MethodGet, "/admin/data-permission/config/resource/:id/operations"},
+		{http.MethodPut, "/admin/data-permission/config/resource/:id/operations"},
+		{http.MethodPut, "/admin/data-permission/config/resource/:id/permission"},
 		{http.MethodGet, "/admin/data-permission/config/resource/:id/ownerships"},
+		{http.MethodPost, "/admin/data-permission/config/ownership"},
+		{http.MethodPost, "/admin/data-permission/config/ownership/query"},
 		{http.MethodGet, "/admin/data-permission/config/ownership/:id"},
+		{http.MethodPut, "/admin/data-permission/config/ownership/:id"},
+		{http.MethodPost, "/admin/data-permission/config/policy"},
 		{http.MethodPost, "/admin/data-permission/config/policy/query"},
 		{http.MethodGet, "/admin/data-permission/config/policy/:id"},
+		{http.MethodPut, "/admin/data-permission/config/policy/:id"},
+		{http.MethodPut, "/admin/data-permission/config/policy/:id/rules"},
+		{http.MethodPut, "/admin/data-permission/config/policy/:id/state"},
 		{http.MethodPost, "/admin/data-permission/config/policy/rule/query"},
+		{http.MethodPost, "/admin/data-permission/config/grant"},
 		{http.MethodPost, "/admin/data-permission/config/grant/query"},
 		{http.MethodGet, "/admin/data-permission/config/grant/:id"},
+		{http.MethodPut, "/admin/data-permission/config/grant/:id/state"},
 		{http.MethodGet, "/admin/data-permission/config/preflight/resource/:id"},
 		{http.MethodGet, "/admin/data-permission/config/preflight/policy/:id"},
 		{http.MethodGet, "/admin/data-permission/config/preflight/grant/:id"},
@@ -523,15 +985,30 @@ func registerDataPermissionConfigControllerTestRoutes(
 	router *gin.Engine,
 	controller *DataPermissionConfigController,
 ) {
+	router.POST("/admin/data-permission/config/dimension/query", controller.QueryDimensions)
+	router.POST("/admin/data-permission/config/resource", controller.CreateResource)
 	router.POST("/admin/data-permission/config/resource/query", controller.QueryResources)
 	router.GET("/admin/data-permission/config/resource/:id", controller.GetResource)
+	router.PUT("/admin/data-permission/config/resource/:id", controller.UpdateResource)
+	router.GET("/admin/data-permission/config/resource/:id/operations", controller.ListResourceOperations)
+	router.PUT("/admin/data-permission/config/resource/:id/operations", controller.ReplaceResourceOperations)
+	router.PUT("/admin/data-permission/config/resource/:id/permission", controller.SetResourcePermission)
 	router.GET("/admin/data-permission/config/resource/:id/ownerships", controller.ListOwnershipsByResource)
+	router.POST("/admin/data-permission/config/ownership", controller.CreateOwnership)
+	router.POST("/admin/data-permission/config/ownership/query", controller.QueryOwnerships)
 	router.GET("/admin/data-permission/config/ownership/:id", controller.GetOwnership)
+	router.PUT("/admin/data-permission/config/ownership/:id", controller.UpdateOwnership)
+	router.POST("/admin/data-permission/config/policy", controller.CreatePolicy)
 	router.POST("/admin/data-permission/config/policy/query", controller.QueryPolicies)
 	router.GET("/admin/data-permission/config/policy/:id", controller.GetPolicy)
+	router.PUT("/admin/data-permission/config/policy/:id", controller.UpdatePolicy)
+	router.PUT("/admin/data-permission/config/policy/:id/rules", controller.ReplacePolicyRules)
+	router.PUT("/admin/data-permission/config/policy/:id/state", controller.SetPolicyState)
 	router.POST("/admin/data-permission/config/policy/rule/query", controller.QueryPolicyRules)
+	router.POST("/admin/data-permission/config/grant", controller.CreateGrant)
 	router.POST("/admin/data-permission/config/grant/query", controller.QueryGrants)
 	router.GET("/admin/data-permission/config/grant/:id", controller.GetGrant)
+	router.PUT("/admin/data-permission/config/grant/:id/state", controller.SetGrantState)
 	router.GET("/admin/data-permission/config/preflight/resource/:id", controller.PreflightResource)
 	router.GET("/admin/data-permission/config/preflight/policy/:id", controller.PreflightPolicy)
 	router.GET("/admin/data-permission/config/preflight/grant/:id", controller.PreflightGrant)
