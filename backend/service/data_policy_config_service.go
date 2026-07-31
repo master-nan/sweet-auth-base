@@ -243,6 +243,9 @@ func (s *DataPolicyConfigService) UpdatePolicy(
 			}
 		}
 		if req.State != nil && *req.State != current.State {
+			if *req.State {
+				return myerrors.ErrDataPermissionPreflightFailed
+			}
 			fields["state"] = *req.State
 			changes["state"] = TransactionalAuditChange{OldValue: current.State, NewValue: *req.State}
 			if !*req.State {

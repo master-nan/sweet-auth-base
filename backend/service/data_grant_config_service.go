@@ -8,7 +8,6 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
-	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -338,172 +337,24 @@ func (s *DataGrantConfigService) validateGrantContext(
 	tx *gorm.DB,
 	grant model.DataGrant,
 ) error {
-	exists, err := s.grantSubjectExists(tx, grant.SubjectType, grant.SubjectId)
+	result, err := s.preflightValidator().validateGrantRecord(tx, grant, false)
 	if err != nil {
 		return err
 	}
-	if !exists {
-		return myerrors.ErrDataGrantSubjectNotFound
-	}
-
-	resource, err := s.resourceRepo.FindByIdForConfigDB(tx, grant.ResourceId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return myerrors.ErrDataResourceNotFound
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if !resource.State {
-		return myerrors.ErrDataResourceStateInvalid
-	}
-
-	operation, err := s.operationRepo.FindByStableKeyForConfigDB(
-		tx,
-		resource.Id,
-		grant.Operation,
-	)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return myerrors.ErrDataResourceOperationNotFound
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if !operation.State {
-		return myerrors.ErrDataResourceOperationInvalid
-	}
-
-	policy, err := s.policyRepo.FindByIdForConfigDB(tx, grant.PolicyId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return myerrors.ErrDataPolicyNotFound
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if !policy.State {
-		return myerrors.ErrDataGrantPolicyInvalid
-	}
-	return s.validatePolicyForGrant(tx, resource, grant.Operation, policy)
+	return dataPermissionDiagnosticAsGrantError(result)
 }
 
-func (s *DataGrantConfigService) validatePolicyForGrant(
-	tx *gorm.DB,
-	resource model.DataResource,
-	operation string,
-	policy model.DataPolicy,
-) error {
-	rules, err := s.ruleRepo.ListByPolicyForConfigDB(tx, policy.Id)
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
+func (s *DataGrantConfigService) preflightValidator() dataPermissionConfigValidator {
+	return dataPermissionConfigValidator{
+		grantRepo:              s.grantRepo,
+		resourceRepo:           s.resourceRepo,
+		operationRepo:          s.operationRepo,
+		ownershipRepo:          s.ownershipRepo,
+		dimensionRepo:          s.dimensionRepo,
+		policyRepo:             s.policyRepo,
+		ruleRepo:               s.ruleRepo,
+		registeredFieldChecker: s.registeredFieldChecker,
 	}
-	activeRules := make([]model.DataPolicyRule, 0, len(rules))
-	for _, rule := range rules {
-		if rule.State {
-			activeRules = append(activeRules, rule)
-		}
-	}
-
-	switch policy.PolicyType {
-	case model.DataPolicyTypeAll, model.DataPolicyTypeNone:
-		if len(activeRules) != 0 {
-			return myerrors.ErrDataGrantPolicyRuleInvalid
-		}
-		return nil
-	case model.DataPolicyTypeRuleSet:
-		if len(activeRules) == 0 || len(activeRules) > maxDataPolicyRules {
-			return myerrors.ErrDataGrantPolicyRuleInvalid
-		}
-	default:
-		return myerrors.ErrDataGrantPolicyInvalid
-	}
-
-	for _, rule := range activeRules {
-		if err = s.validateRuleForGrant(tx, resource, operation, rule); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *DataGrantConfigService) validateRuleForGrant(
-	tx *gorm.DB,
-	resource model.DataResource,
-	operation string,
-	rule model.DataPolicyRule,
-) error {
-	if rule.Sequence <= 0 ||
-		!dataPolicyCodePattern.MatchString(rule.OwnershipCode) {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if _, ok := dataPolicyScopeSourceSet[rule.ScopeSource]; !ok {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if _, ok := dataPolicyRelationSet[rule.Relation]; !ok {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if _, ok := dataPolicyOperatorSet[rule.Operator]; !ok {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-
-	dimension, err := s.dimensionRepo.FindByIdForConfigDB(tx, rule.DimensionId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if !dimension.State {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if err = validateRuleScopeCompatibility(rule, dimension); err != nil {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-	if _, err = normalizePolicySpecifiedValues(
-		json.RawMessage(rule.SpecifiedValues),
-		rule.ScopeSource,
-		rule.Operator,
-		dimension.ValueType,
-	); err != nil {
-		return myerrors.ErrDataGrantPolicyRuleInvalid
-	}
-
-	ownership, err := s.ownershipRepo.FindByStableKeyForConfigDB(
-		tx,
-		resource.Id,
-		rule.OwnershipCode,
-	)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return myerrors.ErrDataGrantOwnershipMismatch
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if !ownership.State ||
-		ownership.DimensionId != rule.DimensionId ||
-		ownership.ValueType != dimension.ValueType {
-		return myerrors.ErrDataGrantOwnershipMismatch
-	}
-	switch ownership.BindingType {
-	case model.DataOwnershipBindingTypeMetadataField:
-		if ownership.TableFieldId == nil {
-			return myerrors.ErrDataGrantOwnershipMismatch
-		}
-	case model.DataOwnershipBindingTypeRegisteredField:
-		if ownership.AdapterFieldCode == nil || s.registeredFieldChecker == nil {
-			return myerrors.ErrDataGrantOwnershipMismatch
-		}
-		if err = s.registeredFieldChecker.ValidateOperation(
-			datapermission.OwnershipFieldOperationValidation{
-				ResourceCode:  resource.ResourceCode,
-				OwnershipCode: ownership.OwnershipCode,
-				Operation:     operation,
-			},
-		); err != nil {
-			return myerrors.ErrDataGrantOwnershipMismatch
-		}
-	default:
-		return myerrors.ErrDataGrantOwnershipMismatch
-	}
-	return nil
 }
 
 func (s *DataGrantConfigService) grantSubjectExists(

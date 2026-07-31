@@ -135,6 +135,18 @@ type DataPermissionReferenceSummaryRes struct {
 	Name string `json:"name"`
 }
 
+type DataPermissionValidationErrorRes struct {
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	ObjectType string `json:"object_type"`
+	ObjectId   int    `json:"object_id"`
+}
+
+type DataPermissionValidationResultRes struct {
+	Valid  bool                               `json:"valid"`
+	Errors []DataPermissionValidationErrorRes `json:"errors"`
+}
+
 func NewDataDimensionDefinitionListRes(value model.DataDimensionDefinition) DataDimensionDefinitionListRes {
 	return DataDimensionDefinitionListRes{
 		DataPermissionConfigBaseRes: newDataPermissionConfigBaseRes(value.Basic),

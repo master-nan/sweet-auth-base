@@ -92,6 +92,8 @@ type DataGrantRepository interface {
 	FindByIdForConfigDB(*gorm.DB, int) (model.DataGrant, error)
 	FindByStableKeyForConfigDB(*gorm.DB, string, int, int, string, int) (model.DataGrant, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
+	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataGrant, error)
+	ListByPolicyForConfigDB(*gorm.DB, int) ([]model.DataGrant, error)
 	RoleExistsForConfig(*gorm.DB, int) (bool, error)
 	UserExistsForConfig(*gorm.DB, int) (bool, error)
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)

@@ -60,6 +60,7 @@ const (
 	ErrorCodeDataGrantExists                      = 120055
 	ErrorCodeDataGrantValidityInvalid             = 120056
 	ErrorCodeDataGrantCountInvalid                = 120057
+	ErrorCodeDataPermissionPreflightFailed        = 120058
 )
 
 var (
@@ -347,5 +348,10 @@ var (
 		http.StatusBadRequest,
 		ErrorCodeDataGrantCountInvalid,
 		"批量数据权限授权数量超过限制",
+	)
+	ErrDataPermissionPreflightFailed = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPermissionPreflightFailed,
+		"数据权限配置预检未通过",
 	)
 )

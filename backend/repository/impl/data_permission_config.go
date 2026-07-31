@@ -666,6 +666,30 @@ func (r *DataGrantRepositoryImpl) UpdateFieldsForConfig(
 	return result.RowsAffected > 0, result.Error
 }
 
+func (r *DataGrantRepositoryImpl) ListByResourceForConfigDB(
+	db *gorm.DB,
+	resourceId int,
+) ([]model.DataGrant, error) {
+	values := make([]model.DataGrant, 0)
+	err := db.Select(dataGrantColumns).
+		Where("resource_id = ?", resourceId).
+		Order("id ASC").
+		Find(&values).Error
+	return values, err
+}
+
+func (r *DataGrantRepositoryImpl) ListByPolicyForConfigDB(
+	db *gorm.DB,
+	policyId int,
+) ([]model.DataGrant, error) {
+	values := make([]model.DataGrant, 0)
+	err := db.Select(dataGrantColumns).
+		Where("policy_id = ?", policyId).
+		Order("id ASC").
+		Find(&values).Error
+	return values, err
+}
+
 func (r *DataGrantRepositoryImpl) RoleExistsForConfig(db *gorm.DB, roleId int) (bool, error) {
 	var count int64
 	err := db.Model(&model.SysRole{}).
