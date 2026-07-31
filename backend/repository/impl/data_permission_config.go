@@ -633,6 +633,55 @@ func (r *DataGrantRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int
 	return findDataPermissionConfigByIds[model.DataGrant](r.db, ctx, ids, dataGrantColumns)
 }
 
+func (r *DataGrantRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataGrant, error) {
+	return findDataPermissionConfigOneDB[model.DataGrant](db, dataGrantColumns, "id = ?", id)
+}
+
+func (r *DataGrantRepositoryImpl) FindByStableKeyForConfigDB(
+	db *gorm.DB,
+	subjectType string,
+	subjectId int,
+	resourceId int,
+	operation string,
+	policyId int,
+) (model.DataGrant, error) {
+	return findDataPermissionConfigOneDB[model.DataGrant](
+		db,
+		dataGrantColumns,
+		"subject_type = ? AND subject_id = ? AND resource_id = ? AND operation = ? AND policy_id = ?",
+		subjectType,
+		subjectId,
+		resourceId,
+		operation,
+		policyId,
+	)
+}
+
+func (r *DataGrantRepositoryImpl) UpdateFieldsForConfig(
+	db *gorm.DB,
+	id int,
+	fields map[string]any,
+) (bool, error) {
+	result := db.Model(&model.DataGrant{}).Where("id = ?", id).Updates(fields)
+	return result.RowsAffected > 0, result.Error
+}
+
+func (r *DataGrantRepositoryImpl) RoleExistsForConfig(db *gorm.DB, roleId int) (bool, error) {
+	var count int64
+	err := db.Model(&model.SysRole{}).
+		Where("id = ? AND state = ?", roleId, true).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *DataGrantRepositoryImpl) UserExistsForConfig(db *gorm.DB, userId int) (bool, error) {
+	var count int64
+	err := db.Model(&model.SysUser{}).
+		Where("id = ? AND state = ?", userId, true).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func (r *DataGrantRepositoryImpl) CountByResourceForConfig(db *gorm.DB, resourceId int) (int64, error) {
 	var count int64
 	err := db.Model(&model.DataGrant{}).

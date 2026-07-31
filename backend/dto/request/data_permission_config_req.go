@@ -1,6 +1,9 @@
 package request
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 const (
 	DataPermissionConfigObjectDimension = "dimension"
@@ -203,6 +206,27 @@ type DataGrantQueryReq struct {
 	Operation   string `form:"operation" json:"operation" binding:"omitempty,oneof=query detail create update delete export run"`
 	PolicyId    *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
 	State       *bool  `form:"state" json:"state"`
+}
+
+type DataGrantCreateReq struct {
+	SubjectType string     `form:"subject_type" json:"subject_type" binding:"required,oneof=role user"`
+	SubjectId   int        `form:"subject_id" json:"subject_id" binding:"required,gt=0"`
+	ResourceId  int        `form:"resource_id" json:"resource_id" binding:"required,gt=0"`
+	Operation   string     `form:"operation" json:"operation" binding:"required,oneof=query detail create update delete export run"`
+	PolicyId    int        `form:"policy_id" json:"policy_id" binding:"required,gt=0"`
+	ValidFrom   *time.Time `form:"valid_from" json:"valid_from"`
+	ValidTo     *time.Time `form:"valid_to" json:"valid_to"`
+	Description string     `form:"description" json:"description" binding:"omitempty,max=256"`
+	State       *bool      `form:"state" json:"state"`
+}
+
+type DataGrantBatchCreateReq struct {
+	Items []DataGrantCreateReq `form:"items" json:"items" binding:"required,min=1,max=100,dive"`
+}
+
+type DataGrantStateReq struct {
+	Id    int   `form:"id" json:"id" binding:"required,gt=0"`
+	State *bool `form:"state" json:"state" binding:"required"`
 }
 
 // DataPermissionFieldBoundary declares DTO field ownership for the future

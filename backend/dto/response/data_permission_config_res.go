@@ -258,6 +258,12 @@ func NewDataGrantListRes(value model.DataGrant) DataGrantListRes {
 	}
 }
 
+func NewDataGrantDetailRes(value model.DataGrant) DataGrantDetailRes {
+	return DataGrantDetailRes{
+		DataGrantListRes: NewDataGrantListRes(value),
+	}
+}
+
 func newDataPermissionConfigBaseRes(value model.Basic) DataPermissionConfigBaseRes {
 	return DataPermissionConfigBaseRes{
 		Id:        value.Id,

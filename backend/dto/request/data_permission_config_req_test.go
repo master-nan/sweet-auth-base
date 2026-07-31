@@ -3,7 +3,9 @@ package request
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"backend/internal/utils"
 	"backend/model"
@@ -87,6 +89,28 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 				},
 			},
 		},
+		DataGrantCreateReq{
+			SubjectType: model.DataGrantSubjectTypeRole,
+			SubjectId:   1,
+			ResourceId:  2,
+			Operation:   model.DataPermissionOperationQuery,
+			PolicyId:    3,
+		},
+		DataGrantBatchCreateReq{
+			Items: []DataGrantCreateReq{
+				{
+					SubjectType: model.DataGrantSubjectTypeUser,
+					SubjectId:   1,
+					ResourceId:  2,
+					Operation:   model.DataPermissionOperationDetail,
+					PolicyId:    3,
+				},
+			},
+		},
+		DataGrantStateReq{
+			Id:    1,
+			State: dataPermissionConfigBoolPointer(true),
+		},
 	}
 	for _, value := range valid {
 		if err := validate.Struct(value); err != nil {
@@ -138,6 +162,17 @@ func TestDataPermissionConfigQueryDTOValidation(t *testing.T) {
 			PolicyId: 1,
 			Items:    make([]DataPolicyRuleCreateItemReq, 9),
 		},
+		DataGrantCreateReq{},
+		DataGrantCreateReq{
+			SubjectType: "position",
+			SubjectId:   1,
+			ResourceId:  2,
+			Operation:   model.DataPermissionOperationQuery,
+			PolicyId:    3,
+		},
+		DataGrantBatchCreateReq{},
+		DataGrantBatchCreateReq{Items: make([]DataGrantCreateReq, 101)},
+		DataGrantStateReq{Id: 1},
 	}
 	for _, value := range invalid {
 		if err := validate.Struct(value); err == nil {
@@ -156,6 +191,9 @@ func TestDataPermissionConfigQueryDTOExcludesUnsafeClientFields(t *testing.T) {
 		reflect.TypeOf(DataPolicyUpdateReq{}),
 		reflect.TypeOf(DataPolicyRuleCreateReq{}),
 		reflect.TypeOf(DataPolicyRuleBatchReq{}),
+		reflect.TypeOf(DataGrantCreateReq{}),
+		reflect.TypeOf(DataGrantBatchCreateReq{}),
+		reflect.TypeOf(DataGrantStateReq{}),
 	} {
 		for _, forbidden := range []string{
 			"table_code",
@@ -171,6 +209,26 @@ func TestDataPermissionConfigQueryDTOExcludesUnsafeClientFields(t *testing.T) {
 			if hasJSONField(dtoType, forbidden) {
 				t.Fatalf("%s exposes forbidden client field %q", dtoType.Name(), forbidden)
 			}
+		}
+	}
+
+	from := time.Date(2026, time.July, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.July, 31, 0, 0, 0, 0, time.UTC)
+	grantPayload, err := json.Marshal(DataGrantCreateReq{
+		SubjectType: model.DataGrantSubjectTypeRole,
+		SubjectId:   1,
+		ResourceId:  2,
+		Operation:   model.DataPermissionOperationQuery,
+		PolicyId:    3,
+		ValidFrom:   &from,
+		ValidTo:     &to,
+	})
+	if err != nil {
+		t.Fatalf("marshal grant request: %v", err)
+	}
+	for _, forbidden := range []string{"sql", "field", "organization_id", "employee_scope", "provider_result"} {
+		if strings.Contains(string(grantPayload), forbidden) {
+			t.Fatalf("grant request leaked forbidden field %q: %s", forbidden, grantPayload)
 		}
 	}
 
@@ -281,6 +339,10 @@ func TestDataPermissionConfigFieldBoundaries(t *testing.T) {
 }
 
 func dataPermissionConfigStringPointer(value string) *string {
+	return &value
+}
+
+func dataPermissionConfigBoolPointer(value bool) *bool {
 	return &value
 }
 

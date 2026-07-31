@@ -50,6 +50,16 @@ const (
 	ErrorCodeDataPolicyRuleOperatorInvalid        = 120045
 	ErrorCodeDataPolicyRuleSpecifiedValuesInvalid = 120046
 	ErrorCodeDataPolicyRuleCountInvalid           = 120047
+	ErrorCodeDataGrantNotFound                    = 120048
+	ErrorCodeDataGrantSubjectTypeInvalid          = 120049
+	ErrorCodeDataGrantSubjectNotFound             = 120050
+	ErrorCodeDataGrantPolicyInvalid               = 120051
+	ErrorCodeDataGrantPolicyRuleInvalid           = 120052
+	ErrorCodeDataGrantOwnershipMismatch           = 120053
+	ErrorCodeDataGrantDuplicate                   = 120054
+	ErrorCodeDataGrantExists                      = 120055
+	ErrorCodeDataGrantValidityInvalid             = 120056
+	ErrorCodeDataGrantCountInvalid                = 120057
 )
 
 var (
@@ -287,5 +297,55 @@ var (
 		http.StatusBadRequest,
 		ErrorCodeDataPolicyRuleCountInvalid,
 		"数据权限策略规则数量超过限制",
+	)
+	ErrDataGrantNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataGrantNotFound,
+		"数据权限授权不存在",
+	)
+	ErrDataGrantSubjectTypeInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataGrantSubjectTypeInvalid,
+		"数据权限授权主体类型不合法",
+	)
+	ErrDataGrantSubjectNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataGrantSubjectNotFound,
+		"数据权限授权主体不存在或已停用",
+	)
+	ErrDataGrantPolicyInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataGrantPolicyInvalid,
+		"数据权限授权策略不存在、已停用或类型不合法",
+	)
+	ErrDataGrantPolicyRuleInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataGrantPolicyRuleInvalid,
+		"数据权限授权策略规则不完整或不合法",
+	)
+	ErrDataGrantOwnershipMismatch = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataGrantOwnershipMismatch,
+		"数据权限策略与目标资源归属定义不匹配",
+	)
+	ErrDataGrantDuplicate = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataGrantDuplicate,
+		"相同数据权限授权已启用",
+	)
+	ErrDataGrantExists = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataGrantExists,
+		"相同数据权限授权已存在，请恢复原授权",
+	)
+	ErrDataGrantValidityInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataGrantValidityInvalid,
+		"数据权限授权有效期不合法",
+	)
+	ErrDataGrantCountInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeDataGrantCountInvalid,
+		"批量数据权限授权数量超过限制",
 	)
 )

@@ -63,6 +63,10 @@ type OwnershipFieldBindingValidator interface {
 	ValidateBinding(OwnershipFieldBindingValidation) error
 }
 
+type OwnershipFieldOperationValidator interface {
+	ValidateOperation(OwnershipFieldOperationValidation) error
+}
+
 // OwnershipFieldRegistry is an in-memory, process-local registry initialized
 // from reviewed module declarations during application construction.
 type OwnershipFieldRegistry struct {
