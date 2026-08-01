@@ -13,7 +13,6 @@
             v-for="btn in masterTopButtons"
             :key="btn.id"
             v-bind="menuButtonDisplayProps(btn, { label: masterButtonLabel(btn) })"
-            unelevated
             dense
             color="primary"
             :disable="loading"
@@ -50,7 +49,6 @@
                 </template>
               </q-input>
               <q-btn
-                unelevated
                 color="primary"
                 label="搜索"
                 :disable="loading"
@@ -143,7 +141,6 @@
               v-for="btn in detailTopButtons"
               :key="btn.id"
               v-bind="menuButtonDisplayProps(btn, { label: detailButtonLabel(btn) })"
-              unelevated
               dense
               color="primary"
               :disable="!currentDict"
