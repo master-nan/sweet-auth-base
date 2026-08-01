@@ -3,27 +3,35 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeDataPermissionSubjectUserNotFound     = 120059
-	ErrorCodeDataPermissionRoleContextMissing      = 120060
-	ErrorCodeDataPermissionEmployeeUnbound         = 120061
-	ErrorCodeDataPermissionSubjectContextInvalid   = 120062
-	ErrorCodeDataScopeDecisionInvalid              = 120063
-	ErrorCodeDataScopeResultConditionMismatch      = 120064
-	ErrorCodeDataScopeFilterConditionMissing       = 120065
-	ErrorCodeDataScopeConditionGroupEmpty          = 120066
-	ErrorCodeDataScopeOwnershipCodeInvalid         = 120067
-	ErrorCodeDataScopeDimensionInvalid             = 120068
-	ErrorCodeDataScopeOperatorInvalid              = 120069
-	ErrorCodeDataScopeValueTypeInvalid             = 120070
-	ErrorCodeDataScopeValueTypeMismatch            = 120071
-	ErrorCodeDataScopeValueCountExceeded           = 120072
-	ErrorCodeDataScopeMergeUnsupported             = 120073
-	ErrorCodeDataScopeResultIdentityInvalid        = 120074
-	ErrorCodeDataScopeComplexityExceeded           = 120075
-	ErrorCodeDataPermissionDimensionNotFound       = 120076
-	ErrorCodeDataPermissionDimensionUnsupported    = 120077
-	ErrorCodeDataPermissionDimensionTypeMismatch   = 120078
-	ErrorCodeDataPermissionDimensionProviderFailed = 120079
+	ErrorCodeDataPermissionSubjectUserNotFound      = 120059
+	ErrorCodeDataPermissionRoleContextMissing       = 120060
+	ErrorCodeDataPermissionEmployeeUnbound          = 120061
+	ErrorCodeDataPermissionSubjectContextInvalid    = 120062
+	ErrorCodeDataScopeDecisionInvalid               = 120063
+	ErrorCodeDataScopeResultConditionMismatch       = 120064
+	ErrorCodeDataScopeFilterConditionMissing        = 120065
+	ErrorCodeDataScopeConditionGroupEmpty           = 120066
+	ErrorCodeDataScopeOwnershipCodeInvalid          = 120067
+	ErrorCodeDataScopeDimensionInvalid              = 120068
+	ErrorCodeDataScopeOperatorInvalid               = 120069
+	ErrorCodeDataScopeValueTypeInvalid              = 120070
+	ErrorCodeDataScopeValueTypeMismatch             = 120071
+	ErrorCodeDataScopeValueCountExceeded            = 120072
+	ErrorCodeDataScopeMergeUnsupported              = 120073
+	ErrorCodeDataScopeResultIdentityInvalid         = 120074
+	ErrorCodeDataScopeComplexityExceeded            = 120075
+	ErrorCodeDataPermissionDimensionNotFound        = 120076
+	ErrorCodeDataPermissionDimensionUnsupported     = 120077
+	ErrorCodeDataPermissionDimensionTypeMismatch    = 120078
+	ErrorCodeDataPermissionDimensionProviderFailed  = 120079
+	ErrorCodeDataPermissionResolverResourceMissing  = 120080
+	ErrorCodeDataPermissionResolverOperationMissing = 120081
+	ErrorCodeDataPermissionResolverGrantMissing     = 120082
+	ErrorCodeDataPermissionResolverPolicyInvalid    = 120083
+	ErrorCodeDataPermissionResolverOwnershipMissing = 120084
+	ErrorCodeDataPermissionResolverDimensionFailed  = 120085
+	ErrorCodeDataPermissionResolverConfigConflict   = 120086
+	ErrorCodeDataPermissionResolverFailed           = 120087
 )
 
 var (
@@ -131,5 +139,45 @@ var (
 		http.StatusServiceUnavailable,
 		ErrorCodeDataPermissionDimensionProviderFailed,
 		"数据权限维度Provider调用失败",
+	)
+	ErrDataPermissionResolverResourceMissing = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataPermissionResolverResourceMissing,
+		"数据权限解析资源不存在",
+	)
+	ErrDataPermissionResolverOperationMissing = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataPermissionResolverOperationMissing,
+		"数据权限解析操作不存在",
+	)
+	ErrDataPermissionResolverGrantMissing = NewBusinessError(
+		http.StatusForbidden,
+		ErrorCodeDataPermissionResolverGrantMissing,
+		"数据权限授权不存在",
+	)
+	ErrDataPermissionResolverPolicyInvalid = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeDataPermissionResolverPolicyInvalid,
+		"数据权限策略无效",
+	)
+	ErrDataPermissionResolverOwnershipMissing = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeDataPermissionResolverOwnershipMissing,
+		"数据权限归属定义缺失",
+	)
+	ErrDataPermissionResolverDimensionFailed = NewBusinessError(
+		http.StatusServiceUnavailable,
+		ErrorCodeDataPermissionResolverDimensionFailed,
+		"数据权限维度解析失败",
+	)
+	ErrDataPermissionResolverConfigConflict = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeDataPermissionResolverConfigConflict,
+		"数据权限解析配置冲突",
+	)
+	ErrDataPermissionResolverFailed = NewBusinessError(
+		http.StatusInternalServerError,
+		ErrorCodeDataPermissionResolverFailed,
+		"数据权限解析失败",
 	)
 )
