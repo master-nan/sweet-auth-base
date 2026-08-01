@@ -3,23 +3,27 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeDataPermissionSubjectUserNotFound   = 120059
-	ErrorCodeDataPermissionRoleContextMissing    = 120060
-	ErrorCodeDataPermissionEmployeeUnbound       = 120061
-	ErrorCodeDataPermissionSubjectContextInvalid = 120062
-	ErrorCodeDataScopeDecisionInvalid            = 120063
-	ErrorCodeDataScopeResultConditionMismatch    = 120064
-	ErrorCodeDataScopeFilterConditionMissing     = 120065
-	ErrorCodeDataScopeConditionGroupEmpty        = 120066
-	ErrorCodeDataScopeOwnershipCodeInvalid       = 120067
-	ErrorCodeDataScopeDimensionInvalid           = 120068
-	ErrorCodeDataScopeOperatorInvalid            = 120069
-	ErrorCodeDataScopeValueTypeInvalid           = 120070
-	ErrorCodeDataScopeValueTypeMismatch          = 120071
-	ErrorCodeDataScopeValueCountExceeded         = 120072
-	ErrorCodeDataScopeMergeUnsupported           = 120073
-	ErrorCodeDataScopeResultIdentityInvalid      = 120074
-	ErrorCodeDataScopeComplexityExceeded         = 120075
+	ErrorCodeDataPermissionSubjectUserNotFound     = 120059
+	ErrorCodeDataPermissionRoleContextMissing      = 120060
+	ErrorCodeDataPermissionEmployeeUnbound         = 120061
+	ErrorCodeDataPermissionSubjectContextInvalid   = 120062
+	ErrorCodeDataScopeDecisionInvalid              = 120063
+	ErrorCodeDataScopeResultConditionMismatch      = 120064
+	ErrorCodeDataScopeFilterConditionMissing       = 120065
+	ErrorCodeDataScopeConditionGroupEmpty          = 120066
+	ErrorCodeDataScopeOwnershipCodeInvalid         = 120067
+	ErrorCodeDataScopeDimensionInvalid             = 120068
+	ErrorCodeDataScopeOperatorInvalid              = 120069
+	ErrorCodeDataScopeValueTypeInvalid             = 120070
+	ErrorCodeDataScopeValueTypeMismatch            = 120071
+	ErrorCodeDataScopeValueCountExceeded           = 120072
+	ErrorCodeDataScopeMergeUnsupported             = 120073
+	ErrorCodeDataScopeResultIdentityInvalid        = 120074
+	ErrorCodeDataScopeComplexityExceeded           = 120075
+	ErrorCodeDataPermissionDimensionNotFound       = 120076
+	ErrorCodeDataPermissionDimensionUnsupported    = 120077
+	ErrorCodeDataPermissionDimensionTypeMismatch   = 120078
+	ErrorCodeDataPermissionDimensionProviderFailed = 120079
 )
 
 var (
@@ -107,5 +111,25 @@ var (
 		http.StatusUnprocessableEntity,
 		ErrorCodeDataScopeComplexityExceeded,
 		"数据权限结果复杂度超过限制",
+	)
+	ErrDataPermissionDimensionNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeDataPermissionDimensionNotFound,
+		"数据权限维度不存在",
+	)
+	ErrDataPermissionDimensionUnsupported = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeDataPermissionDimensionUnsupported,
+		"数据权限维度暂不支持运行时解析",
+	)
+	ErrDataPermissionDimensionTypeMismatch = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeDataPermissionDimensionTypeMismatch,
+		"数据权限维度值类型不匹配",
+	)
+	ErrDataPermissionDimensionProviderFailed = NewBusinessError(
+		http.StatusServiceUnavailable,
+		ErrorCodeDataPermissionDimensionProviderFailed,
+		"数据权限维度Provider调用失败",
 	)
 )

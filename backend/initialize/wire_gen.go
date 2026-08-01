@@ -165,6 +165,7 @@ func InitializeApp() (*App, error) {
 	sysUserApi := api.NewSysUserApi(sysUserService, sysConfigureService, v2)
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
 	subjectContextBuilder := service.NewSubjectContextBuilder(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, orgService)
+	dimensionProviderRuntime := service.NewDimensionProviderRuntime(dataDimensionDefinitionRepositoryImpl, orgService)
 	blackUserCache := cache.NewBlackCache(redisUtil)
 	app := &App{
 		Config:                         server,
@@ -195,6 +196,7 @@ func InitializeApp() (*App, error) {
 		UserService:                    sysUserService,
 		ApplicationService:             applicationService,
 		SubjectContextBuilder:          subjectContextBuilder,
+		DimensionProviderRuntime:       dimensionProviderRuntime,
 		BlackCache:                     blackUserCache,
 		TokenBlackCache:                tokenBlackCache,
 		ApplicationCache:               applicationCache,
@@ -233,6 +235,7 @@ type App struct {
 	UserService                    *service.SysUserService
 	ApplicationService             *service.ApplicationService
 	SubjectContextBuilder          *service.SubjectContextBuilder
+	DimensionProviderRuntime       *service.DimensionProviderRuntime
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
@@ -245,7 +248,7 @@ var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLo
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserRoleCache, cache.NewSysUserCache, cache.NewSysMenuButtonCache, cache.NewSysDictCache, cache.NewSysMenuCache, cache.NewSysRoleCache, cache.NewSysRoleMenuButtonCache, cache.NewSysRoleMenuCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewGeneralizationCache, cache.NewBlackCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSmsLogCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service providers
-var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, ProvideOwnershipFieldRegistry, wire.Bind(
+var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, ProvideOwnershipFieldRegistry, wire.Bind(
 	new(datapermission.OwnershipFieldBindingValidator),
 	new(*datapermission.OwnershipFieldRegistry),
 ), wire.Bind(
