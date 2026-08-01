@@ -8,6 +8,12 @@ $font-family_1:
 
 // app global css in SCSS form
 html {
+  // Theme stores overwrite these values when preferences are applied. Keeping
+  // defaults here prevents missing styles before the runtime theme is ready.
+  --app-primary-soft: rgba(115, 103, 240, 0.08);
+  --app-primary-soft-strong: rgba(115, 103, 240, 0.16);
+  --app-primary-border: rgba(115, 103, 240, 0.28);
+  --app-primary-shadow: rgba(115, 103, 240, 0.2);
   --app-scrollbar-thumb: rgba(100, 116, 139, 0.38);
   --app-scrollbar-thumb-hover: rgba(71, 85, 105, 0.66);
 
