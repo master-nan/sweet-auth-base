@@ -114,6 +114,14 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+:global(:root) {
+  // The theme store overwrites these defaults when preferences are applied.
+  --app-primary-soft: rgba(115, 103, 240, 0.08);
+  --app-primary-soft-strong: rgba(115, 103, 240, 0.16);
+  --app-primary-border: rgba(115, 103, 240, 0.28);
+  --app-primary-shadow: rgba(115, 103, 240, 0.2);
+}
+
 .app-header {
   --app-header-bg: #ffffff;
   --app-header-surface: #fbfcff;
@@ -154,21 +162,6 @@ onMounted(() => {
 .app-header__breadcrumbs {
   min-width: 0;
   color: var(--app-header-text);
-
-  :deep(.q-breadcrumbs__el) {
-    color: inherit;
-    font-size: 14px;
-    font-weight: 800;
-    letter-spacing: 0;
-  }
-
-  :deep(.q-breadcrumbs__el:last-child) {
-    color: var(--q-primary);
-  }
-
-  :deep(.q-breadcrumbs__separator) {
-    color: var(--app-header-muted);
-  }
 }
 
 .app-header__tabs {
