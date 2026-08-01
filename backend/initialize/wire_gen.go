@@ -164,6 +164,7 @@ func InitializeApp() (*App, error) {
 	authApi := api.NewAuthApi(jwtToken, server, sysConfigureService, logService, sysUserService, applicationService, dingTalkService, smsService, applicationCache, tokenBlackCache, sendCodeCache, v2, hmacToken)
 	sysUserApi := api.NewSysUserApi(sysUserService, sysConfigureService, v2)
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
+	subjectContextBuilder := service.NewSubjectContextBuilder(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, orgService)
 	blackUserCache := cache.NewBlackCache(redisUtil)
 	app := &App{
 		Config:                         server,
@@ -193,6 +194,7 @@ func InitializeApp() (*App, error) {
 		LogService:                     logService,
 		UserService:                    sysUserService,
 		ApplicationService:             applicationService,
+		SubjectContextBuilder:          subjectContextBuilder,
 		BlackCache:                     blackUserCache,
 		TokenBlackCache:                tokenBlackCache,
 		ApplicationCache:               applicationCache,
@@ -230,6 +232,7 @@ type App struct {
 	LogService                     *service.LogService
 	UserService                    *service.SysUserService
 	ApplicationService             *service.ApplicationService
+	SubjectContextBuilder          *service.SubjectContextBuilder
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
@@ -242,13 +245,13 @@ var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLo
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserRoleCache, cache.NewSysUserCache, cache.NewSysMenuButtonCache, cache.NewSysDictCache, cache.NewSysMenuCache, cache.NewSysRoleCache, cache.NewSysRoleMenuButtonCache, cache.NewSysRoleMenuCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewGeneralizationCache, cache.NewBlackCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSmsLogCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service providers
-var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, ProvideOwnershipFieldRegistry, wire.Bind(
+var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, ProvideOwnershipFieldRegistry, wire.Bind(
 	new(datapermission.OwnershipFieldBindingValidator),
 	new(*datapermission.OwnershipFieldRegistry),
 ), wire.Bind(
 	new(datapermission.OwnershipFieldOperationValidator),
 	new(*datapermission.OwnershipFieldRegistry),
-), service.NewReportService, service.NewOrgService, service.NewCasbinRuleService, service.NewApplicationService, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
+), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
 )
 
 // Controller providers
