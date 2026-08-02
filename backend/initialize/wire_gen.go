@@ -166,6 +166,7 @@ func InitializeApp() (*App, error) {
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
 	subjectContextBuilder := service.NewSubjectContextBuilder(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, orgService)
 	dimensionProviderRuntime := service.NewDimensionProviderRuntime(dataDimensionDefinitionRepositoryImpl, orgService)
+	dataPermissionPolicyResolver := service.NewDataPermissionPolicyResolver(dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataGrantRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dimensionProviderRuntime)
 	blackUserCache := cache.NewBlackCache(redisUtil)
 	app := &App{
 		Config:                         server,
@@ -197,6 +198,7 @@ func InitializeApp() (*App, error) {
 		ApplicationService:             applicationService,
 		SubjectContextBuilder:          subjectContextBuilder,
 		DimensionProviderRuntime:       dimensionProviderRuntime,
+		DataPermissionResolver:         dataPermissionPolicyResolver,
 		BlackCache:                     blackUserCache,
 		TokenBlackCache:                tokenBlackCache,
 		ApplicationCache:               applicationCache,
@@ -236,6 +238,7 @@ type App struct {
 	ApplicationService             *service.ApplicationService
 	SubjectContextBuilder          *service.SubjectContextBuilder
 	DimensionProviderRuntime       *service.DimensionProviderRuntime
+	DataPermissionResolver         datapermission.Resolver
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
@@ -248,7 +251,7 @@ var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLo
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserRoleCache, cache.NewSysUserCache, cache.NewSysMenuButtonCache, cache.NewSysDictCache, cache.NewSysMenuCache, cache.NewSysRoleCache, cache.NewSysRoleMenuButtonCache, cache.NewSysRoleMenuCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewGeneralizationCache, cache.NewBlackCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSmsLogCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service providers
-var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, ProvideOwnershipFieldRegistry, wire.Bind(
+var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationService, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, service.NewDataPermissionPolicyResolver, wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)), wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)), ProvideOwnershipFieldRegistry, wire.Bind(
 	new(datapermission.OwnershipFieldBindingValidator),
 	new(*datapermission.OwnershipFieldRegistry),
 ), wire.Bind(

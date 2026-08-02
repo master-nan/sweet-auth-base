@@ -79,6 +79,7 @@ type DataPolicyRuleRepository interface {
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataPolicyRule, error)
 	FindByIdForConfigDB(*gorm.DB, int) (model.DataPolicyRule, error)
 	FindByStableKeyForConfigDB(*gorm.DB, int, int) (model.DataPolicyRule, error)
+	ListByPolicy(*gin.Context, int) ([]model.DataPolicyRule, error)
 	ListByPolicyForConfigDB(*gorm.DB, int) ([]model.DataPolicyRule, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 }
@@ -91,6 +92,7 @@ type DataGrantRepository interface {
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataGrant, error)
 	FindByIdForConfigDB(*gorm.DB, int) (model.DataGrant, error)
 	FindByStableKeyForConfigDB(*gorm.DB, string, int, int, string, int) (model.DataGrant, error)
+	ListEffectiveBySubjects(*gin.Context, int, []int, int, string, time.Time) ([]model.DataGrant, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataGrant, error)
 	ListByPolicyForConfigDB(*gorm.DB, int) ([]model.DataGrant, error)

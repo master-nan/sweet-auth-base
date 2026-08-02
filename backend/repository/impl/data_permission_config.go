@@ -562,7 +562,24 @@ func (r *DataPolicyRuleRepositoryImpl) FindByStableKeyForConfigDB(
 	)
 }
 
+func (r *DataPolicyRuleRepositoryImpl) ListByPolicy(
+	ctx *gin.Context,
+	policyId int,
+) ([]model.DataPolicyRule, error) {
+	return listDataPolicyRulesByPolicy(
+		dataPermissionConfigDB(r.db, ctx),
+		policyId,
+	)
+}
+
 func (r *DataPolicyRuleRepositoryImpl) ListByPolicyForConfigDB(
+	db *gorm.DB,
+	policyId int,
+) ([]model.DataPolicyRule, error) {
+	return listDataPolicyRulesByPolicy(db, policyId)
+}
+
+func listDataPolicyRulesByPolicy(
 	db *gorm.DB,
 	policyId int,
 ) ([]model.DataPolicyRule, error) {
@@ -655,6 +672,44 @@ func (r *DataGrantRepositoryImpl) FindByStableKeyForConfigDB(
 		operation,
 		policyId,
 	)
+}
+
+func (r *DataGrantRepositoryImpl) ListEffectiveBySubjects(
+	ctx *gin.Context,
+	userId int,
+	roleIds []int,
+	resourceId int,
+	operation string,
+	asOf time.Time,
+) ([]model.DataGrant, error) {
+	values := make([]model.DataGrant, 0)
+	if userId <= 0 || resourceId <= 0 || operation == "" || asOf.IsZero() {
+		return values, nil
+	}
+	query := dataPermissionConfigDB(r.db, ctx).
+		Select(dataGrantColumns).
+		Where("resource_id = ? AND operation = ? AND state = ?", resourceId, operation, true)
+	if len(roleIds) == 0 {
+		query = query.Where(
+			"subject_type = ? AND subject_id = ?",
+			model.DataGrantSubjectTypeUser,
+			userId,
+		)
+	} else {
+		query = query.Where(
+			"((subject_type = ? AND subject_id = ?) OR (subject_type = ? AND subject_id IN ?))",
+			model.DataGrantSubjectTypeUser,
+			userId,
+			model.DataGrantSubjectTypeRole,
+			roleIds,
+		)
+	}
+	err := query.
+		Where("valid_from IS NULL OR valid_from <= ?", asOf).
+		Where("valid_to IS NULL OR valid_to >= ?", asOf).
+		Order("subject_type ASC, subject_id ASC, policy_id ASC, id ASC").
+		Find(&values).Error
+	return values, err
 }
 
 func (r *DataGrantRepositoryImpl) UpdateFieldsForConfig(

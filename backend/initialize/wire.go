@@ -57,6 +57,7 @@ type App struct {
 	ApplicationService             *service.ApplicationService
 	SubjectContextBuilder          *service.SubjectContextBuilder
 	DimensionProviderRuntime       *service.DimensionProviderRuntime
+	DataPermissionResolver         datapermission.Resolver
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
@@ -202,6 +203,9 @@ var ServiceProvider = wire.NewSet(
 	service.NewDataPermissionConfigPreflightService,
 	service.NewSubjectContextBuilder,
 	service.NewDimensionProviderRuntime,
+	service.NewDataPermissionPolicyResolver,
+	wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)),
+	wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)),
 	ProvideOwnershipFieldRegistry,
 	wire.Bind(
 		new(datapermission.OwnershipFieldBindingValidator),
