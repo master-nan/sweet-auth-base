@@ -36,8 +36,8 @@ type policyResolverDimensionValuesLookup func(
 	string,
 ) (datapermission.DimensionValues, error)
 
-// DataPermissionPolicyResolver resolves all effective Grants for one resource
-// and operation. Each Grant still resolves exactly one Policy and one Rule.
+// DataPermissionPolicyResolver is the complete request-scoped Resolver engine.
+// Rules inside one Policy are AND branches; effective Grants are OR branches.
 type DataPermissionPolicyResolver struct {
 	findResource     policyResolverResourceLookup
 	findOperation    policyResolverOperationLookup
@@ -102,26 +102,39 @@ func (resolver *DataPermissionPolicyResolver) Resolve(
 	if resolver == nil {
 		return datapermission.ResolverFunc(nil).Resolve(ctx, input)
 	}
-	return datapermission.ResolverFunc(resolver.resolveGrantPolicies).Resolve(ctx, input)
+	var request *policyResolverRequestContext
+	result, err := datapermission.ResolverFunc(func(
+		ctx *gin.Context,
+		input datapermission.ResolverInput,
+	) (datapermission.DataScopeResult, error) {
+		request = newPolicyResolverRequestContext(input)
+		return resolver.resolveGrantPolicies(ctx, request)
+	}).Resolve(ctx, input)
+	if err != nil {
+		return datapermission.DataScopeResult{}, err
+	}
+	summary, err := request.summary(result)
+	if err != nil {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	if err = datapermission.StoreResolverSummary(ctx, summary); err != nil {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	return result, nil
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 	ctx *gin.Context,
-	input datapermission.ResolverInput,
+	request *policyResolverRequestContext,
 ) (datapermission.DataScopeResult, error) {
 	if !resolver.hasRequiredLookups() {
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverFailed
 	}
+	input := request.input
 
-	resource, err := resolver.findResource(ctx, input.ResourceCode())
+	resource, err := resolver.loadResource(ctx, request, input.ResourceCode())
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverResourceMissing
-		}
 		return datapermission.DataScopeResult{}, err
-	}
-	if resource.Id <= 0 || resource.ResourceCode != input.ResourceCode() || !resource.State {
-		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverResourceMissing
 	}
 
 	operation, err := resolver.findOperation(ctx, resource.Id, input.Operation())
@@ -155,6 +168,7 @@ func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 	if err != nil {
 		return datapermission.DataScopeResult{}, err
 	}
+	request.checkedGrantCount = len(grants)
 	if len(grants) == 0 {
 		return datapermission.NewNoneResult(input.ResourceCode(), input.Operation())
 	}
@@ -166,7 +180,7 @@ func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 		if !validResolverGrant(grant, subject, resource.Id, input.Operation(), asOf) {
 			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
 		}
-		grantResult, resolveErr := resolver.resolveGrant(ctx, input, resource, grant)
+		grantResult, resolveErr := resolver.resolveGrant(ctx, request, resource, grant)
 		if resolveErr != nil {
 			return datapermission.DataScopeResult{}, resolveErr
 		}
@@ -180,26 +194,17 @@ func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 
 func (resolver *DataPermissionPolicyResolver) resolveGrant(
 	ctx *gin.Context,
-	input datapermission.ResolverInput,
+	request *policyResolverRequestContext,
 	resource model.DataResource,
 	grant model.DataGrant,
 ) (datapermission.DataScopeResult, error) {
-	policy, err := resolver.findPolicy(ctx, grant.PolicyId)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverPolicyInvalid
-		}
-		return datapermission.DataScopeResult{}, err
-	}
-	if policy.Id != grant.PolicyId || !policy.State {
-		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverPolicyInvalid
-	}
-
-	rules, err := resolver.findRules(ctx, policy.Id)
+	input := request.input
+	config, err := resolver.loadPolicyConfig(ctx, request, grant.PolicyId)
 	if err != nil {
 		return datapermission.DataScopeResult{}, err
 	}
-	activeRules := activePolicyResolverRules(rules)
+	policy := config.policy
+	activeRules := activePolicyResolverRules(config.rules)
 	switch policy.PolicyType {
 	case model.DataPolicyTypeAll:
 		if len(activeRules) != 0 {
@@ -215,17 +220,43 @@ func (resolver *DataPermissionPolicyResolver) resolveGrant(
 		if len(activeRules) == 0 {
 			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverPolicyInvalid
 		}
-		if len(activeRules) != 1 {
-			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
-		}
 	default:
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverPolicyInvalid
 	}
-	if activeRules[0].PolicyId != policy.Id {
+
+	result, err := datapermission.NewAllResult(input.ResourceCode(), input.Operation())
+	if err != nil {
+		return datapermission.DataScopeResult{}, err
+	}
+	for _, rule := range activeRules {
+		if rule.PolicyId != policy.Id {
+			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+		}
+		ruleResult, resolveErr := resolver.resolveRule(ctx, request, resource, rule)
+		if resolveErr != nil {
+			return datapermission.DataScopeResult{}, resolveErr
+		}
+		result, err = mergePolicyRuleScopeResults(result, ruleResult)
+		if err != nil {
+			return datapermission.DataScopeResult{}, err
+		}
+	}
+	return result, nil
+}
+
+func mergePolicyRuleScopeResults(
+	left datapermission.DataScopeResult,
+	right datapermission.DataScopeResult,
+) (datapermission.DataScopeResult, error) {
+	if left.Decision() == datapermission.DataScopeDecisionNotApplicable ||
+		right.Decision() == datapermission.DataScopeDecisionNotApplicable {
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
 	}
-
-	return resolver.resolveRule(ctx, input, resource, activeRules[0])
+	result, err := datapermission.AndDataScopeResults(left, right)
+	if err != nil {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	return result, nil
 }
 
 func mergeGrantScopeResults(
@@ -245,10 +276,11 @@ func mergeGrantScopeResults(
 
 func (resolver *DataPermissionPolicyResolver) resolveRule(
 	ctx *gin.Context,
-	input datapermission.ResolverInput,
+	request *policyResolverRequestContext,
 	resource model.DataResource,
 	rule model.DataPolicyRule,
 ) (datapermission.DataScopeResult, error) {
+	input := request.input
 	if rule.PolicyId <= 0 || rule.DimensionId <= 0 || strings.TrimSpace(rule.OwnershipCode) == "" ||
 		rule.Relation != model.DataPolicyRelationExact {
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
@@ -284,7 +316,7 @@ func (resolver *DataPermissionPolicyResolver) resolveRule(
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
 	}
 
-	values, err := resolver.resolveRuleValues(ctx, input.SubjectContext(), rule, dimension, valueType)
+	values, err := resolver.resolveRuleValues(ctx, request, rule, dimension, valueType)
 	if err != nil {
 		return datapermission.DataScopeResult{}, err
 	}
@@ -314,7 +346,7 @@ func (resolver *DataPermissionPolicyResolver) resolveRule(
 
 func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 	ctx *gin.Context,
-	subject datapermission.SubjectContext,
+	request *policyResolverRequestContext,
 	rule model.DataPolicyRule,
 	dimension model.DataDimensionDefinition,
 	valueType datapermission.DataScopeValueType,
@@ -327,17 +359,78 @@ func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 		return values, nil
 	}
 
-	values, err := resolver.resolveDimension(ctx, subject, dimension.Code)
-	if err != nil {
-		return nil, myerrors.ErrDataPermissionResolverDimensionFailed
+	values, exists := request.dimensionValues[dimension.Code]
+	if !exists {
+		var err error
+		values, err = resolver.resolveDimension(ctx, request.input.SubjectContext(), dimension.Code)
+		if err != nil {
+			return nil, myerrors.ErrDataPermissionResolverDimensionFailed
+		}
+		if err = values.Validate(); err != nil {
+			return nil, myerrors.ErrDataPermissionResolverDimensionFailed
+		}
+		request.dimensionValues[dimension.Code] = values
 	}
-	if err = values.Validate(); err != nil {
+	if err := values.Validate(); err != nil {
 		return nil, myerrors.ErrDataPermissionResolverDimensionFailed
 	}
 	if values.DimensionCode() != dimension.Code || values.ValueType() != valueType {
 		return nil, myerrors.ErrDataPermissionResolverConfigConflict
 	}
 	return values.Values(), nil
+}
+
+func (resolver *DataPermissionPolicyResolver) loadResource(
+	ctx *gin.Context,
+	request *policyResolverRequestContext,
+	resourceCode string,
+) (model.DataResource, error) {
+	if resource, exists := request.resources[resourceCode]; exists {
+		return resource, nil
+	}
+	resource, err := resolver.findResource(ctx, resourceCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.DataResource{}, myerrors.ErrDataPermissionResolverResourceMissing
+		}
+		return model.DataResource{}, err
+	}
+	if resource.Id <= 0 || resource.ResourceCode != resourceCode || !resource.State {
+		return model.DataResource{}, myerrors.ErrDataPermissionResolverResourceMissing
+	}
+	request.resources[resourceCode] = resource
+	return resource, nil
+}
+
+func (resolver *DataPermissionPolicyResolver) loadPolicyConfig(
+	ctx *gin.Context,
+	request *policyResolverRequestContext,
+	policyId int,
+) (policyResolverPolicyConfig, error) {
+	if config, exists := request.policies[policyId]; exists {
+		return config.clone(), nil
+	}
+	request.checkedPolicyCount++
+	policy, err := resolver.findPolicy(ctx, policyId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return policyResolverPolicyConfig{}, myerrors.ErrDataPermissionResolverPolicyInvalid
+		}
+		return policyResolverPolicyConfig{}, err
+	}
+	if policy.Id != policyId || !policy.State {
+		return policyResolverPolicyConfig{}, myerrors.ErrDataPermissionResolverPolicyInvalid
+	}
+	rules, err := resolver.findRules(ctx, policy.Id)
+	if err != nil {
+		return policyResolverPolicyConfig{}, err
+	}
+	config := policyResolverPolicyConfig{
+		policy: policy,
+		rules:  append([]model.DataPolicyRule(nil), rules...),
+	}
+	request.policies[policyId] = config
+	return config.clone(), nil
 }
 
 func (resolver *DataPermissionPolicyResolver) hasRequiredLookups() bool {

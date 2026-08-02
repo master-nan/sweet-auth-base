@@ -25,6 +25,9 @@ type grantMergeResolverState struct {
 	providerValues map[string]datapermission.DimensionValues
 	providerErrors map[string]error
 	providerCalls  []string
+	resourceCalls  int
+	policyCalls    map[int]int
+	ruleCalls      map[int]int
 }
 
 func TestDataPermissionPolicyResolverMergesTwoFilteredGrants(t *testing.T) {
@@ -84,8 +87,8 @@ func TestDataPermissionPolicyResolverMergesMultipleRolesAndDeduplicatesCondition
 		len(result.ConditionGroups()) != 1 {
 		t.Fatalf("duplicate condition was not removed: decision=%s groups=%d", result.Decision(), len(result.ConditionGroups()))
 	}
-	if len(state.providerCalls) != 2 {
-		t.Fatalf("Provider calls = %d, want 2 Grants resolved", len(state.providerCalls))
+	if len(state.providerCalls) != 1 {
+		t.Fatalf("Provider calls = %d, want one request-cached lookup", len(state.providerCalls))
 	}
 }
 
@@ -204,9 +207,12 @@ func newGrantMergeResolver(
 			datapermission.DimensionCodeManagementOrg: managementValues,
 		},
 		providerErrors: make(map[string]error),
+		policyCalls:    make(map[int]int),
+		ruleCalls:      make(map[int]int),
 	}
 	resolver := newDataPermissionPolicyResolver(
 		func(_ *gin.Context, code string) (model.DataResource, error) {
+			state.resourceCalls++
 			if code != state.resource.ResourceCode {
 				return model.DataResource{}, gorm.ErrRecordNotFound
 			}
@@ -225,6 +231,7 @@ func newGrantMergeResolver(
 			return append([]model.DataGrant(nil), state.grants...), nil
 		},
 		func(_ *gin.Context, policyId int) (model.DataPolicy, error) {
+			state.policyCalls[policyId]++
 			policy, ok := state.policies[policyId]
 			if !ok {
 				return model.DataPolicy{}, gorm.ErrRecordNotFound
@@ -232,6 +239,7 @@ func newGrantMergeResolver(
 			return policy, nil
 		},
 		func(_ *gin.Context, policyId int) ([]model.DataPolicyRule, error) {
+			state.ruleCalls[policyId]++
 			return append([]model.DataPolicyRule(nil), state.rules[policyId]...), nil
 		},
 		func(_ *gin.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {

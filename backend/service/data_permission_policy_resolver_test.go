@@ -126,8 +126,8 @@ func TestDataPermissionPolicyResolverMergesUserAndRoleGrants(t *testing.T) {
 		len(result.ConditionGroups()) != 1 {
 		t.Fatalf("unexpected merged result: decision=%s groups=%d", result.Decision(), len(result.ConditionGroups()))
 	}
-	if provider.calls != 2 {
-		t.Fatalf("Provider calls = %d, want 2 effective Grants", provider.calls)
+	if provider.calls != 1 {
+		t.Fatalf("Provider calls = %d, want one request-cached lookup", provider.calls)
 	}
 }
 
@@ -266,8 +266,8 @@ func TestDataPermissionPolicyResolverNormalizesEmptyProviderValuesToNone(t *test
 	}
 }
 
-func TestDataPermissionPolicyResolverRejectsMultipleRules(t *testing.T) {
-	t.Run("multiple rules", func(t *testing.T) {
+func TestDataPermissionPolicyResolverDeduplicatesIdenticalPolicyRules(t *testing.T) {
+	t.Run("identical rules use AND semantics", func(t *testing.T) {
 		resolver, db, provider, fixtures := newPolicyResolverTestSubject(t)
 		secondRule := fixtures.rule
 		secondRule.Id = 303
@@ -275,10 +275,16 @@ func TestDataPermissionPolicyResolverRejectsMultipleRules(t *testing.T) {
 		testutil.MustCreate(t, db, &secondRule)
 
 		result, err := resolver.Resolve(nil, policyResolverInput(t))
-		assertPolicyResolverError(t, err, myerrors.ErrorCodeDataPermissionResolverConfigConflict)
-		assertPolicyResolverNoAccess(t, result)
-		if provider.calls != 0 {
-			t.Fatalf("Provider called for multiple Rules: %d", provider.calls)
+		if err != nil {
+			t.Fatalf("resolve identical Rules: %v", err)
+		}
+		if result.Decision() != datapermission.DataScopeDecisionFiltered ||
+			len(result.ConditionGroups()) != 1 ||
+			len(result.ConditionGroups()[0].Conditions()) != 1 {
+			t.Fatalf("identical AND conditions were not deduplicated: %+v", result.ConditionGroups())
+		}
+		if provider.calls != 1 {
+			t.Fatalf("Provider calls = %d, want request-cached call", provider.calls)
 		}
 	})
 }
