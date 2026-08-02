@@ -110,6 +110,27 @@ func TestDataPermissionPolicyResolverResolvesUserGrant(t *testing.T) {
 	}
 }
 
+func TestDataPermissionPolicyResolverMergesUserAndRoleGrants(t *testing.T) {
+	resolver, db, provider, fixtures := newPolicyResolverTestSubject(t)
+	userGrant := fixtures.grant
+	userGrant.Id = 402
+	userGrant.SubjectType = model.DataGrantSubjectTypeUser
+	userGrant.SubjectId = policyResolverSubject(t).UserId()
+	testutil.MustCreate(t, db, &userGrant)
+
+	result, err := resolver.Resolve(nil, policyResolverInput(t))
+	if err != nil {
+		t.Fatalf("resolve user and role Grants: %v", err)
+	}
+	if result.Decision() != datapermission.DataScopeDecisionFiltered ||
+		len(result.ConditionGroups()) != 1 {
+		t.Fatalf("unexpected merged result: decision=%s groups=%d", result.Decision(), len(result.ConditionGroups()))
+	}
+	if provider.calls != 2 {
+		t.Fatalf("Provider calls = %d, want 2 effective Grants", provider.calls)
+	}
+}
+
 func TestDataPermissionPolicyResolverReturnsNoneWithoutEffectiveGrant(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -245,23 +266,7 @@ func TestDataPermissionPolicyResolverNormalizesEmptyProviderValuesToNone(t *test
 	}
 }
 
-func TestDataPermissionPolicyResolverRejectsUnsupportedMultiplicity(t *testing.T) {
-	t.Run("multiple grants", func(t *testing.T) {
-		resolver, db, provider, fixtures := newPolicyResolverTestSubject(t)
-		userGrant := fixtures.grant
-		userGrant.Id = 402
-		userGrant.SubjectType = model.DataGrantSubjectTypeUser
-		userGrant.SubjectId = policyResolverSubject(t).UserId()
-		testutil.MustCreate(t, db, &userGrant)
-
-		result, err := resolver.Resolve(nil, policyResolverInput(t))
-		assertPolicyResolverError(t, err, myerrors.ErrorCodeDataPermissionResolverConfigConflict)
-		assertPolicyResolverNoAccess(t, result)
-		if provider.calls != 0 {
-			t.Fatalf("Provider called for multiple Grants: %d", provider.calls)
-		}
-	})
-
+func TestDataPermissionPolicyResolverRejectsMultipleRules(t *testing.T) {
 	t.Run("multiple rules", func(t *testing.T) {
 		resolver, db, provider, fixtures := newPolicyResolverTestSubject(t)
 		secondRule := fixtures.rule

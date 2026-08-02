@@ -36,8 +36,8 @@ type policyResolverDimensionValuesLookup func(
 	string,
 ) (datapermission.DimensionValues, error)
 
-// DataPermissionPolicyResolver resolves exactly one effective Grant and one
-// Policy. Multi-Grant and multi-Rule combination remains a later Resolver task.
+// DataPermissionPolicyResolver resolves all effective Grants for one resource
+// and operation. Each Grant still resolves exactly one Policy and one Rule.
 type DataPermissionPolicyResolver struct {
 	findResource     policyResolverResourceLookup
 	findOperation    policyResolverOperationLookup
@@ -102,10 +102,10 @@ func (resolver *DataPermissionPolicyResolver) Resolve(
 	if resolver == nil {
 		return datapermission.ResolverFunc(nil).Resolve(ctx, input)
 	}
-	return datapermission.ResolverFunc(resolver.resolveSinglePolicy).Resolve(ctx, input)
+	return datapermission.ResolverFunc(resolver.resolveGrantPolicies).Resolve(ctx, input)
 }
 
-func (resolver *DataPermissionPolicyResolver) resolveSinglePolicy(
+func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 	ctx *gin.Context,
 	input datapermission.ResolverInput,
 ) (datapermission.DataScopeResult, error) {
@@ -158,11 +158,32 @@ func (resolver *DataPermissionPolicyResolver) resolveSinglePolicy(
 	if len(grants) == 0 {
 		return datapermission.NewNoneResult(input.ResourceCode(), input.Operation())
 	}
-	if len(grants) != 1 || !validSingleResolverGrant(grants[0], subject, resource.Id, input.Operation(), asOf) {
-		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	result, err := datapermission.NewNoneResult(input.ResourceCode(), input.Operation())
+	if err != nil {
+		return datapermission.DataScopeResult{}, err
 	}
+	for _, grant := range grants {
+		if !validResolverGrant(grant, subject, resource.Id, input.Operation(), asOf) {
+			return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+		}
+		grantResult, resolveErr := resolver.resolveGrant(ctx, input, resource, grant)
+		if resolveErr != nil {
+			return datapermission.DataScopeResult{}, resolveErr
+		}
+		result, err = mergeGrantScopeResults(result, grantResult)
+		if err != nil {
+			return datapermission.DataScopeResult{}, err
+		}
+	}
+	return result, nil
+}
 
-	grant := grants[0]
+func (resolver *DataPermissionPolicyResolver) resolveGrant(
+	ctx *gin.Context,
+	input datapermission.ResolverInput,
+	resource model.DataResource,
+	grant model.DataGrant,
+) (datapermission.DataScopeResult, error) {
 	policy, err := resolver.findPolicy(ctx, grant.PolicyId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -205,6 +226,21 @@ func (resolver *DataPermissionPolicyResolver) resolveSinglePolicy(
 	}
 
 	return resolver.resolveRule(ctx, input, resource, activeRules[0])
+}
+
+func mergeGrantScopeResults(
+	left datapermission.DataScopeResult,
+	right datapermission.DataScopeResult,
+) (datapermission.DataScopeResult, error) {
+	if left.Decision() == datapermission.DataScopeDecisionNotApplicable ||
+		right.Decision() == datapermission.DataScopeDecisionNotApplicable {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	result, err := datapermission.OrDataScopeResults(left, right)
+	if err != nil {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	return result, nil
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveRule(
@@ -295,9 +331,11 @@ func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 	if err != nil {
 		return nil, myerrors.ErrDataPermissionResolverDimensionFailed
 	}
-	if err = values.Validate(); err != nil || values.DimensionCode() != dimension.Code ||
-		values.ValueType() != valueType {
+	if err = values.Validate(); err != nil {
 		return nil, myerrors.ErrDataPermissionResolverDimensionFailed
+	}
+	if values.DimensionCode() != dimension.Code || values.ValueType() != valueType {
+		return nil, myerrors.ErrDataPermissionResolverConfigConflict
 	}
 	return values.Values(), nil
 }
@@ -309,7 +347,7 @@ func (resolver *DataPermissionPolicyResolver) hasRequiredLookups() bool {
 		resolver.resolveDimension != nil
 }
 
-func validSingleResolverGrant(
+func validResolverGrant(
 	grant model.DataGrant,
 	subject datapermission.SubjectContext,
 	resourceId int,
