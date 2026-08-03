@@ -248,9 +248,6 @@ func (input AdapterInput) Validate() error {
 			return myerrors.ErrDataPermissionAdapterOwnershipMismatch
 		}
 		seen[definition.ownershipCode] = struct{}{}
-		if definition.bindingType == AdapterBindingTypeMetadataField && input.resource.tableId <= 0 {
-			return myerrors.ErrDataPermissionAdapterOwnershipMismatch
-		}
 	}
 	return nil
 }
