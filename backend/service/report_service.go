@@ -88,7 +88,6 @@ type ReportService struct {
 	casbinRuleRepo        repository.CasbinRuleRepository
 	generalizationService *GeneralizationService
 	sysTableService       *SysTableService
-	dataPermissionService *DataPermissionService
 	sf                    *utils.Snowflake
 }
 
@@ -104,7 +103,6 @@ func NewReportService(
 	casbinRuleRepo repository.CasbinRuleRepository,
 	generalizationService *GeneralizationService,
 	sysTableService *SysTableService,
-	dataPermissionService *DataPermissionService,
 	sf *utils.Snowflake,
 ) *ReportService {
 	return &ReportService{
@@ -119,7 +117,6 @@ func NewReportService(
 		casbinRuleRepo:        casbinRuleRepo,
 		generalizationService: generalizationService,
 		sysTableService:       sysTableService,
-		dataPermissionService: dataPermissionService,
 		sf:                    sf,
 	}
 }
@@ -746,7 +743,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 		return preview, nil
 	}
 	activeDatasetID := reportDatasetIdForPreview(config, selectedDataset)
-	sourceTable, permissionTable, err := s.resolveReportPreviewTable(snapshot, selectedDataset)
+	sourceTable, _, err := s.resolveReportPreviewTable(snapshot, selectedDataset)
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
@@ -766,11 +763,12 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 	if snapshot.PermissionMenuId > 0 {
 		query.MenuId = snapshot.PermissionMenuId
 	}
-	if err := s.injectReportDataScopeForAction(ctx, &query, permissionTable, options.DataPermissionAction); err != nil {
+	permission, err := s.generalizationService.ResolveDataPermission(ctx, sourceTable, reportDataPermissionOperation(options.DataPermissionAction))
+	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
-	result, err := s.generalizationService.Query(&query, sourceTable)
+	result, err := s.generalizationService.QueryWithResolvedDataPermission(&query, sourceTable, permission)
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
@@ -781,7 +779,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
-		if err := s.completeReportTableExportRows(query, sourceTable, &result, options.MaxRows); err != nil {
+		if err := s.completeReportTableExportRows(query, sourceTable, permission, &result, options.MaxRows); err != nil {
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
@@ -1068,7 +1066,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	if _, ok := reportFindTableField(primaryTable, "gmt_delete"); ok {
 		query = query.Where(fmt.Sprintf("%s IS NULL", reportDatasetFieldExpr(primaryDataset.Id, "gmt_delete", primaryDataset.Id, primaryTable.TableCode, aliasByDatasetID)))
 	}
-	if err := s.applyJoinedReportDataScope(ctx, &query, req, snapshot, primaryTable, options.DataPermissionAction); err != nil {
+	if err := s.applyJoinedReportDataScope(ctx, &query, primaryTable, options.DataPermissionAction); err != nil {
 		return response.ReportPreviewRes{}, err
 	}
 	joinedDatasetIDs := make(map[string]struct{})
@@ -1148,24 +1146,15 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	}, nil
 }
 
-func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, req request.ReportPreviewReq, snapshot ReportExecutionSnapshot, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
-	if s.dataPermissionService == nil {
-		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
-	}
-	value, exists := ctx.Get("user")
-	if !exists {
-		return myerrors.NewBadRequestError("报表运行缺少当前用户上下文")
-	}
-	user, ok := value.(model.SysUser)
-	if !ok {
-		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
-	}
-	menuID := reportAppliedMenu(snapshot, req.MenuId)
-	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, menuID, primaryTable, action)
+func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
+	permission, err := s.generalizationService.ResolveDataPermission(ctx, primaryTable, reportDataPermissionOperation(action))
 	if err != nil {
 		return err
 	}
-	*query = queryutil.ApplyDataScope(*query, scope, primaryTable)
+	*query, err = queryutil.ApplyGeneralizationPermission(*query, permission, primaryTable)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1832,30 +1821,6 @@ func normalizeReportSQLValue(value interface{}) interface{} {
 	}
 }
 
-func (s *ReportService) injectReportDataScope(ctx *gin.Context, query *request.Basic, permissionTable model.SysTable) error {
-	return s.injectReportDataScopeForAction(ctx, query, permissionTable, enum.ButtonActionQuery)
-}
-
-func (s *ReportService) injectReportDataScopeForAction(ctx *gin.Context, query *request.Basic, permissionTable model.SysTable, action enum.SysMenuButtonEventAction) error {
-	if s.dataPermissionService == nil || query == nil {
-		return myerrors.NewBadRequestError("报表数据权限服务未初始化")
-	}
-	value, exists := ctx.Get("user")
-	if !exists {
-		return myerrors.NewBadRequestError("报表运行缺少当前用户上下文")
-	}
-	user, ok := value.(model.SysUser)
-	if !ok {
-		return myerrors.NewBadRequestError("报表运行用户上下文不合法")
-	}
-	scope, err := s.dataPermissionService.ResolveDataScopeForTableAction(user, query.MenuId, permissionTable, action)
-	if err != nil {
-		return err
-	}
-	query.DataScope = scope
-	return nil
-}
-
 func normalizeReportExecutionOptions(options ReportExecutionOptions) ReportExecutionOptions {
 	if options.PageSizeLimit <= 0 {
 		options.PageSizeLimit = 200
@@ -1877,7 +1842,7 @@ func normalizeReportPageSize(raw int, options ReportExecutionOptions) int {
 	return raw
 }
 
-func (s *ReportService) completeReportTableExportRows(query request.Basic, table model.SysTable, result *repository.GeneralizationListResult, maxRows int) error {
+func (s *ReportService) completeReportTableExportRows(query request.Basic, table model.SysTable, permission repository.GeneralizationPermission, result *repository.GeneralizationListResult, maxRows int) error {
 	if result == nil || maxRows <= 0 || result.Total <= len(result.Data) || result.Total > maxRows {
 		return nil
 	}
@@ -1889,7 +1854,7 @@ func (s *ReportService) completeReportTableExportRows(query request.Basic, table
 		nextQuery := query
 		nextQuery.Page = len(result.Data)/pageSize + 1
 		nextQuery.Num = pageSize
-		nextResult, err := s.generalizationService.Query(&nextQuery, table)
+		nextResult, err := s.generalizationService.QueryWithResolvedDataPermission(&nextQuery, table, permission)
 		if err != nil {
 			return err
 		}
@@ -1905,6 +1870,13 @@ func (s *ReportService) completeReportTableExportRows(query request.Basic, table
 		result.Data = result.Data[:result.Total]
 	}
 	return nil
+}
+
+func reportDataPermissionOperation(action enum.SysMenuButtonEventAction) string {
+	if action == enum.ButtonActionExport {
+		return model.DataPermissionOperationExport
+	}
+	return model.DataPermissionOperationQuery
 }
 
 func normalizeReportExportMaxRows(req request.ReportExportReq) (int, error) {

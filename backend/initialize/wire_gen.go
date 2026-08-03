@@ -72,15 +72,14 @@ func InitializeApp() (*App, error) {
 	sysRoleRepositoryImpl := impl.NewSysRoleRepositoryImpl(primaryDB)
 	sysRoleMenuRepositoryImpl := impl.NewSysRoleMenuRepositoryImpl(primaryDB)
 	sysRoleMenuButtonRepositoryImpl := impl.NewSysRoleMenuButtonRepositoryImpl(primaryDB)
-	dataPermissionService := service.NewDataPermissionService(primaryDB, snowflake)
 	sysTableCache := cache.NewSysTableCache(redisUtil)
 	sysTableFieldCache := cache.NewSysTableFieldCache(redisUtil)
-	sysTableService := service.NewSysTableService(sysTableRepositoryImpl, sysTableFieldRepositoryImpl, sysTableIndexRepositoryImpl, sysTableIndexFieldRepositoryImpl, sysTableRelationRepositoryImpl, sysMenuRepositoryImpl, sysMenuButtonRepositoryImpl, sysMenuButtonTemplateRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, dataPermissionService, snowflake, sysTableCache, sysTableFieldCache, server)
+	sysTableService := service.NewSysTableService(sysTableRepositoryImpl, sysTableFieldRepositoryImpl, sysTableIndexRepositoryImpl, sysTableIndexFieldRepositoryImpl, sysTableRelationRepositoryImpl, sysMenuRepositoryImpl, sysMenuButtonRepositoryImpl, sysMenuButtonTemplateRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, snowflake, sysTableCache, sysTableFieldCache, server)
 	v2, err := InitValidators()
 	if err != nil {
 		return nil, err
 	}
-	dictController := controller.NewDictController(sysDictService, sysTableService, dataPermissionService, v2)
+	dictController := controller.NewDictController(sysDictService, sysTableService, v2)
 	jwtToken := ProvideJWTToken()
 	sysConfigureRepositoryImpl := impl.NewSysConfigureRepositoryImpl(primaryDB)
 	sysConfigureCache := cache.NewSysConfigureCache(redisUtil)
@@ -94,15 +93,14 @@ func InitializeApp() (*App, error) {
 	sysUserService := service.NewSysUserService(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, snowflake, sysUserCache, server)
 	tokenBlackCache := cache.NewTokenBlackCache(redisUtil)
 	loginAttemptCache := cache.NewLoginAttemptCache(redisUtil)
-	basicController := controller.NewBasicController(jwtToken, server, sysConfigureService, logService, sysUserService, sysTableService, dataPermissionService, tokenBlackCache, loginAttemptCache, v2)
+	basicController := controller.NewBasicController(jwtToken, server, sysConfigureService, logService, sysUserService, tokenBlackCache, loginAttemptCache, v2)
 	casbinRuleRepositoryImpl := impl.NewCasbinRuleRepositoryImpl(primaryDB, syncedEnforcer)
-	sysMenuService := service.NewSysMenuService(sysMenuRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuButtonRepositoryImpl, sysUserRoleRepositoryImpl, sysMenuButtonRepositoryImpl, sysTableRepositoryImpl, casbinRuleRepositoryImpl, dataPermissionService, snowflake)
-	tableController := controller.NewTableController(sysTableService, sysMenuService, dataPermissionService, v2)
+	sysMenuService := service.NewSysMenuService(sysMenuRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuButtonRepositoryImpl, sysUserRoleRepositoryImpl, sysMenuButtonRepositoryImpl, sysTableRepositoryImpl, casbinRuleRepositoryImpl, snowflake)
+	tableController := controller.NewTableController(sysTableService, sysMenuService, v2)
 	menuController := controller.NewMenuController(sysMenuService, v2)
-	sysRoleService := service.NewSysRoleService(sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, dataPermissionService, snowflake)
-	roleController := controller.NewRoleController(sysRoleService, sysTableService, dataPermissionService, v2)
-	userController := controller.NewUserController(sysUserService, sysConfigureService, v2, server, sysTableService, dataPermissionService, loginAttemptCache)
-	dataPermissionController := controller.NewDataPermissionController(dataPermissionService, v2)
+	sysRoleService := service.NewSysRoleService(sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, snowflake)
+	roleController := controller.NewRoleController(sysRoleService, sysTableService, v2)
+	userController := controller.NewUserController(sysUserService, sysConfigureService, v2, server, sysTableService, loginAttemptCache)
 	dataResourceRepositoryImpl := impl.NewDataResourceRepositoryImpl(primaryDB)
 	dataResourceOperationRepositoryImpl := impl.NewDataResourceOperationRepositoryImpl(primaryDB)
 	dataOwnershipFieldRepositoryImpl := impl.NewDataOwnershipFieldRepositoryImpl(primaryDB)
@@ -123,7 +121,7 @@ func InitializeApp() (*App, error) {
 	applicationRepositoryImpl := impl.NewApplicationRepositoryImpl(primaryDB)
 	applicationCache := cache.NewApplicationCache(redisUtil)
 	applicationService := service.NewApplicationService(applicationRepositoryImpl, applicationCache, snowflake)
-	applicationController := controller.NewApplicationController(applicationService, sysTableService, dataPermissionService, v2)
+	applicationController := controller.NewApplicationController(applicationService, sysTableService, v2)
 	generalizationRepositoryImpl := impl.NewGeneralizationRepositoryImpl(primaryDB)
 	orgLegalEntityRepositoryImpl := impl.NewOrgLegalEntityRepositoryImpl(primaryDB)
 	orgUnitRepositoryImpl := impl.NewOrgUnitRepositoryImpl(primaryDB)
@@ -143,20 +141,20 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	lowCodeDataPermissionRuntime := service.NewLowCodeDataPermissionRuntime(dataResourceRepositoryImpl, dataOwnershipFieldRepositoryImpl, subjectContextBuilder, dataPermissionPolicyResolver, metadataFieldAdapter, dataPermissionService)
+	lowCodeDataPermissionRuntime := service.NewLowCodeDataPermissionRuntime(dataResourceRepositoryImpl, dataOwnershipFieldRepositoryImpl, subjectContextBuilder, dataPermissionPolicyResolver, metadataFieldAdapter)
 	generalizationService := service.NewGeneralizationServiceWithDataPermission(generalizationRepositoryImpl, snowflake, lowCodeDataPermissionRuntime)
-	generalizationController := controller.NewGeneralizationController(generalizationService, sysTableService, sysMenuService, dataPermissionService, v2)
+	generalizationController := controller.NewGeneralizationController(generalizationService, sysTableService, sysMenuService, v2)
 	reportDefinitionRepositoryImpl := impl.NewReportDefinitionRepositoryImpl(primaryDB)
 	reportDefinitionVersionRepositoryImpl := impl.NewReportDefinitionVersionRepositoryImpl(primaryDB)
 	reportExecutionLogRepositoryImpl := impl.NewReportExecutionLogRepositoryImpl(primaryDB)
-	reportService := service.NewReportService(reportDefinitionRepositoryImpl, reportDefinitionVersionRepositoryImpl, reportExecutionLogRepositoryImpl, sysMenuRepositoryImpl, sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, generalizationService, sysTableService, dataPermissionService, snowflake)
+	reportService := service.NewReportService(reportDefinitionRepositoryImpl, reportDefinitionVersionRepositoryImpl, reportExecutionLogRepositoryImpl, sysMenuRepositoryImpl, sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, generalizationService, sysTableService, snowflake)
 	reportController := controller.NewReportController(reportService, sysTableService, v2)
 	orgController := controller.NewOrgController(orgService, sysTableService, v2)
 	smsLogImpl := impl.NewSmsLogImpl(primaryDB)
 	smsTemplateImpl := impl.NewSmsTemplateImpl(primaryDB)
 	smsTemplateCache := cache.NewSmsTemplateCache(redisUtil)
 	smsService := service.NewSmsService(smsLogImpl, smsTemplateImpl, snowflake, smsTemplateCache, server)
-	smsController := controller.NewSmsController(smsService, sysTableService, dataPermissionService, v2)
+	smsController := controller.NewSmsController(smsService, sysTableService, v2)
 	fileRepositoryImpl := impl.NewFileRepositoryImpl(primaryDB)
 	fileChunkRepositoryImpl := impl.NewFileChunkRepositoryImpl(primaryDB)
 	storageStorage, err := storage.NewStorage(server)
@@ -164,7 +162,7 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	fileService := service.NewFileService(fileRepositoryImpl, fileChunkRepositoryImpl, snowflake, server, storageStorage)
-	fileController := controller.NewFileController(fileService, sysTableService, dataPermissionService, server, v2)
+	fileController := controller.NewFileController(fileService, sysTableService, generalizationService, server, v2)
 	dingTalkCache := cache.NewDingTalkCache(redisUtil)
 	dingTalkUserIDCache := cache.NewDingTalkUserIDCache(redisUtil)
 	dingTalkService := service.NewDingTalkService(dingTalkCache, dingTalkUserIDCache, sysUserService)
@@ -188,7 +186,6 @@ func InitializeApp() (*App, error) {
 		MenuController:                 menuController,
 		RoleController:                 roleController,
 		UserController:                 userController,
-		DataPermissionController:       dataPermissionController,
 		DataPermissionConfigController: dataPermissionConfigController,
 		ApplicationController:          applicationController,
 		GeneralizationController:       generalizationController,
@@ -228,7 +225,6 @@ type App struct {
 	MenuController                 *controller.MenuController
 	RoleController                 *controller.RoleController
 	UserController                 *controller.UserController
-	DataPermissionController       *controller.DataPermissionController
 	DataPermissionConfigController *controller.DataPermissionConfigController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
@@ -257,7 +253,7 @@ var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLo
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserRoleCache, cache.NewSysUserCache, cache.NewSysMenuButtonCache, cache.NewSysDictCache, cache.NewSysMenuCache, cache.NewSysRoleCache, cache.NewSysRoleMenuButtonCache, cache.NewSysRoleMenuCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewGeneralizationCache, cache.NewBlackCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSmsLogCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service providers
-var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationServiceWithDataPermission, service.NewDataPermissionService, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, service.NewDataPermissionPolicyResolver, datapermission.NewMetadataFieldAdapter, service.NewLowCodeDataPermissionRuntime, wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)), wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)), ProvideOwnershipFieldRegistry, wire.Bind(
+var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewSysTableService, service.NewSysUserService, service.NewGeneralizationServiceWithDataPermission, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, service.NewDataPermissionPolicyResolver, datapermission.NewMetadataFieldAdapter, service.NewLowCodeDataPermissionRuntime, wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)), wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)), ProvideOwnershipFieldRegistry, wire.Bind(
 	new(datapermission.OwnershipFieldBindingValidator),
 	new(*datapermission.OwnershipFieldRegistry),
 ), wire.Bind(
@@ -267,7 +263,7 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.Tr
 )
 
 // Controller providers
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionController, controller.NewDataPermissionConfigController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
 
 // Api providers
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)

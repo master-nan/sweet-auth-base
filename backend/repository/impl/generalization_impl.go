@@ -113,20 +113,6 @@ func (g *GeneralizationRepositoryImpl) RowExists(table model.SysTable, id int) (
 	return exists == 1, nil
 }
 
-func (g *GeneralizationRepositoryImpl) RowMatchesDataScope(table model.SysTable, id int, scope *request.DataScope) (bool, error) {
-	if id <= 0 {
-		return false, nil
-	}
-	var exists int
-	query := activeRowQuery(g.db.Table(table.TableCode), table).Select("1").Where("id = ?", id).Limit(1)
-	query = util.ApplyDataScope(query, scope, table)
-	err := query.Scan(&exists).Error
-	if err != nil {
-		return false, err
-	}
-	return exists == 1, nil
-}
-
 func (g *GeneralizationRepositoryImpl) Update(table model.SysTable, id int, data map[string]interface{}) error {
 	return activeRowQuery(g.db.Table(table.TableCode), table).Where("id = ?", id).Updates(data).Error
 }

@@ -80,8 +80,8 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 	want := []string{
 		"auto_migrate_core_schema",
 		"data_permission_domain_schema",
+		"remove_legacy_data_permission_schema",
 		"ensure_sys_menu_option_text",
-		"ensure_data_permission_indexes",
 		"backfill_sys_menu_page_binding",
 		"organization_database_comments",
 	}
@@ -201,17 +201,17 @@ func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
 func platformSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {
 	t.Helper()
 	return map[string]int64{
-		"sys_dict":                 countRows(t, db, &model.SysDict{}),
-		"sys_dict_item":            countRows(t, db, &model.SysDictItem{}),
-		"sys_table":                countRows(t, db, &model.SysTable{}),
-		"sys_table_field":          countRows(t, db, &model.SysTableField{}),
-		"sys_menu":                 countRows(t, db, &model.SysMenu{}),
-		"sys_menu_button":          countRows(t, db, &model.SysMenuButton{}),
-		"sys_menu_button_template": countRows(t, db, &model.SysMenuButtonTemplate{}),
-		"sys_data_dimension":       countRows(t, db, &model.DataDimensionDefinition{}),
-		"sys_role_menu":            countRows(t, db, &model.SysRoleMenu{}),
-		"sys_role_menu_button":     countRows(t, db, &model.SysRoleMenuButton{}),
-		"casbin_rule":              countRows(t, db, &model.CasbinRule{}),
+		"sys_dict":                      countRows(t, db, &model.SysDict{}),
+		"sys_dict_item":                 countRows(t, db, &model.SysDictItem{}),
+		"sys_table":                     countRows(t, db, &model.SysTable{}),
+		"sys_table_field":               countRows(t, db, &model.SysTableField{}),
+		"sys_menu":                      countRows(t, db, &model.SysMenu{}),
+		"sys_menu_button":               countRows(t, db, &model.SysMenuButton{}),
+		"sys_menu_button_template":      countRows(t, db, &model.SysMenuButtonTemplate{}),
+		"sys_data_dimension_definition": countRows(t, db, &model.DataDimensionDefinition{}),
+		"sys_role_menu":                 countRows(t, db, &model.SysRoleMenu{}),
+		"sys_role_menu_button":          countRows(t, db, &model.SysRoleMenuButton{}),
+		"casbin_rule":                   countRows(t, db, &model.CasbinRule{}),
 	}
 }
 
@@ -227,14 +227,14 @@ func countRows(t *testing.T, db *gorm.DB, modelValue interface{}) int64 {
 func platformSeedKeySnapshot(t *testing.T, db *gorm.DB) map[string]map[string]int64 {
 	t.Helper()
 	return map[string]map[string]int64{
-		"sys_dict":                 keyIDSnapshot(t, db, "SELECT dict_code AS seed_key, id FROM sys_dict"),
-		"sys_dict_item":            keyIDSnapshot(t, db, "SELECT CAST(dict_id AS TEXT) || ':' || item_code AS seed_key, id FROM sys_dict_item"),
-		"sys_table":                keyIDSnapshot(t, db, "SELECT table_code AS seed_key, id FROM sys_table"),
-		"sys_table_field":          keyIDSnapshot(t, db, "SELECT CAST(table_id AS TEXT) || ':' || field_code AS seed_key, id FROM sys_table_field"),
-		"sys_menu":                 keyIDSnapshot(t, db, "SELECT name AS seed_key, id FROM sys_menu"),
-		"sys_menu_button":          keyIDSnapshot(t, db, "SELECT CAST(menu_id AS TEXT) || ':' || code AS seed_key, id FROM sys_menu_button"),
-		"sys_menu_button_template": keyIDSnapshot(t, db, "SELECT scene || ':' || code_suffix AS seed_key, id FROM sys_menu_button_template"),
-		"sys_data_dimension":       keyIDSnapshot(t, db, "SELECT code AS seed_key, id FROM sys_data_dimension_definition"),
+		"sys_dict":                      keyIDSnapshot(t, db, "SELECT dict_code AS seed_key, id FROM sys_dict"),
+		"sys_dict_item":                 keyIDSnapshot(t, db, "SELECT CAST(dict_id AS TEXT) || ':' || item_code AS seed_key, id FROM sys_dict_item"),
+		"sys_table":                     keyIDSnapshot(t, db, "SELECT table_code AS seed_key, id FROM sys_table"),
+		"sys_table_field":               keyIDSnapshot(t, db, "SELECT CAST(table_id AS TEXT) || ':' || field_code AS seed_key, id FROM sys_table_field"),
+		"sys_menu":                      keyIDSnapshot(t, db, "SELECT name AS seed_key, id FROM sys_menu"),
+		"sys_menu_button":               keyIDSnapshot(t, db, "SELECT CAST(menu_id AS TEXT) || ':' || code AS seed_key, id FROM sys_menu_button"),
+		"sys_menu_button_template":      keyIDSnapshot(t, db, "SELECT scene || ':' || code_suffix AS seed_key, id FROM sys_menu_button_template"),
+		"sys_data_dimension_definition": keyIDSnapshot(t, db, "SELECT code AS seed_key, id FROM sys_data_dimension_definition"),
 	}
 }
 

@@ -16,18 +16,9 @@ type GeneralizationListResult struct {
 	Total int                      `json:"total"`
 }
 
-type GeneralizationPermissionMode string
-
-const (
-	GeneralizationPermissionLegacy  GeneralizationPermissionMode = "legacy"
-	GeneralizationPermissionAdapter GeneralizationPermissionMode = "adapter"
-)
-
-// GeneralizationPermission carries one server-built permission route into the
-// repository. Client request DTOs cannot populate either branch.
+// GeneralizationPermission carries one server-built Adapter execution into
+// the repository. Client request DTOs cannot populate it.
 type GeneralizationPermission struct {
-	Mode             GeneralizationPermissionMode
-	LegacyScope      *request.DataScope
 	AdapterExecution *datapermission.AdapterExecution
 }
 
@@ -36,7 +27,6 @@ type GeneralizationRepository interface {
 	GetById(table model.SysTable, id int) (map[string]interface{}, error)
 	Create(table model.SysTable, data map[string]interface{}) error
 	RowExists(table model.SysTable, id int) (bool, error)
-	RowMatchesDataScope(table model.SysTable, id int, scope *request.DataScope) (bool, error)
 	Update(table model.SysTable, id int, data map[string]interface{}) error
 	SoftDelete(table model.SysTable, id int, deleteData map[string]interface{}) error
 	HardDelete(table model.SysTable, id int) error

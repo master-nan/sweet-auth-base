@@ -159,7 +159,6 @@ func newSysTableCacheTestService(db *gorm.DB) (*SysTableService, *cache.SysTable
 		nil,
 		nil,
 		nil,
-		nil,
 		tableCache,
 		fieldCache,
 		&config.Server{},

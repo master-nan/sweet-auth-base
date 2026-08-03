@@ -1,422 +1,283 @@
-# 通用数据权限设计与实现说明
+# Sweet Platform 数据权限设计
 
-## 背景
+## 1. 文档目的
 
-底座的数据权限不能写死为公司、组织或某个行业对象。不同项目可能按租户、项目、范围、课程、负责人、创建人或自定义业务字段隔离数据。
+本文说明 Sweet Platform 当前唯一的数据权限领域模型、配置关系和运行链路。
 
-## 结论
+数据权限回答“通过功能权限后，当前主体能访问哪些业务数据”。功能权限继续由
+`sys_menu`、`sys_menu_button` 与 Casbin 负责，二者职责严格分离。
 
-`sweet-auth-base` 已按“通用数据权限模型”落地，不再把公司、部门、HRDB 这类业务实体写进底座。
+## 2. 设计原则
 
-当前模型的核心是：
+1. 数据权限以 Resource + Operation 为保护目标，不以菜单或路由作为资源身份。
+2. 配置和运行结果只保存结构化语义，不保存 SQL、表名、JOIN 或字段表达式。
+3. Organization 只提供组织事实，Data Permission 不直接访问组织表。
+4. Resolver 组合授权语义，Adapter 将结果转换为受控查询条件。
+5. 列表、总数、详情、更新、删除和导出必须使用同一运行链路。
+6. 配置异常、Provider 异常或类型不兼容时安全失败，不得扩大权限。
+7. 平台只维护一套数据权限模型和一条运行链路。
 
-1. 权限维度可配置，例如租户、项目、课程、业务范围、负责人、创建人。
-2. 已绑定数据表的菜单声明自己受哪个维度控制，以及维度落在哪个字段上。
-3. 角色或用户只保存结构化的数据范围，不保存 SQL。
-4. 低代码列表、详情、新增、编辑、删除都走统一的数据权限解析；已接入的固定系统页复用同一套规则。
-5. 控制器不自己拼 `tenant_id`、`owner_id` 之类的条件。
+## 3. 领域模型
 
-这套模型能做 SaaS、企业中台、在线学习、CRM 或其他业务系统。区别只在配置的数据权限维度和绑定字段不同，底座代码不需要知道具体业务是什么。
+```mermaid
+flowchart LR
+    Dimension["DataDimensionDefinition<br/>维度定义"]
+    Resource["DataResource<br/>受保护资源"]
+    Operation["DataResourceOperation<br/>资源操作"]
+    Ownership["DataOwnershipField<br/>数据归属"]
+    Policy["DataPolicy<br/>可复用策略"]
+    Rule["DataPolicyRule<br/>结构化规则"]
+    Grant["DataGrant<br/>主体授权"]
 
-## 当前状态
+    Resource --> Operation
+    Resource --> Ownership
+    Ownership --> Dimension
+    Policy --> Rule
+    Rule --> Dimension
+    Grant --> Resource
+    Grant --> Policy
+```
 
-当前系统已经实现的是菜单权限、按钮权限、接口权限，以及通用数据权限基础模型：
+### 3.1 DataDimensionDefinition
 
-- 维度由 `sys_data_dimension` 定义，不写死具体业务实体。
-- 菜单通过 `sys_data_scope_binding` 绑定维度、表编码、字段编码和生效动作。
-- 角色通过 `sys_role_data_scope` 保存常规范围策略。
-- 用户通过 `sys_user_data_scope_override` 保存临时覆盖或收窄/扩展。
-- 低代码列表、详情、创建、更新、删除会复用解析后的结构化范围做行级检查。
-- 已接入的固定系统页只要菜单绑定了数据表，也可以配置数据权限；列表查询和记录检查会应用同一套结构化范围。
-- 角色权限保存时可以同时保存菜单、按钮和角色数据权限，避免权限保存到一半的中间态。
+定义平台可解析的业务维度及值类型。当前值类型为 `bigint`、`string`，基础维度包括：
 
-树形范围使用 `tree` 策略保存根节点，并按维度来源表的 `value_field` / `parent_field` 展开下级。底座仍不内置公司、部门或其他具体业务实体。
+| 维度编码 | 业务语义 | Provider |
+| --- | --- | --- |
+| `legal_entity` | 法人主体 | Organization Provider |
+| `management_org` | 管理组织 | Organization Provider |
+| `employee` | 企业人员 | Organization Provider |
 
-不要在文件控制器或某个业务控制器里再临时写一套数据归属判断来替代通用数据权限。导出、批量操作、文件预览和下载如果涉及业务记录归属，也应带上业务上下文并复用同一套规则。
+业务模块可以登记仓库、项目、客户、供应商等业务维度，但必须提供受控 Provider 或
+固定值来源，不允许客户端提交计算表达式。
 
-文件访问权限负责判断文件本身是否存在、是否允许预览或下载；当请求携带业务记录上下文时，会回到统一数据权限层判断对应业务记录是否可访问。
+### 3.2 DataResource 与 DataResourceOperation
 
-## 固定字段权限与当前模型
+DataResource 标识受保护的低代码实体、固定业务服务或报表。稳定身份是
+`resource_code`，资源类型为：
 
-第一版容易做成固定业务字段权限：
+- `low_code_table`
+- `business_service`
+- `report`
+
+资源操作独立声明，支持 `query`、`detail`、`create`、`update`、`delete`、`export`、
+`run`。操作与功能权限不同：功能权限控制接口能否访问，资源操作决定访问业务数据时
+应解析哪一组 Data Grant。
+
+`permission_enabled=false` 表示该资源尚未启用数据权限。资源和操作必须通过配置预检
+后才能启用。
+
+### 3.3 DataOwnershipField
+
+Ownership 描述资源记录中的归属值位于哪里，以及该值属于哪个 Dimension。一个资源
+可以有多个 Ownership，每条 PolicyRule 必须显式使用 `ownership_code + dimension_id`
+精确匹配，Resolver 不推断默认归属。
+
+绑定类型仅允许：
+
+- `metadata_field`：通过服务端校验后的 `table_field_id` 定位低代码字段。
+- `registered_field`：通过服务端注册的 `adapter_field_code` 定位固定业务字段能力。
+
+Ownership 不计算主体范围，也不保存数据库字段表达式。完整边界见
+[DataPermissionOwnershipDesign.md](DataPermissionOwnershipDesign.md)。
+
+### 3.4 DataPolicy 与 DataPolicyRule
+
+Policy 是可复用策略，不直接绑定 Resource。策略类型为：
+
+- `all`：有效授权范围内允许全部数据。
+- `none`：明确无数据。
+- `rule_set`：由结构化 Rule 计算过滤范围。
+
+Rule 显式声明：
+
+- `ownership_code`
+- `dimension_id`
+- `scope_source`
+- `relation`
+- `operator`
+- `specified_values`
+- 必要时的 `structure_code`
+
+同一 Policy 内多个有效 Rule 使用 AND；不允许自动选择第一条 Rule 或自动改成 OR。
+
+### 3.5 DataGrant
+
+Grant 将主体、资源、操作和策略连接起来：
 
 ```text
-用户 -> 租户列表 -> 查询时拼 tenant_id IN (...)
+Subject -> Resource + Operation -> Policy
 ```
 
-这种做法适合单个业务系统，但不适合底座。因为在线学习平台可能按 `tenant_id`、`course_id` 或 `school_id` 控制，CRM 可能按 `owner_id` 或 `region_id` 控制，通用项目管理也可能按 `scope_id` 或 `project_id` 控制。
+V1 主体仅支持 `role`、`user`。不支持岗位、任职、用户组或组织直接授权。多个有效
+Grant 采用 OR 合并，多角色自然形成授权并集，不根据角色名称做特殊处理。
 
-当前模型改成配置化维度：
+## 4. 可信主体上下文
+
+SubjectContext 由服务端 SubjectContextBuilder 构建，包含：
+
+- `user_id`
+- 当前有效且去重排序的 `role_ids`
+- Organization 账号绑定解析出的 `employee_id`
+- 服务端生成的 `as_of_date`
+
+客户端不能覆盖 employee_id、role_ids 或 as_of_date。SubjectContext 不携带组织范围、
+权限结果、SQL 或业务查询条件。
+
+## 5. Dimension Provider
+
+Dimension Provider 只回答“当前主体在该 Dimension 下有哪些事实值”。它不读取 Resource、
+Grant、Policy，也不生成 DataScopeResult。
+
+Organization 维度调用边界：
 
 ```text
-用户/角色 -> 数据权限范围 -> 菜单绑定维度 -> 字段 -> 统一查询条件
+Dimension Provider
+  -> Organization Permission Provider
+  -> Organization 组织事实能力
 ```
 
-例如：
+`management_org` 支持 `exact` 与 `self_and_descendants`。后者必须使用显式
+`structure_code` 和 SubjectContext 的 `as_of_date` 展开下级，循环、孤儿、无效组织、
+超限或 Provider 异常均安全失败。`legal_entity` 与 `employee` 当前使用 `exact`。
 
-| 项目场景 | 维度 | 菜单绑定字段 | 范围值 |
-| --- | --- | --- | --- |
-| 示例中心 | 业务范围 | `scope_id` | 1、2 |
-| 示例中心 | 项目 | `project_id` | 1001、1002 |
-| 在线学习 | 学校 | `school_id` | 2001 |
-| 在线学习 | 课程 | `course_id` | 3001、3002 |
-| CRM | 负责人 | `owner_id` | 当前用户 ID |
-| 多租户 SaaS | 租户 | `tenant_id` | 当前租户 ID |
+## 6. Resolver 与结果语义
 
-这样底座只理解“维度、字段、范围值”，不理解具体业务。
-
-## 核心模型
-
-### 1. 权限维度
-
-`sys_data_dimension` 描述某类数据边界，例如租户、项目、课程、业务范围、负责人。
-
-主要字段：
-
-- `code`：维度编码，例如 `tenant`、`project`、`demo_scope`、`owner`。
-- `name`：维度名称。
-- `value_type`：值类型，目前支持 `string`、`number`。
-- `source_type`：取值来源，目前支持 `none`、`table`。
-- `source_code`：来源表编码。
-- `label_field` / `value_field`：展示字段和取值字段。
-- `parent_field`：树形维度的父级字段。
-- `memo`：备注。
-- `state`：是否启用。
-
-示例：
-
-```json
-{
-  "code": "demo_scope",
-  "name": "业务范围",
-  "value_type": "number",
-  "source_type": "table",
-  "source_code": "demo_scope",
-  "label_field": "scope_name",
-  "value_field": "id",
-  "state": true
-}
-```
-
-### 2. 菜单绑定
-
-`sys_data_scope_binding` 声明某个已绑定数据表的菜单受哪些数据权限维度控制，以及该维度落在哪个业务字段上。当前实现以 `menu_id` 为保存和解析入口，`table_code` 从菜单绑定表推导或随绑定保存，用于运行时校验和排查。
-
-示例：
-
-- 用户管理菜单绑定 `department`，字段是 `dept_id`。
-- 订单管理菜单绑定 `tenant`，字段是 `tenant_id`。
-- 示例事项菜单绑定 `demo_scope`，字段是 `scope_id`。
-
-主要字段：
-
-- `menu_id`
-- `table_code`
-- `dimension_code`
-- `field_code`
-- `match_type`：匹配方式，目前支持 `in`、`eq`。
-- `required`：是否必须配置授权范围。
-- `actions`：生效动作 JSON，例如 `query`、`detail`、`create`、`update`、`delete`、`export`、`batch_delete`。
-- `state`：是否启用。
-
-示例：
-
-```json
-{
-  "menu_id": 1201,
-  "table_code": "demo_ticket",
-  "dimension_code": "demo_scope",
-  "field_code": "scope_id",
-  "match_type": "in",
-  "required": true,
-  "actions": ["query", "detail", "create", "update", "delete"]
-}
-```
-
-如果一张表需要多维度控制，例如事项既要限制业务范围，又要限制项目，可以绑定多条规则。运行时默认取交集：
+统一入口按 `SubjectContext + resource_code + operation` 解析：
 
 ```text
-scope_id IN (...) AND project_id IN (...)
+Resource
+  -> Operation
+  -> active Grants
+  -> Policies and Rules
+  -> Ownership exact match
+  -> Dimension Provider
+  -> DataScopeResult
 ```
 
-如果同一张表发布或绑定到多个菜单，请求应携带明确的 `menu_id`。菜单没有数据权限绑定时不追加数据权限条件；同表多菜单且无法唯一定位时，后端会拒绝解析，避免误用另一份菜单授权。
+DataScopeResult 决策如下：
 
-### 3. 角色授权
+| decision | 含义 |
+| --- | --- |
+| `not_applicable` | Resource 或 Operation 未启用数据权限，不表示已授权全部 |
+| `all` | 有效授权明确允许当前 Resource + Operation 的全部数据 |
+| `none` | 明确无授权，或安全失败收敛为无数据 |
+| `filtered` | 必须应用结构化条件组 |
 
-`sys_role_data_scope` 保存角色在某个菜单和维度上的数据范围。
-
-当前策略：
-
-- `all`：全部数据。
-- `none`：无数据。
-- `specified`：指定范围，`scope_values` 保存 JSON 数组。
-- `tree`：指定树节点并展开下级，要求维度来源表配置 `value_field` 和 `parent_field`。
-- `user_dimension`：从 `sys_user_dimension_value` 读取当前用户在该维度上的归属值。
-- `user_field`：从当前登录用户的 `sys_user` 字段读取范围值，`scope_values` 保存一个用户字段名，例如 `company_id` 或 `dept_id`。
-
-指定范围保存为结构化值，例如 JSON 数组，而不是 SQL。
-
-`specified` 是角色固定范围，适合“这个角色永远只能看某几个范围”的场景。`user_dimension` 和 `user_field` 都不是写死角色范围：同一个角色下，不同用户会在运行时按自己的归属值或用户字段值解析出不同数据范围。
-
-运行时以“角色授权”为主，“用户授权”为补充：
-
-- 角色数据权限：常规权限来源。
-- 用户数据权限覆盖：用于在已有角色、菜单和按钮权限基础上临时扩大、收窄、替换或拒绝特殊人员范围；它不能单独授予一个没有角色权限的用户访问页面。
-- 多角色合并：同一维度取并集，不同维度按绑定条件形成交集。
-
-例子：
-
-```json
-{
-  "role_id": 8,
-  "menu_id": 1201,
-  "dimension_code": "demo_scope",
-  "strategy": "specified",
-  "scope_values": ["1001", "1002"]
-}
-```
-
-如果策略是当前用户字段，`scope_values` 填用户表字段名；运行时会读取当前登录用户这一列的值，再与菜单绑定字段比较：
-
-```json
-{
-  "role_id": 10,
-  "menu_id": 1401,
-  "dimension_code": "company",
-  "strategy": "user_field",
-  "scope_values": ["company_id"]
-}
-```
-
-### 4. 用户维度归属与覆盖
-
-`sys_user_dimension_value` 保存用户在某个维度上的默认归属值，供 `user_dimension` 策略使用。例如某个用户归属业务范围 `1`、`2`，角色策略选 `user_dimension` 后运行时会读取这组值。
-
-如果业务已经在 `sys_user` 上扩展了 `company_id`、`dept_id` 等字段，可以优先使用 `user_field` 策略，让角色授权直接读取当前用户字段；如果用户表不想承载业务归属，或同一维度需要维护多个值，则使用 `user_dimension`。
-
-`sys_user_data_scope_override` 保存用户级覆盖，字段包括 `user_id`、`menu_id`、`table_code`、`dimension_code`、`strategy`、`scope_values`、`override_mode`、`expire_at` 和 `state`。
-
-这两类配置都不是角色权限的替代品。用户必须先通过角色获得菜单、按钮和接口权限，数据权限解析才会继续计算用户归属和特殊授权。
-
-覆盖模式：
-
-- `replace`：用用户覆盖替换角色解析结果。
-- `union`：用户覆盖与角色结果取并集。
-- `intersect`：用户覆盖与角色结果取交集。
-- `deny`：直接拒绝该维度访问。
-
-### 5. 运行时解析
-
-请求进入 service 后，根据当前用户、菜单、表编码和接口动作解析数据范围。
-
-解析输出统一结构：
-
-```go
-type DataScope struct {
-	AllowAll   bool
-	DenyAll    bool
-	Conditions []DataScopeCondition
-}
-
-type DataScopeCondition struct {
-	DimensionCode string
-	Field         string
-	MatchType     string
-	ValueType     string
-	Values        []string
-}
-```
-
-repository 层只接收结构化条件并转成 GORM 查询，避免控制器里拼查询条件。
-
-运行时流程：
-
-1. 中间件只负责登录和基础接口权限。
-2. 控制器解析当前访问的是哪个菜单、表和动作。
-3. service 调用数据权限解析器，得到结构化范围。
-4. repository 的查询构建器统一追加数据权限条件。
-5. 详情、编辑、删除先按 ID 查询时也追加同一套条件，避免只拦列表不拦详情。
-
-新增和编辑的校验语义略有不同：
-
-- 新增没有历史行可查，后端会校验本次提交的受控字段是否落在当前可访问范围内。
-- 编辑会先校验原行是否可访问，再校验本次提交里出现的受控字段；未提交的受控字段按原行值处理。
-- 删除、详情和导出按当前菜单、表编码、动作和记录 ID 解析范围后再访问数据。
-
-示意：
+`filtered` 使用“组内 AND、组间 OR”：
 
 ```text
-HTTP 请求
-  -> 登录校验
-  -> 菜单/按钮/接口权限
-  -> 解析数据权限
-  -> repository 追加查询条件
-  -> 返回数据
+(owner_org IN [...]
+ AND legal_entity IN [...])
+OR
+(owner_employee EQ [...])
 ```
 
-不要在 `FileController`、`GeneralizationController`、业务控制器里各写一套数据权限判断。文件预览和下载如果要判断业务归属，应通过“文件引用的业务记录”回到统一数据权限层判断，而不是在文件控制器里按 `table_code` 临时拼条件。
+同一 Policy 的 Rule 位于同一 AND 组，不同 Grant 的过滤结果保留为不同 OR 组。
+`all OR X = all`，`none OR X = X`。`not_applicable` 不能作为授权结果参与合并。
 
-## 数据表
+## 7. not_applicable 的消费规则
 
-### 数据权限维度表
+当前平台尚无生产存量兼容要求，未启用数据权限的资源操作不进入其他数据权限链路：
 
-`sys_data_dimension`
+1. Resolver/运行时返回明确的 `not_applicable`。
+2. Adapter 保留 `not_applicable` 执行模式。
+3. 查询或写操作按原业务条件继续执行，不追加数据权限过滤。
+4. 日志必须记录 `not_applicable`，不得记录为 `all` 或“已授权全部”。
+5. 已启用资源若解析出不适用结果，视为配置冲突并安全失败。
+6. Resolver、Provider 或 Adapter 失败不得转为 `not_applicable`，也不得执行原始全量查询。
 
-保存“有哪些可授权维度”。
+功能权限始终独立生效，因此 not_applicable 不绕过 Casbin 接口授权。
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 主键 |
-| `code` | 维度编码 |
-| `name` | 维度名称 |
-| `value_type` | 值类型 |
-| `source_type` | 数据来源 |
-| `source_code` | 来源表编码 |
-| `label_field` | 展示字段 |
-| `value_field` | 值字段 |
-| `parent_field` | 树形父级字段 |
-| `memo` | 备注 |
-| `state` | 是否启用 |
+## 8. Adapter
 
-### 权限绑定表
+Adapter 不重新读取 Grant、Policy 或 Provider，只消费不可变 DataScopeResult 与服务端加载
+的 Ownership 定义。
 
-`sys_data_scope_binding`
+### 8.1 MetadataFieldAdapter
 
-保存“某个已绑定数据表的菜单按哪个字段受控”。
+通过 `table_id + table_field_id` 校验低代码元数据字段，输出不含 SQL、表名和数据库字段名
+的结构化过滤树。列表 rows、total、详情、更新/删除存在性检查与导出可复用同一执行结果。
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 主键 |
-| `menu_id` | 菜单 ID |
-| `table_code` | 表编码 |
-| `dimension_code` | 维度编码 |
-| `field_code` | 当前表里的受控字段 |
-| `match_type` | 匹配方式 |
-| `required` | 是否必须配置范围 |
-| `actions` | 生效动作 JSON |
-| `state` | 是否启用 |
+### 8.2 RegisteredFieldAdapter
 
-### 角色数据权限授权表
+通过 `adapter_code + adapter_field_code` 定位服务端注册执行能力。注册项声明 Resource、
+Dimension、ValueType、Operation 与 Operator 能力，客户端不能注册或覆盖。
 
-`sys_role_data_scope`
+四种执行模式必须显式处理：
 
-保存“角色在某个菜单上的数据范围”。
+- `not_applicable`
+- `allow_all`
+- `deny_all`
+- `apply_filter`
 
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 主键 |
-| `role_id` | 角色 ID |
-| `menu_id` | 菜单 ID |
-| `table_code` | 表编码 |
-| `dimension_code` | 维度编码 |
-| `strategy` | 全部、无权限、指定值、树范围、用户归属、当前用户字段等 |
-| `scope_values` | JSON 数组，保存指定范围 |
-| `state` | 是否启用 |
+未知 Adapter、Ownership 缺失、字段类型漂移或部分条件转换失败时整体失败。
 
-### 用户数据权限覆盖表
+## 9. 查询与写操作接入
 
-`sys_user_data_scope_override`
-
-用于给某个用户临时扩大、缩小、替换或拒绝范围。
-
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 主键 |
-| `user_id` | 用户 ID |
-| `menu_id` | 菜单 ID |
-| `table_code` | 表编码 |
-| `dimension_code` | 维度编码 |
-| `strategy` | 覆盖策略 |
-| `scope_values` | JSON 数组 |
-| `override_mode` | 覆盖模式：replace、union、intersect、deny |
-| `expire_at` | 过期时间，可选 |
-| `state` | 是否启用 |
-
-### 用户维度归属表
-
-`sys_user_dimension_value`
-
-用于保存用户在某个维度上的默认归属值。
-
-| 字段 | 含义 |
-| --- | --- |
-| `id` | 主键 |
-| `user_id` | 用户 ID |
-| `dimension_code` | 维度编码 |
-| `scope_values` | JSON 数组 |
-| `state` | 是否启用 |
-
-## 配置示例
-
-### 通用 Demo：事项只看指定业务范围
-
-1. 建维度 `demo_scope`，来源表 `demo_scope`。
-2. 事项菜单绑定 `demo_scope` 维度，字段为 `scope_id`。
-3. 角色“范围 A 用户”授权 `demo_scope` 范围为 `[1]`。
-4. 查询事项时自动追加：
+低代码统一链路为：
 
 ```text
-demo_ticket.scope_id IN (1)
+可信认证上下文
+  -> SubjectContextBuilder
+  -> Resolver
+  -> DataScopeResult
+  -> MetadataFieldAdapter
+  -> Generalization 受控查询或写操作
 ```
 
-### 在线学习：老师只看自己课程
+执行要求：
 
-1. 建维度 `course`，来源表 `edu_course`。
-2. 课程内容菜单绑定 `course` 维度，字段为 `course_id`。
-3. 老师角色授权策略为“指定范围”，范围来自老师被分配的课程。
-4. 课程内容列表、详情、编辑和文件预览都只允许访问授权课程下的数据。
+1. rows 与 total 在同一次业务调用中复用相同权限执行结果。
+2. 用户查询与数据权限组合为 `UserQuery AND (PermissionGroup1 OR PermissionGroup2)`。
+3. 详情使用“业务 ID AND 数据权限条件”直接查询，不先读取完整记录再判断。
+4. update/delete 使用各自 operation，并在变更前通过同一执行结果校验记录。
+5. 权限失败时不写入、不软删除，也不泄露无权记录是否存在。
+6. export 独立使用 export operation，不以 query 授权代替。
+7. request 内允许缓存 Resource、Policy、DimensionValues 和 AdapterExecution，不使用全局权限缓存。
 
-### 多租户：业务菜单按租户隔离
+Report 的 run/export 权限属于 Report Resource；数据范围委托已发布数据集对应的底层
+source Resource。自定义 SQL、多数据集和跨表 JOIN 需要单独评审。
 
-1. 建维度 `tenant`。
-2. 每个需要隔离的菜单绑定 `tenant` 维度，字段为 `tenant_id`。
-3. 登录后从用户上下文得到当前租户范围。
-4. repository 统一追加 `tenant_id` 条件。
+## 10. 安全边界
 
-当前实现还没有独立的全局表级绑定开关。如果后续大量菜单都要按同一租户字段隔离，可以在现有模型上增加“批量绑定/模板绑定”能力，但运行时仍应落到菜单绑定和结构化范围解析上。
+禁止以下实现：
 
-## 配置入口
+- 客户端提交 resource_code 覆盖服务端资源定位。
+- 客户端提交数据权限条件、SQL、表名、字段名、JOIN 或表达式。
+- Controller、业务 Repository 自行读取 Grant、Policy 或 Organization 表。
+- Resolver 生成 SQL，或 Adapter 重新解释策略。
+- 列表过滤但 total、详情、写操作或导出绕过。
+- 解析失败后重试放行、返回 all 或执行无过滤查询。
+- 角色名称、管理员名称或固定用户 ID 的硬编码绕过。
 
-当前配置围绕“维度、菜单绑定、角色授权、用户覆盖、权限排查”展开：
+## 11. 当前表结构
 
-1. 数据权限维度：维护维度、来源表、展示字段、值字段、父级字段。
-2. 权限绑定：把菜单绑定到表、维度、字段和生效动作。
-3. 角色管理：保存菜单权限、按钮权限、接口权限和角色数据权限；角色数据权限可选固定范围、树范围、用户归属或当前用户字段。
-4. 用户维度归属和用户覆盖：保存用户默认归属或临时特殊授权。
-5. 权限排查：按用户、菜单、表编码和动作查看最终解析结果。
+当前数据权限领域表为：
 
-权限排查展示：
+| 表 | 对象 |
+| --- | --- |
+| `sys_data_dimension_definition` | DataDimensionDefinition |
+| `sys_data_resource` | DataResource |
+| `sys_data_resource_operation` | DataResourceOperation |
+| `sys_data_ownership_field` | DataOwnershipField |
+| `sys_data_policy` | DataPolicy |
+| `sys_data_policy_rule` | DataPolicyRule |
+| `sys_data_grant` | DataGrant |
 
-- 当前用户有哪些角色。
-- 当前菜单绑定了哪些数据权限维度。
-- 每个维度最终解析出的范围值。
-- 解析后的 `scope` JSON、绑定/角色/用户归属/特殊授权计数和诊断备注。
+所有状态、软删除和审计字段沿用平台 `model.Basic` 规范。
 
-权限排查用于解释“为什么当前账号在这个菜单、表和动作下能看到或看不到数据”。它不是 SQL 预览器，不保证展示最终 GORM 生成的完整 SQL。
+## 12. V1 范围
 
-## 与已有固定字段权限的迁移
+V1 不支持：
 
-如果当前已有固定字段数据权限，可以按下面过渡：
+1. 任意 SQL 或客户端表达式。
+2. 岗位、任职、用户组或组织直接授权。
+3. 复杂 deny 规则。
+4. 跨表 JOIN、组合字段或脚本计算 Ownership。
+5. 自动推断默认 Ownership。
+6. 一个 Ownership 绑定多个 Dimension。
+7. TMS、WMS、SRM 的真实 Registered Adapter 接入。
+8. Report 自定义 SQL 直接作为 Ownership。
 
-1. 初始化一个对应的数据权限维度。
-2. 将已有使用固定字段隔离的菜单绑定到 `tenant_id`、`project_id` 或现有业务字段。
-3. 将原来的角色范围迁移成“指定范围”。
-4. 完成迁移后移除旧固定字段逻辑，运行态只保留新数据权限模型。
-
-## 当前边界
-
-已经明确的规则：
-
-- 用户级覆盖已经支持，用于临时扩展、收窄、替换或拒绝范围。
-- 多角色在同一维度取并集，不同维度通过多条绑定形成交集。
-- 低代码列表、详情、新增、编辑、删除、导出、批量删除应走数据权限。
-- 已接入的固定系统页记录检查应走数据权限；未接入的固定控制器不能在文档里当作已覆盖。
-- 文件预览和下载在有业务记录上下文时应回到统一数据权限层检查。
-- 树形范围支持按来源表展开下级；大规模树形维度后续可以再评估缓存和刷新策略。
-
-仍然不要做的事：
-
-- 不要把数据权限写死为公司、部门或 HRDB。
-- 不要允许前端提交原始 SQL。
-- 不要在每个控制器里各写一套字段判断。
-- 不要只限制列表，不限制详情、编辑、删除和导出。
+未来扩展必须继续保持 Resource、Ownership、Provider、Resolver 与 Adapter 的职责边界。

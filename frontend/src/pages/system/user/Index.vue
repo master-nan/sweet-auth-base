@@ -210,12 +210,6 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-
-    <data-permission-dialog
-      v-model:open="showDataPermissionDialog"
-      :user="currentPermissionUser"
-      @saved="fetchData"
-    />
   </base-content>
 </template>
 
@@ -226,7 +220,6 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import DataPermissionDialog from './DataPermissionDialog.vue'
 
 import { computed, ref, watch, onMounted } from 'vue'
 import { copyToClipboard, type QTableProps, useQuasar } from 'quasar'
@@ -284,7 +277,6 @@ const action_handlers: Record<string, (row?: User) => void> = {
   reset_password: (row) => row && confirmResetPassword(row),
   unlock_login: (row) => row && confirmUnlockLogin(row),
   assign_role: (row) => row && openRoleDialog(row),
-  assign_data_permission: (row) => row && openDataPermissionDialog(row),
 }
 
 const handleButtonClick = (btn: MenuButton, row?: User) => {
@@ -317,8 +309,6 @@ const roleDialogLoading = ref(false)
 const currentRoleUser = ref<User | null>(null)
 const roleOptions = ref<Role[]>([])
 const selectedRoleIds = ref<number[]>([])
-const showDataPermissionDialog = ref(false)
-const currentPermissionUser = ref<User | null>(null)
 
 const columns = ref<QTableProps['columns']>([])
 const table_fields_advanced = ref<TableField[]>([])
@@ -563,11 +553,6 @@ const saveUserRoles = async () => {
 const clearRoleDialog = () => {
   currentRoleUser.value = null
   selectedRoleIds.value = []
-}
-
-const openDataPermissionDialog = (row: User) => {
-  currentPermissionUser.value = row
-  showDataPermissionDialog.value = true
 }
 
 const handleFormSubmit = async (formPayload: { data: User; isEdit: boolean; id?: number }) => {

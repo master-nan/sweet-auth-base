@@ -706,7 +706,6 @@ func TestDynamicQueryWithPermissionKeepsRowsAndTotalConsistent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			permission := repository.GeneralizationPermission{
-				Mode:             repository.GeneralizationPermissionAdapter,
 				AdapterExecution: &tt.execution,
 			}
 			result, err := DynamicQueryWithPermission(db, tt.basic, table, permission)
@@ -723,22 +722,24 @@ func TestDynamicQueryWithPermissionKeepsRowsAndTotalConsistent(t *testing.T) {
 	}
 }
 
-func TestDynamicQueryWithPermissionRejectsNotApplicableExecution(t *testing.T) {
+func TestDynamicQueryWithPermissionKeepsNotApplicableUnfiltered(t *testing.T) {
 	db := generalizationPermissionTestDB(t)
 	table := generalizationPermissionTestTable()
 	execution := mustQueryAdapterExecution(t, datapermission.DataScopeDecisionNotApplicable, nil)
 
-	_, err := DynamicQueryWithPermission(
+	result, err := DynamicQueryWithPermission(
 		db,
 		&request.Basic{Page: 1, Num: 10},
 		table,
 		repository.GeneralizationPermission{
-			Mode:             repository.GeneralizationPermissionAdapter,
 			AdapterExecution: &execution,
 		},
 	)
-	if err == nil {
-		t.Fatal("not_applicable must be routed before the query builder")
+	if err != nil {
+		t.Fatalf("not_applicable query: %v", err)
+	}
+	if result.Total != 4 {
+		t.Fatalf("not_applicable total = %d, want 4", result.Total)
 	}
 }
 

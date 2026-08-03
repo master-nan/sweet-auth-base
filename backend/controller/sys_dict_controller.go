@@ -8,7 +8,6 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/service"
@@ -19,17 +18,15 @@ import (
 )
 
 type DictController struct {
-	sysDictService        *service.SysDictService
-	sysTableService       *service.SysTableService
-	dataPermissionService *service.DataPermissionService
-	translators           map[string]ut.Translator
+	sysDictService  *service.SysDictService
+	sysTableService *service.SysTableService
+	translators     map[string]ut.Translator
 }
 
-func NewDictController(sysDictService *service.SysDictService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *DictController {
+func NewDictController(sysDictService *service.SysDictService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *DictController {
 	return &DictController{
 		sysDictService,
 		sysTableService,
-		dataPermissionService,
 		translators,
 	}
 }
@@ -48,10 +45,6 @@ func (t *DictController) GetSysDictById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -81,10 +74,6 @@ func (t *DictController) GetSysDictByCode(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict", data.Id, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	resp.SetData(data)
 }
 
@@ -111,10 +100,6 @@ func (t *DictController) QuerySysDict(ctx *gin.Context) {
 	}
 	table, err := t.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := injectQueryDataScope(ctx, t.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -182,10 +167,6 @@ func (t *DictController) UpdateSysDict(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysDictService.UpdateSysDict(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -206,10 +187,6 @@ func (t *DictController) DeleteSysDictById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict", id, enum.ButtonActionDelete); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -237,10 +214,6 @@ func (t *DictController) GetSysDictItemsByDictId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict", id, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	result, err := t.sysDictService.GetSysDictItemsByDictId(id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -263,10 +236,6 @@ func (t *DictController) GetSysDictItemById(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict_item", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -329,10 +298,6 @@ func (t *DictController) UpdateSysDictItem(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict_item", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysDictService.UpdateSysDictItem(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -354,10 +319,6 @@ func (t *DictController) DeleteSysDictItemById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_dict_item", id, enum.ButtonActionDelete); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

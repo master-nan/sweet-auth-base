@@ -14,10 +14,9 @@
 - 列表、详情、写操作和导出应使用一致的数据权限结果。
 - 解析失败、配置缺失或类型不兼容时安全失败，不得默认放开全部数据。
 
-`DataPermissionDesign.md` 同时记录了旧五表运行链路。本文针对 DP-1 已落地的
-`DataResource`、`DataOwnershipField`、`DataDimensionDefinition`、
-`DataPolicyRule` 和 `DataGrant` 新模型冻结 Ownership 设计，不在本阶段自动映射、
-替换或清理旧五表。
+本文与当前已落地的 `DataResource`、`DataOwnershipField`、
+`DataDimensionDefinition`、`DataPolicyRule` 和 `DataGrant` 模型共同构成
+Ownership 的正式设计基线。
 
 ## 2. 能力定位
 
@@ -661,9 +660,8 @@ Adapter 禁止：
 8. 基于脚本或函数计算归属。
 9. Report 自定义 SQL 直接作为 Ownership。
 10. `report_source` 绑定类型。
-11. 旧五表自动映射。
-12. 多值 JSONB 业务归属字段。
-13. 以 structure_node_id、source_id、名称或展示文本作为组织业务归属。
+11. 多值 JSONB 业务归属字段。
+12. 以 structure_node_id、source_id、名称或展示文本作为组织业务归属。
 
 未来扩展必须单独设计、评审和实施，不得通过放宽 binding_value 或 Adapter 白名单
 绕过本设计。

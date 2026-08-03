@@ -9,7 +9,6 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	"backend/internal/cache"
 	myerrors "backend/internal/errors"
 	"backend/internal/security"
@@ -26,13 +25,12 @@ import (
 )
 
 type UserController struct {
-	sysUserService        *service.SysUserService
-	sysConfigureService   *service.SysConfigureService
-	translators           map[string]ut.Translator
-	serverConfig          *config.Server
-	sysTableService       *service.SysTableService
-	dataPermissionService *service.DataPermissionService
-	loginAttemptCache     *cache.LoginAttemptCache
+	sysUserService      *service.SysUserService
+	sysConfigureService *service.SysConfigureService
+	translators         map[string]ut.Translator
+	serverConfig        *config.Server
+	sysTableService     *service.SysTableService
+	loginAttemptCache   *cache.LoginAttemptCache
 }
 
 func NewUserController(
@@ -41,7 +39,6 @@ func NewUserController(
 	translators map[string]ut.Translator,
 	serverConfig *config.Server,
 	sysTableService *service.SysTableService,
-	dataPermissionService *service.DataPermissionService,
 	loginAttemptCache *cache.LoginAttemptCache,
 ) *UserController {
 	return &UserController{
@@ -50,7 +47,6 @@ func NewUserController(
 		translators,
 		serverConfig,
 		sysTableService,
-		dataPermissionService,
 		loginAttemptCache,
 	}
 }
@@ -67,10 +63,6 @@ func (u *UserController) QuerySysUser(ctx *gin.Context) {
 	}
 	table, err := u.sysTableService.GetTableByTableCode(data.TableCode)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := injectQueryDataScope(ctx, u.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -188,10 +180,6 @@ func (u *UserController) GetUserById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	data, err := u.sysUserService.GetById(id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -263,10 +251,6 @@ func (u *UserController) UpdateUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = u.sysUserService.Update(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -287,10 +271,6 @@ func (u *UserController) AssignRoles(ctx *gin.Context) {
 	translator := u.translators["zh"]
 	err = utils.ValidatorBody[request.SysUserAssignRolesReq](ctx, &data, translator)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -319,10 +299,6 @@ func (u *UserController) DeleteUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = u.sysUserService.Delete(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -344,10 +320,6 @@ func (u *UserController) ResetPassword(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -399,10 +371,6 @@ func (u *UserController) UnlockLogin(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, u.sysTableService, u.dataPermissionService, "sys_user", id, enum.ButtonActionUpdate); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

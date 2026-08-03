@@ -13,7 +13,6 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
-	queryutil "backend/repository/util"
 	"fmt"
 	"math"
 	"net/url"
@@ -67,11 +66,9 @@ func (gs *GeneralizationService) QueryWithDataPermission(
 	ctx *gin.Context,
 	basic *request.Basic,
 	table model.SysTable,
-	menuId int,
 	operation string,
-	legacyAction enum.SysMenuButtonEventAction,
 ) (repository.GeneralizationListResult, error) {
-	resolution, err := gs.resolveLowCodePermission(ctx, table, menuId, operation, legacyAction)
+	resolution, err := gs.resolveLowCodePermission(ctx, table, operation)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
 	}
@@ -79,6 +76,29 @@ func (gs *GeneralizationService) QueryWithDataPermission(
 		return repository.GeneralizationListResult{}, error2.ErrDataPermissionRuntimeFailed
 	}
 	return gs.permissionRepo.QueryWithPermission(basic, table, resolution.permission)
+}
+
+func (gs *GeneralizationService) QueryWithResolvedDataPermission(
+	basic *request.Basic,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (repository.GeneralizationListResult, error) {
+	if gs.permissionRepo == nil {
+		return repository.GeneralizationListResult{}, error2.ErrDataPermissionRuntimeFailed
+	}
+	return gs.permissionRepo.QueryWithPermission(basic, table, permission)
+}
+
+func (gs *GeneralizationService) ResolveDataPermission(
+	ctx *gin.Context,
+	table model.SysTable,
+	operation string,
+) (repository.GeneralizationPermission, error) {
+	resolution, err := gs.resolveLowCodePermission(ctx, table, operation)
+	if err != nil {
+		return repository.GeneralizationPermission{}, err
+	}
+	return resolution.permission, nil
 }
 
 func (gs *GeneralizationService) GetById(table model.SysTable, id int) (map[string]interface{}, error) {
@@ -89,11 +109,9 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 	ctx *gin.Context,
 	table model.SysTable,
 	id int,
-	menuId int,
 	operation string,
-	legacyAction enum.SysMenuButtonEventAction,
 ) (map[string]interface{}, error) {
-	resolution, err := gs.resolveLowCodePermission(ctx, table, menuId, operation, legacyAction)
+	resolution, err := gs.resolveLowCodePermission(ctx, table, operation)
 	if err != nil {
 		return nil, err
 	}
@@ -106,10 +124,6 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 // GetFieldById 获取指定行的指定字段值
 func (gs *GeneralizationService) GetFieldById(tableCode string, id int, fieldName string) (interface{}, error) {
 	return gs.generalizationRepo.GetFieldById(tableCode, id, fieldName)
-}
-
-func (gs *GeneralizationService) RowMatchesDataScope(table model.SysTable, id int, scope *request.DataScope) (bool, error) {
-	return gs.generalizationRepo.RowMatchesDataScope(table, id, scope)
 }
 
 func (gs *GeneralizationService) Create(ctx *gin.Context, table model.SysTable, data map[string]interface{}) error {
@@ -165,7 +179,6 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 	table model.SysTable,
 	id int,
 	data map[string]interface{},
-	menuId int,
 ) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
@@ -173,18 +186,13 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 	resolution, err := gs.resolveLowCodePermission(
 		ctx,
 		table,
-		menuId,
 		model.DataPermissionOperationUpdate,
-		enum.ButtonActionUpdate,
 	)
 	if err != nil {
 		return err
 	}
 	if resolution.modifiesOwnership(table, data) {
 		return error2.ErrDataPermissionOwnershipUpdateDenied
-	}
-	if err = validateLegacyDataScopeWriteValues(table, resolution.permission, data, false); err != nil {
-		return err
 	}
 	filtered := filterDataByFields(table, data, false)
 	delete(filtered, "id")
@@ -236,8 +244,6 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 	ctx *gin.Context,
 	table model.SysTable,
 	id int,
-	menuId int,
-	legacyAction enum.SysMenuButtonEventAction,
 ) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
@@ -245,9 +251,7 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 	resolution, err := gs.resolveLowCodePermission(
 		ctx,
 		table,
-		menuId,
 		model.DataPermissionOperationDelete,
-		legacyAction,
 	)
 	if err != nil {
 		return err
@@ -290,8 +294,6 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 	ctx *gin.Context,
 	table model.SysTable,
 	ids []int,
-	menuId int,
-	legacyAction enum.SysMenuButtonEventAction,
 ) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
@@ -303,9 +305,7 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 	resolution, err := gs.resolveLowCodePermission(
 		ctx,
 		table,
-		menuId,
 		model.DataPermissionOperationDelete,
-		legacyAction,
 	)
 	if err != nil {
 		return err
@@ -363,55 +363,16 @@ func normalizeGeneralizationIds(ids []int) ([]int, error) {
 func (gs *GeneralizationService) resolveLowCodePermission(
 	ctx *gin.Context,
 	table model.SysTable,
-	menuId int,
 	operation string,
-	legacyAction enum.SysMenuButtonEventAction,
 ) (lowCodePermissionResolution, error) {
 	if gs == nil || gs.permissionRuntime == nil {
 		return lowCodePermissionResolution{}, error2.ErrDataPermissionRuntimeFailed
 	}
-	return gs.permissionRuntime.Resolve(ctx, table, menuId, operation, legacyAction)
+	return gs.permissionRuntime.Resolve(ctx, table, operation)
 }
 
-func validateLegacyDataScopeWriteValues(
-	table model.SysTable,
-	permission repository.GeneralizationPermission,
-	data map[string]interface{},
-	requireField bool,
-) error {
-	if permission.Mode != repository.GeneralizationPermissionLegacy {
-		return nil
-	}
-	scope := permission.LegacyScope
-	if scope == nil || scope.AllowAll {
-		return nil
-	}
-	if scope.DenyAll {
-		return error2.ErrPermissionDenied
-	}
-	for _, condition := range scope.Conditions {
-		value, exists := data[condition.Field]
-		if !exists {
-			if requireField {
-				return error2.ErrPermissionDenied
-			}
-			continue
-		}
-		if !queryutil.DataScopeValueAllowed(table, condition, value) {
-			return error2.ErrPermissionDenied
-		}
-	}
-	return nil
-}
-
-func permissionMissError(permission repository.GeneralizationPermission) error {
-	if permission.Mode == repository.GeneralizationPermissionAdapter {
-		return error2.ErrPermissionDenied
-	}
-	if permission.LegacyScope != nil && !permission.LegacyScope.AllowAll {
-		return error2.ErrPermissionDenied
-	}
-	return error2.ErrDataNotFound
+func permissionMissError(repository.GeneralizationPermission) error {
+	return error2.ErrPermissionDenied
 }
 
 func (gs *GeneralizationService) ensureWritableRowExists(table model.SysTable, id int) error {

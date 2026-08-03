@@ -73,7 +73,6 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 		basic = &request.Basic{}
 	}
 	query := util.ExecuteQuery(b.baseQuery(), basic, table)
-	query = util.ApplyDataScope(query, basic.DataScope, table)
 	query = query.Model(b.model)
 	if basic.IncludeDeleted {
 		query = query.Unscoped()

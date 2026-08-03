@@ -681,37 +681,6 @@ func finalizeQuery(query *gorm.DB, basic *request.Basic, table model.SysTable) *
 	return query
 }
 
-func ApplyDataScope(query *gorm.DB, scope *request.DataScope, table model.SysTable) *gorm.DB {
-	if scope == nil || scope.AllowAll {
-		return query
-	}
-	if scope.DenyAll {
-		return query.Where("1 = 0")
-	}
-	for _, condition := range scope.Conditions {
-		tableField, ok := findField(table, condition.Field)
-		if !ok || security.IsSensitiveFieldName(condition.Field) {
-			return query.Where("1 = 0")
-		}
-		fieldExpr := qualifyField(condition.Field, table.TableCode)
-		values := parseListValue(condition.Values, tableField.FieldType)
-		if isInvalidQueryValue(values) || isEmptyListValue(values) {
-			return query.Where("1 = 0")
-		}
-		switch normalizeDataScopeMatchType(condition.MatchType) {
-		case "eq":
-			items, ok := values.([]interface{})
-			if !ok || len(items) != 1 {
-				return query.Where("1 = 0")
-			}
-			query = query.Where(fmt.Sprintf("%s = ?", fieldExpr), items[0])
-		default:
-			query = query.Where(fmt.Sprintf("%s IN ?", fieldExpr), values)
-		}
-	}
-	return query
-}
-
 // ApplyAdapterExecution converts a validated metadata AdapterExecution into
 // GORM clause expressions. It resolves field IDs only from the trusted table
 // metadata already loaded by the server and never accepts executable input.
@@ -729,7 +698,7 @@ func ApplyAdapterExecution(
 	case datapermission.AdapterExecutionModeDenyAll:
 		return query.Where(clause.Expr{SQL: "1 = 0"}), nil
 	case datapermission.AdapterExecutionModeNotApplicable:
-		return query, myerrors.ErrDataPermissionRuntimeRouteConflict
+		return query, nil
 	case datapermission.AdapterExecutionModeApplyFilter:
 	default:
 		return query, myerrors.ErrDataPermissionFilterApplyFailed
@@ -813,51 +782,9 @@ func adapterConditionValues(condition datapermission.DataScopeCondition) ([]inte
 	}
 }
 
-func DataScopeValueAllowed(table model.SysTable, condition request.DataScopeCondition, raw interface{}) bool {
-	tableField, ok := findField(table, condition.Field)
-	if !ok || security.IsSensitiveFieldName(condition.Field) {
-		return false
-	}
-	parsed := parseValue(raw, tableField.FieldType)
-	if isInvalidQueryValue(parsed) || parsed == nil {
-		return false
-	}
-	values := parseListValue(condition.Values, tableField.FieldType)
-	if isInvalidQueryValue(values) || isEmptyListValue(values) {
-		return false
-	}
-	items, ok := values.([]interface{})
-	if !ok {
-		return false
-	}
-	switch normalizeDataScopeMatchType(condition.MatchType) {
-	case "eq":
-		return len(items) == 1 && reflect.DeepEqual(parsed, items[0])
-	default:
-		for _, item := range items {
-			if reflect.DeepEqual(parsed, item) {
-				return true
-			}
-		}
-		return false
-	}
-}
-
-func normalizeDataScopeMatchType(raw string) string {
-	value := strings.ToLower(strings.TrimSpace(raw))
-	if value == "eq" {
-		return "eq"
-	}
-	return "in"
-}
-
 // DynamicQuery 动态生成结构体并进行查询
 func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
-	permission := repository.GeneralizationPermission{
-		Mode:        repository.GeneralizationPermissionLegacy,
-		LegacyScope: basic.DataScope,
-	}
-	return DynamicQueryWithPermission(db, basic, table, permission)
+	return dynamicQuery(db, basic, table, nil)
 }
 
 func DynamicQueryWithPermission(
@@ -865,6 +792,15 @@ func DynamicQueryWithPermission(
 	basic *request.Basic,
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
+) (repository.GeneralizationListResult, error) {
+	return dynamicQuery(db, basic, table, &permission)
+}
+
+func dynamicQuery(
+	db *gorm.DB,
+	basic *request.Basic,
+	table model.SysTable,
+	permission *repository.GeneralizationPermission,
 ) (repository.GeneralizationListResult, error) {
 	var result repository.GeneralizationListResult
 	resultFields := listResultFields(table.TableFields)
@@ -880,9 +816,11 @@ func DynamicQueryWithPermission(
 	}
 
 	var err error
-	query, err = ApplyGeneralizationPermission(query, permission, table)
-	if err != nil {
-		return result, err
+	if permission != nil {
+		query, err = ApplyGeneralizationPermission(query, *permission, table)
+		if err != nil {
+			return result, err
+		}
 	}
 
 	joinAliasMap := make(map[string]string)
@@ -956,20 +894,10 @@ func ApplyGeneralizationPermission(
 	permission repository.GeneralizationPermission,
 	table model.SysTable,
 ) (*gorm.DB, error) {
-	switch permission.Mode {
-	case repository.GeneralizationPermissionLegacy:
-		if permission.AdapterExecution != nil {
-			return query, myerrors.ErrDataPermissionRuntimeRouteConflict
-		}
-		return ApplyDataScope(query, permission.LegacyScope, table), nil
-	case repository.GeneralizationPermissionAdapter:
-		if permission.LegacyScope != nil || permission.AdapterExecution == nil {
-			return query, myerrors.ErrDataPermissionRuntimeRouteConflict
-		}
-		return ApplyAdapterExecution(query, *permission.AdapterExecution, table)
-	default:
+	if permission.AdapterExecution == nil {
 		return query, myerrors.ErrDataPermissionRuntimeRouteConflict
 	}
+	return ApplyAdapterExecution(query, *permission.AdapterExecution, table)
 }
 
 func hasField(table model.SysTable, fieldCode string) bool {

@@ -32,7 +32,6 @@ type SysMenuService struct {
 	sysMenuButtonRepo     repository.SysMenuButtonRepository
 	sysTableRepo          repository.SysTableRepository
 	casbinRuleRepo        repository.CasbinRuleRepository
-	dataPermissionService *DataPermissionService
 	sf                    *utils.Snowflake
 }
 
@@ -40,7 +39,7 @@ func NewSysMenuService(sysMenuRepo repository.SysMenuRepository, sysRoleMenuRepo
 	sysRoleMenuButtons repository.SysRoleMenuButtonRepository,
 	sysUserRoleRepo repository.SysUserRoleRepository, sysMenuButtonRepo repository.SysMenuButtonRepository,
 	sysTableRepo repository.SysTableRepository, casbinRuleRepo repository.CasbinRuleRepository,
-	dataPermissionService *DataPermissionService, sf *utils.Snowflake) *SysMenuService {
+	sf *utils.Snowflake) *SysMenuService {
 	return &SysMenuService{
 		sysMenuRepo,
 		sysRoleMenuRepo,
@@ -50,7 +49,6 @@ func NewSysMenuService(sysMenuRepo repository.SysMenuRepository, sysRoleMenuRepo
 		sysMenuButtonRepo,
 		sysTableRepo,
 		casbinRuleRepo,
-		dataPermissionService,
 		sf,
 	}
 }
@@ -160,9 +158,6 @@ func (s *SysMenuService) DeleteMenuById(ctx *gin.Context, id int) error {
 			return err
 		}
 		if err := s.sysRoleMenuRepo.DeleteByField(tx, "menu_id", id); err != nil {
-			return err
-		}
-		if err := s.dataPermissionService.DeleteScopesByMenuIds(tx, []int{id}); err != nil {
 			return err
 		}
 		if err := s.sysMenuButtonRepo.DeleteByField(tx, "menu_id", id); err != nil {

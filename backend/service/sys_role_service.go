@@ -9,7 +9,6 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
-	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -28,7 +27,6 @@ type SysRoleService struct {
 	sysRoleMenuRepo       repository.SysRoleMenuRepository
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository
 	casbinRuleRepo        repository.CasbinRuleRepository
-	dataPermissionService *DataPermissionService
 	sf                    *utils.Snowflake
 }
 
@@ -38,7 +36,6 @@ func NewSysRoleService(
 	sysRoleMenuRepo repository.SysRoleMenuRepository,
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
 	casbinRuleRepo repository.CasbinRuleRepository,
-	dataPermissionService *DataPermissionService,
 	sf *utils.Snowflake,
 ) *SysRoleService {
 	return &SysRoleService{
@@ -47,7 +44,6 @@ func NewSysRoleService(
 		sysRoleMenuRepo,
 		sysRoleMenuButtonRepo,
 		casbinRuleRepo,
-		dataPermissionService,
 		sf,
 	}
 }
@@ -87,12 +83,7 @@ func (s *SysRoleService) UpdateRole(ctx *gin.Context, req request.RoleUpdateReq)
 }
 
 func (s *SysRoleService) DeleteRole(ctx *gin.Context, id int) error {
-	return s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		if err := s.dataPermissionService.DeleteRoleScopesByRoleId(tx, id); err != nil {
-			return err
-		}
-		return s.sysRoleRepo.DeleteById(tx, id)
-	})
+	return s.sysRoleRepo.DeleteById(s.sysRoleRepo.DBWithContext(ctx), id)
 }
 
 func (s *SysRoleService) GetRoleMenus(roleId int) ([]model.SysMenu, error) {
@@ -128,10 +119,6 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 	menuIDs := uniquePositiveInts(data.MenuIds)
 	buttonIDs := uniquePositiveInts(data.ButtonIds)
 	menuIDSet := intSet(menuIDs)
-	dataScopeRecords, err := s.assignedRoleDataScopeRecords(data.RoleId, menuIDSet, data.DataPermissions)
-	if err != nil {
-		return err
-	}
 	var assignableButtons []model.SysMenuButton
 	if len(buttonIDs) > 0 {
 		buttons, err := s.sysMenuButtonRepo.FindListByFieldIn("id", buttonIDs)
@@ -141,7 +128,7 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 		assignableButtons = filterAssignableRoleButtons(buttons, menuIDSet)
 	}
 
-	err = s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		// 删除旧的角色菜单
 		if err := s.sysRoleMenuRepo.DeleteByField(tx, "role_id", data.RoleId); err != nil {
 			return err
@@ -171,10 +158,7 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 				return err
 			}
 		}
-		if data.DataPermissions != nil {
-			return s.dataPermissionService.ReplaceRoleDataScopes(tx, data.RoleId, dataScopeRecords)
-		}
-		return s.dataPermissionService.DeleteRoleScopesOutsideMenus(tx, data.RoleId, menuIDs)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -208,18 +192,6 @@ func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAs
 	}
 
 	return nil
-}
-
-func (s *SysRoleService) assignedRoleDataScopeRecords(roleId int, menuIDSet map[int]bool, permissions []request.RoleDataPermissionItemReq) ([]model.SysRoleDataScope, error) {
-	if permissions == nil {
-		return nil, nil
-	}
-	for _, permission := range permissions {
-		if !menuIDSet[permission.MenuId] {
-			return nil, myerrors.NewBadRequestError("数据权限必须属于已选择的菜单")
-		}
-	}
-	return s.dataPermissionService.BuildRoleDataScopeRecords(roleId, permissions)
 }
 
 type buttonAPIPolicy struct {

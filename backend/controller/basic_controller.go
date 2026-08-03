@@ -23,27 +23,23 @@ import (
 )
 
 type BasicController struct {
-	tokenGenerator        token.JWTToken
-	serverConfig          *config.Server
-	sysConfigureService   *service.SysConfigureService
-	logService            *service.LogService
-	sysUserService        *service.SysUserService
-	sysTableService       *service.SysTableService
-	dataPermissionService *service.DataPermissionService
-	tokenBlackCache       *cache.TokenBlackCache
-	loginAttemptCache     *cache.LoginAttemptCache
-	translators           map[string]ut.Translator
+	tokenGenerator      token.JWTToken
+	serverConfig        *config.Server
+	sysConfigureService *service.SysConfigureService
+	logService          *service.LogService
+	sysUserService      *service.SysUserService
+	tokenBlackCache     *cache.TokenBlackCache
+	loginAttemptCache   *cache.LoginAttemptCache
+	translators         map[string]ut.Translator
 }
 
-func NewBasicController(tokenGenerator token.JWTToken, serverConfig *config.Server, sysConfigureService *service.SysConfigureService, logService *service.LogService, sysUserService *service.SysUserService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, tokenBlackCache *cache.TokenBlackCache, loginAttemptCache *cache.LoginAttemptCache, translators map[string]ut.Translator) *BasicController {
+func NewBasicController(tokenGenerator token.JWTToken, serverConfig *config.Server, sysConfigureService *service.SysConfigureService, logService *service.LogService, sysUserService *service.SysUserService, tokenBlackCache *cache.TokenBlackCache, loginAttemptCache *cache.LoginAttemptCache, translators map[string]ut.Translator) *BasicController {
 	return &BasicController{
 		tokenGenerator,
 		serverConfig,
 		sysConfigureService,
 		logService,
 		sysUserService,
-		sysTableService,
-		dataPermissionService,
 		tokenBlackCache,
 		loginAttemptCache,
 		translators,
@@ -333,15 +329,6 @@ func (b *BasicController) QueryAccessLogs(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := b.sysTableService.GetTableByTableCode(data.TableCode)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := injectQueryDataScope(ctx, b.dataPermissionService, &data.Basic, table); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	result, err := b.logService.QueryAccessLogs(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -365,10 +352,6 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
 		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, b.sysTableService, b.dataPermissionService, "access_log", id, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
 		return
 	}
 	logData, err := b.logService.GetAccessLogById(ctx, id)

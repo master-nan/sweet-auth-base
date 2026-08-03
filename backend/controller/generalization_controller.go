@@ -12,7 +12,6 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
-	queryutil "backend/repository/util"
 	"backend/service"
 	"bytes"
 	"encoding/csv"
@@ -28,23 +27,16 @@ type GeneralizationController struct {
 	generalizationService *service.GeneralizationService
 	sysTableService       *service.SysTableService
 	sysMenuService        *service.SysMenuService
-	dataPermissionService *service.DataPermissionService
 	translators           map[string]ut.Translator
 }
 
-func NewGeneralizationController(generalizationService *service.GeneralizationService, sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *GeneralizationController {
+func NewGeneralizationController(generalizationService *service.GeneralizationService, sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *GeneralizationController {
 	return &GeneralizationController{
 		generalizationService: generalizationService,
 		sysTableService:       sysTableService,
 		sysMenuService:        sysMenuService,
-		dataPermissionService: dataPermissionService,
 		translators:           translators,
 	}
-}
-
-func (gc *GeneralizationController) dataScopeForMenu(ctx *gin.Context, table model.SysTable, menuId int, action enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-	user := ctx.MustGet("user").(model.SysUser)
-	return gc.dataPermissionService.ResolveDataScope(user, menuId, table, action)
 }
 
 func (gc *GeneralizationController) checkMenuPermission(ctx *gin.Context, menuId int, tableCode string) error {
@@ -135,48 +127,6 @@ func (gc *GeneralizationController) resolveLowCodeMenuIdByActions(ctx *gin.Conte
 	return 0, myerrors.ErrPermissionDenied
 }
 
-func (gc *GeneralizationController) checkCreateDataPermission(ctx *gin.Context, table model.SysTable, menuId int, data map[string]interface{}) error {
-	scope, err := gc.dataScopeForMenu(ctx, table, menuId, enum.ButtonActionCreate)
-	if err != nil {
-		return err
-	}
-	return validateDataScopeWriteValues(table, scope, data, true)
-}
-
-func validateDataScopeWriteValues(table model.SysTable, scope *request.DataScope, data map[string]interface{}, requireField bool) error {
-	if scope == nil || scope.AllowAll {
-		return nil
-	}
-	if scope.DenyAll {
-		return myerrors.ErrPermissionDenied
-	}
-	for _, condition := range scope.Conditions {
-		if !dataScopeConditionFieldExists(table, condition.Field) {
-			return myerrors.ErrPermissionDenied
-		}
-		value, exists := data[condition.Field]
-		if !exists {
-			if !requireField {
-				continue
-			}
-			return myerrors.ErrPermissionDenied
-		}
-		if !queryutil.DataScopeValueAllowed(table, condition, value) {
-			return myerrors.ErrPermissionDenied
-		}
-	}
-	return nil
-}
-
-func dataScopeConditionFieldExists(table model.SysTable, fieldCode string) bool {
-	for _, field := range table.TableFields {
-		if field.FieldCode == fieldCode {
-			return true
-		}
-	}
-	return false
-}
-
 func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
@@ -211,9 +161,7 @@ func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 		ctx,
 		&data,
 		table,
-		menuId,
 		model.DataPermissionOperationQuery,
-		enum.ButtonActionQuery,
 	)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -253,9 +201,9 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 			return
 		}
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionDetail, false)
+	_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionDetail, false)
 	if err != nil {
-		menuId, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionUpdate, false)
+		_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionUpdate, false)
 	}
 	if err != nil {
 		_ = ctx.Error(err)
@@ -265,9 +213,7 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 		ctx,
 		table,
 		id,
-		menuId,
 		model.DataPermissionOperationDetail,
-		enum.ButtonActionDetail,
 	)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -301,10 +247,6 @@ func (gc *GeneralizationController) Create(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
-	if err := gc.checkCreateDataPermission(ctx, table, data.MenuId, data.Data); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	if err := gc.generalizationService.Create(ctx, table, data.Data); err != nil {
 		_ = ctx.Error(err)
 		return
@@ -341,7 +283,6 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 		table,
 		data.Id,
 		data.Data,
-		data.MenuId,
 	); err != nil {
 		_ = ctx.Error(err)
 		return
@@ -377,8 +318,6 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 		ctx,
 		table,
 		data.Id,
-		data.MenuId,
-		enum.ButtonActionDelete,
 	); err != nil {
 		_ = ctx.Error(err)
 		return
@@ -403,7 +342,7 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionBatchDelete, false)
+	_, err = gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionBatchDelete, false)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -412,8 +351,6 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		ctx,
 		table,
 		data.Ids,
-		menuId,
-		enum.ButtonActionBatchDelete,
 	); err != nil {
 		_ = ctx.Error(err)
 		return
@@ -462,9 +399,7 @@ func (gc *GeneralizationController) Export(ctx *gin.Context) {
 		ctx,
 		&data,
 		table,
-		menuId,
 		model.DataPermissionOperationExport,
-		enum.ButtonActionExport,
 	)
 	if err != nil {
 		_ = ctx.Error(err)

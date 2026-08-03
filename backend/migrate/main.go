@@ -125,25 +125,6 @@ func ensureSysMenuOptionText(db *gorm.DB) error {
 	return db.Exec(sql).Error
 }
 
-func ensureDataPermissionIndexes(db *gorm.DB) error {
-	if db.Dialector.Name() != "postgres" {
-		return nil
-	}
-	table := db.NamingStrategy.TableName("SysUserDimensionValue")
-	dropConstraintSQL := fmt.Sprintf(`ALTER TABLE "%s" DROP CONSTRAINT IF EXISTS uni_user_dimension_value`, table)
-	if err := db.Exec(dropConstraintSQL).Error; err != nil {
-		return err
-	}
-	if err := db.Exec(`DROP INDEX IF EXISTS uni_user_dimension_value`).Error; err != nil {
-		return err
-	}
-	sql := fmt.Sprintf(
-		`CREATE UNIQUE INDEX IF NOT EXISTS uni_user_dimension_value_active ON "%s" ("user_id", "dimension_code") WHERE "gmt_delete" IS NULL`,
-		table,
-	)
-	return db.Exec(sql).Error
-}
-
 func backfillSysMenuPageBinding(db *gorm.DB) error {
 	var menus []model.SysMenu
 	if err := db.Find(&menus).Error; err != nil {
@@ -565,9 +546,7 @@ func menuButtonEventActionDictItems() []systemDictItemSeed {
 		{name: "字典项详情", code: "sys_menu_button_event_action_detail_item", value: string(enum.ButtonActionDetailItem)},
 		{name: "字典项元数据", code: "sys_menu_button_event_action_item_metadata", value: string(enum.ButtonActionItemMetadata)},
 		{name: "分配权限", code: "sys_menu_button_event_action_assign_permission", value: string(enum.ButtonActionAssignPermission)},
-		{name: "分配数据权限", code: "sys_menu_button_event_action_assign_data_permission", value: string(enum.ButtonActionAssignData)},
 		{name: "用户菜单查询", code: "sys_menu_button_event_action_query_user_menu", value: string(enum.ButtonActionQueryUserMenu)},
-		{name: "数据权限查询", code: "sys_menu_button_event_action_query_data_permission", value: string(enum.ButtonActionQueryDataPerm)},
 		{name: "授权菜单查询", code: "sys_menu_button_event_action_query_permission_menu", value: string(enum.ButtonActionQueryPermMenu)},
 		{name: "重置密码", code: "sys_menu_button_event_action_reset_password", value: string(enum.ButtonActionResetPassword)},
 		{name: "解除锁定", code: "sys_menu_button_event_action_unlock_login", value: string(enum.ButtonActionUnlockLogin)},
@@ -1401,8 +1380,6 @@ func seedRoleMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 		menuButtonWithAPI(445, menuID, "编辑", "system_role_update", enum.Line, "update", "edit", "primary", 1, "/admin/role/:id", "PUT"),
 		menuButtonWithAPI(446, menuID, "删除", "system_role_delete", enum.Line, "delete", "delete", "negative", 2, "/admin/role/:id", "DELETE"),
 		menuButtonWithAPI(447, menuID, "分配权限", "system_role_assign_permission", enum.Line, "assign_permission", "admin_panel_settings", "primary", 3, "/admin/role/assign-permissions", "POST"),
-		apiPermissionWithAPI(612, menuID, "角色数据权限查询", "system_role_data_permission_query", enum.Line, "query_data_permission", "rule", "primary", 94, "/admin/role/:id/data-permissions", "GET"),
-		apiPermissionWithAPI(613, menuID, "角色数据权限保存", "system_role_data_permission_save", enum.Line, "save", "save", "primary", 95, "/admin/role/:id/data-permissions", "PUT"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -1542,16 +1519,12 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 		menuButtonWithAPI(454, menuID, "重置密码", "system_user_reset_password", enum.Line, "reset_password", "lock_reset", "warning", 3, "/admin/user/reset_password/:id", "POST"),
 		menuButtonWithAPI(492, menuID, "解除锁定", "system_user_unlock_login", enum.Line, "unlock_login", "lock_open", "warning", 4, "/admin/user/unlock_login/:id", "POST"),
 		menuButtonWithAPI(615, menuID, "分配角色", "system_user_assign_role", enum.Line, "assign_role", "supervisor_account", "primary", 5, "/admin/user/:id/roles", "PUT"),
-		menuButtonWithAPI(411, menuID, "数据权限", "system_user_data_permission", enum.Line, "assign_data_permission", "shield", "primary", 6, "/admin/user/:id/data-permissions", "PUT"),
 		menuButtonWithAPI(412, menuID, "用户菜单", "system_user_menu_query", enum.Line, "query_user_menu", "account_tree", "primary", 98, "/admin/menu/user/:id", "GET"),
-		apiPermissionWithAPI(413, menuID, "数据权限查询", "system_user_data_permission_query", enum.Line, "query_data_permission", "search", "primary", 99, "/admin/user/:id/data-permissions", "GET"),
 		apiPermissionWithAPI(616, menuID, "角色选项", "system_user_role_options", enum.Line, "query_role_options", "groups", "primary", 100, "/admin/role/query", "POST"),
-		apiPermissionWithAPI(617, menuID, "用户归属查询", "system_user_dimension_value_query", enum.Line, "query_data_permission", "person_search", "primary", 101, "/admin/user/:id/dimension-values", "GET"),
-		apiPermissionWithAPI(618, menuID, "用户归属保存", "system_user_dimension_value_save", enum.Line, "save", "badge", "primary", 102, "/admin/user/:id/dimension-values", "PUT"),
 	}
 	for i := range buttons {
 		switch buttons[i].Code {
-		case "system_user_menu_query", "system_user_data_permission_query", "system_user_role_options", "system_user_dimension_value_query", "system_user_dimension_value_save":
+		case "system_user_menu_query", "system_user_role_options":
 			buttons[i].IsButton = false
 			buttons[i].IsHidden = false
 		}
@@ -1561,21 +1534,6 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 
 func seedDataPermissionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
-		apiPermissionWithAPI(600, menuID, "维度列表", "system_data_permission_dimension_query", enum.Top, "query", "search", "primary", 90, "/admin/data-permission/dimension/query", "POST"),
-		apiPermissionWithAPI(601, menuID, "维度详情", "system_data_permission_dimension_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/data-permission/dimension/:id", "GET"),
-		menuButtonWithAPI(602, menuID, "新增维度", "system_data_permission_dimension_create", enum.Top, "create", "add", "primary", 1, "/admin/data-permission/dimension", "POST"),
-		menuButtonWithAPI(603, menuID, "编辑维度", "system_data_permission_dimension_update", enum.Line, "update", "edit", "primary", 2, "/admin/data-permission/dimension/:id", "PUT"),
-		menuButtonWithAPI(604, menuID, "删除维度", "system_data_permission_dimension_delete", enum.Line, "delete", "delete", "negative", 3, "/admin/data-permission/dimension/:id", "DELETE"),
-		apiPermissionWithAPI(605, menuID, "维度选项", "system_data_permission_dimension_options", enum.Line, "query", "list", "primary", 92, "/admin/data-permission/dimension-options/:code", "GET"),
-		apiPermissionWithAPI(606, menuID, "菜单绑定查询", "system_data_permission_binding_query", enum.Line, "query", "account_tree", "primary", 93, "/admin/data-permission/bindings/menu/:menuId", "GET"),
-		apiPermissionWithAPI(607, menuID, "菜单绑定保存", "system_data_permission_binding_save", enum.Line, "save", "save", "primary", 94, "/admin/data-permission/bindings/menu/:menuId", "PUT"),
-		apiPermissionWithAPI(608, menuID, "角色数据权限查询", "system_data_permission_role_query", enum.Line, "query", "admin_panel_settings", "primary", 95, "/admin/role/:id/data-permissions", "GET"),
-		apiPermissionWithAPI(609, menuID, "角色数据权限保存", "system_data_permission_role_save", enum.Line, "save", "save", "primary", 96, "/admin/role/:id/data-permissions", "PUT"),
-		apiPermissionWithAPI(610, menuID, "用户覆盖查询", "system_data_permission_user_query", enum.Line, "query", "person", "primary", 97, "/admin/user/:id/data-permissions", "GET"),
-		apiPermissionWithAPI(611, menuID, "用户覆盖保存", "system_data_permission_user_save", enum.Line, "save", "save", "primary", 98, "/admin/user/:id/data-permissions", "PUT"),
-		apiPermissionWithAPI(619, menuID, "用户归属查询", "system_data_permission_user_dimension_query", enum.Line, "query", "person_search", "primary", 99, "/admin/user/:id/dimension-values", "GET"),
-		apiPermissionWithAPI(620, menuID, "用户归属保存", "system_data_permission_user_dimension_save", enum.Line, "save", "badge", "primary", 100, "/admin/user/:id/dimension-values", "PUT"),
-		apiPermissionWithAPI(614, menuID, "权限排查", "system_data_permission_debug", enum.Line, "debug", "manage_search", "primary", 101, "/admin/data-permission/debug", "GET"),
 		apiPermissionWithAPI(621, menuID, "数据资源列表", "system_data_permission_config_resource_query", enum.Line, "query", "dataset", "primary", 102, "/admin/data-permission/config/resource/query", "POST"),
 		apiPermissionWithAPI(622, menuID, "数据资源详情", "system_data_permission_config_resource_detail", enum.Line, "detail", "visibility", "primary", 103, "/admin/data-permission/config/resource/:id", "GET"),
 		apiPermissionWithAPI(623, menuID, "资源归属查询", "system_data_permission_config_resource_ownership_query", enum.Line, "query", "account_tree", "primary", 104, "/admin/data-permission/config/resource/:id/ownerships", "GET"),
@@ -1961,11 +1919,6 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "sys_table_index", name: "数据索引"},
 		{code: "sys_table_index_field", name: "数据索引字段"},
 		{code: "sys_table_relation", name: "数据关系"},
-		{code: "sys_data_dimension", name: "数据权限维度"},
-		{code: "sys_data_scope_binding", name: "数据权限绑定"},
-		{code: "sys_role_data_scope", name: "角色数据权限"},
-		{code: "sys_user_data_scope_override", name: "用户数据权限覆盖"},
-		{code: "sys_user_dimension_value", name: "用户维度归属"},
 		{code: "report_definition", name: "报表定义"},
 		{code: "report_definition_version", name: "报表定义版本"},
 		{code: "report_execution_log", name: "报表执行日志"},

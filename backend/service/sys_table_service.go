@@ -42,7 +42,6 @@ type SysTableService struct {
 	sysRoleRepo            repository.SysRoleRepository
 	sysRoleMenuRepo        repository.SysRoleMenuRepository
 	sysRoleMenuButtonRepo  repository.SysRoleMenuButtonRepository
-	dataPermissionService  *DataPermissionService
 	sf                     *utils.Snowflake
 	sysTableCache          *cache.SysTableCache
 	sysTableFieldCache     *cache.SysTableFieldCache
@@ -63,7 +62,6 @@ func NewSysTableService(
 	sysRoleRepo repository.SysRoleRepository,
 	sysRoleMenuRepo repository.SysRoleMenuRepository,
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
-	dataPermissionService *DataPermissionService,
 	sf *utils.Snowflake,
 	sysTableCache *cache.SysTableCache,
 	sysTableFieldCache *cache.SysTableFieldCache,
@@ -81,7 +79,6 @@ func NewSysTableService(
 		sysRoleRepo,
 		sysRoleMenuRepo,
 		sysRoleMenuButtonRepo,
-		dataPermissionService,
 		sf,
 		sysTableCache,
 		sysTableFieldCache,
@@ -1787,9 +1784,6 @@ func (s *SysTableService) UnpublishTableMenu(ctx *gin.Context, tableCode string)
 		if err := s.sysRoleMenuButtonRepo.DeleteByMenuIds(tx, menuIDs); err != nil {
 			return err
 		}
-		if err := s.dataPermissionService.DeleteScopesByMenuIds(tx, menuIDs); err != nil {
-			return err
-		}
 		return nil
 	})
 }
@@ -1887,7 +1881,7 @@ func (s *SysTableService) cleanupLegacyLowCodeMenuButtons(tx *gorm.DB, menuID in
 
 // hideDuplicateLowCodeMenus 隐藏同一张表历史上发布出的重复菜单。
 // 发布入口多次迭代后可能存在“同一 table_code 多个菜单”的历史数据；
-// 这里只保留当前菜单，其余全部停用，并清掉旧菜单的菜单授权、按钮授权和数据权限。
+// 这里只保留当前菜单，其余全部停用，并清掉旧菜单的菜单授权和按钮授权。
 func (s *SysTableService) hideDuplicateLowCodeMenus(tx *gorm.DB, tableCode string, keepMenuID int) error {
 	menus, err := s.findPublishedLowCodeMenus(tx, tableCode)
 	if err != nil {
@@ -1911,7 +1905,7 @@ func (s *SysTableService) hideDuplicateLowCodeMenus(tx *gorm.DB, tableCode strin
 	if err := s.sysRoleMenuButtonRepo.DeleteByMenuIds(tx, duplicateIDs); err != nil {
 		return err
 	}
-	return s.dataPermissionService.DeleteScopesByMenuIds(tx, duplicateIDs)
+	return nil
 }
 
 // findPublishedLowCodeMenu 获取指定表当前可用的低代码菜单。

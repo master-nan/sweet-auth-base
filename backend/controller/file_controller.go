@@ -22,6 +22,7 @@ import (
 	"io"
 	"mime"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ import (
 type FileController struct {
 	fileService           *service.FileService
 	sysTableService       *service.SysTableService
-	dataPermissionService *service.DataPermissionService
+	generalizationService *service.GeneralizationService
 	config                *config.Server
 	translators           map[string]ut.Translator
 }
@@ -43,7 +44,6 @@ type FileController struct {
 type fileBusinessContext struct {
 	TableCode string
 	RecordId  int
-	MenuId    int
 	Action    enum.SysMenuButtonEventAction
 }
 
@@ -61,14 +61,14 @@ type fileAccessURLResponse struct {
 func NewFileController(
 	fileService *service.FileService,
 	sysTableService *service.SysTableService,
-	dataPermissionService *service.DataPermissionService,
+	generalizationService *service.GeneralizationService,
 	config *config.Server,
 	translators map[string]ut.Translator,
 ) *FileController {
 	return &FileController{
 		fileService:           fileService,
 		sysTableService:       sysTableService,
-		dataPermissionService: dataPermissionService,
+		generalizationService: generalizationService,
 		config:                config,
 		translators:           translators,
 	}
@@ -497,7 +497,7 @@ func (f *FileController) ensureFileAccess(ctx *gin.Context, file model.File, fal
 }
 
 func (f *FileController) ensureBusinessFileAccess(ctx *gin.Context, file model.File, bizCtx fileBusinessContext) error {
-	if f.sysTableService == nil || f.dataPermissionService == nil {
+	if f.sysTableService == nil || f.generalizationService == nil {
 		return myerrors.ErrPermissionDenied
 	}
 	table, err := f.sysTableService.GetTableByTableCode(bizCtx.TableCode)
@@ -507,30 +507,71 @@ func (f *FileController) ensureBusinessFileAccess(ctx *gin.Context, file model.F
 	if table.Id == 0 {
 		return myerrors.ErrParamInvalid
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	if !utils.IsSuperAdmin(user) {
-		if err := f.dataPermissionService.CheckRecordDataScope(user, bizCtx.MenuId, table, bizCtx.RecordId, bizCtx.Action); err != nil {
-			return err
-		}
+	record, err := f.generalizationService.GetByIdWithDataPermission(
+		ctx,
+		table,
+		bizCtx.RecordId,
+		fileDataPermissionOperation(bizCtx.Action),
+	)
+	if err != nil {
+		return err
 	}
 	if file.FileUuid == "" {
 		return myerrors.ErrFileNotFound
 	}
-	matchesUuid, err := f.dataPermissionService.RecordContainsValue(table, bizCtx.RecordId, file.FileUuid)
-	if err != nil {
-		return err
-	}
+	matchesUuid := recordContainsFileReference(table, record, file.FileUuid)
 	matchesId := false
 	if file.Id > 0 {
-		matchesId, err = f.dataPermissionService.RecordContainsValue(table, bizCtx.RecordId, strconv.Itoa(file.Id))
-		if err != nil {
-			return err
-		}
+		matchesId = recordContainsFileReference(table, record, strconv.Itoa(file.Id))
 	}
 	if !matchesUuid && !matchesId {
 		return myerrors.ErrPermissionDenied
 	}
 	return nil
+}
+
+func fileDataPermissionOperation(action enum.SysMenuButtonEventAction) string {
+	switch action {
+	case enum.ButtonActionUpdate:
+		return model.DataPermissionOperationUpdate
+	case enum.ButtonActionDelete:
+		return model.DataPermissionOperationDelete
+	case enum.ButtonActionExport:
+		return model.DataPermissionOperationExport
+	default:
+		return model.DataPermissionOperationDetail
+	}
+}
+
+func recordContainsFileReference(table model.SysTable, record map[string]interface{}, needle string) bool {
+	needle = strings.TrimSpace(needle)
+	if needle == "" || len(record) == 0 {
+		return false
+	}
+	for _, field := range table.TableFields {
+		if field.InputType != enum.FilePickerInputType && field.InputType != enum.RichTextInputType {
+			continue
+		}
+		value, ok := record[field.FieldCode]
+		if !ok || value == nil {
+			continue
+		}
+		haystack := fmt.Sprintf("%v", value)
+		if raw, ok := value.([]byte); ok {
+			haystack = string(raw)
+		}
+		if _, err := strconv.Atoi(needle); err == nil {
+			pattern := `(^|[^0-9])` + regexp.QuoteMeta(needle) + `([^0-9]|$)`
+			if regexp.MustCompile(pattern).MatchString(haystack) {
+				return true
+			}
+			continue
+		}
+		if strings.Contains(haystack, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseFileBusinessContext(ctx *gin.Context, fallbackAction enum.SysMenuButtonEventAction) (fileBusinessContext, bool, error) {
@@ -546,13 +587,6 @@ func parseFileBusinessContext(ctx *gin.Context, fallbackAction enum.SysMenuButto
 	if err != nil || recordId <= 0 {
 		return fileBusinessContext{}, true, myerrors.ErrParamInvalid
 	}
-	menuId := 0
-	if rawMenuId := strings.TrimSpace(ctx.Query("menu_id")); rawMenuId != "" {
-		menuId, err = strconv.Atoi(rawMenuId)
-		if err != nil || menuId < 0 {
-			return fileBusinessContext{}, true, myerrors.ErrParamInvalid
-		}
-	}
 	action := fallbackAction
 	if rawAction := strings.TrimSpace(ctx.Query("action")); rawAction != "" {
 		normalized, ok := enum.NormalizeSysMenuButtonEventAction(rawAction)
@@ -561,7 +595,7 @@ func parseFileBusinessContext(ctx *gin.Context, fallbackAction enum.SysMenuButto
 		}
 		action = normalized
 	}
-	return fileBusinessContext{TableCode: tableCode, RecordId: recordId, MenuId: menuId, Action: action}, true, nil
+	return fileBusinessContext{TableCode: tableCode, RecordId: recordId, Action: action}, true, nil
 }
 
 func defaultFileBusinessAction(ctx *gin.Context, fallbackAction enum.SysMenuButtonEventAction) enum.SysMenuButtonEventAction {

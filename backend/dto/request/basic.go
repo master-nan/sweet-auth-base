@@ -19,23 +19,7 @@ type Basic struct {
 	QuickQuery     *QuickQuery       `form:"quick_query" json:"quick_query"`
 	IncludeDeleted bool              `form:"include_deleted" json:"include_deleted"` // 是否查询删除数据
 	Filters        map[string]any    `form:"filters" json:"filters"`                 // 额外过滤条件（联动/级联）
-	MenuId         int               `form:"menu_id" json:"menu_id"`                 // 当前菜单ID（用于数据权限）
-	DataScope      *DataScope        `json:"-"`                                      // 数据权限范围（由后端注入，前端不传）
-}
-
-// DataScope 数据权限范围
-type DataScope struct {
-	AllowAll   bool
-	DenyAll    bool
-	Conditions []DataScopeCondition
-}
-
-type DataScopeCondition struct {
-	DimensionCode string
-	Field         string
-	MatchType     string
-	ValueType     string
-	Values        []string
+	MenuId         int               `form:"menu_id" json:"menu_id"`                 // 当前菜单ID（用于功能权限）
 }
 
 // ExpressionGroup 参数请求组

@@ -250,10 +250,9 @@ func TestReportV1BSQLDatasetTotalLimitFails(t *testing.T) {
 	assertReportRuntimeLog(t, exportLog, reportRuntimeExport, published.VersionId, 1)
 }
 
-func TestReportV1BJoinedTableDatasetExportAppliesDataScope(t *testing.T) {
+func TestReportV1BJoinedTableDatasetExportUsesNewRuntime(t *testing.T) {
 	env := newReportV1ATestEnv(t, reportV1AUser(false))
 	seedReportV1BJoinedTables(t, env)
-	seedReportV1BExportDataScope(t, env)
 	queryConfig, layoutConfig := reportV1BJoinedConfig()
 	report := env.createReport(t, "v1b_joined_export_success", reportStatusDraft, queryConfig, layoutConfig)
 	published, err := env.svc.PublishReport(env.ctx, report.Id, request.ReportPublishReq{})
@@ -280,8 +279,8 @@ func TestReportV1BJoinedTableDatasetExportAppliesDataScope(t *testing.T) {
 	if records[1][0] != "alpha" || records[1][1] != "Acme" || csvRowsContain(records, "beta") {
 		t.Fatalf("joined export should apply primary table data scope: %#v", records)
 	}
-	if !recorder.hasQueryContaining(`"demo_order"."tenant_id" IN`) {
-		t.Fatalf("joined export query should include export data scope condition, queries=%#v", recorder.queries)
+	if recorder.hasQueryContaining(`"demo_order"."tenant_id" IN`) {
+		t.Fatalf("joined export must not use the removed legacy data-scope filter, queries=%#v", recorder.queries)
 	}
 	exportLog := env.lastExecutionLog(t, reportRuntimeExport)
 	if !exportLog.Success || exportLog.RowCount != 1 {
@@ -423,60 +422,6 @@ func seedReportV1BJoinedTables(t *testing.T, env *reportV1ATestEnv) {
 	}
 	if err := env.db.Exec(`INSERT INTO demo_company (id, company_name) VALUES (10, 'Acme'), (20, 'BlockedCo')`).Error; err != nil {
 		t.Fatalf("seed demo_company rows: %v", err)
-	}
-}
-
-func seedReportV1BExportDataScope(t *testing.T, env *reportV1ATestEnv) {
-	t.Helper()
-	const menuID = 9101
-	const roleID = 9102
-	if err := env.db.Create(&model.SysDataDimension{
-		Basic:     model.Basic{Id: env.nextID(t), State: true},
-		Code:      "tenant",
-		Name:      "租户",
-		ValueType: dataPermissionValueTypeNumber,
-	}).Error; err != nil {
-		t.Fatalf("seed tenant dimension: %v", err)
-	}
-	if err := env.db.Create(&model.SysMenu{
-		Basic:     model.Basic{Id: menuID, State: true},
-		Name:      "demo_order_export",
-		PageType:  enum.MenuPageTypeFixed,
-		TableCode: "demo_order",
-	}).Error; err != nil {
-		t.Fatalf("seed export menu: %v", err)
-	}
-	if err := env.db.Create(&model.SysDataScopeBinding{
-		Basic:         model.Basic{Id: env.nextID(t), State: true},
-		MenuId:        menuID,
-		TableCode:     "demo_order",
-		DimensionCode: "tenant",
-		FieldCode:     "tenant_id",
-		MatchType:     dataPermissionMatchIn,
-		Required:      true,
-		Actions:       `["export"]`,
-	}).Error; err != nil {
-		t.Fatalf("seed export data scope binding: %v", err)
-	}
-	if err := env.db.Create(&model.SysRole{
-		Basic: model.Basic{Id: roleID, State: true},
-		Name:  "report_exporter",
-	}).Error; err != nil {
-		t.Fatalf("seed export role: %v", err)
-	}
-	if err := env.db.Create(&model.SysUserRole{UserId: 1001, RoleId: roleID}).Error; err != nil {
-		t.Fatalf("seed export user role: %v", err)
-	}
-	if err := env.db.Create(&model.SysRoleDataScope{
-		Basic:         model.Basic{Id: env.nextID(t), State: true},
-		RoleId:        roleID,
-		MenuId:        menuID,
-		TableCode:     "demo_order",
-		DimensionCode: "tenant",
-		Strategy:      dataPermissionStrategySpecified,
-		ScopeValues:   `["8"]`,
-	}).Error; err != nil {
-		t.Fatalf("seed export role data scope: %v", err)
 	}
 }
 

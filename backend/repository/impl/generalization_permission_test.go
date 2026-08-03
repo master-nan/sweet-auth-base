@@ -79,7 +79,6 @@ func TestGeneralizationPermissionRepositoryDoesNotExecuteInvalidOrDenyAllFilters
 		1,
 		map[string]interface{}{"name": "leaked"},
 		repository.GeneralizationPermission{
-			Mode:             repository.GeneralizationPermissionAdapter,
 			AdapterExecution: &denyExecution,
 		},
 	)
@@ -93,11 +92,10 @@ func TestGeneralizationPermissionRepositoryDoesNotExecuteInvalidOrDenyAllFilters
 		table,
 		1,
 		repository.GeneralizationPermission{
-			Mode:             repository.GeneralizationPermissionAdapter,
 			AdapterExecution: &notApplicable,
 		},
-	); err == nil {
-		t.Fatal("not_applicable reached the record query")
+	); err != nil {
+		t.Fatalf("not_applicable detail query: %v", err)
 	}
 }
 
@@ -193,7 +191,6 @@ func generalizationRepositoryPermission(
 		[]datapermission.DataScopeCondition{condition},
 	)
 	return repository.GeneralizationPermission{
-		Mode:             repository.GeneralizationPermissionAdapter,
 		AdapterExecution: &execution,
 	}
 }

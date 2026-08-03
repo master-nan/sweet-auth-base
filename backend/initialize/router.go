@@ -160,8 +160,6 @@ func InitRouter(app *App) *gin.Engine {
 		// role
 		adminGroup.GET("/role/menu/:id", app.RoleController.GetRoleMenus)
 		adminGroup.GET("/role/menu/buttons/:roleId/:menuId", app.RoleController.GetRoleMenuButtons)
-		adminGroup.GET("/role/:id/data-permissions", app.DataPermissionController.GetRoleDataScopes)
-		adminGroup.PUT("/role/:id/data-permissions", app.DataPermissionController.SaveRoleDataScopes)
 		adminGroup.POST("/role/assign-permissions", app.RoleController.AssignPermissions)
 		adminGroup.POST("/role/query", app.RoleController.QueryRole)
 		adminGroup.GET("/role/:id", app.RoleController.GetRoleById)
@@ -177,24 +175,9 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/user/password", app.UserController.UpdatePassword)
 		adminGroup.POST("/user/reset_password/:id", app.UserController.ResetPassword)
 		adminGroup.POST("/user/unlock_login/:id", app.UserController.UnlockLogin)
-		adminGroup.GET("/user/:id/data-permissions", app.DataPermissionController.GetUserOverrides)
-		adminGroup.PUT("/user/:id/data-permissions", app.DataPermissionController.SaveUserOverrides)
-		adminGroup.GET("/user/:id/dimension-values", app.DataPermissionController.GetUserDimensionValues)
-		adminGroup.PUT("/user/:id/dimension-values", app.DataPermissionController.SaveUserDimensionValues)
 		adminGroup.PUT("/user/:id/roles", app.UserController.AssignRoles)
 		adminGroup.PUT("/user/:id", app.UserController.UpdateUser)
 		adminGroup.DELETE("/user/:id", app.UserController.DeleteUser)
-
-		// data permission
-		adminGroup.POST("/data-permission/dimension/query", app.DataPermissionController.QueryDimensions)
-		adminGroup.GET("/data-permission/dimension/:id", app.DataPermissionController.GetDimensionById)
-		adminGroup.POST("/data-permission/dimension", app.DataPermissionController.CreateDimension)
-		adminGroup.PUT("/data-permission/dimension/:id", app.DataPermissionController.UpdateDimension)
-		adminGroup.DELETE("/data-permission/dimension/:id", app.DataPermissionController.DeleteDimension)
-		adminGroup.GET("/data-permission/dimension-options/:code", app.DataPermissionController.GetDimensionOptions)
-		adminGroup.GET("/data-permission/bindings/menu/:menuId", app.DataPermissionController.GetMenuBindings)
-		adminGroup.PUT("/data-permission/bindings/menu/:menuId", app.DataPermissionController.SaveMenuBindings)
-		adminGroup.GET("/data-permission/debug", app.DataPermissionController.DebugDataScope)
 
 		// data permission DP-2 configuration queries and preflight
 		adminGroup.POST("/data-permission/config/dimension/query", app.DataPermissionConfigController.QueryDimensions)

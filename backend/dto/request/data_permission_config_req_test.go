@@ -252,8 +252,7 @@ func TestDataPermissionConfigQueryDTOExcludesUnsafeClientFields(t *testing.T) {
 	if basic.TableCode != "" ||
 		basic.Filters != nil ||
 		basic.IncludeDeleted ||
-		basic.MenuId != 0 ||
-		basic.DataScope != nil {
+		basic.MenuId != 0 {
 		t.Fatalf("restricted fields reached Basic request: %+v", basic)
 	}
 }

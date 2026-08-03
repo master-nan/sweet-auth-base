@@ -45,10 +45,6 @@ func (r *generalizationRepoSpy) RowExists(model.SysTable, int) (bool, error) {
 	return r.rowExists, nil
 }
 
-func (r *generalizationRepoSpy) RowMatchesDataScope(model.SysTable, int, *request.DataScope) (bool, error) {
-	return true, nil
-}
-
 func (r *generalizationRepoSpy) Update(_ model.SysTable, _ int, data map[string]interface{}) error {
 	r.called = true
 	r.updated = copyMap(data)

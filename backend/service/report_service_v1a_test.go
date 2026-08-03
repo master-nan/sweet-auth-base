@@ -5,9 +5,11 @@ import (
 	"backend/enum"
 	"backend/internal/cache"
 	"backend/internal/database"
+	"backend/internal/datapermission"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
@@ -204,11 +206,6 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 		&model.SysTableRelation{},
 		&model.SysTableIndex{},
 		&model.SysTableIndexField{},
-		&model.SysDataDimension{},
-		&model.SysDataScopeBinding{},
-		&model.SysRoleDataScope{},
-		&model.SysUserDataScopeOverride{},
-		&model.SysUserDimensionValue{},
 		&model.ReportDefinition{},
 		&model.ReportDefinitionVersion{},
 		&model.ReportExecutionLog{},
@@ -218,8 +215,24 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 	seedReportV1ATable(t, db)
 	primaryDB := &database.PrimaryDB{DB: db}
 	store := newJSONMemoryCacher()
-	generalizationService := NewGeneralizationService(impl.NewGeneralizationRepositoryImpl(primaryDB), sf)
-	dataPermissionService := NewDataPermissionService(primaryDB, sf)
+	permissionRuntime := newLowCodeDataPermissionRuntime(
+		func(*gin.Context, int) ([]model.DataResource, error) { return nil, nil },
+		func(*gin.Context, int) ([]model.DataOwnershipField, error) { return nil, nil },
+		func(*gin.Context, int) (datapermission.SubjectContext, error) {
+			return datapermission.SubjectContext{}, nil
+		},
+		func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			return datapermission.DataScopeResult{}, nil
+		},
+		func(_ context.Context, input datapermission.AdapterInput) (datapermission.AdapterExecution, error) {
+			return datapermission.BuildAdapterExecution(input)
+		},
+	)
+	generalizationService := NewGeneralizationServiceWithDataPermission(
+		impl.NewGeneralizationRepositoryImpl(primaryDB),
+		sf,
+		permissionRuntime,
+	)
 	sysTableService := &SysTableService{
 		sysTableRepo:       impl.NewSysTableRepositoryImpl(primaryDB),
 		sysTableFieldRepo:  impl.NewSysTableFieldRepositoryImpl(primaryDB),
@@ -237,7 +250,6 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 			reportLogRepo:         impl.NewReportExecutionLogRepositoryImpl(primaryDB),
 			generalizationService: generalizationService,
 			sysTableService:       sysTableService,
-			dataPermissionService: dataPermissionService,
 			sf:                    sf,
 		},
 		ctx: ctx,

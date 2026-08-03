@@ -50,7 +50,9 @@
               color="primary"
               class="q-ml-xs"
               :aria-label="
-                hasAppliedAdvancedFilters ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+                hasAppliedAdvancedFilters
+                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
+                  : '高级查询'
               "
               @click="showAdvancedQuery = true"
             >
@@ -153,9 +155,6 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
-import {
-  type RoleDataPermissionSaveItem,
-} from 'src/api/services/data-permission'
 
 // 加载状态
 const loadingStore = useLoadingStore()
@@ -427,14 +426,12 @@ const savePermission = async (permissionData: {
   roleId: number
   menuIds: number[]
   buttonIds: number[]
-  dataPermissions?: RoleDataPermissionSaveItem[]
 }) => {
   try {
     const result = await roleApi.assignPermissions(
       permissionData.roleId,
       permissionData.menuIds,
       permissionData.buttonIds,
-      permissionData.dataPermissions || [],
     )
 
     if (result.success) {

@@ -25,8 +25,8 @@ func migrationSteps() []migrationStep {
 	return []migrationStep{
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
 		{name: "data_permission_domain_schema", run: migrateDataPermissionSchema},
+		{name: "remove_legacy_data_permission_schema", run: removeLegacyDataPermissionSchema},
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
-		{name: "ensure_data_permission_indexes", run: ensureDataPermissionIndexes},
 		{name: "backfill_sys_menu_page_binding", run: backfillSysMenuPageBinding},
 		{name: "organization_database_comments", run: applyOrganizationDatabaseComments},
 	}
@@ -61,11 +61,6 @@ func autoMigrateCoreSchema(db *gorm.DB) error {
 		&model.SysRole{},
 		&model.SysRoleMenu{},
 		&model.SysRoleMenuButton{},
-		&model.SysDataDimension{},
-		&model.SysDataScopeBinding{},
-		&model.SysRoleDataScope{},
-		&model.SysUserDataScopeOverride{},
-		&model.SysUserDimensionValue{},
 		&model.OrgLegalEntity{},
 		&model.OrgUnit{},
 		&model.OrgStructure{},

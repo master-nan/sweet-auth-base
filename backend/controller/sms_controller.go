@@ -8,7 +8,6 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	"backend/internal/utils"
 	"backend/service"
 	"strconv"
@@ -18,17 +17,15 @@ import (
 )
 
 type SmsController struct {
-	smsService            *service.SmsService
-	sysTableService       *service.SysTableService
-	dataPermissionService *service.DataPermissionService
-	translators           map[string]ut.Translator
+	smsService      *service.SmsService
+	sysTableService *service.SysTableService
+	translators     map[string]ut.Translator
 }
 
-func NewSmsController(smsService *service.SmsService, sysTableService *service.SysTableService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *SmsController {
+func NewSmsController(smsService *service.SmsService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *SmsController {
 	return &SmsController{
 		smsService,
 		sysTableService,
-		dataPermissionService,
 		translators,
 	}
 }
@@ -57,10 +54,6 @@ func (s *SmsController) QuerySmsTemplate(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := injectQueryDataScope(ctx, s.dataPermissionService, &data, table); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	result, err := s.smsService.GetSmsTemplateList(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -83,10 +76,6 @@ func (s *SmsController) GetSmsTemplateById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, s.sysTableService, s.dataPermissionService, "sms_template", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -151,10 +140,6 @@ func (s *SmsController) UpdateSmsTemplate(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, s.sysTableService, s.dataPermissionService, "sms_template", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = s.smsService.UpdateSmsTemplate(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -177,10 +162,6 @@ func (s *SmsController) DeleteSmsTemplateById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, s.sysTableService, s.dataPermissionService, "sms_template", id, enum.ButtonActionDelete); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

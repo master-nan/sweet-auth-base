@@ -24,8 +24,7 @@ type RoleMenuCreateReq struct {
 
 // RoleAssignPermissionsReq 分配权限
 type RoleAssignPermissionsReq struct {
-	RoleId          int                         `json:"role_id" binding:"required"`
-	MenuIds         []int                       `json:"menu_ids" binding:"required"`
-	ButtonIds       []int                       `json:"button_ids" binding:"required"`
-	DataPermissions []RoleDataPermissionItemReq `json:"data_permissions"`
+	RoleId    int   `json:"role_id" binding:"required"`
+	MenuIds   []int `json:"menu_ids" binding:"required"`
+	ButtonIds []int `json:"button_ids" binding:"required"`
 }

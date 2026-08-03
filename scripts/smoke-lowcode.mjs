@@ -183,9 +183,6 @@ function hardCleanupSmokeTable(code) {
   const sqlCode = code.replaceAll("'", "''")
   const menuWhere = `table_code = '${sqlCode}' OR "option" = '${sqlCode}'`
   const sql = `
-DELETE FROM sys_user_data_scope_override WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
-DELETE FROM sys_role_data_scope WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
-DELETE FROM sys_data_scope_binding WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
 DELETE FROM sys_role_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
 DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
 DELETE FROM sys_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE ${menuWhere});
@@ -255,11 +252,10 @@ LIMIT 1;
     userId = parts[0] || ''
     phone = parts[1] || ''
 	  }
-	  runPostgres(`
-	DELETE FROM sys_user_data_scope_override WHERE user_id IN (SELECT id FROM sys_user WHERE user_name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_user_role WHERE user_id IN (SELECT id FROM sys_user WHERE user_name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_user WHERE id IN (SELECT id FROM sys_user WHERE user_name = '${sqlName}' LIMIT 1);
-	`)
+  runPostgres(`
+DELETE FROM sys_user_role WHERE user_id IN (SELECT id FROM sys_user WHERE user_name = '${sqlName}' LIMIT 1);
+DELETE FROM sys_user WHERE id IN (SELECT id FROM sys_user WHERE user_name = '${sqlName}' LIMIT 1);
+`)
   clearUserCacheKeys(userId ? `USER_CACHE_KEY_${userId}` : '', `USER_CACHE_KEY_${userName}`, phone ? `USER_CACHE_KEY_${phone}` : '')
 }
 
@@ -291,15 +287,12 @@ INSERT INTO sys_user_role (user_id, role_id) VALUES (${userId}, ${Number(roleId)
 
 function cleanupSmokeMenu(menuName) {
   if (!dropPhysicalSmokeTables) return
-	  assert(/^smoke_menu_[A-Za-z0-9_]+$/.test(menuName), `refusing to cleanup non-smoke menu: ${menuName}`)
-	  const sqlName = sqlString(menuName)
-	  runPostgres(`
-	DELETE FROM sys_user_data_scope_override WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_role_data_scope WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_data_scope_binding WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_role_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
-	DELETE FROM sys_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
+  assert(/^smoke_menu_[A-Za-z0-9_]+$/.test(menuName), `refusing to cleanup non-smoke menu: ${menuName}`)
+  const sqlName = sqlString(menuName)
+  runPostgres(`
+DELETE FROM sys_role_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
+DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
+DELETE FROM sys_menu_button WHERE menu_id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
 DELETE FROM sys_menu WHERE id IN (SELECT id FROM sys_menu WHERE name = '${sqlName}' LIMIT 1);
 `)
 }
@@ -489,36 +482,6 @@ WHERE ptype = 'p'
 `),
   )
   assert(policyCount === 2, `audit casbin policies missing: ${policyCount}`)
-
-  const userPermissionButtonCount = Number(
-    runPostgres(`
-SELECT COUNT(*)
-FROM sys_menu_button b
-JOIN sys_menu m ON m.id = b.menu_id
-	WHERE m.name = 'system_user'
-	  AND (
-	    (b.code = 'system_user_data_permission' AND b.path = '/admin/user/:id/data-permissions' AND b.method = 'PUT')
-	    OR (b.code = 'system_user_menu_query' AND b.path = '/admin/menu/user/:id' AND b.method = 'GET')
-	    OR (b.code = 'system_user_data_permission_query' AND b.path = '/admin/user/:id/data-permissions' AND b.method = 'GET')
-	  );
-	`),
-	  )
-  assert(userPermissionButtonCount === 3, `user data permission buttons missing: ${userPermissionButtonCount}`)
-
-  const userPermissionPolicyCount = Number(
-    runPostgres(`
-SELECT COUNT(*)
-FROM casbin_rule
-	WHERE ptype = 'p'
-	  AND v0 = 'super_admin'
-	  AND (
-	    (v1 = '/admin/user/:id/data-permissions' AND v2 = 'PUT')
-	    OR (v1 = '/admin/menu/user/:id' AND v2 = 'GET')
-	    OR (v1 = '/admin/user/:id/data-permissions' AND v2 = 'GET')
-	  );
-	`),
-  )
-  assert(userPermissionPolicyCount === 3, `user data permission casbin policies missing: ${userPermissionPolicyCount}`)
 
   const routePolicyCount = Number(
     runPostgres(`
@@ -795,242 +758,6 @@ async function assertProtectedGeneralizationWriteGuard(menus) {
     `protected system table write was not blocked: ${JSON.stringify(denied.body)}`,
   )
   console.log('OK protected table write guard')
-}
-
-function pickDataPermissionField(table) {
-  const fields = table?.table_fields || []
-  const integerTypes = new Set([1, 9, 11])
-  const priority = ['scope_id', 'tenant_id', 'project_id', 'owner_id', 'id']
-  for (const fieldCode of priority) {
-    const field = fields.find((item) => item.field_code === fieldCode && integerTypes.has(Number(item.field_type)))
-    if (field) return field.field_code
-  }
-  const firstInteger = fields.find((item) => integerTypes.has(Number(item.field_type)))
-  assert(firstInteger?.field_code, `table has no integer field for data permission smoke: ${JSON.stringify(table)}`)
-  return firstInteger.field_code
-}
-
-async function assertUserDataPermissionApi(menuId, fixedMenuId, table) {
-  const userMenus = await request('/admin/menu/user/1')
-  assert(userMenus.status === 200 && userMenus.body?.success, `user menu query failed: ${JSON.stringify(userMenus.body)}`)
-  const fieldCode = pickDataPermissionField(table)
-  const dimensionCode = `smoke_scope_${Date.now().toString(36)}`
-
-  const createdDimension = await request('/admin/data-permission/dimension', {
-    method: 'POST',
-    body: JSON.stringify({
-      code: dimensionCode,
-      name: 'Smoke Scope',
-      value_type: 'number',
-      source_type: 'none',
-      memo: 'smoke data permission dimension',
-      state: true,
-    }),
-  })
-  assert(
-    createdDimension.status === 200 && createdDimension.body?.success,
-    `create data permission dimension failed: ${JSON.stringify(createdDimension.body)}`,
-  )
-
-  try {
-    const invalidBinding = await request(`/admin/data-permission/bindings/menu/${menuId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        menu_id: menuId,
-        bindings: [
-          {
-            dimension_code: dimensionCode,
-            field_code: 'missing_data_field',
-            match_type: 'in',
-            actions: ['query'],
-            required: true,
-          },
-        ],
-      }),
-    })
-    assert(
-      invalidBinding.status === 400 && invalidBinding.body?.error_code === 10000,
-      `invalid data permission binding field was not rejected: ${JSON.stringify(invalidBinding.body)}`,
-    )
-
-    if (fixedMenuId) {
-      const fixedMenuBinding = await request(`/admin/data-permission/bindings/menu/${fixedMenuId}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          menu_id: fixedMenuId,
-          bindings: [{ dimension_code: dimensionCode, field_code: 'id', match_type: 'in', actions: ['query'] }],
-        }),
-      })
-      assert(
-        fixedMenuBinding.status === 200 && fixedMenuBinding.body?.success,
-        `fixed data permission menu binding failed: ${JSON.stringify(fixedMenuBinding.body)}`,
-      )
-      await request(`/admin/data-permission/bindings/menu/${fixedMenuId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ menu_id: fixedMenuId, bindings: [] }),
-      })
-    }
-
-    const savedBinding = await request(`/admin/data-permission/bindings/menu/${menuId}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        menu_id: menuId,
-        bindings: [
-          {
-            dimension_code: dimensionCode,
-            field_code: fieldCode,
-            match_type: 'in',
-            actions: ['query', 'detail', 'create', 'update', 'delete'],
-            required: true,
-          },
-        ],
-      }),
-    })
-    assert(
-      savedBinding.status === 200 && savedBinding.body?.success,
-      `save menu data permission binding failed: ${JSON.stringify(savedBinding.body)}`,
-    )
-
-    const savedOverride = await request('/admin/user/1/data-permissions', {
-      method: 'PUT',
-      body: JSON.stringify({
-        user_id: 1,
-        overrides: [
-          {
-            menu_id: menuId,
-            table_code: table.table_code,
-            dimension_code: dimensionCode,
-            strategy: 'specified',
-            scope_values: ['3', '1', '3'],
-            override_mode: 'replace',
-          },
-        ],
-      }),
-    })
-    assert(
-      savedOverride.status === 200 && savedOverride.body?.success,
-      `save user data permission override failed: ${JSON.stringify(savedOverride.body)}`,
-    )
-
-    const overrides = await request('/admin/user/1/data-permissions')
-    assert(
-      overrides.status === 200 && overrides.body?.success,
-      `user data permission override query failed: ${JSON.stringify(overrides.body)}`,
-    )
-    assert(
-      overrides.body.data?.some(
-        (item) =>
-          item.menu_id === menuId &&
-          item.dimension_code === dimensionCode &&
-          Array.isArray(item.scope_values) &&
-          item.scope_values.join(',') === '1,3',
-      ),
-      `saved user data permission override missing or not normalized: ${JSON.stringify(overrides.body.data)}`,
-    )
-
-    const cleared = await request('/admin/user/1/data-permissions', {
-      method: 'PUT',
-      body: JSON.stringify({ user_id: 1, overrides: [] }),
-    })
-    assert(cleared.status === 200 && cleared.body?.success, `clear user data permission failed: ${JSON.stringify(cleared.body)}`)
-  } finally {
-    await request(`/admin/data-permission/bindings/menu/${menuId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ menu_id: menuId, bindings: [] }),
-    })
-    const dimensions = await request('/admin/data-permission/dimension/query', {
-      method: 'POST',
-      body: JSON.stringify({
-        page: 1,
-        num: 1000,
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-      }),
-    })
-    const created = dimensions.body?.data?.find((item) => item.code === dimensionCode)
-    if (created?.id) {
-      await request(`/admin/data-permission/dimension/${created.id}`, { method: 'DELETE' })
-    }
-  }
-}
-
-function normalizeDataScopeValues(scopeValues) {
-  return String(scopeValues || '')
-    .split(/[,\s;]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .sort()
-}
-
-function smokeDimensionCode(fieldCode) {
-  assert(/^[A-Za-z_][A-Za-z0-9_]{0,48}$/.test(fieldCode), `invalid smoke data permission field: ${fieldCode}`)
-  return `smoke_${fieldCode}`
-}
-
-function setMenuDataScope(menuId, scopeValues, fieldCode = 'id') {
-  if (!dropPhysicalSmokeTables) return
-  const numericMenuId = Number(menuId)
-  const values = normalizeDataScopeValues(scopeValues)
-  assert(values.length > 0, 'data scope values are required')
-  const tableCode = runPostgres(`SELECT table_code FROM sys_menu WHERE id = ${numericMenuId} LIMIT 1;`)
-  assert(tableCode, `menu ${numericMenuId} has no table_code for data scope smoke`)
-  const dimensionCode = smokeDimensionCode(fieldCode)
-  const idBase = Date.now() * 1000 + Math.floor(Math.random() * 1000)
-  const actionsJson = sqlString(JSON.stringify(['batch_delete', 'create', 'delete', 'detail', 'export', 'query', 'update']))
-  const valuesJson = sqlString(JSON.stringify(values))
-  runPostgres(`
-INSERT INTO sys_data_dimension
-  (id, gmt_create, gmt_modify, state, code, name, value_type, source_type, source_code, label_field, value_field, parent_field, memo)
-VALUES
-  (${idBase}, NOW(), NOW(), true, '${sqlString(dimensionCode)}', 'Smoke ${sqlString(fieldCode)}', 'number', 'none', '', '', '', '', 'smoke data permission')
-ON CONFLICT (code) DO UPDATE SET
-  gmt_modify = NOW(),
-  state = true,
-  value_type = 'number',
-  source_type = 'none',
-  memo = 'smoke data permission';
-DELETE FROM sys_user_data_scope_override WHERE menu_id = ${numericMenuId} AND dimension_code = '${sqlString(dimensionCode)}';
-DELETE FROM sys_role_data_scope WHERE menu_id = ${numericMenuId} AND dimension_code = '${sqlString(dimensionCode)}';
-DELETE FROM sys_data_scope_binding WHERE menu_id = ${numericMenuId} AND dimension_code = '${sqlString(dimensionCode)}';
-INSERT INTO sys_data_scope_binding
-  (id, gmt_create, gmt_modify, state, menu_id, table_code, dimension_code, field_code, match_type, required, actions)
-VALUES
-  (${idBase + 1}, NOW(), NOW(), true, ${numericMenuId}, '${sqlString(tableCode)}', '${sqlString(dimensionCode)}', '${sqlString(fieldCode)}', 'in', true, '${actionsJson}');
-WITH numbered_roles AS (
-  SELECT role_id, row_number() OVER (ORDER BY role_id) AS rn
-  FROM sys_user_role
-  WHERE user_id = 1
-)
-INSERT INTO sys_role_data_scope
-  (id, gmt_create, gmt_modify, state, role_id, menu_id, table_code, dimension_code, strategy, scope_values)
-SELECT
-  ${idBase + 10} + rn,
-  NOW(),
-  NOW(),
-  true,
-  role_id,
-  ${numericMenuId},
-  '${sqlString(tableCode)}',
-  '${sqlString(dimensionCode)}',
-  'specified',
-  '${valuesJson}'
-FROM numbered_roles;
-`)
-}
-
-function clearMenuDataScope(menuId) {
-  if (!dropPhysicalSmokeTables) return
-  runPostgres(`
-DELETE FROM sys_user_data_scope_override WHERE menu_id = ${Number(menuId)};
-DELETE FROM sys_role_data_scope WHERE menu_id = ${Number(menuId)};
-DELETE FROM sys_data_scope_binding WHERE menu_id = ${Number(menuId)};
-DELETE FROM sys_data_dimension d
-WHERE d.code LIKE 'smoke_%'
-  AND NOT EXISTS (SELECT 1 FROM sys_data_scope_binding b WHERE b.dimension_code = d.code)
-  AND NOT EXISTS (SELECT 1 FROM sys_role_data_scope r WHERE r.dimension_code = d.code)
-  AND NOT EXISTS (SELECT 1 FROM sys_user_data_scope_override u WHERE u.dimension_code = d.code);
-`)
 }
 
 function setMenuButtonDisabled(buttonId, disabled) {
@@ -2241,70 +1968,8 @@ async function assertRelationCandidateMenuScope() {
       `relation source field query failed: ${JSON.stringify(sourceRelationQuery.body)}`,
     )
 
-    setMenuDataScope(targetMenu.id, '1', 'scope_id')
-    const wrongMenuQuery = await request(`/admin/generalization/query/code/${targetCode}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        page: 1,
-        num: 20,
-        table_code: targetCode,
-        menu_id: sourceMenu.id,
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-      }),
-    })
-    assert(
-      wrongMenuQuery.status === 403 && wrongMenuQuery.body?.error_code === 30006,
-      `relation candidate query accepted source menu_id: ${JSON.stringify(wrongMenuQuery.body)}`,
-    )
-
-    const scopedCandidateFilterQuery = await request(`/admin/generalization/query/code/${targetCode}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        page: 1,
-        num: 20,
-        table_code: targetCode,
-        menu_id: targetMenu.id,
-        filters: { id: [targetInScope.id, targetOutScope.id] },
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-      }),
-    })
-    assert(
-      scopedCandidateFilterQuery.status === 200 &&
-        scopedCandidateFilterQuery.body?.success &&
-        scopedCandidateFilterQuery.body.data?.length === 1 &&
-        scopedCandidateFilterQuery.body.data[0]?.name === 'Target In Scope',
-      `relation candidate filtered lookup failed: ${JSON.stringify(scopedCandidateFilterQuery.body)}`,
-    )
-
-    const scopedCandidateQuery = await request(`/admin/generalization/query/code/${targetCode}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        page: 1,
-        num: 20,
-        table_code: targetCode,
-        menu_id: targetMenu.id,
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-      }),
-    })
-    assert(
-      scopedCandidateQuery.status === 200 &&
-        scopedCandidateQuery.body?.success &&
-        scopedCandidateQuery.body.data?.length === 1 &&
-        scopedCandidateQuery.body.data[0]?.name === 'Target In Scope',
-      `relation candidate data scope failed: ${JSON.stringify(scopedCandidateQuery.body)}`,
-    )
-    console.log('OK relation field query and candidate menu scope')
+    console.log('OK relation field query')
   } finally {
-    const targetMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE table_code = '${sqlString(targetCode)}' OR "option" = '${sqlString(targetCode)}';`)
-    const sourceMenuId = runPostgres(`SELECT COALESCE(MAX(id), 0) FROM sys_menu WHERE table_code = '${sqlString(sourceCode)}' OR "option" = '${sqlString(sourceCode)}';`)
-    if (Number(targetMenuId) > 0) clearMenuDataScope(Number(targetMenuId))
-    if (Number(sourceMenuId) > 0) clearMenuDataScope(Number(sourceMenuId))
     await cleanupTable(sourceCode)
     await cleanupTable(targetCode)
   }
@@ -2533,7 +2198,6 @@ async function main() {
   )
   console.log('OK query menu auto resolve')
 
-  setMenuDataScope(lowcodeMenu.id, '1')
   const unpublish = await request(`/admin/table/unpublish/${tableCode}`, { method: 'POST' })
   assert(
     unpublish.status === 200 && unpublish.body?.success,
@@ -2558,17 +2222,6 @@ async function main() {
     staleMenuQuery.status === 403 && staleMenuQuery.body?.error_code === 30006,
     'stale unpublished menu_id query was not denied',
   )
-  if (dropPhysicalSmokeTables) {
-	    const activeDataPermissionCount = Number(
-	      runPostgres(`
-	SELECT
-	  (SELECT COUNT(*) FROM sys_data_scope_binding WHERE menu_id = ${Number(lowcodeMenu.id)} AND gmt_delete IS NULL) +
-	  (SELECT COUNT(*) FROM sys_role_data_scope WHERE menu_id = ${Number(lowcodeMenu.id)} AND gmt_delete IS NULL) +
-	  (SELECT COUNT(*) FROM sys_user_data_scope_override WHERE menu_id = ${Number(lowcodeMenu.id)} AND gmt_delete IS NULL);
-	`),
-	    )
-    assert(activeDataPermissionCount === 0, `unpublish did not clear active data permissions: ${activeDataPermissionCount}`)
-  }
   console.log('OK unpublish')
 
   const republish = await request(`/admin/table/publish/${tableCode}`, { method: 'POST' })
@@ -2620,9 +2273,6 @@ async function main() {
   )
   console.log('OK low-code query field guard')
   await assertRelationCandidateMenuScope()
-
-  await assertUserDataPermissionApi(republishedMenu.id, auditMenu.id, table.body.data)
-  console.log('OK user data permission API')
 
   const autoMenuCreate = await request('/admin/generalization/create', {
     method: 'POST',
@@ -3102,191 +2752,6 @@ async function main() {
     }),
   })
   assert(updatedRow.status === 200 && updatedRow.body?.success, `low-code update failed: ${JSON.stringify(updatedRow.body)}`)
-
-  setMenuDataScope(crudMenu.id, '1')
-
-  const scopedQuery = await request(`/admin/generalization/query/code/${crudTableCode}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      page: 1,
-      num: 5,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-      quick_query: { keyword: 'Smoke Item Updated' },
-      include_deleted: false,
-    }),
-  })
-  assert(
-    scopedQuery.status === 200 && scopedQuery.body?.success && scopedQuery.body.data?.length === 0,
-    `scoped query exposed data outside the configured id scope: ${JSON.stringify(scopedQuery.body)}`,
-  )
-
-  const scopedCreateDenied = await request('/admin/generalization/create', {
-    method: 'POST',
-    body: JSON.stringify({
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Out Of Scope' },
-    }),
-  })
-  assert(
-    scopedCreateDenied.status === 403 && scopedCreateDenied.body?.error_code === 30006,
-    `scoped create without configured id value was not denied: ${JSON.stringify(scopedCreateDenied.body)}`,
-  )
-
-  const scopedUpdateDenied = await request('/admin/generalization/update', {
-    method: 'PUT',
-    body: JSON.stringify({
-      id: rowId,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Out Of Scope Update' },
-    }),
-  })
-  assert(
-    scopedUpdateDenied.status === 403 && scopedUpdateDenied.body?.error_code === 30006,
-    `scoped update without configured id value was not denied: ${JSON.stringify(scopedUpdateDenied.body)}`,
-  )
-
-  const scopedDeleteDenied = await request('/admin/generalization/delete', {
-    method: 'DELETE',
-    body: JSON.stringify({
-      id: rowId,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-    }),
-  })
-  assert(
-    scopedDeleteDenied.status === 403 && scopedDeleteDenied.body?.error_code === 30006,
-    `scoped delete without configured id value was not denied: ${JSON.stringify(scopedDeleteDenied.body)}`,
-  )
-
-  clearMenuDataScope(crudMenu.id)
-  setMenuDataScope(crudMenu.id, '1', 'scope_id')
-  let scopedRowId = 0
-
-  const customScopedQuery = await request(`/admin/generalization/query/code/${crudTableCode}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      page: 1,
-      num: 5,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-      quick_query: { keyword: 'Smoke Item Updated' },
-      include_deleted: false,
-    }),
-  })
-  assert(
-    customScopedQuery.status === 200 && customScopedQuery.body?.success && customScopedQuery.body.data?.length === 0,
-    `custom scoped query exposed out-of-scope data: ${JSON.stringify(customScopedQuery.body)}`,
-  )
-
-  const customScopedCreateDenied = await request('/admin/generalization/create', {
-    method: 'POST',
-    body: JSON.stringify({
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Out Of Scope', scope_id: 2 },
-    }),
-  })
-  assert(
-    customScopedCreateDenied.status === 403 && customScopedCreateDenied.body?.error_code === 30006,
-    `custom scoped create was not denied: ${JSON.stringify(customScopedCreateDenied.body)}`,
-  )
-
-  const customScopedCreateAllowed = await request('/admin/generalization/create', {
-    method: 'POST',
-    body: JSON.stringify({
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item In Scope', scope_id: 1 },
-    }),
-  })
-  assert(
-    customScopedCreateAllowed.status === 200 && customScopedCreateAllowed.body?.success,
-    `custom scoped create in scope failed: ${JSON.stringify(customScopedCreateAllowed.body)}`,
-  )
-  const customScopedAllowedQuery = await request(`/admin/generalization/query/code/${crudTableCode}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      page: 1,
-      num: 5,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-      quick_query: { keyword: 'Smoke Item In Scope' },
-      include_deleted: false,
-    }),
-  })
-  assert(
-    customScopedAllowedQuery.status === 200 &&
-      customScopedAllowedQuery.body?.success &&
-      customScopedAllowedQuery.body.data?.length === 1,
-    `custom scoped in-scope query failed: ${JSON.stringify(customScopedAllowedQuery.body)}`,
-  )
-  scopedRowId = Number(customScopedAllowedQuery.body.data[0].id)
-  assert(scopedRowId > 0, 'custom scoped in-scope row id missing')
-
-  const customScopedMoveDenied = await request('/admin/generalization/update', {
-    method: 'PUT',
-    body: JSON.stringify({
-      id: scopedRowId,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Scope Move', scope_id: 2 },
-    }),
-  })
-  assert(
-    customScopedMoveDenied.status === 403 && customScopedMoveDenied.body?.error_code === 30006,
-    `custom scoped update moved row out of scope: ${JSON.stringify(customScopedMoveDenied.body)}`,
-  )
-
-  const customScopedUpdateDenied = await request('/admin/generalization/update', {
-    method: 'PUT',
-    body: JSON.stringify({
-      id: rowId,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-      data: { name: 'Smoke Item Custom Scope Update' },
-    }),
-  })
-  assert(
-    customScopedUpdateDenied.status === 403 && customScopedUpdateDenied.body?.error_code === 30006,
-    `custom scoped update was not denied: ${JSON.stringify(customScopedUpdateDenied.body)}`,
-  )
-
-  const customScopedDeleteDenied = await request('/admin/generalization/delete', {
-    method: 'DELETE',
-    body: JSON.stringify({
-      id: rowId,
-      table_code: crudTableCode,
-      menu_id: crudMenu.id,
-    }),
-  })
-  assert(
-    customScopedDeleteDenied.status === 403 && customScopedDeleteDenied.body?.error_code === 30006,
-    `custom scoped delete was not denied: ${JSON.stringify(customScopedDeleteDenied.body)}`,
-  )
-
-  clearMenuDataScope(crudMenu.id)
-  console.log('OK data-scope guard')
-
-  if (scopedRowId > 0) {
-    const deletedScopedRow = await request('/admin/generalization/delete', {
-      method: 'DELETE',
-      body: JSON.stringify({
-        id: scopedRowId,
-        table_code: crudTableCode,
-        menu_id: crudMenu.id,
-      }),
-    })
-    assert(
-      deletedScopedRow.status === 200 && deletedScopedRow.body?.success,
-      `low-code scoped row delete failed: ${JSON.stringify(deletedScopedRow.body)}`,
-    )
-  }
 
   const deletedRow = await request('/admin/generalization/delete', {
     method: 'DELETE',

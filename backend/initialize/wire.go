@@ -41,7 +41,6 @@ type App struct {
 	MenuController                 *controller.MenuController
 	RoleController                 *controller.RoleController
 	UserController                 *controller.UserController
-	DataPermissionController       *controller.DataPermissionController
 	DataPermissionConfigController *controller.DataPermissionConfigController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
@@ -197,7 +196,6 @@ var ServiceProvider = wire.NewSet(
 	service.NewSysTableService,
 	service.NewSysUserService,
 	service.NewGeneralizationServiceWithDataPermission,
-	service.NewDataPermissionService,
 	service.NewDataResourceConfigService,
 	service.NewDataOwnershipConfigService,
 	service.NewDataPolicyConfigService,
@@ -236,7 +234,6 @@ var ControllerProvider = wire.NewSet(
 	controller.NewMenuController,
 	controller.NewRoleController,
 	controller.NewUserController,
-	controller.NewDataPermissionController,
 	controller.NewDataPermissionConfigController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,

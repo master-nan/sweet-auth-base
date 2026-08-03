@@ -23,7 +23,6 @@ func TestAssignPermissionsPersistsMenuAndButtonGrantsAndBuildsCasbinPolicy(t *te
 		&model.SysMenuButton{},
 		&model.SysRoleMenu{},
 		&model.SysRoleMenuButton{},
-		&model.SysRoleDataScope{},
 		&model.CasbinRule{},
 	)
 
@@ -77,14 +76,12 @@ func TestAssignPermissionsPersistsMenuAndButtonGrantsAndBuildsCasbinPolicy(t *te
 	if err != nil {
 		t.Fatalf("new snowflake: %v", err)
 	}
-	dataPermissionService := &DataPermissionService{db: db, sf: sf}
 	svc := NewSysRoleService(
 		impl.NewSysMenuButtonRepositoryImpl(primaryDB),
 		impl.NewSysRoleRepositoryImpl(primaryDB),
 		impl.NewSysRoleMenuRepositoryImpl(primaryDB),
 		impl.NewSysRoleMenuButtonRepositoryImpl(primaryDB),
 		impl.NewCasbinRuleRepositoryImpl(primaryDB, enforcer),
-		dataPermissionService,
 		sf,
 	)
 	gin.SetMode(gin.TestMode)
@@ -143,7 +140,6 @@ func TestAssignPermissionsPreservesSeededRoutePolicyRepresentedByPermissionButto
 		&model.SysMenuButton{},
 		&model.SysRoleMenu{},
 		&model.SysRoleMenuButton{},
-		&model.SysRoleDataScope{},
 		&model.CasbinRule{},
 	)
 
@@ -207,7 +203,6 @@ func TestAssignPermissionsPreservesSeededRoutePolicyRepresentedByPermissionButto
 		impl.NewSysRoleMenuRepositoryImpl(primaryDB),
 		impl.NewSysRoleMenuButtonRepositoryImpl(primaryDB),
 		impl.NewCasbinRuleRepositoryImpl(primaryDB, enforcer),
-		&DataPermissionService{db: db, sf: sf},
 		sf,
 	)
 	gin.SetMode(gin.TestMode)

@@ -100,9 +100,7 @@ const (
 	ButtonActionDetailItem       SysMenuButtonEventAction = "detail_item"
 	ButtonActionItemMetadata     SysMenuButtonEventAction = "item_metadata"
 	ButtonActionAssignPermission SysMenuButtonEventAction = "assign_permission"
-	ButtonActionAssignData       SysMenuButtonEventAction = "assign_data_permission"
 	ButtonActionQueryUserMenu    SysMenuButtonEventAction = "query_user_menu"
-	ButtonActionQueryDataPerm    SysMenuButtonEventAction = "query_data_permission"
 	ButtonActionQueryPermMenu    SysMenuButtonEventAction = "query_permission_menu"
 	ButtonActionResetPassword    SysMenuButtonEventAction = "reset_password"
 	ButtonActionUnlockLogin      SysMenuButtonEventAction = "unlock_login"
@@ -168,9 +166,7 @@ func NormalizeSysMenuButtonEventAction(value string) (SysMenuButtonEventAction, 
 		ButtonActionDetailItem,
 		ButtonActionItemMetadata,
 		ButtonActionAssignPermission,
-		ButtonActionAssignData,
 		ButtonActionQueryUserMenu,
-		ButtonActionQueryDataPerm,
 		ButtonActionQueryPermMenu,
 		ButtonActionResetPassword,
 		ButtonActionUnlockLogin,

@@ -8,17 +8,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 	"backend/model"
-	"backend/repository"
 
 	"github.com/gin-gonic/gin"
 )
 
-func TestLowCodeDataPermissionRuntimeRoutesLegacyCompatibilityExplicitly(t *testing.T) {
+func TestLowCodeDataPermissionRuntimeReturnsNotApplicableWithoutLegacyFallback(t *testing.T) {
 	table := lowCodeRuntimeTestTable()
 	tests := []struct {
 		name      string
@@ -32,8 +30,8 @@ func TestLowCodeDataPermissionRuntimeRoutesLegacyCompatibilityExplicitly(t *test
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var legacyCalls atomic.Int32
 			var subjectCalls atomic.Int32
+			var adapterCalls atomic.Int32
 			runtime := newLowCodeDataPermissionRuntime(
 				func(_ *gin.Context, tableId int) ([]model.DataResource, error) {
 					if tableId != table.Id {
@@ -42,7 +40,7 @@ func TestLowCodeDataPermissionRuntimeRoutesLegacyCompatibilityExplicitly(t *test
 					return tt.resources, nil
 				},
 				func(*gin.Context, int) ([]model.DataOwnershipField, error) {
-					t.Fatal("legacy route must not load new Ownership configuration")
+					t.Fatal("not_applicable route must not load Ownership configuration")
 					return nil, nil
 				},
 				func(*gin.Context, int) (datapermission.SubjectContext, error) {
@@ -50,39 +48,29 @@ func TestLowCodeDataPermissionRuntimeRoutesLegacyCompatibilityExplicitly(t *test
 					return datapermission.SubjectContext{}, nil
 				},
 				func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
-					t.Fatal("legacy route must not call Resolver")
+					t.Fatal("not_applicable route must not call Resolver")
 					return datapermission.DataScopeResult{}, nil
 				},
-				func(context.Context, datapermission.AdapterInput) (datapermission.AdapterExecution, error) {
-					t.Fatal("legacy route must not call Metadata Adapter")
-					return datapermission.AdapterExecution{}, nil
-				},
-				func(_ model.SysUser, menuId int, actualTable model.SysTable, action enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-					legacyCalls.Add(1)
-					if menuId != 21 || actualTable.Id != table.Id || action != enum.ButtonActionQuery {
-						t.Fatalf("unexpected legacy request: menu=%d table=%d action=%s", menuId, actualTable.Id, action)
-					}
-					return &request.DataScope{AllowAll: true}, nil
+				func(_ context.Context, input datapermission.AdapterInput) (datapermission.AdapterExecution, error) {
+					adapterCalls.Add(1)
+					return datapermission.BuildAdapterExecution(input)
 				},
 			)
 
 			resolution, err := runtime.Resolve(
 				lowCodeRuntimeGinContext(101),
 				table,
-				21,
 				model.DataPermissionOperationQuery,
-				enum.ButtonActionQuery,
 			)
 			if err != nil {
-				t.Fatalf("resolve legacy route: %v", err)
+				t.Fatalf("resolve not_applicable route: %v", err)
 			}
-			if resolution.permission.Mode != repository.GeneralizationPermissionLegacy ||
-				resolution.permission.LegacyScope == nil || !resolution.permission.LegacyScope.AllowAll ||
-				resolution.permission.AdapterExecution != nil {
-				t.Fatalf("unexpected legacy resolution: %+v", resolution.permission)
+			if resolution.permission.AdapterExecution == nil ||
+				resolution.permission.AdapterExecution.Mode() != datapermission.AdapterExecutionModeNotApplicable {
+				t.Fatalf("unexpected not_applicable resolution: %+v", resolution.permission)
 			}
-			if legacyCalls.Load() != 1 || subjectCalls.Load() != 0 {
-				t.Fatalf("legacy calls=%d subject calls=%d, want 1/0", legacyCalls.Load(), subjectCalls.Load())
+			if adapterCalls.Load() != 1 || subjectCalls.Load() != 0 {
+				t.Fatalf("adapter calls=%d subject calls=%d, want 1/0", adapterCalls.Load(), subjectCalls.Load())
 			}
 		})
 	}
@@ -94,7 +82,6 @@ func TestLowCodeDataPermissionRuntimeUsesTrustedResourceAndBuildsOnce(t *testing
 	var subjectCalls atomic.Int32
 	var resolverCalls atomic.Int32
 	var adapterCalls atomic.Int32
-	var legacyCalls atomic.Int32
 	runtime := newLowCodeDataPermissionRuntime(
 		func(*gin.Context, int) ([]model.DataResource, error) {
 			return []model.DataResource{resource}, nil
@@ -123,35 +110,27 @@ func TestLowCodeDataPermissionRuntimeUsesTrustedResourceAndBuildsOnce(t *testing
 			adapterCalls.Add(1)
 			return datapermission.BuildAdapterExecution(input)
 		},
-		func(model.SysUser, int, model.SysTable, enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-			legacyCalls.Add(1)
-			return &request.DataScope{AllowAll: true}, nil
-		},
 	)
 
 	resolution, err := runtime.Resolve(
 		lowCodeRuntimeGinContext(101),
 		table,
-		21,
 		model.DataPermissionOperationQuery,
-		enum.ButtonActionQuery,
 	)
 	if err != nil {
 		t.Fatalf("resolve new runtime: %v", err)
 	}
-	if resolution.permission.Mode != repository.GeneralizationPermissionAdapter ||
-		resolution.permission.AdapterExecution == nil ||
-		resolution.permission.AdapterExecution.Mode() != datapermission.AdapterExecutionModeApplyFilter ||
-		resolution.permission.LegacyScope != nil {
+	if resolution.permission.AdapterExecution == nil ||
+		resolution.permission.AdapterExecution.Mode() != datapermission.AdapterExecutionModeApplyFilter {
 		t.Fatalf("unexpected adapter resolution: %+v", resolution.permission)
 	}
 	if _, protected := resolution.ownershipFieldIds[501]; !protected {
 		t.Fatal("metadata ownership field was not protected from generic updates")
 	}
-	if subjectCalls.Load() != 1 || resolverCalls.Load() != 1 || adapterCalls.Load() != 1 || legacyCalls.Load() != 0 {
+	if subjectCalls.Load() != 1 || resolverCalls.Load() != 1 || adapterCalls.Load() != 1 {
 		t.Fatalf(
-			"calls subject=%d resolver=%d adapter=%d legacy=%d, want 1/1/1/0",
-			subjectCalls.Load(), resolverCalls.Load(), adapterCalls.Load(), legacyCalls.Load(),
+			"calls subject=%d resolver=%d adapter=%d, want 1/1/1",
+			subjectCalls.Load(), resolverCalls.Load(), adapterCalls.Load(),
 		)
 	}
 }
@@ -199,7 +178,6 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var legacyCalls atomic.Int32
 			resolver := tt.resolver
 			if resolver == nil {
 				resolver = func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
@@ -222,24 +200,15 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 				},
 				resolver,
 				adapter,
-				func(model.SysUser, int, model.SysTable, enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-					legacyCalls.Add(1)
-					return &request.DataScope{AllowAll: true}, nil
-				},
 			)
 
 			_, err := runtime.Resolve(
 				lowCodeRuntimeGinContext(101),
 				table,
-				21,
 				model.DataPermissionOperationQuery,
-				enum.ButtonActionQuery,
 			)
 			if err == nil {
 				t.Fatal("expected fail-closed runtime error")
-			}
-			if legacyCalls.Load() != 0 {
-				t.Fatalf("failed new runtime unexpectedly fell back to legacy %d times", legacyCalls.Load())
 			}
 			if tt.wantErrorCode != 0 {
 				assertLowCodeRuntimeErrorCode(t, err, tt.wantErrorCode)
@@ -265,9 +234,6 @@ func TestLowCodeDataPermissionRuntimeSupportsConcurrentRequestIsolation(t *testi
 		func(_ context.Context, input datapermission.AdapterInput) (datapermission.AdapterExecution, error) {
 			return datapermission.BuildAdapterExecution(input)
 		},
-		func(model.SysUser, int, model.SysTable, enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-			return nil, errors.New("legacy route must not be used")
-		},
 	)
 
 	var wait sync.WaitGroup
@@ -277,8 +243,8 @@ func TestLowCodeDataPermissionRuntimeSupportsConcurrentRequestIsolation(t *testi
 		go func() {
 			defer wait.Done()
 			resolution, err := runtime.Resolve(
-				lowCodeRuntimeGinContext(userId), table, 21,
-				model.DataPermissionOperationQuery, enum.ButtonActionQuery,
+				lowCodeRuntimeGinContext(userId), table,
+				model.DataPermissionOperationQuery,
 			)
 			if err != nil {
 				t.Errorf("concurrent resolve for user %d: %v", userId, err)

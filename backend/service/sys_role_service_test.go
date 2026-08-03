@@ -1,7 +1,6 @@
 package service
 
 import (
-	"backend/dto/request"
 	"backend/model"
 	"reflect"
 	"testing"
@@ -31,62 +30,6 @@ func TestFilterAssignableRoleButtons(t *testing.T) {
 	got = filterAssignableRoleButtons(buttons, nil)
 	if len(got) != 0 {
 		t.Fatalf("expected no buttons without selected menus, got %#v", got)
-	}
-}
-
-func TestAssignedRoleDataScopeRecordsNilPermissionsPreservesLegacyBehavior(t *testing.T) {
-	svc := &SysRoleService{}
-
-	records, err := svc.assignedRoleDataScopeRecords(1, map[int]bool{10: true}, nil)
-	if err != nil {
-		t.Fatalf("expected nil permissions to be accepted: %v", err)
-	}
-	if records != nil {
-		t.Fatalf("expected nil records for legacy request, got %#v", records)
-	}
-}
-
-func TestAssignedRoleDataScopeRecordsRejectsUnselectedMenu(t *testing.T) {
-	dataPermissionService, _ := newDataPermissionServiceForTest(t)
-	svc := &SysRoleService{dataPermissionService: dataPermissionService}
-
-	_, err := svc.assignedRoleDataScopeRecords(1, map[int]bool{10: true}, []request.RoleDataPermissionItemReq{
-		{MenuId: 20, TableCode: "demo_order", DimensionCode: "tenant", Strategy: "specified", ScopeValues: []string{"1"}},
-	})
-	if err == nil {
-		t.Fatal("expected data permission outside selected menus to be rejected")
-	}
-}
-
-func TestAssignedRoleDataScopeRecordsBuildsSelectedMenuScopes(t *testing.T) {
-	dataPermissionService, _ := newDataPermissionServiceForTest(t)
-	seedDataPermissionBinding(t, dataPermissionService.db, true)
-	svc := &SysRoleService{dataPermissionService: dataPermissionService}
-
-	records, err := svc.assignedRoleDataScopeRecords(1, map[int]bool{10: true}, []request.RoleDataPermissionItemReq{
-		{MenuId: 10, TableCode: "demo_order", DimensionCode: "tenant", Strategy: "specified", ScopeValues: []string{"1"}},
-	})
-	if err != nil {
-		t.Fatalf("expected selected menu data scope to be accepted: %v", err)
-	}
-	if len(records) != 1 || records[0].RoleId != 1 || records[0].MenuId != 10 || records[0].DimensionCode != "tenant" {
-		t.Fatalf("unexpected role data scope records: %#v", records)
-	}
-}
-
-func TestAssignedRoleDataScopeRecordsAcceptsUserDimensionStrategy(t *testing.T) {
-	dataPermissionService, _ := newDataPermissionServiceForTest(t)
-	seedDataPermissionBinding(t, dataPermissionService.db, true)
-	svc := &SysRoleService{dataPermissionService: dataPermissionService}
-
-	records, err := svc.assignedRoleDataScopeRecords(1, map[int]bool{10: true}, []request.RoleDataPermissionItemReq{
-		{MenuId: 10, TableCode: "demo_order", DimensionCode: "tenant", Strategy: "user_dimension"},
-	})
-	if err != nil {
-		t.Fatalf("expected user dimension strategy to be accepted: %v", err)
-	}
-	if len(records) != 1 || records[0].Strategy != "user_dimension" || records[0].ScopeValues != "[]" {
-		t.Fatalf("unexpected user dimension role scope: %#v", records)
 	}
 }
 

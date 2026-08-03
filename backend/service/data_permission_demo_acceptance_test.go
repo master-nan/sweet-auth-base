@@ -90,9 +90,7 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 					Order: request.Order{Field: "id", IsAsc: true},
 				},
 				table,
-				21,
 				model.DataPermissionOperationQuery,
-				enum.ButtonActionQuery,
 			)
 			if err != nil {
 				t.Fatalf("query acceptance rows: %v", err)
@@ -106,9 +104,8 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 
 			for _, id := range tt.allowedIds {
 				detail, detailErr := service.GetByIdWithDataPermission(
-					ctx, table, id, 21,
+					ctx, table, id,
 					model.DataPermissionOperationDetail,
-					enum.ButtonActionDetail,
 				)
 				if detailErr != nil || detail["order_no"] == "" {
 					t.Fatalf("allowed detail %d: detail=%v err=%v", id, detail, detailErr)
@@ -116,9 +113,8 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 			}
 			for _, id := range tt.forbiddenIds {
 				_, detailErr := service.GetByIdWithDataPermission(
-					ctx, table, id, 21,
+					ctx, table, id,
 					model.DataPermissionOperationDetail,
-					enum.ButtonActionDetail,
 				)
 				if !errors.Is(detailErr, myerrors.ErrDataNotFound) {
 					t.Fatalf("forbidden detail %d leaked existence: %v", id, detailErr)
@@ -229,9 +225,6 @@ func newDataPermissionDemoAcceptanceService(
 		subjectBuilder.Build,
 		resolver.Resolve,
 		metadataAdapter.Apply,
-		func(model.SysUser, int, model.SysTable, enum.SysMenuButtonEventAction) (*request.DataScope, error) {
-			return nil, errors.New("acceptance resource must not use legacy data permission")
-		},
 	)
 	generalizationRepo := impl.NewGeneralizationRepositoryImpl(primaryDB)
 	return NewGeneralizationServiceWithDataPermission(generalizationRepo, nil, runtime), table

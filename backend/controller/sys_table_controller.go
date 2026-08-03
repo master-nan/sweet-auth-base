@@ -8,7 +8,6 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
@@ -22,17 +21,15 @@ import (
 )
 
 type TableController struct {
-	sysTableService       *service.SysTableService
-	sysMenuService        *service.SysMenuService
-	dataPermissionService *service.DataPermissionService
-	translators           map[string]ut.Translator
+	sysTableService *service.SysTableService
+	sysMenuService  *service.SysMenuService
+	translators     map[string]ut.Translator
 }
 
-func NewTableController(sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, dataPermissionService *service.DataPermissionService, translators map[string]ut.Translator) *TableController {
+func NewTableController(sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
 	return &TableController{
 		sysTableService,
 		sysMenuService,
-		dataPermissionService,
 		translators,
 	}
 }
@@ -54,16 +51,8 @@ func (t *TableController) GetTableByID(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	data, err := t.sysTableService.GetTableById(id)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", data.Id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -107,15 +96,6 @@ func (t *TableController) QueryTable(ctx *gin.Context) {
 	translator := t.translators["zh"]
 	err := utils.ValidatorBody[request.Basic](ctx, &data, translator)
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	table, err := t.sysTableService.GetTableByTableCode(data.TableCode)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := injectQueryDataScope(ctx, t.dataPermissionService, &data, table); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -199,10 +179,6 @@ func (t *TableController) UpdateTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.UpdateTable(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -237,10 +213,6 @@ func (t *TableController) DeleteTableById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.DeleteTableById(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -262,10 +234,6 @@ func (t *TableController) GetTableFieldsByTableId(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -292,10 +260,6 @@ func (t *TableController) GetTableFieldById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_field", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -334,10 +298,6 @@ func (t *TableController) CreateTableField(ctx *gin.Context) {
 	}
 	if !allowed {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", data.TableId, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
 		return
 	}
 	err = t.sysTableService.CreateTableField(ctx, data)
@@ -383,10 +343,6 @@ func (t *TableController) UpdateTableField(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_field", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.UpdateTableField(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -421,10 +377,6 @@ func (t *TableController) DeleteTableFieldById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_field", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.DeleteTableFieldById(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -446,10 +398,6 @@ func (t *TableController) GetTableRelationsByTableId(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -476,10 +424,6 @@ func (t *TableController) GetTableRelationById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_relation", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -518,10 +462,6 @@ func (t *TableController) CreateTableRelation(ctx *gin.Context) {
 	}
 	if !allowed {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", data.TableId, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
 		return
 	}
 	err = t.sysTableService.CreateTableRelation(ctx, data)
@@ -567,10 +507,6 @@ func (t *TableController) UpdateTableRelation(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_relation", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.UpdateTableRelation(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -605,10 +541,6 @@ func (t *TableController) DeleteTableRelationById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_relation", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.DeleteTableRelationById(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -630,10 +562,6 @@ func (t *TableController) GetTableIndexById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_index", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -659,10 +587,6 @@ func (t *TableController) GetTableIndexesByTableId(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDetail); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -701,10 +625,6 @@ func (t *TableController) CreateTableIndex(ctx *gin.Context) {
 	}
 	if !allowed {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", data.TableId, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
 		return
 	}
 	err = t.sysTableService.CreateTableIndex(ctx, data)
@@ -750,10 +670,6 @@ func (t *TableController) UpdateTableIndex(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_index", id, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.UpdateTableIndex(ctx, data)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -788,10 +704,6 @@ func (t *TableController) DeleteTableIndexById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table_index", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
 	err = t.sysTableService.DeleteTableIndexById(ctx, id)
 	if err != nil {
 		_ = ctx.Error(err)
@@ -824,10 +736,6 @@ func (t *TableController) DeleteTableIndexByTableId(ctx *gin.Context) {
 	}
 	if !allowed {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
-		return
-	}
-	if err := checkRecordDataScopeByTableCode(ctx, t.sysTableService, t.dataPermissionService, "sys_table", id, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
 		return
 	}
 	err = t.sysTableService.DeleteTableIndexByTableId(ctx, id)

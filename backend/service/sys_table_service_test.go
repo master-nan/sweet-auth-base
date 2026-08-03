@@ -236,7 +236,7 @@ func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysRoleMenu{}, &model.SysRoleMenuButton{}, &model.SysDataScopeBinding{}, &model.SysRoleDataScope{}, &model.SysUserDataScopeOverride{}); err != nil {
+	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysRoleMenu{}, &model.SysRoleMenuButton{}); err != nil {
 		t.Fatalf("migrate models: %v", err)
 	}
 	menus := []model.SysMenu{
@@ -264,15 +264,6 @@ func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
 	if err := db.Create(&model.SysRoleMenuButton{RoleId: 1, MenuId: 2, ButtonId: 9}).Error; err != nil {
 		t.Fatalf("seed role button: %v", err)
 	}
-	if err := db.Create(&model.SysDataScopeBinding{Basic: model.Basic{Id: 10, State: true}, MenuId: 2, TableCode: "sys_user", DimensionCode: "tenant", FieldCode: "tenant_id"}).Error; err != nil {
-		t.Fatalf("seed data permission binding: %v", err)
-	}
-	if err := db.Create(&model.SysRoleDataScope{Basic: model.Basic{Id: 11, State: true}, RoleId: 1, MenuId: 2, TableCode: "sys_user", DimensionCode: "tenant", Strategy: "specified", ScopeValues: "[\"1\"]"}).Error; err != nil {
-		t.Fatalf("seed role data permission: %v", err)
-	}
-	if err := db.Create(&model.SysUserDataScopeOverride{Basic: model.Basic{Id: 12, State: true}, UserId: 1, MenuId: 2, TableCode: "sys_user", DimensionCode: "tenant", Strategy: "specified", ScopeValues: "[\"1\"]"}).Error; err != nil {
-		t.Fatalf("seed user data permission override: %v", err)
-	}
 
 	svc := newSysTablePublishTestService(db)
 	if err := svc.hideDuplicateLowCodeMenus(db, "sys_user", 1); err != nil {
@@ -298,24 +289,6 @@ func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
 	}
 	if grantCount != 0 {
 		t.Fatalf("duplicate button grants = %d, want 0", grantCount)
-	}
-	if err := db.Model(&model.SysDataScopeBinding{}).Where("menu_id = ?", 2).Count(&grantCount).Error; err != nil {
-		t.Fatalf("count data permission bindings: %v", err)
-	}
-	if grantCount != 0 {
-		t.Fatalf("duplicate data permission bindings = %d, want 0", grantCount)
-	}
-	if err := db.Model(&model.SysRoleDataScope{}).Where("menu_id = ?", 2).Count(&grantCount).Error; err != nil {
-		t.Fatalf("count role data permissions: %v", err)
-	}
-	if grantCount != 0 {
-		t.Fatalf("duplicate role data permissions = %d, want 0", grantCount)
-	}
-	if err := db.Model(&model.SysUserDataScopeOverride{}).Where("menu_id = ?", 2).Count(&grantCount).Error; err != nil {
-		t.Fatalf("count user data permission overrides: %v", err)
-	}
-	if grantCount != 0 {
-		t.Fatalf("duplicate user data permission overrides = %d, want 0", grantCount)
 	}
 }
 
@@ -373,7 +346,6 @@ func newSysTablePublishTestService(db *gorm.DB) *SysTableService {
 		sysRoleRepo:           impl.NewSysRoleRepositoryImpl(primaryDB),
 		sysRoleMenuRepo:       impl.NewSysRoleMenuRepositoryImpl(primaryDB),
 		sysRoleMenuButtonRepo: impl.NewSysRoleMenuButtonRepositoryImpl(primaryDB),
-		dataPermissionService: &DataPermissionService{db: db},
 	}
 }
 

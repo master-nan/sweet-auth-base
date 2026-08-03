@@ -53,9 +53,7 @@ export const findMenuTrailById = (
   basePath = '/admin',
 ): MenuTrailItem[] => {
   if (!menuId) return []
-  return (
-    findMenuTrail(menus, menuId, normalizeMenuPath(basePath), [], '') || []
-  )
+  return findMenuTrail(menus, menuId, normalizeMenuPath(basePath), [], '') || []
 }
 
 export const findMenuPathByTableCode = (
@@ -135,8 +133,6 @@ const relationMenuIdKeys = [
   'target_menu_id',
   'relationMenuId',
   'relation_menu_id',
-  'dataScopeMenuId',
-  'data_scope_menu_id',
 ]
 
 export const resolveRelationMenuId = (
