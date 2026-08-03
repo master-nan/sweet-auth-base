@@ -47,19 +47,6 @@ func (gc *GeneralizationController) dataScopeForMenu(ctx *gin.Context, table mod
 	return gc.dataPermissionService.ResolveDataScope(user, menuId, table, action)
 }
 
-// injectDataScope 从 JWT 用户和请求中的 menu_id 注入数据权限范围
-func (gc *GeneralizationController) injectDataScope(ctx *gin.Context, data *request.Basic, table model.SysTable, action enum.SysMenuButtonEventAction) error {
-	if data.MenuId <= 0 {
-		return nil
-	}
-	scope, err := gc.dataScopeForMenu(ctx, table, data.MenuId, action)
-	if err != nil {
-		return err
-	}
-	data.DataScope = scope
-	return nil
-}
-
 func (gc *GeneralizationController) checkMenuPermission(ctx *gin.Context, menuId int, tableCode string) error {
 	if menuId <= 0 {
 		return nil
@@ -190,36 +177,6 @@ func dataScopeConditionFieldExists(table model.SysTable, fieldCode string) bool 
 	return false
 }
 
-func (gc *GeneralizationController) checkUpdateDataPermission(ctx *gin.Context, table model.SysTable, menuId int, data map[string]interface{}) error {
-	scope, err := gc.dataScopeForMenu(ctx, table, menuId, enum.ButtonActionUpdate)
-	if err != nil {
-		return err
-	}
-	return validateDataScopeWriteValues(table, scope, data, false)
-}
-
-// checkRowDataPermission 检查用户对目标行数据的操作权限。
-func (gc *GeneralizationController) checkRowDataPermission(ctx *gin.Context, table model.SysTable, rowId int, menuId int, action enum.SysMenuButtonEventAction) error {
-	scope, err := gc.dataScopeForMenu(ctx, table, menuId, action)
-	if err != nil {
-		return err
-	}
-	if scope == nil || scope.AllowAll {
-		return nil
-	}
-	if scope.DenyAll {
-		return myerrors.ErrPermissionDenied
-	}
-	ok, err := gc.generalizationService.RowMatchesDataScope(table, rowId, scope)
-	if err != nil {
-		return err
-	}
-	if ok {
-		return nil
-	}
-	return myerrors.ErrPermissionDenied
-}
-
 func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
@@ -250,11 +207,14 @@ func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
-	if err := gc.injectDataScope(ctx, &data, table, enum.ButtonActionQuery); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	result, err := gc.generalizationService.Query(&data, table)
+	result, err := gc.generalizationService.QueryWithDataPermission(
+		ctx,
+		&data,
+		table,
+		menuId,
+		model.DataPermissionOperationQuery,
+		enum.ButtonActionQuery,
+	)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -301,11 +261,14 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := gc.checkRowDataPermission(ctx, table, id, menuId, enum.ButtonActionDetail); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	data, err := gc.generalizationService.GetById(table, id)
+	data, err := gc.generalizationService.GetByIdWithDataPermission(
+		ctx,
+		table,
+		id,
+		menuId,
+		model.DataPermissionOperationDetail,
+		enum.ButtonActionDetail,
+	)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -373,15 +336,13 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
-	if err := gc.checkRowDataPermission(ctx, table, data.Id, data.MenuId, enum.ButtonActionUpdate); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := gc.checkUpdateDataPermission(ctx, table, data.MenuId, data.Data); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := gc.generalizationService.Update(ctx, table, data.Id, data.Data); err != nil {
+	if err := gc.generalizationService.UpdateWithDataPermission(
+		ctx,
+		table,
+		data.Id,
+		data.Data,
+		data.MenuId,
+	); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -412,11 +373,13 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
-	if err := gc.checkRowDataPermission(ctx, table, data.Id, data.MenuId, enum.ButtonActionDelete); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if err := gc.generalizationService.Delete(ctx, table, data.Id); err != nil {
+	if err := gc.generalizationService.DeleteWithDataPermission(
+		ctx,
+		table,
+		data.Id,
+		data.MenuId,
+		enum.ButtonActionDelete,
+	); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -445,17 +408,15 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	for _, id := range data.Ids {
-		if err := gc.checkRowDataPermission(ctx, table, id, menuId, enum.ButtonActionBatchDelete); err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-	}
-	for _, id := range data.Ids {
-		if err := gc.generalizationService.Delete(ctx, table, id); err != nil {
-			_ = ctx.Error(err)
-			return
-		}
+	if err := gc.generalizationService.BatchDeleteWithDataPermission(
+		ctx,
+		table,
+		data.Ids,
+		menuId,
+		enum.ButtonActionBatchDelete,
+	); err != nil {
+		_ = ctx.Error(err)
+		return
 	}
 	resp.SetData(true)
 }
@@ -497,13 +458,14 @@ func (gc *GeneralizationController) Export(ctx *gin.Context) {
 	if data.Num <= 0 || data.Num > 10000 {
 		data.Num = 10000
 	}
-	scope, err := gc.dataScopeForMenu(ctx, table, data.MenuId, enum.ButtonActionExport)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	data.DataScope = scope
-	result, err := gc.generalizationService.Query(&data, table)
+	result, err := gc.generalizationService.QueryWithDataPermission(
+		ctx,
+		&data,
+		table,
+		menuId,
+		model.DataPermissionOperationExport,
+		enum.ButtonActionExport,
+	)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

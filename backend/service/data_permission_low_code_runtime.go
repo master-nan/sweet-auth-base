@@ -1,0 +1,327 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"backend/dto/request"
+	"backend/dto/response"
+	"backend/enum"
+	"backend/internal/datapermission"
+	myerrors "backend/internal/errors"
+	"backend/model"
+	"backend/repository"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+)
+
+type lowCodeResourceLookup func(*gin.Context, int) ([]model.DataResource, error)
+type lowCodeOwnershipLookup func(*gin.Context, int) ([]model.DataOwnershipField, error)
+type lowCodeSubjectBuilder func(*gin.Context, int) (datapermission.SubjectContext, error)
+type lowCodeResolver func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error)
+type lowCodeMetadataAdapter func(context.Context, datapermission.AdapterInput) (datapermission.AdapterExecution, error)
+type lowCodeLegacyScopeResolver func(model.SysUser, int, model.SysTable, enum.SysMenuButtonEventAction) (*request.DataScope, error)
+
+type lowCodePermissionResolution struct {
+	permission        repository.GeneralizationPermission
+	ownershipFieldIds map[int]struct{}
+}
+
+func (resolution lowCodePermissionResolution) modifiesOwnership(
+	table model.SysTable,
+	data map[string]interface{},
+) bool {
+	if resolution.permission.Mode != repository.GeneralizationPermissionAdapter ||
+		len(resolution.ownershipFieldIds) == 0 || len(data) == 0 {
+		return false
+	}
+	for _, field := range table.TableFields {
+		if _, protected := resolution.ownershipFieldIds[field.Id]; !protected {
+			continue
+		}
+		if _, submitted := data[field.FieldCode]; submitted {
+			return true
+		}
+	}
+	return false
+}
+
+// LowCodeDataPermissionRuntime is the single runtime boundary used by generic
+// metadata reads and writes. It selects either the new engine or the legacy
+// compatibility path before any query is built; both are never applied.
+type LowCodeDataPermissionRuntime struct {
+	findResources  lowCodeResourceLookup
+	findOwnerships lowCodeOwnershipLookup
+	buildSubject   lowCodeSubjectBuilder
+	resolveScope   lowCodeResolver
+	applyMetadata  lowCodeMetadataAdapter
+	resolveLegacy  lowCodeLegacyScopeResolver
+}
+
+func NewLowCodeDataPermissionRuntime(
+	resourceRepo repository.DataResourceRepository,
+	ownershipRepo repository.DataOwnershipFieldRepository,
+	subjectBuilder *SubjectContextBuilder,
+	resolver datapermission.Resolver,
+	metadataAdapter *datapermission.MetadataFieldAdapter,
+	legacyService *DataPermissionService,
+) *LowCodeDataPermissionRuntime {
+	return newLowCodeDataPermissionRuntime(
+		resourceRepo.ListByTableId,
+		ownershipRepo.ListByResource,
+		subjectBuilder.Build,
+		resolver.Resolve,
+		metadataAdapter.Apply,
+		legacyService.ResolveDataScopeForTableAction,
+	)
+}
+
+func newLowCodeDataPermissionRuntime(
+	findResources lowCodeResourceLookup,
+	findOwnerships lowCodeOwnershipLookup,
+	buildSubject lowCodeSubjectBuilder,
+	resolveScope lowCodeResolver,
+	applyMetadata lowCodeMetadataAdapter,
+	resolveLegacy lowCodeLegacyScopeResolver,
+) *LowCodeDataPermissionRuntime {
+	return &LowCodeDataPermissionRuntime{
+		findResources:  findResources,
+		findOwnerships: findOwnerships,
+		buildSubject:   buildSubject,
+		resolveScope:   resolveScope,
+		applyMetadata:  applyMetadata,
+		resolveLegacy:  resolveLegacy,
+	}
+}
+
+func (runtime *LowCodeDataPermissionRuntime) Resolve(
+	ctx *gin.Context,
+	table model.SysTable,
+	menuId int,
+	operation string,
+	legacyAction enum.SysMenuButtonEventAction,
+) (lowCodePermissionResolution, error) {
+	startedAt := time.Now()
+	if err := runtime.validate(); err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	operation = strings.ToLower(strings.TrimSpace(operation))
+	if table.Id <= 0 || operation == "" {
+		return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeFailed
+	}
+
+	resources, err := runtime.findResources(ctx, table.Id)
+	if err != nil {
+		return lowCodePermissionResolution{}, mapLowCodeRuntimeDependencyError(err)
+	}
+	if len(resources) == 0 {
+		return runtime.resolveLegacyPermission(ctx, table, menuId, legacyAction)
+	}
+	if len(resources) != 1 {
+		return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+	resource := resources[0]
+	if resource.Id <= 0 || resource.TableId == nil || *resource.TableId != table.Id ||
+		resource.ResourceType != model.DataResourceTypeLowCodeTable {
+		return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+	if !resource.State {
+		if resource.PermissionEnabled {
+			return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeRouteConflict
+		}
+		return runtime.resolveLegacyPermission(ctx, table, menuId, legacyAction)
+	}
+	if !resource.PermissionEnabled {
+		return runtime.resolveLegacyPermission(ctx, table, menuId, legacyAction)
+	}
+
+	user, err := trustedRuntimeUser(ctx)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	subject, err := runtime.buildSubject(ctx, user.Id)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	resolverInput, err := datapermission.NewResolverInput(subject, resource.ResourceCode, operation)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	result, err := runtime.resolveScope(ctx, resolverInput)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	if result.Decision() == datapermission.DataScopeDecisionNotApplicable {
+		return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+
+	ownerships, err := runtime.findOwnerships(ctx, resource.Id)
+	if err != nil {
+		return lowCodePermissionResolution{}, mapLowCodeRuntimeDependencyError(err)
+	}
+	definitions, fieldIds, err := lowCodeOwnershipDefinitions(ownerships)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	resourceContext, err := datapermission.NewAdapterResourceContext(
+		datapermission.AdapterResourceContextInput{
+			ResourceCode: resource.ResourceCode,
+			Operation:    operation,
+			AdapterCode:  resource.AdapterCode,
+			TableId:      table.Id,
+		},
+	)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	adapterInput, err := datapermission.NewAdapterInput(resourceContext, result, definitions)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	execution, err := runtime.applyMetadata(runtimeContext(ctx), adapterInput)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+
+	zapLowCodePermissionDecision(ctx, result, execution.Mode(), startedAt)
+	return lowCodePermissionResolution{
+		permission: repository.GeneralizationPermission{
+			Mode:             repository.GeneralizationPermissionAdapter,
+			AdapterExecution: &execution,
+		},
+		ownershipFieldIds: fieldIds,
+	}, nil
+}
+
+func (runtime *LowCodeDataPermissionRuntime) resolveLegacyPermission(
+	ctx *gin.Context,
+	table model.SysTable,
+	menuId int,
+	action enum.SysMenuButtonEventAction,
+) (lowCodePermissionResolution, error) {
+	user, err := trustedRuntimeUser(ctx)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	scope, err := runtime.resolveLegacy(user, menuId, table, action)
+	if err != nil {
+		return lowCodePermissionResolution{}, err
+	}
+	if scope == nil {
+		return lowCodePermissionResolution{}, myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+	return lowCodePermissionResolution{
+		permission: repository.GeneralizationPermission{
+			Mode:        repository.GeneralizationPermissionLegacy,
+			LegacyScope: scope,
+		},
+	}, nil
+}
+
+func (runtime *LowCodeDataPermissionRuntime) validate() error {
+	if runtime == nil || runtime.findResources == nil || runtime.findOwnerships == nil ||
+		runtime.buildSubject == nil || runtime.resolveScope == nil || runtime.applyMetadata == nil ||
+		runtime.resolveLegacy == nil {
+		return myerrors.ErrDataPermissionRuntimeFailed
+	}
+	return nil
+}
+
+func lowCodeOwnershipDefinitions(
+	ownerships []model.DataOwnershipField,
+) ([]datapermission.AdapterOwnershipDefinition, map[int]struct{}, error) {
+	definitions := make([]datapermission.AdapterOwnershipDefinition, 0, len(ownerships))
+	fieldIds := make(map[int]struct{})
+	for _, ownership := range ownerships {
+		if !ownership.State {
+			continue
+		}
+		tableFieldId := 0
+		if ownership.TableFieldId != nil {
+			tableFieldId = *ownership.TableFieldId
+		}
+		adapterFieldCode := ""
+		if ownership.AdapterFieldCode != nil {
+			adapterFieldCode = *ownership.AdapterFieldCode
+		}
+		definition, err := datapermission.NewAdapterOwnershipDefinition(
+			datapermission.AdapterOwnershipDefinitionInput{
+				OwnershipCode:    ownership.OwnershipCode,
+				DimensionId:      ownership.DimensionId,
+				BindingType:      datapermission.AdapterBindingType(ownership.BindingType),
+				TableFieldId:     tableFieldId,
+				AdapterFieldCode: adapterFieldCode,
+				ValueType:        datapermission.DataScopeValueType(ownership.ValueType),
+			},
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		definitions = append(definitions, definition)
+		if definition.BindingType() == datapermission.AdapterBindingTypeMetadataField {
+			fieldIds[definition.TableFieldId()] = struct{}{}
+		}
+	}
+	return definitions, fieldIds, nil
+}
+
+func trustedRuntimeUser(ctx *gin.Context) (model.SysUser, error) {
+	if ctx == nil {
+		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
+	}
+	value, exists := ctx.Get("user")
+	user, ok := value.(model.SysUser)
+	if !exists || !ok || user.Id <= 0 {
+		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
+	}
+	trustedId, exists := ctx.Get("id")
+	id, ok := trustedId.(int)
+	if !exists || !ok || id != user.Id {
+		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
+	}
+	return user, nil
+}
+
+func runtimeContext(ctx *gin.Context) context.Context {
+	if ctx != nil && ctx.Request != nil {
+		return ctx.Request.Context()
+	}
+	return context.Background()
+}
+
+func mapLowCodeRuntimeDependencyError(err error) error {
+	var adminError *response.AdminError
+	if errors.As(err, &adminError) {
+		return err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+	return myerrors.WrapDatabaseError(err)
+}
+
+func zapLowCodePermissionDecision(
+	ctx *gin.Context,
+	result datapermission.DataScopeResult,
+	mode datapermission.AdapterExecutionMode,
+	startedAt time.Time,
+) {
+	fields := []zap.Field{
+		zap.String("resource_code", result.ResourceCode()),
+		zap.String("operation", result.Operation()),
+		zap.String("decision", string(result.Decision())),
+		zap.String("execution_mode", string(mode)),
+		zap.Duration("elapsed", time.Since(startedAt)),
+	}
+	if summary, ok := datapermission.ResolverSummaryFromContext(ctx); ok {
+		fields = append(fields,
+			zap.Int("checked_grant_count", summary.CheckedGrantCount()),
+			zap.Int("checked_policy_count", summary.CheckedPolicyCount()),
+		)
+	}
+	zap.L().Debug("low-code data permission resolved", fields...)
+}

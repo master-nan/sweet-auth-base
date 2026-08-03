@@ -28,6 +28,7 @@ type DataResourceRepository interface {
 	FindByIdsForConfig(*gin.Context, []int) ([]model.DataResource, error)
 	FindByIdForConfigDB(*gorm.DB, int) (model.DataResource, error)
 	FindByCodeForConfigDB(*gorm.DB, string) (model.DataResource, error)
+	ListByTableId(*gin.Context, int) ([]model.DataResource, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 }
 
@@ -54,6 +55,7 @@ type DataOwnershipFieldRepository interface {
 	FindByIdForConfigDB(*gorm.DB, int) (model.DataOwnershipField, error)
 	FindByStableKeyForConfigDB(*gorm.DB, int, string) (model.DataOwnershipField, error)
 	ListByResourceForConfigDB(*gorm.DB, int) ([]model.DataOwnershipField, error)
+	ListByResource(*gin.Context, int) ([]model.DataOwnershipField, error)
 	UpdateFieldsForConfig(*gorm.DB, int, map[string]any) (bool, error)
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)
 	CountByIdentityForConfig(*gorm.DB, string, *int, bool) (int64, error)

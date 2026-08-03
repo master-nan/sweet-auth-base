@@ -185,6 +185,19 @@ func (r *DataResourceRepositoryImpl) FindByCodeForConfigDB(db *gorm.DB, code str
 	return findDataPermissionConfigOneDB[model.DataResource](db, dataResourceMutationColumns, "resource_code = ?", code)
 }
 
+func (r *DataResourceRepositoryImpl) ListByTableId(
+	ctx *gin.Context,
+	tableId int,
+) ([]model.DataResource, error) {
+	values := make([]model.DataResource, 0)
+	err := lowCodeRuntimeDB(r.db, ctx).
+		Select(dataResourceColumns).
+		Where("resource_type = ? AND table_id = ?", model.DataResourceTypeLowCodeTable, tableId).
+		Order("id ASC").
+		Find(&values).Error
+	return values, err
+}
+
 func (r *DataResourceRepositoryImpl) UpdateFieldsForConfig(
 	db *gorm.DB,
 	id int,
@@ -378,6 +391,19 @@ func (r *DataOwnershipFieldRepositoryImpl) ListByResourceForConfigDB(
 ) ([]model.DataOwnershipField, error) {
 	values := make([]model.DataOwnershipField, 0)
 	err := db.Select(dataOwnershipFieldMutationColumns).
+		Where("resource_id = ?", resourceId).
+		Order("ownership_code ASC, id ASC").
+		Find(&values).Error
+	return values, err
+}
+
+func (r *DataOwnershipFieldRepositoryImpl) ListByResource(
+	ctx *gin.Context,
+	resourceId int,
+) ([]model.DataOwnershipField, error) {
+	values := make([]model.DataOwnershipField, 0)
+	err := lowCodeRuntimeDB(r.db, ctx).
+		Select(dataOwnershipFieldColumns).
 		Where("resource_id = ?", resourceId).
 		Order("ownership_code ASC, id ASC").
 		Find(&values).Error
@@ -875,6 +901,13 @@ func dataPermissionConfigDB(db *gorm.DB, ctx *gin.Context) *gorm.DB {
 		return db
 	}
 	return db.WithContext(ctx)
+}
+
+func lowCodeRuntimeDB(db *gorm.DB, ctx *gin.Context) *gorm.DB {
+	if ctx == nil || ctx.Request == nil {
+		return db
+	}
+	return db.WithContext(ctx.Request.Context())
 }
 
 func dataPermissionConfigQueryTable(

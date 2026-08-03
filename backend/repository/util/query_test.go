@@ -8,7 +8,9 @@ import (
 
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/datapermission"
 	"backend/model"
+	"backend/repository"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -628,6 +630,118 @@ func TestDynamicQueryDoesNotDuplicateRowsForOneToManyRelations(t *testing.T) {
 	}
 }
 
+func TestDynamicQueryWithPermissionKeepsRowsAndTotalConsistent(t *testing.T) {
+	db := generalizationPermissionTestDB(t)
+	table := generalizationPermissionTestTable()
+
+	tests := []struct {
+		name      string
+		basic     *request.Basic
+		execution datapermission.AdapterExecution
+		wantIds   []int64
+		wantTotal int
+	}{
+		{
+			name:      "allow all",
+			basic:     &request.Basic{Page: 1, Num: 2, Order: request.Order{Field: "id", IsAsc: true}},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionAll, nil),
+			wantIds:   []int64{1, 2},
+			wantTotal: 4,
+		},
+		{
+			name:      "deny all",
+			basic:     &request.Basic{Page: 1, Num: 10},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionNone, nil),
+			wantIds:   nil,
+			wantTotal: 0,
+		},
+		{
+			name:  "single filtered condition",
+			basic: &request.Basic{Page: 1, Num: 10, Order: request.Order{Field: "id", IsAsc: true}},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionFiltered, [][]datapermission.DataScopeCondition{
+				{mustQueryScopeCondition(t, "owner_org", 101, datapermission.DataScopeOperatorIn, []any{int64(11)})},
+			}),
+			wantIds:   []int64{1, 2},
+			wantTotal: 2,
+		},
+		{
+			name:  "conditions inside a group use AND",
+			basic: &request.Basic{Page: 1, Num: 10, Order: request.Order{Field: "id", IsAsc: true}},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionFiltered, [][]datapermission.DataScopeCondition{
+				{
+					mustQueryScopeCondition(t, "owner_org", 101, datapermission.DataScopeOperatorIn, []any{int64(11)}),
+					mustQueryScopeCondition(t, "legal_entity", 102, datapermission.DataScopeOperatorEqual, []any{int64(100)}),
+				},
+			}),
+			wantIds:   []int64{1},
+			wantTotal: 1,
+		},
+		{
+			name:  "condition groups use OR",
+			basic: &request.Basic{Page: 1, Num: 10, Order: request.Order{Field: "id", IsAsc: true}},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionFiltered, [][]datapermission.DataScopeCondition{
+				{mustQueryScopeCondition(t, "owner_org", 101, datapermission.DataScopeOperatorEqual, []any{int64(12)})},
+				{mustQueryScopeCondition(t, "legal_entity", 102, datapermission.DataScopeOperatorEqual, []any{int64(200)})},
+			}),
+			wantIds:   []int64{2, 3},
+			wantTotal: 2,
+		},
+		{
+			name: "user query is AND with the whole permission tree",
+			basic: &request.Basic{
+				Page:    1,
+				Num:     10,
+				Order:   request.Order{Field: "id", IsAsc: true},
+				Filters: map[string]any{"name": "alpha"},
+			},
+			execution: mustQueryAdapterExecution(t, datapermission.DataScopeDecisionFiltered, [][]datapermission.DataScopeCondition{
+				{mustQueryScopeCondition(t, "owner_org", 101, datapermission.DataScopeOperatorEqual, []any{int64(11)})},
+				{mustQueryScopeCondition(t, "legal_entity", 102, datapermission.DataScopeOperatorEqual, []any{int64(300)})},
+			}),
+			wantIds:   []int64{1},
+			wantTotal: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			permission := repository.GeneralizationPermission{
+				Mode:             repository.GeneralizationPermissionAdapter,
+				AdapterExecution: &tt.execution,
+			}
+			result, err := DynamicQueryWithPermission(db, tt.basic, table, permission)
+			if err != nil {
+				t.Fatalf("query with permission: %v", err)
+			}
+			if result.Total != tt.wantTotal {
+				t.Fatalf("total = %d, want %d; rows=%+v", result.Total, tt.wantTotal, result.Data)
+			}
+			if got := generalizationPermissionResultIds(t, result.Data); !reflect.DeepEqual(got, tt.wantIds) {
+				t.Fatalf("ids = %v, want %v", got, tt.wantIds)
+			}
+		})
+	}
+}
+
+func TestDynamicQueryWithPermissionRejectsNotApplicableExecution(t *testing.T) {
+	db := generalizationPermissionTestDB(t)
+	table := generalizationPermissionTestTable()
+	execution := mustQueryAdapterExecution(t, datapermission.DataScopeDecisionNotApplicable, nil)
+
+	_, err := DynamicQueryWithPermission(
+		db,
+		&request.Basic{Page: 1, Num: 10},
+		table,
+		repository.GeneralizationPermission{
+			Mode:             repository.GeneralizationPermissionAdapter,
+			AdapterExecution: &execution,
+		},
+	)
+	if err == nil {
+		t.Fatal("not_applicable must be routed before the query builder")
+	}
+}
+
 func TestGetFieldTypeUsesStringForTimeFields(t *testing.T) {
 	if got := GetFieldType(enum.TimeFieldType); got != reflect.TypeOf("") {
 		t.Fatalf("TIME fields should scan into string, got %v", got)
@@ -670,6 +784,137 @@ func queryTestTable() model.SysTable {
 			{FieldCode: "status", FieldType: enum.TinyintFieldType, IsListShow: true},
 		},
 	}
+}
+
+func generalizationPermissionTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err = db.Exec(`CREATE TABLE permission_demo (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		owner_org_id INTEGER NOT NULL,
+		legal_entity_id INTEGER NOT NULL
+	)`).Error; err != nil {
+		t.Fatalf("create permission demo table: %v", err)
+	}
+	if err = db.Exec(`INSERT INTO permission_demo (id, name, owner_org_id, legal_entity_id) VALUES
+		(1, 'alpha', 11, 100),
+		(2, 'beta', 11, 200),
+		(3, 'alpha', 12, 100),
+		(4, 'gamma', 13, 300)`).Error; err != nil {
+		t.Fatalf("seed permission demo table: %v", err)
+	}
+	return db
+}
+
+func generalizationPermissionTestTable() model.SysTable {
+	return model.SysTable{
+		Basic:     model.Basic{Id: 9001, State: true},
+		TableCode: "permission_demo",
+		TableFields: []model.SysTableField{
+			{Basic: model.Basic{Id: 1, State: true}, TableId: 9001, FieldCode: "id", FieldType: enum.BigIntFieldType, IsListShow: true, IsPrimaryKey: true, IsSort: true},
+			{Basic: model.Basic{Id: 2, State: true}, TableId: 9001, FieldCode: "name", FieldType: enum.VarcharFieldType, IsListShow: true},
+			{Basic: model.Basic{Id: 501, State: true}, TableId: 9001, FieldCode: "owner_org_id", FieldType: enum.BigIntFieldType, IsListShow: true, IsAdvancedSearch: true},
+			{Basic: model.Basic{Id: 502, State: true}, TableId: 9001, FieldCode: "legal_entity_id", FieldType: enum.BigIntFieldType, IsListShow: true, IsAdvancedSearch: true},
+		},
+	}
+}
+
+func mustQueryScopeCondition(
+	t *testing.T,
+	ownershipCode string,
+	dimensionId int,
+	operator datapermission.DataScopeOperator,
+	values []any,
+) datapermission.DataScopeCondition {
+	t.Helper()
+	condition, err := datapermission.NewDataScopeCondition(datapermission.DataScopeConditionInput{
+		OwnershipCode: ownershipCode,
+		DimensionId:   dimensionId,
+		Operator:      operator,
+		ValueType:     datapermission.DataScopeValueTypeBigint,
+		Values:        values,
+	})
+	if err != nil {
+		t.Fatalf("create data scope condition: %v", err)
+	}
+	return condition
+}
+
+func mustQueryAdapterExecution(
+	t *testing.T,
+	decision datapermission.DataScopeDecision,
+	conditionGroups [][]datapermission.DataScopeCondition,
+) datapermission.AdapterExecution {
+	t.Helper()
+	resource, err := datapermission.NewAdapterResourceContext(datapermission.AdapterResourceContextInput{
+		ResourceCode: "permission_demo",
+		Operation:    model.DataPermissionOperationQuery,
+		AdapterCode:  "metadata_filter",
+		TableId:      9001,
+	})
+	if err != nil {
+		t.Fatalf("create adapter resource: %v", err)
+	}
+	groups := make([]datapermission.DataScopeConditionGroup, 0, len(conditionGroups))
+	for _, conditions := range conditionGroups {
+		group, groupErr := datapermission.NewDataScopeConditionGroup(conditions)
+		if groupErr != nil {
+			t.Fatalf("create data scope condition group: %v", groupErr)
+		}
+		groups = append(groups, group)
+	}
+	result, err := datapermission.NewDataScopeResult(datapermission.DataScopeResultInput{
+		ResourceCode:    resource.ResourceCode(),
+		Operation:       resource.Operation(),
+		Decision:        decision,
+		ConditionGroups: groups,
+	})
+	if err != nil {
+		t.Fatalf("create data scope result: %v", err)
+	}
+	definitions := make([]datapermission.AdapterOwnershipDefinition, 0, 2)
+	for _, input := range []datapermission.AdapterOwnershipDefinitionInput{
+		{OwnershipCode: "owner_org", DimensionId: 101, BindingType: datapermission.AdapterBindingTypeMetadataField, TableFieldId: 501, ValueType: datapermission.DataScopeValueTypeBigint},
+		{OwnershipCode: "legal_entity", DimensionId: 102, BindingType: datapermission.AdapterBindingTypeMetadataField, TableFieldId: 502, ValueType: datapermission.DataScopeValueTypeBigint},
+	} {
+		definition, definitionErr := datapermission.NewAdapterOwnershipDefinition(input)
+		if definitionErr != nil {
+			t.Fatalf("create adapter ownership: %v", definitionErr)
+		}
+		definitions = append(definitions, definition)
+	}
+	input, err := datapermission.NewAdapterInput(resource, result, definitions)
+	if err != nil {
+		t.Fatalf("create adapter input: %v", err)
+	}
+	execution, err := datapermission.BuildAdapterExecution(input)
+	if err != nil {
+		t.Fatalf("build adapter execution: %v", err)
+	}
+	return execution
+}
+
+func generalizationPermissionResultIds(t *testing.T, rows []map[string]interface{}) []int64 {
+	t.Helper()
+	if len(rows) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		switch value := row["id"].(type) {
+		case int64:
+			ids = append(ids, value)
+		case int:
+			ids = append(ids, int64(value))
+		default:
+			t.Fatalf("unexpected id type %T in row %+v", row["id"], row)
+		}
+	}
+	return ids
 }
 
 func renderQuerySQL(query *gorm.DB) string {

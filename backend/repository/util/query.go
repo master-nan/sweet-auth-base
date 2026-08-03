@@ -8,6 +8,8 @@ package util
 import (
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/datapermission"
+	myerrors "backend/internal/errors"
 	"backend/internal/security"
 	"backend/model"
 	"backend/repository"
@@ -21,6 +23,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type invalidQueryValue struct{}
@@ -709,6 +712,107 @@ func ApplyDataScope(query *gorm.DB, scope *request.DataScope, table model.SysTab
 	return query
 }
 
+// ApplyAdapterExecution converts a validated metadata AdapterExecution into
+// GORM clause expressions. It resolves field IDs only from the trusted table
+// metadata already loaded by the server and never accepts executable input.
+func ApplyAdapterExecution(
+	query *gorm.DB,
+	execution datapermission.AdapterExecution,
+	table model.SysTable,
+) (*gorm.DB, error) {
+	if err := execution.Validate(); err != nil {
+		return query, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+	switch execution.Mode() {
+	case datapermission.AdapterExecutionModeAllowAll:
+		return query, nil
+	case datapermission.AdapterExecutionModeDenyAll:
+		return query.Where(clause.Expr{SQL: "1 = 0"}), nil
+	case datapermission.AdapterExecutionModeNotApplicable:
+		return query, myerrors.ErrDataPermissionRuntimeRouteConflict
+	case datapermission.AdapterExecutionModeApplyFilter:
+	default:
+		return query, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+
+	groups := execution.ConditionGroups()
+	if len(groups) == 0 {
+		return query, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+	orExpressions := make([]clause.Expression, 0, len(groups))
+	for _, group := range groups {
+		conditions := group.Conditions()
+		if len(conditions) == 0 {
+			return query, myerrors.ErrDataPermissionFilterApplyFailed
+		}
+		andExpressions := make([]clause.Expression, 0, len(conditions))
+		for _, condition := range conditions {
+			expression, err := metadataAdapterConditionExpression(condition, table)
+			if err != nil {
+				return query, err
+			}
+			andExpressions = append(andExpressions, expression)
+		}
+		orExpressions = append(orExpressions, clause.And(andExpressions...))
+	}
+	return query.Where(clause.Or(orExpressions...)), nil
+}
+
+func metadataAdapterConditionExpression(
+	condition datapermission.AdapterCondition,
+	table model.SysTable,
+) (clause.Expression, error) {
+	if condition.BindingType() != datapermission.AdapterBindingTypeMetadataField ||
+		condition.TableFieldId() <= 0 {
+		return nil, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+	field, ok := findFieldById(table, condition.TableFieldId())
+	if !ok || security.IsSensitiveFieldName(field.FieldCode) {
+		return nil, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+	scope := condition.ScopeCondition()
+	column := clause.Column{Table: table.TableCode, Name: field.FieldCode}
+	values, err := adapterConditionValues(scope)
+	if err != nil {
+		return nil, err
+	}
+	switch scope.Operator() {
+	case datapermission.DataScopeOperatorEqual:
+		if len(values) != 1 {
+			return nil, myerrors.ErrDataPermissionFilterApplyFailed
+		}
+		return clause.Eq{Column: column, Value: values[0]}, nil
+	case datapermission.DataScopeOperatorIn:
+		if len(values) == 0 {
+			return nil, myerrors.ErrDataPermissionFilterApplyFailed
+		}
+		return clause.IN{Column: column, Values: values}, nil
+	default:
+		return nil, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+}
+
+func adapterConditionValues(condition datapermission.DataScopeCondition) ([]interface{}, error) {
+	switch condition.ValueType() {
+	case datapermission.DataScopeValueTypeBigint:
+		values := condition.BigintValues()
+		result := make([]interface{}, len(values))
+		for index, value := range values {
+			result[index] = value
+		}
+		return result, nil
+	case datapermission.DataScopeValueTypeString:
+		values := condition.StringValues()
+		result := make([]interface{}, len(values))
+		for index, value := range values {
+			result[index] = value
+		}
+		return result, nil
+	default:
+		return nil, myerrors.ErrDataPermissionFilterApplyFailed
+	}
+}
+
 func DataScopeValueAllowed(table model.SysTable, condition request.DataScopeCondition, raw interface{}) bool {
 	tableField, ok := findField(table, condition.Field)
 	if !ok || security.IsSensitiveFieldName(condition.Field) {
@@ -749,6 +853,19 @@ func normalizeDataScopeMatchType(raw string) string {
 
 // DynamicQuery 动态生成结构体并进行查询
 func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
+	permission := repository.GeneralizationPermission{
+		Mode:        repository.GeneralizationPermissionLegacy,
+		LegacyScope: basic.DataScope,
+	}
+	return DynamicQueryWithPermission(db, basic, table, permission)
+}
+
+func DynamicQueryWithPermission(
+	db *gorm.DB,
+	basic *request.Basic,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (repository.GeneralizationListResult, error) {
 	var result repository.GeneralizationListResult
 	resultFields := listResultFields(table.TableFields)
 	// 创建动态结构体
@@ -762,7 +879,11 @@ func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repo
 		query = query.Where(qualifyField("gmt_delete", table.TableCode) + " IS NULL")
 	}
 
-	query = ApplyDataScope(query, basic.DataScope, table)
+	var err error
+	query, err = ApplyGeneralizationPermission(query, permission, table)
+	if err != nil {
+		return result, err
+	}
 
 	joinAliasMap := make(map[string]string)
 	if len(table.TableRelations) > 0 {
@@ -792,7 +913,7 @@ func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repo
 
 	// 查询结果
 	results := reflect.New(reflect.SliceOf(modelType)).Elem()
-	err := query.Find(results.Addr().Interface()).Error
+	err = query.Find(results.Addr().Interface()).Error
 	if err != nil {
 		return result, err
 	}
@@ -830,6 +951,27 @@ func DynamicQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) (repo
 	return result, nil
 }
 
+func ApplyGeneralizationPermission(
+	query *gorm.DB,
+	permission repository.GeneralizationPermission,
+	table model.SysTable,
+) (*gorm.DB, error) {
+	switch permission.Mode {
+	case repository.GeneralizationPermissionLegacy:
+		if permission.AdapterExecution != nil {
+			return query, myerrors.ErrDataPermissionRuntimeRouteConflict
+		}
+		return ApplyDataScope(query, permission.LegacyScope, table), nil
+	case repository.GeneralizationPermissionAdapter:
+		if permission.LegacyScope != nil || permission.AdapterExecution == nil {
+			return query, myerrors.ErrDataPermissionRuntimeRouteConflict
+		}
+		return ApplyAdapterExecution(query, *permission.AdapterExecution, table)
+	default:
+		return query, myerrors.ErrDataPermissionRuntimeRouteConflict
+	}
+}
+
 func hasField(table model.SysTable, fieldCode string) bool {
 	_, ok := findField(table, fieldCode)
 	return ok
@@ -838,6 +980,15 @@ func hasField(table model.SysTable, fieldCode string) bool {
 func findField(table model.SysTable, fieldCode string) (model.SysTableField, bool) {
 	for _, field := range table.TableFields {
 		if field.FieldCode == fieldCode {
+			return field, true
+		}
+	}
+	return model.SysTableField{}, false
+}
+
+func findFieldById(table model.SysTable, fieldId int) (model.SysTableField, bool) {
+	for _, field := range table.TableFields {
+		if field.Id == fieldId {
 			return field, true
 		}
 	}
