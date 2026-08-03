@@ -505,4 +505,4 @@ Resolver 使用请求级 Resource、Policy/Rule 和 DimensionValues 缓存；没
 - `docs/DataPermissionOwnershipDesign.md`
 - `docs/DataPermissionAcceptanceGuide.md`
 
-未发现指向已删除实现或已删除 `DataPermissionDemo.md` 的失效引用，因此本 Task 未修改上述正式设计文档。
+上述正式设计文档之间的引用均有效。

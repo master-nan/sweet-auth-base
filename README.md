@@ -4,11 +4,11 @@ Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字�
 
 常用入口：
 
-- 运行、测试、Docker、数据库和发布说明：[docs/runbook.md](docs/runbook.md)
-- 低代码发布、字段、按钮和权限排查：[docs/low-code-manual.md](docs/low-code-manual.md)
-- 字段输入类型：[docs/field-type-guide.md](docs/field-type-guide.md)
-- 字段联动配置：[docs/linkage-config.md](docs/linkage-config.md)
-- 通用数据权限模型与 Demo：[docs/data-permission-design.md](docs/data-permission-design.md)、[docs/data-permission-demo.md](docs/data-permission-demo.md)
+- 运行、测试、Docker、数据库和发布说明：[docs/Runbook.md](docs/Runbook.md)
+- 低代码发布、字段、按钮和权限排查：[docs/LowCodeManual.md](docs/LowCodeManual.md)
+- 字段输入类型：[docs/FieldTypeGuide.md](docs/FieldTypeGuide.md)
+- 字段联动配置：[docs/LinkageConfig.md](docs/LinkageConfig.md)
+- 数据权限设计与验收：[docs/DataPermissionDesign.md](docs/DataPermissionDesign.md)、[docs/DataPermissionAcceptanceGuide.md](docs/DataPermissionAcceptanceGuide.md)
 
 ## 快速启动
 
@@ -70,9 +70,9 @@ quasar dev
 
 ## 文档
 
-- [运行手册](docs/runbook.md)
-- [低代码配置手册](docs/low-code-manual.md)
-- [通用数据权限设计与实现说明](docs/data-permission-design.md)
-- [通用数据权限 Demo](docs/data-permission-demo.md)
-- [字段类型说明](docs/field-type-guide.md)
-- [联动配置说明](docs/linkage-config.md)
+- [运行手册](docs/Runbook.md)
+- [低代码配置手册](docs/LowCodeManual.md)
+- [数据权限设计与实现说明](docs/DataPermissionDesign.md)
+- [数据权限验收指南](docs/DataPermissionAcceptanceGuide.md)
+- [字段类型说明](docs/FieldTypeGuide.md)
+- [联动配置说明](docs/LinkageConfig.md)

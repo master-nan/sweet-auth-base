@@ -33,7 +33,7 @@ help:
 	@printf '%s\n' '  cp .env.external.example .env.external    首次复制外部环境配置'
 	@printf '%s\n' '  make docker-up-external                   只启动 backend、frontend'
 	@printf '%s\n' ''
-	@printf '%s\n' '详细说明见 docs/runbook.md'
+	@printf '%s\n' '详细说明见 docs/Runbook.md'
 
 verify: backend-test frontend-ci
 
