@@ -21,6 +21,17 @@ const (
 	ErrorCodeMetadataAdapterValueTypeMismatch       = 120103
 	ErrorCodeMetadataAdapterComplexityExceeded      = 120104
 	ErrorCodeMetadataAdapterFailed                  = 120105
+	ErrorCodeRegisteredAdapterUnregistered          = 120106
+	ErrorCodeRegisteredAdapterFieldNotFound         = 120107
+	ErrorCodeRegisteredAdapterRegistrationDuplicate = 120108
+	ErrorCodeRegisteredAdapterRegistrationConflict  = 120109
+	ErrorCodeRegisteredAdapterResourceMismatch      = 120110
+	ErrorCodeRegisteredAdapterDimensionUnsupported  = 120111
+	ErrorCodeRegisteredAdapterValueTypeUnsupported  = 120112
+	ErrorCodeRegisteredAdapterOperationUnsupported  = 120113
+	ErrorCodeRegisteredAdapterOperatorUnsupported   = 120114
+	ErrorCodeRegisteredAdapterExecutionInvalid      = 120115
+	ErrorCodeRegisteredAdapterPartialConversion     = 120116
 )
 
 var (
@@ -113,5 +124,60 @@ var (
 		http.StatusInternalServerError,
 		ErrorCodeMetadataAdapterFailed,
 		"数据权限元数据字段适配失败",
+	)
+	ErrRegisteredAdapterUnregistered = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeRegisteredAdapterUnregistered,
+		"数据权限注册适配器未注册",
+	)
+	ErrRegisteredAdapterFieldNotFound = NewBusinessError(
+		http.StatusNotFound,
+		ErrorCodeRegisteredAdapterFieldNotFound,
+		"数据权限注册字段不存在",
+	)
+	ErrRegisteredAdapterRegistrationDuplicate = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeRegisteredAdapterRegistrationDuplicate,
+		"数据权限注册字段重复注册",
+	)
+	ErrRegisteredAdapterRegistrationConflict = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeRegisteredAdapterRegistrationConflict,
+		"数据权限注册字段配置冲突",
+	)
+	ErrRegisteredAdapterResourceMismatch = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeRegisteredAdapterResourceMismatch,
+		"数据权限注册字段不属于当前资源",
+	)
+	ErrRegisteredAdapterDimensionUnsupported = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeRegisteredAdapterDimensionUnsupported,
+		"数据权限注册字段不支持当前维度",
+	)
+	ErrRegisteredAdapterValueTypeUnsupported = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeRegisteredAdapterValueTypeUnsupported,
+		"数据权限注册字段值类型不支持",
+	)
+	ErrRegisteredAdapterOperationUnsupported = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeRegisteredAdapterOperationUnsupported,
+		"数据权限注册字段不支持当前操作",
+	)
+	ErrRegisteredAdapterOperatorUnsupported = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeRegisteredAdapterOperatorUnsupported,
+		"数据权限注册字段不支持当前操作符",
+	)
+	ErrRegisteredAdapterExecutionInvalid = NewBusinessError(
+		http.StatusUnprocessableEntity,
+		ErrorCodeRegisteredAdapterExecutionInvalid,
+		"数据权限注册字段执行描述不合法",
+	)
+	ErrRegisteredAdapterPartialConversion = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeRegisteredAdapterPartialConversion,
+		"数据权限注册字段条件转换失败",
 	)
 )
