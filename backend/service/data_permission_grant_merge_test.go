@@ -259,8 +259,9 @@ func newGrantMergeResolver(
 		func(
 			_ *gin.Context,
 			_ datapermission.SubjectContext,
-			dimensionCode string,
+			request DimensionProviderRequest,
 		) (datapermission.DimensionValues, error) {
+			dimensionCode := request.DimensionCode
 			state.providerCalls = append(state.providerCalls, dimensionCode)
 			if err := state.providerErrors[dimensionCode]; err != nil {
 				return datapermission.DimensionValues{}, err

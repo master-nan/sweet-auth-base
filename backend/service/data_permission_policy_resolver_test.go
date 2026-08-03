@@ -33,6 +33,8 @@ type policyResolverFixtures struct {
 type policyResolverTestProvider struct {
 	calls         int
 	dimensionCode string
+	relation      string
+	structureCode string
 	subject       datapermission.SubjectContext
 	values        datapermission.DimensionValues
 	err           error
@@ -41,10 +43,12 @@ type policyResolverTestProvider struct {
 func (provider *policyResolverTestProvider) ResolveDimensionValues(
 	_ *gin.Context,
 	subject datapermission.SubjectContext,
-	dimensionCode string,
+	request DimensionProviderRequest,
 ) (datapermission.DimensionValues, error) {
 	provider.calls++
-	provider.dimensionCode = dimensionCode
+	provider.dimensionCode = request.DimensionCode
+	provider.relation = request.Relation
+	provider.structureCode = request.StructureCode
 	provider.subject = subject
 	return provider.values, provider.err
 }

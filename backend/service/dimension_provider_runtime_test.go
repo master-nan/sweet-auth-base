@@ -36,9 +36,10 @@ func TestDimensionProviderRuntimeResolvesOrganizationDimensions(t *testing.T) {
 					}
 					return resolvedDimensionScope(subject, []int{22, 21, 22}, []int{12, 11, 12}), nil
 				},
+				nil,
 			)
 
-			result, err := runtime.ResolveDimensionValues(nil, subject, tt.dimensionCode)
+			result, err := runtime.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, tt.dimensionCode))
 			if err != nil {
 				t.Fatalf("resolve dimension: %v", err)
 			}
@@ -62,9 +63,10 @@ func TestDimensionProviderRuntimeReturnsEmployeeWithoutOrganizationLookup(t *tes
 			t.Fatal("employee dimension must not call Organization scope Provider")
 			return response.OrgEffectiveOrganizationScopeRes{}, nil
 		},
+		nil,
 	)
 
-	result, err := runtime.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeEmployee)
+	result, err := runtime.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeEmployee))
 	if err != nil {
 		t.Fatalf("resolve employee dimension: %v", err)
 	}
@@ -90,14 +92,144 @@ func TestDimensionProviderRuntimeReturnsEmptyOrganizationFacts(t *testing.T) {
 				OrgUnitIds:      []int{},
 			}, nil
 		},
+		nil,
 	)
 
-	result, err := runtime.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeManagementOrg)
+	result, err := runtime.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeManagementOrg))
 	if err != nil {
 		t.Fatalf("resolve empty dimension: %v", err)
 	}
 	if len(result.Values()) != 0 {
 		t.Fatalf("empty scope must not expand access: %v", result.Values())
+	}
+}
+
+func TestDimensionProviderRuntimeResolvesManagementOrgDescendants(t *testing.T) {
+	subject := dimensionProviderSubject(t)
+	structureCode := "DP-ACCEPTANCE-MGMT"
+	requestedRoots := make([]int, 0, 2)
+	runtime := newDimensionProviderRuntime(
+		dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
+		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+			return resolvedDimensionScope(subject, []int{21}, []int{21, 11, 11}), nil
+		},
+		func(_ *gin.Context, code string, rootId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
+			if code != structureCode || asOfDate != subject.AsOfDate() || !includeSelf {
+				t.Fatalf("unexpected descendant request: code=%s date=%s include_self=%v", code, asOfDate, includeSelf)
+			}
+			requestedRoots = append(requestedRoots, rootId)
+			items := map[int][]response.OrgRelationItemRes{
+				11: {
+					{OrgUnitId: 11, Distance: 0},
+					{OrgUnitId: 12, Distance: 1},
+					{OrgUnitId: 13, Distance: 2},
+				},
+				21: {{OrgUnitId: 21, Distance: 0}},
+			}[rootId]
+			return response.OrgDescendantsRes{
+				StructureCode: structureCode,
+				OrgUnitId:     rootId,
+				AsOfDate:      subject.AsOfDate(),
+				Items:         items,
+			}, nil
+		},
+	)
+	request, err := newDimensionProviderRequest(
+		datapermission.DimensionCodeManagementOrg,
+		model.DataPolicyRelationSelfAndDescendants,
+		&structureCode,
+	)
+	if err != nil {
+		t.Fatalf("create descendant request: %v", err)
+	}
+
+	result, err := runtime.ResolveDimensionValues(nil, subject, request)
+	if err != nil {
+		t.Fatalf("resolve descendants: %v", err)
+	}
+	if got, want := result.BigintValues(), []int64{11, 12, 13, 21}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("descendant values: got %v want %v", got, want)
+	}
+	if got, want := requestedRoots, []int{21, 11}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("descendant roots: got %v want %v", got, want)
+	}
+}
+
+func TestDimensionProviderRuntimeFailsClosedOnInvalidOrganizationTrees(t *testing.T) {
+	subject := dimensionProviderSubject(t)
+	structureCode := "DP-ACCEPTANCE-MGMT"
+	tests := []struct {
+		name       string
+		dependency func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
+	}{
+		{
+			name: "cycle",
+			dependency: func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
+				return response.OrgDescendantsRes{}, myerrors.ErrOrgStructureCycle
+			},
+		},
+		{
+			name: "orphan",
+			dependency: func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
+				return response.OrgDescendantsRes{}, myerrors.ErrOrgStructureNodeMissing
+			},
+		},
+		{
+			name: "invalid organization response",
+			dependency: func(_ *gin.Context, _ string, rootId int, _ string, _ bool) (response.OrgDescendantsRes, error) {
+				return response.OrgDescendantsRes{
+					StructureCode: structureCode,
+					OrgUnitId:     rootId,
+					AsOfDate:      subject.AsOfDate(),
+					Items:         []response.OrgRelationItemRes{{OrgUnitId: 999, Distance: 0}},
+				}, nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := newDimensionProviderRuntime(
+				dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
+				func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+					return resolvedDimensionScope(subject, []int{21}, []int{11}), nil
+				},
+				tt.dependency,
+			)
+			request, err := newDimensionProviderRequest(
+				datapermission.DimensionCodeManagementOrg,
+				model.DataPolicyRelationSelfAndDescendants,
+				&structureCode,
+			)
+			if err != nil {
+				t.Fatalf("create descendant request: %v", err)
+			}
+			result, err := runtime.ResolveDimensionValues(nil, subject, request)
+			assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionProviderFailed)
+			if len(result.Values()) != 0 {
+				t.Fatalf("failed tree returned values: %v", result.Values())
+			}
+		})
+	}
+}
+
+func TestDimensionProviderRuntimeKeepsNonOrganizationRelationsExact(t *testing.T) {
+	subject := dimensionProviderSubject(t)
+	structureCode := "DP-ACCEPTANCE-MGMT"
+	request := DimensionProviderRequest{
+		DimensionCode: datapermission.DimensionCodeLegalEntity,
+		Relation:      model.DataPolicyRelationSelfAndDescendants,
+		StructureCode: structureCode,
+	}
+	runtime := newDimensionProviderRuntime(
+		dimensionLookup(dimensionFixture(datapermission.DimensionCodeLegalEntity, model.DataDimensionValueTypeBigint)),
+		nil,
+		nil,
+	)
+
+	result, err := runtime.ResolveDimensionValues(nil, subject, request)
+	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionUnsupported)
+	if len(result.Values()) != 0 {
+		t.Fatalf("unsupported relation returned values: %v", result.Values())
 	}
 }
 
@@ -109,15 +241,17 @@ func TestDimensionProviderRuntimeRejectsMissingAndUnsupportedDimensions(t *testi
 			return model.DataDimensionDefinition{}, gorm.ErrRecordNotFound
 		},
 		nil,
+		nil,
 	)
-	_, err := missing.ResolveDimensionValues(nil, subject, "missing")
+	_, err := missing.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, "missing"))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionNotFound)
 
 	unsupported := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture("warehouse", model.DataDimensionValueTypeBigint)),
 		nil,
+		nil,
 	)
-	_, err = unsupported.ResolveDimensionValues(nil, subject, "warehouse")
+	_, err = unsupported.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, "warehouse"))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionUnsupported)
 }
 
@@ -126,9 +260,10 @@ func TestDimensionProviderRuntimeRejectsTypeMismatch(t *testing.T) {
 	runtime := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeLegalEntity, model.DataDimensionValueTypeString)),
 		nil,
+		nil,
 	)
 
-	_, err := runtime.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeLegalEntity)
+	_, err := runtime.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeLegalEntity))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionTypeMismatch)
 }
 
@@ -140,8 +275,9 @@ func TestDimensionProviderRuntimeWrapsDependencyFailures(t *testing.T) {
 			return model.DataDimensionDefinition{}, errors.New("database unavailable")
 		},
 		nil,
+		nil,
 	)
-	_, err := dimensionFailure.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeLegalEntity)
+	_, err := dimensionFailure.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeLegalEntity))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionProviderFailed)
 
 	organizationFailure := newDimensionProviderRuntime(
@@ -149,8 +285,9 @@ func TestDimensionProviderRuntimeWrapsDependencyFailures(t *testing.T) {
 		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return response.OrgEffectiveOrganizationScopeRes{}, errors.New("organization unavailable")
 		},
+		nil,
 	)
-	_, err = organizationFailure.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeLegalEntity)
+	_, err = organizationFailure.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeLegalEntity))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionProviderFailed)
 }
 
@@ -160,12 +297,13 @@ func TestDimensionProviderRuntimeRejectsInvalidSubjectAndProviderData(t *testing
 		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return response.OrgEffectiveOrganizationScopeRes{}, nil
 		},
+		nil,
 	)
-	_, err := runtime.ResolveDimensionValues(nil, datapermission.SubjectContext{}, datapermission.DimensionCodeManagementOrg)
+	_, err := runtime.ResolveDimensionValues(nil, datapermission.SubjectContext{}, exactDimensionProviderRequest(t, datapermission.DimensionCodeManagementOrg))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionSubjectUserNotFound)
 
 	subject := dimensionProviderSubject(t)
-	_, err = runtime.ResolveDimensionValues(nil, subject, datapermission.DimensionCodeManagementOrg)
+	_, err = runtime.ResolveDimensionValues(nil, subject, exactDimensionProviderRequest(t, datapermission.DimensionCodeManagementOrg))
 	assertDimensionProviderError(t, err, myerrors.ErrorCodeDataPermissionDimensionProviderFailed)
 }
 
@@ -177,6 +315,15 @@ func dimensionProviderSubject(t *testing.T) datapermission.SubjectContext {
 		t.Fatalf("create subject context: %v", err)
 	}
 	return subject
+}
+
+func exactDimensionProviderRequest(t *testing.T, dimensionCode string) DimensionProviderRequest {
+	t.Helper()
+	request, err := newDimensionProviderRequest(dimensionCode, model.DataPolicyRelationExact, nil)
+	if err != nil {
+		t.Fatalf("create exact Dimension Provider request: %v", err)
+	}
+	return request
 }
 
 func dimensionLookup(

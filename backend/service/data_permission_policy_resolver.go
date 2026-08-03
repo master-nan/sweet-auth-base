@@ -33,7 +33,7 @@ type policyResolverDimensionLookup func(*gin.Context, int) (model.DataDimensionD
 type policyResolverDimensionValuesLookup func(
 	*gin.Context,
 	datapermission.SubjectContext,
-	string,
+	DimensionProviderRequest,
 ) (datapermission.DimensionValues, error)
 
 // DataPermissionPolicyResolver is the complete request-scoped Resolver engine.
@@ -281,8 +281,7 @@ func (resolver *DataPermissionPolicyResolver) resolveRule(
 	rule model.DataPolicyRule,
 ) (datapermission.DataScopeResult, error) {
 	input := request.input
-	if rule.PolicyId <= 0 || rule.DimensionId <= 0 || strings.TrimSpace(rule.OwnershipCode) == "" ||
-		rule.Relation != model.DataPolicyRelationExact {
+	if rule.PolicyId <= 0 || rule.DimensionId <= 0 || strings.TrimSpace(rule.OwnershipCode) == "" {
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
 	}
 
@@ -315,8 +314,12 @@ func (resolver *DataPermissionPolicyResolver) resolveRule(
 	if !validResolverRuleSource(rule, dimension.Code) {
 		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
 	}
+	providerRequest, err := newResolverDimensionProviderRequest(rule, dimension.Code)
+	if err != nil {
+		return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
 
-	values, err := resolver.resolveRuleValues(ctx, request, rule, dimension, valueType)
+	values, err := resolver.resolveRuleValues(ctx, request, rule, dimension, valueType, providerRequest)
 	if err != nil {
 		return datapermission.DataScopeResult{}, err
 	}
@@ -350,6 +353,7 @@ func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 	rule model.DataPolicyRule,
 	dimension model.DataDimensionDefinition,
 	valueType datapermission.DataScopeValueType,
+	providerRequest DimensionProviderRequest,
 ) ([]any, error) {
 	if rule.ScopeSource == model.DataPolicyScopeSourceSpecifiedValues {
 		values, err := decodeResolverSpecifiedValues(rule.SpecifiedValues)
@@ -359,17 +363,18 @@ func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 		return values, nil
 	}
 
-	values, exists := request.dimensionValues[dimension.Code]
+	cacheKey := providerRequest.cacheKey()
+	values, exists := request.dimensionValues[cacheKey]
 	if !exists {
 		var err error
-		values, err = resolver.resolveDimension(ctx, request.input.SubjectContext(), dimension.Code)
+		values, err = resolver.resolveDimension(ctx, request.input.SubjectContext(), providerRequest)
 		if err != nil {
 			return nil, myerrors.ErrDataPermissionResolverDimensionFailed
 		}
 		if err = values.Validate(); err != nil {
 			return nil, myerrors.ErrDataPermissionResolverDimensionFailed
 		}
-		request.dimensionValues[dimension.Code] = values
+		request.dimensionValues[cacheKey] = values
 	}
 	if err := values.Validate(); err != nil {
 		return nil, myerrors.ErrDataPermissionResolverDimensionFailed
@@ -378,6 +383,28 @@ func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
 		return nil, myerrors.ErrDataPermissionResolverConfigConflict
 	}
 	return values.Values(), nil
+}
+
+func newResolverDimensionProviderRequest(
+	rule model.DataPolicyRule,
+	dimensionCode string,
+) (DimensionProviderRequest, error) {
+	if rule.ScopeSource == model.DataPolicyScopeSourceSpecifiedValues {
+		if rule.Relation != model.DataPolicyRelationExact || rule.StructureCode != nil {
+			return DimensionProviderRequest{}, myerrors.ErrDataPermissionResolverConfigConflict
+		}
+		return newDimensionProviderRequest(dimensionCode, rule.Relation, nil)
+	}
+	if rule.Relation == model.DataPolicyRelationSelfAndDescendants &&
+		(rule.ScopeSource != model.DataPolicyScopeSourceEffectiveOrgUnits ||
+			dimensionCode != datapermission.DimensionCodeManagementOrg) {
+		return DimensionProviderRequest{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	request, err := newDimensionProviderRequest(dimensionCode, rule.Relation, rule.StructureCode)
+	if err != nil {
+		return DimensionProviderRequest{}, myerrors.ErrDataPermissionResolverConfigConflict
+	}
+	return request, nil
 }
 
 func (resolver *DataPermissionPolicyResolver) loadResource(

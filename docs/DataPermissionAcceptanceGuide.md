@@ -15,16 +15,13 @@ Seed 或 Migration。
 ## 2. 当前验收状态
 
 验收数据、组织层级、账号绑定、低代码实体、数据权限配置和安全回归测试
-已经具备。当前完整业务结果验收存在一个明确阻塞：配置层允许
-`self_and_descendants`，但 Resolver 运行时目前只接受 `exact`，Dimension
-Provider 也只返回员工当前有效任职中的直接组织。
+已经具备。`management_org` 维度当前支持 `exact` 和
+`self_and_descendants`：后者由 Dimension Provider 调用 Organization
+Permission Provider，在策略指定的组织架构和计算日期下展开后代组织。
 
-因此当前版本会对“本组织及下级组织”策略返回稳定配置冲突并拒绝访问，
-不会错误放大为全部数据。待后续单独实现组织下级范围展开后，可直接复用
-本指南和同一份数据脚本，无需改造验收数据。
-
-禁止通过给用户增加下级组织任职、把关系改成 `exact`，或者把上海运输部
-直接写进允许值等方式伪造验收通过。
+展开结果包含员工当前有效任职组织本身及其全部下级组织，并统一去重、稳定
+排序。组织循环、孤儿节点、无效组织、架构异常或 Provider 调用失败时整次
+解析安全失败，不会退化为直接组织，更不会放大为全部组织。
 
 ## 3. 验收数据
 
@@ -95,8 +92,7 @@ PolicyRule 一致性，以及华东、华南两组业务数据的静态预期集
 
 ### 5.1 目标结果
 
-在组织下级范围运行时能力补齐后，分别以三个账号执行同一张低代码表的
-列表、分页总数和详情查询。
+分别以三个账号执行同一张低代码表的列表、分页总数和详情查询。
 
 | 登录账号 | rows | total | detail |
 | --- | --- | --- | --- |
@@ -106,14 +102,16 @@ PolicyRule 一致性，以及华东、华南两组业务数据的静态预期集
 
 列表 rows 和 total 必须使用同一权限结果。无权详情不得泄露记录是否存在。
 
-### 5.2 当前版本预期
+### 5.2 自动化验收
 
-当前版本执行用户 A 或用户 B 的 `query`、`detail` 时，Resolver 应返回数据
-权限配置冲突，查询不得退回未过滤全量结果。自动化测试
-`TestDataPermissionDemoAcceptanceDescendantPolicyFailsClosed` 固定了这一安全
-行为。
+自动化测试 `TestDataPermissionDemoAcceptanceEndToEnd` 使用与生产运行时一致的
+SubjectContextBuilder、Grant/Policy/Ownership Repository、Resolver、Dimension
+Provider、Metadata Adapter 和低代码查询 Repository，验证第 5.1 节的 rows、
+total 与 detail 结果。
 
-这表示安全验收通过，但“用户 A 可见 ORD001、ORD002”的业务验收尚未通过。
+`TestDataPermissionDemoAcceptanceDescendantPolicyResolves` 同时固定 Resolver 向
+Dimension Provider 传递 `self_and_descendants` 和显式 `structure_code` 的契约，
+避免关系被静默降级为 `exact`。
 
 ## 6. 安全验收
 
@@ -127,18 +125,16 @@ go test ./...
 重点确认：
 
 1. 无 Grant 时 Resolver 返回 `none`，rows 为空、total 为 0。
-2. `self_and_descendants` 尚未支持时返回稳定错误，不得返回 `all`。
+2. `self_and_descendants` 必须经 Organization Permission Provider 展开，任何异常不得返回 `all`。
 3. Resolver 依赖失败时不得执行原始全量查询。
 4. Metadata Adapter 字段缺失、停用、类型漂移或绑定不匹配时整体失败。
 5. 详情查询必须在数据库查询中同时应用业务 ID 和权限条件。
 6. rows、total 和 detail 不得使用不同的权限解释。
 
-## 7. 后续准入条件
+## 7. 运行边界
 
-完整业务验收前必须通过独立任务补齐以下能力：
-
-1. Resolver 解释 `self_and_descendants` 和显式 `structure_code`。
-2. 通过 Organization Permission Provider 获取指定架构、指定日期的下级组织。
-3. 保持 Organization Provider 为唯一组织事实来源，Data Permission 不直接访问组织表。
-4. 下级展开失败、循环、孤儿、超限或架构不存在时安全收敛，绝不返回全部数据。
-5. 补齐后重新执行本脚本，并验证本指南第 5.1 节全部结果。
+1. `legal_entity` 和 `employee` 维度当前保持 `exact` 语义，不做树关系展开。
+2. Organization Permission Provider 是组织事实的唯一来源，Data Permission 不直接访问组织表。
+3. `structure_code` 必须由已校验的 PolicyRule 提供，不使用默认架构，也不自动选择架构。
+4. 下级展开失败、循环、孤儿、超限或架构不存在时安全失败，绝不返回全部数据。
+5. 本验收仅覆盖低代码 `metadata_field` 查询链，不代表 TMS、WMS、SRM 已完成真实业务接入。
