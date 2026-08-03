@@ -16,9 +16,8 @@ const (
 
 var dimensionCodePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$`)
 
-// DimensionValues contains only trusted facts returned by a Dimension
-// Provider. Permission decisions and executable filtering expressions are
-// intentionally absent.
+// DimensionValues 仅包含 Dimension Provider 返回的可信事实。
+// 它不包含权限决策或可执行过滤表达式。
 type DimensionValues struct {
 	dimensionCode string
 	valueType     DataScopeValueType

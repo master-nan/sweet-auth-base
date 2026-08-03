@@ -8,8 +8,8 @@ import (
 	"backend/model"
 )
 
-// DimensionProviderRequest carries only the relation facts required by a
-// Dimension Provider. It contains no policy, grant, or executable filter data.
+// DimensionProviderRequest 仅携带 Dimension Provider 所需的关系事实。
+// 它不包含 Policy、Grant 或可执行过滤数据。
 type DimensionProviderRequest struct {
 	DimensionCode string
 	Relation      string

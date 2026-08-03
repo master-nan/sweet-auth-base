@@ -19,12 +19,11 @@ var (
 	ErrInvalidFieldValues = errors.New("repository: field values must be a slice or array")
 )
 
-// BasicRepository defines the shared persistence baseline for typed repositories.
+// BasicRepository 定义类型化 Repository 的共享持久化基线。
 //
-// Implementations may compose database queries, perform CRUD operations and
-// paginate results. Business rules, permission decisions and service calls do
-// not belong in repositories. Methods return validation or database errors to
-// the service layer without translating them into API errors.
+// 实现可以组合数据库查询、执行 CRUD 操作并对结果分页。
+// 业务规则、权限决策和 Service 调用不属于 Repository 职责。
+// 方法将校验或数据库错误返回 Service 层，不在此处转换为 API 错误。
 type BasicRepository[T any] interface {
 	ExecuteTx(ctx *gin.Context, fn func(tx *gorm.DB) error) error
 	DBWithContext(*gin.Context) *gorm.DB

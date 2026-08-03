@@ -17,8 +17,7 @@ const (
 	AdapterBindingTypeRegisteredField AdapterBindingType = "registered_field"
 )
 
-// AdapterExecutionMode is explicit so consumers never infer authorization
-// from an empty condition slice.
+// AdapterExecutionMode 使用显式模式，避免消费者根据空 Condition 切片推断授权。
 type AdapterExecutionMode string
 
 const (
@@ -35,8 +34,7 @@ type AdapterResourceContextInput struct {
 	TableId      int
 }
 
-// AdapterResourceContext contains only server-resolved resource identity.
-// Table and field names are intentionally absent.
+// AdapterResourceContext 仅包含服务端解析的 Resource 身份，不包含表名和字段名。
 type AdapterResourceContext struct {
 	resourceCode string
 	operation    string
@@ -53,9 +51,8 @@ type AdapterOwnershipDefinitionInput struct {
 	ValueType        DataScopeValueType
 }
 
-// AdapterOwnershipDefinition is the safe bridge from Ownership configuration
-// to an Adapter. A binding contains either a metadata ID or a reviewed
-// registration code, never a table name, field expression, or SQL fragment.
+// AdapterOwnershipDefinition 是 Ownership 配置到 Adapter 的安全桥梁。
+// Binding 仅包含元数据 ID 或已评审的注册编码，不包含表名、字段表达式或 SQL 片段。
 type AdapterOwnershipDefinition struct {
 	ownershipCode    string
 	dimensionId      int
@@ -82,9 +79,8 @@ type AdapterConditionGroup struct {
 	conditions []AdapterCondition
 }
 
-// AdapterExecution is an immutable, controlled execution capability. It is
-// still ORM- and database-agnostic; concrete adapters consume its binding IDs
-// or registration codes without changing the Resolver decision.
+// AdapterExecution 是不可变、受控的执行能力，并保持与 ORM 和数据库无关。
+// 具体 Adapter 使用其中的 Binding ID 或注册编码，但不得改变 Resolver 决策。
 type AdapterExecution struct {
 	resourceCode string
 	operation    string
@@ -92,9 +88,8 @@ type AdapterExecution struct {
 	groups       []AdapterConditionGroup
 }
 
-// Adapter applies a validated DataScopeResult to a target-specific execution
-// capability. Implementations may resolve metadata IDs or reviewed server
-// registrations, but may not load or reinterpret Policy configuration.
+// Adapter 将已校验的 DataScopeResult 应用于目标执行能力。
+// 实现可以解析元数据 ID 或已评审的服务端注册项，但不得加载或重新解释 Policy 配置。
 type Adapter interface {
 	Apply(context.Context, AdapterInput) (AdapterExecution, error)
 }
@@ -290,8 +285,8 @@ func (apply AdapterFunc) Apply(
 	return execution.clone(), nil
 }
 
-// BuildAdapterExecution performs only safe contract translation. It does not
-// resolve metadata fields, load registrations, generate SQL, or touch a query.
+// BuildAdapterExecution 仅执行安全契约转换。
+// 它不解析元数据字段、不加载注册项、不生成 SQL，也不操作查询。
 func BuildAdapterExecution(input AdapterInput) (AdapterExecution, error) {
 	if err := input.Validate(); err != nil {
 		return AdapterExecution{}, err

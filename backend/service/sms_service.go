@@ -63,7 +63,6 @@ func (s *SmsService) SendSms(ctx *gin.Context, templateCode, mobile string, para
 	}
 	// 解析模版参数列表（存储为 JSON 格式）
 	var expectedKeys []string
-	//expectedKeys = smsTemp.TemplateParams
 	if err := json.Unmarshal(smsTemp.TemplateParams, &expectedKeys); err != nil {
 		return nil, error2.NewBadRequestError("解析模板参数失败" + err.Error())
 	}

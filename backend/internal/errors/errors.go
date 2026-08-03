@@ -96,8 +96,8 @@ func CategoryOf(err error) response.ErrorCategory {
 	return response.ErrorCategorySystem
 }
 
-// ToClientError converts any error to the stable AdminError response contract.
-// The boolean reports whether the error was explicitly classified or recognized.
+// ToClientError 将任意错误转换为稳定的 AdminError 响应契约。
+// 布尔值表示该错误是否已被明确分类或识别。
 func ToClientError(err error) (*response.AdminError, bool) {
 	if err == nil {
 		return nil, false

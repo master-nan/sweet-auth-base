@@ -14,8 +14,7 @@ type PermissionCase struct {
 	Allowed bool
 }
 
-// AssertPermissions verifies both allowed and denied Casbin paths against the
-// same enforcer used by the caller's permission test.
+// AssertPermissions 使用调用方权限测试所用的同一执行器，校验 Casbin 允许和拒绝路径。
 func AssertPermissions(t testing.TB, enforcer PermissionEnforcer, cases ...PermissionCase) {
 	t.Helper()
 	if enforcer == nil {

@@ -6,11 +6,11 @@ import (
 	"gorm.io/datatypes"
 )
 
-// OrgLegalEntity is the read-only mirror of a legal or accounting entity.
+// OrgLegalEntity 是法律或核算主体的只读镜像。
 type OrgLegalEntity struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	SourceSystemCode        string     `gorm:"size:64;not null;uniqueIndex:uni_org_legal_entity_source,priority:1;uniqueIndex:uni_org_legal_entity_code,priority:1;uniqueIndex:uni_org_legal_entity_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
 	SourceId                string     `gorm:"size:128;not null;uniqueIndex:uni_org_legal_entity_source,priority:2" json:"source_id"`
 	SourceCode              string     `gorm:"size:128;uniqueIndex:uni_org_legal_entity_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_legal_entity_source_code" json:"source_code"`
@@ -32,7 +32,7 @@ type OrgLegalEntity struct {
 	SyncStatus              string     `gorm:"size:32;not null;default:pending;index:idx_org_legal_entity_sync_status" json:"sync_status"`
 	LastError               string     `gorm:"type:text" json:"last_error"`
 
-	// Platform-managed extension fields.
+	// 平台管理扩展字段。
 	LocalNote           string         `gorm:"type:text" json:"local_note"`
 	LocalTags           datatypes.JSON `gorm:"type:jsonb" json:"local_tags"`
 	DisplayOrder        *int           `gorm:"index:idx_org_legal_entity_display_order" json:"display_order"`
@@ -41,11 +41,11 @@ type OrgLegalEntity struct {
 	Parent *OrgLegalEntity `gorm:"foreignKey:ParentId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"parent,omitempty"`
 }
 
-// OrgUnit is the read-only mirror of a management organization.
+// OrgUnit 是管理组织的只读镜像。
 type OrgUnit struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	SourceSystemCode     string     `gorm:"size:64;not null;uniqueIndex:uni_org_unit_source,priority:1;uniqueIndex:uni_org_unit_code,priority:1;uniqueIndex:uni_org_unit_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
 	SourceId             string     `gorm:"size:128;not null;uniqueIndex:uni_org_unit_source,priority:2" json:"source_id"`
 	SourceCode           string     `gorm:"size:128;uniqueIndex:uni_org_unit_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_unit_source_code" json:"source_code"`
@@ -64,7 +64,7 @@ type OrgUnit struct {
 	SyncStatus           string     `gorm:"size:32;not null;default:pending;index:idx_org_unit_sync_status" json:"sync_status"`
 	LastError            string     `gorm:"type:text" json:"last_error"`
 
-	// Platform-managed extension fields.
+	// 平台管理扩展字段。
 	LocalNote           string         `gorm:"type:text" json:"local_note"`
 	LocalTags           datatypes.JSON `gorm:"type:jsonb" json:"local_tags"`
 	DisplayOrder        *int           `gorm:"index:idx_org_unit_display_order" json:"display_order"`
@@ -73,11 +73,11 @@ type OrgUnit struct {
 	PrimaryLegalEntity *OrgLegalEntity `gorm:"foreignKey:PrimaryLegalEntityId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"primary_legal_entity,omitempty"`
 }
 
-// OrgStructure identifies a management organization structure.
+// OrgStructure 标识一套管理组织架构。
 type OrgStructure struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	Code             string     `gorm:"size:64;not null;uniqueIndex:uni_org_structure_code" json:"code"`
 	Name             string     `gorm:"size:128;not null;index:idx_org_structure_name" json:"name"`
 	StructureType    string     `gorm:"size:32;not null;default:management;index:idx_org_structure_type" json:"structure_type"`
@@ -92,12 +92,12 @@ type OrgStructure struct {
 	SyncStatus       string     `gorm:"size:32;not null;default:pending;index:idx_org_structure_sync_status" json:"sync_status"`
 }
 
-// OrgStructureNode maps a management organization into a structure tree.
-// Business records must persist OrgUnitId, never this runtime node ID.
+// OrgStructureNode 将管理组织映射到组织架构树。
+// 业务记录必须保存 OrgUnitId，不得保存运行时节点 ID。
 type OrgStructureNode struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	StructureId      int        `gorm:"type:bigint;not null;uniqueIndex:uni_org_structure_node_current,priority:1,where:status = 'enabled' AND source_deleted = false AND valid_to IS NULL;index:idx_org_structure_node_structure_parent,priority:1;index:idx_org_structure_node_structure_path,priority:1;index:idx_org_structure_node_structure_unit,priority:1" json:"structure_id"`
 	OrgUnitId        int        `gorm:"type:bigint;not null;uniqueIndex:uni_org_structure_node_current,priority:2,where:status = 'enabled' AND source_deleted = false AND valid_to IS NULL;index:idx_org_structure_node_structure_unit,priority:2" json:"org_unit_id"`
 	ParentNodeId     *int       `gorm:"type:bigint;index:idx_org_structure_node_structure_parent,priority:2" json:"parent_node_id"`
@@ -118,11 +118,11 @@ type OrgStructureNode struct {
 	Parent    *OrgStructureNode `gorm:"foreignKey:ParentNodeId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"parent,omitempty"`
 }
 
-// OrgPosition is the read-only mirror of a position defined in a management organization.
+// OrgPosition 是管理组织中岗位的只读镜像。
 type OrgPosition struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	SourceSystemCode  string     `gorm:"size:64;not null;uniqueIndex:uni_org_position_source,priority:1;uniqueIndex:uni_org_position_code,priority:1;uniqueIndex:uni_org_position_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
 	SourceId          string     `gorm:"size:128;not null;uniqueIndex:uni_org_position_source,priority:2" json:"source_id"`
 	SourceCode        string     `gorm:"size:128;uniqueIndex:uni_org_position_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_position_source_code" json:"source_code"`
@@ -140,18 +140,18 @@ type OrgPosition struct {
 	SourceDeleted     bool       `gorm:"not null;default:false;index:idx_org_position_source_deleted" json:"source_deleted"`
 	SyncStatus        string     `gorm:"size:32;not null;default:pending;index:idx_org_position_sync_status" json:"sync_status"`
 
-	// Platform-managed extension fields.
+	// 平台管理扩展字段。
 	LocalNote string `gorm:"type:text" json:"local_note"`
 
 	OrgUnit *OrgUnit `gorm:"foreignKey:OrgUnitId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"org_unit,omitempty"`
 }
 
-// OrgEmployee is the read-only mirror of an enterprise person.
-// UserId is a nullable platform account binding and is not employee master data.
+// OrgEmployee 是企业人员的只读镜像。
+// UserId 是可空的平台账号绑定，不属于人员主数据。
 type OrgEmployee struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	SourceSystemCode     string     `gorm:"size:64;not null;uniqueIndex:uni_org_employee_source,priority:1;uniqueIndex:uni_org_employee_no,priority:1;uniqueIndex:uni_org_employee_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
 	SourceId             string     `gorm:"size:128;not null;uniqueIndex:uni_org_employee_source,priority:2" json:"source_id"`
 	SourceCode           string     `gorm:"size:128;uniqueIndex:uni_org_employee_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_employee_source_code" json:"source_code"`
@@ -169,7 +169,7 @@ type OrgEmployee struct {
 	SourceDeleted        bool       `gorm:"not null;default:false;index:idx_org_employee_source_deleted" json:"source_deleted"`
 	SyncStatus           string     `gorm:"size:32;not null;default:pending;index:idx_org_employee_sync_status" json:"sync_status"`
 
-	// Platform-managed extension fields.
+	// 平台管理扩展字段。
 	UserId    *int           `gorm:"type:bigint;uniqueIndex:uni_org_employee_user,where:user_id IS NOT NULL" json:"user_id"`
 	LocalNote string         `gorm:"type:text" json:"local_note"`
 	LocalTags datatypes.JSON `gorm:"type:jsonb" json:"local_tags"`
@@ -178,11 +178,11 @@ type OrgEmployee struct {
 	User               *SysUser        `gorm:"foreignKey:UserId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:SET NULL" json:"user,omitempty"`
 }
 
-// OrgAssignment is the read-only mirror of an employee assignment.
+// OrgAssignment 是人员任职关系的只读镜像。
 type OrgAssignment struct {
 	Basic
 
-	// Source-managed fields.
+	// 外部来源管理字段。
 	SourceSystemCode string     `gorm:"size:64;not null;uniqueIndex:uni_org_assignment_source,priority:1" json:"source_system_code"`
 	SourceId         string     `gorm:"size:128;not null;uniqueIndex:uni_org_assignment_source,priority:2" json:"source_id"`
 	EmployeeId       int        `gorm:"type:bigint;not null;index:idx_org_assignment_employee;uniqueIndex:uni_org_assignment_current_primary,where:is_primary = true AND status = 'enabled' AND source_deleted = false AND valid_to IS NULL" json:"employee_id"`
@@ -205,8 +205,8 @@ type OrgAssignment struct {
 	Position    *OrgPosition    `gorm:"foreignKey:PositionId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"position,omitempty"`
 }
 
-// OrgSyncBatch records organization-domain synchronization outcomes.
-// Technical HTTP execution details remain owned by the integration center.
+// OrgSyncBatch 记录组织领域同步结果。
+// HTTP 技术执行明细仍由集成中心负责。
 type OrgSyncBatch struct {
 	Basic
 
@@ -224,7 +224,7 @@ type OrgSyncBatch struct {
 	ErrorSummary string     `gorm:"type:text" json:"error_summary"`
 }
 
-// OrgSyncRecord records one organization-domain object processing result.
+// OrgSyncRecord 记录单个组织领域对象的处理结果。
 type OrgSyncRecord struct {
 	Basic
 
@@ -243,7 +243,7 @@ type OrgSyncRecord struct {
 	RetryCount     int        `gorm:"not null;default:0;index:idx_org_sync_record_retry_count" json:"retry_count"`
 	LastRetryAt    *time.Time `gorm:"type:timestamp;index:idx_org_sync_record_last_retry_at" json:"last_retry_at"`
 
-	// Platform-managed extension field.
+	// 平台管理扩展字段。
 	LocalHandlingStatus string `gorm:"size:32;index:idx_org_sync_record_handling_status" json:"local_handling_status"`
 
 	Batch *OrgSyncBatch `gorm:"foreignKey:BatchId;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"batch,omitempty"`

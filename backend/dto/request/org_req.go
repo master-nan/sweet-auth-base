@@ -1,7 +1,7 @@
 package request
 
-// OrgReadScopeReq defines the shared visibility controls for organization
-// mirror reads. A nil OnlyEffective is normalized to true by OrgService.
+// OrgReadScopeReq 定义组织镜像读取的共享可见性控制。
+// OnlyEffective 为 nil 时由 OrgService 规范化为 true。
 type OrgReadScopeReq struct {
 	OnlyEffective   *bool  `form:"only_effective" json:"only_effective"`
 	IncludeDisabled bool   `form:"include_disabled" json:"include_disabled"`
@@ -9,9 +9,8 @@ type OrgReadScopeReq struct {
 	AsOfDate        string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
 
-// OrgSelectorOptionsReq is the shared request protocol for Organization
-// selector option APIs. SelectedIds are replay-only identifiers: inactive
-// records may be returned for display but remain disabled for new selection.
+// OrgSelectorOptionsReq 是 Organization 选择器选项 API 的共享请求协议。
+// SelectedIds 仅用于回显：停用记录可以返回展示，但不能用于新选择。
 type OrgSelectorOptionsReq struct {
 	OrgReadScopeReq
 	Page        int    `form:"page" json:"page"`
@@ -20,13 +19,11 @@ type OrgSelectorOptionsReq struct {
 	SelectedIds []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
-// OrgLegalEntityReadScopeReq is retained as the legal-entity API name for
-// compatibility with E02-S02-T001.
+// OrgLegalEntityReadScopeReq 是法人主体 API 使用的读取范围请求。
 type OrgLegalEntityReadScopeReq = OrgReadScopeReq
 
-// OrgLegalEntityQueryReq defines the repository-safe query fields for legal
-// entities. Source identity and synchronization internals are intentionally
-// excluded from user-facing query DTOs.
+// OrgLegalEntityQueryReq 定义法人主体的 Repository 安全查询字段。
+// 面向用户的查询 DTO 不包含来源身份和同步内部字段。
 type OrgLegalEntityQueryReq struct {
 	Basic
 	OrgLegalEntityReadScopeReq
@@ -36,27 +33,24 @@ type OrgLegalEntityQueryReq struct {
 	Status           string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 }
 
-// OrgLegalEntityDetailReq controls visibility for one internal legal_entity_id.
+// OrgLegalEntityDetailReq 控制指定内部 legal_entity_id 的可见性。
 type OrgLegalEntityDetailReq struct {
 	OrgLegalEntityReadScopeReq
 }
 
-// OrgLegalEntityTreeReq requests a legal-entity tree built exclusively from
-// org_legal_entity.parent_id.
+// OrgLegalEntityTreeReq 请求仅按 org_legal_entity.parent_id 构建的法人主体树。
 type OrgLegalEntityTreeReq struct {
 	OrgLegalEntityReadScopeReq
 	RootId *int `form:"root_id" json:"root_id" binding:"omitempty,gt=0"`
 }
 
-// OrgLegalEntityOptionsReq supports remote option search and replay of
-// already-persisted IDs. SelectedIds never changes the option value contract:
-// values are always internal legal_entity_id values.
+// OrgLegalEntityOptionsReq 支持远程选项搜索和已保存 ID 回显。
+// SelectedIds 不改变选项值契约，Value 始终为内部 legal_entity_id。
 type OrgLegalEntityOptionsReq struct {
 	OrgSelectorOptionsReq
 }
 
-// OrgUnitQueryReq defines the repository-safe query fields for management
-// organization units.
+// OrgUnitQueryReq 定义管理组织的 Repository 安全查询字段。
 type OrgUnitQueryReq struct {
 	Basic
 	OrgReadScopeReq
@@ -67,21 +61,20 @@ type OrgUnitQueryReq struct {
 	Status               string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 }
 
-// OrgUnitDetailReq controls visibility for one internal org_unit_id.
+// OrgUnitDetailReq 控制指定内部 org_unit_id 的可见性。
 type OrgUnitDetailReq struct {
 	OrgReadScopeReq
 }
 
-// OrgUnitOptionsReq supports remote search and replay of persisted org_unit_id
-// values. StructureId restricts candidates through org_structure_node.
+// OrgUnitOptionsReq 支持远程搜索和已保存 org_unit_id 回显。
+// StructureId 通过 org_structure_node 限制候选项。
 type OrgUnitOptionsReq struct {
 	OrgSelectorOptionsReq
 	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
 	StructureId   *int `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
 }
 
-// OrgStructureQueryReq defines the repository-safe query fields for management
-// structure definitions.
+// OrgStructureQueryReq 定义管理架构的 Repository 安全查询字段。
 type OrgStructureQueryReq struct {
 	Basic
 	OrgReadScopeReq
@@ -92,13 +85,12 @@ type OrgStructureQueryReq struct {
 	IsDefault        *bool  `form:"is_default" json:"is_default"`
 }
 
-// OrgStructureDetailReq controls visibility for one internal structure_id.
+// OrgStructureDetailReq 控制指定内部 structure_id 的可见性。
 type OrgStructureDetailReq struct {
 	OrgReadScopeReq
 }
 
-// OrgStructureOptionsReq supports remote option search and replay of persisted
-// structure_id values.
+// OrgStructureOptionsReq 支持远程选项搜索和已保存 structure_id 回显。
 type OrgStructureOptionsReq struct {
 	OrgReadScopeReq
 	Page          int    `form:"page" json:"page"`
@@ -108,9 +100,9 @@ type OrgStructureOptionsReq struct {
 	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
-// OrgStructureOrgTreeReq requests a management tree. RootNodeId identifies one
-// occurrence in the structure; RootOrgUnitId is a business-unit convenience
-// lookup and must resolve to exactly one visible node.
+// OrgStructureOrgTreeReq 请求管理组织树。
+// RootNodeId 标识架构中的一个节点；RootOrgUnitId 用于按业务组织便捷查找，
+// 且必须精确解析为一个可见节点。
 type OrgStructureOrgTreeReq struct {
 	OrgReadScopeReq
 	StructureId   int    `form:"structure_id" json:"structure_id" binding:"required,gt=0"`
@@ -119,9 +111,8 @@ type OrgStructureOrgTreeReq struct {
 	Keyword       string `form:"keyword" json:"keyword" binding:"omitempty,max=255"`
 }
 
-// OrgStructureNodeQueryReq defines the repository-safe query fields for
-// runtime organization tree nodes. Path is an internal query accelerator and
-// is not accepted from ordinary clients.
+// OrgStructureNodeQueryReq 定义运行时组织树节点的 Repository 安全查询字段。
+// Path 是内部查询加速字段，不接受普通客户端提交。
 type OrgStructureNodeQueryReq struct {
 	Basic
 	StructureId  *int   `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
@@ -130,9 +121,8 @@ type OrgStructureNodeQueryReq struct {
 	Status       string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 }
 
-// OrgEmployeeQueryReq never exposes mobile, email, source identity, or source
-// version as ordinary advanced-query fields. Relationship filters are resolved
-// through one matching org_assignment row by the repository.
+// OrgEmployeeQueryReq 不将手机号、邮箱、来源身份或来源版本作为普通高级查询字段开放。
+// Repository 通过一条匹配的 org_assignment 记录解析关系过滤条件。
 type OrgEmployeeQueryReq struct {
 	Basic
 	OrgReadScopeReq
@@ -146,13 +136,13 @@ type OrgEmployeeQueryReq struct {
 	BoundStatus          string `form:"bound_status" json:"bound_status" binding:"omitempty,oneof=all bound unbound"`
 }
 
-// OrgEmployeeDetailReq controls visibility for one internal employee_id.
+// OrgEmployeeDetailReq 控制指定内部 employee_id 的可见性。
 type OrgEmployeeDetailReq struct {
 	OrgReadScopeReq
 }
 
-// OrgEmployeeOptionsReq supports remote search and replay of persisted
-// employee_id values. Values never use user_id, names, or contact details.
+// OrgEmployeeOptionsReq 支持远程搜索和已保存 employee_id 回显。
+// Value 不使用 user_id、姓名或联系方式。
 type OrgEmployeeOptionsReq struct {
 	OrgSelectorOptionsReq
 	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
@@ -160,29 +150,28 @@ type OrgEmployeeOptionsReq struct {
 	PositionId    *int `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
 }
 
-// OrgEmployeeUserOptionsReq supports remote account lookup for the explicit
-// employee-user binding flow. It never accepts contact fields or fuzzy
-// identity matching rules.
+// OrgEmployeeUserOptionsReq 为显式员工账号绑定流程提供远程账号查询。
+// 它不接受联系方式字段或模糊身份匹配规则。
 type OrgEmployeeUserOptionsReq struct {
 	Page    int    `form:"page" json:"page" binding:"required,gt=0"`
 	Num     int    `form:"num" json:"num" binding:"required,gt=0,lte=50"`
 	Keyword string `form:"keyword" json:"keyword" binding:"omitempty,max=128"`
 }
 
-// OrgEmployeeBindUserReq binds one explicitly selected Sweet Platform account
-// to one employee. No account property may be used for implicit matching.
+// OrgEmployeeBindUserReq 将显式选择的 Sweet Platform 账号绑定到员工。
+// 任何账号属性都不能用于隐式匹配。
 type OrgEmployeeBindUserReq struct {
 	EmployeeId int `form:"-" json:"-" binding:"required,gt=0"`
 	UserId     int `form:"user_id" json:"user_id" binding:"required,gt=0"`
 }
 
-// OrgEmployeeUnbindUserReq identifies the employee through the route. Unbind
-// never infers an employee from account names or contact fields.
+// OrgEmployeeUnbindUserReq 通过路由标识员工。
+// 解绑时不得根据账号名称或联系方式推断员工。
 type OrgEmployeeUnbindUserReq struct {
 	EmployeeId int `form:"-" json:"-" binding:"required,gt=0"`
 }
 
-// OrgPositionQueryReq defines the repository-safe query fields for positions.
+// OrgPositionQueryReq 定义岗位的 Repository 安全查询字段。
 type OrgPositionQueryReq struct {
 	Basic
 	OrgReadScopeReq
@@ -194,13 +183,12 @@ type OrgPositionQueryReq struct {
 	Status            string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 }
 
-// OrgPositionDetailReq controls visibility for one internal position_id.
+// OrgPositionDetailReq 控制指定内部 position_id 的可见性。
 type OrgPositionDetailReq struct {
 	OrgReadScopeReq
 }
 
-// OrgPositionOptionsReq supports remote search and replay of persisted
-// position_id values.
+// OrgPositionOptionsReq 支持远程搜索和已保存 position_id 回显。
 type OrgPositionOptionsReq struct {
 	OrgSelectorOptionsReq
 	LegalEntityId *int `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
@@ -214,9 +202,8 @@ const (
 	OrgAssignmentScopeTimeline = "timeline"
 )
 
-// OrgAssignmentQueryReq defines the read-only employee assignment query.
-// TimeScope is normalized to current by OrgService. It never selects a
-// "primary" row or treats the first assignment as special.
+// OrgAssignmentQueryReq 定义人员任职的只读查询。
+// TimeScope 由 OrgService 规范化为 current，不选择主任职，也不特殊处理第一条任职。
 type OrgAssignmentQueryReq struct {
 	Basic
 	EmployeeId     *int   `form:"employee_id" json:"employee_id" binding:"required,gt=0"`
@@ -231,18 +218,17 @@ type OrgAssignmentQueryReq struct {
 	AsOfDate       string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
 
-// OrgAssignmentDetailReq is intentionally empty: assignment detail is located
-// only by the Sweet Platform internal assignment_id.
+// OrgAssignmentDetailReq 有意保持为空，任职详情仅通过 Sweet Platform 内部 assignment_id 定位。
 type OrgAssignmentDetailReq struct{}
 
-// OrgEmployeeCurrentAssignmentSummaryReq selects the effective-date snapshot
-// used to aggregate all current organizations and positions for an employee.
+// OrgEmployeeCurrentAssignmentSummaryReq 选择有效日期快照，
+// 用于聚合员工当前的全部组织和岗位。
 type OrgEmployeeCurrentAssignmentSummaryReq struct {
 	AsOfDate string `form:"as_of_date" json:"as_of_date" binding:"omitempty,datetime=2006-01-02"`
 }
 
-// OrgSyncBatchQueryReq is a read-only query contract for organization-domain
-// synchronization batches. Integration payload fields are outside this DTO.
+// OrgSyncBatchQueryReq 是组织领域同步批次的只读查询契约。
+// 集成载荷字段不属于此 DTO。
 type OrgSyncBatchQueryReq struct {
 	Basic
 	ExecutionId *int   `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
@@ -251,8 +237,7 @@ type OrgSyncBatchQueryReq struct {
 	Status      string `form:"status" json:"status" binding:"omitempty,oneof=pending processing success failed dependency_waiting ignored"`
 }
 
-// OrgSyncRecordQueryReq exposes diagnostic classification fields but not raw
-// source identity, dependency keys, or error messages.
+// OrgSyncRecordQueryReq 开放诊断分类字段，但不开放原始来源身份、依赖键或错误消息。
 type OrgSyncRecordQueryReq struct {
 	Basic
 	BatchId             *int   `form:"batch_id" json:"batch_id" binding:"omitempty,gt=0"`

@@ -15,9 +15,8 @@ import (
 
 var sqliteDatabaseSequence atomic.Uint64
 
-// OpenSQLite creates an isolated in-memory database for database-agnostic
-// repository and service tests. PostgreSQL-specific behavior requires a real
-// PostgreSQL integration test and must not be inferred from this helper.
+// OpenSQLite 为不依赖数据库类型的 Repository 和 Service 测试创建隔离的内存数据库。
+// PostgreSQL 特有行为需要真实 PostgreSQL 集成测试，不能从此辅助方法推断。
 func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 	t.Helper()
 
@@ -56,8 +55,8 @@ func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 	return db
 }
 
-// MustCreate writes an explicit test fixture and fails the current test on
-// error. Fixture factories remain local to the package that owns the model.
+// MustCreate 写入显式测试夹具，发生错误时终止当前测试。
+// 夹具工厂保留在拥有对应 Model 的包内。
 func MustCreate(t testing.TB, db *gorm.DB, value interface{}) {
 	t.Helper()
 	if db == nil {
@@ -71,8 +70,8 @@ func MustCreate(t testing.TB, db *gorm.DB, value interface{}) {
 	}
 }
 
-// WithRollback runs a test section in a transaction and always rolls it back.
-// It is for fixture isolation, not for testing production transaction helpers.
+// WithRollback 在事务中执行测试片段，并始终回滚。
+// 此方法用于夹具隔离，不用于测试生产事务辅助能力。
 func WithRollback(t testing.TB, db *gorm.DB, run func(tx *gorm.DB)) {
 	t.Helper()
 	if db == nil {

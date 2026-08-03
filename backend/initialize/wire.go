@@ -62,7 +62,7 @@ type App struct {
 	ApplicationCache               *cache.ApplicationCache
 }
 
-// Repository providers
+// Repository 提供者
 var RepositoryProvider = wire.NewSet(
 
 	impl.NewAccessLogRepositoryImpl,
@@ -110,8 +110,6 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewSmsTemplateImpl,
 	impl.NewFileRepositoryImpl,
 	impl.NewFileChunkRepositoryImpl,
-	//impl.NewBasicRepositoryImpl,
-
 	wire.Bind(new(repository.AccessLogRepository), new(*impl.AccessLogRepositoryImpl)),
 	wire.Bind(new(repository.LoginLogRepository), new(*impl.LoginLogRepositoryImpl)),
 	wire.Bind(new(repository.SysConfigureRepository), new(*impl.SysConfigureRepositoryImpl)),
@@ -157,10 +155,9 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)),
 	wire.Bind(new(repository.FileRepository), new(*impl.FileRepositoryImpl)),
 	wire.Bind(new(repository.FileChunkRepository), new(*impl.FileChunkRepositoryImpl)),
-	//wire.Bind(new(repository.BasicRepository), new(*impl.BasicRepositoryImpl[T])),
 )
 
-// Cache providers
+// Cache 提供者
 var CacheProvider = wire.NewSet(
 	cache.NewSysConfigureCache,
 	cache.NewSysUserRoleCache,
@@ -185,7 +182,7 @@ var CacheProvider = wire.NewSet(
 	cache.NewDingTalkUserIDCache,
 )
 
-// Service providers
+// Service 提供者
 var ServiceProvider = wire.NewSet(
 	service.NewLogServer,
 	wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)),
@@ -227,7 +224,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewFileService,
 )
 
-// Controller providers
+// Controller 提供者
 var ControllerProvider = wire.NewSet(
 	controller.NewDictController,
 	controller.NewTableController,
@@ -244,7 +241,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewFileController,
 )
 
-// Api providers
+// API 提供者
 var ApiProvider = wire.NewSet(
 	api.NewAuthApi,
 	api.NewSysUserApi,
@@ -255,8 +252,8 @@ func ProvidePrimaryDB(db map[string]*gorm.DB) *database.PrimaryDB {
 	return &database.PrimaryDB{DB: db["primary"]}
 }
 
-// ProvideOwnershipFieldRegistry creates the process-local registry. Reviewed
-// business modules can add declarations when their data resources are enabled.
+// ProvideOwnershipFieldRegistry 创建进程内注册表。
+// 经过审查的业务模块可在启用其数据资源时添加声明。
 func ProvideOwnershipFieldRegistry() (*datapermission.OwnershipFieldRegistry, error) {
 	return datapermission.NewOwnershipFieldRegistry()
 }

@@ -15,9 +15,8 @@ const (
 	DataPermissionConfigObjectGrant     = "grant"
 )
 
-// DataPermissionConfigQueryReq exposes the platform query protocol without
-// accepting table names, free-form filters, delete visibility, or data scope
-// from the client.
+// DataPermissionConfigQueryReq 开放平台查询协议，但不接受客户端提交的表名、
+// 自由过滤条件、删除可见性或数据范围。
 type DataPermissionConfigQueryReq struct {
 	Page        int               `form:"page" json:"page" binding:"omitempty,gte=1"`
 	Num         int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
@@ -135,8 +134,7 @@ type DataOwnershipFieldCreateReq struct {
 	State         *bool                         `form:"state" json:"state"`
 }
 
-// DataOwnershipFieldUpdateReq includes immutable identity fields so the
-// service can reject attempted changes instead of silently ignoring them.
+// DataOwnershipFieldUpdateReq 包含不可变身份字段，便于 Service 明确拒绝修改而不是静默忽略。
 type DataOwnershipFieldUpdateReq struct {
 	Id            int                            `form:"id" json:"id" binding:"required,gt=0"`
 	ResourceId    *int                           `form:"resource_id" json:"resource_id" binding:"omitempty,gt=0"`
@@ -162,8 +160,7 @@ type DataPolicyCreateReq struct {
 	Rules       []DataPolicyRuleCreateItemReq `form:"rules" json:"rules" binding:"omitempty,max=8,dive"`
 }
 
-// DataPolicyUpdateReq includes policy_code so immutable identity changes are
-// rejected explicitly rather than ignored.
+// DataPolicyUpdateReq 包含 policy_code，便于明确拒绝不可变身份修改而不是静默忽略。
 type DataPolicyUpdateReq struct {
 	Id          int     `form:"id" json:"id" binding:"required,gt=0"`
 	PolicyCode  *string `form:"policy_code" json:"policy_code" binding:"omitempty,max=128"`
@@ -237,9 +234,8 @@ type DataGrantStateReq struct {
 	State *bool `form:"state" json:"state" binding:"required"`
 }
 
-// DataPermissionFieldBoundary declares DTO field ownership for the future
-// configuration service. Returned slices are copies and may be safely changed
-// by callers.
+// DataPermissionFieldBoundary 声明配置 Service 的 DTO 字段归属。
+// 返回的切片均为副本，调用方可以安全修改。
 type DataPermissionFieldBoundary struct {
 	Create            []string
 	Update            []string

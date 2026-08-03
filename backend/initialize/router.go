@@ -21,7 +21,6 @@ func InitRouter(app *App) *gin.Engine {
 	})
 	router.GET("/readyz", readinessHandler(app))
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	//store := cookie.NewStore([]byte(app.Config.Session.Secret))
 	router.
 		Use(middleware.CorsHandler(middleware.CorsOptions{
 			AllowedOrigins:   app.Config.Security.CORSAllowedOrigins,
@@ -29,16 +28,15 @@ func InitRouter(app *App) *gin.Engine {
 		})).
 		Use(middleware.LogHandler(app.LogService)).
 		Use(middleware.ResponseHandler())
-	//Use(sessions.Sessions("backend-session", store))
-	//总路由
+	// 总路由
 	routerGroup := router.Group("/" + app.Config.Name)
-	// api路由
+	// API 路由
 	apiBaseGroup := routerGroup.Group("/api")
 	{
-		// api非验证路由
+		// API 非验证路由
 		apiBaseGroup.POST("/app_token", app.AuthApi.GetAppToken)
 
-		// 单个token验证路由
+		// 单 Token 验证路由
 		apiBaseGroup.POST("/send_sms/:mobile/:templateCode", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.SendSms)
 		apiBaseGroup.POST("/sms_code_login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.SmsCodeLogin)
 		apiBaseGroup.POST("/login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.Login)
@@ -53,29 +51,27 @@ func InitRouter(app *App) *gin.Engine {
 	apiGroup.Use(middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache))
 	apiGroup.Use(middleware.AuthHandler(app.Config, app.JwtGenerator, app.UserService, app.TokenBlackCache))
 	{
-		// 双token验证路由
-		// auth
+		// 双 Token 验证路由
+		// 认证
 		apiGroup.POST("/logout", app.AuthApi.Logout)
-		// sys_user
+		// 系统用户
 		apiGroup.GET("/user/me", app.SysUserApi.GetMe)
 		apiGroup.POST("/user/password", app.SysUserApi.UpdatePassword)
 
 	}
 
-	//后台非验证路由
+	// 后台非验证路由
 	adminBaseGroup := routerGroup.Group("/admin")
 	{
 		adminBaseGroup.POST("/login", app.BasicController.Login)
 		adminBaseGroup.GET("/captcha", app.BasicController.Captcha)
 		adminBaseGroup.GET("/configure", app.BasicController.Configure)
 
-		//adminBaseGroup.GET("/test", app.BasicController.Test)
-
 	}
 	routerGroup.GET("/files/access/preview/:uuid", app.FileController.SignedPreview)
 	routerGroup.GET("/files/access/download/:uuid", app.FileController.SignedDownload)
 	routerGroup.GET("/files/:uuid", app.FileController.PublicPreview)
-	//后台验证路由
+	// 后台验证路由
 	adminGroup := routerGroup.Group("/admin")
 	adminGroup.Use(middleware.AuthHandler(app.Config, app.JwtGenerator, app.UserService, app.TokenBlackCache))
 	adminGroup.Use(middleware.CasbinHandler(app.Enforcer, middleware.CasbinOptions{
@@ -90,7 +86,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/log/access/query", app.BasicController.QueryAccessLogs)
 		adminGroup.GET("/log/access/:id", app.BasicController.GetAccessLogById)
 
-		// dict
+		// 字典
 		adminGroup.GET("/dict/id/:id", app.DictController.GetSysDictById)
 		adminGroup.GET("/dict/code/:code", app.DictController.GetSysDictByCode)
 		adminGroup.POST("/dict/query", app.DictController.QuerySysDict)
@@ -98,14 +94,14 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/dict/:id", app.DictController.UpdateSysDict)
 		adminGroup.DELETE("/dict/:id", app.DictController.DeleteSysDictById)
 
-		// dict_item
+		// 字典项
 		adminGroup.GET("/dict/items/:id", app.DictController.GetSysDictItemsByDictId)
 		adminGroup.GET("/dict/item/:id", app.DictController.GetSysDictItemById)
 		adminGroup.POST("/dict/item", app.DictController.CreateSysDictItem)
 		adminGroup.PUT("/dict/item/:id", app.DictController.UpdateSysDictItem)
 		adminGroup.DELETE("/dict/item/:id", app.DictController.DeleteSysDictItemById)
 
-		// table
+		// 数据表
 		adminGroup.GET("/table/id/:id", app.TableController.GetTableByID)
 		adminGroup.GET("/table/code/:code", app.TableController.GetTableByCode)
 		adminGroup.POST("/table/query", app.TableController.QueryTable)
@@ -113,7 +109,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/table/:id", app.TableController.UpdateTable)
 		adminGroup.DELETE("/table/:id", app.TableController.DeleteTableById)
 
-		// table_field
+		// 数据表字段
 		adminGroup.GET("/table/fields/:id", app.TableController.GetTableFieldsByTableId)
 		adminGroup.GET("/table/field/:id", app.TableController.GetTableFieldById)
 		adminGroup.POST("/table/field", app.TableController.CreateTableField)
@@ -126,21 +122,21 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/table/publish/:code", app.TableController.PublishTable)
 		adminGroup.POST("/table/unpublish/:code", app.TableController.UnpublishTable)
 
-		// table_index
+		// 数据表索引
 		adminGroup.GET("/table/indexes/:id", app.TableController.GetTableIndexesByTableId)
 		adminGroup.GET("/table/index/:id", app.TableController.GetTableIndexById)
 		adminGroup.POST("/table/index", app.TableController.CreateTableIndex)
 		adminGroup.PUT("/table/index/:id", app.TableController.UpdateTableIndex)
 		adminGroup.DELETE("/table/index/:id", app.TableController.DeleteTableIndexById)
 
-		// table_relation
+		// 数据表关系
 		adminGroup.GET("/table/relations/:id", app.TableController.GetTableRelationsByTableId)
 		adminGroup.GET("/table/relation/:id", app.TableController.GetTableRelationById)
 		adminGroup.POST("/table/relation", app.TableController.CreateTableRelation)
 		adminGroup.PUT("/table/relation/:id", app.TableController.UpdateTableRelation)
 		adminGroup.DELETE("/table/relation/:id", app.TableController.DeleteTableRelationById)
 
-		// menu
+		// 菜单
 		adminGroup.GET("/menu/user/:id", app.MenuController.GetUserMenus)
 		adminGroup.GET("/menu/:id", app.MenuController.GetMenuById)
 		adminGroup.POST("/menu/query", app.MenuController.QueryMenus)
@@ -151,13 +147,13 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.DELETE("/menu/:id", app.MenuController.DeleteMenuById)
 		adminGroup.GET("/menu/my", app.MenuController.GetMyMenus)
 
-		// menu button
+		// 菜单按钮
 		adminGroup.GET("/menu/buttons/:menuId", app.MenuController.GetMenuButtons)
 		adminGroup.POST("/menu/button", app.MenuController.CreateMenuButton)
 		adminGroup.PUT("/menu/button/:id", app.MenuController.UpdateMenuButton)
 		adminGroup.DELETE("/menu/button/:id", app.MenuController.DeleteMenuButton)
 
-		// role
+		// 角色
 		adminGroup.GET("/role/menu/:id", app.RoleController.GetRoleMenus)
 		adminGroup.GET("/role/menu/buttons/:roleId/:menuId", app.RoleController.GetRoleMenuButtons)
 		adminGroup.POST("/role/assign-permissions", app.RoleController.AssignPermissions)
@@ -167,7 +163,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/role/:id", app.RoleController.UpdateRole)
 		adminGroup.DELETE("/role/:id", app.RoleController.DeleteRoleById)
 
-		// user
+		// 用户
 		adminGroup.GET("/user/me", app.UserController.GetMe)
 		adminGroup.POST("/user/query", app.UserController.QuerySysUser)
 		adminGroup.GET("/user/:id", app.UserController.GetUserById)
@@ -179,7 +175,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/user/:id", app.UserController.UpdateUser)
 		adminGroup.DELETE("/user/:id", app.UserController.DeleteUser)
 
-		// data permission DP-2 configuration queries and preflight
+		// 数据权限配置查询和预检
 		adminGroup.POST("/data-permission/config/dimension/query", app.DataPermissionConfigController.QueryDimensions)
 		adminGroup.POST("/data-permission/config/resource", app.DataPermissionConfigController.CreateResource)
 		adminGroup.POST("/data-permission/config/resource/query", app.DataPermissionConfigController.QueryResources)
@@ -208,13 +204,13 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/data-permission/config/preflight/policy/:id", app.DataPermissionConfigController.PreflightPolicy)
 		adminGroup.GET("/data-permission/config/preflight/grant/:id", app.DataPermissionConfigController.PreflightGrant)
 
-		// organization legal entity (read-only mirror)
+		// 组织法人主体只读镜像
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
 		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)
 		adminGroup.POST("/org/legal-entity/tree", app.OrgController.GetLegalEntityTree)
 		adminGroup.POST("/org/legal-entity/options", app.OrgController.QueryLegalEntityOptions)
 
-		// organization management structure and units (read-only mirror)
+		// 管理架构与组织单元只读镜像
 		adminGroup.POST("/org/structure/query", app.OrgController.QueryStructures)
 		adminGroup.POST("/org/structure/options", app.OrgController.QueryStructureOptions)
 		adminGroup.GET("/org/structure/:id", app.OrgController.GetStructureDetail)
@@ -241,7 +237,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/org/sync/record/:id", app.OrgController.GetSyncRecordDetail)
 		adminGroup.GET("/org/sync/record/:id/error", app.OrgController.GetSyncRecordError)
 
-		// application
+		// 应用
 		adminGroup.GET("/application/:id", app.ApplicationController.GetApplicationById)
 		adminGroup.POST("/application/query", app.ApplicationController.QueryApplication)
 		adminGroup.POST("/application", app.ApplicationController.CreateApplication)
@@ -249,14 +245,14 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/application/:id", app.ApplicationController.UpdateApplication)
 		adminGroup.DELETE("/application/:id", app.ApplicationController.DeleteApplicationById)
 
-		// sms
+		// 短信
 		adminGroup.POST("/sms/template/query", app.SmsController.QuerySmsTemplate)
 		adminGroup.GET("/sms/template/:id", app.SmsController.GetSmsTemplateById)
 		adminGroup.POST("/sms/template", app.SmsController.CreateSmsTemplate)
 		adminGroup.PUT("/sms/template/:id", app.SmsController.UpdateSmsTemplate)
 		adminGroup.DELETE("/sms/template/:id", app.SmsController.DeleteSmsTemplateById)
 
-		// generalization
+		// 通用低代码
 		adminGroup.POST("/generalization/query/code/:code", app.GeneralizationController.QueryByCode)
 		adminGroup.GET("/generalization/detail/code/:code/:id", app.GeneralizationController.DetailByCode)
 		adminGroup.POST("/generalization/create", app.GeneralizationController.Create)
@@ -265,7 +261,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.DELETE("/generalization/batch-delete", app.GeneralizationController.BatchDelete)
 		adminGroup.POST("/generalization/export", app.GeneralizationController.Export)
 
-		// report
+		// 报表
 		adminGroup.POST("/report/query", app.ReportController.QueryReportDefinitions)
 		adminGroup.GET("/report/data-sources", app.ReportController.GetReportDataSources)
 		adminGroup.POST("/report/sql-fields", app.ReportController.InferSQLFields)
@@ -283,7 +279,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.DELETE("/report/:id", app.ReportController.DeleteReportDefinitionById)
 		adminGroup.POST("/report/:id/preview", app.ReportController.PreviewReport)
 
-		// file
+		// 文件
 		adminGroup.POST("/file/upload", app.FileController.Upload)
 		adminGroup.GET("/file/:id", app.FileController.GetFileById)
 		adminGroup.DELETE("/file/:id", app.FileController.DeleteFileById)
@@ -292,7 +288,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/file/preview/:uuid", app.FileController.Preview)
 		adminGroup.GET("/file/download/:uuid", app.FileController.Download)
 
-		// file chunk upload
+		// 文件分片上传
 		adminGroup.POST("/file/upload/init", app.FileController.InitChunkUpload)
 		adminGroup.POST("/file/upload/chunk", app.FileController.UploadChunk)
 		adminGroup.POST("/file/upload/merge/:upload_id", app.FileController.MergeChunks)

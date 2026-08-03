@@ -23,8 +23,7 @@ type SysTableRepository interface {
 
 	Model([]model.SysTableField) interface{}
 
-	// DropTableIndex
-	// 所有数据库操作
+	// 表结构相关数据库操作
 	DropTableIndex(*gorm.DB, string, string) error
 	DropTable(*gorm.DB, string) error
 	DropTableColumn(*gorm.DB, string, string) error

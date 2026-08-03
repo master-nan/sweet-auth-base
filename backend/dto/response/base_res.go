@@ -42,7 +42,7 @@ func (e *AdminError) Unwrap() error {
 	return e.Cause
 }
 
-// ForClient returns a detached response without the internal error cause.
+// ForClient 返回不包含内部错误原因的独立响应。
 func (e *AdminError) ForClient() *AdminError {
 	if e == nil {
 		return nil

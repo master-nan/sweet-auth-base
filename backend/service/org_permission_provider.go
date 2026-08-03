@@ -13,8 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// OrgPermissionProvider is the Organization fact boundary consumed by future
-// data-permission runtime code. It does not expose policy or SQL behavior.
+// OrgPermissionProvider 是数据权限运行时使用的 Organization 事实边界。
+// 它不开放 Policy 或 SQL 行为。
 type OrgPermissionProvider interface {
 	GetEmployeeByUser(*gin.Context, int) (response.OrgEmployeeContextRes, error)
 	GetEffectiveAssignments(*gin.Context, int, string) ([]response.OrgEffectiveAssignmentRes, error)

@@ -193,13 +193,6 @@ func (m *MenuController) DeleteMenuById(ctx *gin.Context) {
 func (m *MenuController) QueryMenus(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	//var data request.Basic
-	//translator := m.translators["zh"]
-	//err := utils.ValidatorQuery[request.Basic](ctx, &data, translator)
-	//if err != nil {
-	//	_ = ctx.Error(err)
-	//	return
-	//}
 	result, err := m.sysMenuService.GetMenuTree()
 	if err != nil {
 		_ = ctx.Error(err)

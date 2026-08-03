@@ -36,8 +36,8 @@ type policyResolverDimensionValuesLookup func(
 	DimensionProviderRequest,
 ) (datapermission.DimensionValues, error)
 
-// DataPermissionPolicyResolver is the complete request-scoped Resolver engine.
-// Rules inside one Policy are AND branches; effective Grants are OR branches.
+// DataPermissionPolicyResolver 是完整的请求级 Resolver 引擎。
+// 同一 Policy 内的 Rule 使用 AND，不同有效 Grant 使用 OR。
 type DataPermissionPolicyResolver struct {
 	findResource     policyResolverResourceLookup
 	findOperation    policyResolverOperationLookup

@@ -56,12 +56,6 @@ func (cs *SysConfigureService) Query() (model.SysConfigure, error) {
 }
 
 func (cs *SysConfigureService) Update(ctx *gin.Context, req request.ConfigureUpdateReq) error {
-	//var data model.SysConfigure
-	//e := mapstructure.Decode(req, &data)
-	//if e != nil {
-	//	zap.L().Error("Error during struct mapping:", zap.Error(e))
-	//	return e
-	//}
 	tx := cs.sysConfigureRepo.DBWithContext(ctx)
 	if strings.TrimSpace(req.SenderPassword) == "" {
 		var existing model.SysConfigure

@@ -573,11 +573,6 @@ func buildQuery(db *gorm.DB, basic *request.Basic, table model.SysTable) *gorm.D
 			subQuery = combineSubQuery(subQuery, nestedQuery, exprGroup.Logic)
 		}
 		// 组合到主查询
-		//if i == 0 {
-		//	query = subQuery
-		//} else {
-		//query = combineSubQuery(query, subQuery, exprGroup.Logic)
-		//}
 		query = combineSubQuery(query, subQuery, enum.And)
 	}
 	if len(basic.Filters) > 0 {
@@ -681,9 +676,8 @@ func finalizeQuery(query *gorm.DB, basic *request.Basic, table model.SysTable) *
 	return query
 }
 
-// ApplyAdapterExecution converts a validated metadata AdapterExecution into
-// GORM clause expressions. It resolves field IDs only from the trusted table
-// metadata already loaded by the server and never accepts executable input.
+// ApplyAdapterExecution 将校验通过的元数据 AdapterExecution 转换为 GORM 子句表达式。
+// 它只根据服务端已加载的可信表元数据解析字段 ID，不接受可执行输入。
 func ApplyAdapterExecution(
 	query *gorm.DB,
 	execution datapermission.AdapterExecution,
@@ -1131,9 +1125,6 @@ func BuildTag(field model.SysTableField) string {
 	if !field.IsNull {
 		gormParts = append(gormParts, `notNull:true`)
 	}
-	//if field.IsIndex {
-	//	gormParts = append(gormParts, `index:true`)
-	//}
 	gormParts = append(gormParts, fmt.Sprintf(`comment:'%s'`, field.FieldName))
 
 	// JSON 标签

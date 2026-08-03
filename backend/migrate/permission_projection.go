@@ -49,8 +49,7 @@ var retiredOrganizationPermissions = []retiredPermissionSpec{
 	{menuName: "organization_sync_error", code: "organization_sync_error_retry"},
 }
 
-// seedFunctionalPermissionProjection repairs permission metadata first, then
-// rebuilds role policies as a pure projection of role-button grants.
+// seedFunctionalPermissionProjection 先修复权限元数据，再将角色 Policy 重建为角色按钮授权的纯投影。
 func seedFunctionalPermissionProjection(db *gorm.DB, sf *utils.Snowflake) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		var superAdmin model.SysRole

@@ -41,8 +41,8 @@ var dataResourceOperationSet = map[string]struct{}{
 	model.DataPermissionOperationRun:    {},
 }
 
-// DataResourceConfigService owns data-resource configuration rules only. It
-// does not resolve data scope, call providers, or depend on menu permissions.
+// DataResourceConfigService 仅负责数据资源配置规则。
+// 它不解析数据范围、不调用 Provider，也不依赖菜单权限。
 type DataResourceConfigService struct {
 	resourceRepo  repository.DataResourceRepository
 	operationRepo repository.DataResourceOperationRepository
@@ -279,9 +279,8 @@ func (s *DataResourceConfigService) DisableResource(ctx *gin.Context, resourceId
 	})
 }
 
-// RemoveResource performs the platform soft-delete operation. Referenced
-// resources are rejected before persistence; this service never performs a
-// physical delete.
+// RemoveResource 执行平台软删除。
+// 已被引用的资源会在持久化前被拒绝，本 Service 不执行物理删除。
 func (s *DataResourceConfigService) RemoveResource(ctx *gin.Context, resourceId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)

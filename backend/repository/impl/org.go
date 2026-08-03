@@ -1157,8 +1157,7 @@ func legalEntityScopedBasic(
 	scope repository.OrgLegalEntityReadScope,
 ) request.Basic {
 	query := cloneOrganizationBasic(source)
-	// Legal-entity history is controlled only by the explicit organization
-	// visibility flags. The generic soft-delete switch is not part of this API.
+	// 法人主体历史记录仅由显式组织可见性标记控制，通用软删除开关不属于此 API。
 	query.IncludeDeleted = false
 	if legalEntityInternalFieldRequested(query, "source_deleted") {
 		query.Expressions = append(query.Expressions, request.ExpressionGroup{
@@ -1556,9 +1555,8 @@ func orgSyncRecordListColumns() []string {
 	}
 }
 
-// organizationQueryTable keeps sys_table/sys_table_field as the single query
-// metadata source while removing fields that metadata has not opened for
-// lists, quick search, advanced search, sorting, or stable identity.
+// organizationQueryTable 保持 sys_table/sys_table_field 为唯一查询元数据来源，
+// 同时移除元数据未开放给列表、快速查询、高级查询、排序或稳定身份使用的字段。
 func organizationQueryTable(table model.SysTable, tableCode string) model.SysTable {
 	table.TableCode = tableCode
 	fields := make([]model.SysTableField, 0, len(table.TableFields))
@@ -1575,9 +1573,8 @@ func organizationQueryTable(table model.SysTable, tableCode string) model.SysTab
 	return table
 }
 
-// organizationEmployeeQueryTable follows the committed metadata boundary:
-// employee_no and name are ordinary quick-search fields, while contact and
-// source identity fields are never opened by this read service.
+// organizationEmployeeQueryTable 遵循已确定的元数据边界：
+// employee_no 和 name 是普通快速查询字段，联系方式和来源身份字段不向此读 Service 开放。
 func organizationEmployeeQueryTable(table model.SysTable) model.SysTable {
 	table = organizationQueryTable(table, "org_employee")
 	for index := range table.TableFields {

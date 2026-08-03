@@ -47,8 +47,7 @@ func (resolution lowCodePermissionResolution) modifiesOwnership(
 	return false
 }
 
-// LowCodeDataPermissionRuntime is the single data-permission boundary used by
-// generic metadata reads and writes.
+// LowCodeDataPermissionRuntime 是通用元数据读写使用的唯一数据权限边界。
 type LowCodeDataPermissionRuntime struct {
 	findResources  lowCodeResourceLookup
 	findOwnerships lowCodeOwnershipLookup

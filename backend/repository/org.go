@@ -12,30 +12,29 @@ import (
 )
 
 var (
-	// ErrOrganizationFieldBoundary is returned before a write when a caller
-	// attempts to cross the source-managed/platform-managed field boundary.
+	// ErrOrganizationFieldBoundary 在调用方试图跨越外部来源管理与平台管理字段边界时，
+	// 于写入前返回。
 	ErrOrganizationFieldBoundary = errors.New("repository: organization field is outside the allowed update boundary")
 	ErrOrganizationTxRequired    = errors.New("repository: organization update requires a transaction")
 )
 
-// OrgReadScope is normalized by OrgService before it reaches a repository.
-// Repositories only translate the already-decided visibility boundary into
-// database predicates.
+// OrgReadScope 在进入 Repository 前由 OrgService 规范化。
+// Repository 仅将已确定的可见性边界转换为数据库条件。
 type OrgReadScope struct {
 	AsOf            time.Time
 	IncludeDisabled bool
 	IncludeHistory  bool
 }
 
-// OrgAssignmentReadScope is decided by OrgService. Repositories translate the
-// selected temporal view into SQL without choosing a primary assignment.
+// OrgAssignmentReadScope 由 OrgService 决定。
+// Repository 将选定的时间视图转换为 SQL，但不选择主任职。
 type OrgAssignmentReadScope struct {
 	AsOf      time.Time
 	TimeScope string
 }
 
-// OrgBoundUserSummary is the repository projection used by Organization
-// services. It deliberately contains no authentication or authorization data.
+// OrgBoundUserSummary 是 Organization Service 使用的 Repository 投影。
+// 它不包含认证或授权数据。
 type OrgBoundUserSummary struct {
 	UserId   int
 	UserName string

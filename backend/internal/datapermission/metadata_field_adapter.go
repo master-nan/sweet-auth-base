@@ -14,16 +14,16 @@ var (
 	ErrMetadataFieldRecordNotFound = errors.New("metadata field record not found")
 )
 
-// MetadataTableRecord is the minimum server-side projection needed by the
-// metadata adapter. It intentionally excludes table names and SQL metadata.
+// MetadataTableRecord 是 Metadata Adapter 所需的最小服务端投影。
+// 它不包含表名和 SQL 元数据。
 type MetadataTableRecord struct {
 	Id      int
 	State   bool
 	Deleted bool
 }
 
-// MetadataFieldRecord is a server-resolved field projection. FieldCode is used
-// only for safety classification and is never copied into AdapterExecution.
+// MetadataFieldRecord 是服务端解析后的字段投影。
+// FieldCode 仅用于安全分类，不会复制到 AdapterExecution。
 type MetadataFieldRecord struct {
 	Id               int
 	TableId          int
@@ -38,16 +38,15 @@ type MetadataFieldRecord struct {
 	IsAdvancedSearch bool
 }
 
-// MetadataFieldReader loads reviewed metadata by numeric identity. Concrete
-// readers must use parameterized lookups and must not accept table or field
-// names from AdapterInput.
+// MetadataFieldReader 按数字身份加载已评审的元数据。
+// 具体 Reader 必须使用参数化查询，不得接受 AdapterInput 中的表名或字段名。
 type MetadataFieldReader interface {
 	FindMetadataTable(context.Context, int) (MetadataTableRecord, error)
 	FindMetadataField(context.Context, int) (MetadataFieldRecord, error)
 }
 
-// MetadataFieldAdapter validates metadata bindings and returns the frozen,
-// structured AdapterExecution tree. It never generates SQL or ORM clauses.
+// MetadataFieldAdapter 校验元数据绑定并返回已冻结的结构化 AdapterExecution 树。
+// 它不生成 SQL 或 ORM Clause。
 type MetadataFieldAdapter struct {
 	reader MetadataFieldReader
 }

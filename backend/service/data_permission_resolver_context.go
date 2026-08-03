@@ -15,8 +15,8 @@ func (config policyResolverPolicyConfig) clone() policyResolverPolicyConfig {
 	return config
 }
 
-// policyResolverRequestContext is created for every Resolve call. Its caches
-// cannot outlive or be shared across requests.
+// policyResolverRequestContext 为每次 Resolve 调用创建。
+// 其中的缓存不能跨请求存活或共享。
 type policyResolverRequestContext struct {
 	input              datapermission.ResolverInput
 	resources          map[string]model.DataResource

@@ -125,20 +125,6 @@ func (d *Client) GetUserInfo(accessToken string, code string) (DingUserInfoRespo
 }
 
 func (d *Client) GetUser(accessToken string, code string) (UserInfo, error) {
-	//var res UserInfo
-	//httpClient := http.NewClient(60 * time.Second)
-	//body := map[string]interface{}{}
-	//body["code"] = code
-	//result, err := httpClient.Post(UserInfoURL+"?access_token="+accessToken, body, nil)
-	//if err != nil {
-	//	return res, err
-	//}
-	//var dingTalkUserInfoResp DingUserInfoResponse
-	//err = json.Unmarshal(result, &dingTalkUserInfoResp)
-	//
-	//if err != nil {
-	//	return res, err
-	//}
 	var res UserInfo
 	dingTalkUserInfoResp, err := d.GetUserInfo(accessToken, code)
 	if err != nil {

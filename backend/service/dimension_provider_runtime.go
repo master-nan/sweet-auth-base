@@ -31,8 +31,8 @@ type dimensionOrganizationDescendantsLookup func(
 	bool,
 ) (response.OrgDescendantsRes, error)
 
-// DimensionProvider resolves trusted subject facts for one configured
-// dimension. It does not read grants, policies, resources, or business data.
+// DimensionProvider 解析指定 Dimension 下可信的主体事实。
+// 它不读取 Grant、Policy、Resource 或业务数据。
 type DimensionProvider interface {
 	ResolveDimensionValues(
 		*gin.Context,

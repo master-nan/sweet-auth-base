@@ -28,8 +28,8 @@ const (
 
 var dataOwnershipCodePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$`)
 
-// DataOwnershipConfigService owns ownership-definition configuration only.
-// It does not resolve subject scope, call providers, or build query filters.
+// DataOwnershipConfigService 仅负责归属定义配置。
+// 它不解析主体范围、不调用 Provider，也不构造查询过滤条件。
 type DataOwnershipConfigService struct {
 	resourceRepo             repository.DataResourceRepository
 	dimensionRepo            repository.DataDimensionDefinitionRepository
@@ -330,8 +330,8 @@ func (s *DataOwnershipConfigService) DisableOwnership(ctx *gin.Context, ownershi
 	})
 }
 
-// RemoveOwnership follows the platform soft-delete baseline. Any policy-rule
-// reference, active or inactive, protects the ownership identity.
+// RemoveOwnership 遵循平台软删除基线。
+// 无论是否启用，任何 PolicyRule 引用都会保护该 Ownership 身份。
 func (s *DataOwnershipConfigService) RemoveOwnership(ctx *gin.Context, ownershipId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)

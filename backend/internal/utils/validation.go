@@ -24,7 +24,7 @@ const (
 	MaxPageSize     = 5000
 )
 
-// ValidationIssue is the stable internal representation of one DTO field error.
+// ValidationIssue 是单个 DTO 字段错误的稳定内部表示。
 type ValidationIssue struct {
 	Field     string
 	Rule      string
@@ -32,7 +32,7 @@ type ValidationIssue struct {
 	Message   string
 }
 
-// InitializeValidator configures the single validator engine used by Gin.
+// InitializeValidator 配置 Gin 使用的统一校验引擎。
 func InitializeValidator(validate *validator.Validate) (map[string]ut.Translator, error) {
 	if validate == nil {
 		return nil, fmt.Errorf("validator engine is nil")
@@ -76,7 +76,7 @@ func InitializeValidator(validate *validator.Validate) (map[string]ut.Translator
 	}, nil
 }
 
-// ValidationIssues converts validator errors without changing the public API response shape.
+// ValidationIssues 转换校验错误，不改变公共 API 响应结构。
 func ValidationIssues(err error, translator ut.Translator) []ValidationIssue {
 	var validationErrors validator.ValidationErrors
 	if !stderrors.As(err, &validationErrors) {
@@ -102,7 +102,7 @@ func ValidationIssues(err error, translator ut.Translator) []ValidationIssue {
 	return issues
 }
 
-// ValidationErrorMessage produces the existing comma-separated client message.
+// ValidationErrorMessage 生成现有的逗号分隔客户端消息。
 func ValidationErrorMessage(err error, translator ut.Translator) string {
 	issues := ValidationIssues(err, translator)
 	if len(issues) == 0 {
@@ -116,7 +116,7 @@ func ValidationErrorMessage(err error, translator ut.Translator) string {
 	return strings.Join(messages, ",")
 }
 
-// ToValidationParameterError preserves the validator cause and uses the platform parameter error.
+// ToValidationParameterError 保留校验原因，并使用平台参数错误。
 func ToValidationParameterError(err error, translator ut.Translator) error {
 	if err == nil {
 		return nil
@@ -124,7 +124,7 @@ func ToValidationParameterError(err error, translator ut.Translator) error {
 	return myerrors.WrapParameterError(err, ValidationErrorMessage(err, translator))
 }
 
-// ValidateStruct validates a DTO with the same engine and response semantics as HTTP binding.
+// ValidateStruct 使用与 HTTP 绑定相同的引擎和响应语义校验 DTO。
 func ValidateStruct(data any, translator ut.Translator) error {
 	if err := binding.Validator.ValidateStruct(data); err != nil {
 		return ToValidationParameterError(err, translator)
@@ -132,7 +132,7 @@ func ValidateStruct(data any, translator ut.Translator) error {
 	return nil
 }
 
-// ValidateEnum validates enum-like values that cannot be expressed with a static oneof tag.
+// ValidateEnum 校验无法通过静态 oneof 标签表达的枚举类值。
 func ValidateEnum[T comparable](field string, value T, allowed ...T) error {
 	for _, candidate := range allowed {
 		if value == candidate {
@@ -146,7 +146,7 @@ func ValidateEnum[T comparable](field string, value T, allowed ...T) error {
 	return myerrors.NewParameterError(field + "取值不合法")
 }
 
-// ValidatePagination validates explicit page values while preserving zero as "use defaults".
+// ValidatePagination 校验显式分页值，并保留零值表示“使用默认值”的语义。
 func ValidatePagination(page, pageSize int) error {
 	if page < 0 {
 		return myerrors.NewParameterError("page不能小于0")
@@ -160,7 +160,7 @@ func ValidatePagination(page, pageSize int) error {
 	return nil
 }
 
-// ValidateDateRange accepts an omitted boundary and rejects a reversed complete range.
+// ValidateDateRange 允许省略边界，并拒绝起止顺序颠倒的完整范围。
 func ValidateDateRange(start, end time.Time) error {
 	if start.IsZero() || end.IsZero() {
 		return nil

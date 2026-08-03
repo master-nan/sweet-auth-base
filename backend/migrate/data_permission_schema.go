@@ -21,8 +21,8 @@ type postgresForeignKeyConstraint struct {
 	referenceFields []string
 }
 
-// migrateDataPermissionSchema owns the reviewed Data Permission V1 schema.
-// Cross-record policy validation remains a Service responsibility.
+// migrateDataPermissionSchema 负责已评审的 Data Permission V1 schema。
+// 跨记录 Policy 校验仍由 Service 负责。
 func migrateDataPermissionSchema(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.AutoMigrate(dataPermissionDomainModels()...); err != nil {

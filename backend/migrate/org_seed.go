@@ -14,8 +14,7 @@ const (
 	organizationRootMenuName = "organization"
 )
 
-// seedOrganizationFoundation extends the existing platform seed pipeline with
-// read-only organization mirror metadata and functional permissions.
+// seedOrganizationFoundation 为现有平台 Seed 流程补充只读组织镜像元数据和功能权限。
 func seedOrganizationFoundation(db *gorm.DB, sf *utils.Snowflake) error {
 	if err := seedOrganizationDictionaries(db, sf); err != nil {
 		return fmt.Errorf("seed organization dictionaries: %w", err)

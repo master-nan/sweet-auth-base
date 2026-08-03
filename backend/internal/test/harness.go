@@ -16,7 +16,7 @@ type HTTPRequest struct {
 	Header http.Header
 }
 
-// PerformRequest executes an HTTP handler without opening a network listener.
+// PerformRequest 在不打开网络监听器的情况下执行 HTTP 处理器。
 func PerformRequest(t testing.TB, handler http.Handler, input HTTPRequest) *httptest.ResponseRecorder {
 	t.Helper()
 	if handler == nil {
@@ -36,7 +36,7 @@ func PerformRequest(t testing.TB, handler http.Handler, input HTTPRequest) *http
 	return recorder
 }
 
-// NewHTTPServer creates a lifecycle-managed server for outbound HTTP tests.
+// NewHTTPServer 为外部 HTTP 测试创建生命周期受控的服务器。
 func NewHTTPServer(t testing.TB, handler http.Handler) *httptest.Server {
 	t.Helper()
 	if handler == nil {
@@ -47,8 +47,8 @@ func NewHTTPServer(t testing.TB, handler http.Handler) *httptest.Server {
 	return server
 }
 
-// AssertIdempotent runs an operation twice and compares deterministic
-// snapshots after each run. The snapshot must include stable keys and counts.
+// AssertIdempotent 执行同一操作两次，并比较每次执行后的确定性快照。
+// 快照必须包含稳定键和数量。
 func AssertIdempotent[T any](
 	t testing.TB,
 	run func() error,

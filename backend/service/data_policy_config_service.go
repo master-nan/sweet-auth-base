@@ -54,9 +54,8 @@ var dataPolicyOperatorSet = map[string]struct{}{
 	model.DataPolicyOperatorIn:    {},
 }
 
-// DataPolicyConfigService owns reusable policy and structured rule
-// configuration. Resource-specific ownership matching remains a Grant
-// preflight because policies intentionally do not store resource_id.
+// DataPolicyConfigService 负责可复用 Policy 和结构化 Rule 配置。
+// Policy 不保存 resource_id，因此资源级 Ownership 匹配仍由 Grant 预检负责。
 type DataPolicyConfigService struct {
 	policyRepo    repository.DataPolicyRepository
 	ruleRepo      repository.DataPolicyRuleRepository

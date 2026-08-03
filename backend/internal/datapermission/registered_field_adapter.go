@@ -11,9 +11,8 @@ import (
 	myerrors "backend/internal/errors"
 )
 
-// RegisteredFieldExecutionRequest contains only immutable, structured
-// permission semantics. A business module can inspect it without receiving a
-// table name, column name, SQL fragment, or ORM clause.
+// RegisteredFieldExecutionRequest 仅包含不可变的结构化权限语义。
+// 业务模块可以读取它，但不会获得表名、列名、SQL 片段或 ORM Clause。
 type RegisteredFieldExecutionRequest struct {
 	resource  AdapterResourceContext
 	condition AdapterCondition
@@ -27,10 +26,9 @@ func (request RegisteredFieldExecutionRequest) Condition() AdapterCondition {
 	return request.condition.clone()
 }
 
-// RegisteredFieldExecutor is implemented by reviewed server code owned by a
-// fixed business module. Prepare validates that the module can consume the
-// structured condition; the returned AdapterExecution remains the safe,
-// ORM-independent description consumed by a later repository integration.
+// RegisteredFieldExecutor 由固定业务模块中已评审的服务端代码实现。
+// Prepare 校验模块能否消费结构化 Condition；返回的 AdapterExecution 仍是安全且与 ORM 无关的描述，
+// 供后续 Repository 接入使用。
 type RegisteredFieldExecutor interface {
 	Prepare(context.Context, RegisteredFieldExecutionRequest) error
 }
@@ -47,8 +45,8 @@ func (executor RegisteredFieldExecutorFunc) Prepare(
 	return executor(ctx, request)
 }
 
-// RegisteredFieldExecutionRegistration is a server-owned declaration. It is
-// constructed by application modules, never from an administrative request.
+// RegisteredFieldExecutionRegistration 是服务端拥有的声明。
+// 它由应用模块构造，不得来自管理端请求。
 type RegisteredFieldExecutionRegistration struct {
 	ResourceCode        string
 	AdapterCode         string
@@ -67,9 +65,8 @@ type registeredFieldExecutionEntry struct {
 	operators    map[DataScopeOperator]struct{}
 }
 
-// RegisteredFieldExecutionRegistry is process-local and safe for concurrent
-// reads. Each application instance builds its own registry during startup;
-// this type is not exposed through a management API and has no global state.
+// RegisteredFieldExecutionRegistry 是进程内注册表，支持并发读取。
+// 每个应用实例在启动时构造自己的注册表；该类型不通过管理 API 暴露，也没有全局状态。
 type RegisteredFieldExecutionRegistry struct {
 	mu           sync.RWMutex
 	entries      map[string]registeredFieldExecutionEntry
@@ -91,8 +88,7 @@ func NewRegisteredFieldExecutionRegistry(
 	return registry, nil
 }
 
-// Register is intended for application construction and isolated tests. No
-// API or persisted configuration is allowed to call this method.
+// Register 仅用于应用构造和隔离测试，API 或持久化配置不得调用此方法。
 func (registry *RegisteredFieldExecutionRegistry) Register(
 	registration RegisteredFieldExecutionRegistration,
 ) error {

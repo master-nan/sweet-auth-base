@@ -168,8 +168,6 @@ func (b *BasicController) Login(ctx *gin.Context) {
 			zap.L().Error("login update err", zap.Error(err))
 		}
 	}()
-	//var userRes response.SysUserRes
-	//copier.Copy(&userRes, &user)
 	signInRes := response.SignInRes{
 		AccessToken:          accessToken,
 		RefreshToken:         refreshToken,

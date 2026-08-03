@@ -17,8 +17,8 @@ type subjectContextUserLookup func(int) (model.SysUser, error)
 type subjectContextRoleLookup func(int) ([]model.SysRole, error)
 type subjectContextEmployeeLookup func(*gin.Context, int) (response.OrgEmployeeContextRes, error)
 
-// SubjectContextBuilder derives Resolver identity exclusively from trusted
-// server-side sources. It never accepts role, employee, or date overrides.
+// SubjectContextBuilder 仅从服务端可信来源生成 Resolver 主体身份。
+// 它不接受角色、员工或日期覆盖值。
 type SubjectContextBuilder struct {
 	findUser     subjectContextUserLookup
 	findRoles    subjectContextRoleLookup
@@ -53,8 +53,7 @@ func newSubjectContextBuilder(
 	}
 }
 
-// Build verifies that userId is the identity set by AuthHandler and then
-// derives every remaining field from server-owned repositories and providers.
+// Build 校验 userId 是否为 AuthHandler 设置的身份，再从服务端 Repository 和 Provider 生成其余字段。
 func (builder *SubjectContextBuilder) Build(
 	ctx *gin.Context,
 	userId int,

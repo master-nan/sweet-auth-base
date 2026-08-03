@@ -56,9 +56,8 @@ const (
 	diagnosticOperationInactive         = "resource_operation_inactive"
 )
 
-// DataPermissionConfigPreflightService validates configuration declarations and
-// changes their enabled state. It does not resolve subject scope or build data
-// filters.
+// DataPermissionConfigPreflightService 校验配置声明并变更其启用状态。
+// 它不解析主体范围，也不构造数据过滤条件。
 type DataPermissionConfigPreflightService struct {
 	validator   dataPermissionConfigValidator
 	auditWriter TransactionalAuditWriter

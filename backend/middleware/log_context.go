@@ -21,8 +21,8 @@ const (
 
 var correlationIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]*$`)
 
-// AuditContext adds business audit semantics to the request-wide access log.
-// Empty fields leave any middleware-classified value unchanged.
+// AuditContext 为请求级访问日志补充业务审计语义。
+// 空字段不会覆盖中间件已经分类的值。
 type AuditContext struct {
 	MenuID       int
 	Action       string
@@ -31,9 +31,8 @@ type AuditContext struct {
 	ResourceID   string
 }
 
-// EnsureLogContext initializes request and trace identifiers once per request.
-// A missing trace ID inherits the request ID so standalone requests remain
-// correlatable without requiring a distributed tracing system.
+// EnsureLogContext 为每个请求初始化一次请求标识和追踪标识。
+// 缺少追踪标识时继承请求标识，使独立请求在未接入分布式追踪系统时仍可关联。
 func EnsureLogContext(ctx *gin.Context) {
 	if ctx == nil {
 		return
@@ -69,8 +68,7 @@ func TraceID(ctx *gin.Context) string {
 	return correlationIDValue(ctx, traceIDContextKey)
 }
 
-// MarkAccessAuditPersisted prevents the request middleware from duplicating a
-// business audit that a Service has already committed in its write transaction.
+// MarkAccessAuditPersisted 防止请求中间件重复记录 Service 已在写事务中提交的业务审计。
 func MarkAccessAuditPersisted(ctx *gin.Context) {
 	if ctx != nil {
 		ctx.Set(accessAuditPersistedKey, true)
@@ -86,9 +84,8 @@ func AccessAuditPersisted(ctx *gin.Context) bool {
 	return exists && ok && persisted
 }
 
-// SetAuditContext lets a controller or service-facing adapter describe the
-// operation without writing an audit record itself. Repeated calls merge
-// non-empty values so shared middleware can add context incrementally.
+// SetAuditContext 允许 Controller 或面向 Service 的 Adapter 描述操作，而不直接写入审计记录。
+// 重复调用会合并非空值，便于共享中间件逐步补充上下文。
 func SetAuditContext(ctx *gin.Context, next AuditContext) {
 	if ctx == nil {
 		return

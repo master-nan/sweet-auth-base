@@ -84,9 +84,8 @@ func (ls *LogService) CreateAccessLog(ctx *gin.Context, log model.AccessLog) err
 	return err
 }
 
-// RecordTransactionalAudit persists a successful sensitive operation with the
-// same transaction as the domain write. Failed requests remain recorded by the
-// request-wide LogHandler after the transaction rolls back.
+// RecordTransactionalAudit 在领域写入事务中一并持久化成功的敏感操作。
+// 事务回滚后的失败请求仍由请求级 LogHandler 记录。
 func (ls *LogService) RecordTransactionalAudit(
 	ctx *gin.Context,
 	tx *gorm.DB,

@@ -12,7 +12,7 @@ import (
 
 var c *cron.Cron
 
-// InitCron initializes the cron jobs
+// InitCron 初始化定时任务。
 func InitCron(app *App) {
 	c = cron.New(cron.WithSeconds())
 	c.Start()

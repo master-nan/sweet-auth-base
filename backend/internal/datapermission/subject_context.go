@@ -9,9 +9,8 @@ import (
 	myerrors "backend/internal/errors"
 )
 
-// SubjectContext is the immutable identity input for one data-permission
-// resolution. Organization scopes and permission decisions are intentionally
-// excluded.
+// SubjectContext 是单次数据权限解析的不可变身份输入。
+// 它不包含组织范围和权限决策。
 type SubjectContext struct {
 	userId     int
 	roleIds    []int
@@ -19,7 +18,7 @@ type SubjectContext struct {
 	asOfDate   string
 }
 
-// NewSubjectContext creates a validated, deterministic Resolver subject.
+// NewSubjectContext 创建经过校验且结果确定的 Resolver 主体。
 func NewSubjectContext(
 	userId int,
 	roleIds []int,
@@ -50,8 +49,7 @@ func NewSubjectContext(
 	return context, nil
 }
 
-// Validate verifies only intrinsic identity and date invariants. It performs no
-// user, role, employee, organization, or permission lookup.
+// Validate 仅校验固有身份和日期不变量，不查询用户、角色、员工、组织或权限。
 func (context SubjectContext) Validate() error {
 	if context.userId <= 0 {
 		return myerrors.ErrDataPermissionSubjectUserNotFound

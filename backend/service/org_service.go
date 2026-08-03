@@ -29,8 +29,8 @@ const (
 	orgEmployeeUnbindUserAction  = "unbind_user"
 )
 
-// OrgService is the public read boundary for Organization Master Data. Other
-// modules call this service instead of reading Organization repositories.
+// OrgService 是组织主数据的公共读取边界。
+// 其他模块必须调用此 Service，不得直接读取 Organization Repository。
 type OrgService struct {
 	legalEntityRepo   repository.OrgLegalEntityRepository
 	orgUnitRepo       repository.OrgUnitRepository
@@ -398,8 +398,7 @@ func (s *OrgService) GetOrgUnitDetail(
 			)
 			result.PrimaryLegalEntity = &summary
 		case errors.Is(legalErr, gorm.ErrRecordNotFound):
-			// Preserve the stable foreign-key ID even if a historical display
-			// record is no longer available.
+			// 即使历史展示记录已不可用，也保留稳定的外键 ID。
 		default:
 			return response.OrgUnitDetailRes{}, myerrors.WrapDatabaseError(legalErr)
 		}

@@ -10,8 +10,8 @@ const (
 	OrgEffectiveScopeEmpty    = "empty"
 )
 
-// OrgEmployeeContextRes is the minimum account-to-employee contract exposed
-// to platform consumers. Account profile and authorization fields stay out.
+// OrgEmployeeContextRes 是向平台消费者开放的最小账号与员工关联契约。
+// 它不包含账号资料和授权字段。
 type OrgEmployeeContextRes struct {
 	UserId        int    `json:"user_id"`
 	EmployeeId    *int   `json:"employee_id"`
@@ -30,8 +30,8 @@ func NewOrgEmployeeContextRes(userId int, employeeId *int) OrgEmployeeContextRes
 	}
 }
 
-// OrgEffectiveAssignmentRes exposes only organization facts required by
-// permission and workflow consumers. Primary-assignment semantics are absent.
+// OrgEffectiveAssignmentRes 仅开放权限和工作流消费者需要的组织事实。
+// 它不包含主任职语义。
 type OrgEffectiveAssignmentRes struct {
 	AssignmentId  int        `json:"assignment_id"`
 	EmployeeId    int        `json:"employee_id"`
@@ -42,8 +42,8 @@ type OrgEffectiveAssignmentRes struct {
 	ValidTo       *time.Time `json:"valid_to"`
 }
 
-// OrgEffectiveOrganizationScopeRes aggregates every effective assignment.
-// Empty means no effective organization scope and never means unrestricted.
+// OrgEffectiveOrganizationScopeRes 聚合全部有效任职。
+// 空集合表示没有有效组织范围，绝不表示不受限制。
 type OrgEffectiveOrganizationScopeRes struct {
 	EmployeeId      int    `json:"employee_id"`
 	AsOfDate        string `json:"as_of_date"`

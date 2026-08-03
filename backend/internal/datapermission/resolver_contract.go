@@ -11,9 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ResolverInput is the immutable identity of one data-scope resolution. The
-// Resolver loads all Resource, Grant, Policy, Rule, Ownership, and Dimension
-// facts server-side; callers cannot inject those configuration objects here.
+// ResolverInput 是单次数据范围解析的不可变身份。
+// Resolver 在服务端加载全部 Resource、Grant、Policy、Rule、Ownership 和 Dimension 事实，
+// 调用方不能在此注入这些配置对象。
 type ResolverInput struct {
 	subjectContext SubjectContext
 	resourceCode   string
@@ -61,17 +61,15 @@ func (input ResolverInput) Operation() string {
 	return input.operation
 }
 
-// Resolver combines trusted identity, configuration, and Dimension Provider
-// facts into DataScopeResult semantics. Implementations may use only data-
-// permission configuration readers and DimensionProvider-style fact ports.
-// SQL, ORM scopes, adapters, organization tables, and business repositories
-// remain outside this interface.
+// Resolver 将可信身份、配置和 Dimension Provider 事实组合为 DataScopeResult 语义。
+// 实现只能使用数据权限配置 Reader 和 Dimension Provider 类型的事实端口。
+// SQL、ORM Scope、Adapter、组织表和业务 Repository 均不属于此接口。
 type Resolver interface {
 	Resolve(*gin.Context, ResolverInput) (DataScopeResult, error)
 }
 
-// ResolverFunc adapts a function to Resolver while enforcing the frozen input,
-// output identity, and fail-closed contract. It contains no parsing algorithm.
+// ResolverFunc 将函数适配为 Resolver，同时执行已冻结的输入、输出身份和失败关闭契约。
+// 它不包含解析算法。
 type ResolverFunc func(*gin.Context, ResolverInput) (DataScopeResult, error)
 
 var _ Resolver = ResolverFunc(nil)

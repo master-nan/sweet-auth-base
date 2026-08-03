@@ -45,7 +45,7 @@ func NewOrgController(
 	}
 }
 
-// QueryLegalEntities godoc
+// QueryLegalEntities 查询法人主体列表。
 // @Summary 法人主体列表
 // @Description 分页查询当前有效或显式请求的历史法人主体
 // @Tags 组织主数据
@@ -80,7 +80,7 @@ func (o *OrgController) QueryLegalEntities(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetLegalEntityDetail godoc
+// GetLegalEntityDetail 查询法人主体详情。
 // @Summary 法人主体详情
 // @Description 按内部 legal_entity_id 查询法人主体详情
 // @Tags 组织主数据
@@ -111,7 +111,7 @@ func (o *OrgController) GetLegalEntityDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// GetLegalEntityTree godoc
+// GetLegalEntityTree 查询法人主体树。
 // @Summary 法人主体树
 // @Description 使用 org_legal_entity.parent_id 组装法人主体树
 // @Tags 组织主数据
@@ -137,7 +137,7 @@ func (o *OrgController) GetLegalEntityTree(ctx *gin.Context) {
 	resp.SetData(result).SetTotal(len(result))
 }
 
-// QueryLegalEntityOptions godoc
+// QueryLegalEntityOptions 查询法人主体选项。
 // @Summary 法人主体选项
 // @Description 查询以 legal_entity_id 为 value 的法人主体选项
 // @Tags 组织主数据
@@ -172,7 +172,7 @@ func (o *OrgController) QueryLegalEntityOptions(ctx *gin.Context) {
 	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
-// QueryStructures godoc
+// QueryStructures 查询组织架构列表。
 // @Summary 管理架构列表
 // @Description 分页查询管理架构定义
 // @Tags 组织主数据
@@ -207,7 +207,7 @@ func (o *OrgController) QueryStructures(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetStructureDetail godoc
+// GetStructureDetail 查询组织架构详情。
 // @Summary 管理架构详情
 // @Description 按内部 structure_id 查询管理架构详情
 // @Tags 组织主数据
@@ -238,7 +238,7 @@ func (o *OrgController) GetStructureDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// QueryStructureOptions godoc
+// QueryStructureOptions 查询组织架构选项。
 // @Summary 管理架构选项
 // @Description 查询以 structure_id 为 value 的管理架构选项
 // @Tags 组织主数据
@@ -273,7 +273,7 @@ func (o *OrgController) QueryStructureOptions(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// QueryOrgUnits godoc
+// QueryOrgUnits 查询管理组织列表。
 // @Summary 管理组织列表
 // @Description 分页查询管理组织单元
 // @Tags 组织主数据
@@ -308,7 +308,7 @@ func (o *OrgController) QueryOrgUnits(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetOrgUnitDetail godoc
+// GetOrgUnitDetail 查询管理组织详情。
 // @Summary 管理组织详情
 // @Description 按内部 org_unit_id 查询组织单元详情
 // @Tags 组织主数据
@@ -339,7 +339,7 @@ func (o *OrgController) GetOrgUnitDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// QueryOrgUnitOptions godoc
+// QueryOrgUnitOptions 查询管理组织选项。
 // @Summary 管理组织选项
 // @Description 查询以 org_unit_id 为 value 的管理组织选项
 // @Tags 组织主数据
@@ -374,7 +374,7 @@ func (o *OrgController) QueryOrgUnitOptions(ctx *gin.Context) {
 	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
-// GetStructureOrgTree godoc
+// GetStructureOrgTree 查询组织架构树。
 // @Summary 管理组织树
 // @Description 使用 org_structure_node.parent_node_id 组装指定管理架构的组织树
 // @Tags 组织主数据
@@ -400,7 +400,7 @@ func (o *OrgController) GetStructureOrgTree(ctx *gin.Context) {
 	resp.SetData(result).SetTotal(countStructureOrgTreeNodes(result))
 }
 
-// QueryEmployees godoc
+// QueryEmployees 查询人员列表。
 // @Summary 企业人员列表
 // @Description 分页查询组织镜像中的企业人员
 // @Tags 组织主数据
@@ -435,7 +435,7 @@ func (o *OrgController) QueryEmployees(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetEmployeeDetail godoc
+// GetEmployeeDetail 查询人员详情。
 // @Summary 企业人员详情
 // @Description 按内部 employee_id 查询企业人员及安全账号摘要
 // @Tags 组织主数据
@@ -466,7 +466,7 @@ func (o *OrgController) GetEmployeeDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// QueryEmployeeOptions godoc
+// QueryEmployeeOptions 查询人员选项。
 // @Summary 企业人员选项
 // @Description 查询以 employee_id 为 value 的企业人员选项
 // @Tags 组织主数据
@@ -501,7 +501,7 @@ func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
 	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
-// QueryEmployeeUserOptions godoc
+// QueryEmployeeUserOptions 查询可绑定的平台账号选项。
 // @Summary 可绑定平台账号选项
 // @Description 按账号名查询员工绑定所需的最小安全账号选项
 // @Tags 组织主数据
@@ -527,7 +527,7 @@ func (o *OrgController) QueryEmployeeUserOptions(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// BindEmployeeUser godoc
+// BindEmployeeUser 绑定人员与平台账号。
 // @Summary 绑定企业人员账号
 // @Description 将企业人员绑定到明确指定的当前 Sweet Platform 登录账号
 // @Tags 组织主数据
@@ -566,7 +566,7 @@ func (o *OrgController) BindEmployeeUser(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// UnbindEmployeeUser godoc
+// UnbindEmployeeUser 解除人员与平台账号绑定。
 // @Summary 解绑企业人员账号
 // @Description 清除企业人员与当前 Sweet Platform 登录账号的绑定
 // @Tags 组织主数据
@@ -604,7 +604,7 @@ func (o *OrgController) UnbindEmployeeUser(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// QueryPositions godoc
+// QueryPositions 查询岗位列表。
 // @Summary 岗位列表
 // @Description 分页查询组织镜像中的岗位
 // @Tags 组织主数据
@@ -639,7 +639,7 @@ func (o *OrgController) QueryPositions(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetPositionDetail godoc
+// GetPositionDetail 查询岗位详情。
 // @Summary 岗位详情
 // @Description 按内部 position_id 查询岗位详情
 // @Tags 组织主数据
@@ -670,7 +670,7 @@ func (o *OrgController) GetPositionDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// QueryPositionOptions godoc
+// QueryPositionOptions 查询岗位选项。
 // @Summary 岗位选项
 // @Description 查询以 position_id 为 value 的岗位选项
 // @Tags 组织主数据
@@ -705,7 +705,7 @@ func (o *OrgController) QueryPositionOptions(ctx *gin.Context) {
 	resp.SetData(result.Items).SetTotal(result.Total)
 }
 
-// QueryAssignments godoc
+// QueryAssignments 查询任职列表。
 // @Summary 企业人员任职列表
 // @Description 按员工和时间范围查询只读任职镜像
 // @Tags 组织主数据
@@ -740,7 +740,7 @@ func (o *OrgController) QueryAssignments(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetAssignmentDetail godoc
+// GetAssignmentDetail 查询任职详情。
 // @Summary 企业人员任职详情
 // @Description 按内部 assignment_id 查询只读任职详情
 // @Tags 组织主数据
@@ -771,7 +771,7 @@ func (o *OrgController) GetAssignmentDetail(ctx *gin.Context) {
 	resp.SetData(result)
 }
 
-// GetEmployeeCurrentAssignmentSummary godoc
+// GetEmployeeCurrentAssignmentSummary 查询人员当前任职摘要。
 // @Summary 企业人员当前任职归属摘要
 // @Description 返回员工全部当前有效任职对应的法人、组织和岗位集合
 // @Tags 组织主数据

@@ -16,8 +16,8 @@ type GeneralizationListResult struct {
 	Total int                      `json:"total"`
 }
 
-// GeneralizationPermission carries one server-built Adapter execution into
-// the repository. Client request DTOs cannot populate it.
+// GeneralizationPermission 将服务端构建的 Adapter 执行结果传入 Repository。
+// 客户端请求 DTO 无法填充此字段。
 type GeneralizationPermission struct {
 	AdapterExecution *datapermission.AdapterExecution
 }

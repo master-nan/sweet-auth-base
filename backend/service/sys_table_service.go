@@ -1041,21 +1041,6 @@ func (s *SysTableService) CreateTableRelation(ctx *gin.Context, req request.Tabl
 				return myerrors.ErrDataNotFound
 			}
 
-			//var relationList []reflect.StructField
-			//referenceKey := reflect.StructField{
-			//	Name: data.ReferenceKey,
-			//	Type: util.GetFieldType(referenceKeyField.FieldType),
-			//	Tag:  reflect.StructTag(`gorm:"primaryKey;autoIncrement:false"`),
-			//}
-			//foreignKey := reflect.StructField{
-			//	Name: data.ForeignKey,
-			//	Type: util.GetFieldType(foreignKeyField.FieldType),
-			//	Tag:  reflect.StructTag(`gorm:"primaryKey;autoIncrement:false"`),
-			//}
-			//relationList = append(relationList, referenceKey, foreignKey)
-			//reflect.StructOf(relationList)
-			//relationModel := reflect.New(reflect.StructOf(relationList)).commonface()
-
 			var relationFields []model.SysTableField
 			relationFields = append(relationFields, referenceKeyField, foreignKeyField)
 			relationModel := s.sysTableRepo.Model(relationFields)

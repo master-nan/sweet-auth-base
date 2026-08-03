@@ -2,12 +2,11 @@ package model
 
 import "gorm.io/datatypes"
 
-// ReportDefinition stores a reusable report definition.
+// ReportDefinition 保存可复用的报表定义。
 //
-// The canonical report model lives in query_config/layout_config as datasets,
-// parameters and sheet layout. SourceCode and SourceType are denormalized from
-// the primary table dataset for list/search compatibility. SQL datasets are
-// executed only through the report service's read-only preview guard.
+// 标准报表模型通过 query_config/layout_config 保存数据集、参数和工作表布局。
+// SourceCode 和 SourceType 从主表数据集冗余，以兼容列表和搜索。
+// SQL 数据集只能通过报表 Service 的只读预览守卫执行。
 type ReportDefinition struct {
 	Basic
 	Code                string         `gorm:"size:128;uniqueIndex:uni_report_definition_code;comment:报表编码" json:"code"`

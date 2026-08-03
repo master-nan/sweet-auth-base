@@ -105,8 +105,8 @@ type dataPermissionConfigPreflightReader interface {
 	DisableGrant(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
 }
 
-// DataPermissionConfigController publishes the reviewed DP-2 configuration
-// services without moving configuration rules into the HTTP layer.
+// DataPermissionConfigController 开放经过审查的数据权限配置 Service，
+// 不将配置规则移入 HTTP 层。
 type DataPermissionConfigController struct {
 	resourceService  dataResourceConfigReader
 	ownershipService dataOwnershipConfigReader

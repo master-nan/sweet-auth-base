@@ -389,8 +389,7 @@ func (gs *GeneralizationService) ensureWritableRowExists(table model.SysTable, i
 	return nil
 }
 
-// IsProtectedGeneralizationTable reports whether a table is core platform data
-// that must not be modified through generic low-code write APIs.
+// IsProtectedGeneralizationTable 判断表是否为禁止通过通用低代码写入 API 修改的平台核心数据。
 func IsProtectedGeneralizationTable(tableCode string) bool {
 	code := strings.ToLower(tableCode)
 	protectedPrefixes := []string{"sys_", "casbin_"}

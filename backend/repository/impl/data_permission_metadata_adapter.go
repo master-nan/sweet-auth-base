@@ -11,9 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// DataPermissionMetadataReaderImpl returns only the metadata columns required
-// by the runtime adapter. It deliberately uses unscoped reads so the adapter
-// can distinguish inactive or soft-deleted fields without exposing DB details.
+// DataPermissionMetadataReaderImpl 仅返回运行时 Adapter 所需的元数据列。
+// 此处有意使用非作用域查询，使 Adapter 能区分停用或软删除字段，同时不开放数据库细节。
 type DataPermissionMetadataReaderImpl struct {
 	db *gorm.DB
 }

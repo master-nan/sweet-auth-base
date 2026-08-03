@@ -7,8 +7,7 @@ import (
 	"time"
 )
 
-// OrgBaseRes contains platform record identity and audit timestamps without
-// exposing source identity or soft-delete internals.
+// OrgBaseRes 包含平台记录身份和审计时间戳，不开放来源身份或软删除内部字段。
 type OrgBaseRes struct {
 	Id        int              `json:"id"`
 	GmtCreate model.CustomTime `json:"gmt_create"`
@@ -38,9 +37,8 @@ type OrgLegalEntityDetailRes struct {
 	LocalHandlingStatus string          `json:"local_handling_status"`
 }
 
-// OrgLegalEntityTreeNodeRes is a presentation node for the legal-entity
-// hierarchy. Value is always the internal legal_entity_id. Orphan is set when
-// the referenced parent is absent from the visible result set.
+// OrgLegalEntityTreeNodeRes 是法人主体层级的展示节点。
+// Value 始终为内部 legal_entity_id；引用的父节点不在可见结果集时设置 Orphan。
 type OrgLegalEntityTreeNodeRes struct {
 	LegalEntityId int                         `json:"legal_entity_id"`
 	Value         int                         `json:"value"`
@@ -56,8 +54,8 @@ type OrgLegalEntityTreeNodeRes struct {
 	Children      []OrgLegalEntityTreeNodeRes `json:"children,omitempty"`
 }
 
-// OrgSelectorOptionRes is the shared Organization selector wire format.
-// Persisted values are platform internal IDs; labels are presentation only.
+// OrgSelectorOptionRes 是 Organization 选择器的共享传输格式。
+// 持久化值为平台内部 ID，Label 仅用于展示。
 type OrgSelectorOptionRes struct {
 	Value    int    `json:"value"`
 	Label    string `json:"label"`
@@ -66,9 +64,9 @@ type OrgSelectorOptionRes struct {
 	Disabled bool   `json:"disabled"`
 }
 
-// OrgSelectorOptionsRes is the shared Service response for the four business
-// selectors. Controllers map Items to the platform Response.data field and
-// Total to Response.total without introducing a second API envelope.
+// OrgSelectorOptionsRes 是四类业务选择器共享的 Service 响应。
+// Controller 将 Items 映射到平台 Response.data，将 Total 映射到 Response.total，
+// 不引入第二层 API 包装。
 type OrgSelectorOptionsRes struct {
 	Items []OrgSelectorOptionRes `json:"items"`
 	Total int                    `json:"total"`
@@ -109,17 +107,16 @@ type OrgStructureDetailRes struct {
 	OrgStructureListRes
 }
 
-// OrgReferenceSummaryRes is a source-safe organization reference used by
-// details. Id always refers to a Sweet Platform internal object ID.
+// OrgReferenceSummaryRes 是详情使用的来源安全组织引用。
+// Id 始终指向 Sweet Platform 内部对象 ID。
 type OrgReferenceSummaryRes struct {
 	Id   int    `json:"id"`
 	Code string `json:"code"`
 	Name string `json:"name"`
 }
 
-// OrgStructureOrgTreeNodeRes keeps tree occurrence identity separate from the
-// business organization identity. Consumers locate a node with StructureNodeId
-// and persist OrgUnitId in business records.
+// OrgStructureOrgTreeNodeRes 将树节点身份与业务组织身份分离。
+// 消费者使用 StructureNodeId 定位节点，业务记录保存 OrgUnitId。
 type OrgStructureOrgTreeNodeRes struct {
 	StructureNodeId int                          `json:"structure_node_id"`
 	StructureId     int                          `json:"structure_id"`
@@ -137,8 +134,8 @@ type OrgStructureOrgTreeNodeRes struct {
 	Children        []OrgStructureOrgTreeNodeRes `json:"children,omitempty"`
 }
 
-// OrgStructureNodeListRes intentionally omits Path and source parent data.
-// Level is safe display metadata; tree persistence must still use OrgUnitId.
+// OrgStructureNodeListRes 有意省略 Path 和来源父级数据。
+// Level 是安全的展示元数据，树相关业务持久化仍必须使用 OrgUnitId。
 type OrgStructureNodeListRes struct {
 	OrgBaseRes
 	StructureId  int        `json:"structure_id"`
@@ -175,9 +172,8 @@ type OrgPositionDetailRes struct {
 	LocalNote   string                  `json:"local_note"`
 }
 
-// OrgBoundUserSummaryRes is the complete account surface exposed by ordinary
-// organization reads. Passwords, tokens, roles, login counters, and other
-// security internals are intentionally absent.
+// OrgBoundUserSummaryRes 是普通组织读取开放的完整账号信息范围。
+// 它不包含密码、Token、角色、登录计数及其他安全内部字段。
 type OrgBoundUserSummaryRes struct {
 	UserId   int    `json:"user_id"`
 	UserName string `json:"user_name"`
@@ -196,8 +192,8 @@ type OrgEmployeeListRes struct {
 	ValidTo              *time.Time              `json:"valid_to"`
 }
 
-// OrgEmployeeDetailRes exposes only masked contact values. BoundUserId is the
-// linked Sweet Platform account and is not an employee identifier.
+// OrgEmployeeDetailRes 仅开放脱敏联系方式。
+// BoundUserId 是关联的 Sweet Platform 账号，不是员工标识。
 type OrgEmployeeDetailRes struct {
 	OrgEmployeeListRes
 	MobileMasked string          `json:"mobile_masked,omitempty"`
@@ -206,9 +202,8 @@ type OrgEmployeeDetailRes struct {
 	LocalTags    json.RawMessage `json:"local_tags,omitempty"`
 }
 
-// OrgEmployeeUserBindingRes is the complete response surface for bind and
-// unbind operations. Account credentials, roles, permissions, and security
-// state are intentionally outside this DTO.
+// OrgEmployeeUserBindingRes 是绑定和解绑操作的完整响应范围。
+// 账号凭据、角色、权限和安全状态不属于此 DTO。
 type OrgEmployeeUserBindingRes struct {
 	EmployeeId    int                     `json:"employee_id"`
 	UserId        *int                    `json:"user_id"`
@@ -216,8 +211,7 @@ type OrgEmployeeUserBindingRes struct {
 	BoundAccount  *OrgBoundUserSummaryRes `json:"bound_account,omitempty"`
 }
 
-// OrgEmployeeUserOptionRes exposes only the account identity required by the
-// explicit employee-user binding UI.
+// OrgEmployeeUserOptionRes 仅开放员工账号显式绑定 UI 所需的账号身份。
 type OrgEmployeeUserOptionRes struct {
 	Value    int    `json:"value"`
 	Label    string `json:"label"`
@@ -246,8 +240,8 @@ type OrgAssignmentDetailRes struct {
 	OrgAssignmentListRes
 }
 
-// OrgEmployeeCurrentAssignmentSummaryRes aggregates every current assignment.
-// The collections deliberately have no primary/default item.
+// OrgEmployeeCurrentAssignmentSummaryRes 聚合全部当前任职。
+// 集合中不设置主项或默认项。
 type OrgEmployeeCurrentAssignmentSummaryRes struct {
 	EmployeeId      int                      `json:"employee_id"`
 	AsOfDate        string                   `json:"as_of_date"`
@@ -277,7 +271,7 @@ type OrgSyncBatchDetailRes struct {
 	OrgSyncBatchListRes
 }
 
-// OrgSyncBatchErrorRes is reserved for a view_error-authorized endpoint.
+// OrgSyncBatchErrorRes 仅用于具有 view_error 权限的接口。
 type OrgSyncBatchErrorRes struct {
 	Id           int    `json:"id"`
 	ErrorSummary string `json:"error_summary"`
@@ -304,8 +298,8 @@ type OrgSyncRecordDetailRes struct {
 	OrgSyncRecordListRes
 }
 
-// OrgSyncRecordErrorRes is reserved for a view_error-authorized endpoint.
-// Raw source identity remains internal even in this diagnostic response.
+// OrgSyncRecordErrorRes 仅用于具有 view_error 权限的接口。
+// 即使在此诊断响应中，原始来源身份仍保持为内部信息。
 type OrgSyncRecordErrorRes struct {
 	Id             int    `json:"id"`
 	ErrorCode      string `json:"error_code"`

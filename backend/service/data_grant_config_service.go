@@ -31,9 +31,8 @@ var dataGrantSubjectTypeSet = map[string]struct{}{
 	model.DataGrantSubjectTypeUser: {},
 }
 
-// DataGrantConfigService binds an existing role or user to an existing
-// resource operation and policy. It does not resolve scope, call providers or
-// create query filters.
+// DataGrantConfigService 将已有角色或用户与已有资源操作和 Policy 绑定。
+// 它不解析范围、不调用 Provider，也不创建查询过滤条件。
 type DataGrantConfigService struct {
 	grantRepo              repository.DataGrantRepository
 	resourceRepo           repository.DataResourceRepository
@@ -190,9 +189,8 @@ func (s *DataGrantConfigService) RestoreGrant(ctx *gin.Context, grantId int) err
 	return s.SetGrantState(ctx, request.DataGrantStateReq{Id: grantId, State: &state})
 }
 
-// RemoveGrant only performs the platform soft delete. The service does not
-// expose a physical-delete path, so historical authorization identity remains
-// auditable and database references are never cascaded.
+// RemoveGrant 仅执行平台软删除。
+// Service 不提供物理删除路径，以保留历史授权身份的可审计性，数据库引用也不会级联删除。
 func (s *DataGrantConfigService) RemoveGrant(ctx *gin.Context, grantId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)

@@ -19,8 +19,7 @@ type seedStep struct {
 	run  func(*gorm.DB, *config.Server, *utils.Snowflake) error
 }
 
-// migrationSteps is the single registration point for schema changes and
-// idempotent backfills that must run during `migrate`.
+// migrationSteps 是 schema 变更和 migrate 阶段幂等回填的唯一注册点。
 func migrationSteps() []migrationStep {
 	return []migrationStep{
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
@@ -112,9 +111,9 @@ func baseSeedSteps() []seedStep {
 	}
 }
 
-// platformSeedSteps is the single registration point for platform seed data.
-// Keep sys_dict before menu/button seed, and sys_table/sys_table_field after
-// schema and menu seed so metadata can discover all migrated tables.
+// platformSeedSteps 是平台 Seed 数据的唯一注册点。
+// sys_dict 必须位于菜单和按钮 Seed 之前；sys_table/sys_table_field 必须位于 schema 和菜单 Seed 之后，
+// 以便元数据发现全部已迁移表。
 func platformSeedSteps() []seedStep {
 	steps := append([]seedStep{}, baseSeedSteps()...)
 	steps = append(steps,

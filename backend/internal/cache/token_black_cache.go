@@ -51,13 +51,3 @@ func (t *TokenBlackCache) Set(tokenType enum.TokenTypeEnum, token string) (bool,
 	}
 	return true, nil
 }
-
-//func (t *TokenBlackCache) GetTokenBlack(token string) (bool, error) {
-//	exists, err := t.cacheInterface.Exists(TokenBlackCacheKey + token)
-//	return exists > 0, err
-//}
-//
-//func (t *TokenBlackCache) GetRefreshTokenBlack(token string) (bool, error) {
-//	exists, err := t.cacheInterface.Exists(RefreshTokenBlackCacheKey + token)
-//	return exists > 0, err
-//}

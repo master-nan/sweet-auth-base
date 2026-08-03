@@ -56,8 +56,8 @@ var (
 	}
 )
 
-// DataScopeConditionInput is a typed construction boundary. Values are copied,
-// normalized, and stored in a private bigint or string slice.
+// DataScopeConditionInput 是类型化构造边界。
+// Values 会被复制、规范化并存入私有 bigint 或 string 切片。
 type DataScopeConditionInput struct {
 	OwnershipCode string
 	DimensionId   int
@@ -66,8 +66,7 @@ type DataScopeConditionInput struct {
 	Values        []any
 }
 
-// DataScopeCondition contains only Resolver semantics. Database fields and
-// executable expressions are intentionally absent.
+// DataScopeCondition 仅包含 Resolver 语义，不包含数据库字段和可执行表达式。
 type DataScopeCondition struct {
 	ownershipCode string
 	dimensionId   int
@@ -77,8 +76,7 @@ type DataScopeCondition struct {
 	stringValues  []string
 }
 
-// DataScopeConditionGroup is one AND branch. Multiple groups in a result are
-// OR branches.
+// DataScopeConditionGroup 表示一个 AND 分支，结果中的多个 Group 表示 OR 分支。
 type DataScopeConditionGroup struct {
 	conditions []DataScopeCondition
 }
@@ -90,8 +88,8 @@ type DataScopeResultInput struct {
 	ConditionGroups []DataScopeConditionGroup
 }
 
-// DataScopeResult is the immutable Resolver output for one resource and
-// operation. It never contains SQL, table names, field names, or ORM clauses.
+// DataScopeResult 是指定 Resource 和 Operation 的不可变 Resolver 输出。
+// 它不包含 SQL、表名、字段名或 ORM Clause。
 type DataScopeResult struct {
 	resourceCode    string
 	operation       string
@@ -166,9 +164,8 @@ func NewDataScopeConditionGroup(
 	sort.Slice(normalized, func(i, j int) bool {
 		return normalized[i].canonicalKey() < normalized[j].canonicalKey()
 	})
-	// Only identical conditions are removed. Different value sets remain
-	// separate AND conditions so this base model never guesses intersection or
-	// union semantics that belong to the Resolver.
+	// 仅移除完全相同的 Condition。不同值集合保持为独立 AND 条件，
+	// 避免基础模型猜测应由 Resolver 决定的交集或并集语义。
 	normalized = deduplicateConditions(normalized)
 	if len(normalized) > DataScopeMaxConditionsPerGroup {
 		return DataScopeConditionGroup{}, myerrors.ErrDataScopeComplexityExceeded
@@ -302,9 +299,8 @@ func AndDataScopeResults(left, right DataScopeResult) (DataScopeResult, error) {
 		return left.clone()
 	}
 
-	// V1 deliberately avoids Boolean distribution. A filtered AND merge is
-	// supported only for one branch on each side; callers must leave multi-group
-	// intersection to the top-level Resolver.
+	// V1 不执行布尔分配律。filtered AND 仅支持两侧各一个分支，
+	// 多 Group 交集必须交给顶层 Resolver 处理。
 	if len(left.conditionGroups) != 1 || len(right.conditionGroups) != 1 {
 		return DataScopeResult{}, myerrors.ErrDataScopeMergeUnsupported
 	}

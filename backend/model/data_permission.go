@@ -52,7 +52,7 @@ const (
 	DataGrantSubjectTypeUser = "user"
 )
 
-// DataDimensionDefinition declares a stable data-permission dimension and its provider.
+// DataDimensionDefinition 声明稳定的数据权限 Dimension 及其 Provider。
 type DataDimensionDefinition struct {
 	Basic
 
@@ -69,7 +69,7 @@ func (DataDimensionDefinition) TableName() string {
 	return "sys_data_dimension_definition"
 }
 
-// DataResource identifies a protected table, service, or report resource.
+// DataResource 标识受保护的表、Service 或报表资源。
 type DataResource struct {
 	Basic
 
@@ -88,7 +88,7 @@ func (DataResource) TableName() string {
 	return "sys_data_resource"
 }
 
-// DataResourceOperation declares one protected operation supported by a resource.
+// DataResourceOperation 声明 Resource 支持的一项受保护 Operation。
 type DataResourceOperation struct {
 	Basic
 
@@ -102,7 +102,7 @@ func (DataResourceOperation) TableName() string {
 	return "sys_data_resource_operation"
 }
 
-// DataOwnershipField binds a resource ownership token to a controlled dimension.
+// DataOwnershipField 将资源归属标识绑定到受控 Dimension。
 type DataOwnershipField struct {
 	Basic
 
@@ -120,7 +120,7 @@ func (DataOwnershipField) TableName() string {
 	return "sys_data_ownership_field"
 }
 
-// DataPolicy defines a reusable data-scope policy without binding a subject or resource.
+// DataPolicy 定义不直接绑定 Subject 或 Resource 的可复用数据范围策略。
 type DataPolicy struct {
 	Basic
 
@@ -134,7 +134,7 @@ func (DataPolicy) TableName() string {
 	return "sys_data_policy"
 }
 
-// DataPolicyRule is one structured rule in a rule-set policy.
+// DataPolicyRule 是规则集 Policy 中的一条结构化 Rule。
 type DataPolicyRule struct {
 	Basic
 
@@ -154,7 +154,7 @@ func (DataPolicyRule) TableName() string {
 	return "sys_data_policy_rule"
 }
 
-// DataGrant binds a reusable policy to a role or user for one resource operation.
+// DataGrant 将可复用 Policy 授予角色或用户的指定 Resource Operation。
 type DataGrant struct {
 	Basic
 

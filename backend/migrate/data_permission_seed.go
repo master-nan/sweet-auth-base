@@ -18,8 +18,8 @@ type dataPermissionDimensionSeed struct {
 	description  string
 }
 
-// seedDataPermissionFoundation initializes only reviewed platform dictionaries
-// and dimension definitions. Resources, policies, and grants are configured later.
+// seedDataPermissionFoundation 仅初始化已评审的平台字典和 Dimension 定义。
+// Resource、Policy 和 Grant 由后续配置完成。
 func seedDataPermissionFoundation(db *gorm.DB, sf *utils.Snowflake) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		for _, seed := range dataPermissionDictionarySeeds() {

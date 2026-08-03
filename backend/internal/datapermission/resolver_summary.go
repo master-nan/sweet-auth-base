@@ -11,8 +11,7 @@ import (
 
 const resolverSummaryContextKey = "data_permission_resolver_summary"
 
-// ResolverSummaryInput is the controlled construction boundary for one
-// request-scoped resolution summary.
+// ResolverSummaryInput 是单次请求级解析摘要的受控构造边界。
 type ResolverSummaryInput struct {
 	ResourceCode       string
 	Operation          string
@@ -21,8 +20,8 @@ type ResolverSummaryInput struct {
 	CheckedPolicyCount int
 }
 
-// ResolverSummary contains only safe orchestration diagnostics. Configuration
-// IDs, subject details, database fields, and executable expressions are absent.
+// ResolverSummary 仅包含安全的编排诊断信息。
+// 其中不包含配置 ID、主体明细、数据库字段或可执行表达式。
 type ResolverSummary struct {
 	resourceCode       string
 	operation          string
@@ -98,8 +97,8 @@ func (summary ResolverSummary) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// StoreResolverSummary attaches a validated summary only to the current
-// request. It deliberately provides no package-level or cross-request cache.
+// StoreResolverSummary 仅将已校验摘要附加到当前请求。
+// 它不提供包级或跨请求缓存。
 func StoreResolverSummary(ctx *gin.Context, summary ResolverSummary) error {
 	if err := summary.Validate(); err != nil {
 		return err

@@ -33,9 +33,8 @@ var (
 	}
 )
 
-// OwnershipFieldRegistration is a server-owned declaration for one fixed
-// business field. It contains no database expression and is never populated
-// from an API request.
+// OwnershipFieldRegistration 是服务端拥有的固定业务字段声明。
+// 它不包含数据库表达式，也不会由 API 请求填充。
 type OwnershipFieldRegistration struct {
 	ResourceCode        string
 	OwnershipCode       string
@@ -67,8 +66,7 @@ type OwnershipFieldOperationValidator interface {
 	ValidateOperation(OwnershipFieldOperationValidation) error
 }
 
-// OwnershipFieldRegistry is an in-memory, process-local registry initialized
-// from reviewed module declarations during application construction.
+// OwnershipFieldRegistry 是进程内内存注册表，在应用构造期间由已评审的模块声明初始化。
 type OwnershipFieldRegistry struct {
 	mu      sync.RWMutex
 	entries map[string]ownershipFieldRegistrationEntry
