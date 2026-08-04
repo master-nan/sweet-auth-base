@@ -9,11 +9,13 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/internal/asynctask"
 	"backend/internal/cache"
 	error2 "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -22,8 +24,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
+
+var ErrUserLoginStateContextWriterRequired = errors.New("user login state context writer is required")
 
 type SysUserService struct {
 	sysUserRepo     repository.SysUserRepository
@@ -31,6 +36,10 @@ type SysUserService struct {
 	sf              *utils.Snowflake
 	sysUserCache    *cache.SysUserCache
 	serverConfig    *config.Server
+}
+
+type userLoginStateContextWriter interface {
+	UpdateLoginStateContext(context.Context, int, string, model.CustomTime) error
 }
 
 func NewSysUserService(
@@ -141,6 +150,37 @@ func (s *SysUserService) Update(ctx *gin.Context, req request.SysUserUpdateReq, 
 	// 删除缓存
 	s.RefreshCache(req.Id)
 	return nil
+}
+
+// UpdateLoginStateAsync 使用独立标准 Context 更新登录状态，不保留请求对象。
+func (s *SysUserService) UpdateLoginStateAsync(
+	taskContext asynctask.Context,
+	userId int,
+	accessTokens string,
+	lastLogin model.CustomTime,
+) {
+	asynctask.Run(taskContext, func(ctx context.Context) {
+		writer, ok := s.sysUserRepo.(userLoginStateContextWriter)
+		if !ok {
+			logAsyncUserStateError(ctx, ErrUserLoginStateContextWriterRequired)
+			return
+		}
+		if err := writer.UpdateLoginStateContext(ctx, userId, accessTokens, lastLogin); err != nil {
+			logAsyncUserStateError(ctx, err)
+			return
+		}
+		s.RefreshCache(userId)
+	})
+}
+
+func logAsyncUserStateError(ctx context.Context, err error) {
+	metadata := asynctask.MetadataFrom(ctx)
+	zap.L().Error("更新登录状态失败",
+		zap.Error(err),
+		zap.String("request_id", metadata.RequestID),
+		zap.String("trace_id", metadata.TraceID),
+		zap.Int("user_id", metadata.UserID),
+	)
 }
 
 // UpdatePassword 更新密码

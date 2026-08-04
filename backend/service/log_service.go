@@ -9,10 +9,12 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/asynctask"
 	error2 "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,12 +22,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 var (
 	ErrTransactionalAuditRepositoryRequired = errors.New("transactional audit repository is required")
 	ErrTransactionalAuditGeneratorRequired  = errors.New("transactional audit id generator is required")
+	ErrLoginLogContextWriterRequired        = errors.New("login log context writer is required")
 )
 
 const (
@@ -56,6 +60,10 @@ type LogService struct {
 	sf                  *utils.Snowflake
 }
 
+type loginLogContextWriter interface {
+	CreateLoginLogContext(context.Context, *model.LoginLog) error
+}
+
 func NewLogServer(loginLogRepository repository.LoginLogRepository, accessLogRepository repository.AccessLogRepository, sf *utils.Snowflake) *LogService {
 	return &LogService{
 		loginLogRepository,
@@ -64,14 +72,39 @@ func NewLogServer(loginLogRepository repository.LoginLogRepository, accessLogRep
 	}
 }
 
-func (ls *LogService) CreateLoginLog(ctx *gin.Context, log model.LoginLog) error {
+func (ls *LogService) CreateLoginLog(ctx context.Context, log model.LoginLog) error {
+	if ls == nil || ls.loginLogRepository == nil {
+		return ErrLoginLogContextWriterRequired
+	}
+	if ls.sf == nil {
+		return ErrTransactionalAuditGeneratorRequired
+	}
+	writer, ok := ls.loginLogRepository.(loginLogContextWriter)
+	if !ok {
+		return ErrLoginLogContextWriterRequired
+	}
 	id, err := ls.sf.GenerateUniqueID()
 	if err != nil {
 		return err
 	}
 	log.Id = int(id)
-	err = ls.loginLogRepository.Create(ls.loginLogRepository.DBWithContext(ctx), &log)
-	return err
+	return writer.CreateLoginLogContext(ctx, &log)
+}
+
+// CreateLoginLogAsync 使用请求字段快照写入登录日志，不保留 Gin Context。
+func (ls *LogService) CreateLoginLogAsync(taskContext asynctask.Context, log model.LoginLog) {
+	asynctask.Run(taskContext, func(ctx context.Context) {
+		if err := ls.CreateLoginLog(ctx, log); err != nil {
+			metadata := asynctask.MetadataFrom(ctx)
+			zap.L().Error("记录登录日志失败",
+				zap.Error(err),
+				zap.String("request_id", metadata.RequestID),
+				zap.String("trace_id", metadata.TraceID),
+				zap.Int("user_id", metadata.UserID),
+				zap.String("client_ip", metadata.ClientIP),
+			)
+		}
+	})
 }
 
 func (ls *LogService) CreateAccessLog(ctx *gin.Context, log model.AccessLog) error {

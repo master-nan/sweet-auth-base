@@ -10,12 +10,14 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/asynctask"
 	"backend/internal/cache"
 	error2 "backend/internal/errors"
 	"backend/internal/sms"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
@@ -24,12 +26,18 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrSmsLogContextWriterRequired = errors.New("sms log context writer is required")
+
 type SmsService struct {
 	smsLogRepo      repository.SmsLogRepository
 	smsTemplateRepo repository.SmsTemplateRepository
 	sf              *utils.Snowflake
 	smsTempCache    *cache.SmsTemplateCache
 	serverConfig    *config.Server
+}
+
+type smsLogContextWriter interface {
+	CreateSmsLogContext(context.Context, *model.SmsLog) error
 }
 
 func NewSmsService(smsLogRepo repository.SmsLogRepository, smsTemplateRepo repository.SmsTemplateRepository,
@@ -46,7 +54,13 @@ func NewSmsService(smsLogRepo repository.SmsLogRepository, smsTemplateRepo repos
 }
 
 // SendSms 发送短信
-func (s *SmsService) SendSms(ctx *gin.Context, templateCode, mobile string, params map[string]interface{}) (map[string]interface{}, error) {
+func (s *SmsService) SendSms(
+	taskContext asynctask.Context,
+	application model.Application,
+	templateCode string,
+	mobile string,
+	params map[string]interface{},
+) (map[string]interface{}, error) {
 	// 通过模板编号查询缓存
 	smsTemp, err := s.smsTempCache.Get(templateCode)
 	if err != nil {
@@ -105,28 +119,44 @@ func (s *SmsService) SendSms(ctx *gin.Context, templateCode, mobile string, para
 	if err != nil {
 		return nil, err
 	}
-	if d, exists := ctx.Get("application"); exists {
-		application := d.(model.Application)
-		smsLog := model.SmsLog{
-			TemplateCode:    templateCode,
-			SignName:        smsTemp.SignName,
-			Mobile:          mobile,
-			Content:         string(smsLogContent),
-			Status:          enum.SmsStatusSuccess,
-			BizId:           *result.BizId,
-			Result:          result.String(),
-			ApplicationId:   application.Id,
-			ApplicationName: application.Name,
-		}
-		smsLog.Id = int(id)
-		// 异步记录短信发送日志
-		go func() {
-			if err := s.smsLogRepo.Create(s.smsLogRepo.DBWithContext(ctx), smsLog); err != nil {
-				zap.L().Error("记录短信发送日志失败", zap.Error(err))
-			}
-		}()
+	smsLog := model.SmsLog{
+		TemplateCode:    templateCode,
+		SignName:        smsTemp.SignName,
+		Mobile:          mobile,
+		Content:         string(smsLogContent),
+		Status:          enum.SmsStatusSuccess,
+		BizId:           *result.BizId,
+		Result:          result.String(),
+		ApplicationId:   application.Id,
+		ApplicationName: application.Name,
 	}
+	smsLog.Id = int(id)
+	s.createSmsLogAsync(taskContext, smsLog)
 	return tempParam, nil
+}
+
+func (s *SmsService) createSmsLogAsync(taskContext asynctask.Context, smsLog model.SmsLog) {
+	asynctask.Run(taskContext, func(ctx context.Context) {
+		writer, ok := s.smsLogRepo.(smsLogContextWriter)
+		if !ok {
+			logAsyncSmsError(ctx, ErrSmsLogContextWriterRequired)
+			return
+		}
+		if err := writer.CreateSmsLogContext(ctx, &smsLog); err != nil {
+			logAsyncSmsError(ctx, err)
+		}
+	})
+}
+
+func logAsyncSmsError(ctx context.Context, err error) {
+	metadata := asynctask.MetadataFrom(ctx)
+	zap.L().Error("记录短信发送日志失败",
+		zap.Error(err),
+		zap.String("request_id", metadata.RequestID),
+		zap.String("trace_id", metadata.TraceID),
+		zap.Int("user_id", metadata.UserID),
+		zap.String("client_ip", metadata.ClientIP),
+	)
 }
 
 func redactSmsTemplateParamsForLog(params map[string]interface{}) map[string]interface{} {

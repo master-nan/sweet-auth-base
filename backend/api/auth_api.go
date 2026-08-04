@@ -10,10 +10,12 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/asynctask"
 	"backend/internal/cache"
 	"backend/internal/errors"
 	"backend/internal/token"
 	"backend/internal/utils"
+	"backend/middleware"
 	"backend/model"
 	"backend/service"
 	"crypto/sha256"
@@ -26,7 +28,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-	"go.uber.org/zap"
 )
 
 const defaultSmsSendIntervalSeconds = 60
@@ -175,7 +176,13 @@ func (a *AuthApi) SendSms(ctx *gin.Context) {
 		return
 	}
 	// 发送短信
-	tempParam, err := a.smsService.SendSms(ctx, templateCode, mobile, data)
+	tempParam, err := a.smsService.SendSms(
+		middleware.DetachedTaskContext(ctx),
+		application,
+		templateCode,
+		mobile,
+		data,
+	)
 	if err != nil {
 		_ = a.sendCodeCache.Delete(rateLimitKey)
 		_ = ctx.Error(err)
@@ -252,13 +259,7 @@ func (a *AuthApi) Login(ctx *gin.Context) {
 		Locality: "",
 		UserName: data.UserName,
 	}
-	// 异步保存登录日志
-	go func(loginLog model.LoginLog) {
-		e := a.logService.CreateLoginLog(ctx, loginLog)
-		if e != nil {
-			zap.L().Error("login loginLog err", zap.Error(err))
-		}
-	}(loginLog)
+	a.logService.CreateLoginLogAsync(middleware.DetachedTaskContext(ctx), loginLog)
 	user, err := a.sysUserService.GetByUserName(data.UserName)
 	if err != nil || utils.Encryption(data.Password, strconv.Itoa(user.Id)+a.serverConfig.Conf.Salt) != user.Password || !user.State {
 		_ = ctx.Error(errors.ErrUserNotFound)
@@ -294,17 +295,7 @@ func (a *AuthApi) Login(ctx *gin.Context) {
 			_ = ctx.Error(err)
 			return
 		}
-		go func() {
-			var up request.SysUserUpdateReq
-			up.Id = user.Id
-			up.AccessTokens = utils.UpdateAccessTokens(user.AccessTokens, accessToken)
-			lastLogin := model.CustomTime(time.Now())
-			up.GmtLastLogin = &lastLogin
-			err := a.sysUserService.Update(ctx, up, "access_tokens", "gmt_last_login")
-			if err != nil {
-				zap.L().Error("login update err", zap.Error(err))
-			}
-		}()
+		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
 		signInRes := response.SignInRes{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
@@ -472,17 +463,7 @@ func (a *AuthApi) SSOLogin(ctx *gin.Context) {
 			_ = ctx.Error(err)
 			return
 		}
-		go func() {
-			var up request.SysUserUpdateReq
-			up.Id = user.Id
-			up.AccessTokens = utils.UpdateAccessTokens(user.AccessTokens, accessToken)
-			lastLogin := model.CustomTime(time.Now())
-			up.GmtLastLogin = &lastLogin
-			err := a.sysUserService.Update(ctx, up, "access_tokens", "gmt_last_login")
-			if err != nil {
-				zap.L().Error("login update err", zap.Error(err))
-			}
-		}()
+		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
 		signInRes := response.SignInRes{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
@@ -563,17 +544,7 @@ func (a *AuthApi) SmsCodeLogin(ctx *gin.Context) {
 			_ = ctx.Error(err)
 			return
 		}
-		go func() {
-			var up request.SysUserUpdateReq
-			up.Id = user.Id
-			up.AccessTokens = utils.UpdateAccessTokens(user.AccessTokens, accessToken)
-			lastLogin := model.CustomTime(time.Now())
-			up.GmtLastLogin = &lastLogin
-			err := a.sysUserService.Update(ctx, up, "access_tokens", "gmt_last_login")
-			if err != nil {
-				zap.L().Error("login update err", zap.Error(err))
-			}
-		}()
+		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
 		signInRes := response.SignInRes{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
@@ -584,6 +555,17 @@ func (a *AuthApi) SmsCodeLogin(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrAppUnauthorized)
 		return
 	}
+}
+
+func (a *AuthApi) updateLoginStateAsync(taskContext asynctask.Context, user model.SysUser, accessToken string) {
+	taskContext = taskContext.WithActor(user.Id, user.UserName)
+	lastLogin := model.CustomTime(time.Now())
+	a.sysUserService.UpdateLoginStateAsync(
+		taskContext,
+		user.Id,
+		utils.UpdateAccessTokens(user.AccessTokens, accessToken),
+		lastLogin,
+	)
 }
 
 // CheckSmsStatus 检查短信发送状态

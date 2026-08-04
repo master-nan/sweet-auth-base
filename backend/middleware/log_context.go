@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"backend/internal/asynctask"
+	"backend/model"
 	"regexp"
 	"strings"
 
@@ -66,6 +68,27 @@ func RequestID(ctx *gin.Context) string {
 
 func TraceID(ctx *gin.Context) string {
 	return correlationIDValue(ctx, traceIDContextKey)
+}
+
+// DetachedTaskContext 复制异步任务需要的请求字段，不保留 Gin Context 或 HTTP 请求对象。
+func DetachedTaskContext(ctx *gin.Context) asynctask.Context {
+	metadata := asynctask.Metadata{}
+	if ctx == nil {
+		return asynctask.New(metadata)
+	}
+	metadata.RequestID = RequestID(ctx)
+	metadata.TraceID = TraceID(ctx)
+	metadata.ClientIP = ctx.ClientIP()
+	if ctx.Request != nil {
+		metadata.UserAgent = ctx.Request.UserAgent()
+	}
+	if value, exists := ctx.Get("user"); exists {
+		if user, ok := value.(model.SysUser); ok {
+			metadata.UserID = user.Id
+			metadata.UserName = user.UserName
+		}
+	}
+	return asynctask.New(metadata)
 }
 
 // MarkAccessAuditPersisted 防止请求中间件重复记录 Service 已在写事务中提交的业务审计。

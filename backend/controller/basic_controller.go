@@ -9,6 +9,7 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/internal/token"
 	"backend/internal/utils"
+	"backend/middleware"
 	"backend/model"
 	"backend/service"
 	"bytes"
@@ -94,13 +95,7 @@ func (b *BasicController) Login(ctx *gin.Context) {
 		Locality: "",
 		UserName: data.UserName,
 	}
-	// 异步保存登录日志
-	go func(loginLog model.LoginLog) {
-		e := b.logService.CreateLoginLog(ctx, loginLog)
-		if e != nil {
-			zap.L().Error("login loginLog err", zap.Error(err))
-		}
-	}(loginLog)
+	b.logService.CreateLoginLogAsync(middleware.DetachedTaskContext(ctx), loginLog)
 	user, err := b.sysUserService.GetByUserName(data.UserName)
 	if err != nil || user.Id == 0 || utils.Encryption(data.Password, strconv.Itoa(user.Id)+b.serverConfig.Conf.Salt) != user.Password || !user.State {
 		if b.loginAttemptCache != nil {
@@ -157,17 +152,13 @@ func (b *BasicController) Login(ctx *gin.Context) {
 		return
 	}
 	mustChangePassword, changeReason := service.PasswordChangeRequirement(user, configUre, time.Now())
-	go func() {
-		var up request.SysUserUpdateReq
-		up.Id = user.Id
-		up.AccessTokens = utils.UpdateAccessTokens(user.AccessTokens, accessToken)
-		lastLogin := model.CustomTime(time.Now())
-		up.GmtLastLogin = &lastLogin
-		err := b.sysUserService.Update(ctx, up, "access_tokens", "gmt_last_login")
-		if err != nil {
-			zap.L().Error("login update err", zap.Error(err))
-		}
-	}()
+	lastLogin := model.CustomTime(time.Now())
+	b.sysUserService.UpdateLoginStateAsync(
+		middleware.DetachedTaskContext(ctx).WithActor(user.Id, user.UserName),
+		user.Id,
+		utils.UpdateAccessTokens(user.AccessTokens, accessToken),
+		lastLogin,
+	)
 	signInRes := response.SignInRes{
 		AccessToken:          accessToken,
 		RefreshToken:         refreshToken,

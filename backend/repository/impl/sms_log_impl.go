@@ -11,6 +11,7 @@ import (
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository/util"
+	"context"
 	"gorm.io/gorm"
 )
 
@@ -24,6 +25,10 @@ func NewSmsLogImpl(primaryDB *database.PrimaryDB) *SmsLogImpl {
 		primaryDB.DB,
 		NewBasicRepositoryImpl(primaryDB.DB, &model.SmsLog{}),
 	}
+}
+
+func (s *SmsLogImpl) CreateSmsLogContext(ctx context.Context, log *model.SmsLog) error {
+	return s.db.WithContext(ctx).Create(log).Error
 }
 
 func (s *SmsLogImpl) GetSmsLogList(basic *request.Basic) (response.ListResult[model.SmsLog], error) {

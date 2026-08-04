@@ -8,6 +8,7 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
+	"context"
 	"gorm.io/gorm"
 )
 
@@ -21,4 +22,8 @@ func NewLoginLogRepositoryImpl(PrimaryDB *database.PrimaryDB) *LoginLogRepositor
 		PrimaryDB.DB,
 		NewBasicRepositoryImpl(PrimaryDB.DB, &model.LoginLog{}),
 	}
+}
+
+func (l *LoginLogRepositoryImpl) CreateLoginLogContext(ctx context.Context, log *model.LoginLog) error {
+	return l.db.WithContext(ctx).Create(log).Error
 }

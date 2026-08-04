@@ -11,6 +11,7 @@ import (
 	"backend/internal/database"
 	"backend/internal/utils"
 	"backend/model"
+	"context"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -23,6 +24,21 @@ type SysUserRepositoryImpl struct {
 
 func NewSysUserRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysUserRepositoryImpl {
 	return &SysUserRepositoryImpl{PrimaryDB.DB, NewBasicRepositoryImpl(PrimaryDB.DB, &model.SysUser{})}
+}
+
+func (s *SysUserRepositoryImpl) UpdateLoginStateContext(
+	ctx context.Context,
+	userID int,
+	accessTokens string,
+	lastLogin model.CustomTime,
+) error {
+	return s.db.WithContext(ctx).
+		Model(&model.SysUser{}).
+		Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"access_tokens":  accessTokens,
+			"gmt_last_login": lastLogin,
+		}).Error
 }
 
 func (s *SysUserRepositoryImpl) GetByUserName(username string) (model.SysUser, error) {
