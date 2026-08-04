@@ -47,7 +47,7 @@ func (m *MenuController) GetMenuById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := m.sysMenuService.GetMenuById(id)
+	data, err := m.sysMenuService.GetMenuByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -193,7 +193,7 @@ func (m *MenuController) DeleteMenuById(ctx *gin.Context) {
 func (m *MenuController) QueryMenus(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	result, err := m.sysMenuService.GetMenuTree()
+	result, err := m.sysMenuService.GetMenuTreeResponse()
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -218,7 +218,7 @@ func (m *MenuController) GetUserMenus(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := m.sysMenuService.GetUserMenus(id)
+	result, err := m.sysMenuService.GetUserMenusResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -238,7 +238,7 @@ func (m *MenuController) GetMyMenus(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	user := ctx.MustGet("user").(model.SysUser)
-	result, err := m.sysMenuService.GetUserMenus(user.Id)
+	result, err := m.sysMenuService.GetUserMenusResponse(user.Id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -263,7 +263,7 @@ func (m *MenuController) GetMenuButtons(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
 		return
 	}
-	data, err := m.sysMenuService.GetMenuButtonsByMenuId(menuId)
+	data, err := m.sysMenuService.GetMenuButtonsByMenuIdResponse(menuId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

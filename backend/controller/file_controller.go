@@ -102,7 +102,7 @@ func (f *FileController) Upload(ctx *gin.Context) {
 		return
 	}
 
-	file, err := f.fileService.Upload(ctx, fileHeader)
+	file, err := f.fileService.UploadResponse(ctx, fileHeader)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -201,7 +201,7 @@ func (f *FileController) MergeChunks(ctx *gin.Context) {
 		return
 	}
 
-	file, err := f.fileService.MergeChunks(ctx, uploadId)
+	file, err := f.fileService.MergeChunksResponse(ctx, uploadId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -262,7 +262,7 @@ func (f *FileController) GetFileById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(file)
+	resp.SetData(f.fileService.FileDetailResponse(file))
 }
 
 // DeleteFileById 根据ID删除文件

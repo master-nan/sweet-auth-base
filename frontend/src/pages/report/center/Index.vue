@@ -316,9 +316,14 @@ async function loadDataSources() {
   }
 }
 
-function openRuntime(row: Report) {
-  runtimeReport.value = row
-  runtimeVisible.value = true
+async function openRuntime(row: Report) {
+  try {
+    const res = await reportApi.queryReportById(row.id)
+    runtimeReport.value = res.data
+    runtimeVisible.value = true
+  } catch {
+    $q.notify({ type: 'negative', message: '报表详情加载失败' })
+  }
 }
 
 function kindLabel(kind: ReportKind) {

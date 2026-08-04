@@ -42,7 +42,7 @@ func (r *ReportController) QueryReportDefinitions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := r.reportService.GetReportDefinitionList(&data, table)
+	result, err := r.reportService.GetReportDefinitionListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -58,7 +58,7 @@ func (r *ReportController) GetReportDefinitionById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := r.reportService.GetReportDefinitionById(id)
+	data, err := r.reportService.GetReportDefinitionByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

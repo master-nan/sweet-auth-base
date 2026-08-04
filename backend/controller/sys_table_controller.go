@@ -51,7 +51,7 @@ func (t *TableController) GetTableByID(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableById(id)
+	data, err := t.sysTableService.GetTableByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -72,7 +72,7 @@ func (t *TableController) GetTableByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	code := utils.SanitizeInput(ctx.Param("code"))
-	data, err := t.sysTableService.GetTableByTableCode(code)
+	data, err := t.sysTableService.GetTableByTableCodeResponse(code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -99,7 +99,7 @@ func (t *TableController) QueryTable(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := t.sysTableService.GetTableList(&data)
+	result, err := t.sysTableService.GetTableListResponse(&data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -237,7 +237,7 @@ func (t *TableController) GetTableFieldsByTableId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableFieldsByTableId(id)
+	data, err := t.sysTableService.GetTableFieldsByTableIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -263,7 +263,7 @@ func (t *TableController) GetTableFieldById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableFieldById(id)
+	data, err := t.sysTableService.GetTableFieldByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -401,7 +401,7 @@ func (t *TableController) GetTableRelationsByTableId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableRelationsByTableId(id)
+	data, err := t.sysTableService.GetTableRelationsByTableIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -427,7 +427,7 @@ func (t *TableController) GetTableRelationById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableRelationById(id)
+	data, err := t.sysTableService.GetTableRelationByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -565,7 +565,7 @@ func (t *TableController) GetTableIndexById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableIndexById(id)
+	data, err := t.sysTableService.GetTableIndexByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -590,7 +590,7 @@ func (t *TableController) GetTableIndexesByTableId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableIndexesByTableId(id)
+	data, err := t.sysTableService.GetTableIndexesByTableIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

@@ -55,7 +55,7 @@ func (r *RoleController) QueryRole(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := r.sysRoleService.GetRoleList(&data, table)
+	result, err := r.sysRoleService.GetRoleListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -80,7 +80,7 @@ func (r *RoleController) GetRoleById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	role, err := r.sysRoleService.GetRoleById(id)
+	role, err := r.sysRoleService.GetRoleByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -188,7 +188,7 @@ func (r *RoleController) GetRoleMenus(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := r.sysRoleService.GetRoleMenus(roleId)
+	result, err := r.sysRoleService.GetRoleMenusResponse(roleId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -245,7 +245,7 @@ func (r *RoleController) GetRoleMenuButtons(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := r.sysRoleService.GetRoleMenuButtons(roleId, menuId)
+	result, err := r.sysRoleService.GetRoleMenuButtonsResponse(roleId, menuId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

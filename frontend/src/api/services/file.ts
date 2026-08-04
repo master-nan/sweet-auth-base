@@ -3,14 +3,11 @@ import { instance } from 'boot/axios'
 
 export interface FileInfo extends Basic {
   file_name: string
-  file_path: string
   file_type: string
   file_url: string
   file_size: number
-  file_md5: string
   file_ext: string
   file_uuid: string
-  storage_type?: string
 }
 
 export type FileAccessMode = 'preview' | 'download'

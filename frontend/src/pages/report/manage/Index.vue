@@ -446,32 +446,38 @@ function openDesigner(row?: Report) {
   void router.push({ name: 'report_design', query: row?.id ? { id: row.id } : {} })
 }
 
-function openRuntime(row: Report) {
-  runtimeReport.value = row
-  runtimeVisible.value = true
+async function openRuntime(row: Report) {
+  try {
+    const res = await reportApi.queryReportById(row.id)
+    runtimeReport.value = res.data
+    runtimeVisible.value = true
+  } catch {
+    $q.notify({ type: 'negative', message: '报表详情加载失败' })
+  }
 }
 
 async function copyReport(row: Report) {
   try {
-    const fields = row.query_config?.fields || []
-    const layout = row.layout_config
+    const detail = await reportApi.queryReportById(row.id).then((res) => res.data)
+    const fields = detail.query_config?.fields || []
+    const layout = detail.layout_config
     const payload = {
-      report_name: `${row.report_name} 副本`,
-      report_code: `${row.report_code}_copy_${Date.now().toString().slice(-4)}`,
-      report_kind: row.report_kind,
+      report_name: `${detail.report_name} 副本`,
+      report_code: `${detail.report_code}_copy_${Date.now().toString().slice(-4)}`,
+      report_kind: detail.report_kind,
       fields,
-      datasets: layout?.datasets || row.query_config?.datasets || [],
-      dataset_joins: layout?.dataset_joins || row.query_config?.dataset_joins || [],
-      parameters: layout?.parameters || row.query_config?.parameters || [],
+      datasets: layout?.datasets || detail.query_config?.datasets || [],
+      dataset_joins: layout?.dataset_joins || detail.query_config?.dataset_joins || [],
+      parameters: layout?.parameters || detail.query_config?.parameters || [],
       sheet: layout?.sheet || defaultReportSheet(),
     }
     const res = await reportApi.createReport({
       ...payload,
-      ...(row.category ? { category: row.category } : {}),
-      ...(row.description ? { description: row.description } : {}),
-      ...(row.data_source_id ? { data_source_id: row.data_source_id } : {}),
-      ...(row.permission_menu_id ? { permission_menu_id: row.permission_menu_id } : {}),
-      ...(row.permission_table_code ? { permission_table_code: row.permission_table_code } : {}),
+      ...(detail.category ? { category: detail.category } : {}),
+      ...(detail.description ? { description: detail.description } : {}),
+      ...(detail.data_source_id ? { data_source_id: detail.data_source_id } : {}),
+      ...(detail.permission_menu_id ? { permission_menu_id: detail.permission_menu_id } : {}),
+      ...(detail.permission_table_code ? { permission_table_code: detail.permission_table_code } : {}),
     })
     $q.notify({ type: 'positive', message: `已复制报表 #${res.data}` })
     await fetchData()
