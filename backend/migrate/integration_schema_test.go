@@ -17,6 +17,9 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	if !db.Migrator().HasTable(&model.ExternalSystem{}) {
 		t.Fatal("external system table was not created")
 	}
+	if !db.Migrator().HasTable(&model.InterfaceDefinition{}) {
+		t.Fatal("interface definition table was not created")
+	}
 	first := model.ExternalSystem{
 		Basic:           model.Basic{Id: 1},
 		SystemCode:      "demo_erp",
@@ -35,12 +38,25 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	if err := db.Create(&first).Error; err == nil {
 		t.Fatal("expected duplicate system code to be rejected")
 	}
+	definition := model.InterfaceDefinition{
+		Basic: model.Basic{Id: 11}, ExternalSystemID: 1, InterfaceCode: "order_query", Name: "订单查询", Version: 1,
+		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/orders",
+		TimeoutSeconds: 30, ResponseLimit: 1024, Status: model.InterfaceDefinitionStatusDraft, Revision: 1,
+	}
+	if err := db.Create(&definition).Error; err != nil {
+		t.Fatalf("create interface definition: %v", err)
+	}
+	definition.Id = 12
+	if err := db.Create(&definition).Error; err == nil {
+		t.Fatal("expected duplicate interface version to be rejected")
+	}
 }
 
 func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(
 		&model.ExternalSystem{},
+		&model.InterfaceDefinition{},
 		&model.SysMenu{},
 		&model.SysMenuButton{},
 		&model.SysRole{},
@@ -73,6 +89,28 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if buttonCount != 7 {
 		t.Fatalf("button count = %d, want 7", buttonCount)
+	}
+	var interfaceMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_interface_definition").First(&interfaceMenu).Error; err != nil {
+		t.Fatalf("load interface definition menu: %v", err)
+	}
+	if interfaceMenu.TableCode != interfaceDefinitionTableCode || interfaceMenu.Component != "pages/integration/interface-definition/Index.vue" {
+		t.Fatalf("unexpected interface definition menu: %+v", interfaceMenu)
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", interfaceMenu.Id).Count(&buttonCount).Error; err != nil {
+		t.Fatalf("count interface definition buttons: %v", err)
+	}
+	if buttonCount != 8 {
+		t.Fatalf("interface button count = %d, want 8", buttonCount)
+	}
+	var interfaceCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).
+		Where("v1 LIKE ?", "%/admin/integration/interface-definition%").
+		Count(&interfaceCasbinCount).Error; err != nil {
+		t.Fatalf("count interface definition Casbin policies: %v", err)
+	}
+	if interfaceCasbinCount != 7 {
+		t.Fatalf("interface Casbin policy count = %d, want 7", interfaceCasbinCount)
 	}
 	var casbinCount int64
 	if err := db.Model(&model.CasbinRule{}).

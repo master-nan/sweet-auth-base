@@ -212,6 +212,15 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/external-system/:id/enable", app.ExternalSystemController.Enable)
 		adminGroup.PUT("/integration/external-system/:id/disable", app.ExternalSystemController.Disable)
 
+		// 集成中心 - 接口定义
+		adminGroup.POST("/integration/interface-definition/query", app.InterfaceDefinitionController.Query)
+		adminGroup.GET("/integration/interface-definition/:id", app.InterfaceDefinitionController.Detail)
+		adminGroup.POST("/integration/interface-definition", app.InterfaceDefinitionController.Create)
+		adminGroup.PUT("/integration/interface-definition/:id", app.InterfaceDefinitionController.Update)
+		adminGroup.POST("/integration/interface-definition/:id/versions", app.InterfaceDefinitionController.CreateVersion)
+		adminGroup.PUT("/integration/interface-definition/:id/enable", app.InterfaceDefinitionController.Enable)
+		adminGroup.PUT("/integration/interface-definition/:id/disable", app.InterfaceDefinitionController.Disable)
+
 		// 组织法人主体只读镜像
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
 		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)

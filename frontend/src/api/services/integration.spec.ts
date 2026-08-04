@@ -81,4 +81,35 @@ describe('external system API', () => {
       { revision: 5 },
     )
   })
+
+  it('uses the versioned interface definition endpoints', async () => {
+    const api = useIntegrationApi()
+    const query = { page: 1, num: 15, quick_query: { keyword: '订单' }, expressions: [] }
+    const createRequest = {
+      external_system_id: 12,
+      interface_code: 'order_query',
+      name: '订单查询',
+      protocol: 'https' as const,
+      http_method: 'GET' as const,
+      relative_path: '/api/orders',
+      timeout_seconds: 30,
+      response_limit: 10485760,
+    }
+
+    await api.queryInterfaceDefinitions(query)
+    await api.getInterfaceDefinition(31)
+    await api.createInterfaceDefinition(createRequest)
+    await api.updateInterfaceDefinition(31, { name: '订单明细查询', revision: 2 })
+    await api.createInterfaceDefinitionVersion(31, 3)
+    await api.enableInterfaceDefinition(32, 1)
+    await api.disableInterfaceDefinition(32, 2)
+
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/interface-definition/query', query)
+    expect(getMock).toHaveBeenCalledWith('/admin/integration/interface-definition/31')
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/interface-definition', createRequest)
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/interface-definition/31', { name: '订单明细查询', revision: 2 })
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/interface-definition/31/versions', { revision: 3 })
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/interface-definition/32/enable', { revision: 1 })
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/interface-definition/32/disable', { revision: 2 })
+  })
 })

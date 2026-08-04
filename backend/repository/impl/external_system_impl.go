@@ -42,6 +42,15 @@ func (r *ExternalSystemRepositoryImpl) FindByIDForUpdate(tx *gorm.DB, id int) (m
 	return value, err
 }
 
+func (r *ExternalSystemRepositoryImpl) FindByIDs(ctx context.Context, ids []int) ([]model.ExternalSystem, error) {
+	if len(ids) == 0 {
+		return []model.ExternalSystem{}, nil
+	}
+	var values []model.ExternalSystem
+	err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&values).Error
+	return values, err
+}
+
 func (r *ExternalSystemRepositoryImpl) FindByCode(tx *gorm.DB, code string) (model.ExternalSystem, error) {
 	var value model.ExternalSystem
 	err := tx.Where("system_code = ?", code).First(&value).Error

@@ -517,6 +517,23 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "接口定义状态",
+			code: "integration_interface_definition_status",
+			items: []systemDictItemSeed{
+				{name: "草稿", code: "integration_interface_definition_status_draft", value: model.InterfaceDefinitionStatusDraft},
+				{name: "已启用", code: "integration_interface_definition_status_enabled", value: model.InterfaceDefinitionStatusEnabled},
+				{name: "已停用", code: "integration_interface_definition_status_disabled", value: model.InterfaceDefinitionStatusDisabled},
+			},
+		},
+		{
+			name: "接口协议",
+			code: "integration_interface_protocol",
+			items: []systemDictItemSeed{
+				{name: "HTTP", code: "integration_interface_protocol_http", value: model.InterfaceProtocolHTTP},
+				{name: "HTTPS", code: "integration_interface_protocol_https", value: model.InterfaceProtocolHTTPS},
+			},
+		},
+		{
 			name: "字段类别",
 			code: "sys_table_field_category",
 			items: []systemDictItemSeed{
@@ -1943,6 +1960,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "report_definition_version", name: "报表定义版本"},
 		{code: "report_execution_log", name: "报表执行日志"},
 		{code: externalSystemTableCode, name: "外部系统"},
+		{code: interfaceDefinitionTableCode, name: "接口定义"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }
@@ -2122,6 +2140,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyMigrationSensitiveFieldDefaults(&field)
 	applyMigrationManagedFieldDefaults(&field)
 	applyExternalSystemFieldDefaults(tableCode, &field)
+	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
@@ -2265,6 +2284,14 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "integration_external_system_status"
 		}
 	}
+	if tableCode == interfaceDefinitionTableCode {
+		switch fieldCode {
+		case "protocol":
+			return "integration_interface_protocol"
+		case "status":
+			return "integration_interface_definition_status"
+		}
+	}
 	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
 		return "whether"
 	}
@@ -2348,6 +2375,106 @@ func applyExternalSystemFieldDefaults(tableCode string, field *model.SysTableFie
 		field.IsAdvancedSearch = true
 		field.InputType = enum.DatetimePickerInputType
 		field.Sequence = 9
+	}
+}
+
+func applyInterfaceDefinitionFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != interfaceDefinitionTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "external_system_id":
+		field.FieldName = "所属系统"
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 1
+	case "interface_code":
+		field.FieldName = "接口编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 2
+	case "name":
+		field.FieldName = "接口名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 3
+	case "version":
+		field.FieldName = "版本"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 4
+	case "protocol":
+		field.FieldName = "协议"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_interface_protocol")
+		field.Sequence = 5
+	case "http_method":
+		field.FieldName = "HTTP Method"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("http_method")
+		field.Sequence = 6
+	case "relative_path":
+		field.FieldName = "相对路径"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 7
+	case "credential_id":
+		field.FieldName = "凭证引用"
+	case "timeout_seconds":
+		field.FieldName = "超时（秒）"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 8
+	case "response_limit":
+		field.FieldName = "响应大小限制（字节）"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 9
+	case "retry_policy_id":
+		field.FieldName = "重试策略引用"
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_interface_definition_status")
+		field.Sequence = 10
+	case "description":
+		field.FieldName = "描述"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.TextareaInputType
+		field.Sequence = 11
+	case "revision":
+		field.FieldName = "修订号"
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 12
 	}
 }
 
@@ -2501,6 +2628,12 @@ var systemTableFieldDisplayNameMap = map[string]map[string]string{
 		"status":           "状态",
 		"description":      "描述",
 		"revision":         "版本",
+	},
+	interfaceDefinitionTableCode: {
+		"external_system_id": "所属系统", "interface_code": "接口编码", "name": "接口名称",
+		"version": "版本", "protocol": "协议", "http_method": "HTTP Method", "relative_path": "相对路径",
+		"credential_id": "凭证引用", "timeout_seconds": "超时（秒）", "response_limit": "响应大小限制（字节）",
+		"retry_policy_id": "重试策略引用", "status": "状态", "description": "描述", "revision": "修订号",
 	},
 	"access_log": {
 		"method":        "操作",

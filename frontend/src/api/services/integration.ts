@@ -49,6 +49,75 @@ export interface ExternalSystemQuery extends Query {
   owner?: string
 }
 
+export type InterfaceDefinitionStatus = 'draft' | 'enabled' | 'disabled'
+export type InterfaceProtocol = 'http' | 'https'
+export type InterfaceHTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export interface InterfaceSystemSummary {
+  id: number
+  system_code: string
+  name: string
+}
+
+export interface InterfaceDefinitionListItem {
+  id: number
+  external_system: InterfaceSystemSummary
+  interface_code: string
+  name: string
+  version: number
+  protocol: InterfaceProtocol
+  http_method: InterfaceHTTPMethod
+  path_summary: string
+  status: InterfaceDefinitionStatus
+  revision: number
+  gmt_modify: string
+}
+
+export interface InterfaceDefinitionDetail extends InterfaceDefinitionListItem {
+  relative_path: string
+  credential_id?: number
+  timeout_seconds: number
+  response_limit: number
+  retry_policy_id?: number
+  description: string
+  gmt_create: string
+}
+
+export interface InterfaceDefinitionCreateRequest {
+  external_system_id: number
+  interface_code: string
+  name: string
+  protocol: InterfaceProtocol
+  http_method: InterfaceHTTPMethod
+  relative_path: string
+  credential_id?: number
+  timeout_seconds: number
+  response_limit: number
+  retry_policy_id?: number
+  description?: string
+}
+
+export interface InterfaceDefinitionUpdateRequest {
+  name?: string
+  protocol?: InterfaceProtocol
+  http_method?: InterfaceHTTPMethod
+  relative_path?: string
+  credential_id?: number
+  clear_credential?: boolean
+  timeout_seconds?: number
+  response_limit?: number
+  retry_policy_id?: number
+  clear_retry_policy?: boolean
+  description?: string
+  revision: number
+}
+
+export interface InterfaceDefinitionQuery extends Query {
+  external_system_id?: number
+  http_method?: InterfaceHTTPMethod | ''
+  status?: InterfaceDefinitionStatus | ''
+}
+
 export const useIntegrationApi = () => ({
   queryExternalSystems: (query: ExternalSystemQuery) =>
     instance
@@ -77,5 +146,33 @@ export const useIntegrationApi = () => ({
       .put<ResponseData<ExternalSystemDetail>>(`/admin/integration/external-system/${id}/disable`, {
         revision,
       })
+      .then((response) => response.data),
+  queryInterfaceDefinitions: (query: InterfaceDefinitionQuery) =>
+    instance
+      .post<ResponseData<InterfaceDefinitionListItem[]>>('/admin/integration/interface-definition/query', query)
+      .then((response) => response.data),
+  getInterfaceDefinition: (id: number) =>
+    instance
+      .get<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}`)
+      .then((response) => response.data),
+  createInterfaceDefinition: (request: InterfaceDefinitionCreateRequest) =>
+    instance
+      .post<ResponseData<InterfaceDefinitionDetail>>('/admin/integration/interface-definition', request)
+      .then((response) => response.data),
+  updateInterfaceDefinition: (id: number, request: InterfaceDefinitionUpdateRequest) =>
+    instance
+      .put<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}`, request)
+      .then((response) => response.data),
+  createInterfaceDefinitionVersion: (id: number, revision: number) =>
+    instance
+      .post<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}/versions`, { revision })
+      .then((response) => response.data),
+  enableInterfaceDefinition: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}/enable`, { revision })
+      .then((response) => response.data),
+  disableInterfaceDefinition: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}/disable`, { revision })
       .then((response) => response.data),
 })

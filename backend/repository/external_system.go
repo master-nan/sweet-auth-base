@@ -14,6 +14,7 @@ type ExternalSystemRepository interface {
 	Create(*gorm.DB, *model.ExternalSystem) error
 	FindByID(context.Context, int) (model.ExternalSystem, error)
 	FindByIDForUpdate(*gorm.DB, int) (model.ExternalSystem, error)
+	FindByIDs(context.Context, []int) ([]model.ExternalSystem, error)
 	FindByCode(*gorm.DB, string) (model.ExternalSystem, error)
 	Query(context.Context, request.ExternalSystemQueryReq, model.SysTable) (response.ListResult[model.ExternalSystem], error)
 	UpdateFields(*gorm.DB, int, int, map[string]any) (bool, error)

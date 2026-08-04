@@ -1,0 +1,486 @@
+package service
+
+import (
+	"backend/dto/request"
+	"backend/dto/response"
+	myerrors "backend/internal/errors"
+	"backend/internal/utils"
+	"backend/model"
+	"backend/repository"
+	"context"
+	"errors"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/gorm"
+)
+
+const (
+	interfaceDefinitionAuditResourceType = "integration_interface_definition"
+	interfaceDefinitionAuditCreate       = "integration.interface_definition.create"
+	interfaceDefinitionAuditUpdate       = "integration.interface_definition.update"
+	interfaceDefinitionAuditVersion      = "integration.interface_definition.create_version"
+	interfaceDefinitionAuditEnable       = "integration.interface_definition.enable"
+	interfaceDefinitionAuditDisable      = "integration.interface_definition.disable"
+	interfaceTimeoutMinSeconds           = 1
+	interfaceTimeoutMaxSeconds           = 300
+	interfaceResponseLimitMin            = int64(1024)
+	interfaceResponseLimitMax            = int64(100 * 1024 * 1024)
+)
+
+var interfaceCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
+
+type InterfaceDefinitionService struct {
+	repository repository.InterfaceDefinitionRepository
+	systems    repository.ExternalSystemRepository
+	sf         *utils.Snowflake
+	audit      StandardContextAuditWriter
+}
+
+func NewInterfaceDefinitionService(
+	repository repository.InterfaceDefinitionRepository,
+	systems repository.ExternalSystemRepository,
+	sf *utils.Snowflake,
+	audit StandardContextAuditWriter,
+) *InterfaceDefinitionService {
+	return &InterfaceDefinitionService{repository: repository, systems: systems, sf: sf, audit: audit}
+}
+
+func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.InterfaceDefinitionCreateReq) (response.InterfaceDefinitionDetailRes, error) {
+	code := strings.TrimSpace(req.InterfaceCode)
+	if !interfaceCodePattern.MatchString(code) {
+		return response.InterfaceDefinitionDetailRes{}, myerrors.ErrInterfaceCodeInvalid
+	}
+	path, err := normalizeInterfaceRelativePath(req.RelativePath)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	value := model.InterfaceDefinition{
+		ExternalSystemID: req.ExternalSystemID, InterfaceCode: code, Name: strings.TrimSpace(req.Name), Version: 1,
+		Protocol: strings.ToLower(strings.TrimSpace(req.Protocol)), HTTPMethod: strings.ToUpper(strings.TrimSpace(req.HTTPMethod)),
+		RelativePath: path, CredentialID: req.CredentialID, TimeoutSeconds: req.TimeoutSeconds,
+		ResponseLimit: req.ResponseLimit, RetryPolicyID: req.RetryPolicyID,
+		Status: model.InterfaceDefinitionStatusDraft, Description: strings.TrimSpace(req.Description), Revision: 1,
+	}
+	if err := validateInterfaceConfiguration(value); err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	id, err := s.sf.GenerateUniqueID()
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapSystemError(err)
+	}
+	value.Basic = model.Basic{Id: int(id), State: false}
+	var system model.ExternalSystem
+	err = RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		var err error
+		system, err = s.loadSystemForConfiguration(tx, value.ExternalSystemID, false)
+		if err != nil {
+			return err
+		}
+		if err := s.validateReferences(tx, value); err != nil {
+			return err
+		}
+		if err := s.repository.Create(tx, &value); err != nil {
+			if isInterfaceDefinitionDuplicate(err) {
+				return myerrors.ErrInterfaceCodeDuplicate
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		return s.writeAudit(ctx, tx, interfaceDefinitionAuditCreate, value, system, nil)
+	})
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system), nil
+}
+
+func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.InterfaceDefinitionDetailRes, error) {
+	value, err := s.repository.FindByID(ctx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return response.InterfaceDefinitionDetailRes{}, myerrors.ErrInterfaceDefinitionNotFound
+	}
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	system, err := s.systems.FindByID(ctx, value.ExternalSystemID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system), nil
+}
+
+func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq, table model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error) {
+	result, err := s.repository.Query(ctx, req, table)
+	if err != nil {
+		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	ids := make([]int, 0, len(result.Data))
+	seen := make(map[int]struct{}, len(result.Data))
+	for _, item := range result.Data {
+		if _, exists := seen[item.ExternalSystemID]; !exists {
+			seen[item.ExternalSystemID] = struct{}{}
+			ids = append(ids, item.ExternalSystemID)
+		}
+	}
+	systems, err := s.systems.FindByIDs(ctx, ids)
+	if err != nil {
+		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	byID := make(map[int]model.ExternalSystem, len(systems))
+	for _, system := range systems {
+		byID[system.Id] = system
+	}
+	items := make([]response.InterfaceDefinitionListRes, 0, len(result.Data))
+	for _, value := range result.Data {
+		items = append(items, response.NewInterfaceDefinitionListRes(value, byID[value.ExternalSystemID]))
+	}
+	return response.ListResult[response.InterfaceDefinitionListRes]{Data: items, Total: result.Total}, nil
+}
+
+func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req request.InterfaceDefinitionUpdateReq) (response.InterfaceDefinitionDetailRes, error) {
+	var updated model.InterfaceDefinition
+	var system model.ExternalSystem
+	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		current, err := s.repository.FindByIDForUpdate(tx, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.ErrInterfaceDefinitionNotFound
+		}
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if current.Status != model.InterfaceDefinitionStatusDraft {
+			return myerrors.ErrInterfaceStatusInvalid
+		}
+		if interfaceIdentityChanged(current, req) {
+			return myerrors.ErrInterfaceFieldImmutable
+		}
+		updates, next, err := interfaceDefinitionUpdates(current, req)
+		if err != nil {
+			return err
+		}
+		system, err = s.loadSystemForConfiguration(tx, current.ExternalSystemID, false)
+		if err != nil {
+			return err
+		}
+		if err := s.validateReferences(tx, next); err != nil {
+			return err
+		}
+		updates["revision"] = current.Revision + 1
+		ok, err := s.repository.UpdateFields(tx, id, req.Revision, updates)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if !ok {
+			return myerrors.ErrInterfaceRevisionConflict
+		}
+		next.Revision = current.Revision + 1
+		updated = next
+		return s.writeAudit(ctx, tx, interfaceDefinitionAuditUpdate, updated, system, &current)
+	})
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system), nil
+}
+
+func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
+	var created model.InterfaceDefinition
+	var system model.ExternalSystem
+	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		current, err := s.repository.FindByIDForUpdate(tx, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.ErrInterfaceDefinitionNotFound
+		}
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if current.Revision != revision {
+			return myerrors.ErrInterfaceRevisionConflict
+		}
+		if current.Status == model.InterfaceDefinitionStatusDraft {
+			return myerrors.ErrInterfaceStatusInvalid
+		}
+		nextVersion, err := s.repository.NextVersion(tx, current.ExternalSystemID, current.InterfaceCode)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		newID, err := s.sf.GenerateUniqueID()
+		if err != nil {
+			return myerrors.WrapSystemError(err)
+		}
+		created = current
+		created.Basic = model.Basic{Id: int(newID), State: false}
+		created.Version = nextVersion
+		created.Status = model.InterfaceDefinitionStatusDraft
+		created.Revision = 1
+		system, err = s.loadSystemForConfiguration(tx, created.ExternalSystemID, false)
+		if err != nil {
+			return err
+		}
+		if err := s.repository.Create(tx, &created); err != nil {
+			if isInterfaceDefinitionDuplicate(err) {
+				return myerrors.ErrInterfaceCodeDuplicate
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		return s.writeAudit(ctx, tx, interfaceDefinitionAuditVersion, created, system, nil)
+	})
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(created, system), nil
+}
+
+func (s *InterfaceDefinitionService) Enable(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
+	return s.changeStatus(ctx, id, revision, model.InterfaceDefinitionStatusEnabled)
+}
+
+func (s *InterfaceDefinitionService) Disable(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
+	return s.changeStatus(ctx, id, revision, model.InterfaceDefinitionStatusDisabled)
+}
+
+func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revision int, target string) (response.InterfaceDefinitionDetailRes, error) {
+	var updated model.InterfaceDefinition
+	var system model.ExternalSystem
+	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		current, err := s.repository.FindByIDForUpdate(tx, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.ErrInterfaceDefinitionNotFound
+		}
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if current.Status == target {
+			updated = current
+			system, err = s.loadSystemForConfiguration(tx, current.ExternalSystemID, target == model.InterfaceDefinitionStatusEnabled)
+			return err
+		}
+		if target == model.InterfaceDefinitionStatusDisabled && current.Status != model.InterfaceDefinitionStatusEnabled {
+			return myerrors.ErrInterfaceStatusInvalid
+		}
+		if target == model.InterfaceDefinitionStatusEnabled && current.Status != model.InterfaceDefinitionStatusDraft && current.Status != model.InterfaceDefinitionStatusDisabled {
+			return myerrors.ErrInterfaceStatusInvalid
+		}
+		system, err = s.loadSystemForConfiguration(tx, current.ExternalSystemID, target == model.InterfaceDefinitionStatusEnabled)
+		if err != nil {
+			return err
+		}
+		if target == model.InterfaceDefinitionStatusEnabled {
+			if err := validateInterfaceConfiguration(current); err != nil {
+				return err
+			}
+			if err := s.validateReferences(tx, current); err != nil {
+				return err
+			}
+			conflict, err := s.repository.HasEnabledVersion(tx, current.ExternalSystemID, current.InterfaceCode, current.Id)
+			if err != nil {
+				return myerrors.WrapDatabaseError(err)
+			}
+			if conflict {
+				return myerrors.ErrInterfaceEnabledVersionConflict
+			}
+		}
+		updates := map[string]any{"status": target, "state": target == model.InterfaceDefinitionStatusEnabled, "revision": current.Revision + 1}
+		ok, err := s.repository.UpdateFields(tx, current.Id, revision, updates)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if !ok {
+			return myerrors.ErrInterfaceRevisionConflict
+		}
+		updated = current
+		updated.Status = target
+		updated.State = target == model.InterfaceDefinitionStatusEnabled
+		updated.Revision++
+		action := interfaceDefinitionAuditEnable
+		if target == model.InterfaceDefinitionStatusDisabled {
+			action = interfaceDefinitionAuditDisable
+		}
+		return s.writeAudit(ctx, tx, action, updated, system, &current)
+	})
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system), nil
+}
+
+func (s *InterfaceDefinitionService) loadSystemForConfiguration(tx *gorm.DB, id int, requireEnabled bool) (model.ExternalSystem, error) {
+	system, err := s.systems.FindByIDForUpdate(tx, id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.ExternalSystem{}, myerrors.ErrInterfaceExternalSystemInvalid
+	}
+	if err != nil {
+		return model.ExternalSystem{}, myerrors.WrapDatabaseError(err)
+	}
+	if system.Status == model.ExternalSystemStatusDisabled || requireEnabled && system.Status != model.ExternalSystemStatusEnabled {
+		return model.ExternalSystem{}, myerrors.ErrInterfaceExternalSystemInvalid
+	}
+	return system, nil
+}
+
+func (s *InterfaceDefinitionService) validateReferences(tx *gorm.DB, value model.InterfaceDefinition) error {
+	if value.CredentialID != nil {
+		valid, err := s.repository.CredentialReferenceValid(tx, *value.CredentialID, value.ExternalSystemID)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if !valid {
+			return myerrors.ErrInterfaceCredentialInvalid
+		}
+	}
+	if value.RetryPolicyID != nil {
+		valid, err := s.repository.RetryPolicyReferenceValid(tx, *value.RetryPolicyID)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if !valid {
+			return myerrors.ErrInterfaceRetryPolicyInvalid
+		}
+	}
+	return nil
+}
+
+func (s *InterfaceDefinitionService) writeAudit(ctx context.Context, tx *gorm.DB, action string, value model.InterfaceDefinition, system model.ExternalSystem, previous *model.InterfaceDefinition) error {
+	changes := map[string]TransactionalAuditChange{
+		"system": {NewValue: system.SystemCode}, "interface_code": {NewValue: value.InterfaceCode},
+		"version": {NewValue: value.Version}, "status": {NewValue: value.Status}, "revision": {NewValue: value.Revision},
+	}
+	if previous != nil {
+		changes["status"] = TransactionalAuditChange{OldValue: previous.Status, NewValue: value.Status}
+		changes["revision"] = TransactionalAuditChange{OldValue: previous.Revision, NewValue: value.Revision}
+	}
+	return s.audit.RecordTransactionalAuditContext(ctx, tx, TransactionalAuditRecord{
+		Action: action, ResourceType: interfaceDefinitionAuditResourceType,
+		ResourceCode: system.SystemCode + "/" + value.InterfaceCode + "@" + strconv.Itoa(value.Version),
+		ResourceId:   strconv.Itoa(value.Id), Changes: changes,
+	})
+}
+
+func interfaceIdentityChanged(current model.InterfaceDefinition, req request.InterfaceDefinitionUpdateReq) bool {
+	return req.ExternalSystemID != nil && *req.ExternalSystemID != current.ExternalSystemID ||
+		req.InterfaceCode != nil && strings.TrimSpace(*req.InterfaceCode) != current.InterfaceCode ||
+		req.Version != nil && *req.Version != current.Version
+}
+
+func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.InterfaceDefinitionUpdateReq) (map[string]any, model.InterfaceDefinition, error) {
+	next := current
+	updates := make(map[string]any)
+	if req.Name != nil {
+		next.Name = strings.TrimSpace(*req.Name)
+		updates["name"] = next.Name
+	}
+	if req.Protocol != nil {
+		next.Protocol = strings.ToLower(strings.TrimSpace(*req.Protocol))
+		updates["protocol"] = next.Protocol
+	}
+	if req.HTTPMethod != nil {
+		next.HTTPMethod = strings.ToUpper(strings.TrimSpace(*req.HTTPMethod))
+		updates["http_method"] = next.HTTPMethod
+	}
+	if req.RelativePath != nil {
+		path, err := normalizeInterfaceRelativePath(*req.RelativePath)
+		if err != nil {
+			return nil, current, err
+		}
+		next.RelativePath = path
+		updates["relative_path"] = path
+	}
+	if req.ClearCredential {
+		next.CredentialID = nil
+		updates["credential_id"] = nil
+	} else if req.CredentialID != nil {
+		next.CredentialID = req.CredentialID
+		updates["credential_id"] = *req.CredentialID
+	}
+	if req.TimeoutSeconds != nil {
+		next.TimeoutSeconds = *req.TimeoutSeconds
+		updates["timeout_seconds"] = next.TimeoutSeconds
+	}
+	if req.ResponseLimit != nil {
+		next.ResponseLimit = *req.ResponseLimit
+		updates["response_limit"] = next.ResponseLimit
+	}
+	if req.ClearRetryPolicy {
+		next.RetryPolicyID = nil
+		updates["retry_policy_id"] = nil
+	} else if req.RetryPolicyID != nil {
+		next.RetryPolicyID = req.RetryPolicyID
+		updates["retry_policy_id"] = *req.RetryPolicyID
+	}
+	if req.Description != nil {
+		next.Description = strings.TrimSpace(*req.Description)
+		updates["description"] = next.Description
+	}
+	if err := validateInterfaceConfiguration(next); err != nil {
+		return nil, current, err
+	}
+	return updates, next, nil
+}
+
+func validateInterfaceConfiguration(value model.InterfaceDefinition) error {
+	if strings.TrimSpace(value.Name) == "" || !interfaceCodePattern.MatchString(value.InterfaceCode) ||
+		!validInterfaceProtocol(value.Protocol) || !validInterfaceMethod(value.HTTPMethod) || value.Version <= 0 ||
+		value.TimeoutSeconds < interfaceTimeoutMinSeconds || value.TimeoutSeconds > interfaceTimeoutMaxSeconds ||
+		value.ResponseLimit < interfaceResponseLimitMin || value.ResponseLimit > interfaceResponseLimitMax {
+		return myerrors.ErrInterfaceConfigurationInvalid
+	}
+	_, err := normalizeInterfaceRelativePath(value.RelativePath)
+	return err
+}
+
+func validInterfaceProtocol(value string) bool {
+	return value == model.InterfaceProtocolHTTP || value == model.InterfaceProtocolHTTPS
+}
+
+func validInterfaceMethod(value string) bool {
+	switch value {
+	case model.InterfaceMethodGET, model.InterfaceMethodPOST, model.InterfaceMethodPUT, model.InterfaceMethodPATCH, model.InterfaceMethodDELETE:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeInterfaceRelativePath(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" || len(value) > 512 || !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") || strings.Contains(value, "\\") {
+		return "", myerrors.ErrInterfacePathInvalid
+	}
+	for _, r := range value {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return "", myerrors.ErrInterfacePathInvalid
+		}
+	}
+	lower := strings.ToLower(value)
+	for _, forbidden := range []string{"%2e", "%2f", "%5c"} {
+		if strings.Contains(lower, forbidden) {
+			return "", myerrors.ErrInterfacePathInvalid
+		}
+	}
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", myerrors.ErrInterfacePathInvalid
+	}
+	decoded, err := url.PathUnescape(parsed.EscapedPath())
+	if err != nil {
+		return "", myerrors.ErrInterfacePathInvalid
+	}
+	for _, segment := range strings.Split(decoded, "/") {
+		if segment == "." || segment == ".." {
+			return "", myerrors.ErrInterfacePathInvalid
+		}
+	}
+	return parsed.Path, nil
+}
+
+func isInterfaceDefinitionDuplicate(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "unique constraint") || strings.Contains(strings.ToLower(err.Error()), "duplicate key")
+}
