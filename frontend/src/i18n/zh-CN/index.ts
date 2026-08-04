@@ -10,6 +10,19 @@ export default {
       configure: '配置管理',
       generalization: '通用页面'
     },
+    organization: {
+      default: '组织管理',
+      structure: '组织架构',
+      employee: '人员与任职',
+      position: '岗位',
+      syncBatch: '同步批次',
+      syncError: '同步异常',
+    },
+    integration: {
+      default: '集成中心',
+      externalSystem: '外部系统',
+      interfaceDefinition: '接口定义',
+    },
     report: {
       default: '报表',
       center: '报表中心',

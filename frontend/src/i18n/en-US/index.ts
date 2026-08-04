@@ -10,6 +10,19 @@ export default {
       configure: 'Configure Management',
       generalization: 'Generic Page',
     },
+    organization: {
+      default: 'Organization',
+      structure: 'Organization Structure',
+      employee: 'Employees and Assignments',
+      position: 'Positions',
+      syncBatch: 'Sync Batches',
+      syncError: 'Sync Errors',
+    },
+    integration: {
+      default: 'Integration Center',
+      externalSystem: 'External Systems',
+      interfaceDefinition: 'Interface Definitions',
+    },
     report: {
       default: 'Reports',
       center: 'Report Center',

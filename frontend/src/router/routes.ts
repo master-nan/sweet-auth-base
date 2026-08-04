@@ -194,7 +194,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'organization',
     name: 'organization',
     meta: {
-      title: '组织管理',
+      title: 'router.organization.default',
       icon: 'account_tree',
       isOpen: false,
     },
@@ -204,7 +204,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'structure',
         name: 'organization_structure',
         meta: {
-          title: '组织架构',
+          title: 'router.organization.structure',
           icon: 'lan',
           keepAlive: true,
         },
@@ -214,7 +214,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'employee',
         name: 'organization_employee',
         meta: {
-          title: '人员与任职',
+          title: 'router.organization.employee',
           icon: 'badge',
           keepAlive: true,
         },
@@ -224,7 +224,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'position',
         name: 'organization_position',
         meta: {
-          title: '岗位',
+          title: 'router.organization.position',
           icon: 'work',
           keepAlive: true,
         },
@@ -234,7 +234,7 @@ const asyncRoutesChildren: Route[] = [
         path: 'sync-batch',
         name: 'organization_sync_batch',
         meta: {
-          title: '同步批次',
+          title: 'router.organization.syncBatch',
           icon: 'sync',
           keepAlive: true,
         },
@@ -244,21 +244,41 @@ const asyncRoutesChildren: Route[] = [
         path: 'sync-error',
         name: 'organization_sync_error',
         meta: {
-          title: '同步异常',
+          title: 'router.organization.syncError',
           icon: 'error_outline',
           keepAlive: true,
         },
       },
+    ],
+  },
+  {
+    component: layout,
+    path: 'integration',
+    name: 'integration',
+    meta: {
+      title: 'router.integration.default',
+      icon: 'hub',
+      isOpen: false,
+    },
+    children: [
       {
-        path: 'legal-entity',
-        name: 'organization_legal_entity_legacy',
-        redirect: {
-          name: 'organization_structure',
-        },
+        component: () => import('pages/integration/external-system/Index.vue'),
+        path: 'external-system',
+        name: 'integration_external_system',
         meta: {
-          title: '法人架构',
-          icon: 'account_balance',
-          isHidden: true,
+          title: 'router.integration.externalSystem',
+          icon: 'dns',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/integration/interface-definition/Index.vue'),
+        path: 'interface-definition',
+        name: 'integration_interface_definition',
+        meta: {
+          title: 'router.integration.interfaceDefinition',
+          icon: 'api',
+          keepAlive: true,
         },
       },
     ],

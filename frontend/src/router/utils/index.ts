@@ -68,9 +68,13 @@ function appendDynamicMenuRoutes(routes: Route[], menus: Menu[]) {
 
 function mergeBackendMenuMeta(route: Route, menu: Menu) {
   const reportOption = isReportMenu(menu) ? parseReportMenuOption(menu.option) : null
+  const routeTitle = route.meta?.title
   route.meta = {
     ...(route.meta || {}),
-    title: menu.title || route.meta?.title || String(route.name || ''),
+    title:
+      typeof routeTitle === 'string' && routeTitle.startsWith('router.')
+        ? routeTitle
+        : menu.title || routeTitle || String(route.name || ''),
     ...(menu.icon ? { icon: menu.icon } : {}),
     isHidden: menu.is_hidden,
     menuId: menu.id,
