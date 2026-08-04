@@ -210,7 +210,7 @@ flowchart LR
 
 多数短文件是 Repository 端口、DTO、DI 标记类型或编译期边界，具有独立价值，应保留。例如 `LoginLogRepository`、`PrimaryDB` 和小型 Response DTO。
 
-确认无独立价值的文件只有 [repository/impl/file_impl.go](../backend/repository/impl/file_impl.go)：文件除作者头外只有 `package impl`，属于明确清理候选。`table_name.go` 虽只有一个函数，但被 Repository 实现共享，应保留。
+此前确认无独立价值的空实现文件已在 ST-006-A 删除；该文件除作者头外只有 `package impl`，不承担接口实现。`table_name.go` 虽只有一个函数，但被 Repository 实现共享，应保留。
 
 ## 6. 死代码审计
 
@@ -218,7 +218,7 @@ flowchart LR
 
 | 对象 | 证据 | 分类建议 |
 | --- | --- | --- |
-| `repository/impl/file_impl.go` | 空实现文件，无声明 | 确定删除候选 |
+| ST-006-A 已删除的空实现文件 | 无声明，不承担接口实现 | 已完成清理 |
 | `ApplicationController.GetApplicationByAppKey` | 有 Controller 方法，但路由未注册；Service 方法仍被 API 鉴权使用 | 删除 Controller 候选，保留 Service |
 | `TableController.DeleteTableIndexByTableId` | 有 Controller 与 Service 方法，未发现路由或生产调用 | 删除前核对外部 API 契约 |
 | `UserController.GetUserByUserName` | 有 Controller 方法，未发现路由或生产调用 | 删除前核对外部 API 契约 |
@@ -301,12 +301,12 @@ Data Permission 和 Organization 已形成较稳定的领域错误体系。旧�
 
 ### 8.3 命名
 
-整体领域命名清晰。确认存在两个文件名拼写错误：
+整体领域命名清晰。此前确认的两个文件名拼写错误已在 ST-006-A 修正为：
 
-- `backend/internal/cache/sys_role_cahce.go`。
-- `backend/initialize/sonwflake.go`。
+- `backend/internal/cache/sys_role_cache.go`。
+- `backend/initialize/snowflake.go`。
 
-建议 P2 单独使用 `git mv` 修复并验证引用。历史 `Id`/`ID` 风格不一致广泛存在，不建议为了形式统一进行高噪声全仓重命名。
+历史 `Id`/`ID` 风格不一致广泛存在，不建议为了形式统一进行高噪声全仓重命名。
 
 ### 8.4 日志
 
@@ -383,8 +383,8 @@ Gin Context 与请求生命周期绑定，不保证请求结束后继续安全�
 | P2-01 | Migration 主文件过大 | `migrate/main.go` | 注册与 Seed 审阅困难 | 按领域拆文件，保持注册顺序和幂等语义 |
 | P2-02 | Organization Service 辅助装配集中 | `org_service.go` | 主流程阅读成本高 | 移动 mapper/tree helper，保留 Provider 与 Service |
 | P2-03 | 6 处 `fmt.Println` | 旧 Service 映射逻辑 | 日志不可检索、错误被吞 | 改结构化日志或向上传播 |
-| P2-04 | 文件名拼写错误 | `sys_role_cahce.go`、`sonwflake.go` | 搜索与认知成本 | 使用 `git mv` 修正并验证构建 |
-| P2-05 | 空实现文件 | `repository/impl/file_impl.go` | 无实际价值 | 独立清理时删除 |
+| P2-04 | 文件名拼写错误 | `sys_role_cache.go`、`snowflake.go` | 搜索与认知成本 | 已在 ST-006-A 修正 |
+| P2-05 | 空实现文件 | Repository Impl 历史空文件 | 无实际价值 | 已在 ST-006-A 删除 |
 
 ## 12. 治理顺序建议
 
