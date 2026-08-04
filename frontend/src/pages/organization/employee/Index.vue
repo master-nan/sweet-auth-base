@@ -140,15 +140,12 @@
     >
       <template #section="{ sectionKey }">
         <template v-if="sectionKey === 'assignments'">
-          <div class="row items-center q-mb-md">
+          <div class="assignment-section-toolbar q-mb-md">
             <div class="text-caption text-grey-7">按时间范围查看员工全部任职，不自动选取主任职</div>
-            <q-space />
-            <q-btn-toggle
+            <assignment-scope-switch
               v-model="assignmentScope"
-              dense
-              unelevated
-              toggle-color="primary"
-              :options="assignmentScopeOptions"
+              class="assignment-scope-control"
+              :loading="assignmentLoading"
               @update:model-value="loadAssignments"
             />
           </div>
@@ -262,6 +259,7 @@ import { useDictStore } from 'src/stores/dict'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import AssignmentScopeSwitch from 'src/pages/organization/employee/AssignmentScopeSwitch.vue'
 import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
@@ -318,13 +316,6 @@ let bindingUserRequestId = 0
 const refreshButtons = computed(() =>
   top_buttons.value.filter((button) => button.event_action === 'refresh'),
 )
-const assignmentScopeOptions = [
-  { label: '当前', value: 'current' },
-  { label: '历史', value: 'history' },
-  { label: '未来', value: 'future' },
-  { label: '时间轴', value: 'timeline' },
-]
-
 const columns: QTableProps['columns'] = [
   { name: 'employee_no', field: 'employee_no', label: '员工编号', align: 'left', sortable: true },
   { name: 'name', field: 'name', label: '姓名', align: 'left', sortable: true },
@@ -687,3 +678,27 @@ onMounted(async () => {
   await fetchData()
 })
 </script>
+
+<style scoped>
+.assignment-section-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.assignment-scope-control {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .assignment-section-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .assignment-scope-control {
+    margin-left: 0;
+  }
+}
+</style>
