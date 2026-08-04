@@ -14,7 +14,6 @@ import (
 	"backend/model"
 	"backend/repository"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -96,7 +95,7 @@ func (s *SysDictService) CreateSysDict(ctx *gin.Context, req request.DictCreateR
 	}
 	err := copier.Copy(&data, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysDict"), zap.Error(err))
 		return 0, err
 	}
 	id, err := s.sf.GenerateUniqueID()

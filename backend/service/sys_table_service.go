@@ -178,7 +178,7 @@ func (s *SysTableService) CreateTable(ctx *gin.Context, req request.TableCreateR
 	}
 	err = copier.Copy(&data, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysTable"), zap.Error(err))
 		return err
 	}
 	id, err := s.sf.GenerateUniqueID()

@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -67,7 +68,7 @@ func (s *SysRoleService) CreateRole(ctx *gin.Context, req request.RoleCreateReq)
 	var role model.SysRole
 	err := copier.Copy(&role, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysRole"), zap.Error(err))
 		return err
 	}
 	id, err := s.sf.GenerateUniqueID()
@@ -108,7 +109,7 @@ func (s *SysRoleService) CreateRoleMenu(ctx *gin.Context, req request.RoleMenuCr
 	var data model.SysRoleMenu
 	err := copier.Copy(&data, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysRoleMenu"), zap.Error(err))
 		return err
 	}
 	return s.sysRoleMenuRepo.Create(s.sysRoleMenuRepo.DBWithContext(ctx), &data)

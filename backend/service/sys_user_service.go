@@ -17,7 +17,6 @@ import (
 	"backend/repository"
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -126,7 +125,7 @@ func (s *SysUserService) Create(ctx *gin.Context, req request.SysUserCreateReq) 
 	now := model.CustomTime(time.Now().UTC())
 	err := copier.Copy(&data, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysUser"), zap.Error(err))
 		return err
 	}
 	id, err := s.sf.GenerateUniqueID()

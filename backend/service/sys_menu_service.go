@@ -20,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -69,7 +70,7 @@ func (s *SysMenuService) CreateMenu(ctx *gin.Context, req request.MenuCreateReq)
 	var data model.SysMenu
 	err := copier.Copy(&data, &req)
 	if err != nil {
-		fmt.Println("Error during struct mapping:", err)
+		zap.L().Error("结构体字段映射失败", zap.String("target", "SysMenu"), zap.Error(err))
 		return err
 	}
 	id, err := s.sf.GenerateUniqueID()
