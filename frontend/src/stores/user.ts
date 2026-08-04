@@ -5,6 +5,7 @@ import { useConfigureStore } from './configure'
 import { Router as router } from 'src/router/index'
 import type { Role } from 'src/api/services/sys-role'
 import type { Menu } from 'src/api/services/sys-menu'
+import { clearAuthSessionStorage } from 'src/utils/auth-session-storage'
 
 interface User {
   roles: Role[]
@@ -97,7 +98,7 @@ export const useUserStore = defineStore('user', {
       this.roles = roles
     },
     setLogout() {
-      LocalStorage.clear()
+      clearAuthSessionStorage()
       this.$reset()
       const tagViewStore = useTagViewStore()
       tagViewStore.removeAllTagView()
