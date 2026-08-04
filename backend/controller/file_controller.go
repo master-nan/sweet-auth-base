@@ -47,9 +47,17 @@ type fileBusinessContext struct {
 	Action    enum.SysMenuButtonEventAction
 }
 
+type fileAccessPurpose string
+
+const (
+	fileAccessPurposePreview  fileAccessPurpose = "preview"
+	fileAccessPurposeDownload fileAccessPurpose = "download"
+)
+
 type signedFileAccessClaims struct {
-	FileUuid  string `json:"file_uuid"`
-	ExpiresAt int64  `json:"expires_at"`
+	FileUuid  string            `json:"file_uuid"`
+	ExpiresAt int64             `json:"expires_at"`
+	Purpose   fileAccessPurpose `json:"purpose"`
 }
 
 type fileAccessURLResponse struct {
@@ -346,7 +354,7 @@ func (f *FileController) PublicPreview(ctx *gin.Context) {
 // @Success 200 {object} response.Response "请求成功"
 // @Router /admin/file/preview-url/{uuid} [get]
 func (f *FileController) GetFilePreviewAccessURL(ctx *gin.Context) {
-	f.getSignedFileAccessURL(ctx, "preview")
+	f.getSignedFileAccessURL(ctx, fileAccessPurposePreview)
 }
 
 // GetFileDownloadAccessURL 生成短期签名文件下载 URL。
@@ -360,10 +368,10 @@ func (f *FileController) GetFilePreviewAccessURL(ctx *gin.Context) {
 // @Success 200 {object} response.Response "请求成功"
 // @Router /admin/file/download-url/{uuid} [get]
 func (f *FileController) GetFileDownloadAccessURL(ctx *gin.Context) {
-	f.getSignedFileAccessURL(ctx, "download")
+	f.getSignedFileAccessURL(ctx, fileAccessPurposeDownload)
 }
 
-func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, action string) {
+func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, purpose fileAccessPurpose) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 
@@ -392,6 +400,7 @@ func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, action string)
 	token, err := f.signFileAccessToken(signedFileAccessClaims{
 		FileUuid:  file.FileUuid,
 		ExpiresAt: expiresAt,
+		Purpose:   purpose,
 	})
 	if err != nil {
 		_ = ctx.Error(err)
@@ -399,7 +408,7 @@ func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, action string)
 	}
 
 	resp.SetData(fileAccessURLResponse{
-		URL:       signedFileAccessURL(f.config, action, file.FileUuid, token),
+		URL:       signedFileAccessURL(f.config, string(purpose), file.FileUuid, token),
 		ExpiresAt: expiresAt,
 	})
 }
@@ -414,7 +423,7 @@ func (f *FileController) getSignedFileAccessURL(ctx *gin.Context, action string)
 // @Success 200 {file} binary
 // @Router /files/access/preview/{uuid} [get]
 func (f *FileController) SignedPreview(ctx *gin.Context) {
-	f.signedAccess(ctx, false)
+	f.signedAccess(ctx, fileAccessPurposePreview, false)
 }
 
 // SignedDownload 通过短期签名 URL 下载文件。
@@ -427,17 +436,17 @@ func (f *FileController) SignedPreview(ctx *gin.Context) {
 // @Success 200 {file} binary
 // @Router /files/access/download/{uuid} [get]
 func (f *FileController) SignedDownload(ctx *gin.Context) {
-	f.signedAccess(ctx, true)
+	f.signedAccess(ctx, fileAccessPurposeDownload, true)
 }
 
-func (f *FileController) signedAccess(ctx *gin.Context, attachment bool) {
-	claims, err := f.verifyFileAccessToken(ctx.Query("token"))
+func (f *FileController) signedAccess(ctx *gin.Context, purpose fileAccessPurpose, attachment bool) {
+	claims, err := f.verifyFileAccessTokenForPurpose(ctx.Query("token"), purpose)
 	if err != nil {
-		_ = ctx.Error(myerrors.ErrFileNotFound)
+		_ = ctx.Error(err)
 		return
 	}
 	if ctx.Param("uuid") != claims.FileUuid {
-		_ = ctx.Error(myerrors.ErrFileNotFound)
+		_ = ctx.Error(myerrors.ErrFileAccessSignatureInvalid)
 		return
 	}
 	file, err := f.fileService.GetFileByUuid(claims.FileUuid)
@@ -732,6 +741,9 @@ func (f *FileController) signFileAccessToken(claims signedFileAccessClaims) (str
 	if strings.TrimSpace(claims.FileUuid) == "" || claims.ExpiresAt <= 0 {
 		return "", myerrors.ErrParamInvalid
 	}
+	if err := validateFileAccessPurpose(claims.Purpose); err != nil {
+		return "", err
+	}
 	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
@@ -746,24 +758,55 @@ func (f *FileController) verifyFileAccessToken(token string) (signedFileAccessCl
 	token = strings.TrimSpace(token)
 	parts := strings.Split(token, ".")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		return signedFileAccessClaims{}, myerrors.ErrParamInvalid
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureInvalid
 	}
 	expectedSignature := f.signFileAccessPayload(parts[0])
 	if !hmac.Equal([]byte(parts[1]), []byte(expectedSignature)) {
-		return signedFileAccessClaims{}, myerrors.ErrParamInvalid
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureInvalid
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return signedFileAccessClaims{}, err
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureInvalid
 	}
 	var claims signedFileAccessClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureInvalid
+	}
+	if strings.TrimSpace(claims.FileUuid) == "" {
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureInvalid
+	}
+	if claims.ExpiresAt <= time.Now().Unix() {
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessSignatureExpired
+	}
+	if err := validateFileAccessPurpose(claims.Purpose); err != nil {
 		return signedFileAccessClaims{}, err
 	}
-	if claims.FileUuid == "" || claims.ExpiresAt <= time.Now().Unix() {
-		return signedFileAccessClaims{}, myerrors.ErrParamInvalid
+	return claims, nil
+}
+
+func (f *FileController) verifyFileAccessTokenForPurpose(token string, purpose fileAccessPurpose) (signedFileAccessClaims, error) {
+	if err := validateFileAccessPurpose(purpose); err != nil {
+		return signedFileAccessClaims{}, err
+	}
+	claims, err := f.verifyFileAccessToken(token)
+	if err != nil {
+		return signedFileAccessClaims{}, err
+	}
+	if claims.Purpose != purpose {
+		return signedFileAccessClaims{}, myerrors.ErrFileAccessPurposeMismatch
 	}
 	return claims, nil
+}
+
+func validateFileAccessPurpose(purpose fileAccessPurpose) error {
+	switch purpose {
+	case fileAccessPurposePreview, fileAccessPurposeDownload:
+		return nil
+	case "":
+		return myerrors.ErrFileAccessPurposeMissing
+	default:
+		return myerrors.ErrFileAccessPurposeMismatch
+	}
 }
 
 // signFileAccessPayload 对 token payload 做 HMAC 签名。

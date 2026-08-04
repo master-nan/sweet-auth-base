@@ -2,6 +2,10 @@ package controller
 
 import (
 	"backend/config"
+	myerrors "backend/internal/errors"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -55,6 +59,7 @@ func TestSignedFileAccessTokenRoundTrip(t *testing.T) {
 	token, err := controller.signFileAccessToken(signedFileAccessClaims{
 		FileUuid:  "file-uuid",
 		ExpiresAt: expiresAt,
+		Purpose:   fileAccessPurposePreview,
 	})
 	if err != nil {
 		t.Fatalf("sign token: %v", err)
@@ -63,18 +68,53 @@ func TestSignedFileAccessTokenRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("verify token: %v", err)
 	}
-	if claims.FileUuid != "file-uuid" || claims.ExpiresAt != expiresAt {
+	if claims.FileUuid != "file-uuid" || claims.ExpiresAt != expiresAt || claims.Purpose != fileAccessPurposePreview {
 		t.Fatalf("unexpected claims: %+v", claims)
 	}
 }
 
+func TestSignedFileAccessTokenIsBoundToPurpose(t *testing.T) {
+	controller := newFileAccessTestController()
+	expiresAt := time.Now().Add(time.Minute).Unix()
+
+	previewToken, err := controller.signFileAccessToken(signedFileAccessClaims{
+		FileUuid:  "file-uuid",
+		ExpiresAt: expiresAt,
+		Purpose:   fileAccessPurposePreview,
+	})
+	if err != nil {
+		t.Fatalf("sign preview token: %v", err)
+	}
+	if _, err := controller.verifyFileAccessTokenForPurpose(previewToken, fileAccessPurposePreview); err != nil {
+		t.Fatalf("preview token should access preview: %v", err)
+	}
+	if _, err := controller.verifyFileAccessTokenForPurpose(previewToken, fileAccessPurposeDownload); !errors.Is(err, myerrors.ErrFileAccessPurposeMismatch) {
+		t.Fatalf("preview token should not access download, got %v", err)
+	}
+
+	downloadToken, err := controller.signFileAccessToken(signedFileAccessClaims{
+		FileUuid:  "file-uuid",
+		ExpiresAt: expiresAt,
+		Purpose:   fileAccessPurposeDownload,
+	})
+	if err != nil {
+		t.Fatalf("sign download token: %v", err)
+	}
+	if _, err := controller.verifyFileAccessTokenForPurpose(downloadToken, fileAccessPurposeDownload); err != nil {
+		t.Fatalf("download token should access download: %v", err)
+	}
+	if _, err := controller.verifyFileAccessTokenForPurpose(downloadToken, fileAccessPurposePreview); !errors.Is(err, myerrors.ErrFileAccessPurposeMismatch) {
+		t.Fatalf("download token should not access preview, got %v", err)
+	}
+}
+
 func TestSignedFileAccessTokenRejectsTamperingAndExpiredTokens(t *testing.T) {
-	controller := &FileController{config: &config.Server{}}
-	controller.config.Session.Secret = "test-file-access-secret"
+	controller := newFileAccessTestController()
 
 	token, err := controller.signFileAccessToken(signedFileAccessClaims{
 		FileUuid:  "file-uuid",
 		ExpiresAt: time.Now().Add(time.Minute).Unix(),
+		Purpose:   fileAccessPurposePreview,
 	})
 	if err != nil {
 		t.Fatalf("sign token: %v", err)
@@ -86,13 +126,80 @@ func TestSignedFileAccessTokenRejectsTamperingAndExpiredTokens(t *testing.T) {
 	expiredToken, err := controller.signFileAccessToken(signedFileAccessClaims{
 		FileUuid:  "file-uuid",
 		ExpiresAt: time.Now().Add(-time.Minute).Unix(),
+		Purpose:   fileAccessPurposePreview,
 	})
 	if err != nil {
 		t.Fatalf("sign expired token: %v", err)
 	}
-	if _, err := controller.verifyFileAccessToken(expiredToken); err == nil {
-		t.Fatal("expected expired token to be rejected")
+	if _, err := controller.verifyFileAccessToken(expiredToken); !errors.Is(err, myerrors.ErrFileAccessSignatureExpired) {
+		t.Fatalf("expected expired token error, got %v", err)
 	}
+}
+
+func TestSignedFileAccessTokenRejectsPurposeTamperingAndMissingPurpose(t *testing.T) {
+	controller := newFileAccessTestController()
+	expiresAt := time.Now().Add(time.Minute).Unix()
+	token, err := controller.signFileAccessToken(signedFileAccessClaims{
+		FileUuid:  "file-uuid",
+		ExpiresAt: expiresAt,
+		Purpose:   fileAccessPurposePreview,
+	})
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	parts := strings.Split(token, ".")
+	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("decode token payload: %v", err)
+	}
+	var claims signedFileAccessClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("unmarshal token payload: %v", err)
+	}
+	claims.Purpose = fileAccessPurposeDownload
+	tamperedPayload, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal tampered claims: %v", err)
+	}
+	tamperedToken := base64.RawURLEncoding.EncodeToString(tamperedPayload) + "." + parts[1]
+	if _, err := controller.verifyFileAccessToken(tamperedToken); !errors.Is(err, myerrors.ErrFileAccessSignatureInvalid) {
+		t.Fatalf("expected purpose tampering to invalidate signature, got %v", err)
+	}
+
+	legacyPayload, err := json.Marshal(struct {
+		FileUuid  string `json:"file_uuid"`
+		ExpiresAt int64  `json:"expires_at"`
+	}{
+		FileUuid:  "file-uuid",
+		ExpiresAt: expiresAt,
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy claims: %v", err)
+	}
+	encodedLegacyPayload := base64.RawURLEncoding.EncodeToString(legacyPayload)
+	legacyToken := encodedLegacyPayload + "." + controller.signFileAccessPayload(encodedLegacyPayload)
+	if _, err := controller.verifyFileAccessToken(legacyToken); !errors.Is(err, myerrors.ErrFileAccessPurposeMissing) {
+		t.Fatalf("expected token without purpose to be rejected, got %v", err)
+	}
+}
+
+func TestSignedFileAccessTokenRejectsMissingOrUnsupportedPurposeWhenSigning(t *testing.T) {
+	controller := newFileAccessTestController()
+	claims := signedFileAccessClaims{FileUuid: "file-uuid", ExpiresAt: time.Now().Add(time.Minute).Unix()}
+	if _, err := controller.signFileAccessToken(claims); !errors.Is(err, myerrors.ErrFileAccessPurposeMissing) {
+		t.Fatalf("expected missing purpose error, got %v", err)
+	}
+	claims.Purpose = "share"
+	if _, err := controller.signFileAccessToken(claims); !errors.Is(err, myerrors.ErrFileAccessPurposeMismatch) {
+		t.Fatalf("expected unsupported purpose error, got %v", err)
+	}
+}
+
+func newFileAccessTestController() *FileController {
+	controller := &FileController{config: &config.Server{}}
+	controller.config.Session.Secret = "test-file-access-secret"
+	return controller
 }
 
 func TestFileAccessTTLAndBaseURL(t *testing.T) {
