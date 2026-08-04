@@ -190,7 +190,6 @@ defineOptions({ name: 'organization_structure' })
 
 import { computed, onMounted, ref } from 'vue'
 import { Dark, date } from 'quasar'
-import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
 import type { OrganizationDetailGroup } from 'src/pages/organization/components/organization-read-only-detail'
@@ -224,12 +223,8 @@ interface SelectionSummary {
 
 const dictStore = useDictStore()
 const { top_buttons } = usePageButtons('organization_structure')
-const route = useRoute()
-const router = useRouter()
 
-const architectureMode = ref<ArchitectureMode>(
-  route.query.architecture === 'legal' ? 'legal' : 'management',
-)
+const architectureMode = ref<ArchitectureMode>('management')
 const structures = ref<OrganizationStructure[]>([])
 const selectedStructureCode = ref<string | null>(null)
 const managementTree = ref<StructureOrgTreeNode[]>([])
@@ -447,12 +442,6 @@ const handleArchitectureModeChange = async () => {
   treeKeyword.value = ''
   treeError.value = ''
   detailError.value = ''
-  await router.replace({
-    query: {
-      ...route.query,
-      architecture: architectureMode.value,
-    },
-  })
 
   if (architectureMode.value === 'legal') {
     if (!legalTreeLoaded.value) {

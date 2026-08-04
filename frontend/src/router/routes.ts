@@ -254,7 +254,6 @@ const asyncRoutesChildren: Route[] = [
         name: 'organization_legal_entity_legacy',
         redirect: {
           name: 'organization_structure',
-          query: { architecture: 'legal' },
         },
         meta: {
           title: '法人架构',

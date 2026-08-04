@@ -10,17 +10,7 @@ const apiMocks = vi.hoisted(() => ({
   getOrgUnitDetail: vi.fn(),
 }))
 
-const routerMocks = vi.hoisted(() => ({
-  route: { query: {} as Record<string, string> },
-  replace: vi.fn(),
-}))
-
 vi.mock('src/api/services/org', () => apiMocks)
-
-vi.mock('vue-router', () => ({
-  useRoute: () => routerMocks.route,
-  useRouter: () => ({ replace: routerMocks.replace }),
-}))
 
 vi.mock('src/stores/dict', () => ({
   useDictStore: () => ({
@@ -188,9 +178,6 @@ const mountPage = () =>
 describe('Organization read-only center', () => {
   beforeEach(() => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
-    routerMocks.route.query = {}
-    routerMocks.replace.mockReset()
-    routerMocks.replace.mockResolvedValue(undefined)
   })
 
   it('uses one organization page and hides the management-view selector for one Structure', async () => {
@@ -264,13 +251,12 @@ describe('Organization read-only center', () => {
     const wrapper = mountPage()
     await flushPromises()
 
+    const locationBeforeSwitch = window.location.href
     const architectureSelector = selectByLabel(wrapper, '架构类型')
     architectureSelector.vm.$emit('update:modelValue', 'legal')
     await flushPromises()
 
-    expect(routerMocks.replace).toHaveBeenCalledWith({
-      query: { architecture: 'legal' },
-    })
+    expect(window.location.href).toBe(locationBeforeSwitch)
     expect(apiMocks.getLegalEntityTree).toHaveBeenCalledWith({
       only_effective: true,
     })
@@ -290,19 +276,6 @@ describe('Organization read-only center', () => {
     expect(apiMocks.getLegalEntityDetail).toHaveBeenLastCalledWith(11, {
       only_effective: true,
     })
-  })
-
-  it('opens legal architecture directly for the legacy hidden route', async () => {
-    routerMocks.route.query = { architecture: 'legal' }
-    mockLegalTreeAndDetail()
-
-    const wrapper = mountPage()
-    await flushPromises()
-
-    expect(apiMocks.queryStructures).not.toHaveBeenCalled()
-    expect(apiMocks.getLegalEntityTree).toHaveBeenCalledTimes(1)
-    expect(selectByLabel(wrapper, '架构类型').attributes('data-model-value')).toBe('legal')
-    expect(wrapper.find('.organization-panel-title').text()).toBe('法人树')
   })
 
   it('keeps technical identifiers out of both detail modes', async () => {
