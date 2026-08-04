@@ -111,6 +111,9 @@ func TestFunctionalPermissionProjectionSeedIsIdempotentAndCoversStrictRoutes(t *
 	if err := autoMigrateCoreSchema(db); err != nil {
 		t.Fatalf("migrate core schema: %v", err)
 	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("migrate integration configuration schema: %v", err)
+	}
 	if err := migrateDataPermissionSchema(db); err != nil {
 		t.Fatalf("migrate data permission schema: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"backend/dto/response"
 	"backend/enum"
 	"backend/internal/asynctask"
+	"backend/internal/audit"
 	error2 "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
@@ -52,6 +53,10 @@ type TransactionalAuditRecord struct {
 
 type TransactionalAuditWriter interface {
 	RecordTransactionalAudit(*gin.Context, *gorm.DB, TransactionalAuditRecord) error
+}
+
+type StandardContextAuditWriter interface {
+	RecordTransactionalAuditContext(context.Context, *gorm.DB, TransactionalAuditRecord) error
 }
 
 type LogService struct {
@@ -157,6 +162,49 @@ func (ls *LogService) RecordTransactionalAudit(
 		Method:       method,
 		Ip:           ip,
 		Url:          path,
+		Action:       record.Action,
+		ResourceType: record.ResourceType,
+		ResourceCode: record.ResourceCode,
+		ResourceId:   record.ResourceId,
+		StatusCode:   http.StatusOK,
+		Success:      true,
+		Result:       "success",
+		Body:         string(body),
+	})
+}
+
+// RecordTransactionalAuditContext 供非 HTTP 耦合的新 Service 使用标准 Context 写入事务审计。
+func (ls *LogService) RecordTransactionalAuditContext(
+	ctx context.Context,
+	tx *gorm.DB,
+	record TransactionalAuditRecord,
+) error {
+	if tx == nil {
+		return ErrTransactionDatabaseRequired
+	}
+	if ls == nil || ls.accessLogRepository == nil {
+		return ErrTransactionalAuditRepositoryRequired
+	}
+	if ls.sf == nil {
+		return ErrTransactionalAuditGeneratorRequired
+	}
+	id, err := ls.sf.GenerateUniqueID()
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal(map[string]any{
+		"resource_id": record.ResourceId,
+		"changes":     record.Changes,
+	})
+	if err != nil {
+		return err
+	}
+	subject, _ := audit.GetAuditSubject(ctx)
+	return ls.accessLogRepository.Create(tx.WithContext(ctx), &model.AccessLog{
+		Basic:        model.Basic{Id: int(id)},
+		UserId:       subject.UserID,
+		UserName:     subject.UserName,
+		Method:       "AUDIT",
 		Action:       record.Action,
 		ResourceType: record.ResourceType,
 		ResourceCode: record.ResourceCode,

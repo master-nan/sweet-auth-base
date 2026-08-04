@@ -42,6 +42,7 @@ type App struct {
 	RoleController                 *controller.RoleController
 	UserController                 *controller.UserController
 	DataPermissionConfigController *controller.DataPermissionConfigController
+	ExternalSystemController       *controller.ExternalSystemController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -84,6 +85,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewSysRoleMenuRepositoryImpl,
 	impl.NewSysUserRoleRepositoryImpl,
 	impl.NewApplicationRepositoryImpl,
+	impl.NewExternalSystemRepositoryImpl,
 	impl.NewGeneralizationRepositoryImpl,
 	impl.NewReportDefinitionRepositoryImpl,
 	impl.NewReportDefinitionVersionRepositoryImpl,
@@ -129,6 +131,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.SysRoleMenuRepository), new(*impl.SysRoleMenuRepositoryImpl)),
 	wire.Bind(new(repository.SysUserRoleRepository), new(*impl.SysUserRoleRepositoryImpl)),
 	wire.Bind(new(repository.ApplicationRepository), new(*impl.ApplicationRepositoryImpl)),
+	wire.Bind(new(repository.ExternalSystemRepository), new(*impl.ExternalSystemRepositoryImpl)),
 	wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)),
@@ -186,6 +189,7 @@ var CacheProvider = wire.NewSet(
 var ServiceProvider = wire.NewSet(
 	service.NewLogServer,
 	wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)),
+	wire.Bind(new(service.StandardContextAuditWriter), new(*service.LogService)),
 	service.NewSysConfigureService,
 	service.NewSysDictService,
 	service.NewSysRoleService,
@@ -219,6 +223,7 @@ var ServiceProvider = wire.NewSet(
 	wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)),
 	service.NewCasbinRuleService,
 	service.NewApplicationService,
+	service.NewExternalSystemService,
 	service.NewDingTalkService,
 	service.NewSmsService,
 	service.NewFileService,
@@ -232,6 +237,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewRoleController,
 	controller.NewUserController,
 	controller.NewDataPermissionConfigController,
+	controller.NewExternalSystemController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
 	controller.NewReportController,

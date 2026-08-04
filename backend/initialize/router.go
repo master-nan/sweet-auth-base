@@ -204,6 +204,14 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/data-permission/config/preflight/policy/:id", app.DataPermissionConfigController.PreflightPolicy)
 		adminGroup.GET("/data-permission/config/preflight/grant/:id", app.DataPermissionConfigController.PreflightGrant)
 
+		// 集成中心 - 外部系统
+		adminGroup.POST("/integration/external-system/query", app.ExternalSystemController.Query)
+		adminGroup.GET("/integration/external-system/:id", app.ExternalSystemController.Detail)
+		adminGroup.POST("/integration/external-system", app.ExternalSystemController.Create)
+		adminGroup.PUT("/integration/external-system/:id", app.ExternalSystemController.Update)
+		adminGroup.PUT("/integration/external-system/:id/enable", app.ExternalSystemController.Enable)
+		adminGroup.PUT("/integration/external-system/:id/disable", app.ExternalSystemController.Disable)
+
 		// 组织法人主体只读镜像
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
 		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)

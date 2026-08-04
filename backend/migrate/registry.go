@@ -23,6 +23,7 @@ type seedStep struct {
 func migrationSteps() []migrationStep {
 	return []migrationStep{
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
+		{name: "integration_configuration_schema", run: migrateIntegrationConfigurationSchema},
 		{name: "data_permission_domain_schema", run: migrateDataPermissionSchema},
 		{name: "remove_legacy_data_permission_schema", run: removeLegacyDataPermissionSchema},
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
@@ -122,6 +123,9 @@ func platformSeedSteps() []seedStep {
 				return err
 			}
 			return seedOrganizationFoundation(db, sf)
+		}},
+		seedStep{name: "integration_configuration_foundation", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
+			return seedIntegrationConfigurationFoundation(db, sf)
 		}},
 		seedStep{name: "data_permission_dictionary_and_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedDataPermissionFoundation(db, sf)

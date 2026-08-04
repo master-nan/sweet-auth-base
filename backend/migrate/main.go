@@ -497,6 +497,26 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "外部系统类型",
+			code: "integration_external_system_type",
+			items: []systemDictItemSeed{
+				{name: "人力资源系统", code: "integration_external_system_type_hr", value: model.ExternalSystemTypeHR},
+				{name: "企业资源计划", code: "integration_external_system_type_erp", value: model.ExternalSystemTypeERP},
+				{name: "运输管理系统", code: "integration_external_system_type_tms", value: model.ExternalSystemTypeTMS},
+				{name: "仓储管理系统", code: "integration_external_system_type_wms", value: model.ExternalSystemTypeWMS},
+				{name: "其他系统", code: "integration_external_system_type_other", value: model.ExternalSystemTypeOther},
+			},
+		},
+		{
+			name: "外部系统状态",
+			code: "integration_external_system_status",
+			items: []systemDictItemSeed{
+				{name: "草稿", code: "integration_external_system_status_draft", value: model.ExternalSystemStatusDraft},
+				{name: "已启用", code: "integration_external_system_status_enabled", value: model.ExternalSystemStatusEnabled},
+				{name: "已停用", code: "integration_external_system_status_disabled", value: model.ExternalSystemStatusDisabled},
+			},
+		},
+		{
 			name: "字段类别",
 			code: "sys_table_field_category",
 			items: []systemDictItemSeed{
@@ -1922,6 +1942,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "report_definition", name: "报表定义"},
 		{code: "report_definition_version", name: "报表定义版本"},
 		{code: "report_execution_log", name: "报表执行日志"},
+		{code: externalSystemTableCode, name: "外部系统"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }
@@ -2100,6 +2121,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	}
 	applyMigrationSensitiveFieldDefaults(&field)
 	applyMigrationManagedFieldDefaults(&field)
+	applyExternalSystemFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
@@ -2235,10 +2257,98 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "report_source_type"
 		}
 	}
+	if tableCode == externalSystemTableCode {
+		switch fieldCode {
+		case "system_type":
+			return "integration_external_system_type"
+		case "status":
+			return "integration_external_system_status"
+		}
+	}
 	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
 		return "whether"
 	}
 	return ""
+}
+
+func applyExternalSystemFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != externalSystemTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+
+	switch field.FieldCode {
+	case "system_code":
+		field.FieldName = "系统编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 1
+	case "name":
+		field.FieldName = "系统名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 2
+	case "system_type":
+		field.FieldName = "系统类型"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_external_system_type")
+		field.Sequence = 3
+	case "base_url":
+		field.FieldName = "基础地址"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 4
+	case "owner_identifier":
+		field.FieldName = "负责人标识"
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 5
+	case "owner_name":
+		field.FieldName = "负责人"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 6
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_external_system_status")
+		field.Sequence = 7
+	case "description":
+		field.FieldName = "描述"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.TextareaInputType
+		field.Sequence = 8
+	case "revision":
+		field.FieldName = "版本"
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 9
+	}
 }
 
 func applyReportDefinitionFieldDefaults(tableCode string, field *model.SysTableField) {
@@ -2381,6 +2491,17 @@ func shouldUpdateSystemFieldName(existingName, tableCode, fieldCode string) bool
 }
 
 var systemTableFieldDisplayNameMap = map[string]map[string]string{
+	externalSystemTableCode: {
+		"system_code":      "系统编码",
+		"name":             "系统名称",
+		"system_type":      "系统类型",
+		"base_url":         "基础地址",
+		"owner_identifier": "负责人标识",
+		"owner_name":       "负责人",
+		"status":           "状态",
+		"description":      "描述",
+		"revision":         "版本",
+	},
 	"access_log": {
 		"method":        "操作",
 		"locality":      "地域",

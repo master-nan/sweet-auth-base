@@ -79,6 +79,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 	got := migrationStepNames(migrationSteps())
 	want := []string{
 		"auto_migrate_core_schema",
+		"integration_configuration_schema",
 		"data_permission_domain_schema",
 		"remove_legacy_data_permission_schema",
 		"ensure_sys_menu_option_text",
@@ -101,6 +102,7 @@ func TestPlatformSeedStepsRegistersMetadataAndPermissionBaselineOrder(t *testing
 		"lowcode_button_templates",
 		"menu_button_defaults_repair",
 		"sys_table_and_field_metadata",
+		"integration_configuration_foundation",
 		"data_permission_dictionary_and_metadata",
 		"sys_table_relation_metadata",
 		"functional_permission_projection",
