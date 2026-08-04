@@ -1,6 +1,7 @@
 package model
 
 import (
+	"backend/internal/audit"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -148,46 +149,57 @@ type Basic struct {
 }
 
 func (b *Basic) BeforeCreate(tx *gorm.DB) (err error) {
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if ok {
-		if userValue, exists := ctx.Get("user"); exists {
-			if user, ok := userValue.(SysUser); ok {
-				tx.Statement.SetColumn("create_user", user.Id)
-			}
-		}
+	if subject, ok := auditSubjectFromTransaction(tx); ok {
+		tx.Statement.SetColumn("create_user", subject.UserID)
 	}
 	return
 }
 
 func (b *Basic) BeforeUpdate(tx *gorm.DB) error {
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if ok {
-		if userValue, exists := ctx.Get("user"); exists {
-			if user, ok := userValue.(SysUser); ok {
-				tx.Statement.SetColumn("modify_user", user.Id)
-			}
-		}
+	if subject, ok := auditSubjectFromTransaction(tx); ok {
+		tx.Statement.SetColumn("modify_user", subject.UserID)
 	}
 	return nil
 }
 
 func (b *Basic) BeforeDelete(tx *gorm.DB) error {
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if ok {
-		if userValue, exists := ctx.Get("user"); exists {
-			if user, ok := userValue.(SysUser); ok {
-				tx.Statement.AddClause(clause.Update{})
-				tx.Statement.AddClause(clause.Set{
-					{Column: clause.Column{Name: "delete_user"}, Value: user.Id},
-					{Column: clause.Column{Name: "gmt_delete"}, Value: Now()},
-				})
-				tx.Statement.Build(
-					clause.Update{}.Name(),
-					clause.Set{}.Name(),
-					clause.Where{}.Name(),
-				)
-			}
-		}
+	subject, ok := auditSubjectFromTransaction(tx)
+	if !ok {
+		return nil
 	}
+	tx.Statement.AddClause(clause.Update{})
+	tx.Statement.AddClause(clause.Set{
+		{Column: clause.Column{Name: "delete_user"}, Value: subject.UserID},
+		{Column: clause.Column{Name: "gmt_delete"}, Value: Now()},
+	})
+	tx.Statement.Build(
+		clause.Update{}.Name(),
+		clause.Set{}.Name(),
+		clause.Where{}.Name(),
+	)
 	return nil
+}
+
+// auditSubjectFromTransaction 优先读取标准 Context，并保留 Gin 上下文兼容读取。
+func auditSubjectFromTransaction(tx *gorm.DB) (audit.AuditSubject, bool) {
+	if tx == nil || tx.Statement == nil {
+		return audit.AuditSubject{}, false
+	}
+	if subject, ok := audit.GetAuditSubject(tx.Statement.Context); ok {
+		return subject, true
+	}
+	ctx, ok := tx.Statement.Context.(*gin.Context)
+	if !ok {
+		return audit.AuditSubject{}, false
+	}
+	userValue, exists := ctx.Get("user")
+	if !exists {
+		return audit.AuditSubject{}, false
+	}
+	user, ok := userValue.(SysUser)
+	if !ok {
+		return audit.AuditSubject{}, false
+	}
+	subject := audit.NewAuditSubject(user.Id, user.UserName)
+	return subject, subject.Valid()
 }

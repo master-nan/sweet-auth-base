@@ -9,6 +9,7 @@ import (
 	"backend/config"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/cache"
 	error2 "backend/internal/errors"
 	"backend/internal/token"
@@ -84,6 +85,7 @@ func AuthHandler(serverConfig *config.Server, tokenGenerator token.Generator, us
 		c.Set("user", user)
 		c.Set("id", i)
 		c.Set("token_subject", claims.ID)
+		InjectAuditSubject(c, audit.NewAuditSubject(user.Id, user.UserName))
 		c.Next()
 		zap.L().Info("AuthHandler end")
 	}
