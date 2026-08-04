@@ -96,7 +96,7 @@ func (m *MenuController) UpdateMenu(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	var data request.MenuUpdateReq
@@ -260,7 +260,7 @@ func (m *MenuController) GetMenuButtons(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	menuId, err := strconv.Atoi(ctx.Param("menuId"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	data, err := m.sysMenuService.GetMenuButtonsByMenuIdResponse(menuId)
@@ -312,7 +312,7 @@ func (m *MenuController) UpdateMenuButton(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	var data request.MenuButtonUpdateReq

@@ -256,7 +256,7 @@ func (b *BasicController) UpdateConfigure(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	translator := b.translators["zh"]
@@ -340,7 +340,7 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	logData, err := b.logService.GetAccessLogById(ctx, id)

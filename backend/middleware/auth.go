@@ -61,7 +61,7 @@ func AuthHandler(serverConfig *config.Server, tokenGenerator token.Generator, us
 		}
 		i, err := strconv.Atoi(claims.ID)
 		if err != nil {
-			_ = c.Error(error2.NewBadRequestError(err.Error()))
+			_ = c.Error(error2.ErrTokenInvalid)
 			c.Abort()
 			return
 		}
@@ -72,7 +72,7 @@ func AuthHandler(serverConfig *config.Server, tokenGenerator token.Generator, us
 			case errors.As(err, &e):
 				_ = c.Error(err)
 			default:
-				_ = c.Error(error2.NewBadRequestError(err.Error()))
+				_ = c.Error(error2.WrapSystemError(err))
 			}
 			c.Abort()
 			return

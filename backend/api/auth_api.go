@@ -156,7 +156,7 @@ func (a *AuthApi) SendSms(ctx *gin.Context) {
 		if err == io.EOF || err.Error() == "EOF" {
 			data = map[string]interface{}{}
 		} else {
-			_ = ctx.Error(errors.NewBadRequestError(err.Error()))
+			_ = ctx.Error(errors.WrapParameterError(err, "请求参数格式错误"))
 			return
 		}
 	}

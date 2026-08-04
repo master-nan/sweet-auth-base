@@ -71,7 +71,7 @@ func (t *DictController) GetSysDictByCode(ctx *gin.Context) {
 	code := utils.SanitizeInput(ctx.Param("code"))
 	data, err := t.sysDictService.GetSysDictByCode(code)
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(err)
 		return
 	}
 	resp.SetData(data)
@@ -156,7 +156,7 @@ func (t *DictController) UpdateSysDict(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	var data request.DictUpdateReq
@@ -287,7 +287,7 @@ func (t *DictController) UpdateSysDictItem(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	translator := t.translators["zh"]

@@ -240,7 +240,7 @@ func (u *UserController) UpdateUser(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	var data request.SysUserUpdateReq
@@ -264,7 +264,7 @@ func (u *UserController) AssignRoles(ctx *gin.Context) {
 	ctx.Set("response", resp)
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError(err.Error()))
+		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
 	var data request.SysUserAssignRolesReq

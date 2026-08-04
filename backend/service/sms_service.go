@@ -78,7 +78,7 @@ func (s *SmsService) SendSms(
 	// 解析模版参数列表（存储为 JSON 格式）
 	var expectedKeys []string
 	if err := json.Unmarshal(smsTemp.TemplateParams, &expectedKeys); err != nil {
-		return nil, error2.NewBadRequestError("解析模板参数失败" + err.Error())
+		return nil, error2.WrapSystemError(err)
 	}
 	client, err := sms.GetSmsClient(s.serverConfig.ALiYun.SMS.AccessKeyId, s.serverConfig.ALiYun.SMS.AccessKeySecret)
 	if err != nil {
