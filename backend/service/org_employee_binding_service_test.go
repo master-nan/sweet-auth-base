@@ -320,7 +320,6 @@ func TestOrgServiceEmployeeUserBindingRollsBackWhenAuditFails(t *testing.T) {
 }
 
 func employeeBindingContext(employeeId int) *gin.Context {
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(
 		http.MethodPost,

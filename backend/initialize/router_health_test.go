@@ -11,7 +11,6 @@ import (
 )
 
 func TestReadinessHandlerReportsMissingDependencies(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/readyz", readinessHandler(&App{}))
 

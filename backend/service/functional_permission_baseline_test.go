@@ -84,7 +84,6 @@ func TestAssignPermissionsPersistsMenuAndButtonGrantsAndBuildsCasbinPolicy(t *te
 		impl.NewCasbinRuleRepositoryImpl(primaryDB, enforcer),
 		sf,
 	)
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 
 	err = svc.AssignPermissions(ctx, request.RoleAssignPermissionsReq{
@@ -205,7 +204,6 @@ func TestAssignPermissionsPreservesSeededRoutePolicyRepresentedByPermissionButto
 		impl.NewCasbinRuleRepositoryImpl(primaryDB, enforcer),
 		sf,
 	)
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 
 	if err = svc.AssignPermissions(ctx, request.RoleAssignPermissionsReq{

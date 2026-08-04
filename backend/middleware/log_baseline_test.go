@@ -172,7 +172,6 @@ func TestLogHandlerDoesNotDuplicateCommittedTransactionalAudit(t *testing.T) {
 
 func newLogBaselineEngine(t *testing.T, writer accessLogWriter) *gin.Engine {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	restoreLogger := zap.ReplaceGlobals(zap.NewNop())
 	t.Cleanup(restoreLogger)
 

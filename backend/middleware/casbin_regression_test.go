@@ -121,7 +121,6 @@ func TestCasbinHandlerMultiRoleUsesAnyAllowedRole(t *testing.T) {
 		t.Fatalf("add policy: %v", err)
 	}
 
-	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(responseMiddlewareForAuthorizationTest())
 	router.Use(func(ctx *gin.Context) {
@@ -251,7 +250,6 @@ func TestCasbinHandlerDiagnosticsCompareAllowedAndDeniedDecisions(t *testing.T) 
 }
 
 func newAuthorizationRegressionRouter(enforcer authorizationEnforcer) *gin.Engine {
-	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(responseMiddlewareForAuthorizationTest())
 	router.Use(func(ctx *gin.Context) {

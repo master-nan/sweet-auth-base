@@ -102,7 +102,6 @@ func TestResponseHandlerClassifiesRawParameterError(t *testing.T) {
 func performResponseRequest(t *testing.T, handler gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 
-	gin.SetMode(gin.TestMode)
 	restoreLogger := zap.ReplaceGlobals(zap.NewNop())
 	t.Cleanup(restoreLogger)
 

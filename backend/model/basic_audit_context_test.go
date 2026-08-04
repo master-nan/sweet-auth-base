@@ -47,7 +47,6 @@ func TestBasicHooksReadAuditSubjectFromStandardContext(t *testing.T) {
 }
 
 func TestBasicHooksKeepGinContextCompatibility(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)

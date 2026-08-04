@@ -2,11 +2,11 @@ package model_test
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
+	testutil "backend/internal/test"
 	"backend/model"
 
 	"gorm.io/driver/postgres"
@@ -16,10 +16,7 @@ import (
 )
 
 func TestOrganizationPostgreSQLPartialUniqueConstraints(t *testing.T) {
-	dsn := os.Getenv("SWEET_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("set SWEET_TEST_POSTGRES_DSN to verify PostgreSQL partial unique constraints")
-	}
+	dsn := testutil.PostgreSQLDSN(t)
 
 	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),

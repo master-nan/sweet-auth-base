@@ -10,7 +10,6 @@ import (
 )
 
 func TestInjectAuditSubjectWritesStandardRequestContext(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/audit-subject", nil)
 
@@ -26,7 +25,6 @@ func TestInjectAuditSubjectWritesStandardRequestContext(t *testing.T) {
 }
 
 func TestInjectAuditSubjectHandlesMissingRequest(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 
 	InjectAuditSubject(ctx, audit.NewAuditSubject(27, "middleware-user"))

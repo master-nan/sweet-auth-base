@@ -344,7 +344,6 @@ func TestReportTableWithPreviewFieldsEnablesConfiguredNonListFields(t *testing.T
 }
 
 func TestInferSQLFields(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	svc := newReportServiceForConfigTest(t)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	fields, err := svc.InferSQLFields(ctx, request.ReportSQLFieldsReq{

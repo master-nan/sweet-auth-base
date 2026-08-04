@@ -31,7 +31,6 @@ func TestResolverSummaryUsesWhitelistSerializationAndRequestContext(t *testing.T
 		}
 	}
 
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(nil)
 	if err = StoreResolverSummary(ctx, summary); err != nil {
 		t.Fatalf("store Resolver summary: %v", err)

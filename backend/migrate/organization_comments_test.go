@@ -1,9 +1,9 @@
 package main
 
 import (
+	testutil "backend/internal/test"
 	"backend/model"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -160,10 +160,7 @@ func TestOrganizationDatabaseCommentHelpersRejectMissingAndUnknownColumns(t *tes
 }
 
 func TestOrganizationDatabaseCommentsPersistOnPostgreSQLWithoutSchemaChanges(t *testing.T) {
-	dsn := os.Getenv("SWEET_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("set SWEET_TEST_POSTGRES_DSN to verify PostgreSQL organization comments")
-	}
+	dsn := testutil.PostgreSQLDSN(t)
 
 	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),

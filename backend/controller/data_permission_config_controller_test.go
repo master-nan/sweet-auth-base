@@ -910,7 +910,6 @@ func newDataPermissionConfigControllerTestRouter(
 	roleName string,
 ) (*gin.Engine, *casbin.Enforcer) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	restoreLogger := zap.ReplaceGlobals(zap.NewNop())
 	t.Cleanup(restoreLogger)
 

@@ -122,7 +122,6 @@ func TestLogServiceRecordTransactionalAuditUsesCallerTransactionAndSafeFields(t 
 	}
 	logService := NewLogServer(nil, impl.NewAccessLogRepositoryImpl(primaryDB), sf)
 
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(
 		http.MethodPost,

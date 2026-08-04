@@ -185,7 +185,6 @@ func TestReportV1ARunRejectsUnpublishedVersionStatus(t *testing.T) {
 
 func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	sf, err := utils.NewSnowflake(1)
 	if err != nil {
 		t.Fatalf("create snowflake: %v", err)

@@ -13,7 +13,6 @@ import (
 )
 
 func TestDetachedTaskContextCopiesRequestAndActorFields(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	requestContext, cancelRequest := context.WithCancel(context.Background())
 	request := httptest.NewRequest(http.MethodGet, "/async-audit", nil).WithContext(requestContext)
 	request.Header.Set(RequestIDHeader, "request-copy-1")

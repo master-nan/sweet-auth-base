@@ -1,10 +1,10 @@
 package main
 
 import (
+	testutil "backend/internal/test"
 	"backend/model"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -146,10 +146,7 @@ func TestDataPermissionDomainMigrationEnforcesPortableConstraints(t *testing.T) 
 }
 
 func TestDataPermissionDomainMigrationPostgreSQLConstraints(t *testing.T) {
-	dsn := os.Getenv("SWEET_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("set SWEET_TEST_POSTGRES_DSN to verify PostgreSQL data permission constraints")
-	}
+	dsn := testutil.PostgreSQLDSN(t)
 
 	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),

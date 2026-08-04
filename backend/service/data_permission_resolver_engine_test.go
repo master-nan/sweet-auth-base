@@ -43,7 +43,6 @@ func TestDataPermissionResolverEngineCombinesPolicyRulesWithAnd(t *testing.T) {
 func TestDataPermissionResolverEnginePublishesSafeSummaryAndUsesRequestCache(t *testing.T) {
 	resolver, state := newGrantMergeResolver(t)
 	state.grants = append(state.grants, grantMergeGrant(411, 7, state.grants[0].PolicyId))
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 
 	result, err := resolver.Resolve(ctx, policyResolverInput(t))

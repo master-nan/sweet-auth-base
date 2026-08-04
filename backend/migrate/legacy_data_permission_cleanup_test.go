@@ -1,9 +1,9 @@
 package main
 
 import (
+	testutil "backend/internal/test"
 	"backend/model"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -80,10 +80,7 @@ func TestRemoveLegacyDataPermissionSchemaIsIdempotentAndPreservesNewDomain(t *te
 }
 
 func TestRemoveLegacyDataPermissionSchemaPostgreSQL(t *testing.T) {
-	dsn := os.Getenv("SWEET_TEST_POSTGRES_DSN")
-	if dsn == "" {
-		t.Skip("set SWEET_TEST_POSTGRES_DSN to verify PostgreSQL legacy cleanup")
-	}
+	dsn := testutil.PostgreSQLDSN(t)
 
 	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),

@@ -331,7 +331,6 @@ func newOrgControllerTestRouter(
 	roleName string,
 ) (*gin.Engine, *gorm.DB, *casbin.Enforcer) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	restoreLogger := zap.ReplaceGlobals(zap.NewNop())
 	t.Cleanup(restoreLogger)
 

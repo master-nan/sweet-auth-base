@@ -228,7 +228,6 @@ func newTestEnforcer(t *testing.T) *casbin.Enforcer {
 }
 
 func newCasbinTestRouter(enforcer *casbin.Enforcer, options CasbinOptions, called *bool) *gin.Engine {
-	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(ctx *gin.Context) {
 		ctx.Set("user", model.SysUser{UserName: "tester", Roles: []model.SysRole{{Name: "tester"}}})
@@ -244,7 +243,6 @@ func newCasbinTestRouter(enforcer *casbin.Enforcer, options CasbinOptions, calle
 
 func newRoleProtectedRouter(t *testing.T, enforcer *casbin.Enforcer, roleName string, called *bool) *gin.Engine {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(ctx *gin.Context) {
 		ctx.Set("user", model.SysUser{UserName: "tester", Roles: []model.SysRole{{Name: roleName}}})
