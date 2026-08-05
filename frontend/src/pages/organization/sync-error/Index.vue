@@ -1,8 +1,8 @@
 <template>
   <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
-    <scrollable-table
+    <q-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
-      class="fit"
+      class="fit sticky-header-table"
       flat
       bordered
       separator="cell"
@@ -82,7 +82,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </scrollable-table>
+    </q-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -135,7 +135,6 @@ import { useRoute } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
-import ScrollableTable from 'src/components/Table/ScrollableTable.vue'
 import {
   getSyncRecordDetail,
   getSyncRecordError,

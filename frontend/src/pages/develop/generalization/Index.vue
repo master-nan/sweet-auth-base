@@ -378,9 +378,9 @@
       </template>
     </master-detail-page>
 
-    <scrollable-table
+    <q-table
       v-else
-      class="fit"
+      class="fit sticky-header-table"
       color="primary"
       selection="multiple"
       v-model:selected="selected"
@@ -522,7 +522,7 @@
           </div>
         </div>
       </template>
-    </scrollable-table>
+    </q-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -577,7 +577,6 @@ defineOptions({ name: 'generalization_page' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
-import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'

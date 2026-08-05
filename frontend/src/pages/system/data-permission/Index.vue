@@ -66,8 +66,8 @@
             class="data-permission-panel"
             :data-panel="tab"
           >
-            <scrollable-table
-              class="fit data-permission-table"
+            <q-table
+              class="fit sticky-header-table data-permission-table"
               color="primary"
               :dense="isCompactTable"
               :rows="rowsByTab[tab]"
@@ -185,7 +185,7 @@
                   @update:page-size="setTabPageSize(tab, $event)"
                 />
               </template>
-            </scrollable-table>
+            </q-table>
           </section>
 
           <section
@@ -247,8 +247,8 @@
               {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
             </q-banner>
 
-            <scrollable-table
-              class="col q-mt-md data-permission-table"
+            <q-table
+              class="col q-mt-md sticky-header-table data-permission-table"
               :rows="preflightResult?.errors || []"
               :columns="preflightColumns"
               row-key="code"
@@ -293,7 +293,6 @@ import { useRoute } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
-import ScrollableTable from 'src/components/Table/ScrollableTable.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DataPermissionConfigDialog from './components/DataPermissionConfigDialog.vue'
 import DataPermissionDetailDialog from './components/DataPermissionDetailDialog.vue'

@@ -1,8 +1,8 @@
 <template>
   <base-content class="q-pa-sm">
-    <scrollable-table
+    <q-table
       v-model:pagination="pagination"
-      class="fit"
+      class="fit sticky-header-table"
       color="primary"
       :dense="$q.screen.lt.md"
       separator="cell"
@@ -117,7 +117,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" />
       </template>
-    </scrollable-table>
+    </q-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -150,7 +150,6 @@ import { type QTableProps, useQuasar } from 'quasar'
 import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
-import ScrollableTable from 'src/components/Table/ScrollableTable.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import ExternalSystemDetailDialog from './ExternalSystemDetailDialog.vue'
