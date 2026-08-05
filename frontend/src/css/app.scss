@@ -86,23 +86,61 @@ body {
   background: transparent !important;
 }
 
+.q-table__container {
+  --app-table-scrollbar-size: 6px;
+}
+
 .q-table__middle {
   overflow: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: auto;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
-.q-table__middle::-webkit-scrollbar-thumb {
+.q-table__middle::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
   background: transparent;
 }
 
-.q-table__middle:hover {
+.q-table__middle::-webkit-scrollbar-track,
+.q-table__middle::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.q-table__middle::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  background-clip: padding-box;
+}
+
+.q-table__container:hover .q-table__middle,
+.q-table__container:focus-within .q-table__middle {
   scrollbar-color: var(--app-scrollbar-thumb) transparent;
 }
 
-.q-table__middle:hover::-webkit-scrollbar-thumb {
+.q-table__container:hover .q-table__middle::-webkit-scrollbar-thumb,
+.q-table__container:focus-within .q-table__middle::-webkit-scrollbar-thumb {
   background: var(--app-scrollbar-thumb);
   background-clip: padding-box;
+}
+
+.q-table__middle::-webkit-scrollbar-thumb:hover {
+  background: var(--app-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+@media (hover: none) {
+  .q-table__middle {
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  }
+
+  .q-table__middle::-webkit-scrollbar-thumb {
+    background: var(--app-scrollbar-thumb);
+    background-clip: padding-box;
+  }
 }
 
 input[type='number'] {
