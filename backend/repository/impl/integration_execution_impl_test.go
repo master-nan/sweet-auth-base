@@ -4,8 +4,10 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/database"
+	"backend/internal/datapermission"
 	testutil "backend/internal/test"
 	"backend/model"
+	"backend/repository"
 	"context"
 	"testing"
 )
@@ -39,9 +41,22 @@ func TestIntegrationExecutionRepositoryDomainQueriesAndPagination(t *testing.T) 
 	}
 
 	basic := request.Basic{Page: 1, Num: 10, Filters: map[string]any{"status": model.IntegrationExecutionStatusCreated}}
-	page, err := executions.GetIntegrationExecutionList(context.Background(), &basic, integrationExecutionQueryTableForTest())
+	notApplicableExecution := generalizationRepositoryExecution(
+		t, model.DataPermissionOperationQuery, datapermission.DataScopeDecisionNotApplicable, nil,
+	)
+	permission := repository.GeneralizationPermission{AdapterExecution: &notApplicableExecution}
+	page, err := executions.GetIntegrationExecutionList(context.Background(), &basic, integrationExecutionQueryTableForTest(), permission)
 	if err != nil || page.Total != 2 || len(page.Data) != 2 {
 		t.Fatalf("page = %+v err=%v", page, err)
+	}
+	detailExecution := generalizationRepositoryExecution(
+		t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable, nil,
+	)
+	if detail, detailErr := executions.FindByIDWithPermission(
+		context.Background(), 1, integrationExecutionQueryTableForTest(),
+		repository.GeneralizationPermission{AdapterExecution: &detailExecution},
+	); detailErr != nil || detail.ExecutionNo != "INT-001" {
+		t.Fatalf("permission detail = %+v err=%v", detail, detailErr)
 	}
 
 	startedAt := model.Now()

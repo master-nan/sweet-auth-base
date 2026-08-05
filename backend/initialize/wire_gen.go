@@ -132,10 +132,9 @@ func InitializeApp() (*App, error) {
 	}
 	credentialService := service.NewCredentialService(credentialRepositoryImpl, externalSystemRepositoryImpl, credentialSecretProtector, snowflake, logService)
 	credentialController := controller.NewCredentialController(credentialService, v2)
-	applicationRepositoryImpl := impl.NewApplicationRepositoryImpl(primaryDB)
-	applicationCache := cache.NewApplicationCache(redisUtil)
-	applicationService := service.NewApplicationService(applicationRepositoryImpl, applicationCache, snowflake)
-	applicationController := controller.NewApplicationController(applicationService, sysTableService, v2)
+	integrationExecutionRepositoryImpl := impl.NewIntegrationExecutionRepositoryImpl(primaryDB)
+	integrationLogRepositoryImpl := impl.NewIntegrationLogRepositoryImpl(primaryDB)
+	integrationExecutionService := service.NewIntegrationExecutionService(integrationExecutionRepositoryImpl, integrationLogRepositoryImpl, externalSystemRepositoryImpl, interfaceDefinitionRepositoryImpl, snowflake, logService)
 	generalizationRepositoryImpl := impl.NewGeneralizationRepositoryImpl(primaryDB)
 	orgLegalEntityRepositoryImpl := impl.NewOrgLegalEntityRepositoryImpl(primaryDB)
 	orgUnitRepositoryImpl := impl.NewOrgUnitRepositoryImpl(primaryDB)
@@ -157,6 +156,11 @@ func InitializeApp() (*App, error) {
 	}
 	lowCodeDataPermissionRuntime := service.NewLowCodeDataPermissionRuntime(dataResourceRepositoryImpl, dataOwnershipFieldRepositoryImpl, subjectContextBuilder, dataPermissionPolicyResolver, metadataFieldAdapter)
 	generalizationService := service.NewGeneralizationServiceWithDataPermission(generalizationRepositoryImpl, snowflake, lowCodeDataPermissionRuntime)
+	integrationExecutionController := controller.NewIntegrationExecutionController(integrationExecutionService, sysTableService, generalizationService, v2)
+	applicationRepositoryImpl := impl.NewApplicationRepositoryImpl(primaryDB)
+	applicationCache := cache.NewApplicationCache(redisUtil)
+	applicationService := service.NewApplicationService(applicationRepositoryImpl, applicationCache, snowflake)
+	applicationController := controller.NewApplicationController(applicationService, sysTableService, v2)
 	generalizationController := controller.NewGeneralizationController(generalizationService, sysTableService, sysMenuService, v2)
 	reportDefinitionRepositoryImpl := impl.NewReportDefinitionRepositoryImpl(primaryDB)
 	reportDefinitionVersionRepositoryImpl := impl.NewReportDefinitionVersionRepositoryImpl(primaryDB)
@@ -204,6 +208,7 @@ func InitializeApp() (*App, error) {
 		ExternalSystemController:       externalSystemController,
 		InterfaceDefinitionController:  interfaceDefinitionController,
 		CredentialController:           credentialController,
+		IntegrationExecutionController: integrationExecutionController,
 		ApplicationController:          applicationController,
 		GeneralizationController:       generalizationController,
 		ReportController:               reportController,
@@ -246,6 +251,7 @@ type App struct {
 	ExternalSystemController       *controller.ExternalSystemController
 	InterfaceDefinitionController  *controller.InterfaceDefinitionController
 	CredentialController           *controller.CredentialController
+	IntegrationExecutionController *controller.IntegrationExecutionController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -283,7 +289,7 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.Tr
 )
 
 // Controller 提供者
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
 
 // API 提供者
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)

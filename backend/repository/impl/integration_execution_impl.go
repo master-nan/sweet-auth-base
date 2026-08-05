@@ -6,6 +6,7 @@ import (
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository"
+	queryutil "backend/repository/util"
 	"context"
 
 	"gorm.io/gorm"
@@ -25,10 +26,33 @@ func (r *IntegrationExecutionRepositoryImpl) GetIntegrationExecutionList(
 	ctx context.Context,
 	basic *request.Basic,
 	table model.SysTable,
+	permission repository.GeneralizationPermission,
 ) (response.ListResult[model.IntegrationExecution], error) {
 	var values []model.IntegrationExecution
-	total, err := r.WithContext(ctx).PaginateAndCountAsync(basic, &values, table)
+	query := queryutil.ExecuteQuery(r.DBWithContext(ctx).Table(table.TableCode), basic, table)
+	query, err := queryutil.ApplyGeneralizationPermission(query, permission, table)
+	if err != nil {
+		return response.ListResult[model.IntegrationExecution]{}, err
+	}
+	total, err := r.PaginateAndCountQuery(query, &values)
 	return response.ListResult[model.IntegrationExecution]{Data: values, Total: int(total)}, err
+}
+
+func (r *IntegrationExecutionRepositoryImpl) FindByIDWithPermission(
+	ctx context.Context,
+	id int,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (model.IntegrationExecution, error) {
+	var value model.IntegrationExecution
+	query, err := queryutil.ApplyGeneralizationPermission(
+		r.DBWithContext(ctx).Table(table.TableCode), permission, table,
+	)
+	if err != nil {
+		return value, err
+	}
+	err = query.Where(table.TableCode+".id = ?", id).Take(&value).Error
+	return value, err
 }
 
 func (r *IntegrationExecutionRepositoryImpl) FindByIdempotency(

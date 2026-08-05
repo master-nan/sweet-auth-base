@@ -139,6 +139,22 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 	return count.total, nil
 }
 
+// PaginateAndCountQuery 对已经应用领域过滤或权限过滤的查询执行一致的分页与计数。
+// 查询由调用方构造，本方法不重新解释筛选条件，也不并发复用事务连接。
+func (b *BasicRepositoryImpl[T]) PaginateAndCountQuery(query *gorm.DB, result interface{}) (int64, error) {
+	if query == nil {
+		return 0, gorm.ErrInvalidDB
+	}
+	total, err := b.Count(query.Session(&gorm.Session{}))
+	if err != nil {
+		return 0, err
+	}
+	if err = b.applyReadOptions(query.Session(&gorm.Session{})).Find(result).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 func (b *BasicRepositoryImpl[T]) Create(tx *gorm.DB, entity interface{}) error {
 	return tx.Model(b.model).Create(entity).Error
 }

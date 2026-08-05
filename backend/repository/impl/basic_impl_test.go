@@ -133,6 +133,25 @@ func TestBasicRepositoryPaginateAndCountAsyncUsesTransactionSequentially(t *test
 	}
 }
 
+func TestBasicRepositoryPaginateAndCountQueryPreservesScopedFilter(t *testing.T) {
+	db := testutil.OpenSQLite(t, &basicRepositoryFindByFieldFixture{})
+	for id, name := range []string{"allowed-1", "denied", "allowed-2"} {
+		if err := db.Create(&basicRepositoryFindByFieldFixture{
+			Basic: model.Basic{Id: id + 1, State: true}, Name: name,
+		}).Error; err != nil {
+			t.Fatalf("create fixture: %v", err)
+		}
+	}
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	query := db.Model(&basicRepositoryFindByFieldFixture{}).
+		Where("name LIKE ?", "allowed-%").Order("id ASC").Limit(1).Offset(1)
+	var rows []basicRepositoryFindByFieldFixture
+	total, err := repo.PaginateAndCountQuery(query, &rows)
+	if err != nil || total != 2 || len(rows) != 1 || rows[0].Name != "allowed-2" {
+		t.Fatalf("scoped page total=%d rows=%+v err=%v", total, rows, err)
+	}
+}
+
 func TestBasicRepositoryFindByFieldScansIntoEntity(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:basic_repo_find?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

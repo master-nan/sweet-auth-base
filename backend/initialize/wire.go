@@ -46,6 +46,7 @@ type App struct {
 	ExternalSystemController       *controller.ExternalSystemController
 	InterfaceDefinitionController  *controller.InterfaceDefinitionController
 	CredentialController           *controller.CredentialController
+	IntegrationExecutionController *controller.IntegrationExecutionController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -255,6 +256,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewExternalSystemController,
 	controller.NewInterfaceDefinitionController,
 	controller.NewCredentialController,
+	controller.NewIntegrationExecutionController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
 	controller.NewReportController,

@@ -123,6 +123,24 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if rootMenu.Title != "router.integration.default" {
 		t.Fatalf("integration root menu title = %q", rootMenu.Title)
 	}
+	var executionButtonCount int64
+	if err := db.Model(&model.SysMenuButton{}).
+		Where("menu_id = ? AND code LIKE ?", rootMenu.Id, "integration_execution_%").
+		Count(&executionButtonCount).Error; err != nil {
+		t.Fatalf("count execution permissions: %v", err)
+	}
+	if executionButtonCount != 7 {
+		t.Fatalf("execution permission count = %d, want 7", executionButtonCount)
+	}
+	var executionCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).
+		Where("v1 LIKE ?", "%/admin/integration/execution%").
+		Count(&executionCasbinCount).Error; err != nil {
+		t.Fatalf("count execution Casbin policies: %v", err)
+	}
+	if executionCasbinCount != 7 {
+		t.Fatalf("execution Casbin policy count = %d, want 7", executionCasbinCount)
+	}
 	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", interfaceMenu.Id).Count(&buttonCount).Error; err != nil {
 		t.Fatalf("count interface definition buttons: %v", err)
 	}
@@ -166,5 +184,21 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if casbinCount != 6 {
 		t.Fatalf("Casbin policy count = %d, want 6", casbinCount)
+	}
+}
+
+func TestIntegrationExecutionMetadataUsesControlledQueryFields(t *testing.T) {
+	status := model.SysTableField{FieldCode: "status"}
+	applyIntegrationExecutionFieldDefaults(integrationExecutionTableCode, &status)
+	if !status.IsListShow || !status.IsAdvancedSearch || status.DictCode == nil || *status.DictCode != "integration_execution_status" {
+		t.Fatalf("status metadata = %+v", status)
+	}
+	secretFields := []string{"idempotency_key", "input_hash", "result_hash", "result_summary"}
+	for _, code := range secretFields {
+		field := model.SysTableField{FieldCode: code, IsListShow: true, IsQuickSearch: true, IsAdvancedSearch: true, IsSort: true}
+		applyIntegrationExecutionFieldDefaults(integrationExecutionTableCode, &field)
+		if field.IsListShow || field.IsQuickSearch || field.IsAdvancedSearch || field.IsSort {
+			t.Fatalf("sensitive metadata %s = %+v", code, field)
+		}
 	}
 }

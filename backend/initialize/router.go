@@ -231,6 +231,15 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/credential/:id/disable", app.CredentialController.Disable)
 		adminGroup.PUT("/integration/credential/:id/revoke", app.CredentialController.Revoke)
 
+		// 集成执行状态服务
+		adminGroup.POST("/integration/execution/query", app.IntegrationExecutionController.Query)
+		adminGroup.GET("/integration/execution/:id", app.IntegrationExecutionController.Detail)
+		adminGroup.POST("/integration/execution", app.IntegrationExecutionController.Create)
+		adminGroup.PUT("/integration/execution/:id/start", app.IntegrationExecutionController.Start)
+		adminGroup.PUT("/integration/execution/:id/complete", app.IntegrationExecutionController.Complete)
+		adminGroup.PUT("/integration/execution/:id/fail", app.IntegrationExecutionController.Fail)
+		adminGroup.PUT("/integration/execution/:id/cancel", app.IntegrationExecutionController.Cancel)
+
 		// 组织法人主体只读镜像
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)
 		adminGroup.GET("/org/legal-entity/:id", app.OrgController.GetLegalEntityDetail)

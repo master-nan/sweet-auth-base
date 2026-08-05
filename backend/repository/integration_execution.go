@@ -11,7 +11,8 @@ import (
 
 type IntegrationExecutionRepository interface {
 	BasicRepository[model.IntegrationExecution]
-	GetIntegrationExecutionList(context.Context, *request.Basic, model.SysTable) (response.ListResult[model.IntegrationExecution], error)
+	GetIntegrationExecutionList(context.Context, *request.Basic, model.SysTable, GeneralizationPermission) (response.ListResult[model.IntegrationExecution], error)
+	FindByIDWithPermission(context.Context, int, model.SysTable, GeneralizationPermission) (model.IntegrationExecution, error)
 	FindByIdempotency(*gorm.DB, int, int, string, string) (model.IntegrationExecution, error)
 	ListCandidatesByStatus(context.Context, []string, int) ([]model.IntegrationExecution, error)
 }

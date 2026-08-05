@@ -30,6 +30,7 @@ type BasicRepository[T any] interface {
 	Count(*gorm.DB) (int64, error)
 	CountByField(*gorm.DB, string, interface{}) (int64, error)
 	PaginateAndCountAsync(*request.Basic, interface{}, model.SysTable) (int64, error)
+	PaginateAndCountQuery(*gorm.DB, interface{}) (int64, error)
 	Create(*gorm.DB, interface{}) error
 	Update(*gorm.DB, interface{}, int) error
 	DeleteById(*gorm.DB, int) error

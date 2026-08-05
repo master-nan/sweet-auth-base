@@ -10,13 +10,14 @@ import (
 )
 
 const (
-	integrationMenuID            = 1200
-	externalSystemMenuID         = 1201
-	interfaceDefinitionMenuID    = 1202
-	credentialMenuID             = 1203
-	externalSystemTableCode      = "integration_external_system"
-	interfaceDefinitionTableCode = "integration_interface_definition"
-	credentialTableCode          = "integration_credential"
+	integrationMenuID             = 1200
+	externalSystemMenuID          = 1201
+	interfaceDefinitionMenuID     = 1202
+	credentialMenuID              = 1203
+	externalSystemTableCode       = "integration_external_system"
+	interfaceDefinitionTableCode  = "integration_interface_definition"
+	credentialTableCode           = "integration_credential"
+	integrationExecutionTableCode = "integration_execution"
 )
 
 func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) error {
@@ -90,6 +91,13 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 		menuButtonWithAPI(12207, credentialMenu.Id, "启用", "integration_credential_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/credential/:id/enable", "PUT"),
 		menuButtonWithAPI(12208, credentialMenu.Id, "停用", "integration_credential_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/credential/:id/disable", "PUT"),
 		menuButtonWithAPI(12209, credentialMenu.Id, "吊销", "integration_credential_revoke", enum.Line, "revoke", "gpp_bad", "negative", 5, "/admin/integration/credential/:id/revoke", "PUT"),
+		apiPermissionWithAPI(12301, root.Id, "执行列表查询", "integration_execution_query", enum.Top, "query_execution", "search", "primary", 101, "/admin/integration/execution/query", "POST"),
+		apiPermissionWithAPI(12302, root.Id, "执行详情", "integration_execution_detail", enum.Top, "detail_execution", "visibility", "primary", 102, "/admin/integration/execution/:id", "GET"),
+		apiPermissionWithAPI(12303, root.Id, "创建执行", "integration_execution_create", enum.Top, "create_execution", "add", "primary", 103, "/admin/integration/execution", "POST"),
+		apiPermissionWithAPI(12304, root.Id, "启动执行", "integration_execution_start", enum.Top, "start_execution", "play_arrow", "primary", 104, "/admin/integration/execution/:id/start", "PUT"),
+		apiPermissionWithAPI(12305, root.Id, "完成执行", "integration_execution_complete", enum.Top, "complete_execution", "check_circle", "positive", 105, "/admin/integration/execution/:id/complete", "PUT"),
+		apiPermissionWithAPI(12306, root.Id, "标记执行失败", "integration_execution_fail", enum.Top, "fail_execution", "error", "negative", 106, "/admin/integration/execution/:id/fail", "PUT"),
+		apiPermissionWithAPI(12307, root.Id, "取消执行", "integration_execution_cancel", enum.Top, "cancel_execution", "cancel", "warning", 107, "/admin/integration/execution/:id/cancel", "PUT"),
 	}
 	return seedMenuButtons(db, sf, role.Id, role.Name, buttons)
 }

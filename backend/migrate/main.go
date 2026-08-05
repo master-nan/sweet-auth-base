@@ -546,6 +546,42 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "集成执行状态",
+			code: "integration_execution_status",
+			items: []systemDictItemSeed{
+				{name: "待执行", code: "integration_execution_status_created", value: model.IntegrationExecutionStatusCreated},
+				{name: "执行中", code: "integration_execution_status_running", value: model.IntegrationExecutionStatusRunning},
+				{name: "等待重试", code: "integration_execution_status_retry_waiting", value: model.IntegrationExecutionStatusRetryWaiting},
+				{name: "成功", code: "integration_execution_status_succeeded", value: model.IntegrationExecutionStatusSucceeded},
+				{name: "失败", code: "integration_execution_status_failed", value: model.IntegrationExecutionStatusFailed},
+				{name: "已取消", code: "integration_execution_status_cancelled", value: model.IntegrationExecutionStatusCancelled},
+			},
+		},
+		{
+			name: "集成触发来源",
+			code: "integration_trigger_source",
+			items: []systemDictItemSeed{
+				{name: "人工触发", code: "integration_trigger_source_manual", value: model.IntegrationTriggerSourceManual},
+				{name: "系统事件", code: "integration_trigger_source_system_event", value: model.IntegrationTriggerSourceSystemEvent},
+				{name: "计划任务", code: "integration_trigger_source_scheduled", value: model.IntegrationTriggerSourceScheduled},
+			},
+		},
+		{
+			name: "集成错误分类",
+			code: "integration_error_category",
+			items: []systemDictItemSeed{
+				{name: "配置错误", code: "integration_error_configuration", value: model.IntegrationErrorCategoryConfiguration},
+				{name: "凭证错误", code: "integration_error_credential", value: model.IntegrationErrorCategoryCredential},
+				{name: "网络错误", code: "integration_error_network", value: model.IntegrationErrorCategoryNetwork},
+				{name: "超时", code: "integration_error_timeout", value: model.IntegrationErrorCategoryTimeout},
+				{name: "远端错误", code: "integration_error_remote", value: model.IntegrationErrorCategoryRemote},
+				{name: "响应错误", code: "integration_error_response", value: model.IntegrationErrorCategoryResponse},
+				{name: "业务错误", code: "integration_error_business", value: model.IntegrationErrorCategoryBusiness},
+				{name: "并发冲突", code: "integration_error_concurrency", value: model.IntegrationErrorCategoryConcurrency},
+				{name: "系统错误", code: "integration_error_system", value: model.IntegrationErrorCategorySystem},
+			},
+		},
+		{
 			name: "接口协议",
 			code: "integration_interface_protocol",
 			items: []systemDictItemSeed{
@@ -2162,6 +2198,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyExternalSystemFieldDefaults(tableCode, &field)
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyCredentialFieldDefaults(tableCode, &field)
+	applyIntegrationExecutionFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
@@ -2319,6 +2356,16 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "integration_credential_type"
 		case "status":
 			return "integration_credential_status"
+		}
+	}
+	if tableCode == integrationExecutionTableCode {
+		switch fieldCode {
+		case "status":
+			return "integration_execution_status"
+		case "trigger_source":
+			return "integration_trigger_source"
+		case "error_category":
+			return "integration_error_category"
 		}
 	}
 	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
@@ -2574,6 +2621,54 @@ func applyCredentialFieldDefaults(tableCode string, field *model.SysTableField) 
 		field.InputType = enum.DatetimePickerInputType
 		field.Sequence = 10
 	case "secret_storage_ref", "secret_ciphertext", "secret_nonce", "secret_fingerprint":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationExecutionFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationExecutionTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "execution_no":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "执行编号", true, true, true, 1
+	case "external_system_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 2
+	case "external_system_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "系统编码", true, true, true, 3
+	case "external_system_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "系统名称", true, true, 4
+	case "interface_definition_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 5
+	case "interface_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "接口编码", true, true, true, 6
+	case "interface_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "接口名称", true, true, 7
+	case "interface_version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "接口版本", true, true, 8
+	case "trigger_source":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "触发来源", true, true, enum.SelectInputType, utils.StringPtr("integration_trigger_source"), 9
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_execution_status"), 10
+	case "current_attempt":
+		field.FieldName, field.IsListShow, field.Sequence = "当前尝试", true, 11
+	case "error_category":
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "错误分类", true, enum.SelectInputType, utils.StringPtr("integration_error_category"), 12
+	case "gmt_create":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "创建时间", true, true, enum.DatetimePickerInputType, 13
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "更新时间", true, enum.DatetimePickerInputType, 14
+	case "started_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "开始时间", true, enum.DatetimePickerInputType, 15
+	case "completed_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "完成时间", true, enum.DatetimePickerInputType, 16
+	case "idempotency_scope", "idempotency_key", "input_hash", "result_hash", "result_summary":
 		field.IsSort = false
 	}
 }
