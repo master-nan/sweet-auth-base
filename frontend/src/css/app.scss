@@ -31,38 +31,38 @@ body {
   font-family: $font-family_1 !important;
 }
 
-* {
+*:not(.q-table__middle) {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
-*::-webkit-scrollbar {
+*:not(.q-table__middle)::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-*::-webkit-scrollbar-track,
-*::-webkit-scrollbar-corner {
+*:not(.q-table__middle)::-webkit-scrollbar-track,
+*:not(.q-table__middle)::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-*::-webkit-scrollbar-thumb {
+*:not(.q-table__middle)::-webkit-scrollbar-thumb {
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   background-clip: padding-box;
 }
 
-*:hover {
+*:not(.q-table__middle):hover {
   scrollbar-color: var(--app-scrollbar-thumb) transparent;
 }
 
-*:hover::-webkit-scrollbar-thumb {
+*:not(.q-table__middle):hover::-webkit-scrollbar-thumb {
   background: var(--app-scrollbar-thumb);
   background-clip: padding-box;
 }
 
-*::-webkit-scrollbar-thumb:hover {
+*:not(.q-table__middle)::-webkit-scrollbar-thumb:hover {
   background: var(--app-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
@@ -90,13 +90,65 @@ body {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: auto;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
 }
 
 .q-table__middle::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 0;
+  height: 0;
+}
+
+.q-table__container[data-app-table-overlay-host] {
+  position: relative;
+}
+
+.app-table-overlay-scrollbar {
+  position: absolute;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.app-table-overlay-scrollbar--scrollable {
+  display: block;
+}
+
+.q-table__container[data-app-table-overlay-host]:hover
+  > .app-table-overlay-scrollbar--scrollable,
+.q-table__container[data-app-table-overlay-active]
+  > .app-table-overlay-scrollbar--scrollable {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-table-overlay-scrollbar--vertical {
+  width: 10px;
+}
+
+.app-table-overlay-scrollbar--horizontal {
+  height: 10px;
+}
+
+.app-table-overlay-scrollbar__thumb {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--app-scrollbar-thumb);
+  cursor: pointer;
+}
+
+.app-table-overlay-scrollbar__thumb:hover {
+  background: var(--app-scrollbar-thumb-hover);
+}
+
+.app-table-overlay-scrollbar--vertical .app-table-overlay-scrollbar__thumb {
+  right: 3px;
+  width: 4px;
+}
+
+.app-table-overlay-scrollbar--horizontal .app-table-overlay-scrollbar__thumb {
+  bottom: 3px;
+  height: 4px;
 }
 
 input[type='number'] {
