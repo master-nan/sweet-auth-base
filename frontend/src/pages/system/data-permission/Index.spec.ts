@@ -287,7 +287,9 @@ describe('Data permission configuration center', () => {
     expect(wrapper.text()).toContain('配置检查')
     expect(apiMocks.queryResources).toHaveBeenCalled()
     expect(apiMocks.queryDimensions).toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
+    const table = wrapper.find('[data-testid="table"]')
+    expect(table.attributes('data-row-count')).toBe('1')
+    expect(table.text()).toContain('新增资源')
   })
 
   it('only renders top actions granted to the active resource section', async () => {
@@ -296,6 +298,20 @@ describe('Data permission configuration center', () => {
 
     expect(wrapper.text()).toContain('新增资源')
     expect(wrapper.text()).not.toContain('新增策略')
+  })
+
+  it('switches the left module navigation without moving the top action out of the table', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await wrapper.find('[data-tab="policies"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.queryPolicies).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('组合归属、范围来源和关系规则')
+    const table = wrapper.find('[data-testid="table"]')
+    expect(table.text()).toContain('新增策略')
+    expect(table.text()).not.toContain('新增资源')
   })
 
   it('sends the keyword through the resource query and opens the configured create dialog', async () => {

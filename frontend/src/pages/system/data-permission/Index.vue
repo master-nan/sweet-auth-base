@@ -1,219 +1,246 @@
 <template>
-  <base-content class="q-pa-sm">
-    <q-card class="fit column no-wrap" flat bordered>
-      <q-card-section class="row items-center q-py-sm">
-        <q-avatar color="primary" text-color="white" icon="rule" rounded />
-        <div class="q-ml-md">
-          <div class="text-h6">数据权限</div>
-          <div class="text-caption text-grey-7">
+  <base-content class="q-pa-sm data-permission-page">
+    <div class="data-permission-shell">
+      <section class="data-permission-hero">
+        <q-avatar
+          class="data-permission-hero__icon"
+          color="primary"
+          text-color="white"
+          icon="rule"
+          rounded
+        />
+        <div class="data-permission-hero__content">
+          <div class="data-permission-hero__title">数据权限</div>
+          <div class="data-permission-hero__subtitle">
             维护资源、归属、策略与授权，不执行运行时数据过滤
           </div>
         </div>
-        <q-space />
-        <q-btn outline color="primary" icon="refresh" label="刷新" @click="refreshActiveTab" />
-      </q-card-section>
+        <q-btn
+          outline
+          color="primary"
+          icon="refresh"
+          label="刷新"
+          :loading="loading || preflightLoading"
+          @click="refreshActiveTab"
+        />
+      </section>
 
-      <q-separator />
-
-      <q-tabs
-        v-model="activeTab"
-        align="left"
-        active-color="primary"
-        indicator-color="primary"
-        no-caps
-        narrow-indicator
-      >
-        <q-tab name="resources" icon="dataset" label="数据资源" />
-        <q-tab name="ownerships" icon="account_tree" label="归属定义" />
-        <q-tab name="policies" icon="policy" label="权限策略" />
-        <q-tab name="grants" icon="verified_user" label="权限授权" />
-        <q-tab name="preflight" icon="fact_check" label="配置检查" />
-      </q-tabs>
-
-      <q-separator />
-
-      <q-tab-panels v-model="activeTab" animated keep-alive class="col">
-        <q-tab-panel
-          v-for="tab in listTabs"
-          :key="tab.name"
-          :name="tab.name"
-          class="fit column no-wrap q-pa-none"
-        >
-          <q-table
-            class="col sticky-header-table"
-            :rows="activeRows"
-            :columns="activeColumns"
-            row-key="id"
-            flat
-            separator="cell"
-            :loading="loading"
-            :pagination="{ rowsPerPage: 0 }"
-            hide-pagination
-            @row-click="(_, row) => openDetail(row)"
+      <div class="data-permission-layout">
+        <aside class="data-permission-sidebar" aria-label="数据权限配置模块">
+          <button
+            v-for="section in permissionSections"
+            :key="section.name"
+            type="button"
+            class="data-permission-nav-item"
+            :class="{ 'data-permission-nav-item--active': activeTab === section.name }"
+            :data-tab="section.name"
+            :aria-selected="activeTab === section.name"
+            @click="activeTab = section.name"
           >
-            <template #top>
-              <div class="row q-col-gutter-sm items-center full-width">
-                <div class="col-12 col-md">
-                  <q-input
-                    v-model="activeQuery.quick_query!.keyword"
-                    dense
-                    outlined
-                    debounce="300"
-                    placeholder="搜索关键词"
-                    @keyup.enter="searchActiveTab"
-                  >
-                    <template #append>
-                      <q-icon name="search" />
-                    </template>
-                  </q-input>
-                </div>
-                <div class="col-auto">
-                  <q-btn
-                    color="primary"
-                    icon="search"
-                    label="查询"
-                    :disable="loading"
-                    @click="searchActiveTab"
+            <span class="data-permission-nav-item__icon">
+              <q-icon :name="section.icon" />
+            </span>
+            <span class="data-permission-nav-item__body">
+              <span class="data-permission-nav-item__title">{{ section.label }}</span>
+              <span class="data-permission-nav-item__caption">{{ section.caption }}</span>
+            </span>
+          </button>
+        </aside>
+
+        <main class="data-permission-main">
+          <header class="data-permission-section-head">
+            <div>
+              <div class="data-permission-section-head__title">{{ currentSection.label }}</div>
+              <div class="data-permission-section-head__caption">{{ currentSection.caption }}</div>
+            </div>
+            <q-icon :name="currentSection.icon" />
+          </header>
+
+          <transition name="data-permission-panel" mode="out-in">
+            <section
+              v-if="activeTab !== 'preflight'"
+              :key="activeTab"
+              class="data-permission-panel"
+            >
+              <q-table
+                class="fit sticky-header-table data-permission-table"
+                :rows="activeRows"
+                :columns="activeColumns"
+                row-key="id"
+                flat
+                separator="cell"
+                :loading="loading"
+                :pagination="{ rowsPerPage: 0 }"
+                hide-pagination
+                @row-click="(_, row) => openDetail(row)"
+              >
+                <template #top>
+                  <div class="row q-col-gutter-sm items-center full-width">
+                    <div class="col-12 col-md">
+                      <q-input
+                        v-model="activeQuery.quick_query!.keyword"
+                        dense
+                        outlined
+                        debounce="300"
+                        placeholder="搜索关键词"
+                        @keyup.enter="searchActiveTab"
+                      >
+                        <template #append>
+                          <q-icon name="search" />
+                        </template>
+                      </q-input>
+                    </div>
+                    <div class="col-auto">
+                      <q-btn
+                        color="primary"
+                        icon="search"
+                        label="查询"
+                        :disable="loading"
+                        @click="searchActiveTab"
+                      />
+                    </div>
+                    <div class="col-auto">
+                      <q-btn
+                        outline
+                        color="primary"
+                        icon="tune"
+                        aria-label="高级查询"
+                        @click="openAdvancedQuery"
+                      >
+                        <q-tooltip>高级查询</q-tooltip>
+                      </q-btn>
+                    </div>
+                    <q-space />
+                    <div class="col-auto row q-gutter-sm">
+                      <q-btn
+                        v-for="button in activeTopButtons"
+                        :key="button.id"
+                        v-bind="menuButtonDisplayProps(button)"
+                        :color="button.color || 'primary'"
+                        :disable="loading"
+                        @click="handleButtonClick(button)"
+                      />
+                    </div>
+                  </div>
+                </template>
+
+                <template #body-cell-permission_enabled="props">
+                  <q-td :props="props">
+                    <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
+                      {{ props.value ? '已启用' : '未启用' }}
+                    </q-badge>
+                  </q-td>
+                </template>
+
+                <template #body-cell-state="props">
+                  <q-td :props="props">
+                    <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
+                      {{ props.value ? '启用' : '停用' }}
+                    </q-badge>
+                  </q-td>
+                </template>
+
+                <template #body-cell-actions="props">
+                  <q-td :props="props" class="q-gutter-xs">
+                    <q-btn
+                      v-for="button in activeLineButtons"
+                      :key="button.id"
+                      v-bind="menuButtonDisplayProps(button)"
+                      :color="button.color || 'primary'"
+                      flat
+                      dense
+                      size="sm"
+                      @click.stop="handleButtonClick(button, props.row)"
+                    >
+                      <q-tooltip>{{ button.name }}</q-tooltip>
+                    </q-btn>
+                  </q-td>
+                </template>
+
+                <template #bottom>
+                  <q-space />
+                  <table-pagination
+                    :page="activeQuery.page"
+                    :page-size="activeQuery.num"
+                    :total="activeTotal"
+                    @update:page="setActivePage"
+                    @update:page-size="setActivePageSize"
                   />
-                </div>
+                </template>
+              </q-table>
+            </section>
+
+            <section v-else key="preflight" class="data-permission-panel data-permission-preflight">
+              <div class="row q-col-gutter-md items-end">
+                <q-select
+                  v-model="preflightType"
+                  class="col-12 col-md-3"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  label="检查对象"
+                  :options="preflightTypeOptions"
+                  @update:model-value="resetPreflightTarget"
+                />
+                <q-select
+                  v-model="preflightId"
+                  class="col-12 col-md"
+                  outlined
+                  dense
+                  emit-value
+                  map-options
+                  use-input
+                  input-debounce="200"
+                  label="选择配置"
+                  :options="preflightTargetOptions"
+                  @filter="filterPreflightOptions"
+                />
                 <div class="col-auto">
-                  <q-btn
-                    outline
-                    color="primary"
-                    icon="tune"
-                    aria-label="高级查询"
-                    @click="openAdvancedQuery"
-                  >
-                    <q-tooltip>高级查询</q-tooltip>
-                  </q-btn>
-                </div>
-                <q-space />
-                <div class="col-auto row q-gutter-sm">
                   <q-btn
                     v-for="button in activeTopButtons"
                     :key="button.id"
                     v-bind="menuButtonDisplayProps(button)"
                     :color="button.color || 'primary'"
-                    :disable="loading"
+                    :disable="!preflightId || preflightLoading"
+                    :loading="preflightLoading"
                     @click="handleButtonClick(button)"
                   />
                 </div>
               </div>
-            </template>
 
-            <template #body-cell-permission_enabled="props">
-              <q-td :props="props">
-                <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                  {{ props.value ? '已启用' : '未启用' }}
-                </q-badge>
-              </q-td>
-            </template>
+              <q-separator class="q-my-md" />
 
-            <template #body-cell-state="props">
-              <q-td :props="props">
-                <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                  {{ props.value ? '启用' : '停用' }}
-                </q-badge>
-              </q-td>
-            </template>
+              <q-banner
+                v-if="preflightResult"
+                rounded
+                :class="
+                  preflightResult.valid ? 'bg-green-1 text-positive' : 'bg-red-1 text-negative'
+                "
+              >
+                <template #avatar>
+                  <q-icon :name="preflightResult.valid ? 'task_alt' : 'error_outline'" />
+                </template>
+                {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
+              </q-banner>
 
-            <template #body-cell-actions="props">
-              <q-td :props="props" class="q-gutter-xs">
-                <q-btn
-                  v-for="button in activeLineButtons"
-                  :key="button.id"
-                  v-bind="menuButtonDisplayProps(button)"
-                  :color="button.color || 'primary'"
-                  flat
-                  dense
-                  size="sm"
-                  @click.stop="handleButtonClick(button, props.row)"
-                >
-                  <q-tooltip>{{ button.name }}</q-tooltip>
-                </q-btn>
-              </q-td>
-            </template>
-
-            <template #bottom>
-              <q-space />
-              <table-pagination
-                :page="activeQuery.page"
-                :page-size="activeQuery.num"
-                :total="activeTotal"
-                @update:page="setActivePage"
-                @update:page-size="setActivePageSize"
+              <q-table
+                class="col q-mt-md sticky-header-table data-permission-table"
+                :rows="preflightResult?.errors || []"
+                :columns="preflightColumns"
+                row-key="code"
+                flat
+                bordered
+                separator="cell"
+                hide-pagination
+                :pagination="{ rowsPerPage: 0 }"
+                no-data-label="请选择对象并执行配置检查"
               />
-            </template>
-          </q-table>
-        </q-tab-panel>
-
-        <q-tab-panel name="preflight" class="fit column no-wrap">
-          <div class="row q-col-gutter-md items-end">
-            <q-select
-              v-model="preflightType"
-              class="col-12 col-md-3"
-              outlined
-              dense
-              emit-value
-              map-options
-              label="检查对象"
-              :options="preflightTypeOptions"
-              @update:model-value="resetPreflightTarget"
-            />
-            <q-select
-              v-model="preflightId"
-              class="col-12 col-md"
-              outlined
-              dense
-              emit-value
-              map-options
-              use-input
-              input-debounce="200"
-              label="选择配置"
-              :options="preflightTargetOptions"
-              @filter="filterPreflightOptions"
-            />
-            <div class="col-auto">
-              <q-btn
-                v-for="button in activeTopButtons"
-                :key="button.id"
-                v-bind="menuButtonDisplayProps(button)"
-                :color="button.color || 'primary'"
-                :disable="!preflightId || preflightLoading"
-                :loading="preflightLoading"
-                @click="handleButtonClick(button)"
-              />
-            </div>
-          </div>
-
-          <q-separator class="q-my-md" />
-
-          <q-banner
-            v-if="preflightResult"
-            rounded
-            :class="preflightResult.valid ? 'bg-green-1 text-positive' : 'bg-red-1 text-negative'"
-          >
-            <template #avatar>
-              <q-icon :name="preflightResult.valid ? 'task_alt' : 'error_outline'" />
-            </template>
-            {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
-          </q-banner>
-
-          <q-table
-            class="col q-mt-md sticky-header-table"
-            :rows="preflightResult?.errors || []"
-            :columns="preflightColumns"
-            row-key="code"
-            flat
-            bordered
-            separator="cell"
-            hide-pagination
-            :pagination="{ rowsPerPage: 0 }"
-            no-data-label="请选择对象并执行配置检查"
-          />
-        </q-tab-panel>
-      </q-tab-panels>
-    </q-card>
+            </section>
+          </transition>
+        </main>
+      </div>
+    </div>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -276,13 +303,42 @@ const { confirmAction } = useConfirmDialog($q)
 const { top_buttons: topButtons, line_buttons: lineButtons } =
   usePageButtons('system_data_permission')
 
-const listTabs: Array<{ name: ListTabName }> = [
-  { name: 'resources' },
-  { name: 'ownerships' },
-  { name: 'policies' },
-  { name: 'grants' },
+const permissionSections: Array<{
+  name: ActiveTabName
+  label: string
+  caption: string
+  icon: string
+}> = [
+  {
+    name: 'resources',
+    label: '数据资源',
+    caption: '维护需要启用数据权限的业务资源',
+    icon: 'dataset',
+  },
+  {
+    name: 'ownerships',
+    label: '归属定义',
+    caption: '定义业务数据依据哪个维度判断归属',
+    icon: 'account_tree',
+  },
+  { name: 'policies', label: '权限策略', caption: '组合归属、范围来源和关系规则', icon: 'policy' },
+  {
+    name: 'grants',
+    label: '权限授权',
+    caption: '将权限策略授权给角色或用户',
+    icon: 'verified_user',
+  },
+  {
+    name: 'preflight',
+    label: '配置检查',
+    caption: '启用前检查资源、策略和授权配置',
+    icon: 'fact_check',
+  },
 ]
 const activeTab = ref<ActiveTabName>('resources')
+const currentSection = computed(
+  () => permissionSections.find((section) => section.name === activeTab.value)!,
+)
 const loading = ref(false)
 const showAdvancedQuery = ref(false)
 const showConfigDialog = ref(false)
@@ -795,3 +851,274 @@ onMounted(async () => {
   await Promise.all([loadLookups(), fetchActiveTab()])
 })
 </script>
+
+<style scoped lang="scss">
+.data-permission-page {
+  --data-permission-border: var(--app-primary-border);
+  --data-permission-ink: #1f2a44;
+  --data-permission-muted: #6f7d95;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-permission-shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.data-permission-hero {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--data-permission-border);
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--app-primary-soft), rgba(0, 184, 169, 0.07)), #fff;
+}
+
+.data-permission-hero__icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 10px 22px var(--app-primary-shadow);
+}
+
+.data-permission-hero__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.data-permission-hero__title {
+  color: var(--data-permission-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.data-permission-hero__subtitle {
+  margin-top: 2px;
+  color: var(--data-permission-muted);
+  font-size: 13px;
+}
+
+.data-permission-layout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.data-permission-sidebar,
+.data-permission-main {
+  border: 1px solid var(--data-permission-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-permission-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+
+.data-permission-nav-item {
+  display: grid;
+  width: 100%;
+  min-height: 64px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--data-permission-ink);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.data-permission-nav-item:hover,
+.data-permission-nav-item--active {
+  border-color: var(--app-primary-border);
+  background: var(--app-primary-soft);
+}
+
+.data-permission-nav-item--active {
+  box-shadow: inset 3px 0 0 var(--q-primary);
+}
+
+.data-permission-nav-item__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--app-primary-soft-strong);
+  color: var(--q-primary);
+}
+
+.data-permission-nav-item__icon .q-icon {
+  font-size: 20px;
+}
+
+.data-permission-nav-item__body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.data-permission-nav-item__title,
+.data-permission-nav-item__caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-permission-nav-item__title {
+  color: var(--data-permission-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.data-permission-nav-item__caption {
+  color: var(--data-permission-muted);
+  font-size: 12px;
+}
+
+.data-permission-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-permission-section-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 70px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--data-permission-border);
+}
+
+.data-permission-section-head__title {
+  color: var(--data-permission-ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.data-permission-section-head__caption {
+  margin-top: 2px;
+  color: var(--data-permission-muted);
+  font-size: 13px;
+}
+
+.data-permission-section-head > .q-icon {
+  color: var(--q-primary);
+  font-size: 26px;
+  opacity: 0.58;
+}
+
+.data-permission-panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.data-permission-table {
+  height: 100%;
+}
+
+.data-permission-preflight {
+  padding: 14px;
+}
+
+.data-permission-panel-enter-active,
+.data-permission-panel-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.data-permission-panel-enter-from,
+.data-permission-panel-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+:global(body.body--dark) .data-permission-page {
+  --data-permission-border: var(--app-dark-border);
+  --data-permission-ink: var(--app-dark-heading);
+  --data-permission-muted: var(--app-dark-muted);
+}
+
+:global(body.body--dark) .data-permission-hero,
+:global(body.body--dark) .data-permission-sidebar,
+:global(body.body--dark) .data-permission-main {
+  background: var(--app-dark-surface);
+}
+
+:global(body.body--dark) .data-permission-hero {
+  background:
+    linear-gradient(135deg, var(--app-primary-soft), rgba(0, 184, 169, 0.07)),
+    var(--app-dark-surface);
+}
+
+@media (max-width: 960px) {
+  .data-permission-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .data-permission-sidebar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(138px, 1fr));
+    overflow-x: auto;
+  }
+
+  .data-permission-nav-item {
+    min-height: 58px;
+  }
+}
+
+@media (max-width: 640px) {
+  .data-permission-hero {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .data-permission-hero__content {
+    align-self: center;
+  }
+
+  .data-permission-hero > .q-btn {
+    width: 100%;
+  }
+
+  .data-permission-section-head {
+    min-height: 64px;
+  }
+}
+</style>
