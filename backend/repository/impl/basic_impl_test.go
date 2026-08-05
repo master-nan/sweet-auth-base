@@ -6,18 +6,17 @@ import (
 	"backend/repository"
 	"context"
 	"errors"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
 type basicRepositoryFindByFieldFixture struct {
 	model.Basic
-	Name    string `gorm:"size:64"`
-	ScopeID int
+	Name     string `gorm:"size:64"`
+	ScopeID  int
+	Revision int
 }
 
 func TestBasicRepositoryPaginateAndCountAsyncReturnsDataQueryError(t *testing.T) {
@@ -212,14 +211,58 @@ func TestBasicRepositoryPropagatesContextCancellation(t *testing.T) {
 
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
-	ginContext, engine := gin.CreateTestContext(httptest.NewRecorder())
-	engine.ContextWithFallback = true
-	ginContext.Request = httptest.NewRequest("GET", "/", nil).WithContext(requestContext)
-
-	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{}).WithContext(ginContext)
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{}).WithContext(requestContext)
 	_, err = repo.FindByField("name", "alpha")
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
+	}
+}
+
+func TestBasicRepositoryFindByIdForUpdateAndRevisionUpdate(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:basic_repo_lock_revision?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&basicRepositoryFindByFieldFixture{}); err != nil {
+		t.Fatalf("migrate fixture: %v", err)
+	}
+	row := basicRepositoryFindByFieldFixture{
+		Basic: model.Basic{Id: 1, State: true},
+		Name:  "before", Revision: 1,
+	}
+	if err := db.Create(&row).Error; err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	err = db.Transaction(func(tx *gorm.DB) error {
+		locked, lockErr := repo.FindByIdForUpdate(tx, row.Id)
+		if lockErr != nil {
+			return lockErr
+		}
+		if locked.Name != "before" || locked.Revision != 1 {
+			t.Fatalf("unexpected locked row: %+v", locked)
+		}
+		updated, updateErr := repo.UpdateFieldsByRevision(tx, row.Id, 1, map[string]any{
+			"name": "after", "revision": 2,
+		})
+		if updateErr != nil {
+			return updateErr
+		}
+		if !updated {
+			t.Fatal("expected revision update to affect one row")
+		}
+		stale, staleErr := repo.UpdateFieldsByRevision(tx, row.Id, 1, map[string]any{"name": "stale"})
+		if staleErr != nil {
+			return staleErr
+		}
+		if stale {
+			t.Fatal("stale revision must not update the row")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("transaction: %v", err)
 	}
 }
 

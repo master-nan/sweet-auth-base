@@ -2,6 +2,7 @@ package service
 
 import (
 	"backend/dto/request"
+	"backend/enum"
 	"backend/internal/audit"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -203,8 +204,12 @@ func externalSystemQueryTableForTest() model.SysTable {
 	return model.SysTable{
 		TableCode: "integration_external_system",
 		TableFields: []model.SysTableField{
-			{Basic: model.Basic{State: true}, FieldCode: "system_code", IsQuickSearch: true},
-			{Basic: model.Basic{State: true}, FieldCode: "name", IsQuickSearch: true},
+			{Basic: model.Basic{State: true}, FieldCode: "system_code", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
+			{Basic: model.Basic{State: true}, FieldCode: "name", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
+			{Basic: model.Basic{State: true}, FieldCode: "system_type", FieldType: enum.VarcharFieldType},
+			{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
+			{Basic: model.Basic{State: true}, FieldCode: "owner_identifier", FieldType: enum.VarcharFieldType},
+			{Basic: model.Basic{State: true}, FieldCode: "owner_name", FieldType: enum.VarcharFieldType},
 		},
 	}
 }

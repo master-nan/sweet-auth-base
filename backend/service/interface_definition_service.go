@@ -99,14 +99,14 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 }
 
 func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.InterfaceDefinitionDetailRes, error) {
-	value, err := s.repository.FindByID(ctx, id)
+	value, err := s.repository.WithContext(ctx).FindById(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return response.InterfaceDefinitionDetailRes{}, myerrors.ErrInterfaceDefinitionNotFound
 	}
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapDatabaseError(err)
 	}
-	system, err := s.systems.FindByID(ctx, value.ExternalSystemID)
+	system, err := s.systems.WithContext(ctx).FindById(value.ExternalSystemID)
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapDatabaseError(err)
 	}
@@ -114,7 +114,8 @@ func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.
 }
 
 func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq, table model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error) {
-	result, err := s.repository.Query(ctx, req, table)
+	basic := req.ToBasic()
+	result, err := s.repository.GetInterfaceDefinitionList(ctx, &basic, table)
 	if err != nil {
 		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -126,7 +127,7 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 			ids = append(ids, item.ExternalSystemID)
 		}
 	}
-	systems, err := s.systems.FindByIDs(ctx, ids)
+	systems, err := s.systems.WithContext(ctx).FindListByFieldIn("id", ids)
 	if err != nil {
 		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -145,7 +146,7 @@ func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req req
 	var updated model.InterfaceDefinition
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrInterfaceDefinitionNotFound
 		}
@@ -170,7 +171,7 @@ func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req req
 			return err
 		}
 		updates["revision"] = current.Revision + 1
-		ok, err := s.repository.UpdateFields(tx, id, req.Revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, req.Revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -191,7 +192,7 @@ func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revi
 	var created model.InterfaceDefinition
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrInterfaceDefinitionNotFound
 		}
@@ -247,7 +248,7 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 	var updated model.InterfaceDefinition
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrInterfaceDefinitionNotFound
 		}
@@ -285,7 +286,7 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 			}
 		}
 		updates := map[string]any{"status": target, "state": target == model.InterfaceDefinitionStatusEnabled, "revision": current.Revision + 1}
-		ok, err := s.repository.UpdateFields(tx, current.Id, revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, current.Id, revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -309,7 +310,7 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 }
 
 func (s *InterfaceDefinitionService) loadSystemForConfiguration(tx *gorm.DB, id int, requireEnabled bool) (model.ExternalSystem, error) {
-	system, err := s.systems.FindByIDForUpdate(tx, id)
+	system, err := s.systems.FindByIdForUpdate(tx, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.ExternalSystem{}, myerrors.ErrInterfaceExternalSystemInvalid
 	}

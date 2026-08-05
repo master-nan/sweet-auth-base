@@ -93,7 +93,7 @@ func (s *ExternalSystemService) Get(
 	ctx context.Context,
 	id int,
 ) (response.ExternalSystemDetailRes, error) {
-	value, err := s.repository.FindByID(ctx, id)
+	value, err := s.repository.WithContext(ctx).FindById(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return response.ExternalSystemDetailRes{}, myerrors.ErrExternalSystemNotFound
 	}
@@ -108,7 +108,8 @@ func (s *ExternalSystemService) Page(
 	req request.ExternalSystemQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.ExternalSystemListRes], error) {
-	result, err := s.repository.Query(ctx, req, table)
+	basic := req.ToBasic()
+	result, err := s.repository.GetExternalSystemList(ctx, &basic, table)
 	if err != nil {
 		return response.ListResult[response.ExternalSystemListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -126,7 +127,7 @@ func (s *ExternalSystemService) Update(
 ) (response.ExternalSystemDetailRes, error) {
 	var updated model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrExternalSystemNotFound
 		}
@@ -141,7 +142,7 @@ func (s *ExternalSystemService) Update(
 			return err
 		}
 		updates["revision"] = current.Revision + 1
-		ok, err := s.repository.UpdateFields(tx, id, req.Revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, req.Revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -174,7 +175,7 @@ func (s *ExternalSystemService) changeStatus(
 ) (response.ExternalSystemDetailRes, error) {
 	var updated model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrExternalSystemNotFound
 		}
@@ -204,7 +205,7 @@ func (s *ExternalSystemService) changeStatus(
 			"state":    target == model.ExternalSystemStatusEnabled,
 			"revision": current.Revision + 1,
 		}
-		ok, err := s.repository.UpdateFields(tx, id, revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}

@@ -8,9 +8,9 @@ package repository
 import (
 	"backend/dto/request"
 	"backend/model"
+	"context"
 	"errors"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -25,8 +25,8 @@ var (
 // 业务规则、权限决策和 Service 调用不属于 Repository 职责。
 // 方法将校验或数据库错误返回 Service 层，不在此处转换为 API 错误。
 type BasicRepository[T any] interface {
-	ExecuteTx(ctx *gin.Context, fn func(tx *gorm.DB) error) error
-	DBWithContext(*gin.Context) *gorm.DB
+	ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error
+	DBWithContext(context.Context) *gorm.DB
 	QueryWhere(string) *gorm.DB
 	Count(*gorm.DB) (int64, error)
 	PaginateAndCountAsync(*request.Basic, interface{}, model.SysTable) (int64, error)
@@ -37,13 +37,15 @@ type BasicRepository[T any] interface {
 	DeleteByIds(*gorm.DB, []int) error
 	DeleteByFieldIn(*gorm.DB, string, []interface{}) error
 	FindById(id int) (T, error)
+	FindByIdForUpdate(*gorm.DB, int) (T, error)
 	FindListById(id int) ([]T, error)
 	FindByField(field string, value interface{}) (T, error)
 	FindListByField(field string, value interface{}) ([]T, error)
 	FindListByFieldIn(field string, value interface{}) ([]T, error)
+	UpdateFieldsByRevision(*gorm.DB, int, int, map[string]any) (bool, error)
 	WithPreload(...string) BasicRepository[T]
 	WithUnscoped() BasicRepository[T]
 	WithSelect(...string) BasicRepository[T]
 	WithOmit(...string) BasicRepository[T]
-	WithContext(*gin.Context) BasicRepository[T]
+	WithContext(context.Context) BasicRepository[T]
 }

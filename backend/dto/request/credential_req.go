@@ -1,6 +1,10 @@
 package request
 
-import "time"
+import (
+	"backend/enum"
+	"backend/model"
+	"time"
+)
 
 type CredentialQueryReq struct {
 	Page             int               `form:"page" json:"page" binding:"omitempty,gte=1"`
@@ -14,7 +18,30 @@ type CredentialQueryReq struct {
 }
 
 func (r CredentialQueryReq) ToBasic() Basic {
-	return Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
+	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
+	filters := make(map[string]any, 3)
+	if r.ExternalSystemID > 0 {
+		filters["external_system_id"] = r.ExternalSystemID
+	}
+	if r.CredentialType != "" {
+		filters["credential_type"] = r.CredentialType
+	}
+	if r.Status != "" && r.Status != "expired" {
+		filters["status"] = r.Status
+	}
+	if len(filters) > 0 {
+		basic.Filters = filters
+	}
+	if r.Status == "expired" {
+		basic.Expressions = append(basic.Expressions, ExpressionGroup{
+			Logic: enum.And,
+			Rules: []QueryRule{
+				{Field: "status", ExpressionType: enum.Ne, Value: model.CredentialStatusRevoked, Type: enum.VarcharFieldType},
+				{Field: "expires_at", ExpressionType: enum.Lte, Value: time.Now(), Type: enum.DatetimeFieldType},
+			},
+		})
+	}
+	return basic
 }
 
 type CredentialCreateReq struct {

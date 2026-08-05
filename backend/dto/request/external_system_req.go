@@ -1,5 +1,10 @@
 package request
 
+import (
+	"backend/enum"
+	"strings"
+)
+
 type ExternalSystemQueryReq struct {
 	Page        int               `form:"page" json:"page" binding:"omitempty,gte=1"`
 	Num         int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
@@ -12,13 +17,33 @@ type ExternalSystemQueryReq struct {
 }
 
 func (r ExternalSystemQueryReq) ToBasic() Basic {
-	return Basic{
+	basic := Basic{
 		Page:        r.Page,
 		Num:         r.Num,
 		Order:       r.Order,
 		Expressions: r.Expressions,
 		QuickQuery:  r.QuickQuery,
 	}
+	filters := make(map[string]any, 2)
+	if r.SystemType != "" {
+		filters["system_type"] = r.SystemType
+	}
+	if r.Status != "" {
+		filters["status"] = r.Status
+	}
+	if len(filters) > 0 {
+		basic.Filters = filters
+	}
+	if owner := strings.TrimSpace(r.Owner); owner != "" {
+		basic.Expressions = append(basic.Expressions, ExpressionGroup{
+			Logic: enum.Or,
+			Rules: []QueryRule{
+				{Field: "owner_identifier", ExpressionType: enum.Like, Value: owner, Type: enum.VarcharFieldType},
+				{Field: "owner_name", ExpressionType: enum.Like, Value: owner, Type: enum.VarcharFieldType},
+			},
+		})
+	}
+	return basic
 }
 
 type ExternalSystemCreateReq struct {

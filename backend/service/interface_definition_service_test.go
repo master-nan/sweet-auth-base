@@ -2,6 +2,7 @@ package service
 
 import (
 	"backend/dto/request"
+	"backend/enum"
 	"backend/internal/database"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -158,7 +159,10 @@ func interfaceDefinitionCreateRequest(systemID int, code string) request.Interfa
 
 func interfaceDefinitionQueryTableForTest() model.SysTable {
 	return model.SysTable{TableCode: "integration_interface_definition", TableFields: []model.SysTableField{
-		{Basic: model.Basic{State: true}, FieldCode: "interface_code", IsQuickSearch: true},
-		{Basic: model.Basic{State: true}, FieldCode: "name", IsQuickSearch: true},
+		{Basic: model.Basic{State: true}, FieldCode: "interface_code", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
+		{Basic: model.Basic{State: true}, FieldCode: "name", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
+		{Basic: model.Basic{State: true}, FieldCode: "external_system_id", FieldType: enum.BigIntFieldType},
+		{Basic: model.Basic{State: true}, FieldCode: "http_method", FieldType: enum.VarcharFieldType},
+		{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
 	}}
 }

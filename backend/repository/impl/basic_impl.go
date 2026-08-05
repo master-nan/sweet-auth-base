@@ -10,14 +10,15 @@ import (
 	"backend/model"
 	"backend/repository"
 	"backend/repository/util"
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type BasicRepositoryImpl[T any] struct {
@@ -27,7 +28,7 @@ type BasicRepositoryImpl[T any] struct {
 	omits    []string
 	model    *T
 	unscoped bool
-	ctx      *gin.Context
+	ctx      context.Context
 }
 
 func NewBasicRepositoryImpl[T any](db *gorm.DB, model *T) *BasicRepositoryImpl[T] {
@@ -37,7 +38,7 @@ func NewBasicRepositoryImpl[T any](db *gorm.DB, model *T) *BasicRepositoryImpl[T
 	}
 }
 
-func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx *gin.Context, fn func(tx *gorm.DB) error) error {
+func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return b.db.WithContext(ctx).Transaction(func(tx *gorm.DB) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -54,7 +55,7 @@ func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx *gin.Context, fn func(tx *gorm.DB
 	})
 }
 
-func (b *BasicRepositoryImpl[T]) DBWithContext(ctx *gin.Context) *gorm.DB {
+func (b *BasicRepositoryImpl[T]) DBWithContext(ctx context.Context) *gorm.DB {
 	return b.db.WithContext(ctx)
 }
 
@@ -175,6 +176,16 @@ func (b *BasicRepositoryImpl[T]) FindById(id int) (T, error) {
 	return entity, err
 }
 
+func (b *BasicRepositoryImpl[T]) FindByIdForUpdate(tx *gorm.DB, id int) (T, error) {
+	var entity T
+	query := b.applyReadOptions(tx.Model(b.model))
+	if b.unscoped {
+		query = query.Unscoped()
+	}
+	err := query.Clauses(clause.Locking{Strength: "UPDATE"}).First(&entity, id).Error
+	return entity, err
+}
+
 func (b *BasicRepositoryImpl[T]) FindListById(id int) ([]T, error) {
 	var entity []T
 	query := b.applyReadOptions(b.baseQuery())
@@ -222,6 +233,18 @@ func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interfac
 	return entities, err
 }
 
+func (b *BasicRepositoryImpl[T]) UpdateFieldsByRevision(
+	tx *gorm.DB,
+	id int,
+	revision int,
+	updates map[string]any,
+) (bool, error) {
+	result := tx.Model(b.model).
+		Where("id = ? AND revision = ?", id, revision).
+		Updates(updates)
+	return result.RowsAffected == 1, result.Error
+}
+
 func (b *BasicRepositoryImpl[T]) WithPreload(preloads ...string) repository.BasicRepository[T] {
 	newImpl := b.clone()
 	// 判断perloads是否为空，如果为空则直接返回
@@ -258,7 +281,7 @@ func (b *BasicRepositoryImpl[T]) WithOmit(omits ...string) repository.BasicRepos
 	return newImpl
 }
 
-func (b *BasicRepositoryImpl[T]) WithContext(ctx *gin.Context) repository.BasicRepository[T] {
+func (b *BasicRepositoryImpl[T]) WithContext(ctx context.Context) repository.BasicRepository[T] {
 	newImpl := b.clone()
 	newImpl.ctx = ctx
 	return newImpl

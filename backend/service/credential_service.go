@@ -129,7 +129,8 @@ func (s *CredentialService) Get(ctx context.Context, id int) (response.Credentia
 }
 
 func (s *CredentialService) Page(ctx context.Context, req request.CredentialQueryReq, table model.SysTable) (response.ListResult[response.CredentialListRes], error) {
-	result, err := s.repository.Query(ctx, req, table)
+	basic := req.ToBasic()
+	result, err := s.repository.GetCredentialList(ctx, &basic, table)
 	if err != nil {
 		return response.ListResult[response.CredentialListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -141,7 +142,7 @@ func (s *CredentialService) Page(ctx context.Context, req request.CredentialQuer
 			systemIDs = append(systemIDs, item.ExternalSystemID)
 		}
 	}
-	systems, err := s.systems.FindByIDs(ctx, systemIDs)
+	systems, err := s.systems.WithContext(ctx).FindListByFieldIn("id", systemIDs)
 	if err != nil {
 		return response.ListResult[response.CredentialListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -164,7 +165,7 @@ func (s *CredentialService) Update(ctx context.Context, id int, req request.Cred
 	var updated model.Credential
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrCredentialNotFound
 		}
@@ -190,7 +191,7 @@ func (s *CredentialService) Update(ctx context.Context, id int, req request.Cred
 		if req.Description != nil {
 			updates["description"] = strings.TrimSpace(*req.Description)
 		}
-		ok, err := s.repository.UpdateFields(tx, id, req.Revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, req.Revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -215,7 +216,7 @@ func (s *CredentialService) Rotate(ctx context.Context, id int, req request.Cred
 	var updated model.Credential
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrCredentialNotFound
 		}
@@ -243,7 +244,7 @@ func (s *CredentialService) Rotate(ctx context.Context, id int, req request.Cred
 			"rotated_at":         now,
 			"revision":           current.Revision + 1,
 		}
-		ok, err := s.repository.UpdateFields(tx, id, req.Revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, req.Revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -280,7 +281,7 @@ func (s *CredentialService) changeStatus(ctx context.Context, id, revision int, 
 	var updated model.Credential
 	var system model.ExternalSystem
 	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		current, err := s.repository.FindByIDForUpdate(tx, id)
+		current, err := s.repository.FindByIdForUpdate(tx, id)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrCredentialNotFound
 		}
@@ -302,7 +303,7 @@ func (s *CredentialService) changeStatus(ctx context.Context, id, revision int, 
 			return err
 		}
 		updates := map[string]any{"status": target, "state": target == model.CredentialStatusActive, "revision": current.Revision + 1}
-		ok, err := s.repository.UpdateFields(tx, id, revision, updates)
+		ok, err := s.repository.UpdateFieldsByRevision(tx, id, revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -320,14 +321,14 @@ func (s *CredentialService) changeStatus(ctx context.Context, id, revision int, 
 }
 
 func (s *CredentialService) loadDetail(ctx context.Context, id int) (model.Credential, model.ExternalSystem, error) {
-	value, err := s.repository.FindByID(ctx, id)
+	value, err := s.repository.WithContext(ctx).FindById(id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.Credential{}, model.ExternalSystem{}, myerrors.ErrCredentialNotFound
 	}
 	if err != nil {
 		return model.Credential{}, model.ExternalSystem{}, myerrors.WrapDatabaseError(err)
 	}
-	system, err := s.systems.FindByID(ctx, value.ExternalSystemID)
+	system, err := s.systems.WithContext(ctx).FindById(value.ExternalSystemID)
 	if err != nil {
 		return model.Credential{}, model.ExternalSystem{}, myerrors.WrapDatabaseError(err)
 	}
@@ -335,7 +336,7 @@ func (s *CredentialService) loadDetail(ctx context.Context, id int) (model.Crede
 }
 
 func (s *CredentialService) loadSystem(tx *gorm.DB, id int, requireEnabled bool) (model.ExternalSystem, error) {
-	system, err := s.systems.FindByIDForUpdate(tx, id)
+	system, err := s.systems.FindByIdForUpdate(tx, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.ExternalSystem{}, myerrors.ErrCredentialExternalSystemInvalid
 	}

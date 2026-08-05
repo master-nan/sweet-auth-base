@@ -17,7 +17,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -473,7 +472,7 @@ type reportDefinitionRepoWithQueryDB struct {
 	queryDB *gorm.DB
 }
 
-func (r reportDefinitionRepoWithQueryDB) DBWithContext(*gin.Context) *gorm.DB {
+func (r reportDefinitionRepoWithQueryDB) DBWithContext(context.Context) *gorm.DB {
 	return r.queryDB
 }
 

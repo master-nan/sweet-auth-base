@@ -12,7 +12,21 @@ type InterfaceDefinitionQueryReq struct {
 }
 
 func (r InterfaceDefinitionQueryReq) ToBasic() Basic {
-	return Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
+	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
+	filters := make(map[string]any, 3)
+	if r.ExternalSystemID > 0 {
+		filters["external_system_id"] = r.ExternalSystemID
+	}
+	if r.HTTPMethod != "" {
+		filters["http_method"] = r.HTTPMethod
+	}
+	if r.Status != "" {
+		filters["status"] = r.Status
+	}
+	if len(filters) > 0 {
+		basic.Filters = filters
+	}
+	return basic
 }
 
 type InterfaceDefinitionCreateReq struct {

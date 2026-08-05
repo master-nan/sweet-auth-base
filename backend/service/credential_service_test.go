@@ -158,5 +158,5 @@ func credentialQueryTableForTest() model.SysTable {
 	field := func(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
 		return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 	}
-	return model.SysTable{TableCode: "integration_credential", TableFields: []model.SysTableField{field("credential_code", enum.VarcharFieldType, true), field("name", enum.VarcharFieldType, true), field("credential_type", enum.VarcharFieldType, false), field("status", enum.VarcharFieldType, false), field("expires_at", enum.DatetimeFieldType, false)}}
+	return model.SysTable{TableCode: "integration_credential", TableFields: []model.SysTableField{field("credential_code", enum.VarcharFieldType, true), field("name", enum.VarcharFieldType, true), field("external_system_id", enum.BigIntFieldType, false), field("credential_type", enum.VarcharFieldType, false), field("status", enum.VarcharFieldType, false), field("expires_at", enum.DatetimeFieldType, false)}}
 }
