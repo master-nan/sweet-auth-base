@@ -3,7 +3,7 @@
     <q-form ref="formRef" class="configure-shell" @submit.prevent="saveConfig">
       <section class="configure-hero">
         <div class="configure-hero__icon">
-          <q-icon name="tune" />
+          <q-icon :name="pageIcon" />
         </div>
         <div class="configure-hero__content">
           <div class="configure-hero__title">配置管理</div>
@@ -442,6 +442,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'develop_configure' })
 import { computed, nextTick, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import { type Configure, useBasicApi } from 'src/api/services/basic'
 import { useQuasar, type QForm } from 'quasar'
@@ -471,6 +472,11 @@ interface ConfigSection {
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 const $q = useQuasar()
+const route = useRoute()
+const pageIcon = computed(() => {
+  const icon = route.meta.icon
+  return typeof icon === 'string' && icon.trim() ? icon : 'tune'
+})
 const basicApi = useBasicApi()
 const configureStore = useConfigureStore()
 

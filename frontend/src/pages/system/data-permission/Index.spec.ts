@@ -55,6 +55,10 @@ vi.mock('boot/axios', () => ({
   instance: {},
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ meta: { icon: 'shield' } }),
+}))
+
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
@@ -279,7 +283,7 @@ describe('Data permission configuration center', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('数据权限')
-    expect(wrapper.find('[data-testid="page-avatar"]').attributes('data-icon')).toBe('rule')
+    expect(wrapper.find('[data-testid="page-avatar"]').attributes('data-icon')).toBe('shield')
     expect(wrapper.text()).toContain('数据资源')
     expect(wrapper.text()).toContain('归属定义')
     expect(wrapper.text()).toContain('权限策略')

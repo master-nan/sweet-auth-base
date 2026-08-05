@@ -2,12 +2,7 @@
   <base-content class="q-pa-sm menu-page" :class="{ 'menu-page--dark': $q.dark.isActive }">
     <q-card flat bordered class="menu-page-header-card">
       <q-card-section class="menu-page-header">
-        <q-avatar
-          class="menu-icon-tile"
-          color="primary"
-          text-color="white"
-          icon="account_tree"
-        />
+        <q-avatar class="menu-icon-tile" color="primary" text-color="white" :icon="pageIcon" />
         <div>
           <div class="menu-page-title">菜单管理</div>
           <div class="menu-page-subtitle">统一维护页面导航、操作按钮与接口权限</div>
@@ -460,6 +455,10 @@ const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)
 const route = useRoute()
 const router = useRouter()
+const pageIcon = computed(() => {
+  const icon = route.meta.icon
+  return typeof icon === 'string' && icon.trim() ? icon : 'menu'
+})
 const menuApi = useMenuApi()
 const tableApi = useTableApi()
 const dictStore = useDictStore()
@@ -1475,20 +1474,13 @@ onMounted(async () => {
   content: '';
 }
 
-.menu-tree
-  :deep(.q-tree__children > .q-tree__node > .q-tree__node-header) {
+.menu-tree :deep(.q-tree__children > .q-tree__node > .q-tree__node-header) {
   width: calc(100% + 47px);
   margin-left: -47px;
   padding-left: 51px;
 }
 
-.menu-tree
-  :deep(
-    .q-tree__children
-      .q-tree__children
-      > .q-tree__node
-      > .q-tree__node-header
-  ) {
+.menu-tree :deep(.q-tree__children .q-tree__children > .q-tree__node > .q-tree__node-header) {
   width: calc(100% + 94px);
   margin-left: -94px;
   padding-left: 98px;
@@ -1496,11 +1488,7 @@ onMounted(async () => {
 
 .menu-tree
   :deep(
-    .q-tree__children
-      .q-tree__children
-      .q-tree__children
-      > .q-tree__node
-      > .q-tree__node-header
+    .q-tree__children .q-tree__children .q-tree__children > .q-tree__node > .q-tree__node-header
   ) {
   width: calc(100% + 141px);
   margin-left: -141px;

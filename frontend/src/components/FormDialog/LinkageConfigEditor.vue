@@ -1,7 +1,13 @@
 <template>
-  <div class="linkage-editor">
+  <div class="linkage-editor" :class="{ 'linkage-editor--dark': isDarkMode }">
     <div class="row items-center q-mb-sm">
-      <q-toggle v-model="state.enabled" color="primary" label="启用联动" :disable="disable" />
+      <q-toggle
+        v-model="state.enabled"
+        color="primary"
+        label="启用联动"
+        :dark="isDarkMode"
+        :disable="disable"
+      />
       <q-space />
       <q-chip v-if="state.enabled" dense square color="primary" text-color="white">
         {{ state.mode === 'cascader' ? '级联字段' : '关联字段' }}
@@ -17,6 +23,7 @@
             label="模式"
             outlined
             dense
+            :dark="isDarkMode"
             emit-value
             map-options
             :disable="disable"
@@ -28,6 +35,7 @@
             label="关联表编码"
             outlined
             dense
+            :dark="isDarkMode"
             :disable="disable"
           />
         </div>
@@ -38,6 +46,7 @@
             label="显示字段"
             outlined
             dense
+            :dark="isDarkMode"
             :disable="disable"
           />
         </div>
@@ -47,6 +56,7 @@
             label="取值字段"
             outlined
             dense
+            :dark="isDarkMode"
             :disable="disable"
           />
         </div>
@@ -56,6 +66,7 @@
             label="加载数量"
             outlined
             dense
+            :dark="isDarkMode"
             type="number"
             :disable="disable"
           />
@@ -68,6 +79,7 @@
               label="父级字段"
               outlined
               dense
+              :dark="isDarkMode"
               :disable="disable"
             />
           </div>
@@ -78,6 +90,7 @@
               label="可选节点"
               outlined
               dense
+              :dark="isDarkMode"
               emit-value
               map-options
               :disable="disable"
@@ -88,6 +101,7 @@
               v-model="state.showPath"
               color="primary"
               label="显示完整路径"
+              :dark="isDarkMode"
               :disable="disable"
             />
           </div>
@@ -122,6 +136,7 @@
                   label="关联表字段"
                   outlined
                   dense
+                  :dark="isDarkMode"
                   :disable="disable"
                 />
               </div>
@@ -131,6 +146,7 @@
                   label="当前表字段"
                   outlined
                   dense
+                  :dark="isDarkMode"
                   :disable="disable"
                 />
               </div>
@@ -154,7 +170,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useQuasar } from 'quasar'
 import { decodeHtmlEntities, parseJsonSafe } from 'src/utils/field-metadata'
 
 defineOptions({ name: 'LinkageConfigEditor' })
@@ -180,6 +197,9 @@ const props = withDefaults(
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void
 }>()
+
+const $q = useQuasar()
+const isDarkMode = computed(() => Boolean($q?.dark?.isActive))
 
 const modeOptions = [
   { label: '关联选择', value: 'relation' },
@@ -334,17 +354,18 @@ watch([state, mappingRows], emitConfig, { deep: true })
   background: #ffffff;
 }
 
-:global(body.body--dark) .linkage-editor {
+.linkage-editor--dark {
   border-color: rgba(255, 255, 255, 0.12);
-  background: #20283a;
+  background: var(--app-dark-surface-soft);
+  color: var(--app-dark-text);
 }
 
-:global(body.body--dark) .linkage-editor__body {
+.linkage-editor--dark .linkage-editor__body {
   border-top-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(body.body--dark) .mapping-box {
+.linkage-editor--dark .mapping-box {
   border-color: rgba(255, 255, 255, 0.14);
-  background: #1b2232;
+  background: var(--app-dark-surface);
 }
 </style>

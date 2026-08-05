@@ -1,12 +1,15 @@
 <template>
-  <base-content class="q-pa-sm data-permission-page">
+  <base-content
+    class="q-pa-sm data-permission-page"
+    :class="{ 'data-permission-page--dark': isDarkMode }"
+  >
     <div class="data-permission-shell">
       <section class="data-permission-hero">
         <q-avatar
           class="data-permission-hero__icon"
           color="primary"
           text-color="white"
-          icon="rule"
+          :icon="pageIcon"
           rounded
         />
         <div class="data-permission-hero__content">
@@ -56,188 +59,186 @@
             <q-icon :name="currentSection.icon" />
           </header>
 
-          <transition name="data-permission-panel" mode="out-in">
-            <section
-              v-if="activeTab !== 'preflight'"
-              :key="activeTab"
-              class="data-permission-panel"
+          <section v-if="activeTab !== 'preflight'" class="data-permission-panel">
+            <q-table
+              class="fit sticky-header-table data-permission-table"
+              :rows="activeRows"
+              :columns="activeColumns"
+              row-key="id"
+              flat
+              separator="cell"
+              :dark="isDarkMode"
+              :loading="loading"
+              :pagination="{ rowsPerPage: 0 }"
+              hide-pagination
+              @row-click="(_, row) => openDetail(row)"
             >
-              <q-table
-                class="fit sticky-header-table data-permission-table"
-                :rows="activeRows"
-                :columns="activeColumns"
-                row-key="id"
-                flat
-                separator="cell"
-                :loading="loading"
-                :pagination="{ rowsPerPage: 0 }"
-                hide-pagination
-                @row-click="(_, row) => openDetail(row)"
-              >
-                <template #top>
-                  <div class="row q-col-gutter-sm items-center full-width">
-                    <div class="col-12 col-md">
-                      <q-input
-                        v-model="activeQuery.quick_query!.keyword"
-                        dense
-                        outlined
-                        debounce="300"
-                        placeholder="搜索关键词"
-                        @keyup.enter="searchActiveTab"
-                      >
-                        <template #append>
-                          <q-icon name="search" />
-                        </template>
-                      </q-input>
-                    </div>
-                    <div class="col-auto">
-                      <q-btn
-                        color="primary"
-                        icon="search"
-                        label="查询"
-                        :disable="loading"
-                        @click="searchActiveTab"
-                      />
-                    </div>
-                    <div class="col-auto">
-                      <q-btn
-                        outline
-                        color="primary"
-                        icon="tune"
-                        aria-label="高级查询"
-                        @click="openAdvancedQuery"
-                      >
-                        <q-tooltip>高级查询</q-tooltip>
-                      </q-btn>
-                    </div>
-                    <q-space />
-                    <div class="col-auto row q-gutter-sm">
-                      <q-btn
-                        v-for="button in activeTopButtons"
-                        :key="button.id"
-                        v-bind="menuButtonDisplayProps(button)"
-                        :color="button.color || 'primary'"
-                        :disable="loading"
-                        @click="handleButtonClick(button)"
-                      />
-                    </div>
+              <template #top>
+                <div class="row q-col-gutter-sm items-center full-width">
+                  <div class="col-12 col-sm-auto data-permission-quick-search">
+                    <q-input
+                      v-model="activeQuery.quick_query!.keyword"
+                      dense
+                      outlined
+                      :dark="isDarkMode"
+                      debounce="300"
+                      placeholder="搜索关键词"
+                      @keyup.enter="searchActiveTab"
+                    >
+                      <template #append>
+                        <q-icon name="search" />
+                      </template>
+                    </q-input>
                   </div>
-                </template>
-
-                <template #body-cell-permission_enabled="props">
-                  <q-td :props="props">
-                    <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                      {{ props.value ? '已启用' : '未启用' }}
-                    </q-badge>
-                  </q-td>
-                </template>
-
-                <template #body-cell-state="props">
-                  <q-td :props="props">
-                    <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                      {{ props.value ? '启用' : '停用' }}
-                    </q-badge>
-                  </q-td>
-                </template>
-
-                <template #body-cell-actions="props">
-                  <q-td :props="props" class="q-gutter-xs">
+                  <div class="col-auto">
                     <q-btn
-                      v-for="button in activeLineButtons"
+                      color="primary"
+                      icon="search"
+                      label="查询"
+                      :disable="loading"
+                      @click="searchActiveTab"
+                    />
+                  </div>
+                  <div class="col-auto">
+                    <q-btn
+                      outline
+                      color="primary"
+                      icon="tune"
+                      aria-label="高级查询"
+                      @click="openAdvancedQuery"
+                    >
+                      <q-tooltip>高级查询</q-tooltip>
+                    </q-btn>
+                  </div>
+                  <q-space />
+                  <div class="col-auto row q-gutter-sm">
+                    <q-btn
+                      v-for="button in activeTopButtons"
                       :key="button.id"
                       v-bind="menuButtonDisplayProps(button)"
                       :color="button.color || 'primary'"
-                      flat
-                      dense
-                      size="sm"
-                      @click.stop="handleButtonClick(button, props.row)"
-                    >
-                      <q-tooltip>{{ button.name }}</q-tooltip>
-                    </q-btn>
-                  </q-td>
-                </template>
+                      :disable="loading"
+                      @click="handleButtonClick(button)"
+                    />
+                  </div>
+                </div>
+              </template>
 
-                <template #bottom>
-                  <q-space />
-                  <table-pagination
-                    :page="activeQuery.page"
-                    :page-size="activeQuery.num"
-                    :total="activeTotal"
-                    @update:page="setActivePage"
-                    @update:page-size="setActivePageSize"
-                  />
-                </template>
-              </q-table>
-            </section>
+              <template #body-cell-permission_enabled="props">
+                <q-td :props="props">
+                  <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
+                    {{ props.value ? '已启用' : '未启用' }}
+                  </q-badge>
+                </q-td>
+              </template>
 
-            <section v-else key="preflight" class="data-permission-panel data-permission-preflight">
-              <div class="row q-col-gutter-md items-end">
-                <q-select
-                  v-model="preflightType"
-                  class="col-12 col-md-3"
-                  outlined
-                  dense
-                  emit-value
-                  map-options
-                  label="检查对象"
-                  :options="preflightTypeOptions"
-                  @update:model-value="resetPreflightTarget"
-                />
-                <q-select
-                  v-model="preflightId"
-                  class="col-12 col-md"
-                  outlined
-                  dense
-                  emit-value
-                  map-options
-                  use-input
-                  input-debounce="200"
-                  label="选择配置"
-                  :options="preflightTargetOptions"
-                  @filter="filterPreflightOptions"
-                />
-                <div class="col-auto">
+              <template #body-cell-state="props">
+                <q-td :props="props">
+                  <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
+                    {{ props.value ? '启用' : '停用' }}
+                  </q-badge>
+                </q-td>
+              </template>
+
+              <template #body-cell-actions="props">
+                <q-td :props="props" class="q-gutter-xs">
                   <q-btn
-                    v-for="button in activeTopButtons"
+                    v-for="button in activeLineButtons"
                     :key="button.id"
                     v-bind="menuButtonDisplayProps(button)"
                     :color="button.color || 'primary'"
-                    :disable="!preflightId || preflightLoading"
-                    :loading="preflightLoading"
-                    @click="handleButtonClick(button)"
-                  />
-                </div>
-              </div>
+                    flat
+                    dense
+                    size="sm"
+                    @click.stop="handleButtonClick(button, props.row)"
+                  >
+                    <q-tooltip>{{ button.name }}</q-tooltip>
+                  </q-btn>
+                </q-td>
+              </template>
 
-              <q-separator class="q-my-md" />
+              <template #bottom>
+                <q-space />
+                <table-pagination
+                  :page="activeQuery.page"
+                  :page-size="activeQuery.num"
+                  :total="activeTotal"
+                  @update:page="setActivePage"
+                  @update:page-size="setActivePageSize"
+                />
+              </template>
+            </q-table>
+          </section>
 
-              <q-banner
-                v-if="preflightResult"
-                rounded
-                :class="
-                  preflightResult.valid ? 'bg-green-1 text-positive' : 'bg-red-1 text-negative'
-                "
-              >
-                <template #avatar>
-                  <q-icon :name="preflightResult.valid ? 'task_alt' : 'error_outline'" />
-                </template>
-                {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
-              </q-banner>
-
-              <q-table
-                class="col q-mt-md sticky-header-table data-permission-table"
-                :rows="preflightResult?.errors || []"
-                :columns="preflightColumns"
-                row-key="code"
-                flat
-                bordered
-                separator="cell"
-                hide-pagination
-                :pagination="{ rowsPerPage: 0 }"
-                no-data-label="请选择对象并执行配置检查"
+          <section v-else class="data-permission-panel data-permission-preflight">
+            <div class="row q-col-gutter-md items-end">
+              <q-select
+                v-model="preflightType"
+                class="col-12 col-md-3"
+                outlined
+                dense
+                :dark="isDarkMode"
+                emit-value
+                map-options
+                label="检查对象"
+                :options="preflightTypeOptions"
+                @update:model-value="resetPreflightTarget"
               />
-            </section>
-          </transition>
+              <q-select
+                v-model="preflightId"
+                class="col-12 col-md"
+                outlined
+                dense
+                :dark="isDarkMode"
+                emit-value
+                map-options
+                use-input
+                input-debounce="200"
+                label="选择配置"
+                :options="preflightTargetOptions"
+                @filter="filterPreflightOptions"
+              />
+              <div class="col-auto">
+                <q-btn
+                  v-for="button in activeTopButtons"
+                  :key="button.id"
+                  v-bind="menuButtonDisplayProps(button)"
+                  :color="button.color || 'primary'"
+                  :disable="!preflightId || preflightLoading"
+                  :loading="preflightLoading"
+                  @click="handleButtonClick(button)"
+                />
+              </div>
+            </div>
+
+            <q-separator class="q-my-md" />
+
+            <q-banner
+              v-if="preflightResult"
+              rounded
+              :dark="isDarkMode"
+              :class="preflightResult.valid ? 'bg-green-1 text-positive' : 'bg-red-1 text-negative'"
+            >
+              <template #avatar>
+                <q-icon :name="preflightResult.valid ? 'task_alt' : 'error_outline'" />
+              </template>
+              {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
+            </q-banner>
+
+            <q-table
+              class="col q-mt-md sticky-header-table data-permission-table"
+              :rows="preflightResult?.errors || []"
+              :columns="preflightColumns"
+              row-key="code"
+              flat
+              bordered
+              separator="cell"
+              :dark="isDarkMode"
+              hide-pagination
+              :pagination="{ rowsPerPage: 0 }"
+              no-data-label="请选择对象并执行配置检查"
+            />
+          </section>
         </main>
       </div>
     </div>
@@ -266,6 +267,7 @@ defineOptions({ name: 'system_data_permission' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
@@ -299,6 +301,12 @@ type PreflightType = 'resource' | 'policy' | 'grant'
 
 const api = useDataPermissionConfigApi()
 const $q = useQuasar()
+const route = useRoute()
+const isDarkMode = computed(() => Boolean($q?.dark?.isActive))
+const pageIcon = computed(() => {
+  const icon = route.meta.icon
+  return typeof icon === 'string' && icon.trim() ? icon : 'rule'
+})
 const { confirmAction } = useConfirmDialog($q)
 const { top_buttons: topButtons, line_buttons: lineButtons } =
   usePageButtons('system_data_permission')
@@ -860,6 +868,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #f7f9fc;
 }
 
 .data-permission-shell {
@@ -879,7 +888,7 @@ onMounted(async () => {
   padding: 12px 16px;
   border: 1px solid var(--data-permission-border);
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--app-primary-soft), rgba(0, 184, 169, 0.07)), #fff;
+  background: linear-gradient(135deg, var(--app-primary-soft-strong), transparent 72%), #fff;
 }
 
 .data-permission-hero__icon {
@@ -1048,6 +1057,11 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+.data-permission-quick-search {
+  width: 320px;
+  max-width: 100%;
+}
+
 .data-permission-table {
   height: 100%;
 }
@@ -1056,35 +1070,32 @@ onMounted(async () => {
   padding: 14px;
 }
 
-.data-permission-panel-enter-active,
-.data-permission-panel-leave-active {
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.data-permission-panel-enter-from,
-.data-permission-panel-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
-}
-
-:global(body.body--dark) .data-permission-page {
+.data-permission-page--dark {
   --data-permission-border: var(--app-dark-border);
   --data-permission-ink: var(--app-dark-heading);
   --data-permission-muted: var(--app-dark-muted);
+  background: var(--app-dark-page);
 }
 
-:global(body.body--dark) .data-permission-hero,
-:global(body.body--dark) .data-permission-sidebar,
-:global(body.body--dark) .data-permission-main {
+.data-permission-page--dark .data-permission-hero,
+.data-permission-page--dark .data-permission-sidebar,
+.data-permission-page--dark .data-permission-main {
   background: var(--app-dark-surface);
 }
 
-:global(body.body--dark) .data-permission-hero {
+.data-permission-page--dark .data-permission-hero {
   background:
-    linear-gradient(135deg, var(--app-primary-soft), rgba(0, 184, 169, 0.07)),
+    linear-gradient(135deg, var(--app-primary-soft-strong), transparent 72%),
     var(--app-dark-surface);
+}
+
+.data-permission-page--dark .data-permission-nav-item:hover,
+.data-permission-page--dark .data-permission-nav-item--active {
+  background: var(--app-primary-soft-strong);
+}
+
+.data-permission-page--dark .data-permission-preflight {
+  color: var(--app-dark-text);
 }
 
 @media (max-width: 960px) {
@@ -1119,6 +1130,10 @@ onMounted(async () => {
 
   .data-permission-section-head {
     min-height: 64px;
+  }
+
+  .data-permission-quick-search {
+    width: 100%;
   }
 }
 </style>
