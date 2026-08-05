@@ -1,7 +1,10 @@
 <template>
   <q-btn
     class="toolbar-title"
-    :class="{ 'toolbar-title--mini': mini }"
+    :class="{
+      'toolbar-title--mini': mini,
+      'toolbar-title--dark': $q.dark.isActive,
+    }"
     flat
     no-caps
     no-wrap
@@ -19,7 +22,10 @@
 </template>
 
 <script lang="ts" setup>
+import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+
+const $q = useQuasar()
 const router = useRouter()
 
 defineOptions({ name: 'ToolbarTitle' })
@@ -120,7 +126,7 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; lo
   }
 }
 
-:global(.body--dark) .toolbar-title {
+.toolbar-title--dark {
   color: #eef2ff;
   border-color: rgba(148, 163, 184, 0.24);
   background: #20283a;
