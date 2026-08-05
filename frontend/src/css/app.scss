@@ -92,16 +92,15 @@ body {
 
 .q-table__middle {
   overflow: auto;
-  overflow: overlay;
   overscroll-behavior: contain;
   scrollbar-gutter: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
 
 .q-table__middle::-webkit-scrollbar {
-  width: var(--app-table-scrollbar-size);
-  height: var(--app-table-scrollbar-size);
+  width: 0;
+  height: 0;
   background: transparent;
 }
 
@@ -117,13 +116,25 @@ body {
   background-clip: padding-box;
 }
 
-.q-table__container:hover .q-table__middle,
-.q-table__container:focus-within .q-table__middle {
-  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+.q-table__middle:hover,
+.q-table__middle:focus-within {
+  // 滚动层向外扩展与滚动条等宽，显示滚动条时不挤占表格内容。
+  width: calc(100% + var(--app-table-scrollbar-size));
+  max-width: calc(100% + var(--app-table-scrollbar-size));
+  margin-right: calc(var(--app-table-scrollbar-size) * -1);
+  margin-bottom: calc(var(--app-table-scrollbar-size) * -1);
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
 
-.q-table__container:hover .q-table__middle::-webkit-scrollbar-thumb,
-.q-table__container:focus-within .q-table__middle::-webkit-scrollbar-thumb {
+.q-table__middle:hover::-webkit-scrollbar,
+.q-table__middle:focus-within::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
+}
+
+.q-table__middle:hover::-webkit-scrollbar-thumb,
+.q-table__middle:focus-within::-webkit-scrollbar-thumb {
   background: var(--app-scrollbar-thumb);
   background-clip: padding-box;
 }
@@ -131,17 +142,6 @@ body {
 .q-table__middle::-webkit-scrollbar-thumb:hover {
   background: var(--app-scrollbar-thumb-hover);
   background-clip: padding-box;
-}
-
-@media (hover: none) {
-  .q-table__middle {
-    scrollbar-color: var(--app-scrollbar-thumb) transparent;
-  }
-
-  .q-table__middle::-webkit-scrollbar-thumb {
-    background: var(--app-scrollbar-thumb);
-    background-clip: padding-box;
-  }
 }
 
 input[type='number'] {

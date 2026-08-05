@@ -2575,7 +2575,6 @@ watch(
 .structure-table :deep(.q-table__middle) {
   height: 100%;
   overflow: auto;
-  overflow: overlay;
 }
 
 .structure-table :deep(thead tr th) {
