@@ -56,9 +56,9 @@
       </aside>
 
       <div class="workbench-list">
-        <q-table
+        <scrollable-table
           v-model:pagination="pagination"
-          class="fit sticky-header-table report-workbench-table"
+          class="fit report-workbench-table"
           color="primary"
           :dense="$q.screen.lt.md"
           separator="cell"
@@ -271,7 +271,7 @@
           :total="total"
         />
       </template>
-        </q-table>
+        </scrollable-table>
       </div>
     </section>
 
@@ -300,6 +300,7 @@ import cloneDeep from 'lodash/cloneDeep'
 
 import AdvancedQuery from 'components/Query/AdvancedQuery.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import { useReportApi, type Report, type ReportKind, type ReportStatus } from 'src/api/services/report'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import { usePageButtons } from 'src/composables/page-buttons'
@@ -943,23 +944,13 @@ async function unpublishMenu(id: number) {
 .report-workbench-table {
   height: 100%;
   min-height: 0;
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
 
   :deep(.q-table__top) {
     padding: 8px;
-    flex: 0 0 auto;
-  }
-
-  :deep(.q-table__middle) {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
   }
 
   :deep(.q-table__bottom) {
-    flex: 0 0 auto;
     min-height: 48px;
   }
 }

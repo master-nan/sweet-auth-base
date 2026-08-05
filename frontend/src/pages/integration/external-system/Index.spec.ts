@@ -134,6 +134,7 @@ const mountPage = () =>
       stubs: {
         BaseContent: SlotStub,
         QTable: TableStub,
+        ScrollableTable: TableStub,
         QInput: true,
         QSelect: true,
         QBtn: ButtonStub,

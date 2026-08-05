@@ -98,7 +98,7 @@
             </div>
           </div>
 
-          <q-table
+          <scrollable-table
             flat
             bordered
             separator="cell"
@@ -167,7 +167,7 @@
               <q-space />
               <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
             </template>
-          </q-table>
+          </scrollable-table>
         </section>
       </section>
     </div>
@@ -186,6 +186,7 @@ defineOptions({ name: 'report_center' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import type { Query } from 'src/types/global'

@@ -1,8 +1,8 @@
 <template>
   <base-content :scrollable="showDetailDialog && detailMode === 'page'" class="q-pa-sm">
-    <q-table
+    <scrollable-table
       v-if="!showDetailDialog || detailMode === 'dialog'"
-      class="fit sticky-header-table"
+      class="fit"
       flat
       bordered
       separator="cell"
@@ -105,7 +105,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </q-table>
+    </scrollable-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -238,6 +238,7 @@ import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import ScrollableTable from 'src/components/Table/ScrollableTable.vue'
 import {
   bindEmployeeUser,
   getEmployeeDetail,

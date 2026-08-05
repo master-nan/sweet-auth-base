@@ -1,7 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
-    <q-table
-      class="fit sticky-header-table"
+    <scrollable-table
+      class="fit"
       color="primary"
       selection="multiple"
       v-model:selected="selected"
@@ -110,7 +110,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </q-table>
+    </scrollable-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -218,6 +218,7 @@ defineOptions({ name: 'system_user' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 

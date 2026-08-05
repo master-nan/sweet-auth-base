@@ -90,70 +90,13 @@ body {
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 .q-table__middle::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.app-table-scrollbar-host {
-  position: relative;
-}
-
-.app-table-scrollbar {
-  position: absolute;
-  z-index: 4;
-  display: none;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-}
-
-.app-table-scrollbar--scrollable {
-  display: block;
-}
-
-.app-table-scrollbar-active .app-table-scrollbar--scrollable {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.app-table-scrollbar--vertical {
-  width: 10px;
-}
-
-.app-table-scrollbar--horizontal {
-  height: 10px;
-}
-
-.app-table-scrollbar__thumb {
-  position: absolute;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: var(--app-scrollbar-thumb);
-  background-clip: padding-box;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-
-.app-table-scrollbar__thumb:hover {
-  background: var(--app-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}
-
-.app-table-scrollbar--vertical .app-table-scrollbar__thumb {
-  right: 3px;
-  width: 4px;
-  min-height: 28px;
-}
-
-.app-table-scrollbar--horizontal .app-table-scrollbar__thumb {
-  bottom: 3px;
-  height: 4px;
-  min-width: 28px;
+  width: 6px;
+  height: 6px;
 }
 
 input[type='number'] {

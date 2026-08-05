@@ -1,7 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
-    <q-table
-      class="fit sticky-header-table"
+    <scrollable-table
+      class="fit"
       color="primary"
       selection="multiple"
       v-model:selected="selected"
@@ -117,7 +117,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </q-table>
+    </scrollable-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -825,6 +825,7 @@
 defineOptions({ name: 'develop_database' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'

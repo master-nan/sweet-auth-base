@@ -235,6 +235,7 @@ const mountPage = () =>
         QTabPanels: SlotStub,
         QTabPanel: SlotStub,
         QTable: TableStub,
+        ScrollableTable: TableStub,
         QTd: SlotStub,
         QBadge: SlotStub,
         QInput: InputStub,

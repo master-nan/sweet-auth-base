@@ -1,7 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
-    <q-table
-      class="fit sticky-header-table"
+    <scrollable-table
+      class="fit"
       color="primary"
       selection="multiple"
       v-model:selected="selected"
@@ -102,7 +102,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </q-table>
+    </scrollable-table>
 
     <!-- 高级查询对话框 -->
     <advanced-query
@@ -135,6 +135,7 @@
 defineOptions({ name: 'system_role' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import ScrollableTable from 'components/Table/ScrollableTable.vue'
 import PermissionDialog from './PermissionDialog.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'

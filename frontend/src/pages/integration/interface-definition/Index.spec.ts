@@ -41,7 +41,7 @@ const ButtonStub = defineComponent({
   setup(props, { emit }) { return () => h('button', { onClick: () => emit('click') }, props.label) },
 })
 const mountPage = () => shallowMount(InterfaceDefinitionPage, { global: { plugins: [createPinia()], stubs: {
-  BaseContent: SlotStub, QTable: TableStub, QInput: true, QSelect: true, QBtn: ButtonStub, QIcon: true, QSpace: true,
+  BaseContent: SlotStub, QTable: TableStub, ScrollableTable: TableStub, QInput: true, QSelect: true, QBtn: ButtonStub, QIcon: true, QSpace: true,
   QBadge: true, QTooltip: true, QChip: true, QTd: SlotStub, TablePagination: true, AdvancedQuery: true,
   InterfaceDefinitionFormDialog: true, InterfaceDefinitionDetailDialog: true,
 } } })

@@ -1,7 +1,7 @@
 <template>
   <base-content class="q-pa-sm">
-    <q-table
-      class="fit sticky-header-table"
+    <scrollable-table
+      class="fit"
       flat
       bordered
       separator="cell"
@@ -96,7 +96,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-    </q-table>
+    </scrollable-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
@@ -130,6 +130,7 @@ import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import ScrollableTable from 'src/components/Table/ScrollableTable.vue'
 import {
   getSyncBatchError,
   querySyncBatches,
