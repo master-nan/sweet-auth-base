@@ -62,14 +62,21 @@ func (b *BasicRepositoryImpl[T]) DBWithContext(ctx context.Context) *gorm.DB {
 	return b.db.WithContext(ctx)
 }
 
-func (b *BasicRepositoryImpl[T]) QueryWhere(filter string) *gorm.DB {
-	return b.baseQuery().Model(b.model).Where(filter)
-}
-
 func (b *BasicRepositoryImpl[T]) Count(query *gorm.DB) (int64, error) {
 	var total int64
 	err := query.Limit(-1).Offset(-1).Count(&total).Error
 	return total, err
+}
+
+func (b *BasicRepositoryImpl[T]) CountByField(db *gorm.DB, field string, value interface{}) (int64, error) {
+	if err := validateRepositoryField(field); err != nil {
+		return 0, err
+	}
+	query := db.Model(b.model)
+	if b.unscoped {
+		query = query.Unscoped()
+	}
+	return b.Count(query.Where(fmt.Sprintf("%s = ?", field), value))
 }
 
 func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, result interface{}, table model.SysTable) (int64, error) {
@@ -121,21 +128,15 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 		}
 	}()
 
-	var total int64
-	for i := 0; i < 2; i++ {
-		select {
-		case count := <-countChan:
-			if count.err != nil {
-				return 0, count.err
-			}
-			total = count.total
-		case err := <-dataErrChan:
-			if err != nil {
-				return 0, err
-			}
-		}
+	count := <-countChan
+	dataErr := <-dataErrChan
+	if count.err != nil {
+		return 0, count.err
 	}
-	return total, nil
+	if dataErr != nil {
+		return 0, dataErr
+	}
+	return count.total, nil
 }
 
 func (b *BasicRepositoryImpl[T]) Create(tx *gorm.DB, entity interface{}) error {
@@ -211,13 +212,6 @@ func (b *BasicRepositoryImpl[T]) FindByIdForUpdate(tx *gorm.DB, id int) (T, erro
 	return entity, err
 }
 
-func (b *BasicRepositoryImpl[T]) FindListById(id int) ([]T, error) {
-	var entity []T
-	query := b.applyReadOptions(b.baseQuery())
-	err := query.Find(&entity, id).Error
-	return entity, err
-}
-
 func (b *BasicRepositoryImpl[T]) FindByField(field string, value interface{}) (T, error) {
 	var entity T
 	if err := validateRepositoryField(field); err != nil {
@@ -249,6 +243,19 @@ func (b *BasicRepositoryImpl[T]) FindListByField(field string, value interface{}
 	query := b.applyReadOptions(b.baseQuery())
 	err := query.Where(fmt.Sprintf("%s = ?", field), value).Find(&entity).Error
 	return entity, err
+}
+
+func (b *BasicRepositoryImpl[T]) FindListByFieldWithDB(db *gorm.DB, field string, value interface{}) ([]T, error) {
+	var entities []T
+	if err := validateRepositoryField(field); err != nil {
+		return nil, err
+	}
+	query := b.applyReadOptions(db.Model(b.model))
+	if b.unscoped {
+		query = query.Unscoped()
+	}
+	err := query.Where(fmt.Sprintf("%s = ?", field), value).Find(&entities).Error
+	return entities, err
 }
 
 func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interface{}) ([]T, error) {

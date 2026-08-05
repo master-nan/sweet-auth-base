@@ -27,8 +27,8 @@ var (
 type BasicRepository[T any] interface {
 	ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error
 	DBWithContext(context.Context) *gorm.DB
-	QueryWhere(string) *gorm.DB
 	Count(*gorm.DB) (int64, error)
+	CountByField(*gorm.DB, string, interface{}) (int64, error)
 	PaginateAndCountAsync(*request.Basic, interface{}, model.SysTable) (int64, error)
 	Create(*gorm.DB, interface{}) error
 	Update(*gorm.DB, interface{}, int) error
@@ -39,10 +39,10 @@ type BasicRepository[T any] interface {
 	FindById(id int) (T, error)
 	FindByIdWithDB(*gorm.DB, int) (T, error)
 	FindByIdForUpdate(*gorm.DB, int) (T, error)
-	FindListById(id int) ([]T, error)
 	FindByField(field string, value interface{}) (T, error)
 	FindByFieldWithDB(*gorm.DB, string, interface{}) (T, error)
 	FindListByField(field string, value interface{}) ([]T, error)
+	FindListByFieldWithDB(*gorm.DB, string, interface{}) ([]T, error)
 	FindListByFieldIn(field string, value interface{}) ([]T, error)
 	UpdateFields(*gorm.DB, int, map[string]any) (bool, error)
 	UpdateFieldsByRevision(*gorm.DB, int, int, map[string]any) (bool, error)

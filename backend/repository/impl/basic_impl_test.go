@@ -8,7 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -42,6 +44,68 @@ func TestBasicRepositoryPaginateAndCountAsyncReturnsDataQueryError(t *testing.T)
 	_, err = repo.PaginateAndCountAsync(&request.Basic{Page: 1, Num: 10}, &rows, model.SysTable{})
 	if err == nil {
 		t.Fatal("expected data query error")
+	}
+}
+
+func TestBasicRepositoryPaginateAndCountAsyncWaitsForBothQueriesBeforeReturning(t *testing.T) {
+	db := testutil.OpenSQLite(t, &basicRepositoryFindByFieldFixture{})
+	if err := db.Create(&basicRepositoryFindByFieldFixture{
+		Basic: model.Basic{Id: 1, State: true}, Name: "alpha",
+	}).Error; err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	countErr := errors.New("count query failed")
+	countFailed := make(chan struct{})
+	dataStarted := make(chan struct{})
+	releaseData := make(chan struct{})
+	var countOnce, dataOnce sync.Once
+	callbackName := "test:wait_for_parallel_page_queries"
+	if err := db.Callback().Query().Before("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		switch tx.Statement.Dest.(type) {
+		case *int64:
+			tx.AddError(countErr)
+			countOnce.Do(func() { close(countFailed) })
+		case *[]basicRepositoryFindByFieldFixture:
+			dataOnce.Do(func() { close(dataStarted) })
+			<-releaseData
+		}
+	}); err != nil {
+		t.Fatalf("register query callback: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Callback().Query().Remove(callbackName) })
+
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	result := make(chan error, 1)
+	go func() {
+		var rows []basicRepositoryFindByFieldFixture
+		_, err := repo.PaginateAndCountAsync(&request.Basic{Page: 1, Num: 10}, &rows, model.SysTable{})
+		result <- err
+	}()
+
+	select {
+	case <-dataStarted:
+	case <-time.After(time.Second):
+		t.Fatal("data query did not start")
+	}
+	select {
+	case <-countFailed:
+	case <-time.After(time.Second):
+		t.Fatal("count query did not fail")
+	}
+	select {
+	case err := <-result:
+		t.Fatalf("pagination returned before the data query completed: %v", err)
+	case <-time.After(30 * time.Millisecond):
+	}
+	close(releaseData)
+	select {
+	case err := <-result:
+		if !errors.Is(err, countErr) {
+			t.Fatalf("expected count error, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("pagination did not return after both queries completed")
 	}
 }
 
@@ -117,6 +181,14 @@ func TestBasicRepositoryTransactionReadAndFieldUpdate(t *testing.T) {
 	byName, err := repo.FindByFieldWithDB(db, "name", "alpha")
 	if err != nil || byName.Id != 1 {
 		t.Fatalf("find by field with DB: value=%+v err=%v", byName, err)
+	}
+	listByName, err := repo.FindListByFieldWithDB(db, "name", "alpha")
+	if err != nil || len(listByName) != 1 || listByName[0].Id != 1 {
+		t.Fatalf("find list by field with DB: value=%+v err=%v", listByName, err)
+	}
+	countByName, err := repo.CountByField(db, "name", "alpha")
+	if err != nil || countByName != 1 {
+		t.Fatalf("count by field: count=%d err=%v", countByName, err)
 	}
 	updated, err := repo.UpdateFields(db, 1, map[string]any{"name": "beta"})
 	if err != nil || !updated {
@@ -338,6 +410,12 @@ func TestBasicRepositoryReturnsStableValidationErrors(t *testing.T) {
 	}
 	if _, err := repo.FindListByFieldIn("id", 1); !errors.Is(err, repository.ErrInvalidFieldValues) {
 		t.Fatalf("expected invalid field values error, got %v", err)
+	}
+	if _, err := repo.CountByField(&gorm.DB{}, "name; DROP TABLE fixture", "alpha"); !errors.Is(err, repository.ErrInvalidField) {
+		t.Fatalf("expected count invalid field error, got %v", err)
+	}
+	if _, err := repo.FindListByFieldWithDB(&gorm.DB{}, "name; DROP TABLE fixture", "alpha"); !errors.Is(err, repository.ErrInvalidField) {
+		t.Fatalf("expected list invalid field error, got %v", err)
 	}
 }
 

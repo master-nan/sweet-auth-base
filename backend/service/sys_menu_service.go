@@ -133,21 +133,21 @@ func (s *SysMenuService) RefreshMenuCache(ctx *gin.Context) error {
 func (s *SysMenuService) DeleteMenuById(ctx *gin.Context, id int) error {
 	var cleanups []rolePolicyCleanup
 	err := s.sysMenuRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		childCount, err := s.sysMenuRepo.Count(s.sysMenuRepo.QueryWhere(fmt.Sprintf("pid = %d", id)))
+		childCount, err := s.sysMenuRepo.CountByField(tx, "pid", id)
 		if err != nil {
 			return err
 		}
 		if childCount > 0 {
 			return myerrors.NewBadRequestError("请先删除子菜单")
 		}
-		menu, err := s.sysMenuRepo.FindById(id)
+		menu, err := s.sysMenuRepo.FindByIdWithDB(tx, id)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
 			return err
 		}
-		buttons, err := s.sysMenuButtonRepo.FindListByField("menu_id", id)
+		buttons, err := s.sysMenuButtonRepo.FindListByFieldWithDB(tx, "menu_id", id)
 		if err != nil {
 			return err
 		}
