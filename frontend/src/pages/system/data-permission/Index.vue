@@ -23,7 +23,7 @@
           color="primary"
           icon="refresh"
           label="刷新"
-          :loading="loading || preflightLoading"
+          :loading="activeLoading || preflightLoading"
           @click="refreshActiveTab"
         />
       </section>
@@ -59,65 +59,83 @@
             <q-icon :name="currentSection.icon" />
           </header>
 
-          <section v-if="activeTab !== 'preflight'" class="data-permission-panel">
+          <section
+            v-for="tab in listTabs"
+            v-show="activeTab === tab"
+            :key="tab"
+            class="data-permission-panel"
+            :data-panel="tab"
+          >
             <q-table
               class="fit sticky-header-table data-permission-table"
-              :rows="activeRows"
-              :columns="activeColumns"
+              color="primary"
+              :dense="isCompactTable"
+              :rows="rowsByTab[tab]"
+              :columns="columnsByTab[tab]"
               row-key="id"
               flat
+              bordered
               separator="cell"
               :dark="isDarkMode"
-              :loading="loading"
+              :loading="loadingByTab[tab]"
               :pagination="{ rowsPerPage: 0 }"
               hide-pagination
-              @row-click="(_, row) => openDetail(row)"
+              @row-click="(_, row) => openDetail(tab, row)"
             >
               <template #top>
-                <div class="row q-col-gutter-sm items-center full-width">
-                  <div class="col-12 col-sm-auto data-permission-quick-search">
+                <div class="row q-gutter-xs full-width">
+                  <div class="col-grow row q-gutter-xs">
                     <q-input
-                      v-model="activeQuery.quick_query!.keyword"
+                      v-model="queries[tab].quick_query!.keyword"
                       dense
                       outlined
                       :dark="isDarkMode"
                       debounce="300"
                       placeholder="搜索关键词"
-                      @keyup.enter="searchActiveTab"
+                      @keyup.enter="searchTab(tab)"
                     >
                       <template #append>
                         <q-icon name="search" />
                       </template>
                     </q-input>
-                  </div>
-                  <div class="col-auto">
                     <q-btn
                       color="primary"
-                      icon="search"
-                      label="查询"
-                      :disable="loading"
-                      @click="searchActiveTab"
+                      label="搜索"
+                      :disable="loadingByTab[tab]"
+                      @click="searchTab(tab)"
                     />
-                  </div>
-                  <div class="col-auto">
                     <q-btn
                       outline
-                      color="primary"
                       icon="tune"
-                      aria-label="高级查询"
-                      @click="openAdvancedQuery"
+                      color="primary"
+                      class="q-ml-xs"
+                      :aria-label="
+                        filterCountForTab(tab) > 0
+                          ? `高级查询，已启用 ${filterCountForTab(tab)} 个条件`
+                          : '高级查询'
+                      "
+                      @click="openAdvancedQuery(tab)"
                     >
-                      <q-tooltip>高级查询</q-tooltip>
+                      <q-badge v-if="filterCountForTab(tab) > 0" floating color="red">
+                        {{ filterCountForTab(tab) }}
+                      </q-badge>
+                      <q-tooltip>
+                        {{
+                          filterCountForTab(tab) > 0
+                            ? `高级查询，已启用 ${filterCountForTab(tab)} 个条件`
+                            : '高级查询'
+                        }}
+                      </q-tooltip>
                     </q-btn>
                   </div>
                   <q-space />
-                  <div class="col-auto row q-gutter-sm">
+                  <div class="row q-gutter-xs">
                     <q-btn
-                      v-for="button in activeTopButtons"
+                      v-for="button in topButtonsForTab(tab)"
                       :key="button.id"
                       v-bind="menuButtonDisplayProps(button)"
                       :color="button.color || 'primary'"
-                      :disable="loading"
+                      :disable="loadingByTab[tab]"
                       @click="handleButtonClick(button)"
                     />
                   </div>
@@ -143,7 +161,7 @@
               <template #body-cell-actions="props">
                 <q-td :props="props" class="q-gutter-xs">
                   <q-btn
-                    v-for="button in activeLineButtons"
+                    v-for="button in lineButtonsForTab(tab)"
                     :key="button.id"
                     v-bind="menuButtonDisplayProps(button)"
                     :color="button.color || 'primary'"
@@ -160,17 +178,21 @@
               <template #bottom>
                 <q-space />
                 <table-pagination
-                  :page="activeQuery.page"
-                  :page-size="activeQuery.num"
-                  :total="activeTotal"
-                  @update:page="setActivePage"
-                  @update:page-size="setActivePageSize"
+                  :page="queries[tab].page"
+                  :page-size="queries[tab].num"
+                  :total="totals[tab]"
+                  @update:page="setTabPage(tab, $event)"
+                  @update:page-size="setTabPageSize(tab, $event)"
                 />
               </template>
             </q-table>
           </section>
 
-          <section v-else class="data-permission-panel data-permission-preflight">
+          <section
+            v-show="activeTab === 'preflight'"
+            class="data-permission-panel data-permission-preflight"
+            data-panel="preflight"
+          >
             <div class="row q-col-gutter-md items-end">
               <q-select
                 v-model="preflightType"
@@ -200,7 +222,7 @@
               />
               <div class="col-auto">
                 <q-btn
-                  v-for="button in activeTopButtons"
+                  v-for="button in preflightTopButtons"
                   :key="button.id"
                   v-bind="menuButtonDisplayProps(button)"
                   :color="button.color || 'primary'"
@@ -265,7 +287,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'system_data_permission' })
 
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
@@ -292,6 +314,7 @@ import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { countEffectiveQueryRules } from 'src/utils/query-state'
 
 type ListTabName = 'resources' | 'ownerships' | 'policies' | 'grants'
 type ActiveTabName = ListTabName | 'preflight'
@@ -303,6 +326,7 @@ const api = useDataPermissionConfigApi()
 const $q = useQuasar()
 const route = useRoute()
 const isDarkMode = computed(() => Boolean($q?.dark?.isActive))
+const isCompactTable = computed(() => Boolean($q?.screen?.lt?.md))
 const pageIcon = computed(() => {
   const icon = route.meta.icon
   return typeof icon === 'string' && icon.trim() ? icon : 'rule'
@@ -343,11 +367,26 @@ const permissionSections: Array<{
     icon: 'fact_check',
   },
 ]
+const listTabs: ListTabName[] = ['resources', 'ownerships', 'policies', 'grants']
 const activeTab = ref<ActiveTabName>('resources')
 const currentSection = computed(
   () => permissionSections.find((section) => section.name === activeTab.value)!,
 )
-const loading = ref(false)
+const loadingByTab = reactive<Record<ListTabName, boolean>>({
+  resources: false,
+  ownerships: false,
+  policies: false,
+  grants: false,
+})
+const loadedTabs = reactive<Record<ListTabName, boolean>>({
+  resources: false,
+  ownerships: false,
+  policies: false,
+  grants: false,
+})
+const activeLoading = computed(() =>
+  activeTab.value === 'preflight' ? false : loadingByTab[activeTab.value],
+)
 const showAdvancedQuery = ref(false)
 const showConfigDialog = ref(false)
 const configDialogKind = ref<ConfigDialogKind>('resource')
@@ -364,6 +403,8 @@ const dimensions = ref<DataPermissionDimension[]>([])
 const policyRules = ref<DataPolicyRule[]>([])
 const resourceLookup = ref<DataResource[]>([])
 const policyLookup = ref<DataPolicy[]>([])
+const preflightGrants = ref<DataGrant[]>([])
+const preflightGrantsLoaded = ref(false)
 
 const totals = ref<Record<ListTabName, number>>({
   resources: 0,
@@ -385,6 +426,7 @@ const queries = ref<Record<ListTabName, DataPermissionConfigQuery>>({
   policies: newQuery(),
   grants: newQuery(),
 })
+const advancedQueryTab = ref<ListTabName>('resources')
 const tempAdvancedQuery = ref<Query>(cloneDeep(queries.value.resources))
 
 const resourceTypeLabels: Record<string, string> = {
@@ -498,25 +540,18 @@ const preflightColumns: QTableProps['columns'] = [
   { name: 'object_id', label: '对象ID', field: 'object_id', align: 'left' },
 ]
 
-const activeQuery = computed(() =>
-  activeTab.value === 'preflight' ? queries.value.resources : queries.value[activeTab.value],
-)
-const activeRows = computed(() => {
-  if (activeTab.value === 'resources') return resources.value
-  if (activeTab.value === 'ownerships') return ownerships.value
-  if (activeTab.value === 'policies') return policies.value
-  if (activeTab.value === 'grants') return grants.value
-  return []
-})
-const activeColumns = computed(() => {
-  if (activeTab.value === 'resources') return resourceColumns
-  if (activeTab.value === 'ownerships') return ownershipColumns
-  if (activeTab.value === 'policies') return policyColumns
-  return grantColumns
-})
-const activeTotal = computed(() =>
-  activeTab.value === 'preflight' ? 0 : totals.value[activeTab.value],
-)
+const rowsByTab = computed<Record<ListTabName, ConfigRow[]>>(() => ({
+  resources: resources.value,
+  ownerships: ownerships.value,
+  policies: policies.value,
+  grants: grants.value,
+}))
+const columnsByTab: Record<ListTabName, QTableProps['columns']> = {
+  resources: resourceColumns,
+  ownerships: ownershipColumns,
+  policies: policyColumns,
+  grants: grantColumns,
+}
 
 const topActionByTab: Record<ActiveTabName, string[]> = {
   resources: ['create_resource'],
@@ -531,18 +566,17 @@ const lineActionByTab: Record<ListTabName, string[]> = {
   policies: ['update_policy', 'configure_rules', 'toggle_policy'],
   grants: ['toggle_grant'],
 }
-const activeTopButtons = computed(() =>
+const preflightTopButtons = computed(() =>
   topButtons.value.filter((button) => {
-    if (!topActionByTab[activeTab.value].includes(button.event_action)) return false
-    if (activeTab.value !== 'preflight') return true
+    if (!topActionByTab.preflight.includes(button.event_action)) return false
     return button.event_action === `preflight_${preflightType.value}`
   }),
 )
-const activeLineButtons = computed(() => {
-  const tab = activeTab.value
-  if (tab === 'preflight') return []
-  return lineButtons.value.filter((button) => lineActionByTab[tab].includes(button.event_action))
-})
+const topButtonsForTab = (tab: ListTabName) =>
+  topButtons.value.filter((button) => topActionByTab[tab].includes(button.event_action))
+const lineButtonsForTab = (tab: ListTabName) =>
+  lineButtons.value.filter((button) => lineActionByTab[tab].includes(button.event_action))
+const filterCountForTab = (tab: ListTabName) => countEffectiveQueryRules(queries.value[tab])
 
 const field = (
   code: string,
@@ -587,9 +621,7 @@ const advancedFields: Record<ListTabName, Partial<TableField>[]> = {
     field('state', '状态', SysTableFieldType.BOOLEAN),
   ],
 }
-const advancedQueryFields = computed(() =>
-  activeTab.value === 'preflight' ? [] : advancedFields[activeTab.value],
-)
+const advancedQueryFields = computed(() => advancedFields[advancedQueryTab.value])
 
 const preflightType = ref<PreflightType>('resource')
 const preflightId = ref<number | null>(null)
@@ -615,11 +647,9 @@ const dimensionLabel = (id: number) => {
   return dimension ? `${dimension.dimension_code} · ${dimension.name}` : `#${id}`
 }
 
-const fetchActiveTab = async () => {
-  if (activeTab.value === 'preflight') return
-  loading.value = true
+const fetchTab = async (tab: ListTabName) => {
+  loadingByTab[tab] = true
   try {
-    const tab = activeTab.value
     const query = queries.value[tab]
     if (tab === 'resources') {
       const result = await api.queryResources(query)
@@ -642,8 +672,9 @@ const fetchActiveTab = async () => {
       grants.value = result.data || []
       totals.value.grants = result.total || 0
     }
+    loadedTabs[tab] = true
   } finally {
-    loading.value = false
+    loadingByTab[tab] = false
   }
 }
 
@@ -659,40 +690,45 @@ const loadLookups = async () => {
   dimensions.value = dimensionResult.data || []
 }
 
-const searchActiveTab = () => {
-  if (activeTab.value === 'preflight') return
-  queries.value[activeTab.value].page = 1
-  void fetchActiveTab()
+const loadPreflightGrants = async (force = false) => {
+  if (preflightGrantsLoaded.value && !force) return
+  const result = await api.queryGrants({ ...newQuery(), num: 500 })
+  preflightGrants.value = result.data || []
+  preflightGrantsLoaded.value = true
+}
+
+const searchTab = (tab: ListTabName) => {
+  queries.value[tab].expressions = cloneDeep(newQuery().expressions)
+  queries.value[tab].page = 1
+  void fetchTab(tab)
 }
 const refreshActiveTab = () => {
   if (activeTab.value === 'preflight') {
-    resetPreflightTarget()
+    void Promise.all([loadLookups(), loadPreflightGrants(true)]).then(resetPreflightTarget)
     return
   }
-  void Promise.all([fetchActiveTab(), loadLookups()])
+  void Promise.all([fetchTab(activeTab.value), loadLookups()])
 }
-const setActivePage = (page: number) => {
-  if (activeTab.value === 'preflight') return
-  queries.value[activeTab.value].page = page
-  void fetchActiveTab()
+const setTabPage = (tab: ListTabName, page: number) => {
+  queries.value[tab].page = page
+  void fetchTab(tab)
 }
-const setActivePageSize = (pageSize: number) => {
-  if (activeTab.value === 'preflight') return
-  queries.value[activeTab.value].num = pageSize
-  queries.value[activeTab.value].page = 1
-  void fetchActiveTab()
+const setTabPageSize = (tab: ListTabName, pageSize: number) => {
+  queries.value[tab].num = pageSize
+  queries.value[tab].page = 1
+  void fetchTab(tab)
 }
-const openAdvancedQuery = () => {
-  if (activeTab.value === 'preflight') return
-  tempAdvancedQuery.value = cloneDeep(queries.value[activeTab.value])
+const openAdvancedQuery = (tab: ListTabName) => {
+  advancedQueryTab.value = tab
+  tempAdvancedQuery.value = cloneDeep(queries.value[tab])
   showAdvancedQuery.value = true
 }
 const applyAdvancedQuery = () => {
-  if (activeTab.value === 'preflight') return
-  queries.value[activeTab.value].expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-  queries.value[activeTab.value].page = 1
+  const tab = advancedQueryTab.value
+  queries.value[tab].expressions = cloneDeep(tempAdvancedQuery.value.expressions)
+  queries.value[tab].page = 1
   showAdvancedQuery.value = false
-  void fetchActiveTab()
+  void fetchTab(tab)
 }
 
 const openConfig = (kind: ConfigDialogKind, row: ConfigRow | null = null) => {
@@ -700,14 +736,21 @@ const openConfig = (kind: ConfigDialogKind, row: ConfigRow | null = null) => {
   currentEditData.value = row
   showConfigDialog.value = true
 }
-const openDetail = (row: ConfigRow) => {
-  if (activeTab.value === 'preflight') return
-  detailKind.value = activeTab.value.slice(0, -1) as ConfigDialogKind
+const openDetail = (tab: ListTabName, row: ConfigRow) => {
+  detailKind.value = tab.slice(0, -1) as ConfigDialogKind
   detailId.value = row.id
   showDetailDialog.value = true
 }
 const handleSaved = () => {
-  void Promise.all([fetchActiveTab(), loadLookups()])
+  const tabByKind: Record<ConfigDialogKind, ListTabName> = {
+    resource: 'resources',
+    ownership: 'ownerships',
+    policy: 'policies',
+    grant: 'grants',
+  }
+  const tab = tabByKind[configDialogKind.value]
+  if (tab === 'grants') preflightGrantsLoaded.value = false
+  void Promise.all([fetchTab(tab), loadLookups()])
 }
 
 const toggleResource = (row: DataResource) => {
@@ -727,7 +770,7 @@ const toggleResource = (row: DataResource) => {
       return
     }
     $q.notify({ type: 'positive', message: enabled ? '数据权限已启用' : '数据权限已停用' })
-    await fetchActiveTab()
+    await fetchTab('resources')
   })
 }
 const toggleOwnership = (row: DataOwnership) => {
@@ -738,7 +781,7 @@ const toggleOwnership = (row: DataOwnership) => {
   }).onOk(async () => {
     await api.disableOwnership(row.id)
     $q.notify({ type: 'positive', message: '归属定义已停用' })
-    await fetchActiveTab()
+    await fetchTab('ownerships')
   })
 }
 const togglePolicy = (row: DataPolicy) => {
@@ -756,7 +799,7 @@ const togglePolicy = (row: DataPolicy) => {
       return
     }
     $q.notify({ type: 'positive', message: `权限策略已${enabled ? '启用' : '停用'}` })
-    await fetchActiveTab()
+    await fetchTab('policies')
   })
 }
 const toggleGrant = (row: DataGrant) => {
@@ -774,7 +817,7 @@ const toggleGrant = (row: DataGrant) => {
       return
     }
     $q.notify({ type: 'positive', message: `权限授权已${enabled ? '启用' : '停用'}` })
-    await fetchActiveTab()
+    await fetchTab('grants')
   })
 }
 
@@ -811,7 +854,7 @@ const targetOptions = (keyword = '') => {
       .filter((item) => `${item.policy_code} ${item.name}`.toLowerCase().includes(normalized))
       .map((item) => ({ label: `${item.policy_code} · ${item.name}`, value: item.id }))
   }
-  return grants.value
+  return preflightGrants.value
     .filter((item) =>
       `${item.subject_type} ${item.subject_id} ${resourceLabel(item.resource_id)}`
         .toLowerCase()
@@ -844,19 +887,15 @@ const runPreflight = async () => {
 
 watch(activeTab, async (tab) => {
   if (tab === 'preflight') {
-    if (grants.value.length === 0) {
-      const result = await api.queryGrants({ ...newQuery(), num: 500 })
-      grants.value = result.data || []
-    }
-    resetPreflightTarget()
+    await loadPreflightGrants()
+    preflightTargetOptions.value = targetOptions()
     return
   }
-  tempAdvancedQuery.value = cloneDeep(queries.value[tab])
-  await fetchActiveTab()
+  if (!loadedTabs[tab]) await fetchTab(tab)
 })
 
 onMounted(async () => {
-  await Promise.all([loadLookups(), fetchActiveTab()])
+  await Promise.all([loadLookups(), fetchTab('resources')])
 })
 </script>
 
@@ -1057,11 +1096,6 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.data-permission-quick-search {
-  width: 320px;
-  max-width: 100%;
-}
-
 .data-permission-table {
   height: 100%;
 }
@@ -1130,10 +1164,6 @@ onMounted(async () => {
 
   .data-permission-section-head {
     min-height: 64px;
-  }
-
-  .data-permission-quick-search {
-    width: 100%;
   }
 }
 </style>

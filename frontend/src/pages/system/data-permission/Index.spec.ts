@@ -291,31 +291,42 @@ describe('Data permission configuration center', () => {
     expect(wrapper.text()).toContain('配置检查')
     expect(apiMocks.queryResources).toHaveBeenCalled()
     expect(apiMocks.queryDimensions).toHaveBeenCalled()
-    const table = wrapper.find('[data-testid="table"]')
+    const table = wrapper.find('[data-panel="resources"] [data-testid="table"]')
     expect(table.attributes('data-row-count')).toBe('1')
     expect(table.text()).toContain('新增资源')
   })
 
-  it('only renders top actions granted to the active resource section', async () => {
+  it('keeps top actions inside their matching list panels', async () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('新增资源')
-    expect(wrapper.text()).not.toContain('新增策略')
+    const resourcePanel = wrapper.find('[data-panel="resources"]')
+    const policyPanel = wrapper.find('[data-panel="policies"]')
+    expect(resourcePanel.text()).toContain('新增资源')
+    expect(resourcePanel.text()).not.toContain('新增策略')
+    expect(policyPanel.text()).toContain('新增策略')
+    expect(policyPanel.text()).not.toContain('新增资源')
   })
 
-  it('switches the left module navigation without moving the top action out of the table', async () => {
+  it('loads each list once and preserves its state when switching back', async () => {
     const wrapper = mountPage()
     await flushPromises()
+    apiMocks.queryPolicies.mockClear()
 
     await wrapper.find('[data-tab="policies"]').trigger('click')
     await flushPromises()
 
-    expect(apiMocks.queryPolicies).toHaveBeenCalled()
+    expect(apiMocks.queryPolicies).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('组合归属、范围来源和关系规则')
-    const table = wrapper.find('[data-testid="table"]')
+    const table = wrapper.find('[data-panel="policies"] [data-testid="table"]')
     expect(table.text()).toContain('新增策略')
     expect(table.text()).not.toContain('新增资源')
+
+    await wrapper.find('[data-tab="resources"]').trigger('click')
+    await wrapper.find('[data-tab="policies"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.queryPolicies).toHaveBeenCalledTimes(1)
   })
 
   it('sends the keyword through the resource query and opens the configured create dialog', async () => {
@@ -323,9 +334,10 @@ describe('Data permission configuration center', () => {
     await flushPromises()
     apiMocks.queryResources.mockClear()
 
-    const keywordInput = wrapper.find('input[placeholder="搜索关键词"]')
+    const resourcePanel = wrapper.find('[data-panel="resources"]')
+    const keywordInput = resourcePanel.find('input[placeholder="搜索关键词"]')
     await keywordInput.setValue('运输')
-    const queryButton = wrapper.findAll('button').find((button) => button.text() === '查询')
+    const queryButton = resourcePanel.findAll('button').find((button) => button.text() === '搜索')
     await queryButton?.trigger('click')
     await flushPromises()
 
@@ -336,9 +348,32 @@ describe('Data permission configuration center', () => {
       }),
     )
 
-    const createButton = wrapper.findAll('button').find((button) => button.text() === '新增资源')
+    const createButton = resourcePanel
+      .findAll('button')
+      .find((button) => button.text() === '新增资源')
     await createButton?.trigger('click')
     expect(wrapper.find('[data-testid="config-dialog"]').attributes('data-kind')).toBe('resource')
+  })
+
+  it('preserves quick queries independently across list panels', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const resourceInput = wrapper.find('[data-panel="resources"] input[placeholder="搜索关键词"]')
+    await resourceInput.setValue('运输')
+
+    await wrapper.find('[data-tab="policies"]').trigger('click')
+    await flushPromises()
+    const policyInput = wrapper.find('[data-panel="policies"] input[placeholder="搜索关键词"]')
+    await policyInput.setValue('组织策略')
+
+    apiMocks.queryResources.mockClear()
+    await wrapper.find('[data-tab="resources"]').trigger('click')
+    await flushPromises()
+
+    expect(resourceInput.element).toHaveProperty('value', '运输')
+    expect(policyInput.element).toHaveProperty('value', '组织策略')
+    expect(apiMocks.queryResources).not.toHaveBeenCalled()
   })
 
   it('stops submission when the common form validation fails', async () => {
