@@ -161,6 +161,14 @@ function bindDrag(state: OverlayState, axis: Axis, thumb: HTMLElement) {
 
 function initialize(middle: HTMLElement, states: Set<OverlayState>) {
   if (middle.dataset.appTableOverlay === 'ready') return
+  if (middle.closest('.q-scrollarea')) return
+
+  const overflow = window.getComputedStyle(middle)
+  const hasNativeScrollContainer = [overflow.overflowX, overflow.overflowY].some((value) =>
+    ['auto', 'scroll', 'overlay'].includes(value),
+  )
+  if (!hasNativeScrollContainer) return
+
   const host = middle.closest<HTMLElement>('.q-table__container')
   if (!host) return
 
