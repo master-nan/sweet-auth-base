@@ -224,23 +224,18 @@
               </q-btn>
             </div>
 
-            <q-scroll-area
-              ref="menuButtonScrollAreaRef"
-              class="menu-button-table-scroll"
-              :delay="0"
-              :vertical-offset="[6, 6]"
+            <q-table
+              ref="menuButtonTableRef"
+              class="menu-button-table sticky-header-table"
+              :rows="activeButtonRows"
+              :columns="buttonDisplayColumns"
+              row-key="id"
+              flat
+              :dark="$q.dark.isActive"
+              :loading="loading"
+              :pagination="{ rowsPerPage: 0 }"
+              hide-pagination
             >
-              <q-table
-                class="menu-button-table sticky-header-table"
-                :rows="activeButtonRows"
-                :columns="buttonDisplayColumns"
-                row-key="id"
-                flat
-                :dark="$q.dark.isActive"
-                :loading="loading"
-                :pagination="{ rowsPerPage: 0 }"
-                hide-pagination
-              >
                 <template #body-cell-feature="props">
                   <q-td :props="props">
                     <div class="menu-button-feature">
@@ -318,8 +313,7 @@
                     <span>{{ activeButtonEmptyText }}</span>
                   </div>
                 </template>
-              </q-table>
-            </q-scroll-area>
+            </q-table>
           </div>
 
           <div v-else class="preview-container">
@@ -470,8 +464,8 @@ const selectedMenu = ref<Menu | null>(null)
 const activeTab = ref<'page_buttons' | 'api_permissions' | 'preview'>('page_buttons')
 const expandedMenuIds = ref<number[]>([])
 type ButtonTableTab = 'page_buttons' | 'api_permissions'
-type ButtonTableScrollAreaRef = { getScrollTarget?: () => HTMLElement }
-const menuButtonScrollAreaRef = ref<ButtonTableScrollAreaRef | null>(null)
+type ButtonTableRef = { $el?: HTMLElement }
+const menuButtonTableRef = ref<ButtonTableRef | null>(null)
 const buttonTableScrollPositions: Record<ButtonTableTab, number> = {
   page_buttons: 0,
   api_permissions: 0,
@@ -480,7 +474,8 @@ const buttonTableScrollPositions: Record<ButtonTableTab, number> = {
 const isButtonTableTab = (tab: typeof activeTab.value): tab is ButtonTableTab =>
   tab === 'page_buttons' || tab === 'api_permissions'
 
-const getButtonTableScrollElement = () => menuButtonScrollAreaRef.value?.getScrollTarget?.() || null
+const getButtonTableScrollElement = () =>
+  menuButtonTableRef.value?.$el?.querySelector<HTMLElement>('.q-table__middle') || null
 
 const resetButtonTableScroll = () => {
   buttonTableScrollPositions.page_buttons = 0
@@ -1775,7 +1770,7 @@ onMounted(async () => {
   font-size: 11px;
 }
 
-.menu-button-table-scroll {
+.menu-button-table.sticky-header-table {
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -1784,16 +1779,10 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
-.menu-button-table.sticky-header-table {
-  min-height: 100%;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-}
-
 .menu-button-table :deep(.q-table__middle) {
+  min-height: 0;
   max-height: none;
-  overflow: visible;
+  overflow: auto;
 }
 
 .menu-button-table :deep(th) {
