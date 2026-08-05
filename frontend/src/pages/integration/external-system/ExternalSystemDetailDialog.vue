@@ -44,6 +44,10 @@
     <div v-else class="external-system-detail__loading">
       <q-spinner-dots color="primary" size="36px" />
     </div>
+    <template #footer-actions>
+      <q-btn v-if="detail" flat color="primary" icon="api" label="查看接口" @click="emit('show-interfaces', detail.id)" />
+      <q-btn v-if="detail" flat color="primary" icon="key" label="查看凭证" @click="emit('show-credentials', detail.id)" />
+    </template>
   </form-dialog-shell>
 </template>
 
@@ -56,7 +60,11 @@ import {
 } from 'src/api/services/integration'
 
 const props = defineProps<{ modelValue: boolean; id: number }>()
-const emit = defineEmits<{ (event: 'update:modelValue', value: boolean): void }>()
+const emit = defineEmits<{
+  (event: 'update:modelValue', value: boolean): void
+  (event: 'show-interfaces', id: number): void
+  (event: 'show-credentials', id: number): void
+}>()
 const api = useIntegrationApi()
 const loading = ref(false)
 const detail = ref<ExternalSystemDetail | null>(null)

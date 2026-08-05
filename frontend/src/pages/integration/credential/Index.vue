@@ -37,6 +37,7 @@ defineOptions({ name: 'integration_credential' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
@@ -56,6 +57,7 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const $q = useQuasar()
+const route = useRoute()
 const api = useIntegrationApi()
 const tableApi = useTableApi()
 const { loading } = storeToRefs(useLoadingStore())
@@ -90,7 +92,10 @@ const columns: QTableProps['columns'] = [
 const visibleColumns = ref(columns.map((column) => column.name))
 const systemOptions = computed(() => systems.value.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })))
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
-const query = ref<CredentialQuery>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() })
+const routeSystemID = Number(route.query.external_system_id)
+const initialQuery: CredentialQuery = { page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() }
+if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0) initialQuery.external_system_id = routeSystemID
+const query = ref<CredentialQuery>(initialQuery)
 const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
 const appliedAdvancedQuery = ref<Query>(cloneDeep(query.value))
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"backend/internal/asynctask"
+	"backend/internal/audit"
 	"backend/model"
 	"regexp"
 	"strings"
@@ -58,6 +59,13 @@ func EnsureLogContext(ctx *gin.Context) {
 
 	ctx.Set(requestIDContextKey, requestID)
 	ctx.Set(traceIDContextKey, traceID)
+	if ctx.Request != nil {
+		requestContext := audit.WithCorrelationIDs(ctx.Request.Context(), audit.CorrelationIDs{
+			RequestID: requestID,
+			TraceID:   traceID,
+		})
+		ctx.Request = ctx.Request.WithContext(requestContext)
+	}
 	ctx.Header(RequestIDHeader, requestID)
 	ctx.Header(TraceIDHeader, traceID)
 }

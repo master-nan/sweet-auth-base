@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -35,19 +36,24 @@ const (
 var interfaceCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
 
 type InterfaceDefinitionService struct {
-	repository repository.InterfaceDefinitionRepository
-	systems    repository.ExternalSystemRepository
-	sf         *utils.Snowflake
-	audit      StandardContextAuditWriter
+	repository  repository.InterfaceDefinitionRepository
+	systems     repository.ExternalSystemRepository
+	credentials repository.CredentialRepository
+	sf          *utils.Snowflake
+	audit       StandardContextAuditWriter
+	now         func() time.Time
 }
 
 func NewInterfaceDefinitionService(
 	repository repository.InterfaceDefinitionRepository,
 	systems repository.ExternalSystemRepository,
+	credentials repository.CredentialRepository,
 	sf *utils.Snowflake,
 	audit StandardContextAuditWriter,
 ) *InterfaceDefinitionService {
-	return &InterfaceDefinitionService{repository: repository, systems: systems, sf: sf, audit: audit}
+	return &InterfaceDefinitionService{
+		repository: repository, systems: systems, credentials: credentials, sf: sf, audit: audit, now: time.Now,
+	}
 }
 
 func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.InterfaceDefinitionCreateReq) (response.InterfaceDefinitionDetailRes, error) {
@@ -81,7 +87,7 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 		if err != nil {
 			return err
 		}
-		if err := s.validateReferences(tx, value); err != nil {
+		if _, err := s.validateReferences(tx, value, false); err != nil {
 			return err
 		}
 		if err := s.repository.Create(tx, &value); err != nil {
@@ -95,7 +101,11 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(value, system), nil
+	credential, err := s.loadCredentialSummary(ctx, value.CredentialID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now()), nil
 }
 
 func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.InterfaceDefinitionDetailRes, error) {
@@ -110,7 +120,11 @@ func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, myerrors.WrapDatabaseError(err)
 	}
-	return response.NewInterfaceDefinitionDetailRes(value, system), nil
+	credential, err := s.loadCredentialSummary(ctx, value.CredentialID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now()), nil
 }
 
 func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq, table model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error) {
@@ -120,11 +134,15 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
 	}
 	ids := make([]int, 0, len(result.Data))
+	credentialIDs := make([]int, 0, len(result.Data))
 	seen := make(map[int]struct{}, len(result.Data))
 	for _, item := range result.Data {
 		if _, exists := seen[item.ExternalSystemID]; !exists {
 			seen[item.ExternalSystemID] = struct{}{}
 			ids = append(ids, item.ExternalSystemID)
+		}
+		if item.CredentialID != nil {
+			credentialIDs = append(credentialIDs, *item.CredentialID)
 		}
 	}
 	systems, err := s.systems.WithContext(ctx).FindListByFieldIn("id", ids)
@@ -135,9 +153,24 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 	for _, system := range systems {
 		byID[system.Id] = system
 	}
+	credentials, err := s.credentials.WithContext(ctx).FindListByFieldIn("id", credentialIDs)
+	if err != nil {
+		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	credentialsByID := make(map[int]model.Credential, len(credentials))
+	for _, credential := range credentials {
+		credentialsByID[credential.Id] = credential
+	}
+	now := s.now()
 	items := make([]response.InterfaceDefinitionListRes, 0, len(result.Data))
 	for _, value := range result.Data {
-		items = append(items, response.NewInterfaceDefinitionListRes(value, byID[value.ExternalSystemID]))
+		var credential *model.Credential
+		if value.CredentialID != nil {
+			if item, ok := credentialsByID[*value.CredentialID]; ok {
+				credential = &item
+			}
+		}
+		items = append(items, response.NewInterfaceDefinitionListRes(value, byID[value.ExternalSystemID], credential, now))
 	}
 	return response.ListResult[response.InterfaceDefinitionListRes]{Data: items, Total: result.Total}, nil
 }
@@ -167,7 +200,7 @@ func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req req
 		if err != nil {
 			return err
 		}
-		if err := s.validateReferences(tx, next); err != nil {
+		if _, err := s.validateReferences(tx, next, false); err != nil {
 			return err
 		}
 		updates["revision"] = current.Revision + 1
@@ -185,7 +218,11 @@ func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req req
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(updated, system), nil
+	credential, err := s.loadCredentialSummary(ctx, updated.CredentialID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now()), nil
 }
 
 func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
@@ -233,7 +270,11 @@ func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revi
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(created, system), nil
+	credential, err := s.loadCredentialSummary(ctx, created.CredentialID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(created, system, credential, s.now()), nil
 }
 
 func (s *InterfaceDefinitionService) Enable(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
@@ -274,7 +315,7 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 			if err := validateInterfaceConfiguration(current); err != nil {
 				return err
 			}
-			if err := s.validateReferences(tx, current); err != nil {
+			if _, err := s.validateReferences(tx, current, true); err != nil {
 				return err
 			}
 			conflict, err := s.repository.HasEnabledVersion(tx, current.ExternalSystemID, current.InterfaceCode, current.Id)
@@ -306,7 +347,11 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(updated, system), nil
+	credential, err := s.loadCredentialSummary(ctx, updated.CredentialID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now()), nil
 }
 
 func (s *InterfaceDefinitionService) loadSystemForConfiguration(tx *gorm.DB, id int, requireEnabled bool) (model.ExternalSystem, error) {
@@ -323,26 +368,48 @@ func (s *InterfaceDefinitionService) loadSystemForConfiguration(tx *gorm.DB, id 
 	return system, nil
 }
 
-func (s *InterfaceDefinitionService) validateReferences(tx *gorm.DB, value model.InterfaceDefinition) error {
+func (s *InterfaceDefinitionService) validateReferences(tx *gorm.DB, value model.InterfaceDefinition, requireUsable bool) (*model.Credential, error) {
+	var credential *model.Credential
 	if value.CredentialID != nil {
-		valid, err := s.repository.CredentialReferenceValid(tx, *value.CredentialID, value.ExternalSystemID)
+		item, err := s.credentials.FindByIdForUpdate(tx, *value.CredentialID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, myerrors.ErrInterfaceCredentialInvalid
+		}
 		if err != nil {
-			return myerrors.WrapDatabaseError(err)
+			return nil, myerrors.WrapDatabaseError(err)
 		}
-		if !valid {
-			return myerrors.ErrInterfaceCredentialInvalid
+		if item.ExternalSystemID != value.ExternalSystemID || item.Status == model.CredentialStatusRevoked {
+			return nil, myerrors.ErrInterfaceCredentialInvalid
 		}
+		if requireUsable && (item.Status != model.CredentialStatusActive || item.ExpiresAt != nil && !item.ExpiresAt.After(s.now())) {
+			return nil, myerrors.ErrInterfaceCredentialInvalid
+		}
+		credential = &item
 	}
 	if value.RetryPolicyID != nil {
 		valid, err := s.repository.RetryPolicyReferenceValid(tx, *value.RetryPolicyID)
 		if err != nil {
-			return myerrors.WrapDatabaseError(err)
+			return nil, myerrors.WrapDatabaseError(err)
 		}
 		if !valid {
-			return myerrors.ErrInterfaceRetryPolicyInvalid
+			return nil, myerrors.ErrInterfaceRetryPolicyInvalid
 		}
 	}
-	return nil
+	return credential, nil
+}
+
+func (s *InterfaceDefinitionService) loadCredentialSummary(ctx context.Context, id *int) (*model.Credential, error) {
+	if id == nil {
+		return nil, nil
+	}
+	credential, err := s.credentials.WithContext(ctx).FindById(*id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, myerrors.WrapDatabaseError(err)
+	}
+	return &credential, nil
 }
 
 func (s *InterfaceDefinitionService) writeAudit(ctx context.Context, tx *gorm.DB, action string, value model.InterfaceDefinition, system model.ExternalSystem, previous *model.InterfaceDefinition) error {

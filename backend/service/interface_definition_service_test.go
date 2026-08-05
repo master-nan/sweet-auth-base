@@ -14,6 +14,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -72,7 +73,7 @@ func TestInterfaceDefinitionServiceVersionLifecycleAndAudit(t *testing.T) {
 }
 
 func TestInterfaceDefinitionServiceValidationReferencesAndDTOWhitelist(t *testing.T) {
-	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	svc, db, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
 	ctx := context.Background()
 	invalidPath := interfaceDefinitionCreateRequest(system.Id, "unsafe_path")
 	invalidPath.RelativePath = "https://outside.example.com/orders"
@@ -88,6 +89,34 @@ func TestInterfaceDefinitionServiceValidationReferencesAndDTOWhitelist(t *testin
 	invalidReference.CredentialID = &credentialID
 	if _, err := svc.Create(ctx, invalidReference); !errors.Is(err, apperrors.ErrInterfaceCredentialInvalid) {
 		t.Fatalf("credential reference error = %v", err)
+	}
+	draftCredential := model.Credential{
+		Basic: model.Basic{Id: 101}, ExternalSystemID: system.Id, CredentialCode: "draft_token",
+		Name: "Draft Token", CredentialType: model.CredentialTypeBearerToken,
+		Status: model.CredentialStatusDraft, SecretStorageRef: "ref", SecretCiphertext: "cipher",
+		SecretNonce: "nonce", SecretFingerprint: "fingerprint", Version: 1, Revision: 1,
+	}
+	if err := db.Create(&draftCredential).Error; err != nil {
+		t.Fatalf("create draft credential: %v", err)
+	}
+	draftReference := interfaceDefinitionCreateRequest(system.Id, "draft_credential_query")
+	draftReference.CredentialID = &draftCredential.Id
+	createdWithDraft, err := svc.Create(ctx, draftReference)
+	if err != nil {
+		t.Fatalf("draft interface should accept same-system draft credential: %v", err)
+	}
+	if _, err := svc.Enable(ctx, createdWithDraft.Id, createdWithDraft.Revision); !errors.Is(err, apperrors.ErrInterfaceCredentialInvalid) {
+		t.Fatalf("enable with draft credential error = %v", err)
+	}
+	draftCredential.Status = model.CredentialStatusActive
+	draftCredential.State = true
+	expiresAt := time.Now().Add(-time.Minute)
+	draftCredential.ExpiresAt = &expiresAt
+	if err := db.Save(&draftCredential).Error; err != nil {
+		t.Fatalf("expire credential: %v", err)
+	}
+	if _, err := svc.Enable(ctx, createdWithDraft.Id, createdWithDraft.Revision); !errors.Is(err, apperrors.ErrInterfaceCredentialInvalid) {
+		t.Fatalf("enable with expired credential error = %v", err)
 	}
 
 	created, err := svc.Create(ctx, interfaceDefinitionCreateRequest(system.Id, "stock_query"))
@@ -112,6 +141,32 @@ func TestInterfaceDefinitionServiceValidationReferencesAndDTOWhitelist(t *testin
 	}
 }
 
+func TestInterfaceDefinitionServiceRejectsCrossSystemCredential(t *testing.T) {
+	svc, db, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	otherSystem := model.ExternalSystem{
+		Basic: model.Basic{Id: 200, State: true}, SystemCode: "other_erp", Name: "Other ERP",
+		SystemType: model.ExternalSystemTypeERP, BaseURL: "https://other.example.com",
+		OwnerIdentifier: "owner-2", OwnerName: "另一负责人", Status: model.ExternalSystemStatusEnabled, Revision: 1,
+	}
+	credential := model.Credential{
+		Basic: model.Basic{Id: 201, State: true}, ExternalSystemID: otherSystem.Id,
+		CredentialCode: "other_token", Name: "Other Token", CredentialType: model.CredentialTypeBearerToken,
+		Status: model.CredentialStatusActive, SecretStorageRef: "other-ref", SecretCiphertext: "cipher",
+		SecretNonce: "nonce", SecretFingerprint: "fingerprint", Version: 1, Revision: 1,
+	}
+	if err := db.Create(&otherSystem).Error; err != nil {
+		t.Fatalf("create other system: %v", err)
+	}
+	if err := db.Create(&credential).Error; err != nil {
+		t.Fatalf("create other credential: %v", err)
+	}
+	req := interfaceDefinitionCreateRequest(system.Id, "cross_system_query")
+	req.CredentialID = &credential.Id
+	if _, err := svc.Create(context.Background(), req); !errors.Is(err, apperrors.ErrInterfaceCredentialInvalid) {
+		t.Fatalf("cross-system credential error = %v", err)
+	}
+}
+
 func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
 	if _, err := svc.Create(context.Background(), interfaceDefinitionCreateRequest(system.Id, "shipment_query")); err != nil {
@@ -130,7 +185,7 @@ func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 
 func newInterfaceDefinitionTestSubject(t *testing.T, writer StandardContextAuditWriter) (*InterfaceDefinitionService, *gorm.DB, model.ExternalSystem) {
 	t.Helper()
-	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.InterfaceDefinition{})
+	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.InterfaceDefinition{}, &model.Credential{})
 	system := model.ExternalSystem{
 		Basic: model.Basic{Id: 100, State: true}, SystemCode: "demo_erp", Name: "Demo ERP",
 		SystemType: model.ExternalSystemTypeERP, BaseURL: "https://api.example.com",
@@ -145,7 +200,8 @@ func newInterfaceDefinitionTestSubject(t *testing.T, writer StandardContextAudit
 	}
 	primary := &database.PrimaryDB{DB: db}
 	return NewInterfaceDefinitionService(
-		impl.NewInterfaceDefinitionRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary), sf, writer,
+		impl.NewInterfaceDefinitionRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary),
+		impl.NewCredentialRepositoryImpl(primary), sf, writer,
 	), db, system
 }
 

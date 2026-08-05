@@ -138,6 +138,8 @@
     <external-system-detail-dialog
       v-model="showDetailDialog"
       :id="currentDetailId"
+      @show-interfaces="openRelatedInterfaces"
+      @show-credentials="openRelatedCredentials"
     />
   </base-content>
 </template>
@@ -147,6 +149,7 @@ defineOptions({ name: 'integration_external_system' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
@@ -173,6 +176,7 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const $q = useQuasar()
+const router = useRouter()
 const api = useIntegrationApi()
 const tableApi = useTableApi()
 const loadingStore = useLoadingStore()
@@ -271,6 +275,14 @@ const availableLineButtons = (row: ExternalSystemListItem) =>
 const openDetail = (row: ExternalSystemListItem) => {
   currentDetailId.value = row.id
   showDetailDialog.value = true
+}
+const openRelatedInterfaces = (id: number) => {
+  showDetailDialog.value = false
+  void router.push({ name: 'integration_interface_definition', query: { external_system_id: String(id) } })
+}
+const openRelatedCredentials = (id: number) => {
+  showDetailDialog.value = false
+  void router.push({ name: 'integration_credential', query: { external_system_id: String(id) } })
 }
 
 const openEdit = async (row: ExternalSystemListItem) => {

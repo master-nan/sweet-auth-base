@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"backend/internal/asynctask"
+	"backend/internal/audit"
 	"backend/model"
 	"context"
 	"net/http"
@@ -22,6 +23,10 @@ func TestDetachedTaskContextCopiesRequestAndActorFields(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = request
 	EnsureLogContext(ctx)
+	correlation := audit.GetCorrelationIDs(ctx.Request.Context())
+	if correlation.RequestID != "request-copy-1" || correlation.TraceID != "trace-copy-1" {
+		t.Fatalf("标准 Context 未收到请求关联标识: %+v", correlation)
+	}
 	ctx.Set("user", model.SysUser{
 		Basic:    model.Basic{Id: 81},
 		UserName: "audit-user",

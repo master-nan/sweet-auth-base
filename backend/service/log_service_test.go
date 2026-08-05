@@ -4,11 +4,13 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/asynctask"
+	"backend/internal/audit"
 	"backend/internal/database"
 	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -174,6 +176,33 @@ func TestLogServiceRecordTransactionalAuditUsesCallerTransactionAndSafeFields(t 
 	if !strings.Contains(stored.Body, `"old_value":null`) ||
 		!strings.Contains(stored.Body, `"new_value":501`) {
 		t.Fatalf("transactional audit lost old/new user_id: %s", stored.Body)
+	}
+}
+
+func TestLogServiceRecordTransactionalAuditContextKeepsSubjectAndCorrelation(t *testing.T) {
+	db := testutil.OpenSQLite(t, &model.AccessLog{})
+	primaryDB := &database.PrimaryDB{DB: db}
+	sf, err := utils.NewSnowflake(3)
+	if err != nil {
+		t.Fatalf("new snowflake: %v", err)
+	}
+	logService := NewLogServer(nil, impl.NewAccessLogRepositoryImpl(primaryDB), sf)
+	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(73, "integration-admin"))
+	ctx = audit.WithCorrelationIDs(ctx, audit.CorrelationIDs{RequestID: "request-integration", TraceID: "trace-integration"})
+	err = RunInTransaction(ctx, db.WithContext(ctx), func(tx *gorm.DB) error {
+		return logService.RecordTransactionalAuditContext(ctx, tx, TransactionalAuditRecord{
+			Action: "integration.credential.rotate", ResourceType: "integration_credential", ResourceCode: "hr_token", ResourceId: "9",
+		})
+	})
+	if err != nil {
+		t.Fatalf("record standard-context audit: %v", err)
+	}
+	var stored model.AccessLog
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load audit: %v", err)
+	}
+	if stored.UserId != 73 || stored.UserName != "integration-admin" || stored.RequestId != "request-integration" || stored.TraceId != "trace-integration" {
+		t.Fatalf("audit context lost: %+v", stored)
 	}
 }
 

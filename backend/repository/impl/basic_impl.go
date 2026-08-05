@@ -81,6 +81,18 @@ func (b *BasicRepositoryImpl[T]) PaginateAndCountAsync(basic *request.Basic, res
 	if basic.IncludeDeleted {
 		query = query.Unscoped()
 	}
+	// 同一事务连接不得被多个 goroutine 并发使用；事务内按同一查询条件顺序读取。
+	if _, transactional := query.Statement.ConnPool.(gorm.TxCommitter); transactional {
+		total, err := b.Count(query.Session(&gorm.Session{}))
+		if err != nil {
+			return 0, err
+		}
+		dataQuery := b.applyReadOptions(query.Session(&gorm.Session{}))
+		if err := dataQuery.Find(result).Error; err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
 
 	type countResult struct {
 		total int64

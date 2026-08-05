@@ -2,10 +2,12 @@ package impl
 
 import (
 	"backend/dto/request"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -40,6 +42,30 @@ func TestBasicRepositoryPaginateAndCountAsyncReturnsDataQueryError(t *testing.T)
 	_, err = repo.PaginateAndCountAsync(&request.Basic{Page: 1, Num: 10}, &rows, model.SysTable{})
 	if err == nil {
 		t.Fatal("expected data query error")
+	}
+}
+
+func TestBasicRepositoryPaginateAndCountAsyncUsesTransactionSequentially(t *testing.T) {
+	db := testutil.OpenSQLite(t, &basicRepositoryFindByFieldFixture{})
+	for i := 1; i <= 3; i++ {
+		if err := db.Create(&basicRepositoryFindByFieldFixture{Basic: model.Basic{Id: i}, Name: fmt.Sprintf("item-%d", i)}).Error; err != nil {
+			t.Fatalf("create fixture: %v", err)
+		}
+	}
+	err := db.Transaction(func(tx *gorm.DB) error {
+		repo := NewBasicRepositoryImpl(tx, &basicRepositoryFindByFieldFixture{})
+		var rows []basicRepositoryFindByFieldFixture
+		total, err := repo.PaginateAndCountAsync(&request.Basic{Page: 1, Num: 2}, &rows, model.SysTable{})
+		if err != nil {
+			return err
+		}
+		if total != 3 || len(rows) != 2 {
+			t.Fatalf("transaction page total=%d rows=%d", total, len(rows))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("transaction pagination: %v", err)
 	}
 }
 

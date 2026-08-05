@@ -27,6 +27,14 @@
         :rules="[(value) => /^[a-z][a-z0-9_]{1,63}$/.test(value || '') || '请输入合法接口编码']"
       />
       <q-input v-model="form.name" outlined dense label="接口名称 *" :rules="[(value) => Boolean(value?.trim()) || '请输入接口名称']" />
+      <q-select
+        v-model="form.credential_id"
+        outlined dense emit-value map-options clearable
+        :disable="!form.external_system_id"
+        :options="credentialOptions"
+        label="认证凭证"
+        hint="仅显示当前外部系统的受控凭证"
+      />
       <q-select v-model="form.protocol" outlined dense emit-value map-options :options="protocolOptions" label="协议 *" />
       <q-select v-model="form.http_method" outlined dense emit-value map-options :options="methodOptions" label="HTTP Method *" />
       <q-input
@@ -52,6 +60,7 @@ import type { QForm } from 'quasar'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import type {
   ExternalSystemListItem,
+  CredentialListItem,
   InterfaceDefinitionDetail,
   InterfaceHTTPMethod,
   InterfaceProtocol,
@@ -67,12 +76,14 @@ type InterfaceFormValue = {
   timeout_seconds: number
   response_limit: number
   description: string
+  credential_id: number | null
 }
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
   editData: InterfaceDefinitionDetail | null
   systems: ExternalSystemListItem[]
+  credentials: CredentialListItem[]
   loading?: boolean
 }>(), { loading: false })
 const emit = defineEmits<{
@@ -83,11 +94,14 @@ const formRef = ref<QForm | null>(null)
 const visible = computed({ get: () => props.modelValue, set: (value) => emit('update:modelValue', value) })
 const form = reactive<InterfaceFormValue>(emptyForm())
 const systemOptions = computed(() => props.systems.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })))
+const credentialOptions = computed(() => props.credentials
+  .filter((item) => item.external_system.id === form.external_system_id && item.status !== 'revoked')
+  .map((item) => ({ label: `${item.name}（${item.credential_code}）`, value: item.id })))
 const protocolOptions = [{ label: 'HTTPS', value: 'https' }, { label: 'HTTP', value: 'http' }]
 const methodOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
 
 function emptyForm(): InterfaceFormValue {
-  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', timeout_seconds: 30, response_limit: 10485760, description: '' }
+  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, timeout_seconds: 30, response_limit: 10485760, description: '' }
 }
 
 watch(
@@ -101,6 +115,7 @@ watch(
       protocol: detail.protocol,
       http_method: detail.http_method,
       relative_path: detail.relative_path,
+      credential_id: detail.credential_id || null,
       timeout_seconds: detail.timeout_seconds,
       response_limit: detail.response_limit,
       description: detail.description || '',
@@ -108,6 +123,10 @@ watch(
   },
   { immediate: true },
 )
+
+watch(() => form.external_system_id, (systemID, previous) => {
+  if (previous != null && systemID !== previous) form.credential_id = null
+})
 
 const submit = async () => {
   if (!(await formRef.value?.validate())) return

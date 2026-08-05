@@ -14,6 +14,5 @@ type InterfaceDefinitionRepository interface {
 	GetInterfaceDefinitionList(context.Context, *request.Basic, model.SysTable) (response.ListResult[model.InterfaceDefinition], error)
 	NextVersion(*gorm.DB, int, string) (int, error)
 	HasEnabledVersion(*gorm.DB, int, string, int) (bool, error)
-	CredentialReferenceValid(*gorm.DB, int, int) (bool, error)
 	RetryPolicyReferenceValid(*gorm.DB, int) (bool, error)
 }

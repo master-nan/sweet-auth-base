@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
-  queryInterfaceDefinitions: vi.fn(), queryExternalSystems: vi.fn(), getInterfaceDefinition: vi.fn(),
+  queryInterfaceDefinitions: vi.fn(), queryExternalSystems: vi.fn(), queryCredentials: vi.fn(), getInterfaceDefinition: vi.fn(),
   createInterfaceDefinition: vi.fn(), updateInterfaceDefinition: vi.fn(), createInterfaceDefinitionVersion: vi.fn(),
   enableInterfaceDefinition: vi.fn(), disableInterfaceDefinition: vi.fn(),
 }))
@@ -19,6 +19,7 @@ const buttons = vi.hoisted(() => ({
 }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
 vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true) }) }))
@@ -56,6 +57,7 @@ describe('interface definition management page', () => {
     tableApiMocks.queryTableByCode.mockReset()
     apiMocks.queryInterfaceDefinitions.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [system], total: 1 })
+    apiMocks.queryCredentials.mockResolvedValue({ data: [], total: 0 })
     tableApiMocks.queryTableByCode.mockResolvedValue({ data: { table_fields: [] } })
   })
 
@@ -64,6 +66,7 @@ describe('interface definition management page', () => {
     await flushPromises()
     expect(tableApiMocks.queryTableByCode).toHaveBeenCalledWith('integration_interface_definition')
     expect(apiMocks.queryExternalSystems).toHaveBeenCalled()
+    expect(apiMocks.queryCredentials).toHaveBeenCalled()
     expect(apiMocks.queryInterfaceDefinitions).toHaveBeenCalledWith(expect.objectContaining({ page: 1, num: 15 }))
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).toContain('新增')

@@ -81,7 +81,10 @@ function emptyForm(): CredentialFormValue {
 }
 
 watch(() => [props.modelValue, props.editData, props.rotateMode] as const, ([open, detail, rotate]) => {
-  if (!open) return
+  if (!open) {
+    form.secret = {}
+    return
+  }
   Object.assign(form, detail ? {
     external_system_id: detail.external_system.id,
     credential_code: detail.credential_code,

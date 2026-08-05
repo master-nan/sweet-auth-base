@@ -11,6 +11,7 @@ const apiMocks = vi.hoisted(() => ({
   enableExternalSystem: vi.fn(),
   disableExternalSystem: vi.fn(),
 }))
+const routerPush = vi.hoisted(() => vi.fn())
 
 const tableApiMocks = vi.hoisted(() => ({
   queryTableByCode: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('quasar', () => ({
 }))
 
 vi.mock('boot/axios', () => ({ instance: {} }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 
 vi.mock('src/api/services/integration', () => ({
   useIntegrationApi: () => apiMocks,
@@ -168,6 +170,7 @@ describe('external system management page', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
+    routerPush.mockReset()
     tableApiMocks.queryTableByCode.mockReset()
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.getExternalSystem.mockResolvedValue({
@@ -218,6 +221,19 @@ describe('external system management page', () => {
     expect(
       vm.availableLineButtons({ ...row, status: 'enabled' }).map((button) => button.event_action),
     ).toEqual(['detail', 'update', 'disable'])
+  })
+
+  it('navigates from detail to system-scoped interface and credential lists', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      openRelatedInterfaces: (id: number) => void
+      openRelatedCredentials: (id: number) => void
+    }
+    vm.openRelatedInterfaces(12)
+    vm.openRelatedCredentials(12)
+    expect(routerPush).toHaveBeenNthCalledWith(1, { name: 'integration_interface_definition', query: { external_system_id: '12' } })
+    expect(routerPush).toHaveBeenNthCalledWith(2, { name: 'integration_credential', query: { external_system_id: '12' } })
   })
 
   it('submits an edit with the server revision and without the immutable code', async () => {

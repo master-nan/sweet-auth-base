@@ -200,10 +200,13 @@ func (ls *LogService) RecordTransactionalAuditContext(
 		return err
 	}
 	subject, _ := audit.GetAuditSubject(ctx)
+	correlation := audit.GetCorrelationIDs(ctx)
 	return ls.accessLogRepository.Create(tx.WithContext(ctx), &model.AccessLog{
 		Basic:        model.Basic{Id: int(id)},
 		UserId:       subject.UserID,
 		UserName:     subject.UserName,
+		RequestId:    correlation.RequestID,
+		TraceId:      correlation.TraceID,
 		Method:       "AUDIT",
 		Action:       record.Action,
 		ResourceType: record.ResourceType,

@@ -50,6 +50,7 @@ export interface ExternalSystemQuery extends Query {
 }
 
 export type InterfaceDefinitionStatus = 'draft' | 'enabled' | 'disabled'
+export type InterfaceDefinitionEffectiveStatus = InterfaceDefinitionStatus | 'unavailable'
 export type InterfaceProtocol = 'http' | 'https'
 export type InterfaceHTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -69,6 +70,7 @@ export interface InterfaceDefinitionListItem {
   http_method: InterfaceHTTPMethod
   path_summary: string
   status: InterfaceDefinitionStatus
+  effective_status: InterfaceDefinitionEffectiveStatus
   revision: number
   gmt_modify: string
 }
@@ -76,6 +78,13 @@ export interface InterfaceDefinitionListItem {
 export interface InterfaceDefinitionDetail extends InterfaceDefinitionListItem {
   relative_path: string
   credential_id?: number
+  credential?: {
+    id: number
+    credential_code: string
+    name: string
+    credential_type: CredentialType
+    effective_status: CredentialEffectiveStatus
+  }
   timeout_seconds: number
   response_limit: number
   retry_policy_id?: number

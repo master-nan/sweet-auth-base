@@ -47,17 +47,6 @@ func (r *InterfaceDefinitionRepositoryImpl) HasEnabledVersion(tx *gorm.DB, syste
 	return count > 0, err
 }
 
-func (r *InterfaceDefinitionRepositoryImpl) CredentialReferenceValid(tx *gorm.DB, id, systemID int) (bool, error) {
-	if !tx.Migrator().HasTable("integration_credential") {
-		return false, nil
-	}
-	var count int64
-	err := tx.Table("integration_credential").
-		Where("id = ? AND external_system_id = ? AND status = ? AND gmt_delete IS NULL", id, systemID, "active").
-		Count(&count).Error
-	return count == 1, err
-}
-
 func (r *InterfaceDefinitionRepositoryImpl) RetryPolicyReferenceValid(tx *gorm.DB, id int) (bool, error) {
 	if !tx.Migrator().HasTable("integration_retry_policy") {
 		return false, nil

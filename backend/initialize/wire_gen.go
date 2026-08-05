@@ -122,10 +122,10 @@ func InitializeApp() (*App, error) {
 	externalSystemRepositoryImpl := impl.NewExternalSystemRepositoryImpl(primaryDB)
 	externalSystemService := service.NewExternalSystemService(externalSystemRepositoryImpl, snowflake, logService)
 	externalSystemController := controller.NewExternalSystemController(externalSystemService, v2)
-	interfaceDefinitionRepositoryImpl := impl.NewInterfaceDefinitionRepositoryImpl(primaryDB)
-	interfaceDefinitionService := service.NewInterfaceDefinitionService(interfaceDefinitionRepositoryImpl, externalSystemRepositoryImpl, snowflake, logService)
-	interfaceDefinitionController := controller.NewInterfaceDefinitionController(interfaceDefinitionService, v2)
 	credentialRepositoryImpl := impl.NewCredentialRepositoryImpl(primaryDB)
+	interfaceDefinitionRepositoryImpl := impl.NewInterfaceDefinitionRepositoryImpl(primaryDB)
+	interfaceDefinitionService := service.NewInterfaceDefinitionService(interfaceDefinitionRepositoryImpl, externalSystemRepositoryImpl, credentialRepositoryImpl, snowflake, logService)
+	interfaceDefinitionController := controller.NewInterfaceDefinitionController(interfaceDefinitionService, v2)
 	credentialSecretProtector, err := security.NewCredentialSecretProtector(server)
 	if err != nil {
 		return nil, err
