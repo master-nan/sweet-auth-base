@@ -112,4 +112,34 @@ describe('external system API', () => {
     expect(putMock).toHaveBeenCalledWith('/admin/integration/interface-definition/32/enable', { revision: 1 })
     expect(putMock).toHaveBeenCalledWith('/admin/integration/interface-definition/32/disable', { revision: 2 })
   })
+
+  it('keeps credential secrets write-only across lifecycle endpoints', async () => {
+    const api = useIntegrationApi()
+    const query = { page: 1, num: 15, quick_query: { keyword: 'ERP' }, expressions: [] }
+    const createRequest = {
+      external_system_id: 12,
+      credential_code: 'erp_api',
+      name: 'ERP API Key',
+      credential_type: 'api_key' as const,
+      secret: { api_key: 'write-only-secret' },
+    }
+
+    await api.queryCredentials(query)
+    await api.getCredential(41)
+    await api.createCredential(createRequest)
+    await api.updateCredential(41, { name: 'ERP Key', revision: 2 })
+    await api.rotateCredential(41, { api_key: 'rotated-secret' }, 3)
+    await api.enableCredential(41, 4)
+    await api.disableCredential(41, 5)
+    await api.revokeCredential(41, 6)
+
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/credential/query', query)
+    expect(getMock).toHaveBeenCalledWith('/admin/integration/credential/41')
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/credential', createRequest)
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41', { name: 'ERP Key', revision: 2 })
+    expect(postMock).toHaveBeenCalledWith('/admin/integration/credential/41/rotate', { secret: { api_key: 'rotated-secret' }, revision: 3 })
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41/enable', { revision: 4 })
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41/disable', { revision: 5 })
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41/revoke', { revision: 6 })
+  })
 })

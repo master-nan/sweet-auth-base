@@ -9,7 +9,7 @@ import (
 
 func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.AutoMigrate(&model.ExternalSystem{}, &model.InterfaceDefinition{}); err != nil {
+		if err := tx.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{}); err != nil {
 			return fmt.Errorf("auto migrate external system: %w", err)
 		}
 		if tx.Dialector.Name() != "postgres" {
@@ -38,6 +38,10 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_revision", expression: "revision > 0"},
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_timeout", expression: "timeout_seconds BETWEEN 1 AND 300"},
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_response_limit", expression: "response_limit BETWEEN 1024 AND 104857600"},
+			{model: &model.Credential{}, name: "chk_integration_credential_type", expression: "credential_type IN ('basic','api_key','bearer_token','oauth_client')"},
+			{model: &model.Credential{}, name: "chk_integration_credential_status", expression: "status IN ('draft','active','disabled','revoked')"},
+			{model: &model.Credential{}, name: "chk_integration_credential_version", expression: "version > 0"},
+			{model: &model.Credential{}, name: "chk_integration_credential_revision", expression: "revision > 0"},
 		}
 		for _, check := range checks {
 			if err := createPostgresCheckConstraint(tx, check); err != nil {

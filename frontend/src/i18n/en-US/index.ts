@@ -22,6 +22,7 @@ export default {
       default: 'Integration Center',
       externalSystem: 'External Systems',
       interfaceDefinition: 'Interface Definitions',
+      credential: 'Integration Credentials',
     },
     report: {
       default: 'Reports',

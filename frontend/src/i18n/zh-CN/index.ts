@@ -22,6 +22,7 @@ export default {
       default: '集成中心',
       externalSystem: '外部系统',
       interfaceDefinition: '接口定义',
+      credential: '集成凭证',
     },
     report: {
       default: '报表',

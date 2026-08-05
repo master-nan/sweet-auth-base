@@ -281,6 +281,16 @@ const asyncRoutesChildren: Route[] = [
           keepAlive: true,
         },
       },
+      {
+        component: () => import('pages/integration/credential/Index.vue'),
+        path: 'credential',
+        name: 'integration_credential',
+        meta: {
+          title: 'router.integration.credential',
+          icon: 'key',
+          keepAlive: true,
+        },
+      },
     ],
   },
   {

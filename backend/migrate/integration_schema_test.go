@@ -20,6 +20,9 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	if !db.Migrator().HasTable(&model.InterfaceDefinition{}) {
 		t.Fatal("interface definition table was not created")
 	}
+	if !db.Migrator().HasTable(&model.Credential{}) {
+		t.Fatal("credential table was not created")
+	}
 	first := model.ExternalSystem{
 		Basic:           model.Basic{Id: 1},
 		SystemCode:      "demo_erp",
@@ -33,6 +36,15 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	}
 	if err := db.Create(&first).Error; err != nil {
 		t.Fatalf("create external system: %v", err)
+	}
+	credential := model.Credential{Basic: model.Basic{Id: 5}, ExternalSystemID: 1, CredentialCode: "erp_key", Name: "ERP Key", CredentialType: model.CredentialTypeAPIKey, Status: model.CredentialStatusDraft, SecretStorageRef: "ref-1", SecretCiphertext: "cipher", SecretNonce: "nonce", SecretFingerprint: "fingerprint", Version: 1, Revision: 1}
+	if err := db.Create(&credential).Error; err != nil {
+		t.Fatalf("create credential: %v", err)
+	}
+	credential.Id = 6
+	credential.SecretStorageRef = "ref-2"
+	if err := db.Create(&credential).Error; err == nil {
+		t.Fatal("expected duplicate credential code to be rejected")
 	}
 	first.Id = 2
 	if err := db.Create(&first).Error; err == nil {
@@ -57,6 +69,7 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if err := db.AutoMigrate(
 		&model.ExternalSystem{},
 		&model.InterfaceDefinition{},
+		&model.Credential{},
 		&model.SysMenu{},
 		&model.SysMenuButton{},
 		&model.SysRole{},
@@ -124,6 +137,26 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if interfaceCasbinCount != 7 {
 		t.Fatalf("interface Casbin policy count = %d, want 7", interfaceCasbinCount)
+	}
+	var credentialMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_credential").First(&credentialMenu).Error; err != nil {
+		t.Fatalf("load credential menu: %v", err)
+	}
+	if credentialMenu.TableCode != credentialTableCode || credentialMenu.Title != "router.integration.credential" {
+		t.Fatalf("unexpected credential menu: %+v", credentialMenu)
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", credentialMenu.Id).Count(&buttonCount).Error; err != nil {
+		t.Fatalf("count credential buttons: %v", err)
+	}
+	if buttonCount != 9 {
+		t.Fatalf("credential button count = %d, want 9", buttonCount)
+	}
+	var credentialCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/credential%").Count(&credentialCasbinCount).Error; err != nil {
+		t.Fatalf("count credential Casbin policies: %v", err)
+	}
+	if credentialCasbinCount != 8 {
+		t.Fatalf("credential Casbin policy count = %d, want 8", credentialCasbinCount)
 	}
 	var casbinCount int64
 	if err := db.Model(&model.CasbinRule{}).

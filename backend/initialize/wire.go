@@ -14,6 +14,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/datapermission"
+	"backend/internal/security"
 	"backend/internal/storage"
 	"backend/internal/token"
 	"backend/internal/utils"
@@ -44,6 +45,7 @@ type App struct {
 	DataPermissionConfigController *controller.DataPermissionConfigController
 	ExternalSystemController       *controller.ExternalSystemController
 	InterfaceDefinitionController  *controller.InterfaceDefinitionController
+	CredentialController           *controller.CredentialController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -88,6 +90,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewApplicationRepositoryImpl,
 	impl.NewExternalSystemRepositoryImpl,
 	impl.NewInterfaceDefinitionRepositoryImpl,
+	impl.NewCredentialRepositoryImpl,
 	impl.NewGeneralizationRepositoryImpl,
 	impl.NewReportDefinitionRepositoryImpl,
 	impl.NewReportDefinitionVersionRepositoryImpl,
@@ -135,6 +138,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.ApplicationRepository), new(*impl.ApplicationRepositoryImpl)),
 	wire.Bind(new(repository.ExternalSystemRepository), new(*impl.ExternalSystemRepositoryImpl)),
 	wire.Bind(new(repository.InterfaceDefinitionRepository), new(*impl.InterfaceDefinitionRepositoryImpl)),
+	wire.Bind(new(repository.CredentialRepository), new(*impl.CredentialRepositoryImpl)),
 	wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionRepository), new(*impl.ReportDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.ReportDefinitionVersionRepository), new(*impl.ReportDefinitionVersionRepositoryImpl)),
@@ -228,6 +232,8 @@ var ServiceProvider = wire.NewSet(
 	service.NewApplicationService,
 	service.NewExternalSystemService,
 	service.NewInterfaceDefinitionService,
+	security.NewCredentialSecretProtector,
+	service.NewCredentialService,
 	service.NewDingTalkService,
 	service.NewSmsService,
 	service.NewFileService,
@@ -243,6 +249,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewDataPermissionConfigController,
 	controller.NewExternalSystemController,
 	controller.NewInterfaceDefinitionController,
+	controller.NewCredentialController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
 	controller.NewReportController,

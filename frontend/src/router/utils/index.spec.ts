@@ -42,6 +42,15 @@ const integrationMenus = [
         page_type: 'fixed',
         is_hidden: false,
       },
+      {
+        id: 1203,
+        name: 'integration_credential',
+        title: '集成凭证',
+        path: 'credential',
+        component: 'pages/integration/credential/Index.vue',
+        page_type: 'fixed',
+        is_hidden: false,
+      },
     ],
   },
 ] as Menu[]
@@ -91,6 +100,15 @@ describe('permission route construction', () => {
     userStore.menu_names = ['integration']
 
     expect(constructionRouters(integrationRoutes(), integrationMenus)).toEqual([])
+  })
+
+  it('renders the credential page only when returned by backend permissions', () => {
+    userStore.menu_names = ['integration', 'integration_credential']
+
+    const routes = constructionRouters(integrationRoutes(), integrationMenus)
+
+    expect(routes[0]?.children?.map((item) => item.name)).toEqual(['integration_credential'])
+    expect(routes[0]?.children?.[0]?.meta?.title).toBe('router.integration.credential')
   })
 
   it('contains no legacy legal-entity route', () => {

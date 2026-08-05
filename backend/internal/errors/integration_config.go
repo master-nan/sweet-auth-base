@@ -24,6 +24,17 @@ const (
 	ErrorCodeInterfaceCredentialInvalid      = 130110
 	ErrorCodeInterfaceRetryPolicyInvalid     = 130111
 	ErrorCodeInterfaceEnabledVersionConflict = 130112
+	ErrorCodeCredentialNotFound              = 130201
+	ErrorCodeCredentialCodeDuplicate         = 130202
+	ErrorCodeCredentialCodeInvalid           = 130203
+	ErrorCodeCredentialFieldImmutable        = 130204
+	ErrorCodeCredentialTypeInvalid           = 130205
+	ErrorCodeCredentialSecretInvalid         = 130206
+	ErrorCodeCredentialStatusInvalid         = 130207
+	ErrorCodeCredentialRevisionConflict      = 130208
+	ErrorCodeCredentialExternalSystemInvalid = 130209
+	ErrorCodeCredentialExpired               = 130210
+	ErrorCodeCredentialProtectionFailed      = 130211
 )
 
 var (
@@ -48,4 +59,15 @@ var (
 	ErrInterfaceCredentialInvalid      = NewBusinessError(http.StatusBadRequest, ErrorCodeInterfaceCredentialInvalid, "接口凭证引用不存在、无效或不属于当前系统")
 	ErrInterfaceRetryPolicyInvalid     = NewBusinessError(http.StatusBadRequest, ErrorCodeInterfaceRetryPolicyInvalid, "接口重试策略引用不存在或无效")
 	ErrInterfaceEnabledVersionConflict = NewBusinessError(http.StatusConflict, ErrorCodeInterfaceEnabledVersionConflict, "同一接口已有启用版本，请先停用后再启用新版本")
+	ErrCredentialNotFound              = NewBusinessError(http.StatusNotFound, ErrorCodeCredentialNotFound, "集成凭证不存在")
+	ErrCredentialCodeDuplicate         = NewBusinessError(http.StatusConflict, ErrorCodeCredentialCodeDuplicate, "同一外部系统下凭证编码已存在")
+	ErrCredentialCodeInvalid           = NewBusinessError(http.StatusBadRequest, ErrorCodeCredentialCodeInvalid, "凭证编码格式不合法")
+	ErrCredentialFieldImmutable        = NewBusinessError(http.StatusConflict, ErrorCodeCredentialFieldImmutable, "凭证身份字段不可修改")
+	ErrCredentialTypeInvalid           = NewBusinessError(http.StatusBadRequest, ErrorCodeCredentialTypeInvalid, "凭证类型不受支持")
+	ErrCredentialSecretInvalid         = NewBusinessError(http.StatusBadRequest, ErrorCodeCredentialSecretInvalid, "凭证秘密内容不完整或格式不合法")
+	ErrCredentialStatusInvalid         = NewBusinessError(http.StatusConflict, ErrorCodeCredentialStatusInvalid, "凭证当前状态不允许执行该操作")
+	ErrCredentialRevisionConflict      = NewBusinessError(http.StatusConflict, ErrorCodeCredentialRevisionConflict, "凭证已被其他操作修改，请刷新后重试")
+	ErrCredentialExternalSystemInvalid = NewBusinessError(http.StatusConflict, ErrorCodeCredentialExternalSystemInvalid, "所属外部系统不存在或状态不允许")
+	ErrCredentialExpired               = NewBusinessError(http.StatusConflict, ErrorCodeCredentialExpired, "凭证已经过期，不能启用")
+	ErrCredentialProtectionFailed      = NewBusinessError(http.StatusInternalServerError, ErrorCodeCredentialProtectionFailed, "凭证秘密保护失败")
 )

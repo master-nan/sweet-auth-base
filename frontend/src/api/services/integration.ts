@@ -118,6 +118,56 @@ export interface InterfaceDefinitionQuery extends Query {
   status?: InterfaceDefinitionStatus | ''
 }
 
+export type CredentialType = 'basic' | 'api_key' | 'bearer_token' | 'oauth_client'
+export type CredentialStatus = 'draft' | 'active' | 'disabled' | 'revoked'
+export type CredentialEffectiveStatus = CredentialStatus | 'expired'
+export type CredentialSecret = Record<string, string>
+
+export interface CredentialListItem {
+  id: number
+  external_system: InterfaceSystemSummary
+  credential_code: string
+  name: string
+  credential_type: CredentialType
+  status: CredentialStatus
+  effective_status: CredentialEffectiveStatus
+  fingerprint_summary: string
+  expires_at?: string
+  version: number
+  rotated_at?: string
+  revision: number
+  gmt_modify: string
+}
+
+export interface CredentialDetail extends CredentialListItem {
+  description: string
+  gmt_create: string
+}
+
+export interface CredentialCreateRequest {
+  external_system_id: number
+  credential_code: string
+  name: string
+  credential_type: CredentialType
+  secret: CredentialSecret
+  expires_at?: string
+  description?: string
+}
+
+export interface CredentialUpdateRequest {
+  name?: string
+  expires_at?: string
+  clear_expires_at?: boolean
+  description?: string
+  revision: number
+}
+
+export interface CredentialQuery extends Query {
+  external_system_id?: number
+  credential_type?: CredentialType | ''
+  status?: CredentialEffectiveStatus | ''
+}
+
 export const useIntegrationApi = () => ({
   queryExternalSystems: (query: ExternalSystemQuery) =>
     instance
@@ -174,5 +224,37 @@ export const useIntegrationApi = () => ({
   disableInterfaceDefinition: (id: number, revision: number) =>
     instance
       .put<ResponseData<InterfaceDefinitionDetail>>(`/admin/integration/interface-definition/${id}/disable`, { revision })
+      .then((response) => response.data),
+  queryCredentials: (query: CredentialQuery) =>
+    instance
+      .post<ResponseData<CredentialListItem[]>>('/admin/integration/credential/query', query)
+      .then((response) => response.data),
+  getCredential: (id: number) =>
+    instance
+      .get<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}`)
+      .then((response) => response.data),
+  createCredential: (request: CredentialCreateRequest) =>
+    instance
+      .post<ResponseData<CredentialDetail>>('/admin/integration/credential', request)
+      .then((response) => response.data),
+  updateCredential: (id: number, request: CredentialUpdateRequest) =>
+    instance
+      .put<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}`, request)
+      .then((response) => response.data),
+  rotateCredential: (id: number, secret: CredentialSecret, revision: number) =>
+    instance
+      .post<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}/rotate`, { secret, revision })
+      .then((response) => response.data),
+  enableCredential: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}/enable`, { revision })
+      .then((response) => response.data),
+  disableCredential: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}/disable`, { revision })
+      .then((response) => response.data),
+  revokeCredential: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<CredentialDetail>>(`/admin/integration/credential/${id}/revoke`, { revision })
       .then((response) => response.data),
 })

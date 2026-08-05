@@ -526,6 +526,26 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "集成凭证类型",
+			code: "integration_credential_type",
+			items: []systemDictItemSeed{
+				{name: "Basic", code: "integration_credential_type_basic", value: model.CredentialTypeBasic},
+				{name: "API Key", code: "integration_credential_type_api_key", value: model.CredentialTypeAPIKey},
+				{name: "Bearer Token", code: "integration_credential_type_bearer_token", value: model.CredentialTypeBearerToken},
+				{name: "OAuth Client", code: "integration_credential_type_oauth_client", value: model.CredentialTypeOAuthClient},
+			},
+		},
+		{
+			name: "集成凭证状态",
+			code: "integration_credential_status",
+			items: []systemDictItemSeed{
+				{name: "草稿", code: "integration_credential_status_draft", value: model.CredentialStatusDraft},
+				{name: "已启用", code: "integration_credential_status_active", value: model.CredentialStatusActive},
+				{name: "已停用", code: "integration_credential_status_disabled", value: model.CredentialStatusDisabled},
+				{name: "已吊销", code: "integration_credential_status_revoked", value: model.CredentialStatusRevoked},
+			},
+		},
+		{
 			name: "接口协议",
 			code: "integration_interface_protocol",
 			items: []systemDictItemSeed{
@@ -2141,6 +2161,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyMigrationManagedFieldDefaults(&field)
 	applyExternalSystemFieldDefaults(tableCode, &field)
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
+	applyCredentialFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
@@ -2290,6 +2311,14 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "integration_interface_protocol"
 		case "status":
 			return "integration_interface_definition_status"
+		}
+	}
+	if tableCode == credentialTableCode {
+		switch fieldCode {
+		case "credential_type":
+			return "integration_credential_type"
+		case "status":
+			return "integration_credential_status"
 		}
 	}
 	if fieldType == enum.BooleanFieldType || strings.HasPrefix(fieldCode, "is_") {
@@ -2475,6 +2504,77 @@ func applyInterfaceDefinitionFieldDefaults(tableCode string, field *model.SysTab
 		field.IsAdvancedSearch = true
 		field.InputType = enum.DatetimePickerInputType
 		field.Sequence = 12
+	}
+}
+
+func applyCredentialFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != credentialTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "external_system_id":
+		field.FieldName = "所属系统"
+		field.IsAdvancedSearch = true
+		field.Sequence = 1
+	case "credential_code":
+		field.FieldName = "凭证编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 2
+	case "name":
+		field.FieldName = "凭证名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 3
+	case "credential_type":
+		field.FieldName = "凭证类型"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_credential_type")
+		field.Sequence = 4
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_credential_status")
+		field.Sequence = 5
+	case "expires_at":
+		field.FieldName = "有效期"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 6
+	case "version":
+		field.FieldName = "秘密版本"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 7
+	case "rotated_at":
+		field.FieldName = "轮换时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 8
+	case "description":
+		field.FieldName = "描述"
+		field.Sequence = 9
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 10
+	case "secret_storage_ref", "secret_ciphertext", "secret_nonce", "secret_fingerprint":
+		field.IsSort = false
 	}
 }
 
