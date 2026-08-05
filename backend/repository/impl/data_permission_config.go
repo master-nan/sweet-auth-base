@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"context"
 	"time"
 
 	"backend/dto/request"
@@ -9,7 +10,6 @@ import (
 	"backend/model"
 	"backend/repository"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -93,23 +93,15 @@ func NewDataGrantRepositoryImpl(primaryDB *database.PrimaryDB) *DataGrantReposit
 	}
 }
 
-func (r *DataDimensionDefinitionRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataDimensionDefinitionQueryReq,
+func (r *DataDimensionDefinitionRepositoryImpl) GetDataDimensionDefinitionList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataDimensionDefinition], error) {
-	if req == nil {
-		req = &request.DataDimensionDefinitionQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"category":   optionalConfigString(req.Category),
-			"value_type": optionalConfigString(req.ValueType),
-			"state":      optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_dimension_definition",
 		dataDimensionDefinitionQueryFields,
@@ -117,47 +109,15 @@ func (r *DataDimensionDefinitionRepositoryImpl) Query(
 	)
 }
 
-func (r *DataDimensionDefinitionRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataDimensionDefinition, error) {
-	return findDataPermissionConfigById[model.DataDimensionDefinition](r.db, ctx, id, dataDimensionDefinitionColumns)
-}
-
-func (r *DataDimensionDefinitionRepositoryImpl) FindByCode(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
-	return findDataPermissionConfigOne[model.DataDimensionDefinition](r.db, ctx, dataDimensionDefinitionColumns, "code = ?", code)
-}
-
-func (r *DataDimensionDefinitionRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataDimensionDefinition, error) {
-	return findDataPermissionConfigByIds[model.DataDimensionDefinition](r.db, ctx, ids, dataDimensionDefinitionColumns)
-}
-
-func (r *DataDimensionDefinitionRepositoryImpl) FindByIdForConfigDB(
-	db *gorm.DB,
-	id int,
-) (model.DataDimensionDefinition, error) {
-	return findDataPermissionConfigOneDB[model.DataDimensionDefinition](
-		db,
-		dataDimensionDefinitionColumns,
-		"id = ?",
-		id,
-	)
-}
-
-func (r *DataResourceRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataResourceQueryReq,
+func (r *DataResourceRepositoryImpl) GetDataResourceList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataResource], error) {
-	if req == nil {
-		req = &request.DataResourceQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"resource_type":      optionalConfigString(req.ResourceType),
-			"permission_enabled": optionalConfigBool(req.PermissionEnabled),
-			"state":              optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_resource",
 		dataResourceQueryFields,
@@ -165,32 +125,12 @@ func (r *DataResourceRepositoryImpl) Query(
 	)
 }
 
-func (r *DataResourceRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataResource, error) {
-	return findDataPermissionConfigById[model.DataResource](r.db, ctx, id, dataResourceColumns)
-}
-
-func (r *DataResourceRepositoryImpl) FindByCode(ctx *gin.Context, code string) (model.DataResource, error) {
-	return findDataPermissionConfigOne[model.DataResource](r.db, ctx, dataResourceColumns, "resource_code = ?", code)
-}
-
-func (r *DataResourceRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataResource, error) {
-	return findDataPermissionConfigByIds[model.DataResource](r.db, ctx, ids, dataResourceColumns)
-}
-
-func (r *DataResourceRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataResource, error) {
-	return findDataPermissionConfigOneDB[model.DataResource](db, dataResourceMutationColumns, "id = ?", id)
-}
-
-func (r *DataResourceRepositoryImpl) FindByCodeForConfigDB(db *gorm.DB, code string) (model.DataResource, error) {
-	return findDataPermissionConfigOneDB[model.DataResource](db, dataResourceMutationColumns, "resource_code = ?", code)
-}
-
 func (r *DataResourceRepositoryImpl) ListByTableId(
-	ctx *gin.Context,
+	ctx context.Context,
 	tableId int,
 ) ([]model.DataResource, error) {
 	values := make([]model.DataResource, 0)
-	err := lowCodeRuntimeDB(r.db, ctx).
+	err := r.DBWithContext(ctx).
 		Select(dataResourceColumns).
 		Where("resource_type = ? AND table_id = ?", model.DataResourceTypeLowCodeTable, tableId).
 		Order("id ASC").
@@ -198,33 +138,15 @@ func (r *DataResourceRepositoryImpl) ListByTableId(
 	return values, err
 }
 
-func (r *DataResourceRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataResource{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
-}
-
-func (r *DataResourceOperationRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataResourceOperationQueryReq,
+func (r *DataResourceOperationRepositoryImpl) GetDataResourceOperationList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataResourceOperation], error) {
-	if req == nil {
-		req = &request.DataResourceOperationQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"resource_id":        optionalConfigInt(req.ResourceId),
-			"operation":          optionalConfigString(req.Operation),
-			"permission_enabled": optionalConfigBool(req.PermissionEnabled),
-			"state":              optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_resource_operation",
 		dataResourceOperationQueryFields,
@@ -232,30 +154,17 @@ func (r *DataResourceOperationRepositoryImpl) Query(
 	)
 }
 
-func (r *DataResourceOperationRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataResourceOperation, error) {
-	return findDataPermissionConfigById[model.DataResourceOperation](r.db, ctx, id, dataResourceOperationColumns)
-}
-
 func (r *DataResourceOperationRepositoryImpl) FindByStableKey(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 	operation string,
 ) (model.DataResourceOperation, error) {
-	return findDataPermissionConfigOne[model.DataResourceOperation](
-		r.db, ctx, dataResourceOperationColumns,
-		"resource_id = ? AND operation = ?", resourceId, operation,
-	)
-}
-
-func (r *DataResourceOperationRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataResourceOperation, error) {
-	return findDataPermissionConfigByIds[model.DataResourceOperation](r.db, ctx, ids, dataResourceOperationColumns)
-}
-
-func (r *DataResourceOperationRepositoryImpl) FindByIdForConfigDB(
-	db *gorm.DB,
-	id int,
-) (model.DataResourceOperation, error) {
-	return findDataPermissionConfigOneDB[model.DataResourceOperation](db, dataResourceOperationMutationColumns, "id = ?", id)
+	var value model.DataResourceOperation
+	err := r.DBWithContext(ctx).
+		Select(dataResourceOperationColumns).
+		Where("resource_id = ? AND operation = ?", resourceId, operation).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataResourceOperationRepositoryImpl) FindByStableKeyForConfigDB(
@@ -263,13 +172,11 @@ func (r *DataResourceOperationRepositoryImpl) FindByStableKeyForConfigDB(
 	resourceId int,
 	operation string,
 ) (model.DataResourceOperation, error) {
-	return findDataPermissionConfigOneDB[model.DataResourceOperation](
-		db,
-		dataResourceOperationMutationColumns,
-		"resource_id = ? AND operation = ?",
-		resourceId,
-		operation,
-	)
+	var value model.DataResourceOperation
+	err := db.Select(dataResourceOperationMutationColumns).
+		Where("resource_id = ? AND operation = ?", resourceId, operation).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataResourceOperationRepositoryImpl) ListByResourceForConfigDB(
@@ -282,15 +189,6 @@ func (r *DataResourceOperationRepositoryImpl) ListByResourceForConfigDB(
 		Order("operation ASC, id ASC").
 		Find(&values).Error
 	return values, err
-}
-
-func (r *DataResourceOperationRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataResourceOperation{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
 }
 
 func (r *DataResourceOperationRepositoryImpl) UpdateFieldsByResourceForConfig(
@@ -314,25 +212,15 @@ func (r *DataResourceOperationRepositoryImpl) CountByResourceForConfig(
 	return count, err
 }
 
-func (r *DataOwnershipFieldRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataOwnershipFieldQueryReq,
+func (r *DataOwnershipFieldRepositoryImpl) GetDataOwnershipFieldList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataOwnershipField], error) {
-	if req == nil {
-		req = &request.DataOwnershipFieldQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"resource_id":  optionalConfigInt(req.ResourceId),
-			"dimension_id": optionalConfigInt(req.DimensionId),
-			"binding_type": optionalConfigString(req.BindingType),
-			"value_type":   optionalConfigString(req.ValueType),
-			"state":        optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_ownership_field",
 		dataOwnershipFieldQueryFields,
@@ -340,35 +228,17 @@ func (r *DataOwnershipFieldRepositoryImpl) Query(
 	)
 }
 
-func (r *DataOwnershipFieldRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataOwnershipField, error) {
-	return findDataPermissionConfigById[model.DataOwnershipField](r.db, ctx, id, dataOwnershipFieldColumns)
-}
-
 func (r *DataOwnershipFieldRepositoryImpl) FindByStableKey(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 	ownershipCode string,
 ) (model.DataOwnershipField, error) {
-	return findDataPermissionConfigOne[model.DataOwnershipField](
-		r.db, ctx, dataOwnershipFieldColumns,
-		"resource_id = ? AND ownership_code = ?", resourceId, ownershipCode,
-	)
-}
-
-func (r *DataOwnershipFieldRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataOwnershipField, error) {
-	return findDataPermissionConfigByIds[model.DataOwnershipField](r.db, ctx, ids, dataOwnershipFieldColumns)
-}
-
-func (r *DataOwnershipFieldRepositoryImpl) FindByIdForConfigDB(
-	db *gorm.DB,
-	id int,
-) (model.DataOwnershipField, error) {
-	return findDataPermissionConfigOneDB[model.DataOwnershipField](
-		db,
-		dataOwnershipFieldMutationColumns,
-		"id = ?",
-		id,
-	)
+	var value model.DataOwnershipField
+	err := r.DBWithContext(ctx).
+		Select(dataOwnershipFieldColumns).
+		Where("resource_id = ? AND ownership_code = ?", resourceId, ownershipCode).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataOwnershipFieldRepositoryImpl) FindByStableKeyForConfigDB(
@@ -376,13 +246,11 @@ func (r *DataOwnershipFieldRepositoryImpl) FindByStableKeyForConfigDB(
 	resourceId int,
 	ownershipCode string,
 ) (model.DataOwnershipField, error) {
-	return findDataPermissionConfigOneDB[model.DataOwnershipField](
-		db,
-		dataOwnershipFieldMutationColumns,
-		"resource_id = ? AND ownership_code = ?",
-		resourceId,
-		ownershipCode,
-	)
+	var value model.DataOwnershipField
+	err := db.Select(dataOwnershipFieldMutationColumns).
+		Where("resource_id = ? AND ownership_code = ?", resourceId, ownershipCode).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataOwnershipFieldRepositoryImpl) ListByResourceForConfigDB(
@@ -398,25 +266,16 @@ func (r *DataOwnershipFieldRepositoryImpl) ListByResourceForConfigDB(
 }
 
 func (r *DataOwnershipFieldRepositoryImpl) ListByResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) ([]model.DataOwnershipField, error) {
 	values := make([]model.DataOwnershipField, 0)
-	err := lowCodeRuntimeDB(r.db, ctx).
+	err := r.DBWithContext(ctx).
 		Select(dataOwnershipFieldColumns).
 		Where("resource_id = ?", resourceId).
 		Order("ownership_code ASC, id ASC").
 		Find(&values).Error
 	return values, err
-}
-
-func (r *DataOwnershipFieldRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataOwnershipField{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
 }
 
 func (r *DataOwnershipFieldRepositoryImpl) CountByResourceForConfig(db *gorm.DB, resourceId int) (int64, error) {
@@ -471,22 +330,15 @@ func (r *DataOwnershipFieldRepositoryImpl) CountPolicyRuleReferencesForConfig(
 	return count, err
 }
 
-func (r *DataPolicyRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataPolicyQueryReq,
+func (r *DataPolicyRepositoryImpl) GetDataPolicyList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataPolicy], error) {
-	if req == nil {
-		req = &request.DataPolicyQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"policy_type": optionalConfigString(req.PolicyType),
-			"state":       optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_policy",
 		dataPolicyQueryFields,
@@ -494,56 +346,15 @@ func (r *DataPolicyRepositoryImpl) Query(
 	)
 }
 
-func (r *DataPolicyRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataPolicy, error) {
-	return findDataPermissionConfigById[model.DataPolicy](r.db, ctx, id, dataPolicyColumns)
-}
-
-func (r *DataPolicyRepositoryImpl) FindByCode(ctx *gin.Context, code string) (model.DataPolicy, error) {
-	return findDataPermissionConfigOne[model.DataPolicy](r.db, ctx, dataPolicyColumns, "code = ?", code)
-}
-
-func (r *DataPolicyRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataPolicy, error) {
-	return findDataPermissionConfigByIds[model.DataPolicy](r.db, ctx, ids, dataPolicyColumns)
-}
-
-func (r *DataPolicyRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataPolicy, error) {
-	return findDataPermissionConfigOneDB[model.DataPolicy](db, dataPolicyColumns, "id = ?", id)
-}
-
-func (r *DataPolicyRepositoryImpl) FindByCodeForConfigDB(db *gorm.DB, code string) (model.DataPolicy, error) {
-	return findDataPermissionConfigOneDB[model.DataPolicy](db, dataPolicyColumns, "code = ?", code)
-}
-
-func (r *DataPolicyRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataPolicy{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
-}
-
-func (r *DataPolicyRuleRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataPolicyRuleQueryReq,
+func (r *DataPolicyRuleRepositoryImpl) GetDataPolicyRuleList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataPolicyRule], error) {
-	if req == nil {
-		req = &request.DataPolicyRuleQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"policy_id":      optionalConfigInt(req.PolicyId),
-			"dimension_id":   optionalConfigInt(req.DimensionId),
-			"ownership_code": optionalConfigString(req.OwnershipCode),
-			"scope_source":   optionalConfigString(req.ScopeSource),
-			"relation":       optionalConfigString(req.Relation),
-			"operator":       optionalConfigString(req.Operator),
-			"state":          optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_policy_rule",
 		dataPolicyRuleQueryFields,
@@ -551,27 +362,17 @@ func (r *DataPolicyRuleRepositoryImpl) Query(
 	)
 }
 
-func (r *DataPolicyRuleRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataPolicyRule, error) {
-	return findDataPermissionConfigById[model.DataPolicyRule](r.db, ctx, id, dataPolicyRuleColumns)
-}
-
 func (r *DataPolicyRuleRepositoryImpl) FindByStableKey(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 	sequence int,
 ) (model.DataPolicyRule, error) {
-	return findDataPermissionConfigOne[model.DataPolicyRule](
-		r.db, ctx, dataPolicyRuleColumns,
-		"policy_id = ? AND sequence = ?", policyId, sequence,
-	)
-}
-
-func (r *DataPolicyRuleRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataPolicyRule, error) {
-	return findDataPermissionConfigByIds[model.DataPolicyRule](r.db, ctx, ids, dataPolicyRuleColumns)
-}
-
-func (r *DataPolicyRuleRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataPolicyRule, error) {
-	return findDataPermissionConfigOneDB[model.DataPolicyRule](db, dataPolicyRuleColumns, "id = ?", id)
+	var value model.DataPolicyRule
+	err := r.DBWithContext(ctx).
+		Select(dataPolicyRuleColumns).
+		Where("policy_id = ? AND sequence = ?", policyId, sequence).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataPolicyRuleRepositoryImpl) FindByStableKeyForConfigDB(
@@ -579,21 +380,19 @@ func (r *DataPolicyRuleRepositoryImpl) FindByStableKeyForConfigDB(
 	policyId int,
 	sequence int,
 ) (model.DataPolicyRule, error) {
-	return findDataPermissionConfigOneDB[model.DataPolicyRule](
-		db,
-		dataPolicyRuleColumns,
-		"policy_id = ? AND sequence = ?",
-		policyId,
-		sequence,
-	)
+	var value model.DataPolicyRule
+	err := db.Select(dataPolicyRuleColumns).
+		Where("policy_id = ? AND sequence = ?", policyId, sequence).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataPolicyRuleRepositoryImpl) ListByPolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 ) ([]model.DataPolicyRule, error) {
 	return listDataPolicyRulesByPolicy(
-		dataPermissionConfigDB(r.db, ctx),
+		r.DBWithContext(ctx),
 		policyId,
 	)
 }
@@ -617,35 +416,15 @@ func listDataPolicyRulesByPolicy(
 	return values, err
 }
 
-func (r *DataPolicyRuleRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataPolicyRule{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
-}
-
-func (r *DataGrantRepositoryImpl) Query(
-	ctx *gin.Context,
-	req *request.DataGrantQueryReq,
+func (r *DataGrantRepositoryImpl) GetDataGrantList(
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 ) (response.ListResult[model.DataGrant], error) {
-	if req == nil {
-		req = &request.DataGrantQueryReq{}
-	}
-	return queryDataPermissionConfig(
+	return getDataPermissionConfigList(
 		r.BasicRepositoryImpl,
 		ctx,
-		req.DataPermissionConfigQueryReq,
-		map[string]any{
-			"subject_type": optionalConfigString(req.SubjectType),
-			"subject_id":   optionalConfigInt(req.SubjectId),
-			"resource_id":  optionalConfigInt(req.ResourceId),
-			"operation":    optionalConfigString(req.Operation),
-			"policy_id":    optionalConfigInt(req.PolicyId),
-			"state":        optionalConfigBool(req.State),
-		},
+		basic,
 		table,
 		"sys_data_grant",
 		dataGrantQueryFields,
@@ -653,31 +432,23 @@ func (r *DataGrantRepositoryImpl) Query(
 	)
 }
 
-func (r *DataGrantRepositoryImpl) FindByIdForConfig(ctx *gin.Context, id int) (model.DataGrant, error) {
-	return findDataPermissionConfigById[model.DataGrant](r.db, ctx, id, dataGrantColumns)
-}
-
 func (r *DataGrantRepositoryImpl) FindByStableKey(
-	ctx *gin.Context,
+	ctx context.Context,
 	subjectType string,
 	subjectId int,
 	resourceId int,
 	operation string,
 	policyId int,
 ) (model.DataGrant, error) {
-	return findDataPermissionConfigOne[model.DataGrant](
-		r.db, ctx, dataGrantColumns,
-		"subject_type = ? AND subject_id = ? AND resource_id = ? AND operation = ? AND policy_id = ?",
-		subjectType, subjectId, resourceId, operation, policyId,
-	)
-}
-
-func (r *DataGrantRepositoryImpl) FindByIdsForConfig(ctx *gin.Context, ids []int) ([]model.DataGrant, error) {
-	return findDataPermissionConfigByIds[model.DataGrant](r.db, ctx, ids, dataGrantColumns)
-}
-
-func (r *DataGrantRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.DataGrant, error) {
-	return findDataPermissionConfigOneDB[model.DataGrant](db, dataGrantColumns, "id = ?", id)
+	var value model.DataGrant
+	err := r.DBWithContext(ctx).
+		Select(dataGrantColumns).
+		Where(
+			"subject_type = ? AND subject_id = ? AND resource_id = ? AND operation = ? AND policy_id = ?",
+			subjectType, subjectId, resourceId, operation, policyId,
+		).
+		First(&value).Error
+	return value, err
 }
 
 func (r *DataGrantRepositoryImpl) FindByStableKeyForConfigDB(
@@ -688,20 +459,20 @@ func (r *DataGrantRepositoryImpl) FindByStableKeyForConfigDB(
 	operation string,
 	policyId int,
 ) (model.DataGrant, error) {
-	return findDataPermissionConfigOneDB[model.DataGrant](
-		db,
-		dataGrantColumns,
+	var value model.DataGrant
+	err := db.Select(dataGrantColumns).Where(
 		"subject_type = ? AND subject_id = ? AND resource_id = ? AND operation = ? AND policy_id = ?",
 		subjectType,
 		subjectId,
 		resourceId,
 		operation,
 		policyId,
-	)
+	).First(&value).Error
+	return value, err
 }
 
 func (r *DataGrantRepositoryImpl) ListEffectiveBySubjects(
-	ctx *gin.Context,
+	ctx context.Context,
 	userId int,
 	roleIds []int,
 	resourceId int,
@@ -712,7 +483,7 @@ func (r *DataGrantRepositoryImpl) ListEffectiveBySubjects(
 	if userId <= 0 || resourceId <= 0 || operation == "" || asOf.IsZero() {
 		return values, nil
 	}
-	query := dataPermissionConfigDB(r.db, ctx).
+	query := r.DBWithContext(ctx).
 		Select(dataGrantColumns).
 		Where("resource_id = ? AND operation = ? AND state = ?", resourceId, operation, true)
 	if len(roleIds) == 0 {
@@ -736,15 +507,6 @@ func (r *DataGrantRepositoryImpl) ListEffectiveBySubjects(
 		Order("subject_type ASC, subject_id ASC, policy_id ASC, id ASC").
 		Find(&values).Error
 	return values, err
-}
-
-func (r *DataGrantRepositoryImpl) UpdateFieldsForConfig(
-	db *gorm.DB,
-	id int,
-	fields map[string]any,
-) (bool, error) {
-	result := db.Model(&model.DataGrant{}).Where("id = ?", id).Updates(fields)
-	return result.RowsAffected > 0, result.Error
 }
 
 func (r *DataGrantRepositoryImpl) ListByResourceForConfigDB(
@@ -807,24 +569,15 @@ func (r *DataGrantRepositoryImpl) CountByResourceOperationForConfig(
 	return count, err
 }
 
-func queryDataPermissionConfig[T any](
+func getDataPermissionConfigList[T any](
 	repo repository.BasicRepository[T],
-	ctx *gin.Context,
-	req request.DataPermissionConfigQueryReq,
-	typedFilters map[string]any,
+	ctx context.Context,
+	basic *request.Basic,
 	table model.SysTable,
 	tableCode string,
 	allowedFields map[string]struct{},
 	columns []string,
 ) (response.ListResult[T], error) {
-	basic := req.ToBasic()
-	basic.Filters = make(map[string]any, len(typedFilters))
-	for field, value := range typedFilters {
-		if value != nil {
-			basic.Filters[field] = value
-		}
-	}
-
 	readRepo := repo
 	if ctx != nil {
 		readRepo = readRepo.WithContext(ctx)
@@ -833,81 +586,11 @@ func queryDataPermissionConfig[T any](
 	total, err := readRepo.
 		WithSelect(columns...).
 		PaginateAndCountAsync(
-			&basic,
+			basic,
 			&rows,
 			dataPermissionConfigQueryTable(table, tableCode, allowedFields),
 		)
 	return response.ListResult[T]{Data: rows, Total: int(total)}, err
-}
-
-func findDataPermissionConfigById[T any](
-	db *gorm.DB,
-	ctx *gin.Context,
-	id int,
-	columns []string,
-) (T, error) {
-	return findDataPermissionConfigOne[T](db, ctx, columns, "id = ?", id)
-}
-
-func findDataPermissionConfigOne[T any](
-	db *gorm.DB,
-	ctx *gin.Context,
-	columns []string,
-	query string,
-	args ...any,
-) (T, error) {
-	return findDataPermissionConfigOneDB[T](
-		dataPermissionConfigDB(db, ctx),
-		columns,
-		query,
-		args...,
-	)
-}
-
-func findDataPermissionConfigOneDB[T any](
-	db *gorm.DB,
-	columns []string,
-	query string,
-	args ...any,
-) (T, error) {
-	var value T
-	err := db.
-		Select(columns).
-		Where(query, args...).
-		First(&value).Error
-	return value, err
-}
-
-func findDataPermissionConfigByIds[T any](
-	db *gorm.DB,
-	ctx *gin.Context,
-	ids []int,
-	columns []string,
-) ([]T, error) {
-	if len(ids) == 0 {
-		return []T{}, nil
-	}
-	values := make([]T, 0, len(ids))
-	err := dataPermissionConfigDB(db, ctx).
-		Select(columns).
-		Where("id IN ?", ids).
-		Order("id ASC").
-		Find(&values).Error
-	return values, err
-}
-
-func dataPermissionConfigDB(db *gorm.DB, ctx *gin.Context) *gorm.DB {
-	if ctx == nil {
-		return db
-	}
-	return db.WithContext(ctx)
-}
-
-func lowCodeRuntimeDB(db *gorm.DB, ctx *gin.Context) *gorm.DB {
-	if ctx == nil || ctx.Request == nil {
-		return db
-	}
-	return db.WithContext(ctx.Request.Context())
 }
 
 func dataPermissionConfigQueryTable(
@@ -931,27 +614,6 @@ func dataPermissionConfigQueryTable(
 	}
 	table.TableFields = fields
 	return table
-}
-
-func optionalConfigString(value string) any {
-	if value == "" {
-		return nil
-	}
-	return value
-}
-
-func optionalConfigInt(value *int) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func optionalConfigBool(value *bool) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }
 
 func dataPermissionConfigFieldSet(fields ...string) map[string]struct{} {

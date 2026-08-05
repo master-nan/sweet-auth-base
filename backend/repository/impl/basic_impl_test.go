@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -64,6 +65,43 @@ func TestBasicRepositoryFindByFieldScansIntoEntity(t *testing.T) {
 	}
 	if got.Id != 1 || got.Name != "alpha" {
 		t.Fatalf("unexpected entity: %+v", got)
+	}
+}
+
+func TestBasicRepositoryTransactionReadAndFieldUpdate(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:basic_repo_transaction_read?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err = db.AutoMigrate(&basicRepositoryFindByFieldFixture{}); err != nil {
+		t.Fatalf("migrate fixture: %v", err)
+	}
+	if err = db.Create(&basicRepositoryFindByFieldFixture{
+		Basic: model.Basic{Id: 1, State: true},
+		Name:  "alpha",
+	}).Error; err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	byID, err := repo.FindByIdWithDB(db, 1)
+	if err != nil || byID.Name != "alpha" {
+		t.Fatalf("find by ID with DB: value=%+v err=%v", byID, err)
+	}
+	byName, err := repo.FindByFieldWithDB(db, "name", "alpha")
+	if err != nil || byName.Id != 1 {
+		t.Fatalf("find by field with DB: value=%+v err=%v", byName, err)
+	}
+	updated, err := repo.UpdateFields(db, 1, map[string]any{"name": "beta"})
+	if err != nil || !updated {
+		t.Fatalf("update fields: updated=%v err=%v", updated, err)
+	}
+	if got, err := repo.FindById(1); err != nil || got.Name != "beta" {
+		t.Fatalf("find updated fixture: value=%+v err=%v", got, err)
+	}
+	var nilGinContext *gin.Context
+	if got, err := repo.WithContext(nilGinContext).FindById(1); err != nil || got.Name != "beta" {
+		t.Fatalf("typed nil context should be ignored: value=%+v err=%v", got, err)
 	}
 }
 

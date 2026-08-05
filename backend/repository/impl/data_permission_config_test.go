@@ -28,7 +28,7 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 	grantRepo := NewDataGrantRepositoryImpl(primaryDB)
 
 	t.Run("dimension", func(t *testing.T) {
-		result, err := dimensionRepo.Query(nil, &request.DataDimensionDefinitionQueryReq{
+		query := request.DataDimensionDefinitionQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{
 				Page: 1,
 				Num:  1,
@@ -46,7 +46,9 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 				},
 			},
 			Category: model.DataDimensionCategoryOrganization,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := dimensionRepo.GetDataDimensionDefinitionList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_dimension_definition",
 			map[string]enum.SysTableFieldType{
 				"code":     enum.VarcharFieldType,
@@ -63,15 +65,15 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 			result.Data[0].Description != "" {
 			t.Fatalf("unexpected dimension query result: %+v", result.Data[0])
 		}
-		stable, err := dimensionRepo.FindByCode(nil, fixtures.dimension.Code)
+		stable, err := dimensionRepo.FindByField("code", fixtures.dimension.Code)
 		if err != nil || stable.Id != fixtures.dimension.Id {
 			t.Fatalf("find dimension stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := dimensionRepo.FindByIdForConfig(nil, fixtures.dimension.Id)
+		byID, err := dimensionRepo.FindById(fixtures.dimension.Id)
 		if err != nil || byID.Code != fixtures.dimension.Code {
 			t.Fatalf("find dimension by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := dimensionRepo.FindByIdsForConfig(nil, []int{fixtures.dimension.Id, fixtures.employeeDimension.Id})
+		batch, err := dimensionRepo.FindListByFieldIn("id", []int{fixtures.dimension.Id, fixtures.employeeDimension.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch dimensions: values=%+v err=%v", batch, err)
 		}
@@ -79,11 +81,13 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 
 	t.Run("resource", func(t *testing.T) {
 		disabled := false
-		result, err := resourceRepo.Query(nil, &request.DataResourceQueryReq{
+		query := request.DataResourceQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			ResourceType:                 model.DataResourceTypeLowCodeTable,
 			PermissionEnabled:            &disabled,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := resourceRepo.GetDataResourceList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_resource",
 			map[string]enum.SysTableFieldType{
 				"resource_code":      enum.VarcharFieldType,
@@ -101,7 +105,7 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 			result.Data[0].Description != "" {
 			t.Fatalf("unexpected resource query result: %+v", result.Data[0])
 		}
-		stable, err := resourceRepo.FindByCode(nil, fixtures.resource.ResourceCode)
+		stable, err := resourceRepo.FindByField("resource_code", fixtures.resource.ResourceCode)
 		if err != nil || stable.Id != fixtures.resource.Id {
 			t.Fatalf("find resource stable key: value=%+v err=%v", stable, err)
 		}
@@ -109,11 +113,13 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 	})
 
 	t.Run("resource_operation", func(t *testing.T) {
-		result, err := operationRepo.Query(nil, &request.DataResourceOperationQueryReq{
+		query := request.DataResourceOperationQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			ResourceId:                   &fixtures.resource.Id,
 			Operation:                    model.DataPermissionOperationQuery,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := operationRepo.GetDataResourceOperationList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_resource_operation",
 			map[string]enum.SysTableFieldType{
 				"resource_id": enum.BigIntFieldType,
@@ -129,23 +135,25 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 		if err != nil || stable.Id != fixtures.operation.Id {
 			t.Fatalf("find operation stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := operationRepo.FindByIdForConfig(nil, fixtures.operation.Id)
+		byID, err := operationRepo.FindById(fixtures.operation.Id)
 		if err != nil || byID.Operation != fixtures.operation.Operation {
 			t.Fatalf("find operation by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := operationRepo.FindByIdsForConfig(nil, []int{fixtures.operation.Id, fixtures.detailOperation.Id})
+		batch, err := operationRepo.FindListByFieldIn("id", []int{fixtures.operation.Id, fixtures.detailOperation.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch operations: values=%+v err=%v", batch, err)
 		}
 	})
 
 	t.Run("ownership", func(t *testing.T) {
-		result, err := ownershipRepo.Query(nil, &request.DataOwnershipFieldQueryReq{
+		query := request.DataOwnershipFieldQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			ResourceId:                   &fixtures.resource.Id,
 			DimensionId:                  &fixtures.dimension.Id,
 			BindingType:                  model.DataOwnershipBindingTypeMetadataField,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := ownershipRepo.GetDataOwnershipFieldList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_ownership_field",
 			map[string]enum.SysTableFieldType{
 				"resource_id":    enum.BigIntFieldType,
@@ -163,21 +171,23 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 		if err != nil || stable.Id != fixtures.ownership.Id {
 			t.Fatalf("find ownership stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := ownershipRepo.FindByIdForConfig(nil, fixtures.ownership.Id)
+		byID, err := ownershipRepo.FindById(fixtures.ownership.Id)
 		if err != nil || byID.OwnershipCode != fixtures.ownership.OwnershipCode {
 			t.Fatalf("find ownership by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := ownershipRepo.FindByIdsForConfig(nil, []int{fixtures.ownership.Id, fixtures.secondOwnership.Id})
+		batch, err := ownershipRepo.FindListByFieldIn("id", []int{fixtures.ownership.Id, fixtures.secondOwnership.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch ownership fields: values=%+v err=%v", batch, err)
 		}
 	})
 
 	t.Run("policy", func(t *testing.T) {
-		result, err := policyRepo.Query(nil, &request.DataPolicyQueryReq{
+		query := request.DataPolicyQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			PolicyType:                   model.DataPolicyTypeRuleSet,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := policyRepo.GetDataPolicyList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_policy",
 			map[string]enum.SysTableFieldType{
 				"code":        enum.VarcharFieldType,
@@ -190,27 +200,29 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 			t.Fatalf("query policies: %v", err)
 		}
 		assertConfigPage(t, result.Total, len(result.Data), 1, 1)
-		stable, err := policyRepo.FindByCode(nil, fixtures.policy.Code)
+		stable, err := policyRepo.FindByField("code", fixtures.policy.Code)
 		if err != nil || stable.Id != fixtures.policy.Id {
 			t.Fatalf("find policy stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := policyRepo.FindByIdForConfig(nil, fixtures.policy.Id)
+		byID, err := policyRepo.FindById(fixtures.policy.Id)
 		if err != nil || byID.Code != fixtures.policy.Code {
 			t.Fatalf("find policy by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := policyRepo.FindByIdsForConfig(nil, []int{fixtures.policy.Id, fixtures.allPolicy.Id})
+		batch, err := policyRepo.FindListByFieldIn("id", []int{fixtures.policy.Id, fixtures.allPolicy.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch policies: values=%+v err=%v", batch, err)
 		}
 	})
 
 	t.Run("policy_rule", func(t *testing.T) {
-		result, err := ruleRepo.Query(nil, &request.DataPolicyRuleQueryReq{
+		query := request.DataPolicyRuleQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			PolicyId:                     &fixtures.policy.Id,
 			DimensionId:                  &fixtures.dimension.Id,
 			ScopeSource:                  model.DataPolicyScopeSourceEffectiveOrgUnits,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := ruleRepo.GetDataPolicyRuleList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_policy_rule",
 			map[string]enum.SysTableFieldType{
 				"policy_id":    enum.BigIntFieldType,
@@ -227,25 +239,27 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 		if err != nil || stable.Id != fixtures.rule.Id {
 			t.Fatalf("find rule stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := ruleRepo.FindByIdForConfig(nil, fixtures.rule.Id)
+		byID, err := ruleRepo.FindById(fixtures.rule.Id)
 		if err != nil || byID.Sequence != fixtures.rule.Sequence {
 			t.Fatalf("find rule by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := ruleRepo.FindByIdsForConfig(nil, []int{fixtures.rule.Id, fixtures.secondRule.Id})
+		batch, err := ruleRepo.FindListByFieldIn("id", []int{fixtures.rule.Id, fixtures.secondRule.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch policy rules: values=%+v err=%v", batch, err)
 		}
 	})
 
 	t.Run("grant", func(t *testing.T) {
-		result, err := grantRepo.Query(nil, &request.DataGrantQueryReq{
+		query := request.DataGrantQueryReq{
 			DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{Page: 1, Num: 1},
 			SubjectType:                  model.DataGrantSubjectTypeRole,
 			SubjectId:                    &fixtures.grant.SubjectId,
 			ResourceId:                   &fixtures.resource.Id,
 			Operation:                    model.DataPermissionOperationQuery,
 			PolicyId:                     &fixtures.policy.Id,
-		}, dataPermissionConfigTestTable(
+		}
+		basic := query.ToBasic()
+		result, err := grantRepo.GetDataGrantList(nil, &basic, dataPermissionConfigTestTable(
 			"sys_data_grant",
 			map[string]enum.SysTableFieldType{
 				"subject_type": enum.VarcharFieldType,
@@ -270,11 +284,11 @@ func TestDataPermissionConfigRepositoriesQueryAndStableKeys(t *testing.T) {
 		if err != nil || stable.Id != fixtures.grant.Id {
 			t.Fatalf("find grant stable key: value=%+v err=%v", stable, err)
 		}
-		byID, err := grantRepo.FindByIdForConfig(nil, fixtures.grant.Id)
+		byID, err := grantRepo.FindById(fixtures.grant.Id)
 		if err != nil || byID.SubjectId != fixtures.grant.SubjectId {
 			t.Fatalf("find grant by ID: value=%+v err=%v", byID, err)
 		}
-		batch, err := grantRepo.FindByIdsForConfig(nil, []int{fixtures.grant.Id, fixtures.secondGrant.Id})
+		batch, err := grantRepo.FindListByFieldIn("id", []int{fixtures.grant.Id, fixtures.secondGrant.Id})
 		if err != nil || len(batch) != 2 {
 			t.Fatalf("batch grants: values=%+v err=%v", batch, err)
 		}
@@ -306,7 +320,7 @@ func TestDataPermissionConfigRepositoryUsesControlledMetadataAndNoPreload(t *tes
 		},
 		"resource_code", "name", "description",
 	)
-	result, err := repo.Query(nil, &request.DataResourceQueryReq{
+	query := request.DataResourceQueryReq{
 		DataPermissionConfigQueryReq: request.DataPermissionConfigQueryReq{
 			Page: 1,
 			Num:  10,
@@ -314,7 +328,9 @@ func TestDataPermissionConfigRepositoryUsesControlledMetadataAndNoPreload(t *tes
 				Keyword: fixtures.resource.Description,
 			},
 		},
-	}, table)
+	}
+	basic := query.ToBasic()
+	result, err := repo.GetDataResourceList(nil, &basic, table)
 	if err != nil {
 		t.Fatalf("query controlled metadata: %v", err)
 	}
@@ -332,7 +348,7 @@ func TestDataPermissionConfigRepositoryPropagatesDatabaseError(t *testing.T) {
 	if err := db.Migrator().DropTable(&model.DataPolicy{}); err != nil {
 		t.Fatalf("drop policy table: %v", err)
 	}
-	if _, err := repo.FindByCode(nil, "missing"); err == nil {
+	if _, err := repo.FindByField("code", "missing"); err == nil {
 		t.Fatal("database error was swallowed")
 	}
 }
@@ -554,11 +570,11 @@ func assertResourceReadMethods(
 	fixtures dataPermissionConfigFixtures,
 ) {
 	t.Helper()
-	byID, err := repo.FindByIdForConfig(nil, fixtures.resource.Id)
+	byID, err := repo.FindById(fixtures.resource.Id)
 	if err != nil || byID.ResourceCode != fixtures.resource.ResourceCode {
 		t.Fatalf("find resource by ID: value=%+v err=%v", byID, err)
 	}
-	batch, err := repo.FindByIdsForConfig(nil, []int{fixtures.resource.Id, fixtures.serviceResource.Id})
+	batch, err := repo.FindListByFieldIn("id", []int{fixtures.resource.Id, fixtures.serviceResource.Id})
 	if err != nil || len(batch) != 2 {
 		t.Fatalf("batch resources: values=%+v err=%v", batch, err)
 	}

@@ -108,7 +108,7 @@ func (s *DataPolicyConfigService) CreatePolicy(
 
 	createdRules := make([]model.DataPolicyRule, 0, len(req.Rules))
 	err := RunInTransaction(ctx, s.policyRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		if _, err := s.policyRepo.FindByCodeForConfigDB(tx, policy.Code); err == nil {
+		if _, err := s.policyRepo.FindByFieldWithDB(tx, "code", policy.Code); err == nil {
 			return myerrors.ErrDataPolicyCodeDuplicate
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.WrapDatabaseError(err)
@@ -126,7 +126,7 @@ func (s *DataPolicyConfigService) CreatePolicy(
 			return myerrors.WrapDatabaseError(err)
 		}
 		if !policy.State {
-			if _, err = s.policyRepo.UpdateFieldsForConfig(tx, policy.Id, map[string]any{"state": false}); err != nil {
+			if _, err = s.policyRepo.UpdateFields(tx, policy.Id, map[string]any{"state": false}); err != nil {
 				return myerrors.WrapDatabaseError(err)
 			}
 		}
@@ -164,7 +164,7 @@ func (s *DataPolicyConfigService) GetPolicy(
 	if policyId <= 0 {
 		return response.DataPolicyDetailRes{}, myerrors.NewParameterError("policy_id必须大于0")
 	}
-	policy, err := s.policyRepo.FindByIdForConfig(ctx, policyId)
+	policy, err := s.policyRepo.WithContext(ctx).FindById(policyId)
 	if err != nil {
 		return response.DataPolicyDetailRes{}, mapDataPolicyReadError(err)
 	}
@@ -186,7 +186,8 @@ func (s *DataPolicyConfigService) PagePolicies(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.policyRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.policyRepo.GetDataPolicyList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -254,7 +255,7 @@ func (s *DataPolicyConfigService) UpdatePolicy(
 		if len(fields) == 0 {
 			return nil
 		}
-		changed, err := s.policyRepo.UpdateFieldsForConfig(tx, current.Id, fields)
+		changed, err := s.policyRepo.UpdateFields(tx, current.Id, fields)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -391,7 +392,7 @@ func (s *DataPolicyConfigService) GetPolicyRule(
 	if ruleId <= 0 {
 		return response.DataPolicyRuleDetailRes{}, myerrors.NewParameterError("rule_id必须大于0")
 	}
-	rule, err := s.ruleRepo.FindByIdForConfig(ctx, ruleId)
+	rule, err := s.ruleRepo.WithContext(ctx).FindById(ruleId)
 	if err != nil {
 		return response.DataPolicyRuleDetailRes{}, mapDataPolicyRuleReadError(err)
 	}
@@ -407,7 +408,8 @@ func (s *DataPolicyConfigService) PagePolicyRules(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.ruleRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.ruleRepo.GetDataPolicyRuleList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -423,7 +425,7 @@ func (s *DataPolicyConfigService) ListPolicyRules(
 	if policyId <= 0 {
 		return nil, myerrors.NewParameterError("policy_id必须大于0")
 	}
-	if _, err := s.policyRepo.FindByIdForConfig(ctx, policyId); err != nil {
+	if _, err := s.policyRepo.WithContext(ctx).FindById(policyId); err != nil {
 		return nil, mapDataPolicyReadError(err)
 	}
 	rules, err := s.ruleRepo.ListByPolicyForConfigDB(s.ruleRepo.DBWithContext(ctx), policyId)
@@ -441,14 +443,14 @@ func (s *DataPolicyConfigService) DisablePolicyRule(ctx *gin.Context, ruleId int
 		return myerrors.NewParameterError("rule_id必须大于0")
 	}
 	return RunInTransaction(ctx, s.ruleRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		rule, err := s.ruleRepo.FindByIdForConfigDB(tx, ruleId)
+		rule, err := s.ruleRepo.FindByIdWithDB(tx, ruleId)
 		if err != nil {
 			return mapDataPolicyRuleReadError(err)
 		}
 		if !rule.State {
 			return nil
 		}
-		changed, err := s.ruleRepo.UpdateFieldsForConfig(tx, rule.Id, map[string]any{"state": false})
+		changed, err := s.ruleRepo.UpdateFields(tx, rule.Id, map[string]any{"state": false})
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
@@ -509,7 +511,7 @@ func (s *DataPolicyConfigService) createRule(tx *gorm.DB, rule *model.DataPolicy
 		return myerrors.WrapDatabaseError(err)
 	}
 	if !rule.State {
-		if _, err = s.ruleRepo.UpdateFieldsForConfig(tx, rule.Id, map[string]any{"state": false}); err != nil {
+		if _, err = s.ruleRepo.UpdateFields(tx, rule.Id, map[string]any{"state": false}); err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
 	}
@@ -768,7 +770,7 @@ func (s *DataPolicyConfigService) findPolicyForUpdate(
 	tx *gorm.DB,
 	policyId int,
 ) (model.DataPolicy, error) {
-	policy, err := s.policyRepo.FindByIdForConfigDB(tx, policyId)
+	policy, err := s.policyRepo.FindByIdWithDB(tx, policyId)
 	if err != nil {
 		return model.DataPolicy{}, mapDataPolicyReadError(err)
 	}
@@ -793,7 +795,7 @@ func (s *DataPolicyConfigService) findActivePolicyDimension(
 	tx *gorm.DB,
 	dimensionId int,
 ) (model.DataDimensionDefinition, error) {
-	dimension, err := s.dimensionRepo.FindByIdForConfigDB(tx, dimensionId)
+	dimension, err := s.dimensionRepo.FindByIdWithDB(tx, dimensionId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.DataDimensionDefinition{}, myerrors.ErrDataDimensionNotFound
 	}
@@ -810,11 +812,11 @@ func (s *DataPolicyConfigService) policyRuleDetail(
 	ctx *gin.Context,
 	rule model.DataPolicyRule,
 ) (response.DataPolicyRuleDetailRes, error) {
-	policy, err := s.policyRepo.FindByIdForConfig(ctx, rule.PolicyId)
+	policy, err := s.policyRepo.WithContext(ctx).FindById(rule.PolicyId)
 	if err != nil {
 		return response.DataPolicyRuleDetailRes{}, mapDataPolicyReadError(err)
 	}
-	dimension, err := s.dimensionRepo.FindByIdForConfig(ctx, rule.DimensionId)
+	dimension, err := s.dimensionRepo.WithContext(ctx).FindById(rule.DimensionId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return response.DataPolicyRuleDetailRes{}, myerrors.ErrDataDimensionNotFound
 	}

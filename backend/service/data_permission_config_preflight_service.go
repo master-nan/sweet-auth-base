@@ -172,7 +172,7 @@ func (s *DataPermissionConfigPreflightService) EnableResources(
 				return validationErr
 			}
 			collector.merge(validation)
-			resource, findErr := s.validator.resourceRepo.FindByIdForConfigDB(tx, resourceId)
+			resource, findErr := s.validator.resourceRepo.FindByIdWithDB(tx, resourceId)
 			if findErr == nil {
 				resources = append(resources, resource)
 			} else if !errors.Is(findErr, gorm.ErrRecordNotFound) {
@@ -187,7 +187,7 @@ func (s *DataPermissionConfigPreflightService) EnableResources(
 			if resource.PermissionEnabled {
 				continue
 			}
-			changed, updateErr := s.validator.resourceRepo.UpdateFieldsForConfig(
+			changed, updateErr := s.validator.resourceRepo.UpdateFields(
 				tx,
 				resource.Id,
 				map[string]any{"permission_enabled": true},
@@ -233,14 +233,14 @@ func (s *DataPermissionConfigPreflightService) DisableResource(
 	}
 	result := validDataPermissionValidationResult()
 	err := RunInTransaction(ctx, s.validator.resourceRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		resource, findErr := s.validator.resourceRepo.FindByIdForConfigDB(tx, resourceId)
+		resource, findErr := s.validator.resourceRepo.FindByIdWithDB(tx, resourceId)
 		if findErr != nil {
 			return mapDataResourceReadError(findErr)
 		}
 		if !resource.PermissionEnabled {
 			return nil
 		}
-		changed, updateErr := s.validator.resourceRepo.UpdateFieldsForConfig(
+		changed, updateErr := s.validator.resourceRepo.UpdateFields(
 			tx,
 			resource.Id,
 			map[string]any{"permission_enabled": false},
@@ -311,7 +311,7 @@ func (s *DataPermissionConfigPreflightService) setPolicyState(
 	}
 	result := validDataPermissionValidationResult()
 	err := RunInTransaction(ctx, s.validator.policyRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		policy, findErr := s.validator.policyRepo.FindByIdForConfigDB(tx, policyId)
+		policy, findErr := s.validator.policyRepo.FindByIdWithDB(tx, policyId)
 		if findErr != nil {
 			return mapDataPolicyReadError(findErr)
 		}
@@ -327,7 +327,7 @@ func (s *DataPermissionConfigPreflightService) setPolicyState(
 		if policy.State == state {
 			return nil
 		}
-		changed, updateErr := s.validator.policyRepo.UpdateFieldsForConfig(
+		changed, updateErr := s.validator.policyRepo.UpdateFields(
 			tx,
 			policy.Id,
 			map[string]any{"state": state},
@@ -374,7 +374,7 @@ func (s *DataPermissionConfigPreflightService) setGrantState(
 	}
 	result := validDataPermissionValidationResult()
 	err := RunInTransaction(ctx, s.validator.grantRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		grant, findErr := s.validator.grantRepo.FindByIdForConfigDB(tx, grantId)
+		grant, findErr := s.validator.grantRepo.FindByIdWithDB(tx, grantId)
 		if findErr != nil {
 			return mapDataGrantReadError(findErr)
 		}
@@ -390,7 +390,7 @@ func (s *DataPermissionConfigPreflightService) setGrantState(
 		if grant.State == state {
 			return nil
 		}
-		changed, updateErr := s.validator.grantRepo.UpdateFieldsForConfig(
+		changed, updateErr := s.validator.grantRepo.UpdateFields(
 			tx,
 			grant.Id,
 			map[string]any{"state": state},
@@ -453,7 +453,7 @@ func (v dataPermissionConfigValidator) validateResource(
 	resourceId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	collector := newDataPermissionValidationCollector()
-	resource, err := v.resourceRepo.FindByIdForConfigDB(tx, resourceId)
+	resource, err := v.resourceRepo.FindByIdWithDB(tx, resourceId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector.add(
 			diagnosticResourceNotFound,
@@ -516,7 +516,7 @@ func (v dataPermissionConfigValidator) validatePolicy(
 	policyId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	collector := newDataPermissionValidationCollector()
-	policy, err := v.policyRepo.FindByIdForConfigDB(tx, policyId)
+	policy, err := v.policyRepo.FindByIdWithDB(tx, policyId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector.add(
 			diagnosticPolicyNotFound,
@@ -542,7 +542,7 @@ func (v dataPermissionConfigValidator) validatePolicy(
 		if !grant.State {
 			continue
 		}
-		resource, findErr := v.resourceRepo.FindByIdForConfigDB(tx, grant.ResourceId)
+		resource, findErr := v.resourceRepo.FindByIdWithDB(tx, grant.ResourceId)
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			collector.add(
 				diagnosticResourceNotFound,
@@ -574,7 +574,7 @@ func (v dataPermissionConfigValidator) validateGrant(
 	tx *gorm.DB,
 	grantId int,
 ) (response.DataPermissionValidationResultRes, error) {
-	grant, err := v.grantRepo.FindByIdForConfigDB(tx, grantId)
+	grant, err := v.grantRepo.FindByIdWithDB(tx, grantId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector := newDataPermissionValidationCollector()
 		collector.add(
@@ -627,7 +627,7 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 		)
 	}
 
-	resource, err := v.resourceRepo.FindByIdForConfigDB(tx, grant.ResourceId)
+	resource, err := v.resourceRepo.FindByIdWithDB(tx, grant.ResourceId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector.add(
 			diagnosticResourceNotFound,
@@ -672,7 +672,7 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 		)
 	}
 
-	policy, err := v.policyRepo.FindByIdForConfigDB(tx, grant.PolicyId)
+	policy, err := v.policyRepo.FindByIdWithDB(tx, grant.PolicyId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector.add(
 			diagnosticPolicyNotFound,
@@ -800,7 +800,7 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 		)
 	}
 
-	dimension, err := v.dimensionRepo.FindByIdForConfigDB(tx, rule.DimensionId)
+	dimension, err := v.dimensionRepo.FindByIdWithDB(tx, rule.DimensionId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		collector.add(
 			diagnosticDimensionNotFound,
@@ -940,7 +940,7 @@ func (v dataPermissionConfigValidator) validateRulesForResource(
 			)
 			continue
 		}
-		dimension, err := v.dimensionRepo.FindByIdForConfigDB(tx, rule.DimensionId)
+		dimension, err := v.dimensionRepo.FindByIdWithDB(tx, rule.DimensionId)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				continue

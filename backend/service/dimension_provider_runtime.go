@@ -54,7 +54,9 @@ func NewDimensionProviderRuntime(
 	organizationProvider OrgPermissionProvider,
 ) *DimensionProviderRuntime {
 	return newDimensionProviderRuntime(
-		dimensionRepo.FindByCode,
+		func(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
+			return dimensionRepo.WithContext(ctx).FindByField("code", code)
+		},
 		organizationProvider.GetEmployeeEffectiveOrganizationScope,
 		organizationProvider.GetOrgDescendants,
 	)

@@ -62,13 +62,27 @@ func NewDataPermissionPolicyResolver(
 	dimensionProvider DimensionProvider,
 ) *DataPermissionPolicyResolver {
 	return newDataPermissionPolicyResolver(
-		resourceRepo.FindByCode,
-		operationRepo.FindByStableKey,
-		grantRepo.ListEffectiveBySubjects,
-		policyRepo.FindByIdForConfig,
-		ruleRepo.ListByPolicy,
-		ownershipRepo.FindByStableKey,
-		dimensionRepo.FindByIdForConfig,
+		func(ctx *gin.Context, code string) (model.DataResource, error) {
+			return resourceRepo.WithContext(ctx).FindByField("resource_code", code)
+		},
+		func(ctx *gin.Context, resourceId int, operation string) (model.DataResourceOperation, error) {
+			return operationRepo.FindByStableKey(ctx, resourceId, operation)
+		},
+		func(ctx *gin.Context, userId int, roleIds []int, resourceId int, operation string, asOf time.Time) ([]model.DataGrant, error) {
+			return grantRepo.ListEffectiveBySubjects(ctx, userId, roleIds, resourceId, operation, asOf)
+		},
+		func(ctx *gin.Context, id int) (model.DataPolicy, error) {
+			return policyRepo.WithContext(ctx).FindById(id)
+		},
+		func(ctx *gin.Context, policyId int) ([]model.DataPolicyRule, error) {
+			return ruleRepo.ListByPolicy(ctx, policyId)
+		},
+		func(ctx *gin.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {
+			return ownershipRepo.FindByStableKey(ctx, resourceId, ownershipCode)
+		},
+		func(ctx *gin.Context, id int) (model.DataDimensionDefinition, error) {
+			return dimensionRepo.WithContext(ctx).FindById(id)
+		},
 		dimensionProvider.ResolveDimensionValues,
 	)
 }

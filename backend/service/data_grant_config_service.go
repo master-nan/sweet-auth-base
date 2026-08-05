@@ -101,7 +101,7 @@ func (s *DataGrantConfigService) GetGrant(
 	if grantId <= 0 {
 		return response.DataGrantDetailRes{}, myerrors.NewParameterError("grant_id必须大于0")
 	}
-	grant, err := s.grantRepo.FindByIdForConfig(ctx, grantId)
+	grant, err := s.grantRepo.WithContext(ctx).FindById(grantId)
 	if err != nil {
 		return response.DataGrantDetailRes{}, mapDataGrantReadError(err)
 	}
@@ -117,7 +117,8 @@ func (s *DataGrantConfigService) PageGrants(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.grantRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.grantRepo.GetDataGrantList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -152,7 +153,7 @@ func (s *DataGrantConfigService) SetGrantState(
 				return err
 			}
 		}
-		changed, err := s.grantRepo.UpdateFieldsForConfig(
+		changed, err := s.grantRepo.UpdateFields(
 			tx,
 			grant.Id,
 			map[string]any{"state": *req.State},
@@ -266,7 +267,7 @@ func (s *DataGrantConfigService) createGrants(
 				return myerrors.WrapDatabaseError(err)
 			}
 			if !grant.State {
-				if _, err = s.grantRepo.UpdateFieldsForConfig(
+				if _, err = s.grantRepo.UpdateFields(
 					tx,
 					grant.Id,
 					map[string]any{"state": false},
@@ -406,7 +407,7 @@ func (s *DataGrantConfigService) findGrantForUpdate(
 	tx *gorm.DB,
 	grantId int,
 ) (model.DataGrant, error) {
-	grant, err := s.grantRepo.FindByIdForConfigDB(tx, grantId)
+	grant, err := s.grantRepo.FindByIdWithDB(tx, grantId)
 	if err != nil {
 		return model.DataGrant{}, mapDataGrantReadError(err)
 	}
@@ -417,11 +418,11 @@ func (s *DataGrantConfigService) grantDetail(
 	ctx *gin.Context,
 	grant model.DataGrant,
 ) (response.DataGrantDetailRes, error) {
-	resource, err := s.resourceRepo.FindByIdForConfig(ctx, grant.ResourceId)
+	resource, err := s.resourceRepo.WithContext(ctx).FindById(grant.ResourceId)
 	if err != nil {
 		return response.DataGrantDetailRes{}, mapDataResourceReadError(err)
 	}
-	policy, err := s.policyRepo.FindByIdForConfig(ctx, grant.PolicyId)
+	policy, err := s.policyRepo.WithContext(ctx).FindById(grant.PolicyId)
 	if err != nil {
 		return response.DataGrantDetailRes{}, mapDataPolicyReadError(err)
 	}

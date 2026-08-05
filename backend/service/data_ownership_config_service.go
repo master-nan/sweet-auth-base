@@ -69,7 +69,8 @@ func (s *DataOwnershipConfigService) PageDimensions(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.dimensionRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.dimensionRepo.GetDataDimensionDefinitionList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -125,7 +126,7 @@ func (s *DataOwnershipConfigService) CreateOwnership(
 			return myerrors.WrapDatabaseError(err)
 		}
 		if !ownership.State {
-			if _, err = s.ownershipRepo.UpdateFieldsForConfig(
+			if _, err = s.ownershipRepo.UpdateFields(
 				tx,
 				ownership.Id,
 				map[string]any{"state": false},
@@ -160,7 +161,7 @@ func (s *DataOwnershipConfigService) GetOwnership(
 	if ownershipId <= 0 {
 		return response.DataOwnershipFieldDetailRes{}, myerrors.NewParameterError("ownership_id必须大于0")
 	}
-	ownership, err := s.ownershipRepo.FindByIdForConfig(ctx, ownershipId)
+	ownership, err := s.ownershipRepo.WithContext(ctx).FindById(ownershipId)
 	if err != nil {
 		return response.DataOwnershipFieldDetailRes{}, mapDataOwnershipReadError(err)
 	}
@@ -176,7 +177,8 @@ func (s *DataOwnershipConfigService) PageOwnerships(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.ownershipRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.ownershipRepo.GetDataOwnershipFieldList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -195,7 +197,7 @@ func (s *DataOwnershipConfigService) ListOwnershipsByResource(
 	if resourceId <= 0 {
 		return nil, myerrors.NewParameterError("resource_id必须大于0")
 	}
-	if _, err := s.resourceRepo.FindByIdForConfig(ctx, resourceId); err != nil {
+	if _, err := s.resourceRepo.WithContext(ctx).FindById(resourceId); err != nil {
 		return nil, mapDataResourceReadError(err)
 	}
 	rows, err := s.ownershipRepo.ListByResourceForConfigDB(
@@ -257,7 +259,7 @@ func (s *DataOwnershipConfigService) UpdateOwnership(
 				return err
 			}
 		}
-		changed, err := s.ownershipRepo.UpdateFieldsForConfig(
+		changed, err := s.ownershipRepo.UpdateFields(
 			tx,
 			current.Id,
 			map[string]any{"state": *req.State},
@@ -307,7 +309,7 @@ func (s *DataOwnershipConfigService) DisableOwnership(ctx *gin.Context, ownershi
 		if referenced {
 			return myerrors.ErrDataOwnershipReferenced
 		}
-		changed, err := s.ownershipRepo.UpdateFieldsForConfig(
+		changed, err := s.ownershipRepo.UpdateFields(
 			tx,
 			ownership.Id,
 			map[string]any{"state": false},
@@ -633,7 +635,7 @@ func (s *DataOwnershipConfigService) findConfigurableResource(
 	if resourceId <= 0 {
 		return model.DataResource{}, myerrors.NewParameterError("resource_id必须大于0")
 	}
-	resource, err := s.resourceRepo.FindByIdForConfigDB(tx, resourceId)
+	resource, err := s.resourceRepo.FindByIdWithDB(tx, resourceId)
 	if err != nil {
 		return model.DataResource{}, mapDataResourceReadError(err)
 	}
@@ -647,7 +649,7 @@ func (s *DataOwnershipConfigService) findActiveDimension(
 	tx *gorm.DB,
 	dimensionId int,
 ) (model.DataDimensionDefinition, error) {
-	dimension, err := s.dimensionRepo.FindByIdForConfigDB(tx, dimensionId)
+	dimension, err := s.dimensionRepo.FindByIdWithDB(tx, dimensionId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.DataDimensionDefinition{}, myerrors.ErrDataDimensionNotFound
 	}
@@ -664,7 +666,7 @@ func (s *DataOwnershipConfigService) findOwnershipForUpdate(
 	tx *gorm.DB,
 	ownershipId int,
 ) (model.DataOwnershipField, error) {
-	ownership, err := s.ownershipRepo.FindByIdForConfigDB(tx, ownershipId)
+	ownership, err := s.ownershipRepo.FindByIdWithDB(tx, ownershipId)
 	if err != nil {
 		return model.DataOwnershipField{}, mapDataOwnershipReadError(err)
 	}
@@ -694,11 +696,11 @@ func (s *DataOwnershipConfigService) ownershipDetail(
 	ctx *gin.Context,
 	ownership model.DataOwnershipField,
 ) (response.DataOwnershipFieldDetailRes, error) {
-	resource, err := s.resourceRepo.FindByIdForConfig(ctx, ownership.ResourceId)
+	resource, err := s.resourceRepo.WithContext(ctx).FindById(ownership.ResourceId)
 	if err != nil {
 		return response.DataOwnershipFieldDetailRes{}, mapDataResourceReadError(err)
 	}
-	dimension, err := s.dimensionRepo.FindByIdForConfig(ctx, ownership.DimensionId)
+	dimension, err := s.dimensionRepo.WithContext(ctx).FindById(ownership.DimensionId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return response.DataOwnershipFieldDetailRes{}, myerrors.ErrDataDimensionNotFound
 	}

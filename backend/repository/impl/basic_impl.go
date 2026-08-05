@@ -56,6 +56,9 @@ func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx context.Context, fn func(tx *gorm
 }
 
 func (b *BasicRepositoryImpl[T]) DBWithContext(ctx context.Context) *gorm.DB {
+	if isNilRepositoryContext(ctx) {
+		return b.db
+	}
 	return b.db.WithContext(ctx)
 }
 
@@ -176,6 +179,16 @@ func (b *BasicRepositoryImpl[T]) FindById(id int) (T, error) {
 	return entity, err
 }
 
+func (b *BasicRepositoryImpl[T]) FindByIdWithDB(db *gorm.DB, id int) (T, error) {
+	var entity T
+	query := b.applyReadOptions(db.Model(b.model))
+	if b.unscoped {
+		query = query.Unscoped()
+	}
+	err := query.First(&entity, id).Error
+	return entity, err
+}
+
 func (b *BasicRepositoryImpl[T]) FindByIdForUpdate(tx *gorm.DB, id int) (T, error) {
 	var entity T
 	query := b.applyReadOptions(tx.Model(b.model))
@@ -199,6 +212,19 @@ func (b *BasicRepositoryImpl[T]) FindByField(field string, value interface{}) (T
 		return entity, err
 	}
 	query := b.applyReadOptions(b.baseQuery())
+	err := query.Where(fmt.Sprintf("%s = ?", field), value).First(&entity).Error
+	return entity, err
+}
+
+func (b *BasicRepositoryImpl[T]) FindByFieldWithDB(db *gorm.DB, field string, value interface{}) (T, error) {
+	var entity T
+	if err := validateRepositoryField(field); err != nil {
+		return entity, err
+	}
+	query := b.applyReadOptions(db.Model(b.model))
+	if b.unscoped {
+		query = query.Unscoped()
+	}
 	err := query.Where(fmt.Sprintf("%s = ?", field), value).First(&entity).Error
 	return entity, err
 }
@@ -231,6 +257,15 @@ func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interfac
 	query := b.applyReadOptions(b.baseQuery())
 	err := query.Model(b.model).Where(fmt.Sprintf("%s IN ?", field), valueSlice).Find(&entities).Error
 	return entities, err
+}
+
+func (b *BasicRepositoryImpl[T]) UpdateFields(
+	tx *gorm.DB,
+	id int,
+	updates map[string]any,
+) (bool, error) {
+	result := tx.Model(b.model).Where("id = ?", id).Updates(updates)
+	return result.RowsAffected > 0, result.Error
 }
 
 func (b *BasicRepositoryImpl[T]) UpdateFieldsByRevision(
@@ -283,7 +318,10 @@ func (b *BasicRepositoryImpl[T]) WithOmit(omits ...string) repository.BasicRepos
 
 func (b *BasicRepositoryImpl[T]) WithContext(ctx context.Context) repository.BasicRepository[T] {
 	newImpl := b.clone()
-	newImpl.ctx = ctx
+	newImpl.ctx = nil
+	if !isNilRepositoryContext(ctx) {
+		newImpl.ctx = ctx
+	}
 	return newImpl
 }
 
@@ -346,4 +384,17 @@ func isRepositoryIdentifier(value string) bool {
 		return false
 	}
 	return true
+}
+
+func isNilRepositoryContext(ctx context.Context) bool {
+	if ctx == nil {
+		return true
+	}
+	value := reflect.ValueOf(ctx)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }

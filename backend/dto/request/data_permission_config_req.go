@@ -32,6 +32,7 @@ func (r DataPermissionConfigQueryReq) ToBasic() Basic {
 		Order:       r.Order,
 		Expressions: r.Expressions,
 		QuickQuery:  r.QuickQuery,
+		Filters:     make(map[string]any),
 	}
 }
 
@@ -54,11 +55,27 @@ type DataDimensionDefinitionQueryReq struct {
 	State     *bool  `form:"state" json:"state"`
 }
 
+func (r DataDimensionDefinitionQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "category", r.Category)
+	setDataPermissionFilter(basic.Filters, "value_type", r.ValueType)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
+}
+
 type DataResourceQueryReq struct {
 	DataPermissionConfigQueryReq
 	ResourceType      string `form:"resource_type" json:"resource_type" binding:"omitempty,oneof=low_code_table business_service report"`
 	PermissionEnabled *bool  `form:"permission_enabled" json:"permission_enabled"`
 	State             *bool  `form:"state" json:"state"`
+}
+
+func (r DataResourceQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "resource_type", r.ResourceType)
+	setDataPermissionFilter(basic.Filters, "permission_enabled", r.PermissionEnabled)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
 }
 
 type DataResourceOperationQueryReq struct {
@@ -67,6 +84,15 @@ type DataResourceOperationQueryReq struct {
 	Operation         string `form:"operation" json:"operation" binding:"omitempty,oneof=query detail create update delete export run"`
 	PermissionEnabled *bool  `form:"permission_enabled" json:"permission_enabled"`
 	State             *bool  `form:"state" json:"state"`
+}
+
+func (r DataResourceOperationQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "resource_id", r.ResourceId)
+	setDataPermissionFilter(basic.Filters, "operation", r.Operation)
+	setDataPermissionFilter(basic.Filters, "permission_enabled", r.PermissionEnabled)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
 }
 
 type DataResourceTargetReq struct {
@@ -119,6 +145,16 @@ type DataOwnershipFieldQueryReq struct {
 	State       *bool  `form:"state" json:"state"`
 }
 
+func (r DataOwnershipFieldQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "resource_id", r.ResourceId)
+	setDataPermissionFilter(basic.Filters, "dimension_id", r.DimensionId)
+	setDataPermissionFilter(basic.Filters, "binding_type", r.BindingType)
+	setDataPermissionFilter(basic.Filters, "value_type", r.ValueType)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
+}
+
 type DataOwnershipBindingTargetReq struct {
 	ReferenceId   *int    `form:"reference_id" json:"reference_id" binding:"omitempty,gt=0"`
 	ReferenceCode *string `form:"reference_code" json:"reference_code" binding:"omitempty,max=128"`
@@ -152,6 +188,13 @@ type DataPolicyQueryReq struct {
 	State      *bool  `form:"state" json:"state"`
 }
 
+func (r DataPolicyQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "policy_type", r.PolicyType)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
+}
+
 type DataPolicyCreateReq struct {
 	PolicyCode  string                        `form:"policy_code" json:"policy_code" binding:"required,max=128"`
 	Name        string                        `form:"name" json:"name" binding:"required,max=128"`
@@ -178,6 +221,18 @@ type DataPolicyRuleQueryReq struct {
 	Relation      string `form:"relation" json:"relation" binding:"omitempty,oneof=exact self_and_descendants"`
 	Operator      string `form:"operator" json:"operator" binding:"omitempty,oneof=eq in"`
 	State         *bool  `form:"state" json:"state"`
+}
+
+func (r DataPolicyRuleQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "policy_id", r.PolicyId)
+	setDataPermissionFilter(basic.Filters, "dimension_id", r.DimensionId)
+	setDataPermissionFilter(basic.Filters, "ownership_code", r.OwnershipCode)
+	setDataPermissionFilter(basic.Filters, "scope_source", r.ScopeSource)
+	setDataPermissionFilter(basic.Filters, "relation", r.Relation)
+	setDataPermissionFilter(basic.Filters, "operator", r.Operator)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
 }
 
 type DataPolicyRuleCreateItemReq struct {
@@ -211,6 +266,41 @@ type DataGrantQueryReq struct {
 	Operation   string `form:"operation" json:"operation" binding:"omitempty,oneof=query detail create update delete export run"`
 	PolicyId    *int   `form:"policy_id" json:"policy_id" binding:"omitempty,gt=0"`
 	State       *bool  `form:"state" json:"state"`
+}
+
+func (r DataGrantQueryReq) ToBasic() Basic {
+	basic := r.DataPermissionConfigQueryReq.ToBasic()
+	setDataPermissionFilter(basic.Filters, "subject_type", r.SubjectType)
+	setDataPermissionFilter(basic.Filters, "subject_id", r.SubjectId)
+	setDataPermissionFilter(basic.Filters, "resource_id", r.ResourceId)
+	setDataPermissionFilter(basic.Filters, "operation", r.Operation)
+	setDataPermissionFilter(basic.Filters, "policy_id", r.PolicyId)
+	setDataPermissionFilter(basic.Filters, "state", r.State)
+	return compactDataPermissionFilters(basic)
+}
+
+func compactDataPermissionFilters(basic Basic) Basic {
+	if len(basic.Filters) == 0 {
+		basic.Filters = nil
+	}
+	return basic
+}
+
+func setDataPermissionFilter(filters map[string]any, field string, value any) {
+	switch typed := value.(type) {
+	case string:
+		if typed != "" {
+			filters[field] = typed
+		}
+	case *int:
+		if typed != nil {
+			filters[field] = *typed
+		}
+	case *bool:
+		if typed != nil {
+			filters[field] = *typed
+		}
+	}
 }
 
 type DataGrantCreateReq struct {

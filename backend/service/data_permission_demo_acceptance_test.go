@@ -177,7 +177,9 @@ func newDataPermissionDemoAcceptanceService(
 	grantRepo := impl.NewDataGrantRepositoryImpl(primaryDB)
 
 	dimensionRuntime := newDimensionProviderRuntime(
-		dimensionRepo.FindByCode,
+		func(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
+			return dimensionRepo.WithContext(ctx).FindByField("code", code)
+		},
 		demoAcceptanceOrganizationScope,
 		demoAcceptanceOrganizationDescendants,
 	)
@@ -220,8 +222,12 @@ func newDataPermissionDemoAcceptanceService(
 		t.Fatalf("create Metadata Adapter: %v", err)
 	}
 	runtime := newLowCodeDataPermissionRuntime(
-		resourceRepo.ListByTableId,
-		ownershipRepo.ListByResource,
+		func(ctx *gin.Context, tableId int) ([]model.DataResource, error) {
+			return resourceRepo.ListByTableId(ctx, tableId)
+		},
+		func(ctx *gin.Context, resourceId int) ([]model.DataOwnershipField, error) {
+			return ownershipRepo.ListByResource(ctx, resourceId)
+		},
 		subjectBuilder.Build,
 		resolver.Resolve,
 		metadataAdapter.Apply,

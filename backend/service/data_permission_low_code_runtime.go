@@ -64,8 +64,12 @@ func NewLowCodeDataPermissionRuntime(
 	metadataAdapter *datapermission.MetadataFieldAdapter,
 ) *LowCodeDataPermissionRuntime {
 	return newLowCodeDataPermissionRuntime(
-		resourceRepo.ListByTableId,
-		ownershipRepo.ListByResource,
+		func(ctx *gin.Context, tableId int) ([]model.DataResource, error) {
+			return resourceRepo.ListByTableId(ctx, tableId)
+		},
+		func(ctx *gin.Context, resourceId int) ([]model.DataOwnershipField, error) {
+			return ownershipRepo.ListByResource(ctx, resourceId)
+		},
 		subjectBuilder.Build,
 		resolver.Resolve,
 		metadataAdapter.Apply,

@@ -37,11 +37,14 @@ type BasicRepository[T any] interface {
 	DeleteByIds(*gorm.DB, []int) error
 	DeleteByFieldIn(*gorm.DB, string, []interface{}) error
 	FindById(id int) (T, error)
+	FindByIdWithDB(*gorm.DB, int) (T, error)
 	FindByIdForUpdate(*gorm.DB, int) (T, error)
 	FindListById(id int) ([]T, error)
 	FindByField(field string, value interface{}) (T, error)
+	FindByFieldWithDB(*gorm.DB, string, interface{}) (T, error)
 	FindListByField(field string, value interface{}) ([]T, error)
 	FindListByFieldIn(field string, value interface{}) ([]T, error)
+	UpdateFields(*gorm.DB, int, map[string]any) (bool, error)
 	UpdateFieldsByRevision(*gorm.DB, int, int, map[string]any) (bool, error)
 	WithPreload(...string) BasicRepository[T]
 	WithUnscoped() BasicRepository[T]

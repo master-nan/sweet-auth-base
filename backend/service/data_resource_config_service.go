@@ -93,7 +93,7 @@ func (s *DataResourceConfigService) CreateResource(
 	}
 
 	err = RunInTransaction(ctx, s.resourceRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		if _, err := s.resourceRepo.FindByCodeForConfigDB(tx, resource.ResourceCode); err == nil {
+		if _, err := s.resourceRepo.FindByFieldWithDB(tx, "resource_code", resource.ResourceCode); err == nil {
 			return myerrors.ErrDataResourceCodeDuplicate
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.WrapDatabaseError(err)
@@ -111,7 +111,7 @@ func (s *DataResourceConfigService) CreateResource(
 			return myerrors.WrapDatabaseError(err)
 		}
 		if !resource.State {
-			if _, err = s.resourceRepo.UpdateFieldsForConfig(
+			if _, err = s.resourceRepo.UpdateFields(
 				tx,
 				resource.Id,
 				map[string]any{"state": false},
@@ -172,7 +172,7 @@ func (s *DataResourceConfigService) UpdateResource(
 			}
 		}
 		if len(fields) > 0 {
-			changed, err := s.resourceRepo.UpdateFieldsForConfig(tx, current.Id, fields)
+			changed, err := s.resourceRepo.UpdateFields(tx, current.Id, fields)
 			if err != nil {
 				return myerrors.WrapDatabaseError(err)
 			}
@@ -189,7 +189,7 @@ func (s *DataResourceConfigService) UpdateResource(
 				return myerrors.WrapDatabaseError(err)
 			}
 		}
-		updated, err = s.resourceRepo.FindByIdForConfigDB(tx, current.Id)
+		updated, err = s.resourceRepo.FindByIdWithDB(tx, current.Id)
 		if err != nil {
 			return mapDataResourceReadError(err)
 		}
@@ -212,7 +212,7 @@ func (s *DataResourceConfigService) GetResource(
 	if resourceId <= 0 {
 		return response.DataResourceDetailRes{}, myerrors.NewParameterError("resource_id必须大于0")
 	}
-	resource, err := s.resourceRepo.FindByIdForConfig(ctx, resourceId)
+	resource, err := s.resourceRepo.WithContext(ctx).FindById(resourceId)
 	if err != nil {
 		return response.DataResourceDetailRes{}, mapDataResourceReadError(err)
 	}
@@ -228,7 +228,8 @@ func (s *DataResourceConfigService) PageResources(
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
-	rows, err := s.resourceRepo.Query(ctx, &req, table)
+	basic := req.ToBasic()
+	rows, err := s.resourceRepo.GetDataResourceList(ctx, &basic, table)
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -252,7 +253,7 @@ func (s *DataResourceConfigService) DisableResource(ctx *gin.Context, resourceId
 		if err != nil {
 			return err
 		}
-		if _, err = s.resourceRepo.UpdateFieldsForConfig(
+		if _, err = s.resourceRepo.UpdateFields(
 			tx,
 			resourceId,
 			map[string]any{"state": false, "permission_enabled": false},
@@ -398,7 +399,7 @@ func (s *DataResourceConfigService) ReplaceResourceOperations(
 					"permission_enabled": false,
 					"description":        strings.TrimSpace(item.Description),
 				}
-				if _, err = s.operationRepo.UpdateFieldsForConfig(tx, current.Id, fields); err != nil {
+				if _, err = s.operationRepo.UpdateFields(tx, current.Id, fields); err != nil {
 					return myerrors.WrapDatabaseError(err)
 				}
 				continue
@@ -415,7 +416,7 @@ func (s *DataResourceConfigService) ReplaceResourceOperations(
 			if _, keep := requested[current.Operation]; keep {
 				continue
 			}
-			if _, err = s.operationRepo.UpdateFieldsForConfig(
+			if _, err = s.operationRepo.UpdateFields(
 				tx,
 				current.Id,
 				map[string]any{"state": false, "permission_enabled": false},
@@ -446,7 +447,7 @@ func (s *DataResourceConfigService) ListResourceOperations(
 	if resourceId <= 0 {
 		return nil, myerrors.NewParameterError("resource_id必须大于0")
 	}
-	if _, err := s.resourceRepo.FindByIdForConfig(ctx, resourceId); err != nil {
+	if _, err := s.resourceRepo.WithContext(ctx).FindById(resourceId); err != nil {
 		return nil, mapDataResourceReadError(err)
 	}
 	rows, err := s.operationRepo.ListByResourceForConfigDB(
@@ -482,7 +483,7 @@ func (s *DataResourceConfigService) DisableResourceOperation(
 		if err != nil {
 			return err
 		}
-		if _, err = s.operationRepo.UpdateFieldsForConfig(
+		if _, err = s.operationRepo.UpdateFields(
 			tx,
 			operation.Id,
 			map[string]any{"state": false, "permission_enabled": false},
@@ -807,7 +808,7 @@ func (s *DataResourceConfigService) createResourceOperations(
 			return myerrors.WrapDatabaseError(err)
 		}
 		if !operation.State {
-			if _, err = s.operationRepo.UpdateFieldsForConfig(
+			if _, err = s.operationRepo.UpdateFields(
 				tx,
 				operation.Id,
 				map[string]any{"state": false},
@@ -823,7 +824,7 @@ func (s *DataResourceConfigService) findResourceForUpdate(
 	tx *gorm.DB,
 	resourceId int,
 ) (model.DataResource, error) {
-	resource, err := s.resourceRepo.FindByIdForConfigDB(tx, resourceId)
+	resource, err := s.resourceRepo.FindByIdWithDB(tx, resourceId)
 	if err != nil {
 		return model.DataResource{}, mapDataResourceReadError(err)
 	}
@@ -851,7 +852,7 @@ func (s *DataResourceConfigService) findOperationForUpdate(
 	tx *gorm.DB,
 	operationId int,
 ) (model.DataResourceOperation, error) {
-	operation, err := s.operationRepo.FindByIdForConfigDB(tx, operationId)
+	operation, err := s.operationRepo.FindByIdWithDB(tx, operationId)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.DataResourceOperation{}, myerrors.ErrDataResourceOperationNotFound
 	}
