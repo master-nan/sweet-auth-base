@@ -956,6 +956,7 @@ async function unpublishMenu(id: number) {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
+    overflow: overlay;
   }
 
   :deep(.q-table__bottom) {
