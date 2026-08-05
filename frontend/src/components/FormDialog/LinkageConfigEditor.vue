@@ -333,4 +333,18 @@ watch([state, mappingRows], emitConfig, { deep: true })
   padding: 12px;
   background: #ffffff;
 }
+
+:global(body.body--dark) .linkage-editor {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #20283a;
+}
+
+:global(body.body--dark) .linkage-editor__body {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(body.body--dark) .mapping-box {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #1b2232;
+}
 </style>

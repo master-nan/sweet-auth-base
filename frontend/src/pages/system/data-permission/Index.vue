@@ -2,9 +2,9 @@
   <base-content class="q-pa-sm">
     <q-card class="fit column no-wrap" flat bordered>
       <q-card-section class="row items-center q-py-sm">
-        <q-avatar color="primary" text-color="white" icon="policy" rounded />
+        <q-avatar color="primary" text-color="white" icon="rule" rounded />
         <div class="q-ml-md">
-          <div class="text-h6">数据权限配置中心</div>
+          <div class="text-h6">数据权限</div>
           <div class="text-caption text-grey-7">
             维护资源、归属、策略与授权，不执行运行时数据过滤
           </div>

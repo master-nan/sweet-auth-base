@@ -197,7 +197,20 @@ func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
 	assertNoDuplicateGroups(t, db, "sys_role_menu", []string{"role_id", "menu_id"})
 	assertNoDuplicateGroups(t, db, "sys_role_menu_button", []string{"role_id", "menu_id", "button_id"})
 	assertNoDuplicateGroups(t, db, "casbin_rule", []string{"ptype", "v0", "v1", "v2"})
+	assertMenuTitle(t, db, "system_data_permission", "router.system.dataPermission")
+	assertMenuTitle(t, db, "report_v2_workbench", "router.report.workbench")
 	assertSeedUserMaintainedFieldsPreserved(t, db, whether.Id)
+}
+
+func assertMenuTitle(t *testing.T, db *gorm.DB, name string, expected string) {
+	t.Helper()
+	var menu model.SysMenu
+	if err := db.Where("name = ?", name).First(&menu).Error; err != nil {
+		t.Fatalf("query menu %s: %v", name, err)
+	}
+	if menu.Title != expected {
+		t.Fatalf("menu %s title = %q, want %q", name, menu.Title, expected)
+	}
 }
 
 func platformSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {

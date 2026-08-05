@@ -141,6 +141,16 @@ const ButtonStub = defineComponent({
   },
 })
 
+const AvatarStub = defineComponent({
+  name: 'QAvatar',
+  props: {
+    icon: { type: String, default: '' },
+  },
+  setup(props) {
+    return () => h('div', { 'data-testid': 'page-avatar', 'data-icon': props.icon })
+  },
+})
+
 const InputStub = defineComponent({
   name: 'QInput',
   props: {
@@ -213,7 +223,7 @@ const mountPage = () =>
         BaseContent: SlotStub,
         QCard: SlotStub,
         QCardSection: SlotStub,
-        QAvatar: true,
+        QAvatar: AvatarStub,
         QSpace: true,
         QSeparator: true,
         QTabs: SlotStub,
@@ -268,7 +278,8 @@ describe('Data permission configuration center', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('数据权限配置中心')
+    expect(wrapper.text()).toContain('数据权限')
+    expect(wrapper.find('[data-testid="page-avatar"]').attributes('data-icon')).toBe('rule')
     expect(wrapper.text()).toContain('数据资源')
     expect(wrapper.text()).toContain('归属定义')
     expect(wrapper.text()).toContain('权限策略')

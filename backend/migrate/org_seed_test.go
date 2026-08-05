@@ -318,7 +318,11 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 		title    string
 		sequence uint8
 	}{
-		"organization_structure": {title: "组织架构", sequence: 1},
+		"organization_structure":  {title: "router.organization.structure", sequence: 1},
+		"organization_employee":   {title: "router.organization.employee", sequence: 3},
+		"organization_position":   {title: "router.organization.position", sequence: 4},
+		"organization_sync_batch": {title: "router.organization.syncBatch", sequence: 5},
+		"organization_sync_error": {title: "router.organization.syncError", sequence: 6},
 	}
 	for name, expected := range expectedMenuPresentation {
 		var menu model.SysMenu
@@ -336,8 +340,8 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if err := db.Where("name = ?", organizationRootMenuName).First(&rootMenu).Error; err != nil {
 		t.Fatalf("query organization root menu: %v", err)
 	}
-	if rootMenu.Title != "组织管理" {
-		t.Fatalf("organization root title = %q, want 组织管理", rootMenu.Title)
+	if rootMenu.Title != "router.organization.default" {
+		t.Fatalf("organization root title = %q, want router.organization.default", rootMenu.Title)
 	}
 	if got := countWhere(t, db, &model.SysMenu{}, "name = ?", "organization_legal_entity"); got != 0 {
 		t.Fatalf("legacy legal entity menu count = %d, want 0", got)

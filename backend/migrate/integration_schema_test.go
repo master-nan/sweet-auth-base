@@ -83,6 +83,9 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if menu.TableCode != externalSystemTableCode || menu.Component != "pages/integration/external-system/Index.vue" {
 		t.Fatalf("unexpected external system menu: %+v", menu)
 	}
+	if menu.Title != "router.integration.externalSystem" {
+		t.Fatalf("external system menu title = %q", menu.Title)
+	}
 	var buttonCount int64
 	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", menu.Id).Count(&buttonCount).Error; err != nil {
 		t.Fatalf("count external system buttons: %v", err)
@@ -96,6 +99,16 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if interfaceMenu.TableCode != interfaceDefinitionTableCode || interfaceMenu.Component != "pages/integration/interface-definition/Index.vue" {
 		t.Fatalf("unexpected interface definition menu: %+v", interfaceMenu)
+	}
+	if interfaceMenu.Title != "router.integration.interfaceDefinition" {
+		t.Fatalf("interface definition menu title = %q", interfaceMenu.Title)
+	}
+	var rootMenu model.SysMenu
+	if err := db.Where("name = ?", "integration").First(&rootMenu).Error; err != nil {
+		t.Fatalf("load integration root menu: %v", err)
+	}
+	if rootMenu.Title != "router.integration.default" {
+		t.Fatalf("integration root menu title = %q", rootMenu.Title)
 	}
 	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", interfaceMenu.Id).Count(&buttonCount).Error; err != nil {
 		t.Fatalf("count interface definition buttons: %v", err)

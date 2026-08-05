@@ -23,21 +23,21 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	}
 	root, err := seedMenu(db, sf, directoryMenu(menu(
 		integrationMenuID, 0, "integration", "integration", "src/components/Layout/Layout.vue",
-		"集成中心", "hub", 5,
+		"router.integration.default", "hub", 5,
 	)))
 	if err != nil {
 		return err
 	}
 	child, err := seedMenu(db, sf, menuWithTable(menu(
 		externalSystemMenuID, root.Id, "integration_external_system", "external-system",
-		"pages/integration/external-system/Index.vue", "外部系统", "dns", 1,
+		"pages/integration/external-system/Index.vue", "router.integration.externalSystem", "dns", 1,
 	), externalSystemTableCode))
 	if err != nil {
 		return err
 	}
 	interfaceMenu, err := seedMenu(db, sf, menuWithTable(menu(
 		interfaceDefinitionMenuID, root.Id, "integration_interface_definition", "interface-definition",
-		"pages/integration/interface-definition/Index.vue", "接口定义", "api", 2,
+		"pages/integration/interface-definition/Index.vue", "router.integration.interfaceDefinition", "api", 2,
 	), interfaceDefinitionTableCode))
 	if err != nil {
 		return err

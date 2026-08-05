@@ -433,18 +433,18 @@ func seedOrganizationMenusAndPermissions(db *gorm.DB, sf *utils.Snowflake) error
 	root, err := seedMenu(
 		db,
 		sf,
-		directoryMenu(menu(1000, 0, organizationRootMenuName, "organization", "src/components/Layout/Layout.vue", "组织管理", "account_tree", 5)),
+		directoryMenu(menu(1000, 0, organizationRootMenuName, "organization", "src/components/Layout/Layout.vue", "router.organization.default", "account_tree", 5)),
 	)
 	if err != nil {
 		return err
 	}
 
 	menuSeeds := []model.SysMenu{
-		menuWithOption(menuWithTable(menu(1002, root.Id, "organization_structure", "structure", "pages/organization/structure/Index.vue", "组织架构", "lan", 1), "org_unit"), "org_structure,org_structure_node,org_unit,org_legal_entity"),
-		menuWithOption(menuWithTable(menu(1003, root.Id, "organization_employee", "employee", "pages/organization/employee/Index.vue", "人员与任职", "badge", 3), "org_employee"), "org_employee,org_assignment"),
-		menuWithTable(menu(1004, root.Id, "organization_position", "position", "pages/organization/position/Index.vue", "岗位", "work", 4), "org_position"),
-		menuWithOption(menuWithTable(menu(1005, root.Id, "organization_sync_batch", "sync-batch", "pages/organization/sync-batch/Index.vue", "同步批次", "sync", 5), "org_sync_batch"), "org_sync_batch,org_sync_record"),
-		menuWithTable(menu(1006, root.Id, "organization_sync_error", "sync-error", "pages/organization/sync-error/Index.vue", "同步异常", "error_outline", 6), "org_sync_record"),
+		menuWithOption(menuWithTable(menu(1002, root.Id, "organization_structure", "structure", "pages/organization/structure/Index.vue", "router.organization.structure", "lan", 1), "org_unit"), "org_structure,org_structure_node,org_unit,org_legal_entity"),
+		menuWithOption(menuWithTable(menu(1003, root.Id, "organization_employee", "employee", "pages/organization/employee/Index.vue", "router.organization.employee", "badge", 3), "org_employee"), "org_employee,org_assignment"),
+		menuWithTable(menu(1004, root.Id, "organization_position", "position", "pages/organization/position/Index.vue", "router.organization.position", "work", 4), "org_position"),
+		menuWithOption(menuWithTable(menu(1005, root.Id, "organization_sync_batch", "sync-batch", "pages/organization/sync-batch/Index.vue", "router.organization.syncBatch", "sync", 5), "org_sync_batch"), "org_sync_batch,org_sync_record"),
+		menuWithTable(menu(1006, root.Id, "organization_sync_error", "sync-error", "pages/organization/sync-error/Index.vue", "router.organization.syncError", "error_outline", 6), "org_sync_record"),
 	}
 
 	menuByName := map[string]model.SysMenu{root.Name: root}

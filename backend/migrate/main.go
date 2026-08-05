@@ -780,7 +780,7 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithTable(menu(203, 200, "system_menu", "menu", "pages/system/menu/Index.vue", "router.system.menu", "menu", 3), "sys_menu"),
 		menuWithTable(menu(204, 200, "system_role", "role", "pages/system/role/Index.vue", "router.system.role", "admin_panel_settings", 4), "sys_role"),
 		menuWithTable(menu(205, 200, "system_user", "user", "pages/system/user/Index.vue", "router.system.user", "person", 5), "sys_user"),
-		menu(207, 200, "system_data_permission", "data-permission", "pages/system/data-permission/Index.vue", "数据权限", "rule", 6),
+		menu(207, 200, "system_data_permission", "data-permission", "pages/system/data-permission/Index.vue", "router.system.dataPermission", "rule", 6),
 		menuWithTable(menu(206, 200, "system_audit", "audit", "pages/system/audit/Index.vue", "router.system.audit", "manage_search", 7), "access_log"),
 		directoryMenu(menu(300, 0, "develop", "develop", "src/components/Layout/Layout.vue", "router.develop.default", "developer_mode", 3)),
 		menu(301, 300, "develop_configure", "configure", "pages/develop/configure/Index.vue", "router.develop.configure", "tune", 1),
@@ -791,7 +791,7 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
 		menuWithTable(menu(902, 900, "report_manage", "manage", "pages/report/manage/Index.vue", "router.report.manage", "build", 2), "report_definition"),
 		reportDesignMenu,
-		menuWithTable(menu(904, 900, "report_v2_workbench", "report-v2/workbench", "pages/report-v2/workbench/ReportWorkbenchPage.vue", "报表工作台", "space_dashboard", 4), "report_definition"),
+		menuWithTable(menu(904, 900, "report_v2_workbench", "report-v2/workbench", "pages/report-v2/workbench/ReportWorkbenchPage.vue", "router.report.workbench", "space_dashboard", 4), "report_definition"),
 	}
 	menuByName := make(map[string]model.SysMenu, len(menus))
 	for _, item := range menus {
