@@ -119,4 +119,32 @@ withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; lo
     }
   }
 }
+
+:global(.body--dark) .toolbar-title {
+  color: #eef2ff;
+  border-color: rgba(148, 163, 184, 0.24);
+  background: #20283a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 8px 18px rgba(2, 6, 23, 0.16);
+
+  &:hover {
+    border-color: var(--app-primary-border);
+    background: #262e41;
+  }
+
+  .toolbar-title__logo {
+    color: #f8fafc;
+    background: linear-gradient(135deg, #2563eb, #14b8a6);
+    box-shadow: 0 8px 18px rgba(20, 184, 166, 0.14);
+  }
+
+  .toolbar-title__name {
+    color: #f8fafc;
+  }
+
+  .toolbar-title__subtitle {
+    color: #aeb8cc;
+  }
+}
 </style>

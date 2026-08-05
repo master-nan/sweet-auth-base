@@ -424,25 +424,6 @@ input[type='number']::-webkit-inner-spin-button {
     background: var(--app-primary-soft);
   }
 
-  .toolbar-title {
-    color: #eef2ff;
-    border-color: rgba(148, 163, 184, 0.24);
-    background: #20283a;
-  }
-
-  .toolbar-title:hover {
-    background: #262e41;
-    border-color: var(--app-primary-border);
-  }
-
-  .toolbar-title__name {
-    color: #f8fafc;
-  }
-
-  .toolbar-title__subtitle {
-    color: #aeb8cc;
-  }
-
   .base-menu-item,
   .base-menu-item .q-item {
     color: #dbe5f4 !important;
