@@ -302,3 +302,54 @@ yarn build
 当前实现已经具备可复用的 Runtime 技术基础，且主要安全组件和数据库原子原语通过了实际测试；本次发现的页面查询缺陷也已修复。然而管理状态 API、异步输入快照、配置上限、租约余量和 Attempt 权限边界仍会影响执行真实性、审计完整性或生产安全，不能作为非阻塞限制处理。
 
 因此本次不冻结 Integration Runtime 第一期。完成阻塞项后，应基于本报告场景重新执行 INT-003B-7，只有完整调用链、状态机唯一入口、输入可重建、权限边界和生产配置契约同时通过后，方可进入正式冻结。
+
+## 15. 阻塞项整改状态补充
+
+### 15.1 INT-003B-7A 状态机唯一入口
+
+2026-08-06 已完成本项整改：
+
+1. 管理 Router、Controller、Application Service 和请求 DTO 不再暴露 `start`、`complete`、`fail` 命令。
+2. 对应 `sys_menu_button`、角色按钮关联和 Casbin 路径由 Seed 幂等清理，不保留失效授权入口。
+3. 创建后的 Execution 保持 `created`；`created -> running` 仅由 Worker 领取原语在创建 running Attempt 的同一事务内完成。
+4. `running -> succeeded / failed / retry_waiting` 仅由 Engine 通过租约所有者、revision、running Attempt 和完成事务收敛。
+5. 管理端仅保留 `created`、`retry_waiting` 的取消命令；`running` 和终态均稳定拒绝。
+
+回归测试确认：旧状态路由不存在，无租约或 Attempt 不能完成 Execution，Engine 正常领取和完成路径保持通过。
+
+### 15.2 INT-003B-7A Attempt 权限边界
+
+Execution 详情响应已移除内嵌 Attempt 技术摘要，只保留 Execution 自身白名单字段与 `current_attempt`。Attempt 必须通过独立调用日志接口查询，并分别执行调用日志功能权限与 Data Permission `query/detail` 校验。
+
+前端仅在拥有 `integration_log_query` 时请求 Attempt 列表；仅在拥有 `integration_log_detail` 时提供详情入口。无调用日志权限时不发起 Attempt 请求，并显示中性权限提示。调用日志路由参数同样受详情按钮权限约束，不会先请求再根据 403 隐藏内容。
+
+### 15.3 本项实际验证
+
+```text
+cd backend && go test ./... -count=1
+结果：通过。
+
+go test -race ./controller ./service ./repository/impl ./internal/integration/... -count=1
+结果：Service、Repository、Integration Engine 通过；全量 Controller 仍命中第 11.2 节记录的既有 Organization/Gin 测试竞争。
+
+go test -race ./controller -run Integration -count=1
+结果：通过。
+
+cd frontend && yarn test
+结果：29 个测试文件、111 个测试通过。
+
+yarn lint
+yarn typecheck
+yarn build
+结果：全部通过；构建仅有既有产物体积提示。
+```
+
+### 15.4 验收结论保持
+
+本补充只关闭第 13.1 节中的第 1 项和第 5 项，不改变本报告“不通过”的正式结论。仍待独立 Task 完成：
+
+1. Execution 受控输入快照或受控引用。
+2. InterfaceDefinition 与 Transport 的超时、响应大小契约统一。
+3. 租约时长大于请求上限并包含完成余量的配置校验。
+
+全部阻塞项关闭后，由 INT-003B-7R 重新执行正式验收并决定是否冻结。

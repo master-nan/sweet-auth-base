@@ -92,14 +92,17 @@
       </template>
 
       <template #body-cell-execution_no="props">
-        <q-td :props="props"
-          ><q-btn
+        <q-td :props="props">
+          <q-btn
+            v-if="canViewDetail"
             flat
             dense
             color="primary"
             :label="props.row.execution_no"
             @click="openDetail(props.row)"
-        /></q-td>
+          />
+          <span v-else>{{ props.row.execution_no }}</span>
+        </q-td>
       </template>
       <template #body-cell-status="props">
         <q-td :props="props"
@@ -155,7 +158,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'integration_execution' })
 
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
@@ -169,6 +172,7 @@ import {
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useLoadingStore } from 'src/stores/loading'
+import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
@@ -177,9 +181,11 @@ import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 const $q = useQuasar()
 const router = useRouter()
 const api = useIntegrationApi()
+const userStore = useUserStore()
 const { loading } = storeToRefs(useLoadingStore())
 const { confirmAction } = useConfirmDialog($q)
 const { line_buttons, top_buttons } = usePageButtons('integration_execution')
+const canViewDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
 const rows = ref<IntegrationExecutionListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)

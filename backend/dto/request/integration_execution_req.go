@@ -114,18 +114,3 @@ type IntegrationExecutionCreateReq struct {
 type IntegrationExecutionStateReq struct {
 	Revision int `form:"revision" json:"revision" binding:"required,gt=0"`
 }
-
-type IntegrationExecutionCompleteReq struct {
-	Revision         int    `form:"revision" json:"revision" binding:"required,gt=0"`
-	ResultHTTPStatus *int   `form:"result_http_status" json:"result_http_status" binding:"omitempty,gte=100,lte=599"`
-	ResultSizeBytes  int64  `form:"result_size_bytes" json:"result_size_bytes" binding:"gte=0"`
-	ResultHash       string `form:"result_hash" json:"result_hash" binding:"omitempty,len=64,hexadecimal"`
-	ResultSummary    string `form:"result_summary" json:"result_summary" binding:"omitempty,max=1024"`
-}
-
-type IntegrationExecutionFailReq struct {
-	Revision      int    `form:"revision" json:"revision" binding:"required,gt=0"`
-	TargetStatus  string `form:"target_status" json:"target_status" binding:"required,oneof=failed retry_waiting"`
-	ErrorCategory string `form:"error_category" json:"error_category" binding:"required,oneof=configuration credential network timeout remote response business concurrency system"`
-	ResultSummary string `form:"result_summary" json:"result_summary" binding:"omitempty,max=1024"`
-}

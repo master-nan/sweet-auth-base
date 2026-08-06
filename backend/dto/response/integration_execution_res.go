@@ -35,24 +35,6 @@ type IntegrationExecutionListRes struct {
 	ErrorCategory  string                           `json:"error_category,omitempty"`
 }
 
-type IntegrationLogSummaryRes struct {
-	Id              int        `json:"id"`
-	AttemptNo       int        `json:"attempt_no"`
-	Status          string     `json:"status"`
-	StartedAt       time.Time  `json:"started_at"`
-	EndedAt         *time.Time `json:"ended_at,omitempty"`
-	DurationMs      int64      `json:"duration_ms"`
-	HTTPStatus      *int       `json:"http_status,omitempty"`
-	ErrorCategory   string     `json:"error_category,omitempty"`
-	ErrorCode       string     `json:"error_code,omitempty"`
-	ResultSummary   string     `json:"result_summary,omitempty"`
-	ResultSizeBytes int64      `json:"result_size_bytes"`
-	ResultHash      string     `json:"result_hash,omitempty"`
-	ResultCertainty string     `json:"result_certainty"`
-	RequestID       string     `json:"request_id,omitempty"`
-	TraceID         string     `json:"trace_id,omitempty"`
-}
-
 type IntegrationLogListRes struct {
 	Id              int        `json:"id"`
 	ExecutionNo     string     `json:"execution_no"`
@@ -132,18 +114,17 @@ func NewIntegrationLogDetailRes(value model.IntegrationLog) IntegrationLogDetail
 
 type IntegrationExecutionDetailRes struct {
 	IntegrationExecutionListRes
-	IdempotencyScope  string                     `json:"idempotency_scope"`
-	IdempotencyKey    string                     `json:"idempotency_key"`
-	InputHash         string                     `json:"input_hash"`
-	ResultHTTPStatus  *int                       `json:"result_http_status,omitempty"`
-	ResultSizeBytes   int64                      `json:"result_size_bytes"`
-	ResultHash        string                     `json:"result_hash,omitempty"`
-	ResultSummary     string                     `json:"result_summary,omitempty"`
-	LeaseOwnerSummary string                     `json:"lease_owner_summary,omitempty"`
-	LeaseExpiresAt    *time.Time                 `json:"lease_expires_at,omitempty"`
-	NextRunAt         *time.Time                 `json:"next_run_at,omitempty"`
-	CancelledAt       *time.Time                 `json:"cancelled_at,omitempty"`
-	Attempts          []IntegrationLogSummaryRes `json:"attempts"`
+	IdempotencyScope  string     `json:"idempotency_scope"`
+	IdempotencyKey    string     `json:"idempotency_key"`
+	InputHash         string     `json:"input_hash"`
+	ResultHTTPStatus  *int       `json:"result_http_status,omitempty"`
+	ResultSizeBytes   int64      `json:"result_size_bytes"`
+	ResultHash        string     `json:"result_hash,omitempty"`
+	ResultSummary     string     `json:"result_summary,omitempty"`
+	LeaseOwnerSummary string     `json:"lease_owner_summary,omitempty"`
+	LeaseExpiresAt    *time.Time `json:"lease_expires_at,omitempty"`
+	NextRunAt         *time.Time `json:"next_run_at,omitempty"`
+	CancelledAt       *time.Time `json:"cancelled_at,omitempty"`
 }
 
 func NewIntegrationExecutionListRes(value model.IntegrationExecution) IntegrationExecutionListRes {
@@ -163,24 +144,7 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 	}
 }
 
-func NewIntegrationLogSummaryRes(value model.IntegrationLog) IntegrationLogSummaryRes {
-	return IntegrationLogSummaryRes{
-		Id: value.Id, AttemptNo: value.AttemptNo, Status: value.Status, StartedAt: value.StartedAt,
-		EndedAt: value.EndedAt, DurationMs: value.DurationMs, HTTPStatus: value.HTTPStatus,
-		ErrorCategory: value.ErrorCategory, ErrorCode: value.ErrorCode, ResultSummary: value.ResultSummary,
-		ResultSizeBytes: value.ResultSizeBytes, ResultHash: value.ResultHash,
-		ResultCertainty: value.ResultCertainty, RequestID: value.RequestID, TraceID: value.TraceID,
-	}
-}
-
-func NewIntegrationExecutionDetailRes(
-	value model.IntegrationExecution,
-	logs []model.IntegrationLog,
-) IntegrationExecutionDetailRes {
-	attempts := make([]IntegrationLogSummaryRes, 0, len(logs))
-	for _, log := range logs {
-		attempts = append(attempts, NewIntegrationLogSummaryRes(log))
-	}
+func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) IntegrationExecutionDetailRes {
 	return IntegrationExecutionDetailRes{
 		IntegrationExecutionListRes: NewIntegrationExecutionListRes(value),
 		IdempotencyScope:            value.IdempotencyScope, IdempotencyKey: integrationIdentifierSummary(value.IdempotencyKey),
@@ -188,6 +152,6 @@ func NewIntegrationExecutionDetailRes(
 		ResultSizeBytes: value.ResultSizeBytes, ResultHash: value.ResultHash,
 		ResultSummary:     value.ResultSummary,
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
-		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt, Attempts: attempts,
+		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt,
 	}
 }

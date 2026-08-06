@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/enum"
 	"backend/internal/utils"
 	"backend/model"
 	"testing"
@@ -123,6 +124,31 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if rootMenu.Title != "router.integration.default" {
 		t.Fatalf("integration root menu title = %q", rootMenu.Title)
 	}
+	var role model.SysRole
+	if err := db.Where("name = ?", "super_admin").First(&role).Error; err != nil {
+		t.Fatalf("load integration seed role: %v", err)
+	}
+	legacyButtons := []model.SysMenuButton{
+		apiPermissionWithAPI(12304, rootMenu.Id, "启动执行", "integration_execution_start", enum.Top, "start", "play_arrow", "primary", 121, "/admin/integration/execution/:id/start", "PUT"),
+		apiPermissionWithAPI(12305, rootMenu.Id, "完成执行", "integration_execution_complete", enum.Top, "complete", "done", "positive", 122, "/admin/integration/execution/:id/complete", "PUT"),
+		apiPermissionWithAPI(12306, rootMenu.Id, "执行失败", "integration_execution_fail", enum.Top, "fail", "error", "negative", 123, "/admin/integration/execution/:id/fail", "PUT"),
+	}
+	if err := seedMenuButtons(db, sf, role.Id, role.Name, legacyButtons); err != nil {
+		t.Fatalf("prepare legacy execution permissions: %v", err)
+	}
+	crossMenuButton := apiPermissionWithAPI(
+		22304, menu.Id, "同编码非集成命令", "integration_execution_start", enum.Top,
+		"custom", "play_arrow", "primary", 200, "/admin/custom/integration-start", "POST",
+	)
+	if err := seedMenuButtons(db, sf, role.Id, role.Name, []model.SysMenuButton{crossMenuButton}); err != nil {
+		t.Fatalf("prepare cross-menu permission fixture: %v", err)
+	}
+	if err := seedIntegrationConfigurationFoundation(db, sf); err != nil {
+		t.Fatalf("clean legacy execution permissions: %v", err)
+	}
+	if err := seedIntegrationConfigurationFoundation(db, sf); err != nil {
+		t.Fatalf("repeat legacy execution permission cleanup: %v", err)
+	}
 	var executionMenu model.SysMenu
 	if err := db.Where("name = ?", "integration_execution").First(&executionMenu).Error; err != nil {
 		t.Fatalf("load execution menu: %v", err)
@@ -143,8 +169,48 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 		Count(&executionCasbinCount).Error; err != nil {
 		t.Fatalf("count execution Casbin policies: %v", err)
 	}
-	if executionCasbinCount != 7 {
-		t.Fatalf("execution Casbin policy count = %d, want 7", executionCasbinCount)
+	if executionCasbinCount != 4 {
+		t.Fatalf("execution Casbin policy count = %d, want 4", executionCasbinCount)
+	}
+	var deprecatedButtonCount int64
+	deprecatedCodes := []string{"integration_execution_start", "integration_execution_complete", "integration_execution_fail"}
+	if err := db.Unscoped().Model(&model.SysMenuButton{}).
+		Where("menu_id = ? AND code IN ?", rootMenu.Id, deprecatedCodes).
+		Count(&deprecatedButtonCount).Error; err != nil {
+		t.Fatalf("count deprecated execution permissions: %v", err)
+	}
+	if deprecatedButtonCount != 0 {
+		t.Fatalf("deprecated execution permission count = %d, want 0", deprecatedButtonCount)
+	}
+	var preservedCrossMenuButtonCount int64
+	if err := db.Model(&model.SysMenuButton{}).
+		Where("menu_id = ? AND code = ? AND path = ?", menu.Id, crossMenuButton.Code, crossMenuButton.Path).
+		Count(&preservedCrossMenuButtonCount).Error; err != nil {
+		t.Fatalf("count preserved cross-menu permission: %v", err)
+	}
+	if preservedCrossMenuButtonCount != 1 {
+		t.Fatalf("preserved cross-menu permission count = %d, want 1", preservedCrossMenuButtonCount)
+	}
+	var deprecatedRoleButtonCount int64
+	if err := db.Model(&model.SysRoleMenuButton{}).
+		Where("button_id IN ?", []int{12304, 12305, 12306}).
+		Count(&deprecatedRoleButtonCount).Error; err != nil {
+		t.Fatalf("count deprecated role execution permissions: %v", err)
+	}
+	if deprecatedRoleButtonCount != 0 {
+		t.Fatalf("deprecated role execution permission count = %d, want 0", deprecatedRoleButtonCount)
+	}
+	var deprecatedCasbinCount int64
+	deprecatedPaths := []string{
+		"/admin/integration/execution/:id/start",
+		"/admin/integration/execution/:id/complete",
+		"/admin/integration/execution/:id/fail",
+	}
+	if err := db.Model(&model.CasbinRule{}).Where("v1 IN ?", deprecatedPaths).Count(&deprecatedCasbinCount).Error; err != nil {
+		t.Fatalf("count deprecated execution Casbin policies: %v", err)
+	}
+	if deprecatedCasbinCount != 0 {
+		t.Fatalf("deprecated execution Casbin policy count = %d, want 0", deprecatedCasbinCount)
 	}
 	var logMenu model.SysMenu
 	if err := db.Where("name = ?", "integration_log").First(&logMenu).Error; err != nil {

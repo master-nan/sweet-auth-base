@@ -18,12 +18,7 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 		InputHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		StartedAt: &startedAt, Revision: 2,
 	}
-	log := model.IntegrationLog{
-		Basic: model.Basic{Id: 2, State: true}, ExecutionID: value.Id, AttemptNo: 1,
-		Status: model.IntegrationLogStatusRunning, StartedAt: startedAt,
-		ResultCertainty: model.IntegrationResultCertaintyUnknown, RequestID: "request-id", TraceID: "trace-id",
-	}
-	payload, err := json.Marshal(NewIntegrationExecutionDetailRes(value, []model.IntegrationLog{log}))
+	payload, err := json.Marshal(NewIntegrationExecutionDetailRes(value))
 	if err != nil {
 		t.Fatalf("marshal execution response: %v", err)
 	}
@@ -31,12 +26,13 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 	for _, forbidden := range []string{
 		"gmt_delete", "create_user", "modify_user", "delete_user", "authorization",
 		"secret", "ciphertext", "nonce", "payload", "external_system_id\"", "interface_definition_id\"",
+		"attempts", "http_status", "result_certainty", "request_id", "trace_id",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("response leaked %q: %s", forbidden, payload)
 		}
 	}
-	for _, required := range []string{"execution_no", "external_system", "interface", "attempts", "input_hash"} {
+	for _, required := range []string{"execution_no", "external_system", "interface", "current_attempt", "input_hash"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("response missing %q: %s", required, payload)
 		}

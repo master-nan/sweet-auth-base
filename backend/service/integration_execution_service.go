@@ -28,9 +28,6 @@ var (
 const (
 	integrationExecutionAuditResourceType = "integration_execution"
 	integrationExecutionAuditCreate       = "integration.execution.create"
-	integrationExecutionAuditStart        = "integration.execution.start"
-	integrationExecutionAuditComplete     = "integration.execution.complete"
-	integrationExecutionAuditFail         = "integration.execution.fail"
 	integrationExecutionAuditCancel       = "integration.execution.cancel"
 )
 
@@ -134,7 +131,7 @@ func (s *IntegrationExecutionService) CreateExecution(
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, err
 	}
-	return response.NewIntegrationExecutionDetailRes(value, nil), nil
+	return response.NewIntegrationExecutionDetailRes(value), nil
 }
 
 func (s *IntegrationExecutionService) GetExecution(
@@ -142,8 +139,6 @@ func (s *IntegrationExecutionService) GetExecution(
 	id int,
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
-	logTable model.SysTable,
-	logPermission repository.GeneralizationPermission,
 ) (response.IntegrationExecutionDetailRes, error) {
 	value, err := s.executions.FindByIDWithPermission(ctx, id, table, permission)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,11 +147,7 @@ func (s *IntegrationExecutionService) GetExecution(
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, integrationExecutionReadError(err)
 	}
-	logs, err := s.logs.ListByExecutionIDWithPermission(ctx, value.Id, logTable, logPermission)
-	if err != nil {
-		return response.IntegrationExecutionDetailRes{}, myerrors.WrapDatabaseError(err)
-	}
-	return response.NewIntegrationExecutionDetailRes(value, logs), nil
+	return response.NewIntegrationExecutionDetailRes(value), nil
 }
 
 func (s *IntegrationExecutionService) GetLog(
@@ -216,86 +207,10 @@ func (s *IntegrationExecutionService) PageExecution(
 	return response.ListResult[response.IntegrationExecutionListRes]{Data: items, Total: result.Total}, nil
 }
 
-func (s *IntegrationExecutionService) StartExecution(
-	ctx context.Context,
-	id int,
-	revision int,
-) (response.IntegrationExecutionDetailRes, error) {
-	now := s.now()
-	return s.transitionExecution(ctx, id, revision, model.IntegrationExecutionStatusRunning,
-		[]string{model.IntegrationExecutionStatusCreated, model.IntegrationExecutionStatusRetryWaiting},
-		map[string]any{"started_at": now, "next_run_at": nil}, integrationExecutionAuditStart)
-}
-
-func (s *IntegrationExecutionService) CompleteExecution(
-	ctx context.Context,
-	id int,
-	req request.IntegrationExecutionCompleteReq,
-) (response.IntegrationExecutionDetailRes, error) {
-	req.ResultHash = strings.ToLower(strings.TrimSpace(req.ResultHash))
-	req.ResultSummary = strings.TrimSpace(req.ResultSummary)
-	if req.ResultSizeBytes < 0 || !validIntegrationHTTPStatus(req.ResultHTTPStatus) ||
-		(req.ResultHash != "" && !integrationInputHashPattern.MatchString(req.ResultHash)) || len(req.ResultSummary) > 1024 {
-		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
-	}
-	now := s.now()
-	return s.transitionExecution(ctx, id, req.Revision, model.IntegrationExecutionStatusSucceeded,
-		[]string{model.IntegrationExecutionStatusRunning}, map[string]any{
-			"result_http_status": req.ResultHTTPStatus,
-			"result_size_bytes":  req.ResultSizeBytes,
-			"result_hash":        req.ResultHash,
-			"result_summary":     req.ResultSummary,
-			"error_category":     "",
-			"completed_at":       now,
-			"next_run_at":        nil,
-		}, integrationExecutionAuditComplete)
-}
-
-func (s *IntegrationExecutionService) FailExecution(
-	ctx context.Context,
-	id int,
-	req request.IntegrationExecutionFailReq,
-) (response.IntegrationExecutionDetailRes, error) {
-	req.TargetStatus = strings.TrimSpace(req.TargetStatus)
-	req.ErrorCategory = strings.TrimSpace(req.ErrorCategory)
-	req.ResultSummary = strings.TrimSpace(req.ResultSummary)
-	if !validIntegrationFailureTarget(req.TargetStatus) || !validIntegrationErrorCategory(req.ErrorCategory) || len(req.ResultSummary) > 1024 {
-		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
-	}
-	sources := []string{model.IntegrationExecutionStatusRunning}
-	updates := map[string]any{
-		"error_category": req.ErrorCategory,
-		"result_summary": req.ResultSummary,
-	}
-	if req.TargetStatus == model.IntegrationExecutionStatusFailed {
-		sources = append(sources, model.IntegrationExecutionStatusRetryWaiting)
-		updates["completed_at"] = s.now()
-		updates["next_run_at"] = nil
-	} else {
-		updates["completed_at"] = nil
-	}
-	return s.transitionExecution(ctx, id, req.Revision, req.TargetStatus, sources, updates, integrationExecutionAuditFail)
-}
-
 func (s *IntegrationExecutionService) CancelExecution(
 	ctx context.Context,
 	id int,
 	revision int,
-) (response.IntegrationExecutionDetailRes, error) {
-	now := s.now()
-	return s.transitionExecution(ctx, id, revision, model.IntegrationExecutionStatusCancelled,
-		[]string{model.IntegrationExecutionStatusCreated, model.IntegrationExecutionStatusRetryWaiting},
-		map[string]any{"cancelled_at": now, "completed_at": now, "next_run_at": nil}, integrationExecutionAuditCancel)
-}
-
-func (s *IntegrationExecutionService) transitionExecution(
-	ctx context.Context,
-	id int,
-	revision int,
-	target string,
-	commandSources []string,
-	updates map[string]any,
-	action string,
 ) (response.IntegrationExecutionDetailRes, error) {
 	if id <= 0 || revision <= 0 {
 		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
@@ -312,19 +227,18 @@ func (s *IntegrationExecutionService) transitionExecution(
 		if current.Revision != revision {
 			return myerrors.ErrIntegrationExecutionRevisionConflict
 		}
-		if !containsIntegrationExecutionStatus(commandSources, current.Status) ||
-			!allowedIntegrationExecutionTransition(current.Status, target) {
+		if current.Status != model.IntegrationExecutionStatusCreated &&
+			current.Status != model.IntegrationExecutionStatusRetryWaiting {
 			return myerrors.ErrIntegrationExecutionStatusInvalid
 		}
-		if target == model.IntegrationExecutionStatusRunning && current.StartedAt != nil {
-			delete(updates, "started_at")
+		now := s.now()
+		updates := map[string]any{
+			"status":       model.IntegrationExecutionStatusCancelled,
+			"cancelled_at": now,
+			"completed_at": now,
+			"next_run_at":  nil,
+			"revision":     current.Revision + 1,
 		}
-
-		if updates == nil {
-			updates = make(map[string]any)
-		}
-		updates["status"] = target
-		updates["revision"] = current.Revision + 1
 		updated, err := s.executions.UpdateFieldsByRevision(tx, current.Id, revision, updates)
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
@@ -336,51 +250,12 @@ func (s *IntegrationExecutionService) transitionExecution(
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
-		return s.writeAudit(ctx, tx, action, value, current.Status, value.Status)
+		return s.writeAudit(ctx, tx, integrationExecutionAuditCancel, value, current.Status, value.Status)
 	})
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, err
 	}
-	logs, err := s.logs.ListByExecutionID(ctx, value.Id)
-	if err != nil {
-		return response.IntegrationExecutionDetailRes{}, myerrors.WrapDatabaseError(err)
-	}
-	return response.NewIntegrationExecutionDetailRes(value, logs), nil
-}
-
-func allowedIntegrationExecutionTransition(from string, to string) bool {
-	switch from {
-	case model.IntegrationExecutionStatusCreated:
-		return to == model.IntegrationExecutionStatusRunning || to == model.IntegrationExecutionStatusCancelled
-	case model.IntegrationExecutionStatusRunning:
-		return to == model.IntegrationExecutionStatusSucceeded ||
-			to == model.IntegrationExecutionStatusFailed ||
-			to == model.IntegrationExecutionStatusRetryWaiting ||
-			to == model.IntegrationExecutionStatusCancelled
-	case model.IntegrationExecutionStatusRetryWaiting:
-		return to == model.IntegrationExecutionStatusRunning ||
-			to == model.IntegrationExecutionStatusFailed ||
-			to == model.IntegrationExecutionStatusCancelled
-	default:
-		return false
-	}
-}
-
-func containsIntegrationExecutionStatus(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func validIntegrationFailureTarget(value string) bool {
-	return value == model.IntegrationExecutionStatusFailed || value == model.IntegrationExecutionStatusRetryWaiting
-}
-
-func validIntegrationHTTPStatus(value *int) bool {
-	return value == nil || (*value >= 100 && *value <= 599)
+	return response.NewIntegrationExecutionDetailRes(value), nil
 }
 
 func integrationExecutionReadError(err error) error {
@@ -388,23 +263,6 @@ func integrationExecutionReadError(err error) error {
 		return err
 	}
 	return myerrors.WrapDatabaseError(err)
-}
-
-func validIntegrationErrorCategory(value string) bool {
-	switch value {
-	case model.IntegrationErrorCategoryConfiguration,
-		model.IntegrationErrorCategoryCredential,
-		model.IntegrationErrorCategoryNetwork,
-		model.IntegrationErrorCategoryTimeout,
-		model.IntegrationErrorCategoryRemote,
-		model.IntegrationErrorCategoryResponse,
-		model.IntegrationErrorCategoryBusiness,
-		model.IntegrationErrorCategoryConcurrency,
-		model.IntegrationErrorCategorySystem:
-		return true
-	default:
-		return false
-	}
 }
 
 func (s *IntegrationExecutionService) writeAudit(
@@ -472,7 +330,7 @@ func (s *IntegrationExecutionService) resolveIdempotencyRace(
 	if value.InputHash != req.InputHash {
 		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionIdempotencyConflict
 	}
-	return response.NewIntegrationExecutionDetailRes(value, nil), nil
+	return response.NewIntegrationExecutionDetailRes(value), nil
 }
 
 func normalizeIntegrationExecutionCreateReq(

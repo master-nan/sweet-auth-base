@@ -67,7 +67,7 @@
       <template #body-cell-actions="props"
         ><q-td :props="props" class="q-gutter-xs no-wrap"
           ><q-btn
-            v-for="button in line_buttons"
+            v-for="button in detailButtons"
             :key="button.id"
             flat
             dense
@@ -130,7 +130,7 @@
 
 <script setup lang="ts">
 defineOptions({ name: 'integration_log' })
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps } from 'quasar'
 import { useRoute } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
@@ -143,13 +143,20 @@ import {
 } from 'src/api/services/integration'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useLoadingStore } from 'src/stores/loading'
+import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const route = useRoute()
 const api = useIntegrationApi()
+const userStore = useUserStore()
 const { loading } = storeToRefs(useLoadingStore())
 const { line_buttons, top_buttons } = usePageButtons('integration_log')
+const detailButtons = computed(() =>
+  line_buttons.value.filter((button) => button.event_action === 'detail'),
+)
+const canViewDetail = computed(() => detailButtons.value.length > 0)
+const canQueryLogs = computed(() => userStore.buttons.includes('integration_log_query'))
 const rows = ref<IntegrationLogListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
@@ -190,6 +197,7 @@ const columns: QTableProps['columns'] = [
   { name: 'actions', label: '操作', field: 'actions', align: 'center' },
 ]
 const fetchData = async () => {
+  if (!canQueryLogs.value) return
   const response = await api.queryLogs(query.value)
   rows.value = response.data || []
   total.value = response.total || 0
@@ -204,6 +212,7 @@ const openDetail = async (row: IntegrationLogListItem) => {
   showDetail.value = true
 }
 const openDetailFromRoute = async () => {
+  if (!canViewDetail.value) return
   const logId = Number(route.query.log_id)
   if (logId > 0) {
     const response = await api.getLog(logId)
@@ -212,6 +221,10 @@ const openDetailFromRoute = async () => {
   }
 }
 onMounted(async () => {
+  if (!canQueryLogs.value) {
+    initialized.value = true
+    return
+  }
   await fetchData()
   await openDetailFromRoute()
   initialized.value = true
@@ -219,7 +232,7 @@ onMounted(async () => {
 watch(
   () => [query.value.page, query.value.num] as const,
   () => {
-    if (initialized.value) void fetchData()
+    if (initialized.value && canQueryLogs.value) void fetchData()
   },
 )
 </script>

@@ -244,23 +244,6 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
   lease_expires_at?: string
   next_run_at?: string
   cancelled_at?: string
-  attempts: Array<{
-    id: number
-    attempt_no: number
-    status: string
-    started_at: string
-    ended_at?: string
-    duration_ms: number
-    http_status?: number
-    error_category?: string
-    error_code?: string
-    result_summary?: string
-    result_size_bytes: number
-    result_hash?: string
-    result_certainty: IntegrationResultCertainty
-    request_id?: string
-    trace_id?: string
-  }>
 }
 
 export interface IntegrationExecutionQuery extends Query {

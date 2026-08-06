@@ -82,11 +82,24 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 	table := integrationExecutionServiceQueryTable()
 	logTable := table
 	logTable.TableCode = "integration_log"
+	logTable.TableFields = []model.SysTableField{
+		{Basic: model.Basic{Id: 21, State: true}, FieldCode: "execution_id", FieldType: enum.BigIntFieldType, IsAdvancedSearch: true},
+		{Basic: model.Basic{Id: 22, State: true}, FieldCode: "attempt_no", FieldType: enum.IntFieldType, IsAdvancedSearch: true, IsSort: true},
+		{Basic: model.Basic{Id: 23, State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType, IsAdvancedSearch: true},
+	}
 	detail, err := svc.GetExecution(ctx, created.Id, table,
-		integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable),
-		logTable, integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable))
-	if err != nil || len(detail.Attempts) != 1 || detail.Attempts[0].AttemptNo != 1 {
+		integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable))
+	if err != nil || detail.Id != created.Id || detail.CurrentAttempt != 0 {
 		t.Fatalf("detail = %+v err=%v", detail, err)
+	}
+	logPage, err := svc.PageLogs(ctx, request.IntegrationLogQueryReq{Page: 1, Num: 10, ExecutionID: created.Id}, logTable,
+		integrationExecutionPermission(t, model.DataPermissionOperationQuery, datapermission.DataScopeDecisionNotApplicable))
+	if err != nil || logPage.Total != 1 || len(logPage.Data) != 1 || logPage.Data[0].AttemptNo != 1 {
+		t.Fatalf("independent log page = %+v err=%v", logPage, err)
+	}
+	if _, err = svc.GetLog(ctx, log.Id, logTable,
+		integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNone)); !errors.Is(err, apperrors.ErrIntegrationExecutionNotFound) {
+		t.Fatalf("denied log detail error = %v", err)
 	}
 
 	from := time.Time(created.GmtCreate).Add(-time.Minute)
@@ -111,7 +124,10 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 	if err != nil {
 		t.Fatalf("marshal detail: %v", err)
 	}
-	for _, forbidden := range []string{"authorization", "secret", "ciphertext", "payload", "gmt_delete"} {
+	for _, forbidden := range []string{
+		"authorization", "secret", "ciphertext", "payload", "gmt_delete", "attempts",
+		"http_status", "result_certainty", "request_id", "trace_id",
+	} {
 		if strings.Contains(strings.ToLower(string(payload)), forbidden) {
 			t.Fatalf("detail leaked %q: %s", forbidden, payload)
 		}
@@ -119,88 +135,57 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 }
 
 func TestIntegrationExecutionServiceStateMachineAndRevision(t *testing.T) {
-	svc, _, system, definition, auditWriter := newIntegrationExecutionTestSubject(t)
+	svc, db, system, definition, auditWriter := newIntegrationExecutionTestSubject(t)
 	ctx := context.Background()
 
-	created, err := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "success-001"))
+	created, err := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "cancel-created"))
 	if err != nil {
-		t.Fatalf("create success fixture: %v", err)
+		t.Fatalf("create fixture: %v", err)
 	}
-	if _, err = svc.StartExecution(ctx, created.Id, created.Revision+1); !errors.Is(err, apperrors.ErrIntegrationExecutionRevisionConflict) {
-		t.Fatalf("stale start error = %v", err)
+	if created.Status != model.IntegrationExecutionStatusCreated || created.CurrentAttempt != 0 {
+		t.Fatalf("creation bypassed worker claim: %+v", created)
 	}
-	running, err := svc.StartExecution(ctx, created.Id, created.Revision)
-	if err != nil || running.Status != model.IntegrationExecutionStatusRunning || running.StartedAt == nil {
-		t.Fatalf("start = %+v err=%v", running, err)
+	if _, err = svc.CancelExecution(ctx, created.Id, created.Revision+1); !errors.Is(err, apperrors.ErrIntegrationExecutionRevisionConflict) {
+		t.Fatalf("stale cancel error = %v", err)
 	}
-	httpStatus := 200
-	succeeded, err := svc.CompleteExecution(ctx, running.Id, request.IntegrationExecutionCompleteReq{
-		Revision: running.Revision, ResultHTTPStatus: &httpStatus, ResultSizeBytes: 128,
-		ResultHash: strings.Repeat("c", 64), ResultSummary: "ok",
-	})
-	if err != nil || succeeded.Status != model.IntegrationExecutionStatusSucceeded || succeeded.CompletedAt == nil {
-		t.Fatalf("complete = %+v err=%v", succeeded, err)
-	}
-	if _, err = svc.StartExecution(ctx, succeeded.Id, succeeded.Revision); !errors.Is(err, apperrors.ErrIntegrationExecutionStatusInvalid) {
-		t.Fatalf("terminal restart error = %v", err)
-	}
-
-	retryCreated, _ := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "retry-001"))
-	retryRunning, _ := svc.StartExecution(ctx, retryCreated.Id, retryCreated.Revision)
-	retryWaiting, err := svc.FailExecution(ctx, retryRunning.Id, request.IntegrationExecutionFailReq{
-		Revision: retryRunning.Revision, TargetStatus: model.IntegrationExecutionStatusRetryWaiting,
-		ErrorCategory: model.IntegrationErrorCategoryNetwork, ResultSummary: "retryable",
-	})
-	if err != nil || retryWaiting.Status != model.IntegrationExecutionStatusRetryWaiting || retryWaiting.CompletedAt != nil {
-		t.Fatalf("retry waiting = %+v err=%v", retryWaiting, err)
-	}
-	retryRunning, err = svc.StartExecution(ctx, retryWaiting.Id, retryWaiting.Revision)
-	if err != nil || retryRunning.Status != model.IntegrationExecutionStatusRunning {
-		t.Fatalf("restart retry = %+v err=%v", retryRunning, err)
-	}
-	failed, err := svc.FailExecution(ctx, retryRunning.Id, request.IntegrationExecutionFailReq{
-		Revision: retryRunning.Revision, TargetStatus: model.IntegrationExecutionStatusFailed,
-		ErrorCategory: model.IntegrationErrorCategoryRemote, ResultSummary: "terminal",
-	})
-	if err != nil || failed.Status != model.IntegrationExecutionStatusFailed || failed.CompletedAt == nil {
-		t.Fatalf("fail = %+v err=%v", failed, err)
-	}
-
-	cancelCreated, _ := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "cancel-001"))
-	cancelled, err := svc.CancelExecution(ctx, cancelCreated.Id, cancelCreated.Revision)
+	cancelled, err := svc.CancelExecution(ctx, created.Id, created.Revision)
 	if err != nil || cancelled.Status != model.IntegrationExecutionStatusCancelled || cancelled.CancelledAt == nil {
-		t.Fatalf("cancel = %+v err=%v", cancelled, err)
+		t.Fatalf("cancel created = %+v err=%v", cancelled, err)
 	}
-	runningCancelCreated, _ := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "cancel-002"))
-	runningCancel, _ := svc.StartExecution(ctx, runningCancelCreated.Id, runningCancelCreated.Revision)
-	if _, err = svc.CancelExecution(ctx, runningCancel.Id, runningCancel.Revision); !errors.Is(err, apperrors.ErrIntegrationExecutionStatusInvalid) {
+	if _, err = svc.CancelExecution(ctx, cancelled.Id, cancelled.Revision); !errors.Is(err, apperrors.ErrIntegrationExecutionStatusInvalid) {
+		t.Fatalf("terminal cancel error = %v", err)
+	}
+
+	retryWaiting, err := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "cancel-retry"))
+	if err != nil {
+		t.Fatalf("create retry fixture: %v", err)
+	}
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", retryWaiting.Id).Updates(map[string]any{
+		"status": model.IntegrationExecutionStatusRetryWaiting, "revision": retryWaiting.Revision + 1,
+	}).Error; err != nil {
+		t.Fatalf("prepare retry waiting fixture: %v", err)
+	}
+	retryWaiting.Revision++
+	retryCancelled, err := svc.CancelExecution(ctx, retryWaiting.Id, retryWaiting.Revision)
+	if err != nil || retryCancelled.Status != model.IntegrationExecutionStatusCancelled {
+		t.Fatalf("cancel retry waiting = %+v err=%v", retryCancelled, err)
+	}
+
+	running, err := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "running-reject"))
+	if err != nil {
+		t.Fatalf("create running fixture: %v", err)
+	}
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", running.Id).Updates(map[string]any{
+		"status": model.IntegrationExecutionStatusRunning, "revision": running.Revision + 1,
+		"lease_owner": "worker-only", "current_attempt": 1,
+	}).Error; err != nil {
+		t.Fatalf("prepare running fixture: %v", err)
+	}
+	if _, err = svc.CancelExecution(ctx, running.Id, running.Revision+1); !errors.Is(err, apperrors.ErrIntegrationExecutionStatusInvalid) {
 		t.Fatalf("running cancel error = %v", err)
 	}
-
-	retryFailCreated, _ := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "retry-fail"))
-	retryFailRunning, _ := svc.StartExecution(ctx, retryFailCreated.Id, retryFailCreated.Revision)
-	retryFailWaiting, _ := svc.FailExecution(ctx, retryFailRunning.Id, request.IntegrationExecutionFailReq{
-		Revision: retryFailRunning.Revision, TargetStatus: model.IntegrationExecutionStatusRetryWaiting,
-		ErrorCategory: model.IntegrationErrorCategoryTimeout,
-	})
-	if _, err = svc.FailExecution(ctx, retryFailWaiting.Id, request.IntegrationExecutionFailReq{
-		Revision: retryFailWaiting.Revision, TargetStatus: model.IntegrationExecutionStatusFailed,
-		ErrorCategory: model.IntegrationErrorCategoryTimeout,
-	}); err != nil {
-		t.Fatalf("retry waiting to failed: %v", err)
-	}
-
-	retryCancelCreated, _ := svc.CreateExecution(ctx, integrationExecutionCreateRequest(system.Id, definition.Id, "retry-cancel"))
-	retryCancelRunning, _ := svc.StartExecution(ctx, retryCancelCreated.Id, retryCancelCreated.Revision)
-	retryCancelWaiting, _ := svc.FailExecution(ctx, retryCancelRunning.Id, request.IntegrationExecutionFailReq{
-		Revision: retryCancelRunning.Revision, TargetStatus: model.IntegrationExecutionStatusRetryWaiting,
-		ErrorCategory: model.IntegrationErrorCategoryNetwork,
-	})
-	if _, err = svc.CancelExecution(ctx, retryCancelWaiting.Id, retryCancelWaiting.Revision); err != nil {
-		t.Fatalf("retry waiting to cancelled: %v", err)
-	}
-	if len(auditWriter.records) != 20 {
-		t.Fatalf("audit count = %d, want 20", len(auditWriter.records))
+	if len(auditWriter.records) != 5 {
+		t.Fatalf("audit count = %d, want 5", len(auditWriter.records))
 	}
 }
 

@@ -84,8 +84,11 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	}
 	if err := retireMenuButtons(db, root.Id, []string{
 		"integration_execution_query", "integration_execution_detail", "integration_execution_create",
-		"integration_execution_start", "integration_execution_complete", "integration_execution_fail", "integration_execution_cancel",
+		"integration_execution_cancel",
 	}); err != nil {
+		return err
+	}
+	if err := removeDeprecatedIntegrationExecutionCommands(db, root.Id); err != nil {
 		return err
 	}
 
@@ -117,13 +120,41 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 		apiPermissionWithAPI(12301, executionMenu.Id, "执行列表查询", "integration_execution_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/execution/query", "POST"),
 		menuButtonWithAPI(12302, executionMenu.Id, "执行详情", "integration_execution_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/execution/:id", "GET"),
 		apiPermissionWithAPI(12303, root.Id, "提交执行", "integration_execution_create", enum.Top, "create", "add", "primary", 120, "/admin/integration/execution", "POST"),
-		apiPermissionWithAPI(12304, root.Id, "启动执行", "integration_execution_start", enum.Top, "start", "play_arrow", "primary", 121, "/admin/integration/execution/:id/start", "PUT"),
-		apiPermissionWithAPI(12305, root.Id, "完成执行", "integration_execution_complete", enum.Top, "complete", "done", "positive", 122, "/admin/integration/execution/:id/complete", "PUT"),
-		apiPermissionWithAPI(12306, root.Id, "执行失败", "integration_execution_fail", enum.Top, "fail", "error", "negative", 123, "/admin/integration/execution/:id/fail", "PUT"),
 		apiPermissionWithAPI(12308, logMenu.Id, "调用日志查询", "integration_log_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/log/query", "POST"),
 		menuButtonWithAPI(12309, logMenu.Id, "调用日志详情", "integration_log_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/log/:id", "GET"),
 		menuButtonWithAPI(12311, executionMenu.Id, "取消执行", "integration_execution_cancel", enum.Line, "cancel", "cancel", "warning", 1, "/admin/integration/execution/:id/cancel", "PUT"),
 		apiPermissionWithAPI(12310, root.Id, "Worker状态", "integration_worker_status", enum.Top, "status", "monitor_heart", "primary", 110, "/admin/integration/worker/status", "GET"),
 	}
 	return seedMenuButtons(db, sf, role.Id, role.Name, buttons)
+}
+
+func removeDeprecatedIntegrationExecutionCommands(db *gorm.DB, menuID int) error {
+	codes := []string{
+		"integration_execution_start",
+		"integration_execution_complete",
+		"integration_execution_fail",
+	}
+	paths := []string{
+		"/admin/integration/execution/:id/start",
+		"/admin/integration/execution/:id/complete",
+		"/admin/integration/execution/:id/fail",
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		var buttonIDs []int
+		if err := tx.Unscoped().Model(&model.SysMenuButton{}).
+			Where("menu_id = ? AND code IN ? AND path IN ? AND method = ?", menuID, codes, paths, "PUT").
+			Pluck("id", &buttonIDs).Error; err != nil {
+			return err
+		}
+		if len(buttonIDs) > 0 {
+			if err := tx.Unscoped().Where("button_id IN ?", buttonIDs).Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Unscoped().Where("id IN ?", buttonIDs).Delete(&model.SysMenuButton{}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Where("ptype = ? AND v1 IN ? AND v2 = ?", "p", paths, "PUT").Delete(&model.CasbinRule{}).Error
+	})
 }

@@ -16,9 +16,10 @@ import (
 
 type integrationExecutionApplicationStub struct {
 	integrationExecutionApplication
-	pageCalls   int
-	detailCalls int
-	operations  []string
+	pageCalls      int
+	detailCalls    int
+	logPageCalls   int
+	logDetailCalls int
 }
 
 func (s *integrationExecutionApplicationStub) PageExecution(
@@ -38,8 +39,6 @@ func (s *integrationExecutionApplicationStub) GetExecution(
 	_ int,
 	_ model.SysTable,
 	_ repository.GeneralizationPermission,
-	_ model.SysTable,
-	_ repository.GeneralizationPermission,
 ) (response.IntegrationExecutionDetailRes, error) {
 	s.detailCalls++
 	return response.IntegrationExecutionDetailRes{
@@ -47,29 +46,55 @@ func (s *integrationExecutionApplicationStub) GetExecution(
 	}, nil
 }
 
+func (s *integrationExecutionApplicationStub) PageLogs(
+	_ context.Context,
+	_ request.IntegrationLogQueryReq,
+	_ model.SysTable,
+	_ repository.GeneralizationPermission,
+) (response.ListResult[response.IntegrationLogListRes], error) {
+	s.logPageCalls++
+	return response.ListResult[response.IntegrationLogListRes]{
+		Data: []response.IntegrationLogListRes{{Id: 2, ExecutionNo: "INT-1", AttemptNo: 1}}, Total: 1,
+	}, nil
+}
+
+func (s *integrationExecutionApplicationStub) GetLog(
+	_ context.Context,
+	_ int,
+	_ model.SysTable,
+	_ repository.GeneralizationPermission,
+) (response.IntegrationLogDetailRes, error) {
+	s.logDetailCalls++
+	return response.IntegrationLogDetailRes{
+		IntegrationLogListRes: response.IntegrationLogListRes{Id: 2, ExecutionNo: "INT-1", AttemptNo: 1},
+	}, nil
+}
+
 type integrationExecutionTableProviderStub struct {
-	table model.SysTable
-	err   error
+	tables map[string]model.SysTable
+	err    error
 }
 
 func (s integrationExecutionTableProviderStub) GetTableByTableCode(code string) (model.SysTable, error) {
 	if code != integrationExecutionTableCode && code != integrationLogTableCode {
 		return model.SysTable{}, apperrors.ErrParamInvalid
 	}
-	return s.table, s.err
+	return s.tables[code], s.err
 }
 
 type integrationExecutionPermissionResolverStub struct {
 	operations []string
+	tableCodes []string
 	err        error
 }
 
 func (s *integrationExecutionPermissionResolverStub) ResolveDataPermission(
 	_ *gin.Context,
-	_ model.SysTable,
+	table model.SysTable,
 	operation string,
 ) (repository.GeneralizationPermission, error) {
 	s.operations = append(s.operations, operation)
+	s.tableCodes = append(s.tableCodes, table.TableCode)
 	return repository.GeneralizationPermission{}, s.err
 }
 
@@ -78,7 +103,10 @@ func TestIntegrationExecutionControllerResolvesDataPermissionForQueryAndDetail(t
 	permissionResolver := &integrationExecutionPermissionResolverStub{}
 	controller := newIntegrationExecutionController(
 		app,
-		integrationExecutionTableProviderStub{table: model.SysTable{Basic: model.Basic{Id: 50}, TableCode: integrationExecutionTableCode}},
+		integrationExecutionTableProviderStub{tables: map[string]model.SysTable{
+			integrationExecutionTableCode: {Basic: model.Basic{Id: 50}, TableCode: integrationExecutionTableCode},
+			integrationLogTableCode:       {Basic: model.Basic{Id: 51}, TableCode: integrationLogTableCode},
+		}},
 		permissionResolver,
 		nil,
 	)
@@ -93,14 +121,31 @@ func TestIntegrationExecutionControllerResolvesDataPermissionForQueryAndDetail(t
 	detailContext.Params = gin.Params{{Key: "id", Value: "1"}}
 	controller.Detail(detailContext)
 
-	if app.pageCalls != 1 || app.detailCalls != 1 {
-		t.Fatalf("service calls page=%d detail=%d", app.pageCalls, app.detailCalls)
+	logQueryContext, _ := gin.CreateTestContext(httptest.NewRecorder())
+	logQueryContext.Request = httptest.NewRequest("POST", "/admin/integration/log/query", strings.NewReader(`{"page":1,"num":10,"execution_id":1}`))
+	logQueryContext.Request.Header.Set("Content-Type", "application/json")
+	controller.QueryLogs(logQueryContext)
+
+	logDetailContext, _ := gin.CreateTestContext(httptest.NewRecorder())
+	logDetailContext.Request = httptest.NewRequest("GET", "/admin/integration/log/2", nil)
+	logDetailContext.Params = gin.Params{{Key: "id", Value: "2"}}
+	controller.LogDetail(logDetailContext)
+
+	if app.pageCalls != 1 || app.detailCalls != 1 || app.logPageCalls != 1 || app.logDetailCalls != 1 {
+		t.Fatalf("service calls page=%d detail=%d log_page=%d log_detail=%d", app.pageCalls, app.detailCalls, app.logPageCalls, app.logDetailCalls)
 	}
-	if len(permissionResolver.operations) != 3 ||
+	if len(permissionResolver.operations) != 4 ||
 		permissionResolver.operations[0] != model.DataPermissionOperationQuery ||
 		permissionResolver.operations[1] != model.DataPermissionOperationDetail ||
-		permissionResolver.operations[2] != model.DataPermissionOperationDetail {
+		permissionResolver.operations[2] != model.DataPermissionOperationQuery ||
+		permissionResolver.operations[3] != model.DataPermissionOperationDetail {
 		t.Fatalf("permission operations = %v", permissionResolver.operations)
+	}
+	wantTables := []string{integrationExecutionTableCode, integrationExecutionTableCode, integrationLogTableCode, integrationLogTableCode}
+	for index := range wantTables {
+		if permissionResolver.tableCodes[index] != wantTables[index] {
+			t.Fatalf("permission tables = %v", permissionResolver.tableCodes)
+		}
 	}
 }
 
@@ -108,7 +153,9 @@ func TestIntegrationExecutionControllerStopsWhenPermissionResolutionFails(t *tes
 	app := &integrationExecutionApplicationStub{}
 	controller := newIntegrationExecutionController(
 		app,
-		integrationExecutionTableProviderStub{table: model.SysTable{Basic: model.Basic{Id: 50}, TableCode: integrationExecutionTableCode}},
+		integrationExecutionTableProviderStub{tables: map[string]model.SysTable{
+			integrationExecutionTableCode: {Basic: model.Basic{Id: 50}, TableCode: integrationExecutionTableCode},
+		}},
 		&integrationExecutionPermissionResolverStub{err: apperrors.ErrDataPermissionRuntimeFailed},
 		nil,
 	)

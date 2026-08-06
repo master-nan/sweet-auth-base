@@ -142,4 +142,19 @@ describe('external system API', () => {
     expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41/disable', { revision: 5 })
     expect(putMock).toHaveBeenCalledWith('/admin/integration/credential/41/revoke', { revision: 6 })
   })
+
+  it('exposes only application-safe execution commands', async () => {
+    const api = useIntegrationApi()
+
+    await api.getExecution(51)
+    await api.cancelExecution(51, 3)
+
+    expect(getMock).toHaveBeenCalledWith('/admin/integration/execution/51')
+    expect(putMock).toHaveBeenCalledWith('/admin/integration/execution/51/cancel', {
+      revision: 3,
+    })
+    expect(api).not.toHaveProperty('startExecution')
+    expect(api).not.toHaveProperty('completeExecution')
+    expect(api).not.toHaveProperty('failExecution')
+  })
 })

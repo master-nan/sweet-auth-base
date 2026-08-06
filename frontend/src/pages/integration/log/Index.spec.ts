@@ -1,0 +1,71 @@
+import { computed } from 'vue'
+import { flushPromises, shallowMount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const apiMocks = vi.hoisted(() => ({ queryLogs: vi.fn(), getLog: vi.fn() }))
+const detailButtons = vi.hoisted(() => [] as Array<Record<string, unknown>>)
+const permissionCodes = vi.hoisted(() => [] as string[])
+
+vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: { execution_no: 'INT-51', log_id: '91' } }),
+}))
+vi.mock('src/composables/page-buttons', () => ({
+  usePageButtons: () => ({
+    line_buttons: computed(() => detailButtons),
+    top_buttons: computed(() => []),
+  }),
+}))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
+vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+  default: { template: '<div><slot /></div>' },
+}))
+vi.mock('src/components/Table/TablePagination.vue', () => ({
+  default: { template: '<div />' },
+}))
+
+import IntegrationLogPage from './Index.vue'
+
+const mountPage = () =>
+  shallowMount(IntegrationLogPage, {
+    global: { plugins: [createPinia()], renderStubDefaultSlot: true },
+  })
+
+describe('integration log detail permission', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    detailButtons.splice(0)
+    permissionCodes.splice(0)
+    apiMocks.queryLogs.mockReset()
+    apiMocks.getLog.mockReset()
+    apiMocks.queryLogs.mockResolvedValue({ data: [], total: 0 })
+    apiMocks.getLog.mockResolvedValue({ data: { id: 91 } })
+  })
+
+  it('does not request logs without the log query permission', async () => {
+    mountPage()
+    await flushPromises()
+
+    expect(apiMocks.queryLogs).not.toHaveBeenCalled()
+    expect(apiMocks.getLog).not.toHaveBeenCalled()
+  })
+
+  it('queries logs but does not request routed detail without detail permission', async () => {
+    permissionCodes.push('integration_log_query')
+    mountPage()
+    await flushPromises()
+
+    expect(apiMocks.queryLogs).toHaveBeenCalled()
+    expect(apiMocks.getLog).not.toHaveBeenCalled()
+  })
+
+  it('loads routed log detail when the detail permission is present', async () => {
+    permissionCodes.push('integration_log_query')
+    detailButtons.push({ id: 1, name: '详情', event_action: 'detail' })
+    mountPage()
+    await flushPromises()
+
+    expect(apiMocks.getLog).toHaveBeenCalledWith(91)
+  })
+})

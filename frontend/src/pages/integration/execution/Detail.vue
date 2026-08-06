@@ -80,21 +80,29 @@
       <q-card flat bordered
         ><q-card-section
           ><div class="text-subtitle1 text-weight-bold q-mb-sm">Attempt 记录</div>
+          <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">
+            无调用日志查看权限
+          </div>
           <q-table
+            v-else
             flat
             bordered
             dense
-            :rows="detail.attempts"
+            :loading="attemptsLoading"
+            :rows="attempts"
             :columns="attemptColumns"
             row-key="id"
             ><template #body-cell-attempt_no="props"
               ><q-td :props="props"
                 ><q-btn
+                  v-if="canViewLogDetail"
                   flat
                   dense
                   color="primary"
                   :label="`#${props.row.attempt_no}`"
-                  @click="openLog(props.row.id)" /></q-td></template
+                  @click="openLog(props.row.id)" />
+                <span v-else>#{{ props.row.attempt_no }}</span></q-td
+              ></template
             ><template #body-cell-status="props"
               ><q-td :props="props"
                 ><q-chip
@@ -112,11 +120,16 @@
 
 <script setup lang="ts">
 defineOptions({ name: 'integration_execution_detail_page' })
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import { useIntegrationApi, type IntegrationExecutionDetail } from 'src/api/services/integration'
+import {
+  useIntegrationApi,
+  type IntegrationExecutionDetail,
+  type IntegrationLogListItem,
+} from 'src/api/services/integration'
 import { useLoadingStore } from 'src/stores/loading'
+import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import type { QTableProps } from 'quasar'
 import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
@@ -124,8 +137,13 @@ import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 const route = useRoute()
 const router = useRouter()
 const api = useIntegrationApi()
+const userStore = useUserStore()
 const { loading } = storeToRefs(useLoadingStore())
 const detail = ref<IntegrationExecutionDetail | null>(null)
+const attempts = ref<IntegrationLogListItem[]>([])
+const attemptsLoading = ref(false)
+const canQueryLogs = computed(() => userStore.buttons.includes('integration_log_query'))
+const canViewLogDetail = computed(() => userStore.buttons.includes('integration_log_detail'))
 const statusMeta: Record<string, { label: string; color: string }> = {
   created: { label: '待执行', color: 'grey-7' },
   running: { label: '执行中', color: 'primary' },
@@ -161,6 +179,22 @@ onMounted(async () => {
   if (id > 0) {
     const response = await api.getExecution(id)
     detail.value = response.data || null
+    if (detail.value && canQueryLogs.value) {
+      attemptsLoading.value = true
+      try {
+        const logs = await api.queryLogs({
+          page: 1,
+          num: 500,
+          order: { field: 'attempt_no', is_asc: true },
+          quick_query: { keyword: '' },
+          expressions: [],
+          execution_id: detail.value.id,
+        })
+        attempts.value = logs.data || []
+      } finally {
+        attemptsLoading.value = false
+      }
+    }
   }
 })
 </script>

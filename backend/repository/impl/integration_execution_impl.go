@@ -345,34 +345,6 @@ func NewIntegrationLogRepositoryImpl(primaryDB *database.PrimaryDB) *Integration
 	}
 }
 
-func (r *IntegrationLogRepositoryImpl) ListByExecutionID(
-	ctx context.Context,
-	executionID int,
-) ([]model.IntegrationLog, error) {
-	var values []model.IntegrationLog
-	err := r.DBWithContext(ctx).
-		Model(&model.IntegrationLog{}).
-		Where("execution_id = ?", executionID).
-		Order("attempt_no ASC").
-		Find(&values).Error
-	return values, err
-}
-
-func (r *IntegrationLogRepositoryImpl) ListByExecutionIDWithPermission(
-	ctx context.Context,
-	executionID int,
-	table model.SysTable,
-	permission repository.GeneralizationPermission,
-) ([]model.IntegrationLog, error) {
-	var values []model.IntegrationLog
-	query, err := queryutil.ApplyGeneralizationPermission(r.DBWithContext(ctx).Table(table.TableCode), permission, table)
-	if err != nil {
-		return nil, err
-	}
-	err = query.Preload("Execution").Where(table.TableCode+".execution_id = ?", executionID).Order("attempt_no ASC").Find(&values).Error
-	return values, err
-}
-
 func (r *IntegrationLogRepositoryImpl) GetIntegrationLogList(
 	ctx context.Context,
 	req request.IntegrationLogQueryReq,

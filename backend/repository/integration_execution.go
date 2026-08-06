@@ -80,8 +80,6 @@ type IntegrationExecutionRepository interface {
 
 type IntegrationLogRepository interface {
 	BasicRepository[model.IntegrationLog]
-	ListByExecutionID(context.Context, int) ([]model.IntegrationLog, error)
-	ListByExecutionIDWithPermission(context.Context, int, model.SysTable, GeneralizationPermission) ([]model.IntegrationLog, error)
 	GetIntegrationLogList(context.Context, request.IntegrationLogQueryReq, model.SysTable, GeneralizationPermission) (response.ListResult[model.IntegrationLog], error)
 	FindByIDWithPermission(context.Context, int, model.SysTable, GeneralizationPermission) (model.IntegrationLog, error)
 }

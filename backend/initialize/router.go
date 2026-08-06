@@ -232,13 +232,10 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/credential/:id/disable", app.CredentialController.Disable)
 		adminGroup.PUT("/integration/credential/:id/revoke", app.CredentialController.Revoke)
 
-		// 集成执行状态服务
+		// 集成执行与调用日志只暴露管理查询、提交和安全取消；状态收敛由 Worker 与 Engine 完成。
 		adminGroup.POST("/integration/execution/query", app.IntegrationExecutionController.Query)
 		adminGroup.GET("/integration/execution/:id", app.IntegrationExecutionController.Detail)
 		adminGroup.POST("/integration/execution", app.IntegrationExecutionController.Create)
-		adminGroup.PUT("/integration/execution/:id/start", app.IntegrationExecutionController.Start)
-		adminGroup.PUT("/integration/execution/:id/complete", app.IntegrationExecutionController.Complete)
-		adminGroup.PUT("/integration/execution/:id/fail", app.IntegrationExecutionController.Fail)
 		adminGroup.PUT("/integration/execution/:id/cancel", app.IntegrationExecutionController.Cancel)
 		adminGroup.POST("/integration/log/query", app.IntegrationExecutionController.QueryLogs)
 		adminGroup.GET("/integration/log/:id", app.IntegrationExecutionController.LogDetail)

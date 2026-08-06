@@ -66,18 +66,23 @@ func TestIntegrationExecutionRepositoryDomainQueriesAndPagination(t *testing.T) 
 	first := model.IntegrationLog{Basic: model.Basic{Id: 101, State: true}, ExecutionID: 1, AttemptNo: 1, Status: model.IntegrationLogStatusFailed, StartedAt: startedAt, ResultCertainty: model.IntegrationResultCertaintyUnknown}
 	testutil.MustCreate(t, db, &second)
 	testutil.MustCreate(t, db, &first)
-	items, err := logs.ListByExecutionID(context.Background(), 1)
-	if err != nil || len(items) != 2 || items[0].AttemptNo != 1 || items[1].AttemptNo != 2 {
-		t.Fatalf("logs = %+v err=%v", items, err)
-	}
 	logPage, err := logs.GetIntegrationLogList(
 		context.Background(),
-		request.IntegrationLogQueryReq{Page: 1, Num: 10},
+		request.IntegrationLogQueryReq{Page: 1, Num: 10, ExecutionID: 1, Order: request.Order{Field: "attempt_no", IsAsc: true}},
 		integrationLogQueryTableForTest(),
 		permission,
 	)
-	if err != nil || logPage.Total != 2 || len(logPage.Data) != 2 || logPage.Data[0].Execution.ExecutionNo != "INT-001" {
+	if err != nil || logPage.Total != 2 || len(logPage.Data) != 2 || logPage.Data[0].AttemptNo != 1 || logPage.Data[1].AttemptNo != 2 || logPage.Data[0].Execution.ExecutionNo != "INT-001" {
 		t.Fatalf("log page = %+v err=%v", logPage, err)
+	}
+	mismatchedPage, err := logs.GetIntegrationLogList(
+		context.Background(),
+		request.IntegrationLogQueryReq{Page: 1, Num: 10, ExecutionID: 2},
+		integrationLogQueryTableForTest(),
+		permission,
+	)
+	if err != nil || mismatchedPage.Total != 0 || len(mismatchedPage.Data) != 0 {
+		t.Fatalf("mismatched execution log page = %+v err=%v", mismatchedPage, err)
 	}
 }
 
@@ -90,6 +95,15 @@ func TestIntegrationExecutionRepositoryClaimCompleteAndRecover(t *testing.T) {
 	second := repositoryExecutionFixture(12, "INT-CLAIM-012", model.IntegrationExecutionStatusCreated, "claim-two")
 	testutil.MustCreate(t, db, &created)
 	testutil.MustCreate(t, db, &second)
+
+	_, err := executions.CompleteAttemptAndExecution(context.Background(), repository.IntegrationAttemptCompletion{
+		ExecutionID: created.Id, AttemptID: 999, AttemptNo: 1,
+		WorkerID: "worker-a", ExpectedRevision: created.Revision, ExecutionStatus: model.IntegrationExecutionStatusSucceeded,
+		CompletedAt: now, ResultCertainty: model.IntegrationResultCertaintyConfirmed,
+	})
+	if !errors.Is(err, repository.ErrIntegrationExecutionLeaseLost) {
+		t.Fatalf("completion without lease or attempt error = %v", err)
+	}
 
 	claimed, err := executions.ClaimCreatedExecutions(context.Background(), repository.IntegrationExecutionClaimRequest{
 		WorkerID: "worker-a", StartedAt: now, LeaseExpiresAt: now.Add(time.Minute), AttemptIDs: []int{101, 102}, RequestID: "request-1", TraceID: "trace-1",
