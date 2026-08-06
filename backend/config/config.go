@@ -73,6 +73,7 @@ type IntegrationWorker struct {
 	InstanceConcurrency   int    `mapstructure:"instance_concurrency"`
 	LeaseRecoveryInterval int    `mapstructure:"lease_recovery_interval"`
 	ShutdownTimeout       int    `mapstructure:"shutdown_timeout"`
+	LeaseDuration         int    `mapstructure:"lease_duration"`
 }
 
 type Conf struct {

@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	defaultExecutionLeaseDuration = 2 * time.Minute
-	defaultExecutionBatchSize     = 8
-	maxExecutionBatchSize         = 32
+	defaultExecutionBatchSize = 8
+	maxExecutionBatchSize     = 32
 )
 
 // ExecutionEngineOptions 仅接收 Worker 服务端配置，不接收 Controller DTO 或 Gin 上下文。
@@ -87,10 +86,10 @@ func NewIntegrationExecutionEngine(
 	}
 	leaseDuration := options.LeaseDuration
 	if leaseDuration == 0 {
-		leaseDuration = defaultExecutionLeaseDuration
+		leaseDuration = IntegrationDefaultLeaseDuration
 	}
-	if leaseDuration < 5*time.Second || leaseDuration > 10*time.Minute {
-		return nil, myerrors.ErrIntegrationConfigurationUnavailable
+	if err := ValidateLeaseDuration(leaseDuration); err != nil {
+		return nil, err
 	}
 	batchSize := options.BatchSize
 	if batchSize == 0 {
@@ -193,6 +192,9 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	startedAt := claimed.Attempt.StartedAt
 	system, definition, credentialIdentity, err := e.loadRuntimeConfiguration(ctx, claimed.Execution)
 	if err != nil {
+		if errors.Is(err, myerrors.ErrIntegrationExecutionRuntimeIncompatible) {
+			return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "integration_execution_runtime_incompatible", "集成执行引用的接口不符合当前运行契约", model.IntegrationResultCertaintyConfirmed, false)
+		}
 		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "configuration_unavailable", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false)
 	}
 	snapshot, err := LoadExecutionInputSnapshot(
@@ -282,6 +284,9 @@ func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(
 		definition.InterfaceCode != execution.InterfaceCode || definition.Version != execution.InterfaceVersion ||
 		definition.Status != model.InterfaceDefinitionStatusEnabled || !definition.State || definition.CredentialID == nil {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationConfigurationUnavailable
+	}
+	if err := ValidateInterfaceRuntimeContract(definition.TimeoutSeconds, definition.ResponseLimit); err != nil {
+		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationExecutionRuntimeIncompatible
 	}
 	identity, err := e.credentials.GetRuntimeCredentialIdentity(ctx, *definition.CredentialID)
 	if err != nil || identity.ID != *definition.CredentialID || identity.ExternalSystemID != system.Id {

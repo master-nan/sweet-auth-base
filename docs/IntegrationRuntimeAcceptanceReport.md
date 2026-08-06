@@ -409,3 +409,35 @@ go test ./repository/impl -run TestIntegrationExecutionPostgreSQLClaimUsesRowLoc
 2. 校验 Worker 租约时长大于最大请求时长并包含状态完成安全余量。
 
 完成上述整改后，仍须由 INT-003B-7R 重新执行完整 Runtime 验收并决定是否冻结。
+
+### 15.10 INT-003B-7C 统一运行参数契约
+
+2026-08-06 已完成最后一组代码阻塞整改。配置中心、Transport、Execution Service、Engine 与 Runner 现统一使用服务端 `IntegrationRuntimeLimits`：接口请求超时为 1 至 120 秒，默认 30 秒；响应限制为 1 KiB 至 64 MiB，默认 10 MiB。接口草稿创建/编辑、启用、Execution 创建、Worker 执行前和 Transport 构造请求均复核同一边界，不存在“配置通过、Transport 必然 invalid_config”的合法配置。
+
+一期采用固定平台租约。计算公式为：
+
+```text
+minimum_lease_duration
+= max_request_timeout 120 秒
+  + completion_margin 30 秒
+  + claim_safety_margin 15 秒
+= 165 秒
+```
+
+默认租约为 180 秒，最大为 600 秒。Runner 与 Engine 启动时均校验该预算，余量不足稳定拒绝启动；本项未引入续租 goroutine。恢复器仍只处理真实过期的 `running` Execution，并收敛为 `failed + unknown`，不会自动重发。
+
+PostgreSQL Migration 会将历史超限 `enabled` 接口安全停用，保留原 timeout、response_limit 和版本技术事实；新增条件 CHECK 阻止超限版本重新启用。当前本地数据库审计未发现超限记录。
+
+前端接口定义表单同步为最大 120 秒和 65,536 KiB（64 MiB），新建、编辑草稿与创建版本复用同一表单校验；后端仍是最终安全边界。
+
+### 15.11 INT-003B-7C 验证与结论边界
+
+本次实际验证结果：
+
+1. `cd backend && go test ./... -count=1`：通过。
+2. `go test -race ./internal/integration/... ./service ./repository/impl ./initialize -count=1`：通过。
+3. PostgreSQL 16 专项：统一上限 Migration、CHECK、重复执行、超限启用版本停用、`SKIP LOCKED` 领取、租约未到期不恢复及真正过期后恢复均通过。专项测试期间识别出 Go 侧时间解析与 PostgreSQL 会话时区可能不一致的问题，已将完成与恢复的租约时点判断收口为数据库条件更新，避免应用时区参与租约真值判断。
+4. `cd frontend && yarn test`：30 个测试文件、112 项测试全部通过。
+5. `yarn lint`、`yarn typecheck`、`yarn build`：通过；构建仅保留仓库既有的大体积 Chunk 提示。
+
+本项补充记录统一契约、迁移、租约和测试证据，但不把本报告正式结论提前改为通过。INT-003B-7A、7B、7C 识别的代码阻塞项现均已完成整改；是否通过与冻结仍由 INT-003B-7R 基于完整链路重新验收决定。

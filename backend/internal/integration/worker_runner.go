@@ -41,6 +41,7 @@ type WorkerRunnerConfig struct {
 	InstanceConcurrency   int
 	LeaseRecoveryInterval time.Duration
 	ShutdownTimeout       time.Duration
+	LeaseDuration         time.Duration
 }
 
 // WorkerStatus 是仅供受控健康检查或进程诊断读取的安全摘要。
@@ -108,12 +109,18 @@ func resolveWorkerRunnerConfig(config WorkerRunnerConfig) (WorkerRunnerConfig, e
 	if config.ShutdownTimeout == 0 {
 		config.ShutdownTimeout = defaultWorkerShutdownTimeout
 	}
+	if config.LeaseDuration == 0 {
+		config.LeaseDuration = IntegrationDefaultLeaseDuration
+	}
 	if config.PollInterval < minWorkerPollInterval || config.PollInterval > maxWorkerInterval ||
 		config.ClaimBatchSize < 1 || config.ClaimBatchSize > maxWorkerClaimBatchSize ||
 		config.InstanceConcurrency < 1 || config.InstanceConcurrency > maxWorkerConcurrency ||
 		config.LeaseRecoveryInterval < minWorkerRecoveryInterval || config.LeaseRecoveryInterval > maxWorkerInterval ||
 		config.ShutdownTimeout < time.Second || config.ShutdownTimeout > maxWorkerShutdownTimeout {
 		return WorkerRunnerConfig{}, myerrors.ErrIntegrationWorkerInvalidConfig
+	}
+	if err := ValidateLeaseDuration(config.LeaseDuration); err != nil {
+		return WorkerRunnerConfig{}, err
 	}
 	if config.Enabled && (config.WorkerID == "" || len(config.WorkerID) > 128) {
 		return WorkerRunnerConfig{}, myerrors.ErrIntegrationWorkerInvalidConfig

@@ -19,22 +19,16 @@ import (
 )
 
 const (
-	defaultConnectTimeout        = 5 * time.Second
-	defaultTLSHandshakeTimeout   = 10 * time.Second
-	defaultRequestTimeout        = 30 * time.Second
-	defaultResponseHeaderTimeout = 15 * time.Second
-	defaultMaxRequestBodyBytes   = int64(1024 * 1024)
-	defaultMaxResponseBytes      = int64(10 * 1024 * 1024)
-	maxRequestBodyBytes          = int64(4 * 1024 * 1024)
-	maxResponseBytes             = int64(64 * 1024 * 1024)
-	maxHeaderCount               = 32
-	maxHeaderNameLength          = 64
-	maxHeaderValueLength         = 4096
-	maxHeaderTotalLength         = 16 * 1024
-	maxQueryParameterCount       = 64
-	maxQueryNameLength           = 128
-	maxQueryValueLength          = 2048
-	maxPathParameterLength       = 256
+	defaultMaxRequestBodyBytes = int64(1024 * 1024)
+	maxRequestBodyBytes        = int64(4 * 1024 * 1024)
+	maxHeaderCount             = 32
+	maxHeaderNameLength        = 64
+	maxHeaderValueLength       = 4096
+	maxHeaderTotalLength       = 16 * 1024
+	maxQueryParameterCount     = 64
+	maxQueryNameLength         = 128
+	maxQueryValueLength        = 2048
+	maxPathParameterLength     = 256
 )
 
 var pathParameterPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,63}$`)
@@ -326,23 +320,24 @@ func responseHash(body []byte) string {
 func normalizeTimeouts(input TransportTimeouts) (TransportTimeouts, error) {
 	value := input
 	if value.Connect == 0 {
-		value.Connect = defaultConnectTimeout
+		value.Connect = IntegrationDefaultConnectTimeout
 	}
 	if value.TLSHandshake == 0 {
-		value.TLSHandshake = defaultTLSHandshakeTimeout
+		value.TLSHandshake = IntegrationDefaultTLSHandshake
 	}
 	if value.Request == 0 {
-		value.Request = defaultRequestTimeout
+		value.Request = IntegrationDefaultRequestTimeout
 	}
 	if value.ResponseHeader == 0 {
-		value.ResponseHeader = defaultResponseHeaderTimeout
+		value.ResponseHeader = IntegrationDefaultResponseHeader
 		if value.ResponseHeader > value.Request {
 			value.ResponseHeader = value.Request
 		}
 	}
 	if value.Connect <= 0 || value.TLSHandshake <= 0 || value.Request <= 0 || value.ResponseHeader <= 0 ||
-		value.Connect > 30*time.Second || value.TLSHandshake > 30*time.Second ||
-		value.ResponseHeader > value.Request || value.Request > 2*time.Minute {
+		value.Connect > IntegrationMaxConnectTimeout || value.TLSHandshake > IntegrationMaxTLSHandshakeTimeout ||
+		value.ResponseHeader > value.Request || value.ResponseHeader > IntegrationMaxResponseHeaderTimeout ||
+		value.Request > IntegrationMaxRequestTimeout {
 		return TransportTimeouts{}, newTransportError(TransportErrorInvalidConfig)
 	}
 	return value, nil
@@ -350,9 +345,9 @@ func normalizeTimeouts(input TransportTimeouts) (TransportTimeouts, error) {
 
 func normalizeMaxResponseBytes(value int64) (int64, error) {
 	if value == 0 {
-		return defaultMaxResponseBytes, nil
+		return IntegrationDefaultResponseBytes, nil
 	}
-	if value <= 0 || value > maxResponseBytes {
+	if value < IntegrationMinResponseBytes || value > IntegrationMaxResponseBytes {
 		return 0, newTransportError(TransportErrorInvalidConfig)
 	}
 	return value, nil

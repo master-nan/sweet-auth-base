@@ -54,6 +54,13 @@ const (
 	ErrorCodeIntegrationExecutionSensitiveInputRejected  = 130349
 	ErrorCodeIntegrationExecutionInputStorageFailed      = 130350
 	ErrorCodeIntegrationExecutionInputLoadFailed         = 130351
+	ErrorCodeIntegrationTimeoutOutOfRange                = 130352
+	ErrorCodeIntegrationResponseLimitOutOfRange          = 130353
+	ErrorCodeIntegrationRuntimeContractInvalid           = 130354
+	ErrorCodeIntegrationLeaseDurationInvalid             = 130355
+	ErrorCodeIntegrationLeaseMarginInsufficient          = 130356
+	ErrorCodeIntegrationInterfaceRuntimeIncompatible     = 130357
+	ErrorCodeIntegrationExecutionRuntimeIncompatible     = 130358
 )
 
 var (
@@ -311,5 +318,40 @@ var (
 		http.StatusInternalServerError,
 		ErrorCodeIntegrationExecutionInputLoadFailed,
 		"集成执行输入快照加载失败",
+	)
+	ErrIntegrationTimeoutOutOfRange = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationTimeoutOutOfRange,
+		"接口请求超时超出平台运行范围",
+	)
+	ErrIntegrationResponseLimitOutOfRange = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationResponseLimitOutOfRange,
+		"接口响应大小限制超出平台运行范围",
+	)
+	ErrIntegrationRuntimeContractInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRuntimeContractInvalid,
+		"集成运行参数契约不合法",
+	)
+	ErrIntegrationLeaseDurationInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationLeaseDurationInvalid,
+		"集成执行租约时长不合法",
+	)
+	ErrIntegrationLeaseMarginInsufficient = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationLeaseMarginInsufficient,
+		"集成执行租约安全余量不足",
+	)
+	ErrIntegrationInterfaceRuntimeIncompatible = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationInterfaceRuntimeIncompatible,
+		"接口定义与当前集成运行契约不兼容",
+	)
+	ErrIntegrationExecutionRuntimeIncompatible = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionRuntimeIncompatible,
+		"集成执行引用的接口不符合当前运行契约",
 	)
 )

@@ -2,9 +2,18 @@ package main
 
 import (
 	"backend/enum"
+	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
+	"fmt"
 	"testing"
+	"time"
+
+	"gorm.io/datatypes"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
@@ -62,6 +71,67 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	definition.Id = 12
 	if err := db.Create(&definition).Error; err == nil {
 		t.Fatal("expected duplicate interface version to be rejected")
+	}
+}
+
+func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
+	dsn := testutil.PostgreSQLDSN(t)
+	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	schemaName := fmt.Sprintf("integration_runtime_contract_%d", time.Now().UnixNano())
+	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)).Error; err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() { _ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
+	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
+	})
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL schema: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("initial migration: %v", err)
+	}
+	for _, name := range []string{"chk_integration_interface_enabled_timeout", "chk_integration_interface_enabled_response_limit"} {
+		if err := db.Exec(fmt.Sprintf(`ALTER TABLE integration_interface_definition DROP CONSTRAINT IF EXISTS %s`, name)).Error; err != nil {
+			t.Fatalf("drop runtime constraint %s: %v", name, err)
+		}
+	}
+	system := model.ExternalSystem{
+		Basic: model.Basic{Id: 7001, State: true}, SystemCode: "runtime_contract", Name: "Runtime Contract",
+		SystemType: model.ExternalSystemTypeERP, BaseURL: "https://runtime.example.com", OwnerIdentifier: "owner",
+		OwnerName: "owner", Status: model.ExternalSystemStatusEnabled, Revision: 1,
+	}
+	if err := db.Create(&system).Error; err != nil {
+		t.Fatalf("create system: %v", err)
+	}
+	definition := model.InterfaceDefinition{
+		Basic: model.Basic{Id: 7002, State: true}, ExternalSystemID: system.Id, InterfaceCode: "legacy_limit",
+		Name: "Legacy Limit", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
+		RelativePath: "/api/legacy", InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)),
+		TimeoutSeconds: 200, ResponseLimit: 80 * 1024 * 1024, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+	}
+	if err := db.Create(&definition).Error; err != nil {
+		t.Fatalf("create legacy enabled interface: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("contract migration: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("repeat contract migration: %v", err)
+	}
+	var migrated model.InterfaceDefinition
+	if err := db.First(&migrated, definition.Id).Error; err != nil {
+		t.Fatalf("load migrated interface: %v", err)
+	}
+	if migrated.Status != model.InterfaceDefinitionStatusDisabled || migrated.State || migrated.TimeoutSeconds != 200 || migrated.ResponseLimit != 80*1024*1024 {
+		t.Fatalf("legacy enabled interface was not safely disabled: %+v", migrated)
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).Updates(map[string]any{"status": model.InterfaceDefinitionStatusEnabled, "state": true}).Error; err == nil {
+		t.Fatal("expected PostgreSQL runtime contract CHECK to reject incompatible enable")
 	}
 }
 

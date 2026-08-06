@@ -62,7 +62,7 @@ const contractItems = computed(() => detail.value ? [
   { label: 'HTTP Method', value: detail.value.http_method, mono: true },
   { label: '相对路径', value: detail.value.relative_path, mono: true },
   { label: '超时', value: `${detail.value.timeout_seconds} 秒`, mono: false },
-  { label: '响应大小限制', value: `${detail.value.response_limit.toLocaleString()} 字节`, mono: false },
+  { label: '响应大小限制', value: `${(detail.value.response_limit / 1024).toLocaleString()} KiB`, mono: false },
   { label: '认证引用', value: detail.value.credential ? `${detail.value.credential.name}（${detail.value.credential.credential_code}）` : '未配置', mono: false },
   { label: '凭证状态', value: detail.value.credential?.effective_status || '-', mono: false },
   { label: '重试策略', value: detail.value.retry_policy_id ? '已配置重试策略' : '未配置', mono: false },

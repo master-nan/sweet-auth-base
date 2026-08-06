@@ -8,6 +8,7 @@ import (
 	"backend/repository"
 	queryutil "backend/repository/util"
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -183,7 +184,7 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			return err
 		}
 		if execution.Status != model.IntegrationExecutionStatusRunning || execution.Revision != completion.ExpectedRevision ||
-			execution.LeaseOwner != completion.WorkerID || execution.LeaseExpiresAt == nil || !execution.LeaseExpiresAt.After(completion.CompletedAt) {
+			execution.LeaseOwner != completion.WorkerID || execution.LeaseExpiresAt == nil {
 			return repository.ErrIntegrationExecutionLeaseLost
 		}
 		var attempt model.IntegrationLog
@@ -234,7 +235,7 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			"revision":           execution.Revision + 1,
 		}
 		result := tx.Model(&model.IntegrationExecution{}).
-			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID).
+			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ? AND lease_expires_at > ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID, completion.CompletedAt).
 			Updates(executionUpdates)
 		if result.Error != nil {
 			return result.Error
@@ -283,12 +284,15 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 	}
 	recovered := false
 	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		execution, err := r.FindByIdForUpdate(tx, recovery.ExecutionID)
+		var execution model.IntegrationExecution
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?", recovery.ExecutionID, model.IntegrationExecutionStatusRunning, recovery.RecoveredAt).
+			First(&execution).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
 		if err != nil {
 			return err
-		}
-		if execution.Status != model.IntegrationExecutionStatusRunning || execution.LeaseExpiresAt == nil || execution.LeaseExpiresAt.After(recovery.RecoveredAt) {
-			return nil
 		}
 		var attempt model.IntegrationLog
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -313,7 +317,7 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 			return repository.ErrIntegrationAttemptAlreadyCompleted
 		}
 		result := tx.Model(&model.IntegrationExecution{}).
-			Where("id = ? AND status = ? AND revision = ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision).
+			Where("id = ? AND status = ? AND revision = ? AND lease_expires_at <= ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, recovery.RecoveredAt).
 			Updates(map[string]any{
 				"status": model.IntegrationExecutionStatusFailed, "lease_owner": "", "lease_expires_at": nil,
 				"completed_at": recovery.RecoveredAt, "next_run_at": nil,

@@ -25,6 +25,7 @@ func ProvideIntegrationWorkerRunnerConfig(server *config.Server) (integration.Wo
 		InstanceConcurrency:   worker.InstanceConcurrency,
 		LeaseRecoveryInterval: time.Duration(worker.LeaseRecoveryInterval) * time.Second,
 		ShutdownTimeout:       time.Duration(worker.ShutdownTimeout) * time.Second,
+		LeaseDuration:         time.Duration(worker.LeaseDuration) * time.Second,
 	})
 }
 
@@ -52,7 +53,7 @@ func ProvideIntegrationExecutionEngine(
 ) (*integration.IntegrationExecutionEngine, error) {
 	return integration.NewIntegrationExecutionEngine(
 		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
-		integration.ExecutionEngineOptions{WorkerID: worker.WorkerID, BatchSize: worker.ClaimBatchSize},
+		integration.ExecutionEngineOptions{WorkerID: worker.WorkerID, LeaseDuration: worker.LeaseDuration, BatchSize: worker.ClaimBatchSize},
 	)
 }
 

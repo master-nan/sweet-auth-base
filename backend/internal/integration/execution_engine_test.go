@@ -34,6 +34,9 @@ func TestIntegrationExecutionEngineClaimRunAndConverge(t *testing.T) {
 	if claimed[0].Execution.Status != model.IntegrationExecutionStatusRunning || claimed[0].Attempt.AttemptNo != 1 || claimed[0].Attempt.WorkerID != "runtime-worker-1" {
 		t.Fatalf("unexpected claim: %+v", claimed[0])
 	}
+	if claimed[0].Execution.LeaseExpiresAt == nil || claimed[0].Execution.LeaseExpiresAt.Sub(claimed[0].Attempt.StartedAt) < IntegrationMinimumLeaseDuration {
+		t.Fatalf("claim lease does not include runtime safety margin: %+v", claimed[0].Execution.LeaseExpiresAt)
+	}
 	result, err := engine.RunExecution(context.Background(), claimed[0])
 	if err != nil || !result.Succeeded || result.HTTPStatus == nil || *result.HTTPStatus != http.StatusOK {
 		t.Fatalf("run result = %+v err=%v", result, err)
@@ -120,6 +123,26 @@ func TestIntegrationExecutionEngineConfigurationFailureDoesNotCallTransport(t *t
 	var stored model.IntegrationExecution
 	if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusFailed {
 		t.Fatalf("configuration failure convergence = %+v err=%v", stored, err)
+	}
+}
+
+func TestIntegrationExecutionEngineRejectsRuntimeIncompatibleDirtyConfiguration(t *testing.T) {
+	engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
+	defer closeServer()
+	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim = %+v err=%v", claimed, err)
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", execution.InterfaceDefinitionID).Update("timeout_seconds", 121).Error; err != nil {
+		t.Fatalf("prepare dirty runtime configuration: %v", err)
+	}
+	result, err := engine.RunExecution(context.Background(), claimed[0])
+	if err != nil || result.Succeeded || result.ReasonCode != "integration_execution_runtime_incompatible" {
+		t.Fatalf("runtime compatibility result = %+v err=%v", result, err)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusFailed {
+		t.Fatalf("runtime-incompatible convergence = %+v err=%v", stored, err)
 	}
 }
 
@@ -348,7 +371,7 @@ func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, cr
 	}
 	engine, err := NewIntegrationExecutionEngine(
 		impl.NewIntegrationExecutionRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary), impl.NewInterfaceDefinitionRepositoryImpl(primary), credentialRepository,
-		provider, client, guard, sf, ExecutionEngineOptions{WorkerID: "runtime-worker-1", LeaseDuration: time.Minute, BatchSize: 2},
+		provider, client, guard, sf, ExecutionEngineOptions{WorkerID: "runtime-worker-1", LeaseDuration: IntegrationDefaultLeaseDuration, BatchSize: 2},
 	)
 	if err != nil {
 		closeServer()

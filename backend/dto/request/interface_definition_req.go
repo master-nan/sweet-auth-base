@@ -40,8 +40,8 @@ type InterfaceDefinitionCreateReq struct {
 	RelativePath     string          `form:"relative_path" json:"relative_path" binding:"required,max=512"`
 	InputContract    json.RawMessage `form:"input_contract" json:"input_contract,omitempty"`
 	CredentialID     *int            `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
-	TimeoutSeconds   int             `form:"timeout_seconds" json:"timeout_seconds" binding:"required,gte=1,lte=300"`
-	ResponseLimit    int64           `form:"response_limit" json:"response_limit" binding:"required,gte=1024,lte=104857600"`
+	TimeoutSeconds   int             `form:"timeout_seconds" json:"timeout_seconds" binding:"required,gte=1"`
+	ResponseLimit    int64           `form:"response_limit" json:"response_limit" binding:"required,gte=1024"`
 	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
 	Description      string          `form:"description" json:"description" binding:"omitempty,max=512"`
 }
@@ -57,8 +57,8 @@ type InterfaceDefinitionUpdateReq struct {
 	InputContract    json.RawMessage `form:"input_contract" json:"input_contract,omitempty"`
 	CredentialID     *int            `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
 	ClearCredential  bool            `form:"clear_credential" json:"clear_credential"`
-	TimeoutSeconds   *int            `form:"timeout_seconds" json:"timeout_seconds" binding:"omitempty,gte=1,lte=300"`
-	ResponseLimit    *int64          `form:"response_limit" json:"response_limit" binding:"omitempty,gte=1024,lte=104857600"`
+	TimeoutSeconds   *int            `form:"timeout_seconds" json:"timeout_seconds" binding:"omitempty,gte=1"`
+	ResponseLimit    *int64          `form:"response_limit" json:"response_limit" binding:"omitempty,gte=1024"`
 	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
 	ClearRetryPolicy bool            `form:"clear_retry_policy" json:"clear_retry_policy"`
 	Description      *string         `form:"description" json:"description" binding:"omitempty,max=512"`

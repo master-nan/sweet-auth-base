@@ -332,6 +332,9 @@ func (s *IntegrationExecutionService) loadExecutionConfiguration(
 		definition.ExternalSystemID != system.Id {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
 	}
+	if err := integration.ValidateInterfaceRuntimeContract(definition.TimeoutSeconds, definition.ResponseLimit); err != nil {
+		return model.ExternalSystem{}, model.InterfaceDefinition{}, myerrors.ErrIntegrationExecutionRuntimeIncompatible
+	}
 	return system, definition, nil
 }
 

@@ -85,6 +85,17 @@ func TestIntegrationExecutionServiceConcurrentIdempotencyConverges(t *testing.T)
 	}
 }
 
+func TestIntegrationExecutionServiceRejectsRuntimeIncompatibleInterface(t *testing.T) {
+	svc, db, system, definition, _ := newIntegrationExecutionTestSubject(t)
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).Update("response_limit", int64(64*1024*1024+1)).Error; err != nil {
+		t.Fatalf("prepare incompatible interface: %v", err)
+	}
+	_, err := svc.CreateExecution(context.Background(), integrationExecutionCreateRequest(system.Id, definition.Id, "runtime-incompatible"))
+	if !errors.Is(err, apperrors.ErrIntegrationExecutionRuntimeIncompatible) {
+		t.Fatalf("runtime-incompatible execution error = %v", err)
+	}
+}
+
 func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T) {
 	svc, db, system, definition, auditWriter := newIntegrationExecutionTestSubject(t)
 	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(88, "runtime-admin"))

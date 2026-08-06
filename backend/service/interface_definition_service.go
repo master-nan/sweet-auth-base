@@ -29,10 +29,6 @@ const (
 	interfaceDefinitionAuditVersion      = "integration.interface_definition.create_version"
 	interfaceDefinitionAuditEnable       = "integration.interface_definition.enable"
 	interfaceDefinitionAuditDisable      = "integration.interface_definition.disable"
-	interfaceTimeoutMinSeconds           = 1
-	interfaceTimeoutMaxSeconds           = 300
-	interfaceResponseLimitMin            = int64(1024)
-	interfaceResponseLimitMax            = int64(100 * 1024 * 1024)
 )
 
 var interfaceCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
@@ -319,6 +315,9 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 		}
 		if target == model.InterfaceDefinitionStatusEnabled {
 			if err := validateInterfaceConfiguration(current); err != nil {
+				if errors.Is(err, myerrors.ErrIntegrationTimeoutOutOfRange) || errors.Is(err, myerrors.ErrIntegrationResponseLimitOutOfRange) {
+					return myerrors.ErrIntegrationInterfaceRuntimeIncompatible
+				}
 				return err
 			}
 			if _, err := s.validateReferences(tx, current, true); err != nil {
@@ -510,9 +509,11 @@ func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.I
 func validateInterfaceConfiguration(value model.InterfaceDefinition) error {
 	if strings.TrimSpace(value.Name) == "" || !interfaceCodePattern.MatchString(value.InterfaceCode) ||
 		!validInterfaceProtocol(value.Protocol) || !validInterfaceMethod(value.HTTPMethod) || value.Version <= 0 ||
-		value.TimeoutSeconds < interfaceTimeoutMinSeconds || value.TimeoutSeconds > interfaceTimeoutMaxSeconds ||
-		value.ResponseLimit < interfaceResponseLimitMin || value.ResponseLimit > interfaceResponseLimitMax {
+		value.TimeoutSeconds <= 0 || value.ResponseLimit <= 0 {
 		return myerrors.ErrInterfaceConfigurationInvalid
+	}
+	if err := integration.ValidateInterfaceRuntimeContract(value.TimeoutSeconds, value.ResponseLimit); err != nil {
+		return err
 	}
 	path, err := normalizeInterfaceRelativePath(value.RelativePath)
 	if err != nil {

@@ -2,6 +2,7 @@ package impl
 
 import (
 	"backend/internal/database"
+	"backend/internal/integration"
 	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
@@ -51,8 +52,8 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 	second := NewIntegrationExecutionRepositoryImpl(primary)
 	now := model.Now()
 	requests := []repository.IntegrationExecutionClaimRequest{
-		{WorkerID: "postgres-worker-a", StartedAt: now, LeaseExpiresAt: now.Add(time.Minute), AttemptIDs: []int{7101}},
-		{WorkerID: "postgres-worker-b", StartedAt: now, LeaseExpiresAt: now.Add(time.Minute), AttemptIDs: []int{7102}},
+		{WorkerID: "postgres-worker-a", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7101}},
+		{WorkerID: "postgres-worker-b", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7102}},
 	}
 	start := make(chan struct{})
 	var group sync.WaitGroup
@@ -93,6 +94,40 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 	if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", execution.Id).Count(&attempts).Error; err != nil || attempts != 1 {
 		t.Fatalf("attempt count = %d err=%v", attempts, err)
 	}
+	var running model.IntegrationExecution
+	if err := db.First(&running, execution.Id).Error; err != nil {
+		t.Fatalf("load claimed execution: %v", err)
+	}
+	if running.LeaseExpiresAt == nil || running.LeaseExpiresAt.Sub(now) < integration.IntegrationMinimumLeaseDuration {
+		t.Fatalf("claimed lease does not include safety margin: %+v", running.LeaseExpiresAt)
+	}
+	if candidates, err := first.FindExpiredRunningExecutions(context.Background(), now.Add(integration.IntegrationMinimumLeaseDuration-time.Second), 1); err != nil || len(candidates) != 0 {
+		t.Fatalf("valid maximum-duration lease was recovered early: values=%+v err=%v", candidates, err)
+	}
+	expiredAt := now.Add(-time.Second)
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Update("lease_expires_at", expiredAt).Error; err != nil {
+		t.Fatalf("expire lease: %v", err)
+	}
+	recoveryAt := model.Now().Add(time.Minute)
+	expiredCandidates, err := first.FindExpiredRunningExecutions(context.Background(), recoveryAt, 1)
+	if err != nil || len(expiredCandidates) != 1 {
+		t.Fatalf("expired lease was not visible: values=%+v err=%v", expiredCandidates, err)
+	}
+	recovered, err := first.RecoverExpiredExecution(context.Background(), repository.ExpiredExecutionRecovery{ExecutionID: execution.Id, RecoveredAt: recoveryAt})
+	if err != nil || !recovered {
+		t.Fatalf("recover expired execution = %t err=%v", recovered, err)
+	}
+	var recoveredExecution model.IntegrationExecution
+	var recoveredAttempt model.IntegrationLog
+	if err := db.First(&recoveredExecution, execution.Id).Error; err != nil {
+		t.Fatalf("load recovered execution: %v", err)
+	}
+	if err := db.Where("execution_id = ?", execution.Id).First(&recoveredAttempt).Error; err != nil {
+		t.Fatalf("load recovered attempt: %v", err)
+	}
+	if recoveredExecution.Status != model.IntegrationExecutionStatusFailed || recoveredAttempt.ResultCertainty != model.IntegrationResultCertaintyUnknown {
+		t.Fatalf("unexpected recovery result: execution=%+v attempt=%+v", recoveredExecution, recoveredAttempt)
+	}
 }
 
 func postgresClaimDSN(t *testing.T, dsn string, schemaName string) string {
@@ -103,6 +138,7 @@ func postgresClaimDSN(t *testing.T, dsn string, schemaName string) string {
 	}
 	query := parsed.Query()
 	query.Set("search_path", schemaName)
+	query.Set("TimeZone", "Asia/Shanghai")
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
 }

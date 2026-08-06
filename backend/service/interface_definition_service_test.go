@@ -222,6 +222,40 @@ func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 	}
 }
 
+func TestInterfaceDefinitionServiceUsesRuntimeHardLimits(t *testing.T) {
+	svc, db, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	ctx := context.Background()
+	maximum := interfaceDefinitionCreateRequest(system.Id, "maximum_contract")
+	maximum.TimeoutSeconds = 120
+	maximum.ResponseLimit = 64 * 1024 * 1024
+	created, err := svc.Create(ctx, maximum)
+	if err != nil {
+		t.Fatalf("create maximum runtime contract: %v", err)
+	}
+
+	overTimeout := interfaceDefinitionCreateRequest(system.Id, "timeout_too_large")
+	overTimeout.TimeoutSeconds = 121
+	if _, err := svc.Create(ctx, overTimeout); !errors.Is(err, apperrors.ErrIntegrationTimeoutOutOfRange) {
+		t.Fatalf("timeout upper bound error = %v", err)
+	}
+	overResponse := interfaceDefinitionCreateRequest(system.Id, "response_too_large")
+	overResponse.ResponseLimit = 64*1024*1024 + 1
+	if _, err := svc.Create(ctx, overResponse); !errors.Is(err, apperrors.ErrIntegrationResponseLimitOutOfRange) {
+		t.Fatalf("response upper bound error = %v", err)
+	}
+
+	invalidTimeout := 121
+	if _, err := svc.Update(ctx, created.Id, request.InterfaceDefinitionUpdateReq{TimeoutSeconds: &invalidTimeout, Revision: created.Revision}); !errors.Is(err, apperrors.ErrIntegrationTimeoutOutOfRange) {
+		t.Fatalf("draft update upper bound error = %v", err)
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", created.Id).Update("timeout_seconds", 121).Error; err != nil {
+		t.Fatalf("prepare incompatible draft: %v", err)
+	}
+	if _, err := svc.Enable(ctx, created.Id, created.Revision); !errors.Is(err, apperrors.ErrIntegrationInterfaceRuntimeIncompatible) {
+		t.Fatalf("enable runtime-incompatible draft error = %v", err)
+	}
+}
+
 func newInterfaceDefinitionTestSubject(t *testing.T, writer StandardContextAuditWriter) (*InterfaceDefinitionService, *gorm.DB, model.ExternalSystem) {
 	t.Helper()
 	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.InterfaceDefinition{}, &model.Credential{})

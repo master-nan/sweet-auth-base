@@ -36,6 +36,7 @@ integration:
     instance_concurrency: 4
     lease_recovery_interval: 60
     shutdown_timeout: 15
+    lease_duration: 180
 conf:
   salt: 'local-docker-sweet-admin-salt-change-me'
   enable: false

@@ -308,17 +308,17 @@ func TestHTTPTransportClientControlsJSONBodyAndResponseLimits(t *testing.T) {
 
 	policy, _ := NewEndpointPolicy(false, nil, staticHostResolver{"api.integration.test": {net.ParseIP("93.184.216.34")}})
 	oversizeClient, _ := NewHTTPTransportClient(policy, TransportClientOptions{RoundTripper: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}, "Content-Length": {"99"}}, ContentLength: 99, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}, "Content-Length": {"2048"}}, ContentLength: 2048, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
 	})})
-	request = newRequest(t, http.MethodGet, "/large", func(input *TransportRequestInput) { input.MaxResponseBytes = 8 })
+	request = newRequest(t, http.MethodGet, "/large", func(input *TransportRequestInput) { input.MaxResponseBytes = 1024 })
 	result, err := oversizeClient.Execute(context.Background(), request)
 	assertTransportCategory(t, err, TransportErrorResponseTooLarge)
-	if result.ResponseSize != 99 || result.CompleteResponse || result.Determinacy != TransportDeterminacyUnknown {
+	if result.ResponseSize != 2048 || result.CompleteResponse || result.Determinacy != TransportDeterminacyUnknown {
 		t.Fatalf("declared oversize result was unsafe: %+v", result)
 	}
 
 	streamClient, _ := NewHTTPTransportClient(policy, TransportClientOptions{RoundTripper: roundTripperFunc(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, ContentLength: -1, Body: io.NopCloser(strings.NewReader(`{"too":"large"}`))}, nil
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, ContentLength: -1, Body: io.NopCloser(strings.NewReader(strings.Repeat("x", 2048)))}, nil
 	})})
 	result, err = streamClient.Execute(context.Background(), request)
 	assertTransportCategory(t, err, TransportErrorResponseTooLarge)

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
 	"context"
@@ -43,6 +44,10 @@ func TestNewWorkerRunnerConfigRejectsUnsafeValues(t *testing.T) {
 	_, err = NewWorkerRunnerConfig(WorkerRunnerConfig{Enabled: true, WorkerID: "", PollInterval: time.Second})
 	if err == nil {
 		t.Fatal("expected enabled worker without identity to fail")
+	}
+	_, err = NewWorkerRunnerConfig(WorkerRunnerConfig{Enabled: true, WorkerID: "worker", LeaseDuration: IntegrationMinimumLeaseDuration - time.Second})
+	if !errors.Is(err, myerrors.ErrIntegrationLeaseMarginInsufficient) {
+		t.Fatalf("insufficient lease margin error = %v", err)
 	}
 }
 

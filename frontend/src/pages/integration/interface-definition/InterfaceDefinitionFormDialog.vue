@@ -44,8 +44,21 @@
         hint="仅填写以 / 开头的相对路径"
         :rules="[(value) => /^\/(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))[^?#\s]*$/.test(value || '') || '请输入安全的相对路径']"
       />
-      <q-input v-model.number="form.timeout_seconds" outlined dense type="number" min="1" max="300" label="超时（秒） *" />
-      <q-input v-model.number="form.response_limit" outlined dense type="number" min="1024" max="104857600" label="响应大小限制（字节） *" />
+      <q-input
+        v-model.number="form.timeout_seconds"
+        outlined dense type="number" min="1" :max="MAX_TIMEOUT_SECONDS"
+        label="请求超时（秒） *"
+        hint="平台允许 1 至 120 秒"
+        :rules="[(value) => value >= 1 && value <= MAX_TIMEOUT_SECONDS || '请求超时必须在 1 至 120 秒之间']"
+      />
+      <q-input
+        outlined dense type="number" min="1" :max="MAX_RESPONSE_KIB"
+        label="响应大小限制（KiB） *"
+        :model-value="responseLimitKiB"
+        hint="1 KiB 至 65,536 KiB（64 MiB）"
+        :rules="[() => form.response_limit >= MIN_RESPONSE_BYTES && form.response_limit <= MAX_RESPONSE_BYTES || '响应大小必须在 1 KiB 至 64 MiB 之间']"
+        @update:model-value="updateResponseLimitKiB"
+      />
       <q-input v-model="form.description" outlined dense type="textarea" autogrow class="interface-form__wide" label="描述" />
     </q-form>
     <template #footer-status>
@@ -99,6 +112,17 @@ const credentialOptions = computed(() => props.credentials
   .map((item) => ({ label: `${item.name}（${item.credential_code}）`, value: item.id })))
 const protocolOptions = [{ label: 'HTTPS', value: 'https' }, { label: 'HTTP', value: 'http' }]
 const methodOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
+const MAX_TIMEOUT_SECONDS = 120
+const MIN_RESPONSE_BYTES = 1024
+const MAX_RESPONSE_BYTES = 64 * 1024 * 1024
+const KIBIBYTE = 1024
+const MAX_RESPONSE_KIB = MAX_RESPONSE_BYTES / KIBIBYTE
+const responseLimitKiB = computed(() => form.response_limit / KIBIBYTE)
+
+function updateResponseLimitKiB(value: string | number | null) {
+  const numeric = Number(value)
+  form.response_limit = Number.isFinite(numeric) ? Math.round(numeric * KIBIBYTE) : 0
+}
 
 function emptyForm(): InterfaceFormValue {
   return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, timeout_seconds: 30, response_limit: 10485760, description: '' }
