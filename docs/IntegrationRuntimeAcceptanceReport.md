@@ -353,3 +353,59 @@ yarn build
 3. 租约时长大于请求上限并包含完成余量的配置校验。
 
 全部阻塞项关闭后，由 INT-003B-7R 重新执行正式验收并决定是否冻结。
+
+### 15.5 INT-003B-7B Execution 输入快照设计与存储
+
+2026-08-06 已完成本项整改。正式设计已在 `IntegrationRuntimeDesign.md` 冻结版本 1 输入快照：只包含接口契约允许的 Path、Query、普通 Header 和 JSON Body，不包含 Host、完整 URL、Credential、Authorization、代理、TLS、脚本、SQL、模板或表达式。
+
+InterfaceDefinition 新增版本化 `input_contract`，定义参数编码、位置、数据类型、必填性、最大长度、是否多值和敏感标记。路径占位符与 Path 契约必须精确一致；已启用版本不能原地修改技术契约，创建下一版本时完整复制契约。
+
+V1 采用 PostgreSQL JSONB 保存规范化、非敏感输入，数据库同时保存快照版本和大小摘要。当前没有接入 KMS，也没有复用 Credential AES-GCM 密钥语义；契约声明为敏感的字段、敏感控制名称、二进制、Multipart 和超过限制的输入均被拒绝。Execution API 和管理页面不提供完整快照读取能力。
+
+服务端限制为：Path 32 项/4 KiB、Query 64 项/16 KiB、Header 16 项/8 KiB、JSON Body 256 KiB、完整快照 384 KiB、JSON 深度 16、单数组 256 项、字段总数 256、单字符串 4 KiB。
+
+### 15.6 规范化、幂等与 Worker 请求重建
+
+Execution 创建 Service 现在加载明确的 InterfaceDefinition 版本，对输入执行契约校验和规范化，再对“明确接口版本 + 规范化快照”计算服务端 SHA-256。客户端 `input_hash` 只作为可选比对值，不能覆盖服务端结果。
+
+规范化规则包括：Header 名称小写、Query 多值稳定排序、JSON 对象稳定键顺序、JSON 数组保持顺序。`request_id`、`trace_id`、Worker ID、Credential 秘密和时间字段不参与 Hash。相同幂等键且规范化输入相同返回原 Execution；输入不同返回稳定冲突；并发创建最终只保留一条记录。
+
+Worker 在 Credential 解析和 Transport 调用之前完成：加载快照、校验版本和大小、按冻结契约重新规范化、重算 Hash、校验规范化字节与 Hash，然后重建 Path、Query、普通 Header 和 JSON Body。Credential Provider 最后注入认证。快照缺失、损坏或 Hash 不一致时不发送 HTTP，并按配置错误完成 Attempt。
+
+Repository 领取条件只接受版本 1 且大小有效的待执行记录。Migration 将没有快照的历史 `created` / `retry_waiting` Execution 收敛为 `failed`，不伪造空输入继续调用。
+
+### 15.7 DTO、日志与页面边界
+
+Execution 详情只新增输入摘要：快照版本、大小、Path/Query/Header 数量和是否包含 Body。DTO 白名单测试确认不返回 Path、Query、Header 和 JSON Body 原值。
+
+动态 Engine 测试实际携带业务 Path、Header 和 Body，并捕获结构化日志确认这些原值及认证 Token 不进入日志。Audit 继续只记录 Execution 创建和合法取消，不记录输入快照。
+
+当前 Runtime 页面没有创建 Execution 的动态输入表单，本 Task 未增加自由 JSON、任意 Header 或完整 URL 编辑器。管理页面仍只展示输入 Hash 与安全摘要；动态契约配置和受控提交入口属于后续产品化范围。
+
+### 15.8 INT-003B-7B 实际验证
+
+```text
+cd backend && go test ./... -count=1
+结果：通过。
+
+go test -race ./internal/integration/... ./service ./repository/impl -count=1
+结果：通过。
+
+SWEET_TEST_POSTGRES_DSN=<本地 Docker PostgreSQL 16>
+go test ./migrate -run TestIntegrationRuntimeSchemaPostgreSQLConstraints -count=1
+结果：通过；实际验证 JSONB 字段、CHECK、Migration 重复执行和无效契约/快照约束。
+
+go test ./repository/impl -run TestIntegrationExecutionPostgreSQLClaimUsesRowLock -count=1
+结果：通过；真实 PostgreSQL 行锁领取回归未受输入快照条件影响。
+```
+
+前端代码未修改，因此本整改未重复执行 Yarn。前端边界通过现有页面代码审计确认：当前没有创建 Execution 的自由输入入口，也没有完整 Payload 查看能力。
+
+### 15.9 当前剩余阻塞项
+
+本补充关闭第 13.1 节中的第 2 项，但不改变本报告“不通过”的正式结论。当前仅剩 INT-003B-7C 范围内两项：
+
+1. 统一 InterfaceDefinition 与 Transport 的超时、响应大小契约。
+2. 校验 Worker 租约时长大于最大请求时长并包含状态完成安全余量。
+
+完成上述整改后，仍须由 INT-003B-7R 重新执行完整 Runtime 验收并决定是否冻结。

@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
+	"backend/internal/integration"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -71,12 +73,30 @@ func (s *IntegrationExecutionService) CreateExecution(
 
 	var value model.IntegrationExecution
 	var interfaceVersion int
+	var serverInputHash string
 	err = RunInTransaction(ctx, s.executions.DBWithContext(ctx), func(tx *gorm.DB) error {
 		system, definition, err := s.loadExecutionConfiguration(tx, req)
 		if err != nil {
 			return err
 		}
 		interfaceVersion = definition.Version
+		_, snapshot, inputHash, err := integration.BuildExecutionInputSnapshot(
+			definition.InputContract,
+			definition.HTTPMethod,
+			definition.RelativePath,
+			definition.Version,
+			integration.ExecutionInputValues{
+				PathParams: req.Input.PathParams, QueryParams: req.Input.QueryParams,
+				Headers: req.Input.Headers, JSONBody: req.Input.JSONBody,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		serverInputHash = inputHash
+		if req.InputHash != "" && req.InputHash != serverInputHash {
+			return myerrors.ErrIntegrationExecutionInputHashMismatch
+		}
 
 		existing, err := s.executions.FindByIdempotency(
 			tx,
@@ -86,7 +106,7 @@ func (s *IntegrationExecutionService) CreateExecution(
 			req.IdempotencyKey,
 		)
 		if err == nil {
-			if existing.InputHash != req.InputHash {
+			if existing.InputHash != serverInputHash {
 				return myerrors.ErrIntegrationExecutionIdempotencyConflict
 			}
 			value = existing
@@ -114,7 +134,10 @@ func (s *IntegrationExecutionService) CreateExecution(
 			Status:                model.IntegrationExecutionStatusCreated,
 			IdempotencyScope:      req.IdempotencyScope,
 			IdempotencyKey:        req.IdempotencyKey,
-			InputHash:             req.InputHash,
+			InputHash:             serverInputHash,
+			InputSnapshot:         datatypes.JSON(snapshot),
+			InputSnapshotVersion:  integration.ExecutionInputSnapshotVersion,
+			InputSnapshotSize:     len(snapshot),
 			Revision:              1,
 		}
 		if err := s.executions.Create(tx, &value); err != nil {
@@ -126,7 +149,7 @@ func (s *IntegrationExecutionService) CreateExecution(
 		return s.writeAudit(ctx, tx, integrationExecutionAuditCreate, value, "", value.Status)
 	})
 	if errors.Is(err, errIntegrationIdempotencyRace) {
-		return s.resolveIdempotencyRace(ctx, req, interfaceVersion)
+		return s.resolveIdempotencyRace(ctx, req, interfaceVersion, serverInputHash)
 	}
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, err
@@ -316,6 +339,7 @@ func (s *IntegrationExecutionService) resolveIdempotencyRace(
 	ctx context.Context,
 	req request.IntegrationExecutionCreateReq,
 	interfaceVersion int,
+	serverInputHash string,
 ) (response.IntegrationExecutionDetailRes, error) {
 	value, err := s.executions.FindByIdempotency(
 		s.executions.DBWithContext(ctx),
@@ -327,7 +351,7 @@ func (s *IntegrationExecutionService) resolveIdempotencyRace(
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, myerrors.WrapDatabaseError(err)
 	}
-	if value.InputHash != req.InputHash {
+	if value.InputHash != serverInputHash {
 		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionIdempotencyConflict
 	}
 	return response.NewIntegrationExecutionDetailRes(value), nil
@@ -344,7 +368,7 @@ func normalizeIntegrationExecutionCreateReq(
 		!validIntegrationTriggerSource(req.TriggerSource) ||
 		!integrationIdempotencyScopePattern.MatchString(req.IdempotencyScope) ||
 		req.IdempotencyKey == "" || len(req.IdempotencyKey) > 128 ||
-		!integrationInputHashPattern.MatchString(req.InputHash) {
+		req.InputHash != "" && !integrationInputHashPattern.MatchString(req.InputHash) {
 		return request.IntegrationExecutionCreateReq{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
 	}
 	return req, nil

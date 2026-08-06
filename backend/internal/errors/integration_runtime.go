@@ -3,43 +3,57 @@ package errors
 import "net/http"
 
 const (
-	ErrorCodeIntegrationExecutionNotFound             = 130301
-	ErrorCodeIntegrationExecutionIdempotencyConflict  = 130302
-	ErrorCodeIntegrationExecutionStatusInvalid        = 130303
-	ErrorCodeIntegrationExecutionRevisionConflict     = 130304
-	ErrorCodeIntegrationExecutionConfigurationInvalid = 130305
-	ErrorCodeIntegrationCredentialNotFound            = 130306
-	ErrorCodeIntegrationCredentialSystemMismatch      = 130307
-	ErrorCodeIntegrationCredentialInterfaceMismatch   = 130308
-	ErrorCodeIntegrationCredentialInactive            = 130309
-	ErrorCodeIntegrationCredentialExpired             = 130310
-	ErrorCodeIntegrationCredentialRevoked             = 130311
-	ErrorCodeIntegrationCredentialTypeUnsupported     = 130312
-	ErrorCodeIntegrationCredentialSecretMissing       = 130313
-	ErrorCodeIntegrationCredentialDecryptFailed       = 130314
-	ErrorCodeIntegrationCredentialMaterialInvalid     = 130315
-	ErrorCodeIntegrationCredentialInjectionInvalid    = 130316
-	ErrorCodeIntegrationExecutionClaimConflict        = 130317
-	ErrorCodeIntegrationExecutionLeaseLost            = 130318
-	ErrorCodeIntegrationAttemptCreateFailed           = 130319
-	ErrorCodeIntegrationAttemptAlreadyCompleted       = 130320
-	ErrorCodeIntegrationConfigurationUnavailable      = 130321
-	ErrorCodeIntegrationCredentialResolutionFailed    = 130322
-	ErrorCodeIntegrationTransportFailed               = 130323
-	ErrorCodeIntegrationExecutionCompleteFailed       = 130324
-	ErrorCodeIntegrationExecutionResultUnknown        = 130325
-	ErrorCodeIntegrationConcurrencyLimitReached       = 130326
-	ErrorCodeIntegrationLeaseRecoveryFailed           = 130327
-	ErrorCodeIntegrationWorkerDisabled                = 130328
-	ErrorCodeIntegrationWorkerAlreadyRunning          = 130329
-	ErrorCodeIntegrationWorkerInvalidConfig           = 130330
-	ErrorCodeIntegrationWorkerStartFailed             = 130331
-	ErrorCodeIntegrationWorkerPollFailed              = 130332
-	ErrorCodeIntegrationWorkerClaimFailed             = 130333
-	ErrorCodeIntegrationWorkerExecutionFailed         = 130334
-	ErrorCodeIntegrationWorkerRecoveryFailed          = 130335
-	ErrorCodeIntegrationWorkerShutdownTimeout         = 130336
-	ErrorCodeIntegrationWorkerPanicRecovered          = 130337
+	ErrorCodeIntegrationExecutionNotFound                = 130301
+	ErrorCodeIntegrationExecutionIdempotencyConflict     = 130302
+	ErrorCodeIntegrationExecutionStatusInvalid           = 130303
+	ErrorCodeIntegrationExecutionRevisionConflict        = 130304
+	ErrorCodeIntegrationExecutionConfigurationInvalid    = 130305
+	ErrorCodeIntegrationCredentialNotFound               = 130306
+	ErrorCodeIntegrationCredentialSystemMismatch         = 130307
+	ErrorCodeIntegrationCredentialInterfaceMismatch      = 130308
+	ErrorCodeIntegrationCredentialInactive               = 130309
+	ErrorCodeIntegrationCredentialExpired                = 130310
+	ErrorCodeIntegrationCredentialRevoked                = 130311
+	ErrorCodeIntegrationCredentialTypeUnsupported        = 130312
+	ErrorCodeIntegrationCredentialSecretMissing          = 130313
+	ErrorCodeIntegrationCredentialDecryptFailed          = 130314
+	ErrorCodeIntegrationCredentialMaterialInvalid        = 130315
+	ErrorCodeIntegrationCredentialInjectionInvalid       = 130316
+	ErrorCodeIntegrationExecutionClaimConflict           = 130317
+	ErrorCodeIntegrationExecutionLeaseLost               = 130318
+	ErrorCodeIntegrationAttemptCreateFailed              = 130319
+	ErrorCodeIntegrationAttemptAlreadyCompleted          = 130320
+	ErrorCodeIntegrationConfigurationUnavailable         = 130321
+	ErrorCodeIntegrationCredentialResolutionFailed       = 130322
+	ErrorCodeIntegrationTransportFailed                  = 130323
+	ErrorCodeIntegrationExecutionCompleteFailed          = 130324
+	ErrorCodeIntegrationExecutionResultUnknown           = 130325
+	ErrorCodeIntegrationConcurrencyLimitReached          = 130326
+	ErrorCodeIntegrationLeaseRecoveryFailed              = 130327
+	ErrorCodeIntegrationWorkerDisabled                   = 130328
+	ErrorCodeIntegrationWorkerAlreadyRunning             = 130329
+	ErrorCodeIntegrationWorkerInvalidConfig              = 130330
+	ErrorCodeIntegrationWorkerStartFailed                = 130331
+	ErrorCodeIntegrationWorkerPollFailed                 = 130332
+	ErrorCodeIntegrationWorkerClaimFailed                = 130333
+	ErrorCodeIntegrationWorkerExecutionFailed            = 130334
+	ErrorCodeIntegrationWorkerRecoveryFailed             = 130335
+	ErrorCodeIntegrationWorkerShutdownTimeout            = 130336
+	ErrorCodeIntegrationWorkerPanicRecovered             = 130337
+	ErrorCodeIntegrationExecutionInputMissing            = 130338
+	ErrorCodeIntegrationExecutionInputInvalid            = 130339
+	ErrorCodeIntegrationExecutionInputTooLarge           = 130340
+	ErrorCodeIntegrationExecutionInputContractMismatch   = 130341
+	ErrorCodeIntegrationExecutionInputHashMismatch       = 130342
+	ErrorCodeIntegrationExecutionInputVersionUnsupported = 130343
+	ErrorCodeIntegrationExecutionPathParameterMissing    = 130344
+	ErrorCodeIntegrationExecutionPathParameterUnknown    = 130345
+	ErrorCodeIntegrationExecutionQueryParameterInvalid   = 130346
+	ErrorCodeIntegrationExecutionHeaderNotAllowed        = 130347
+	ErrorCodeIntegrationExecutionBodyInvalid             = 130348
+	ErrorCodeIntegrationExecutionSensitiveInputRejected  = 130349
+	ErrorCodeIntegrationExecutionInputStorageFailed      = 130350
+	ErrorCodeIntegrationExecutionInputLoadFailed         = 130351
 )
 
 var (
@@ -227,5 +241,75 @@ var (
 		http.StatusInternalServerError,
 		ErrorCodeIntegrationWorkerPanicRecovered,
 		"集成常驻 Worker 执行异常已恢复",
+	)
+	ErrIntegrationExecutionInputMissing = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionInputMissing,
+		"集成执行输入快照缺失",
+	)
+	ErrIntegrationExecutionInputInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionInputInvalid,
+		"集成执行输入不合法",
+	)
+	ErrIntegrationExecutionInputTooLarge = NewBusinessError(
+		http.StatusRequestEntityTooLarge,
+		ErrorCodeIntegrationExecutionInputTooLarge,
+		"集成执行输入超过平台限制",
+	)
+	ErrIntegrationExecutionInputContractMismatch = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionInputContractMismatch,
+		"集成执行输入与接口契约不匹配",
+	)
+	ErrIntegrationExecutionInputHashMismatch = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionInputHashMismatch,
+		"集成执行输入完整性校验失败",
+	)
+	ErrIntegrationExecutionInputVersionUnsupported = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionInputVersionUnsupported,
+		"集成执行输入快照版本不受支持",
+	)
+	ErrIntegrationExecutionPathParameterMissing = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionPathParameterMissing,
+		"集成执行缺少必填 Path 参数",
+	)
+	ErrIntegrationExecutionPathParameterUnknown = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionPathParameterUnknown,
+		"集成执行包含未声明的 Path 参数",
+	)
+	ErrIntegrationExecutionQueryParameterInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionQueryParameterInvalid,
+		"集成执行 Query 参数不合法",
+	)
+	ErrIntegrationExecutionHeaderNotAllowed = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionHeaderNotAllowed,
+		"集成执行 Header 不在允许范围内",
+	)
+	ErrIntegrationExecutionBodyInvalid = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionBodyInvalid,
+		"集成执行 JSON Body 不合法",
+	)
+	ErrIntegrationExecutionSensitiveInputRejected = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationExecutionSensitiveInputRejected,
+		"集成执行不允许保存敏感输入",
+	)
+	ErrIntegrationExecutionInputStorageFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationExecutionInputStorageFailed,
+		"集成执行输入快照保存失败",
+	)
+	ErrIntegrationExecutionInputLoadFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationExecutionInputLoadFailed,
+		"集成执行输入快照加载失败",
 	)
 )

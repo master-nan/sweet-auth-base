@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
+	"backend/internal/integration"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -17,6 +18,7 @@ import (
 	"unicode"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -65,10 +67,14 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
+	contract, err := integration.NormalizeInputContract(req.InputContract, req.HTTPMethod, path)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
 	value := model.InterfaceDefinition{
 		ExternalSystemID: req.ExternalSystemID, InterfaceCode: code, Name: strings.TrimSpace(req.Name), Version: 1,
 		Protocol: strings.ToLower(strings.TrimSpace(req.Protocol)), HTTPMethod: strings.ToUpper(strings.TrimSpace(req.HTTPMethod)),
-		RelativePath: path, CredentialID: req.CredentialID, TimeoutSeconds: req.TimeoutSeconds,
+		RelativePath: path, InputContract: datatypes.JSON(contract), CredentialID: req.CredentialID, TimeoutSeconds: req.TimeoutSeconds,
 		ResponseLimit: req.ResponseLimit, RetryPolicyID: req.RetryPolicyID,
 		Status: model.InterfaceDefinitionStatusDraft, Description: strings.TrimSpace(req.Description), Revision: 1,
 	}
@@ -457,6 +463,10 @@ func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.I
 		next.RelativePath = path
 		updates["relative_path"] = path
 	}
+	contractChanged := len(req.InputContract) > 0
+	if contractChanged {
+		next.InputContract = append(datatypes.JSON(nil), req.InputContract...)
+	}
 	if req.ClearCredential {
 		next.CredentialID = nil
 		updates["credential_id"] = nil
@@ -486,6 +496,14 @@ func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.I
 	if err := validateInterfaceConfiguration(next); err != nil {
 		return nil, current, err
 	}
+	if contractChanged {
+		contract, err := integration.NormalizeInputContract(next.InputContract, next.HTTPMethod, next.RelativePath)
+		if err != nil {
+			return nil, current, err
+		}
+		next.InputContract = datatypes.JSON(contract)
+		updates["input_contract"] = next.InputContract
+	}
 	return updates, next, nil
 }
 
@@ -496,7 +514,11 @@ func validateInterfaceConfiguration(value model.InterfaceDefinition) error {
 		value.ResponseLimit < interfaceResponseLimitMin || value.ResponseLimit > interfaceResponseLimitMax {
 		return myerrors.ErrInterfaceConfigurationInvalid
 	}
-	_, err := normalizeInterfaceRelativePath(value.RelativePath)
+	path, err := normalizeInterfaceRelativePath(value.RelativePath)
+	if err != nil {
+		return err
+	}
+	_, err = integration.NormalizeInputContract(value.InputContract, value.HTTPMethod, path)
 	return err
 }
 

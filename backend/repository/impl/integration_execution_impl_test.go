@@ -12,6 +12,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"gorm.io/datatypes"
 )
 
 func TestIntegrationExecutionRepositoryDomainQueriesAndPagination(t *testing.T) {
@@ -186,13 +188,16 @@ func TestIntegrationExecutionRepositoryClaimRollsBackWhenAttemptCreationFails(t 
 }
 
 func repositoryExecutionFixture(id int, number, status, key string) model.IntegrationExecution {
+	snapshot := datatypes.JSON([]byte(`{"version":1,"path_params":{},"query_params":{},"headers":{}}`))
 	return model.IntegrationExecution{
 		Basic: model.Basic{Id: id, State: true}, ExecutionNo: number,
 		ExternalSystemID: 10, ExternalSystemCode: "repo_system", ExternalSystemName: "Repo System",
 		InterfaceDefinitionID: 20, InterfaceCode: "repo_api", InterfaceName: "Repo API", InterfaceVersion: 1,
 		TriggerSource: model.IntegrationTriggerSourceManual, Status: status,
 		IdempotencyScope: "repository", IdempotencyKey: key,
-		InputHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Revision: 1,
+		InputHash:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		InputSnapshot: snapshot, InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion,
+		InputSnapshotSize: len(snapshot), Revision: 1,
 	}
 }
 

@@ -28,6 +28,20 @@ func TestIntegrationRuntimeErrorsExposeStableCodes(t *testing.T) {
 		{name: "credential decrypt failed", err: ErrIntegrationCredentialDecryptFailed, statusCode: http.StatusInternalServerError, errorCode: ErrorCodeIntegrationCredentialDecryptFailed},
 		{name: "credential material invalid", err: ErrIntegrationCredentialMaterialInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationCredentialMaterialInvalid},
 		{name: "credential injection invalid", err: ErrIntegrationCredentialInjectionInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationCredentialInjectionInvalid},
+		{name: "input missing", err: ErrIntegrationExecutionInputMissing, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionInputMissing},
+		{name: "input invalid", err: ErrIntegrationExecutionInputInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionInputInvalid},
+		{name: "input too large", err: ErrIntegrationExecutionInputTooLarge, statusCode: http.StatusRequestEntityTooLarge, errorCode: ErrorCodeIntegrationExecutionInputTooLarge},
+		{name: "input contract mismatch", err: ErrIntegrationExecutionInputContractMismatch, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionInputContractMismatch},
+		{name: "input hash mismatch", err: ErrIntegrationExecutionInputHashMismatch, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionInputHashMismatch},
+		{name: "input version unsupported", err: ErrIntegrationExecutionInputVersionUnsupported, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionInputVersionUnsupported},
+		{name: "path missing", err: ErrIntegrationExecutionPathParameterMissing, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionPathParameterMissing},
+		{name: "path unknown", err: ErrIntegrationExecutionPathParameterUnknown, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionPathParameterUnknown},
+		{name: "query invalid", err: ErrIntegrationExecutionQueryParameterInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionQueryParameterInvalid},
+		{name: "header not allowed", err: ErrIntegrationExecutionHeaderNotAllowed, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionHeaderNotAllowed},
+		{name: "body invalid", err: ErrIntegrationExecutionBodyInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionBodyInvalid},
+		{name: "sensitive input rejected", err: ErrIntegrationExecutionSensitiveInputRejected, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionSensitiveInputRejected},
+		{name: "input storage failed", err: ErrIntegrationExecutionInputStorageFailed, statusCode: http.StatusInternalServerError, errorCode: ErrorCodeIntegrationExecutionInputStorageFailed},
+		{name: "input load failed", err: ErrIntegrationExecutionInputLoadFailed, statusCode: http.StatusInternalServerError, errorCode: ErrorCodeIntegrationExecutionInputLoadFailed},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

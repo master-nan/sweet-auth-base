@@ -101,13 +101,61 @@ erDiagram
 
 ### 3.4 输入快照
 
-异步 Worker 必须能够在请求结束后独立执行，因此输入不能只保存在 HTTP 请求或 Gin Context 中。输入快照应满足：
+异步 Worker 必须在原始 HTTP 请求结束后独立重建请求，不能读取 Controller Request、Gin Context 或客户端完整 URL。V1 冻结 `ExecutionInputSnapshot` 版本 1，结构如下：
 
-- 只包含 InterfaceDefinition 契约允许的 Path、Query、Header 和 Body 参数。
-- 不接受客户端提交的 Host、基础地址、Credential、Authorization、代理或 TLS 配置。
-- 保存规范化 Hash，用于识别相同幂等键下的输入冲突。
-- 小型非敏感结构可受控持久化；敏感或大型内容必须使用加密存储或受控 File 引用并配置留存期。
-- V1 具体存储形式与大小上限待实施确认，但禁止默认永久保存完整敏感 Payload。
+| 字段 | 结构 | 规则 |
+| --- | --- | --- |
+| `path_params` | `map<string,string>` | 只能对应相对路径中已声明的必填占位符，不允许多余参数、斜杠、`..`、百分号或控制字符 |
+| `query_params` | `map<string,string[]>` | 只能使用契约白名单；单值/多值由契约声明；键和值均受长度和总量限制 |
+| `headers` | `map<string,string[]>` | 名称统一为小写；V1 仅允许 Transport 普通 Header 白名单的安全子集，每项仅一个值 |
+| `json_body` | JSON 对象 | 仅允许契约声明的顶层字段；服务端解析后规范化，不保存原始 JSON 字符串；GET 禁止 Body |
+
+InterfaceDefinition 版本保存 `input_contract`，每项定义参数编码、位置、数据类型、必填性、最大长度、是否多值和敏感标记。V1 不引入脚本、JSONPath、模板、函数或字段映射；路径占位符与 Path 契约必须精确一致。已启用版本不能原地修改契约，技术契约变化必须创建新版本。
+
+#### 3.4.1 白名单与敏感边界
+
+快照不允许保存认证秘密。协议、Host、端口、基础地址、完整 URL、代理、DNS、TLS、证书、Credential 引用、Authorization、Cookie、API Key、Token、密码、Client Secret、连接控制 Header、SQL、脚本、模板和表达式均被服务端拒绝。普通 Header 还禁止 `Forwarded`、`X-Forwarded-*` 及 Hop-by-Hop Header。
+
+V1 选择“受控 JSONB 明文存储、只允许已声明非敏感字段”的策略：契约中 `sensitive=true` 的参数不能创建或启用；Body 中出现敏感控制名称同样拒绝。当前没有将业务输入接入 KMS，也不复用 Credential AES-GCM 密钥语义。需要敏感 Body、二进制、Multipart 或大型内容的业务必须等待独立的加密输入存储或受控 File 引用能力，不能通过前端隐藏实现。
+
+快照随 Execution 生命周期留存，但不进入普通 Audit、IntegrationLog、结构化日志或 Response DTO。本阶段不提供查看、复制或导出完整快照的 API。
+
+#### 3.4.2 规范化与 Hash
+
+创建 Execution 时由服务端完成以下处理：
+
+1. 加载明确的 InterfaceDefinition 版本和 `input_contract`。
+2. 严格解析输入，拒绝未知字段、未知参数、类型不匹配和非标准 JSON。
+3. Header 名称转为小写；Query 多值按稳定顺序排序；JSON 对象使用稳定键顺序重新序列化；JSON 数组顺序保持业务语义。
+4. 生成版本 1 的规范化快照字节。
+5. 对“InterfaceDefinition 明确版本 + 规范化快照”计算 SHA-256，保存为 `input_hash`。
+
+`request_id`、`trace_id`、Worker ID、Credential 秘密、创建时间和数据库 ID 不参与 Hash。客户端 `input_hash` 仅可作为可选比对值，不能覆盖服务端结果。相同幂等键且 Hash 相同返回原 Execution；Hash 不同返回稳定幂等冲突。
+
+#### 3.4.3 V1 服务端上限
+
+| 限制 | 上限 |
+| --- | ---: |
+| 契约参数定义 | 128 项 |
+| Path 参数 | 32 项、总计 4 KiB |
+| Query 参数 | 64 项、总计 16 KiB |
+| 普通 Header | 16 项、总计 8 KiB |
+| JSON Body | 256 KiB |
+| 完整规范化快照 | 384 KiB |
+| JSON 最大嵌套深度 | 16 层 |
+| 单数组元素数 | 256 项 |
+| JSON 字段总数 | 256 项 |
+| 单字符串 | 4 KiB |
+
+上限由服务端常量统一控制，客户端不能扩大。创建时和 Worker 加载时均校验；PostgreSQL 同时约束快照类型、版本和记录大小摘要。
+
+#### 3.4.4 Worker 重建与旧记录
+
+Worker 在 Credential 解析和 HTTP 调用前执行：加载快照、校验版本与大小、按冻结契约重新规范化、重算 Hash、与 Execution `input_hash` 比对，然后使用快照重建 Path、Query、普通 Header 和 JSON Body。Credential Provider 最后注入认证，Transport Client 继续执行 URL、SSRF、Header、超时和响应限制。
+
+快照缺失、损坏、版本不支持或 Hash 不一致时，Attempt 以配置错误安全失败且不发送 HTTP。Migration 将没有快照的历史 `created` / `retry_waiting` Execution 收敛为 `failed`，不伪造空快照继续执行；Repository 领取条件也只接受版本 1 且大小有效的记录。
+
+Execution 列表和详情只返回 `input_hash`、快照版本、大小、各类参数数量和是否包含 Body，不返回 Path、Query、Header 或 Body 原值。
 
 ## 4. IntegrationAttempt / IntegrationLog 设计
 
@@ -491,11 +539,10 @@ Runtime 不读取 Grant、Policy 或 Ownership，不复制过滤算法。数据�
 以下内容不改变本设计语义，但必须在代码实施任务中确认：
 
 1. Attempt 持久化对象最终命名为 `IntegrationAttempt` 还是兼容上位设计的 `IntegrationLog`。
-2. Execution 输入快照的 JSON 大小上限、敏感分级、加密方式和留存时间。
-3. PostgreSQL 原子领取采用 `FOR UPDATE SKIP LOCKED` 还是条件更新，以及对应索引。
-4. 多实例并发配额采用数据库租约槽还是平台已有分布式能力。
-5. 租约时长、单批领取数、平台总并发和系统/接口并发上限。
-6. 手工触发第一阶段允许的输入来源与幂等键生成规则。
+2. PostgreSQL 原子领取采用 `FOR UPDATE SKIP LOCKED` 还是条件更新，以及对应索引。
+3. 多实例并发配额采用数据库租约槽还是平台已有分布式能力。
+4. 租约时长、单批领取数、平台总并发和系统/接口并发上限。
+5. 手工触发第一阶段允许的输入来源与幂等键生成规则。
 
 待确认项不得通过在 Controller 中增加分支、在事务中执行 HTTP、保存明文秘密或默认放行的方式临时解决。
 

@@ -2,6 +2,7 @@ package response
 
 import (
 	"backend/model"
+	"encoding/json"
 	"time"
 )
 
@@ -37,6 +38,7 @@ type InterfaceCredentialSummaryRes struct {
 type InterfaceDefinitionDetailRes struct {
 	InterfaceDefinitionListRes
 	RelativePath   string                         `json:"relative_path"`
+	InputContract  json.RawMessage                `json:"input_contract"`
 	CredentialID   *int                           `json:"credential_id,omitempty"`
 	Credential     *InterfaceCredentialSummaryRes `json:"credential,omitempty"`
 	TimeoutSeconds int                            `json:"timeout_seconds"`
@@ -61,6 +63,7 @@ func NewInterfaceDefinitionDetailRes(value model.InterfaceDefinition, system mod
 	result := InterfaceDefinitionDetailRes{
 		InterfaceDefinitionListRes: NewInterfaceDefinitionListRes(value, system, credential, now),
 		RelativePath:               value.RelativePath, CredentialID: value.CredentialID,
+		InputContract:  append(json.RawMessage(nil), value.InputContract...),
 		TimeoutSeconds: value.TimeoutSeconds, ResponseLimit: value.ResponseLimit,
 		RetryPolicyID: value.RetryPolicyID, Description: value.Description, GmtCreate: value.GmtCreate,
 	}

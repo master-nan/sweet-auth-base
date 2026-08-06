@@ -167,6 +167,45 @@ func TestInterfaceDefinitionServiceRejectsCrossSystemCredential(t *testing.T) {
 	}
 }
 
+func TestInterfaceDefinitionServiceFreezesVersionedInputContract(t *testing.T) {
+	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	req := interfaceDefinitionCreateRequest(system.Id, "employee_detail")
+	req.RelativePath = "/api/employees/{employee_id}"
+	req.InputContract = json.RawMessage(`{"version":1,"parameters":[{"code":"employee_id","location":"path","data_type":"string","required":true,"max_length":64,"allow_multiple":false,"sensitive":false}]}`)
+	created, err := svc.Create(context.Background(), req)
+	if err != nil {
+		t.Fatalf("create contract interface: %v", err)
+	}
+	if !strings.Contains(string(created.InputContract), `"employee_id"`) {
+		t.Fatalf("contract not returned: %s", created.InputContract)
+	}
+	enabled, err := svc.Enable(context.Background(), created.Id, created.Revision)
+	if err != nil {
+		t.Fatalf("enable contract interface: %v", err)
+	}
+	changed := json.RawMessage(`{"version":1,"parameters":[]}`)
+	if _, err := svc.Update(context.Background(), enabled.Id, request.InterfaceDefinitionUpdateReq{
+		InputContract: changed, Revision: enabled.Revision,
+	}); !errors.Is(err, apperrors.ErrInterfaceStatusInvalid) {
+		t.Fatalf("enabled contract update error=%v", err)
+	}
+	v2, err := svc.CreateVersion(context.Background(), enabled.Id, enabled.Revision)
+	if err != nil || string(v2.InputContract) != string(created.InputContract) {
+		t.Fatalf("versioned contract=%s err=%v", v2.InputContract, err)
+	}
+
+	invalid := interfaceDefinitionCreateRequest(system.Id, "missing_contract")
+	invalid.RelativePath = "/api/employees/{employee_id}"
+	if _, err := svc.Create(context.Background(), invalid); !errors.Is(err, apperrors.ErrIntegrationExecutionInputContractMismatch) {
+		t.Fatalf("missing path contract error=%v", err)
+	}
+	sensitive := interfaceDefinitionCreateRequest(system.Id, "sensitive_contract")
+	sensitive.InputContract = json.RawMessage(`{"version":1,"parameters":[{"code":"token","location":"query","data_type":"string","required":false,"max_length":64,"allow_multiple":false,"sensitive":true}]}`)
+	if _, err := svc.Create(context.Background(), sensitive); !errors.Is(err, apperrors.ErrIntegrationExecutionSensitiveInputRejected) {
+		t.Fatalf("sensitive contract error=%v", err)
+	}
+}
+
 func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
 	if _, err := svc.Create(context.Background(), interfaceDefinitionCreateRequest(system.Id, "shipment_query")); err != nil {

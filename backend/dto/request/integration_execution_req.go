@@ -2,6 +2,7 @@ package request
 
 import (
 	"backend/enum"
+	"encoding/json"
 	"time"
 )
 
@@ -102,13 +103,21 @@ func (r IntegrationExecutionQueryReq) ToBasic() Basic {
 	return basic
 }
 
+type IntegrationExecutionInputReq struct {
+	PathParams  map[string]string   `form:"path_params" json:"path_params,omitempty"`
+	QueryParams map[string][]string `form:"query_params" json:"query_params,omitempty"`
+	Headers     map[string][]string `form:"headers" json:"headers,omitempty"`
+	JSONBody    json.RawMessage     `form:"json_body" json:"json_body,omitempty"`
+}
+
 type IntegrationExecutionCreateReq struct {
-	ExternalSystemID      int    `form:"external_system_id" json:"external_system_id" binding:"required,gt=0"`
-	InterfaceDefinitionID int    `form:"interface_definition_id" json:"interface_definition_id" binding:"required,gt=0"`
-	TriggerSource         string `form:"trigger_source" json:"trigger_source" binding:"required,oneof=manual system_event scheduled"`
-	IdempotencyScope      string `form:"idempotency_scope" json:"idempotency_scope" binding:"required,max=64"`
-	IdempotencyKey        string `form:"idempotency_key" json:"idempotency_key" binding:"required,max=128"`
-	InputHash             string `form:"input_hash" json:"input_hash" binding:"required,len=64,hexadecimal"`
+	ExternalSystemID      int                          `form:"external_system_id" json:"external_system_id" binding:"required,gt=0"`
+	InterfaceDefinitionID int                          `form:"interface_definition_id" json:"interface_definition_id" binding:"required,gt=0"`
+	TriggerSource         string                       `form:"trigger_source" json:"trigger_source" binding:"required,oneof=manual system_event scheduled"`
+	IdempotencyScope      string                       `form:"idempotency_scope" json:"idempotency_scope" binding:"required,max=64"`
+	IdempotencyKey        string                       `form:"idempotency_key" json:"idempotency_key" binding:"required,max=128"`
+	Input                 IntegrationExecutionInputReq `form:"input" json:"input"`
+	InputHash             string                       `form:"input_hash" json:"input_hash,omitempty" binding:"omitempty,len=64,hexadecimal"`
 }
 
 type IntegrationExecutionStateReq struct {

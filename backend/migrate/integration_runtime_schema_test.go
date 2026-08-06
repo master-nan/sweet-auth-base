@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -58,6 +59,36 @@ func TestIntegrationRuntimeSchemaIsIdempotentAndUnique(t *testing.T) {
 	}
 }
 
+func TestIntegrationRuntimeSchemaClosesLegacyPendingExecutionWithoutSnapshot(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("migrate integration configuration: %v", err)
+	}
+	if err := migrateIntegrationRuntimeSchema(db); err != nil {
+		t.Fatalf("migrate integration runtime: %v", err)
+	}
+	system, definition := integrationRuntimeMigrationFixtures(t, db)
+	legacy := validIntegrationExecutionFixture(601, "INT-LEGACY-601", system, definition, "legacy-601")
+	legacy.InputSnapshot = datatypes.JSON([]byte(`{}`))
+	legacy.InputSnapshotVersion = 0
+	legacy.InputSnapshotSize = 0
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatalf("create legacy execution: %v", err)
+	}
+	if err := migrateIntegrationRuntimeSchema(db); err != nil {
+		t.Fatalf("rerun runtime migration: %v", err)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, legacy.Id).Error; err != nil {
+		t.Fatalf("load legacy execution: %v", err)
+	}
+	if stored.Status != model.IntegrationExecutionStatusFailed ||
+		stored.ErrorCategory != model.IntegrationErrorCategoryConfiguration ||
+		stored.CompletedAt == nil || stored.Revision != legacy.Revision+1 {
+		t.Fatalf("legacy execution was not safely closed: status=%s category=%s", stored.Status, stored.ErrorCategory)
+	}
+}
+
 func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
@@ -100,8 +131,36 @@ func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 	if tableCount != 2 {
 		t.Fatalf("runtime table count = %d, want 2", tableCount)
 	}
+	var columnTypes []struct {
+		ColumnName string
+		DataType   string
+	}
+	if err := db.Raw(`
+		SELECT column_name, data_type FROM information_schema.columns
+		WHERE table_schema = ? AND table_name = 'integration_execution'
+		  AND column_name IN ('input_snapshot','input_snapshot_version','input_snapshot_size')
+		ORDER BY column_name
+	`, schemaName).Scan(&columnTypes).Error; err != nil {
+		t.Fatalf("inspect input snapshot columns: %v", err)
+	}
+	if len(columnTypes) != 3 {
+		t.Fatalf("input snapshot column count = %d, want 3", len(columnTypes))
+	}
+	for _, column := range columnTypes {
+		if column.ColumnName == "input_snapshot" && column.DataType != "jsonb" {
+			t.Fatalf("input_snapshot type = %s, want jsonb", column.DataType)
+		}
+	}
 
 	system, definition := integrationRuntimeMigrationFixtures(t, db)
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).
+		Update("input_contract", datatypes.JSON([]byte(`{"version":2,"parameters":[]}`))).Error; err == nil {
+		t.Fatal("expected invalid interface input contract version to be rejected")
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).
+		Update("input_contract", datatypes.JSON([]byte(`{"version":1}`))).Error; err == nil {
+		t.Fatal("expected incomplete interface input contract to be rejected")
+	}
 	invalid := validIntegrationExecutionFixture(501, "INT-501", system, definition, "request-501")
 	invalid.Status = "invalid"
 	if err := db.Create(&invalid).Error; err == nil {
@@ -126,6 +185,18 @@ func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 	invalid.ErrorCategory = "unknown_category"
 	if err := db.Create(&invalid).Error; err == nil {
 		t.Fatal("expected invalid error category to be rejected")
+	}
+	invalid = validIntegrationExecutionFixture(506, "INT-506", system, definition, "request-506")
+	invalid.InputSnapshotVersion = model.IntegrationExecutionInputSnapshotVersion
+	invalid.InputSnapshotSize = 0
+	if err := db.Create(&invalid).Error; err == nil {
+		t.Fatal("expected versioned empty snapshot to be rejected")
+	}
+	invalid = validIntegrationExecutionFixture(507, "INT-507", system, definition, "request-507")
+	invalid.InputSnapshot = datatypes.JSON([]byte(`{"version":1}`))
+	invalid.InputSnapshotSize = len(invalid.InputSnapshot)
+	if err := db.Create(&invalid).Error; err == nil {
+		t.Fatal("expected incomplete versioned snapshot to be rejected")
 	}
 }
 
@@ -163,6 +234,7 @@ func validIntegrationExecutionFixture(
 	definition model.InterfaceDefinition,
 	idempotencyKey string,
 ) model.IntegrationExecution {
+	snapshot := datatypes.JSON([]byte(`{"version":1,"path_params":{},"query_params":{},"headers":{}}`))
 	return model.IntegrationExecution{
 		Basic: model.Basic{Id: id, State: true}, ExecutionNo: number,
 		ExternalSystemID: system.Id, ExternalSystemCode: system.SystemCode, ExternalSystemName: system.Name,
@@ -170,6 +242,8 @@ func validIntegrationExecutionFixture(
 		InterfaceName: definition.Name, InterfaceVersion: definition.Version,
 		TriggerSource: model.IntegrationTriggerSourceManual, Status: model.IntegrationExecutionStatusCreated,
 		IdempotencyScope: "acceptance", IdempotencyKey: idempotencyKey,
-		InputHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Revision: 1,
+		InputHash:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		InputSnapshot: snapshot, InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion,
+		InputSnapshotSize: len(snapshot), Revision: 1,
 	}
 }

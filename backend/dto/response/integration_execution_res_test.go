@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"gorm.io/datatypes"
 )
 
 func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
@@ -15,7 +17,9 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 		InterfaceDefinitionID: 20, InterfaceCode: "org_list", InterfaceName: "组织列表", InterfaceVersion: 1,
 		TriggerSource: model.IntegrationTriggerSourceManual, Status: model.IntegrationExecutionStatusRunning,
 		IdempotencyScope: "acceptance", IdempotencyKey: "request-001",
-		InputHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		InputHash:            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		InputSnapshot:        datatypes.JSON([]byte(`{"version":1,"path_params":{"employee_id":"10001"},"query_params":{"page":["1"]},"headers":{"x-correlation-id":["corr-1"]},"json_body":{"name":"private-business-value"}}`)),
+		InputSnapshotVersion: 1, InputSnapshotSize: 180,
 		StartedAt: &startedAt, Revision: 2,
 	}
 	payload, err := json.Marshal(NewIntegrationExecutionDetailRes(value))
@@ -27,15 +31,21 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 		"gmt_delete", "create_user", "modify_user", "delete_user", "authorization",
 		"secret", "ciphertext", "nonce", "payload", "external_system_id\"", "interface_definition_id\"",
 		"attempts", "http_status", "result_certainty", "request_id", "trace_id",
+		"employee_id", "10001", "corr-1", "private-business-value", "json_body", "path_params",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("response leaked %q: %s", forbidden, payload)
 		}
 	}
-	for _, required := range []string{"execution_no", "external_system", "interface", "current_attempt", "input_hash"} {
+	for _, required := range []string{"execution_no", "external_system", "interface", "current_attempt", "input_hash", "input_summary", "snapshot_version", "has_body"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("response missing %q: %s", required, payload)
 		}
+	}
+	detail := NewIntegrationExecutionDetailRes(value)
+	if detail.InputSummary.PathCount != 1 || detail.InputSummary.QueryCount != 1 ||
+		detail.InputSummary.HeaderCount != 1 || !detail.InputSummary.HasBody {
+		t.Fatalf("input summary = %+v", detail.InputSummary)
 	}
 }
 

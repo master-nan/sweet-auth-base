@@ -16,13 +16,16 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type integrationExecutionAuditWriter struct {
+	mu          sync.Mutex
 	records     []TransactionalAuditRecord
 	subject     audit.AuditSubject
 	correlation audit.CorrelationIDs
@@ -33,10 +36,53 @@ func (w *integrationExecutionAuditWriter) RecordTransactionalAuditContext(
 	_ *gorm.DB,
 	record TransactionalAuditRecord,
 ) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.records = append(w.records, record)
 	w.subject, _ = audit.GetAuditSubject(ctx)
 	w.correlation = audit.GetCorrelationIDs(ctx)
 	return nil
+}
+
+func TestIntegrationExecutionServiceConcurrentIdempotencyConverges(t *testing.T) {
+	svc, db, system, definition, _ := newIntegrationExecutionTestSubject(t)
+	req := integrationExecutionCreateRequest(system.Id, definition.Id, "concurrent-request")
+	const callers = 8
+	ids := make(chan int, callers)
+	errs := make(chan error, callers)
+	var wait sync.WaitGroup
+	for index := 0; index < callers; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			result, err := svc.CreateExecution(context.Background(), req)
+			if err != nil {
+				errs <- err
+				return
+			}
+			ids <- result.Id
+		}()
+	}
+	wait.Wait()
+	close(ids)
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent create error: %v", err)
+	}
+	unique := map[int]struct{}{}
+	for id := range ids {
+		unique[id] = struct{}{}
+	}
+	if len(unique) != 1 {
+		t.Fatalf("concurrent execution ids = %v", unique)
+	}
+	var count int64
+	if err := db.Model(&model.IntegrationExecution{}).
+		Where("interface_definition_id = ? AND interface_version = ? AND idempotency_scope = ? AND idempotency_key = ?",
+			definition.Id, definition.Version, req.IdempotencyScope, req.IdempotencyKey).
+		Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("idempotent execution count=%d err=%v", count, err)
+	}
 }
 
 func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T) {
@@ -66,9 +112,14 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 		t.Fatalf("idempotency hit = %+v audits=%d err=%v", hit, len(auditWriter.records), err)
 	}
 	conflictReq := req
-	conflictReq.InputHash = strings.Repeat("b", 64)
+	conflictReq.Input.QueryParams = map[string][]string{"page": {"2"}}
 	if _, err = svc.CreateExecution(ctx, conflictReq); !errors.Is(err, apperrors.ErrIntegrationExecutionIdempotencyConflict) {
 		t.Fatalf("idempotency conflict error = %v", err)
+	}
+	forgedHashReq := integrationExecutionCreateRequest(system.Id, definition.Id, "forged-hash")
+	forgedHashReq.InputHash = strings.Repeat("b", 64)
+	if _, err = svc.CreateExecution(ctx, forgedHashReq); !errors.Is(err, apperrors.ErrIntegrationExecutionInputHashMismatch) {
+		t.Fatalf("forged input hash error = %v", err)
 	}
 
 	startedAt := model.Now()
@@ -91,6 +142,10 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 		integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable))
 	if err != nil || detail.Id != created.Id || detail.CurrentAttempt != 0 {
 		t.Fatalf("detail = %+v err=%v", detail, err)
+	}
+	if detail.InputSummary.SnapshotVersion != model.IntegrationExecutionInputSnapshotVersion ||
+		detail.InputSummary.QueryCount != 1 || detail.InputSummary.SizeBytes <= 0 {
+		t.Fatalf("input summary = %+v", detail.InputSummary)
 	}
 	logPage, err := svc.PageLogs(ctx, request.IntegrationLogQueryReq{Page: 1, Num: 10, ExecutionID: created.Id}, logTable,
 		integrationExecutionPermission(t, model.DataPermissionOperationQuery, datapermission.DataScopeDecisionNotApplicable))
@@ -230,7 +285,8 @@ func newIntegrationExecutionTestSubject(
 		InterfaceCode: "organization_list", Name: "组织列表", Version: 1,
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/api/organizations", TimeoutSeconds: 30, ResponseLimit: 1024,
-		Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+		InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[{"code":"page","location":"query","data_type":"integer","required":false,"max_length":8,"allow_multiple":false,"sensitive":false}]}`)),
+		Status:        model.InterfaceDefinitionStatusEnabled, Revision: 1,
 	}
 	testutil.MustCreate(t, db, &definition)
 	sf, err := utils.NewSnowflake(1)
@@ -253,7 +309,8 @@ func integrationExecutionCreateRequest(systemID int, interfaceID int, idempotenc
 	return request.IntegrationExecutionCreateReq{
 		ExternalSystemID: systemID, InterfaceDefinitionID: interfaceID,
 		TriggerSource: model.IntegrationTriggerSourceManual, IdempotencyScope: "acceptance",
-		IdempotencyKey: idempotencyKey, InputHash: strings.Repeat("a", 64),
+		IdempotencyKey: idempotencyKey,
+		Input:          request.IntegrationExecutionInputReq{QueryParams: map[string][]string{"page": {"1"}}},
 	}
 }
 

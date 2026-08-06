@@ -1,5 +1,7 @@
 package request
 
+import "encoding/json"
+
 type InterfaceDefinitionQueryReq struct {
 	Page             int               `form:"page" json:"page" binding:"omitempty,gte=1"`
 	Num              int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
@@ -30,35 +32,37 @@ func (r InterfaceDefinitionQueryReq) ToBasic() Basic {
 }
 
 type InterfaceDefinitionCreateReq struct {
-	ExternalSystemID int    `form:"external_system_id" json:"external_system_id" binding:"required,gt=0"`
-	InterfaceCode    string `form:"interface_code" json:"interface_code" binding:"required,max=64"`
-	Name             string `form:"name" json:"name" binding:"required,max=128"`
-	Protocol         string `form:"protocol" json:"protocol" binding:"required,oneof=http https"`
-	HTTPMethod       string `form:"http_method" json:"http_method" binding:"required,oneof=GET POST PUT PATCH DELETE"`
-	RelativePath     string `form:"relative_path" json:"relative_path" binding:"required,max=512"`
-	CredentialID     *int   `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
-	TimeoutSeconds   int    `form:"timeout_seconds" json:"timeout_seconds" binding:"required,gte=1,lte=300"`
-	ResponseLimit    int64  `form:"response_limit" json:"response_limit" binding:"required,gte=1024,lte=104857600"`
-	RetryPolicyID    *int   `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
-	Description      string `form:"description" json:"description" binding:"omitempty,max=512"`
+	ExternalSystemID int             `form:"external_system_id" json:"external_system_id" binding:"required,gt=0"`
+	InterfaceCode    string          `form:"interface_code" json:"interface_code" binding:"required,max=64"`
+	Name             string          `form:"name" json:"name" binding:"required,max=128"`
+	Protocol         string          `form:"protocol" json:"protocol" binding:"required,oneof=http https"`
+	HTTPMethod       string          `form:"http_method" json:"http_method" binding:"required,oneof=GET POST PUT PATCH DELETE"`
+	RelativePath     string          `form:"relative_path" json:"relative_path" binding:"required,max=512"`
+	InputContract    json.RawMessage `form:"input_contract" json:"input_contract,omitempty"`
+	CredentialID     *int            `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
+	TimeoutSeconds   int             `form:"timeout_seconds" json:"timeout_seconds" binding:"required,gte=1,lte=300"`
+	ResponseLimit    int64           `form:"response_limit" json:"response_limit" binding:"required,gte=1024,lte=104857600"`
+	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
+	Description      string          `form:"description" json:"description" binding:"omitempty,max=512"`
 }
 
 type InterfaceDefinitionUpdateReq struct {
-	ExternalSystemID *int    `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
-	InterfaceCode    *string `form:"interface_code" json:"interface_code" binding:"omitempty,max=64"`
-	Version          *int    `form:"version" json:"version" binding:"omitempty,gt=0"`
-	Name             *string `form:"name" json:"name" binding:"omitempty,max=128"`
-	Protocol         *string `form:"protocol" json:"protocol" binding:"omitempty,oneof=http https"`
-	HTTPMethod       *string `form:"http_method" json:"http_method" binding:"omitempty,oneof=GET POST PUT PATCH DELETE"`
-	RelativePath     *string `form:"relative_path" json:"relative_path" binding:"omitempty,max=512"`
-	CredentialID     *int    `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
-	ClearCredential  bool    `form:"clear_credential" json:"clear_credential"`
-	TimeoutSeconds   *int    `form:"timeout_seconds" json:"timeout_seconds" binding:"omitempty,gte=1,lte=300"`
-	ResponseLimit    *int64  `form:"response_limit" json:"response_limit" binding:"omitempty,gte=1024,lte=104857600"`
-	RetryPolicyID    *int    `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
-	ClearRetryPolicy bool    `form:"clear_retry_policy" json:"clear_retry_policy"`
-	Description      *string `form:"description" json:"description" binding:"omitempty,max=512"`
-	Revision         int     `form:"revision" json:"revision" binding:"required,gt=0"`
+	ExternalSystemID *int            `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
+	InterfaceCode    *string         `form:"interface_code" json:"interface_code" binding:"omitempty,max=64"`
+	Version          *int            `form:"version" json:"version" binding:"omitempty,gt=0"`
+	Name             *string         `form:"name" json:"name" binding:"omitempty,max=128"`
+	Protocol         *string         `form:"protocol" json:"protocol" binding:"omitempty,oneof=http https"`
+	HTTPMethod       *string         `form:"http_method" json:"http_method" binding:"omitempty,oneof=GET POST PUT PATCH DELETE"`
+	RelativePath     *string         `form:"relative_path" json:"relative_path" binding:"omitempty,max=512"`
+	InputContract    json.RawMessage `form:"input_contract" json:"input_contract,omitempty"`
+	CredentialID     *int            `form:"credential_id" json:"credential_id" binding:"omitempty,gt=0"`
+	ClearCredential  bool            `form:"clear_credential" json:"clear_credential"`
+	TimeoutSeconds   *int            `form:"timeout_seconds" json:"timeout_seconds" binding:"omitempty,gte=1,lte=300"`
+	ResponseLimit    *int64          `form:"response_limit" json:"response_limit" binding:"omitempty,gte=1024,lte=104857600"`
+	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
+	ClearRetryPolicy bool            `form:"clear_retry_policy" json:"clear_retry_policy"`
+	Description      *string         `form:"description" json:"description" binding:"omitempty,max=512"`
+	Revision         int             `form:"revision" json:"revision" binding:"required,gt=0"`
 }
 
 type InterfaceDefinitionVersionReq struct {

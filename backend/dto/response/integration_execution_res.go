@@ -2,6 +2,7 @@ package response
 
 import (
 	"backend/model"
+	"encoding/json"
 	"time"
 )
 
@@ -114,17 +115,27 @@ func NewIntegrationLogDetailRes(value model.IntegrationLog) IntegrationLogDetail
 
 type IntegrationExecutionDetailRes struct {
 	IntegrationExecutionListRes
-	IdempotencyScope  string     `json:"idempotency_scope"`
-	IdempotencyKey    string     `json:"idempotency_key"`
-	InputHash         string     `json:"input_hash"`
-	ResultHTTPStatus  *int       `json:"result_http_status,omitempty"`
-	ResultSizeBytes   int64      `json:"result_size_bytes"`
-	ResultHash        string     `json:"result_hash,omitempty"`
-	ResultSummary     string     `json:"result_summary,omitempty"`
-	LeaseOwnerSummary string     `json:"lease_owner_summary,omitempty"`
-	LeaseExpiresAt    *time.Time `json:"lease_expires_at,omitempty"`
-	NextRunAt         *time.Time `json:"next_run_at,omitempty"`
-	CancelledAt       *time.Time `json:"cancelled_at,omitempty"`
+	IdempotencyScope  string                              `json:"idempotency_scope"`
+	IdempotencyKey    string                              `json:"idempotency_key"`
+	InputHash         string                              `json:"input_hash"`
+	InputSummary      IntegrationExecutionInputSummaryRes `json:"input_summary"`
+	ResultHTTPStatus  *int                                `json:"result_http_status,omitempty"`
+	ResultSizeBytes   int64                               `json:"result_size_bytes"`
+	ResultHash        string                              `json:"result_hash,omitempty"`
+	ResultSummary     string                              `json:"result_summary,omitempty"`
+	LeaseOwnerSummary string                              `json:"lease_owner_summary,omitempty"`
+	LeaseExpiresAt    *time.Time                          `json:"lease_expires_at,omitempty"`
+	NextRunAt         *time.Time                          `json:"next_run_at,omitempty"`
+	CancelledAt       *time.Time                          `json:"cancelled_at,omitempty"`
+}
+
+type IntegrationExecutionInputSummaryRes struct {
+	SnapshotVersion int  `json:"snapshot_version"`
+	SizeBytes       int  `json:"size_bytes"`
+	PathCount       int  `json:"path_count"`
+	QueryCount      int  `json:"query_count"`
+	HeaderCount     int  `json:"header_count"`
+	HasBody         bool `json:"has_body"`
 }
 
 func NewIntegrationExecutionListRes(value model.IntegrationExecution) IntegrationExecutionListRes {
@@ -145,13 +156,44 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 }
 
 func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) IntegrationExecutionDetailRes {
+	inputSummary := integrationExecutionInputSummary(value)
 	return IntegrationExecutionDetailRes{
 		IntegrationExecutionListRes: NewIntegrationExecutionListRes(value),
 		IdempotencyScope:            value.IdempotencyScope, IdempotencyKey: integrationIdentifierSummary(value.IdempotencyKey),
-		InputHash: value.InputHash, ResultHTTPStatus: value.ResultHTTPStatus,
-		ResultSizeBytes: value.ResultSizeBytes, ResultHash: value.ResultHash,
+		InputHash: value.InputHash,
+		InputSummary: IntegrationExecutionInputSummaryRes{
+			SnapshotVersion: inputSummary.SnapshotVersion, SizeBytes: inputSummary.SizeBytes,
+			PathCount: inputSummary.PathCount, QueryCount: inputSummary.QueryCount,
+			HeaderCount: inputSummary.HeaderCount, HasBody: inputSummary.HasBody,
+		},
+		ResultHTTPStatus: value.ResultHTTPStatus,
+		ResultSizeBytes:  value.ResultSizeBytes, ResultHash: value.ResultHash,
 		ResultSummary:     value.ResultSummary,
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
 		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt,
 	}
+}
+
+func integrationExecutionInputSummary(value model.IntegrationExecution) IntegrationExecutionInputSummaryRes {
+	summary := IntegrationExecutionInputSummaryRes{
+		SnapshotVersion: value.InputSnapshotVersion,
+		SizeBytes:       value.InputSnapshotSize,
+	}
+	if value.InputSnapshotVersion <= 0 || len(value.InputSnapshot) == 0 {
+		return summary
+	}
+	var snapshot struct {
+		PathParams  map[string]string   `json:"path_params"`
+		QueryParams map[string][]string `json:"query_params"`
+		Headers     map[string][]string `json:"headers"`
+		JSONBody    json.RawMessage     `json:"json_body"`
+	}
+	if json.Unmarshal(value.InputSnapshot, &snapshot) != nil {
+		return summary
+	}
+	summary.PathCount = len(snapshot.PathParams)
+	summary.QueryCount = len(snapshot.QueryParams)
+	summary.HeaderCount = len(snapshot.Headers)
+	summary.HasBody = len(snapshot.JSONBody) > 0
+	return summary
 }

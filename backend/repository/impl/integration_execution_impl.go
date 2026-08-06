@@ -110,7 +110,11 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
 	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		var executions []model.IntegrationExecution
 		query := tx.Model(&model.IntegrationExecution{}).
-			Where("status = ?", model.IntegrationExecutionStatusCreated).
+			Where(
+				"status = ? AND input_snapshot_version = ? AND input_snapshot_size > 0",
+				model.IntegrationExecutionStatusCreated,
+				model.IntegrationExecutionInputSnapshotVersion,
+			).
 			Order("gmt_create ASC, id ASC").
 			Limit(len(request.AttemptIDs)).
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})

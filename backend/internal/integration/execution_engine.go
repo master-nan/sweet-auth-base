@@ -195,16 +195,20 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	if err != nil {
 		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "configuration_unavailable", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false)
 	}
-	resolveRequest, err := NewCredentialResolveRequest(system.Id, definition.Id, credentialIdentity.ID, credentialIdentity.CredentialCode, credentialIdentity.CredentialType, claimed.Execution.ExecutionNo)
+	snapshot, err := LoadExecutionInputSnapshot(
+		definition.InputContract,
+		definition.HTTPMethod,
+		definition.RelativePath,
+		definition.Version,
+		claimed.Execution.InputSnapshot,
+		claimed.Execution.InputSnapshotSize,
+		claimed.Execution.InputHash,
+	)
 	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, executionInputReasonCode(err), "集成执行输入快照不可用", model.IntegrationResultCertaintyConfirmed, false)
 	}
-	resolution, err := e.provider.Resolve(ctx, resolveRequest)
-	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
-	}
+	headers := snapshotTransportHeaders(snapshot.Headers)
 	correlation := audit.GetCorrelationIDs(ctx)
-	headers := make(map[string]string, 2)
 	if correlation.RequestID != "" {
 		headers["X-Request-ID"] = correlation.RequestID
 	}
@@ -213,12 +217,21 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	}
 	request, err := NewTransportRequest(TransportRequestInput{
 		Method: definition.HTTPMethod, BaseURL: system.BaseURL, RelativePath: definition.RelativePath,
-		Headers:          headers,
+		PathParameters: snapshot.PathParams, QueryParameters: snapshot.QueryParams,
+		Headers: headers, JSONBody: snapshot.JSONBody,
 		Timeouts:         TransportTimeouts{Request: time.Duration(definition.TimeoutSeconds) * time.Second},
 		MaxResponseBytes: definition.ResponseLimit,
 	})
 	if err != nil {
-		return withCredentialSummary(e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "transport_request_invalid", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false), resolution)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "transport_request_invalid", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false)
+	}
+	resolveRequest, err := NewCredentialResolveRequest(system.Id, definition.Id, credentialIdentity.ID, credentialIdentity.CredentialCode, credentialIdentity.CredentialType, claimed.Execution.ExecutionNo)
+	if err != nil {
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
+	}
+	resolution, err := e.provider.Resolve(ctx, resolveRequest)
+	if err != nil {
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
 	}
 	request, err = request.WithAuthentication(resolution.Authentication())
 	if err != nil {
@@ -226,6 +239,33 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	}
 	transportResult, transportErr := e.transport.Execute(ctx, request)
 	return withCredentialSummary(attemptResultFromTransport(startedAt, definition.HTTPMethod, transportResult, transportErr), resolution)
+}
+
+func snapshotTransportHeaders(values map[string][]string) map[string]string {
+	result := make(map[string]string, len(values)+2)
+	for name, items := range values {
+		if len(items) == 1 {
+			result[name] = items[0]
+		}
+	}
+	return result
+}
+
+func executionInputReasonCode(err error) string {
+	switch {
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputMissing):
+		return "execution_input_missing"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputTooLarge):
+		return "execution_input_too_large"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputContractMismatch):
+		return "execution_input_contract_mismatch"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputHashMismatch):
+		return "execution_input_hash_mismatch"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputVersionUnsupported):
+		return "execution_input_version_unsupported"
+	default:
+		return "execution_input_invalid"
+	}
 }
 
 func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(

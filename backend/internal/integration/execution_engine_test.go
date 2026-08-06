@@ -10,10 +10,16 @@ import (
 	"backend/repository/impl"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -134,6 +140,116 @@ func TestIntegrationExecutionEngineUsesSupportedCredentialTypes(t *testing.T) {
 	}
 }
 
+func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(t *testing.T) {
+	core, observed := observer.New(zap.InfoLevel)
+	restoreLogger := zap.ReplaceGlobals(zap.New(core))
+	t.Cleanup(restoreLogger)
+	requestSeen := make(chan struct{}, 1)
+	engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/api/runtime/10001" || req.URL.Query().Get("page") != "1" {
+			t.Errorf("rebuilt URL = %s", req.URL.String())
+		}
+		if req.Header.Get("X-Correlation-ID") != "private-correlation-7b" {
+			t.Errorf("rebuilt header = %q", req.Header.Get("X-Correlation-ID"))
+		}
+		if req.Header.Get("Authorization") != "Bearer execution-engine-token" {
+			t.Errorf("credential was not injected last: %q", req.Header.Get("Authorization"))
+		}
+		var body map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil || body["active"] != true || body["name"] != "private-display-name-7b" {
+			t.Errorf("rebuilt body = %#v err=%v", body, err)
+		}
+		requestSeen <- struct{}{}
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusOK)
+		_, _ = writer.Write([]byte(`{"result":"ok"}`))
+	}))
+	defer closeServer()
+
+	contract := snapshotTestContract()
+	definitionUpdates := map[string]any{
+		"http_method": "POST", "relative_path": "/api/runtime/{employee_id}", "input_contract": datatypes.JSON(contract),
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", execution.InterfaceDefinitionID).Updates(definitionUpdates).Error; err != nil {
+		t.Fatalf("update interface contract: %v", err)
+	}
+	_, snapshot, hash, err := BuildExecutionInputSnapshot(contract, "POST", "/api/runtime/{employee_id}", execution.InterfaceVersion, ExecutionInputValues{
+		PathParams: map[string]string{"employee_id": "10001"}, QueryParams: map[string][]string{"page": {"1"}},
+		Headers:  map[string][]string{"x-correlation-id": {"private-correlation-7b"}},
+		JSONBody: json.RawMessage(`{"name":"private-display-name-7b","active":true,"items":[]}`),
+	})
+	if err != nil {
+		t.Fatalf("build dynamic snapshot: %v", err)
+	}
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(map[string]any{
+		"input_snapshot": datatypes.JSON(snapshot), "input_snapshot_version": model.IntegrationExecutionInputSnapshotVersion,
+		"input_snapshot_size": len(snapshot), "input_hash": hash,
+	}).Error; err != nil {
+		t.Fatalf("update execution snapshot: %v", err)
+	}
+	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim dynamic execution = %+v err=%v", claimed, err)
+	}
+	result, err := engine.RunExecution(context.Background(), claimed[0])
+	if err != nil || !result.Succeeded {
+		t.Fatalf("run dynamic execution = %+v err=%v", result, err)
+	}
+	select {
+	case <-requestSeen:
+	default:
+		t.Fatal("transport did not receive rebuilt request")
+	}
+	logs := fmt.Sprint(observed.All())
+	for _, forbidden := range []string{"private-correlation-7b", "private-display-name-7b", "execution-engine-token"} {
+		if strings.Contains(logs, forbidden) {
+			t.Fatalf("runtime log leaked input value %q: %s", forbidden, logs)
+		}
+	}
+}
+
+func TestIntegrationExecutionEngineRejectsMissingOrTamperedSnapshotWithoutHTTP(t *testing.T) {
+	t.Run("missing snapshot is not claimable", func(t *testing.T) {
+		var calls atomic.Int32
+		engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			calls.Add(1)
+		}))
+		defer closeServer()
+		if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(map[string]any{
+			"input_snapshot": datatypes.JSON([]byte(`{}`)), "input_snapshot_version": 0, "input_snapshot_size": 0,
+		}).Error; err != nil {
+			t.Fatalf("remove snapshot: %v", err)
+		}
+		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		if err != nil || len(claimed) != 0 || calls.Load() != 0 {
+			t.Fatalf("missing snapshot claim=%+v calls=%d err=%v", claimed, calls.Load(), err)
+		}
+	})
+
+	t.Run("hash mismatch completes without transport", func(t *testing.T) {
+		var calls atomic.Int32
+		engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			calls.Add(1)
+		}))
+		defer closeServer()
+		if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Update("input_hash", strings.Repeat("0", 64)).Error; err != nil {
+			t.Fatalf("tamper hash: %v", err)
+		}
+		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		if err != nil || len(claimed) != 1 {
+			t.Fatalf("claim tampered execution=%+v err=%v", claimed, err)
+		}
+		result, err := engine.RunExecution(context.Background(), claimed[0])
+		if err != nil || result.Succeeded || result.ReasonCode != "execution_input_hash_mismatch" || calls.Load() != 0 {
+			t.Fatalf("tampered result=%+v calls=%d err=%v", result, calls.Load(), err)
+		}
+		var stored model.IntegrationExecution
+		if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusFailed {
+			t.Fatalf("tampered execution state=%+v err=%v", stored, err)
+		}
+	})
+}
+
 func TestInMemoryConcurrencyGuard(t *testing.T) {
 	guard, err := NewInMemoryConcurrencyGuard(1, 1, 1)
 	if err != nil {
@@ -155,13 +271,17 @@ func TestInMemoryConcurrencyGuard(t *testing.T) {
 }
 
 func newExecutionEngineFixture(t *testing.T, responseStatus int, credentialTypes ...string) (*IntegrationExecutionEngine, *gorm.DB, model.IntegrationExecution, func()) {
-	t.Helper()
-	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
-	client, _, closeServer := newTestTransportClient(t, false, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	return newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.WriteHeader(responseStatus)
 		_, _ = writer.Write([]byte(`{"result":"ok"}`))
-	}))
+	}), credentialTypes...)
+}
+
+func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, credentialTypes ...string) (*IntegrationExecutionEngine, *gorm.DB, model.IntegrationExecution, func()) {
+	t.Helper()
+	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
+	client, _, closeServer := newTestTransportClient(t, false, handler)
 	protector, err := security.NewCredentialSecretProtectorWithKey("execution-engine-master-key")
 	if err != nil {
 		closeServer()
@@ -197,11 +317,19 @@ func newExecutionEngineFixture(t *testing.T, responseStatus int, credentialTypes
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 103, State: true}, ExternalSystemID: system.Id, InterfaceCode: "runtime_list", Name: "运行时列表", Version: 1,
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/runtime", CredentialID: &credentialID,
 		TimeoutSeconds: 15, ResponseLimit: 1024, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
+	_, snapshot, inputHash, err := BuildExecutionInputSnapshot(
+		definition.InputContract, definition.HTTPMethod, definition.RelativePath, definition.Version, ExecutionInputValues{},
+	)
+	if err != nil {
+		closeServer()
+		t.Fatalf("build execution input snapshot: %v", err)
+	}
 	execution := model.IntegrationExecution{Basic: model.Basic{Id: 104, State: true}, ExecutionNo: "INT-RUNTIME-104", ExternalSystemID: system.Id,
 		ExternalSystemCode: system.SystemCode, ExternalSystemName: system.Name, InterfaceDefinitionID: definition.Id, InterfaceCode: definition.InterfaceCode,
 		InterfaceName: definition.Name, InterfaceVersion: definition.Version, TriggerSource: model.IntegrationTriggerSourceManual,
 		Status: model.IntegrationExecutionStatusCreated, IdempotencyScope: "runtime", IdempotencyKey: "execution-104",
-		InputHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Revision: 1}
+		InputHash: inputHash, InputSnapshot: datatypes.JSON(snapshot),
+		InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion, InputSnapshotSize: len(snapshot), Revision: 1}
 	for _, value := range []any{&system, &credential, &definition, &execution} {
 		testutil.MustCreate(t, db, value)
 	}
