@@ -14,6 +14,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/datapermission"
+	"backend/internal/integration"
 	"backend/internal/security"
 	"backend/internal/storage"
 	"backend/internal/token"
@@ -65,6 +66,7 @@ type App struct {
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
+	IntegrationWorker              *integration.IntegrationWorkerRunner
 }
 
 // Repository 提供者
@@ -240,6 +242,7 @@ var ServiceProvider = wire.NewSet(
 	security.NewCredentialSecretProtector,
 	service.NewCredentialService,
 	service.NewIntegrationExecutionService,
+	integration.NewCredentialProvider,
 	service.NewDingTalkService,
 	service.NewSmsService,
 	service.NewFileService,
@@ -313,6 +316,11 @@ var Providers = wire.NewSet(
 	token.NewHMACGenerator,
 
 	storage.NewStorage,
+	ProvideIntegrationWorkerRunnerConfig,
+	ProvideIntegrationTransportClient,
+	ProvideIntegrationConcurrencyGuard,
+	ProvideIntegrationExecutionEngine,
+	ProvideIntegrationWorkerRunner,
 
 	RepositoryProvider,
 	CacheProvider,

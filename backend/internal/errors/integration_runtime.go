@@ -30,6 +30,16 @@ const (
 	ErrorCodeIntegrationExecutionResultUnknown        = 130325
 	ErrorCodeIntegrationConcurrencyLimitReached       = 130326
 	ErrorCodeIntegrationLeaseRecoveryFailed           = 130327
+	ErrorCodeIntegrationWorkerDisabled                = 130328
+	ErrorCodeIntegrationWorkerAlreadyRunning          = 130329
+	ErrorCodeIntegrationWorkerInvalidConfig           = 130330
+	ErrorCodeIntegrationWorkerStartFailed             = 130331
+	ErrorCodeIntegrationWorkerPollFailed              = 130332
+	ErrorCodeIntegrationWorkerClaimFailed             = 130333
+	ErrorCodeIntegrationWorkerExecutionFailed         = 130334
+	ErrorCodeIntegrationWorkerRecoveryFailed          = 130335
+	ErrorCodeIntegrationWorkerShutdownTimeout         = 130336
+	ErrorCodeIntegrationWorkerPanicRecovered          = 130337
 )
 
 var (
@@ -167,5 +177,55 @@ var (
 		http.StatusInternalServerError,
 		ErrorCodeIntegrationLeaseRecoveryFailed,
 		"集成执行租约恢复失败",
+	)
+	ErrIntegrationWorkerDisabled = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationWorkerDisabled,
+		"集成常驻 Worker 未启用",
+	)
+	ErrIntegrationWorkerAlreadyRunning = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationWorkerAlreadyRunning,
+		"集成常驻 Worker 已在运行",
+	)
+	ErrIntegrationWorkerInvalidConfig = NewBusinessError(
+		http.StatusBadRequest,
+		ErrorCodeIntegrationWorkerInvalidConfig,
+		"集成常驻 Worker 配置不合法",
+	)
+	ErrIntegrationWorkerStartFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerStartFailed,
+		"集成常驻 Worker 启动失败",
+	)
+	ErrIntegrationWorkerPollFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerPollFailed,
+		"集成常驻 Worker 轮询失败",
+	)
+	ErrIntegrationWorkerClaimFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerClaimFailed,
+		"集成常驻 Worker 领取执行失败",
+	)
+	ErrIntegrationWorkerExecutionFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerExecutionFailed,
+		"集成常驻 Worker 执行失败",
+	)
+	ErrIntegrationWorkerRecoveryFailed = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerRecoveryFailed,
+		"集成常驻 Worker 租约恢复失败",
+	)
+	ErrIntegrationWorkerShutdownTimeout = NewError(
+		http.StatusGatewayTimeout,
+		ErrorCodeIntegrationWorkerShutdownTimeout,
+		"集成常驻 Worker 优雅关闭超时",
+	)
+	ErrIntegrationWorkerPanicRecovered = NewError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationWorkerPanicRecovered,
+		"集成常驻 Worker 执行异常已恢复",
 	)
 )

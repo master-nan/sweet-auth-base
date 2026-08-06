@@ -27,6 +27,15 @@ security:
   cors_allow_credentials: false
 audit:
   access_log_retention_days: 30
+integration:
+  worker:
+    enabled: false
+    worker_id: 'integration-docker-1'
+    poll_interval: 5
+    claim_batch_size: 8
+    instance_concurrency: 4
+    lease_recovery_interval: 60
+    shutdown_timeout: 15
 conf:
   salt: 'local-docker-sweet-admin-salt-change-me'
   enable: false

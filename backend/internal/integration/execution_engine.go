@@ -152,7 +152,7 @@ func (e *IntegrationExecutionEngine) RunOnce(ctx context.Context) (int, error) {
 func (e *IntegrationExecutionEngine) RunExecution(
 	ctx context.Context,
 	claimed repository.ClaimedIntegrationExecution,
-) (AttemptResult, error) {
+) (result AttemptResult, err error) {
 	if e == nil || claimed.Execution.Status != model.IntegrationExecutionStatusRunning || claimed.Attempt.Status != model.IntegrationLogStatusRunning ||
 		claimed.Execution.LeaseOwner != e.workerID || claimed.Execution.LeaseExpiresAt == nil {
 		return AttemptResult{}, myerrors.ErrIntegrationExecutionClaimConflict
@@ -160,6 +160,18 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	if !claimed.Execution.LeaseExpiresAt.After(e.now()) {
 		return AttemptResult{}, myerrors.ErrIntegrationExecutionLeaseLost
 	}
+	defer func() {
+		if recover() == nil {
+			return
+		}
+		result = e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategorySystem, "worker_panic_recovered", "集成执行发生内部异常", model.IntegrationResultCertaintyConfirmed, false)
+		if completeErr := e.completeClaim(ctx, claimed, result); completeErr != nil {
+			err = myerrors.ErrIntegrationExecutionResultUnknown
+			return
+		}
+		e.logAttempt(ctx, claimed, result, "panic_recovered")
+		err = myerrors.ErrIntegrationWorkerPanicRecovered
+	}()
 	release, err := e.guard.Acquire(claimed.Execution.ExternalSystemID, claimed.Execution.InterfaceDefinitionID)
 	if err != nil {
 		result := e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategoryConcurrency, "concurrency_limit_reached", "集成执行并发已达上限", model.IntegrationResultCertaintyConfirmed, false)
@@ -167,7 +179,7 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	}
 	defer release()
 
-	result := e.executeAttempt(ctx, claimed)
+	result = e.executeAttempt(ctx, claimed)
 	if err := e.completeClaim(ctx, claimed, result); err != nil {
 		// 远端调用完成后若持久化失败，不能宣称成功；后续仅能通过租约恢复收敛为 unknown。
 		e.logAttempt(ctx, claimed, result, "complete_failed")

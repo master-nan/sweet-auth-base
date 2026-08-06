@@ -30,6 +30,9 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("failed to initialize application", zap.Error(err))
 	}
+	if err := app.IntegrationWorker.Start(context.Background()); err != nil {
+		zap.L().Fatal("failed to start integration worker", zap.Error(err))
+	}
 	initialize.InitCron(app)
 	router := initialize.InitRouter(app)
 	port := app.Config.Port
@@ -54,6 +57,9 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit // 阻塞，直到接收到信号
 	zap.L().Info("Shutting down server...")
+	if err := app.IntegrationWorker.Stop(context.Background()); err != nil {
+		zap.L().Warn("integration worker did not stop cleanly", zap.Error(err))
+	}
 	// 创建一个5秒的超时上下文
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

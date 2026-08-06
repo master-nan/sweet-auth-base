@@ -27,6 +27,15 @@ security:
   cors_allow_credentials: false
 audit:
   access_log_retention_days: 180
+integration:
+  worker:
+    enabled: false
+    worker_id: ''
+    poll_interval: 5
+    claim_batch_size: 8
+    instance_concurrency: 4
+    lease_recovery_interval: 60
+    shutdown_timeout: 15
 conf:
   salt: 'replace-with-at-least-32-random-characters'
   enable: true

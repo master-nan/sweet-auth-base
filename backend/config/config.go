@@ -6,18 +6,19 @@
 package config
 
 type Server struct {
-	Name     string   `mapstructure:"name"`
-	Version  string   `mapstructure:"version"`
-	Port     int      `mapstructure:"port"`
-	DBS      DBS      `mapstructure:"dbs"`
-	Redis    Redis    `mapstructure:"redis"`
-	Session  Session  `mapstructure:"session"`
-	Security Security `mapstructure:"security"`
-	Audit    Audit    `mapstructure:"audit"`
-	WorkerID int64    `mapstructure:"worker_id"`
-	Conf     Conf     `mapstructure:"conf"`
-	ALiYun   ALiYun   `mapstructure:"aliyun"`
-	Upload   Upload   `mapstructure:"upload"`
+	Name        string      `mapstructure:"name"`
+	Version     string      `mapstructure:"version"`
+	Port        int         `mapstructure:"port"`
+	DBS         DBS         `mapstructure:"dbs"`
+	Redis       Redis       `mapstructure:"redis"`
+	Session     Session     `mapstructure:"session"`
+	Security    Security    `mapstructure:"security"`
+	Audit       Audit       `mapstructure:"audit"`
+	Integration Integration `mapstructure:"integration"`
+	WorkerID    int64       `mapstructure:"worker_id"`
+	Conf        Conf        `mapstructure:"conf"`
+	ALiYun      ALiYun      `mapstructure:"aliyun"`
+	Upload      Upload      `mapstructure:"upload"`
 }
 
 type DBS struct {
@@ -56,6 +57,22 @@ type Security struct {
 
 type Audit struct {
 	AccessLogRetentionDays int `mapstructure:"access_log_retention_days"`
+}
+
+// Integration 仅保存集成运行时的服务端配置，不由普通请求修改。
+type Integration struct {
+	Worker IntegrationWorker `mapstructure:"worker"`
+}
+
+// IntegrationWorker 的时间字段单位均为秒，避免配置文件中使用无单位 duration。
+type IntegrationWorker struct {
+	Enabled               bool   `mapstructure:"enabled"`
+	WorkerID              string `mapstructure:"worker_id"`
+	PollInterval          int    `mapstructure:"poll_interval"`
+	ClaimBatchSize        int    `mapstructure:"claim_batch_size"`
+	InstanceConcurrency   int    `mapstructure:"instance_concurrency"`
+	LeaseRecoveryInterval int    `mapstructure:"lease_recovery_interval"`
+	ShutdownTimeout       int    `mapstructure:"shutdown_timeout"`
 }
 
 type Conf struct {

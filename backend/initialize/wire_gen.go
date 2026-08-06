@@ -13,6 +13,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/datapermission"
+	"backend/internal/integration"
 	"backend/internal/security"
 	"backend/internal/storage"
 	"backend/internal/token"
@@ -190,6 +191,27 @@ func InitializeApp() (*App, error) {
 	sysUserApi := api.NewSysUserApi(sysUserService, sysConfigureService, v2)
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
 	blackUserCache := cache.NewBlackCache(redisUtil)
+	credentialProvider := integration.NewCredentialProvider(credentialRepositoryImpl, interfaceDefinitionRepositoryImpl, credentialSecretProtector)
+	httpTransportClient, err := ProvideIntegrationTransportClient()
+	if err != nil {
+		return nil, err
+	}
+	workerRunnerConfig, err := ProvideIntegrationWorkerRunnerConfig(server)
+	if err != nil {
+		return nil, err
+	}
+	inMemoryConcurrencyGuard, err := ProvideIntegrationConcurrencyGuard(workerRunnerConfig)
+	if err != nil {
+		return nil, err
+	}
+	integrationExecutionEngine, err := ProvideIntegrationExecutionEngine(integrationExecutionRepositoryImpl, externalSystemRepositoryImpl, interfaceDefinitionRepositoryImpl, credentialRepositoryImpl, credentialProvider, httpTransportClient, inMemoryConcurrencyGuard, snowflake, workerRunnerConfig)
+	if err != nil {
+		return nil, err
+	}
+	integrationWorkerRunner, err := ProvideIntegrationWorkerRunner(integrationExecutionEngine, workerRunnerConfig)
+	if err != nil {
+		return nil, err
+	}
 	app := &App{
 		Config:                         server,
 		DBs:                            v,
@@ -227,6 +249,7 @@ func InitializeApp() (*App, error) {
 		BlackCache:                     blackUserCache,
 		TokenBlackCache:                tokenBlackCache,
 		ApplicationCache:               applicationCache,
+		IntegrationWorker:              integrationWorkerRunner,
 	}
 	return app, nil
 }
@@ -270,6 +293,7 @@ type App struct {
 	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
+	IntegrationWorker              *integration.IntegrationWorkerRunner
 }
 
 // Repository 提供者
@@ -285,7 +309,7 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.Tr
 ), wire.Bind(
 	new(datapermission.OwnershipFieldOperationValidator),
 	new(*datapermission.OwnershipFieldRegistry),
-), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewIntegrationExecutionService, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
+), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
 )
 
 // Controller 提供者
@@ -323,7 +347,13 @@ var Providers = wire.NewSet(
 	InitRedis,
 	InitCasbin, wire.Bind(new(repository.CasbinPolicyEnforcer), new(*casbin.SyncedEnforcer)), InitSnowflake,
 	InitValidators, cache.NewRedisUtil, wire.Bind(new(cache.Cacher), new(*cache.RedisUtil)), ProvideJWTToken,
-	ProvideHMACToken, token.NewJWTGenerator, token.NewHMACGenerator, storage.NewStorage, RepositoryProvider,
+	ProvideHMACToken, token.NewJWTGenerator, token.NewHMACGenerator, storage.NewStorage, ProvideIntegrationWorkerRunnerConfig,
+	ProvideIntegrationTransportClient,
+	ProvideIntegrationConcurrencyGuard,
+	ProvideIntegrationExecutionEngine,
+	ProvideIntegrationWorkerRunner,
+
+	RepositoryProvider,
 	CacheProvider,
 	ServiceProvider,
 	ControllerProvider,
