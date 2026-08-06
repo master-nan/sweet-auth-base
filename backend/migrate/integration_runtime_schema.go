@@ -29,6 +29,7 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_result_size", expression: "result_size_bytes >= 0"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_http_status", expression: "result_http_status IS NULL OR result_http_status BETWEEN 100 AND 599"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_error_category", expression: "error_category = '' OR error_category IN ('configuration','credential','network','timeout','remote','response','business','concurrency','system')"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_lease", expression: "lease_expires_at IS NULL OR btrim(lease_owner) <> ''"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_attempt", expression: "attempt_no > 0"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_status", expression: "status IN ('running','succeeded','failed','cancelled')"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_duration", expression: "duration_ms >= 0"},

@@ -51,6 +51,8 @@ type IntegrationExecution struct {
 	IdempotencyKey        string     `gorm:"size:128;not null;uniqueIndex:uni_integration_execution_idempotency,priority:4" json:"idempotency_key"`
 	InputHash             string     `gorm:"size:64;not null" json:"input_hash"`
 	CurrentAttempt        int        `gorm:"not null;default:0" json:"current_attempt"`
+	LeaseOwner            string     `gorm:"size:128;index:idx_integration_execution_lease_owner" json:"-"`
+	LeaseExpiresAt        *time.Time `gorm:"type:timestamp;index:idx_integration_execution_lease_expires_at" json:"-"`
 	ResultHTTPStatus      *int       `gorm:"index:idx_integration_execution_http_status" json:"result_http_status"`
 	ResultSizeBytes       int64      `gorm:"not null;default:0" json:"result_size_bytes"`
 	ResultHash            string     `gorm:"size:64" json:"result_hash"`
@@ -74,21 +76,26 @@ func (IntegrationExecution) TableName() string {
 type IntegrationLog struct {
 	Basic
 
-	ExecutionID     int        `gorm:"type:bigint;not null;index:idx_integration_log_execution;uniqueIndex:uni_integration_log_attempt,priority:1" json:"execution_id"`
-	AttemptNo       int        `gorm:"not null;uniqueIndex:uni_integration_log_attempt,priority:2" json:"attempt_no"`
-	Status          string     `gorm:"size:32;not null;index:idx_integration_log_status" json:"status"`
-	StartedAt       time.Time  `gorm:"type:timestamp;not null;index:idx_integration_log_started_at" json:"started_at"`
-	EndedAt         *time.Time `gorm:"type:timestamp" json:"ended_at"`
-	DurationMs      int64      `gorm:"not null;default:0" json:"duration_ms"`
-	HTTPStatus      *int       `gorm:"index:idx_integration_log_http_status" json:"http_status"`
-	ErrorCategory   string     `gorm:"size:32;index:idx_integration_log_error_category" json:"error_category"`
-	ErrorCode       string     `gorm:"size:64" json:"error_code"`
-	ResultSummary   string     `gorm:"size:1024" json:"result_summary"`
-	ResultSizeBytes int64      `gorm:"not null;default:0" json:"result_size_bytes"`
-	ResultHash      string     `gorm:"size:64" json:"result_hash"`
-	ResultCertainty string     `gorm:"size:16;not null;default:unknown" json:"result_certainty"`
-	RequestID       string     `gorm:"size:128;index:idx_integration_log_request_id" json:"request_id"`
-	TraceID         string     `gorm:"size:128;index:idx_integration_log_trace_id" json:"trace_id"`
+	ExecutionID                  int        `gorm:"type:bigint;not null;index:idx_integration_log_execution;uniqueIndex:uni_integration_log_attempt,priority:1" json:"execution_id"`
+	AttemptNo                    int        `gorm:"not null;uniqueIndex:uni_integration_log_attempt,priority:2" json:"attempt_no"`
+	Status                       string     `gorm:"size:32;not null;index:idx_integration_log_status" json:"status"`
+	StartedAt                    time.Time  `gorm:"type:timestamp;not null;index:idx_integration_log_started_at" json:"started_at"`
+	EndedAt                      *time.Time `gorm:"type:timestamp" json:"ended_at"`
+	DurationMs                   int64      `gorm:"not null;default:0" json:"duration_ms"`
+	HTTPStatus                   *int       `gorm:"index:idx_integration_log_http_status" json:"http_status"`
+	ErrorCategory                string     `gorm:"size:32;index:idx_integration_log_error_category" json:"error_category"`
+	ErrorCode                    string     `gorm:"size:64" json:"error_code"`
+	ResultSummary                string     `gorm:"size:1024" json:"result_summary"`
+	ResultSizeBytes              int64      `gorm:"not null;default:0" json:"result_size_bytes"`
+	ResultHash                   string     `gorm:"size:64" json:"result_hash"`
+	ResultCertainty              string     `gorm:"size:16;not null;default:unknown" json:"result_certainty"`
+	RequestID                    string     `gorm:"size:128;index:idx_integration_log_request_id" json:"request_id"`
+	TraceID                      string     `gorm:"size:128;index:idx_integration_log_trace_id" json:"trace_id"`
+	WorkerID                     string     `gorm:"size:128;index:idx_integration_log_worker_id" json:"-"`
+	ResponseContentType          string     `gorm:"size:128" json:"-"`
+	CredentialCode               string     `gorm:"size:64" json:"-"`
+	CredentialVersion            string     `gorm:"size:32" json:"-"`
+	CredentialFingerprintSummary string     `gorm:"size:32" json:"-"`
 
 	Execution IntegrationExecution `gorm:"foreignKey:ExecutionID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
 }

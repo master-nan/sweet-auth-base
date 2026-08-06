@@ -8,8 +8,11 @@ import (
 	"backend/repository"
 	queryutil "backend/repository/util"
 	"context"
+	"strings"
+	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IntegrationExecutionRepositoryImpl struct {
@@ -91,6 +94,245 @@ func (r *IntegrationExecutionRepositoryImpl) ListCandidatesByStatus(
 		Limit(limit).
 		Find(&values).Error
 	return values, err
+}
+
+// ClaimCreatedExecutions 在一个短事务中使用行锁领取 created Execution 并创建 running Attempt。
+// PostgreSQL 会生成 FOR UPDATE SKIP LOCKED；SQLite 测试仅验证状态条件和原子回滚，不替代行锁专项验证。
+func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
+	ctx context.Context,
+	request repository.IntegrationExecutionClaimRequest,
+) ([]repository.ClaimedIntegrationExecution, error) {
+	if strings.TrimSpace(request.WorkerID) == "" || request.LeaseExpiresAt.IsZero() || request.StartedAt.IsZero() ||
+		!request.LeaseExpiresAt.After(request.StartedAt) || len(request.AttemptIDs) == 0 {
+		return nil, repository.ErrIntegrationExecutionClaimUnavailable
+	}
+	claimed := make([]repository.ClaimedIntegrationExecution, 0, len(request.AttemptIDs))
+	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		var executions []model.IntegrationExecution
+		query := tx.Model(&model.IntegrationExecution{}).
+			Where("status = ?", model.IntegrationExecutionStatusCreated).
+			Order("gmt_create ASC, id ASC").
+			Limit(len(request.AttemptIDs)).
+			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})
+		if err := query.Find(&executions).Error; err != nil {
+			return err
+		}
+		for index := range executions {
+			execution := executions[index]
+			nextAttempt := execution.CurrentAttempt + 1
+			updates := map[string]any{
+				"status":           model.IntegrationExecutionStatusRunning,
+				"lease_owner":      request.WorkerID,
+				"lease_expires_at": request.LeaseExpiresAt,
+				"started_at":       request.StartedAt,
+				"current_attempt":  nextAttempt,
+				"revision":         execution.Revision + 1,
+			}
+			result := tx.Model(&model.IntegrationExecution{}).
+				Where("id = ? AND status = ? AND revision = ?", execution.Id, model.IntegrationExecutionStatusCreated, execution.Revision).
+				Updates(updates)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return repository.ErrIntegrationExecutionClaimUnavailable
+			}
+			attempt := model.IntegrationLog{
+				Basic:       model.Basic{Id: request.AttemptIDs[index], State: true},
+				ExecutionID: execution.Id, AttemptNo: nextAttempt,
+				Status: model.IntegrationLogStatusRunning, StartedAt: request.StartedAt,
+				ResultCertainty: model.IntegrationResultCertaintyUnknown,
+				RequestID:       request.RequestID, TraceID: request.TraceID, WorkerID: request.WorkerID,
+			}
+			if err := tx.Create(&attempt).Error; err != nil {
+				return err
+			}
+			execution.Status = model.IntegrationExecutionStatusRunning
+			execution.LeaseOwner = request.WorkerID
+			execution.LeaseExpiresAt = &request.LeaseExpiresAt
+			execution.StartedAt = &request.StartedAt
+			execution.CurrentAttempt = nextAttempt
+			execution.Revision++
+			claimed = append(claimed, repository.ClaimedIntegrationExecution{Execution: execution, Attempt: attempt})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return claimed, nil
+}
+
+// CompleteAttemptAndExecution 在新的短事务内验证租约并原子收敛 Attempt 和 Execution。
+func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
+	ctx context.Context,
+	completion repository.IntegrationAttemptCompletion,
+) (model.IntegrationExecution, error) {
+	var completed model.IntegrationExecution
+	if completion.ExecutionID <= 0 || completion.AttemptID <= 0 || completion.AttemptNo <= 0 ||
+		completion.ExpectedRevision <= 0 || strings.TrimSpace(completion.WorkerID) == "" || completion.CompletedAt.IsZero() {
+		return completed, repository.ErrIntegrationExecutionLeaseLost
+	}
+	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		execution, err := r.FindByIdForUpdate(tx, completion.ExecutionID)
+		if err != nil {
+			return err
+		}
+		if execution.Status != model.IntegrationExecutionStatusRunning || execution.Revision != completion.ExpectedRevision ||
+			execution.LeaseOwner != completion.WorkerID || execution.LeaseExpiresAt == nil || !execution.LeaseExpiresAt.After(completion.CompletedAt) {
+			return repository.ErrIntegrationExecutionLeaseLost
+		}
+		var attempt model.IntegrationLog
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND execution_id = ? AND attempt_no = ?", completion.AttemptID, completion.ExecutionID, completion.AttemptNo).
+			First(&attempt).Error; err != nil {
+			return err
+		}
+		if attempt.Status != model.IntegrationLogStatusRunning {
+			return repository.ErrIntegrationAttemptAlreadyCompleted
+		}
+		duration := completion.CompletedAt.Sub(attempt.StartedAt).Milliseconds()
+		if duration < 0 {
+			duration = 0
+		}
+		attemptUpdates := map[string]any{
+			"status":                         attemptTerminalStatus(completion.ExecutionStatus),
+			"ended_at":                       completion.CompletedAt,
+			"duration_ms":                    duration,
+			"http_status":                    completion.HTTPStatus,
+			"error_category":                 completion.ErrorCategory,
+			"error_code":                     completion.ErrorCode,
+			"result_summary":                 completion.ResultSummary,
+			"result_size_bytes":              completion.ResultSizeBytes,
+			"result_hash":                    completion.ResultHash,
+			"result_certainty":               completion.ResultCertainty,
+			"response_content_type":          completion.ResponseContentType,
+			"credential_code":                completion.CredentialCode,
+			"credential_version":             completion.CredentialVersion,
+			"credential_fingerprint_summary": completion.CredentialFingerprintSummary,
+		}
+		if result := tx.Model(&model.IntegrationLog{}).Where("id = ? AND status = ?", attempt.Id, model.IntegrationLogStatusRunning).Updates(attemptUpdates); result.Error != nil {
+			return result.Error
+		} else if result.RowsAffected != 1 {
+			return repository.ErrIntegrationAttemptAlreadyCompleted
+		}
+		executionUpdates := map[string]any{
+			"status":             completion.ExecutionStatus,
+			"lease_owner":        "",
+			"lease_expires_at":   nil,
+			"result_http_status": completion.HTTPStatus,
+			"result_size_bytes":  completion.ResultSizeBytes,
+			"result_hash":        completion.ResultHash,
+			"result_summary":     completion.ResultSummary,
+			"error_category":     completion.ErrorCategory,
+			"completed_at":       completion.CompletedAt,
+			"next_run_at":        nil,
+			"revision":           execution.Revision + 1,
+		}
+		result := tx.Model(&model.IntegrationExecution{}).
+			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID).
+			Updates(executionUpdates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return repository.ErrIntegrationExecutionLeaseLost
+		}
+		completed = execution
+		completed.Status = completion.ExecutionStatus
+		completed.LeaseOwner = ""
+		completed.LeaseExpiresAt = nil
+		completed.ResultHTTPStatus = completion.HTTPStatus
+		completed.ResultSizeBytes = completion.ResultSizeBytes
+		completed.ResultHash = completion.ResultHash
+		completed.ResultSummary = completion.ResultSummary
+		completed.ErrorCategory = completion.ErrorCategory
+		completed.CompletedAt = &completion.CompletedAt
+		completed.Revision++
+		return nil
+	})
+	return completed, err
+}
+
+func (r *IntegrationExecutionRepositoryImpl) FindExpiredRunningExecutions(
+	ctx context.Context,
+	now time.Time,
+	limit int,
+) ([]model.IntegrationExecution, error) {
+	if limit <= 0 {
+		return []model.IntegrationExecution{}, nil
+	}
+	var values []model.IntegrationExecution
+	err := r.DBWithContext(ctx).Model(&model.IntegrationExecution{}).
+		Where("status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?", model.IntegrationExecutionStatusRunning, now).
+		Order("lease_expires_at ASC, id ASC").Limit(limit).Find(&values).Error
+	return values, err
+}
+
+// RecoverExpiredExecution 不重新发起远端调用，只将遗留 Attempt 和 Execution 收敛为未知失败。
+func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
+	ctx context.Context,
+	recovery repository.ExpiredExecutionRecovery,
+) (bool, error) {
+	if recovery.ExecutionID <= 0 || recovery.RecoveredAt.IsZero() {
+		return false, repository.ErrIntegrationExecutionLeaseLost
+	}
+	recovered := false
+	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		execution, err := r.FindByIdForUpdate(tx, recovery.ExecutionID)
+		if err != nil {
+			return err
+		}
+		if execution.Status != model.IntegrationExecutionStatusRunning || execution.LeaseExpiresAt == nil || execution.LeaseExpiresAt.After(recovery.RecoveredAt) {
+			return nil
+		}
+		var attempt model.IntegrationLog
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("execution_id = ? AND attempt_no = ?", execution.Id, execution.CurrentAttempt).
+			First(&attempt).Error; err != nil {
+			return err
+		}
+		if attempt.Status != model.IntegrationLogStatusRunning {
+			return repository.ErrIntegrationAttemptAlreadyCompleted
+		}
+		duration := recovery.RecoveredAt.Sub(attempt.StartedAt).Milliseconds()
+		if duration < 0 {
+			duration = 0
+		}
+		if result := tx.Model(&model.IntegrationLog{}).Where("id = ? AND status = ?", attempt.Id, model.IntegrationLogStatusRunning).Updates(map[string]any{
+			"status": model.IntegrationLogStatusFailed, "ended_at": recovery.RecoveredAt, "duration_ms": duration,
+			"error_category": model.IntegrationErrorCategoryConcurrency, "error_code": "lease_expired",
+			"result_summary": "执行租约已过期，远端处理结果无法确认", "result_certainty": model.IntegrationResultCertaintyUnknown,
+		}); result.Error != nil {
+			return result.Error
+		} else if result.RowsAffected != 1 {
+			return repository.ErrIntegrationAttemptAlreadyCompleted
+		}
+		result := tx.Model(&model.IntegrationExecution{}).
+			Where("id = ? AND status = ? AND revision = ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision).
+			Updates(map[string]any{
+				"status": model.IntegrationExecutionStatusFailed, "lease_owner": "", "lease_expires_at": nil,
+				"completed_at": recovery.RecoveredAt, "next_run_at": nil,
+				"error_category": model.IntegrationErrorCategoryConcurrency,
+				"result_summary": "执行租约已过期，远端处理结果无法确认", "revision": execution.Revision + 1,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return repository.ErrIntegrationExecutionLeaseLost
+		}
+		recovered = true
+		return nil
+	})
+	return recovered, err
+}
+
+func attemptTerminalStatus(executionStatus string) string {
+	if executionStatus == model.IntegrationExecutionStatusSucceeded {
+		return model.IntegrationLogStatusSucceeded
+	}
+	return model.IntegrationLogStatusFailed
 }
 
 type IntegrationLogRepositoryImpl struct {
