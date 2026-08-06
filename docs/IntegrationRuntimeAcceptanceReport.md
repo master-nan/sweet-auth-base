@@ -9,6 +9,7 @@
 | 验收日期 | 2026-08-06 |
 | 首次验收基线 | `6412875ab0a603a777f3fb16bcc6c5e671a25f4a`（实现集成运行管理页面） |
 | INT-003B-7R 复验基线 | `d6a28b5a4b98521c44097e103bc54aa2754c64f1`（统一集成运行参数与租约契约） |
+| INT-003B-7D 整改基线 | `44ad3b2fd77c69ad2a500c21fcb7dff6db518fbb`（完成集成运行时复验与冻结） |
 | 验收环境 | macOS arm64、Go 1.26.2、Node.js 22、PostgreSQL 16、Redis 6.2.7、Docker Compose 本地环境 |
 | 适用阶段 | Integration Runtime 第一期验收，不包含 Retry Worker、SyncTask/SyncBatch、OAuth Token 流程和业务同步规则 |
 
@@ -560,3 +561,82 @@ yarn build
 状态机、权限、统一上限和租约四项原阻塞已经关闭，但真实 PostgreSQL 环境中的输入快照无法被 Worker 成功重建，导致一期 Runtime 不能完成最基本的常驻 Worker 成功调用。这是代码与执行真实性阻塞项，不属于环境或后续能力限制。
 
 **冻结结论：不冻结。** 本次不生成 `IntegrationRuntimeFreezeReview.md`，也不允许进入 INT-004 Retry。应先通过独立整改 Task 冻结 JSONB 语义校验方案，例如统一以重新规范化后的语义字节计算大小和 Hash，或选择可保持规范化字节的存储类型；整改必须补充真实 PostgreSQL 往返和常驻 Runner 成功调用回归，再重新执行 INT-003B-7R。
+
+## 17. INT-003B-7D JSONB 输入快照语义校验整改
+
+### 17.1 根因与设计修订
+
+INT-003B-7R 的失败根因已确认：创建端以应用规范化 JSON 字节计算 `input_snapshot_size` 和 `input_hash`，而 Worker 读取 PostgreSQL JSONB 后，错误地把数据库返回文本长度直接与语义大小比较，并要求返回字节与创建字节逐字相等。JSONB 只保证 JSON 语义，会调整对象键顺序、空白和等价转义表达，因此原校验把合法往返误判为损坏。
+
+正式设计已修订并冻结：
+
+1. `input_snapshot_size` 是版本 1 快照重新规范化后的语义字节长度，不是 JSONB 驱动返回字节长度。
+2. 创建和 Worker 加载复用同一个规范化入口；Header 名称小写、Query 多值稳定排序、JSON 对象稳定序列化、数组顺序保留。
+3. Hash 信封继续固定包含 InterfaceDefinition 明确版本和规范化快照，不包含数据库 ID、request_id、trace_id、Worker ID 或 Credential。
+4. Worker 严格解码 JSONB、检查版本、复核接口契约、重新规范化，再比较语义大小与 Hash；只有全部通过才构造 TransportRequest。
+5. 新增独立的 512 KiB JSONB 读取防御上限 `max_snapshot_storage_bytes`；384 KiB 仍是规范化语义快照上限，两者不混用。
+
+### 17.2 实现与错误语义
+
+原创建端和 Worker 端的相似流程已收口到单一规范化实现。Worker 不再比较 JSONB 原始字节，也不再用原始字节长度判断 `input_snapshot_size`。
+
+本次稳定区分：
+
+- `execution_input_storage_too_large`：数据库返回 JSONB 超过独立存储防御上限。
+- `execution_input_semantic_too_large`：重新规范化后的输入超过语义上限或结构复杂度上限。
+- `execution_input_size_mismatch`：重新计算的语义大小与 Execution 摘要不一致。
+- `execution_input_hash_mismatch`：语义大小一致但接口版本或输入语义发生变化。
+- `execution_input_invalid`：JSONB 不能严格解码或结构不合法。
+- `execution_input_contract_mismatch`：快照不再符合冻结接口契约。
+
+### 17.3 数据库与 Migration 审计
+
+`integration_execution.input_snapshot` 继续使用 PostgreSQL JSONB，不改为 TEXT 或 BYTEA。现有 `input_snapshot_size` CHECK 只验证 0 至 393,216 的语义摘要范围和版本关系，没有把 `octet_length(input_snapshot::text)` 等同于语义大小，因此无需变更数据库结构。
+
+现有 Execution 创建逻辑原本就保存应用规范化后的大小和 Hash，合法开发记录不需要迁移重算；修复后会在 Worker 加载时重新规范化并验证。历史无快照记录继续由既有幂等 Migration 安全收敛为 failed，无法解码、版本不支持、摘要不一致或契约不匹配的记录均不会发送 HTTP，也不伪造空快照或修改已完成历史事实。
+
+PostgreSQL Migration 专项新增验证：JSONB 返回文本长度与 `input_snapshot_size` 不同的合法记录可以通过 CHECK；Migration 连续执行仍通过。
+
+### 17.4 PostgreSQL 16 语义往返与篡改测试
+
+使用 `SWEET_TEST_POSTGRES_DSN` 和 `SWEET_REQUIRE_POSTGRES_TESTS=true` 实际执行 PostgreSQL 16 专项，未跳过：
+
+1. 创建包含 Path、Query、普通 Header 和 JSON Body 的版本 1 快照，输入包含对象键顺序、空白、Unicode 转义和 Query 多值顺序差异。
+2. 保存为 JSONB 后读取，实际返回字节内容和长度均不同于创建时规范化字节。
+3. Worker 重新规范化后得到相同 semantic_size 和 input_hash，TransportRequest 重建成功。
+4. 分别修改 Path、Query、Header、Body，均稳定触发 Hash 完整性失败。
+5. 修改大小摘要触发 `execution_input_size_mismatch`；修改快照版本稳定拒绝；超过存储防御上限稳定触发 `execution_input_storage_too_large`。
+6. 同语义 JSON 键顺序、Query 多值顺序和 Header 大小写继续得到相同 Hash；JSON 数组顺序变化继续得到不同 Hash。
+
+### 17.5 常驻 Runner + TLS 端到端结果
+
+本次把上一轮失败链路固化为自动化 PostgreSQL 门控测试并实际通过：
+
+1. 在独立 PostgreSQL Schema 创建 ExternalSystem、Bearer Credential 和带 Path、Query、Header、JSON Body 契约的 InterfaceDefinition。
+2. 通过 Application Service 提交 Execution，随后结束原提交 Context。
+3. 启动真实 `IntegrationWorkerRunner`，没有直接调用 `RunOnce`。
+4. Runner 自动领取 created Execution，并在领取事务内创建 running Attempt。
+5. Engine 从 JSONB 读取快照，重新执行契约校验、规范化、semantic_size 与 Hash 校验。
+6. 校验通过后 Credential Provider 才解析并注入 Bearer 认证。
+7. 本地 TLS Server 实际收到正确的 Path、排序后的 Query、普通 Header、JSON Body 和 Authorization。
+8. Attempt 与 Execution 均收敛为 succeeded，凭证摘要正确记录，完整输入和秘密未进入 DTO、Audit 或日志。
+
+### 17.6 自动化结果与结论边界
+
+```text
+SWEET_TEST_POSTGRES_DSN=<本地 Docker PostgreSQL 16>
+SWEET_REQUIRE_POSTGRES_TESTS=true
+
+cd backend && go test ./... -count=1
+结果：通过；PostgreSQL 门控测试实际执行，未跳过。
+
+go test -race ./internal/integration/... ./service ./repository/impl ./initialize -count=1
+结果：通过。
+
+PostgreSQL JSONB 往返、Migration、CHECK、唯一约束、行锁和 Runner + TLS 专项
+结果：全部通过。
+```
+
+本 Task 没有修改前端 DTO 或页面，因此未重复执行 Yarn。
+
+INT-003B-7D 已关闭当前已知的 JSONB 语义校验代码阻塞，但按 Task 约束，本节不把第 16.10 节的总体验收结论改为通过，也不生成冻结评审。当前没有已知剩余代码阻塞项；仍需执行精简的 INT-003B-7R2 最终复验，复核后再决定是否通过和冻结。

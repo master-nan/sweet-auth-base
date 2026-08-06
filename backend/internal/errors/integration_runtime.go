@@ -42,7 +42,7 @@ const (
 	ErrorCodeIntegrationWorkerPanicRecovered             = 130337
 	ErrorCodeIntegrationExecutionInputMissing            = 130338
 	ErrorCodeIntegrationExecutionInputInvalid            = 130339
-	ErrorCodeIntegrationExecutionInputTooLarge           = 130340
+	ErrorCodeIntegrationExecutionInputSemanticTooLarge   = 130340
 	ErrorCodeIntegrationExecutionInputContractMismatch   = 130341
 	ErrorCodeIntegrationExecutionInputHashMismatch       = 130342
 	ErrorCodeIntegrationExecutionInputVersionUnsupported = 130343
@@ -61,6 +61,8 @@ const (
 	ErrorCodeIntegrationLeaseMarginInsufficient          = 130356
 	ErrorCodeIntegrationInterfaceRuntimeIncompatible     = 130357
 	ErrorCodeIntegrationExecutionRuntimeIncompatible     = 130358
+	ErrorCodeIntegrationExecutionInputStorageTooLarge    = 130359
+	ErrorCodeIntegrationExecutionInputSizeMismatch       = 130360
 )
 
 var (
@@ -259,10 +261,10 @@ var (
 		ErrorCodeIntegrationExecutionInputInvalid,
 		"集成执行输入不合法",
 	)
-	ErrIntegrationExecutionInputTooLarge = NewBusinessError(
+	ErrIntegrationExecutionInputSemanticTooLarge = NewBusinessError(
 		http.StatusRequestEntityTooLarge,
-		ErrorCodeIntegrationExecutionInputTooLarge,
-		"集成执行输入超过平台限制",
+		ErrorCodeIntegrationExecutionInputSemanticTooLarge,
+		"集成执行输入语义大小超过平台限制",
 	)
 	ErrIntegrationExecutionInputContractMismatch = NewBusinessError(
 		http.StatusConflict,
@@ -353,5 +355,15 @@ var (
 		http.StatusConflict,
 		ErrorCodeIntegrationExecutionRuntimeIncompatible,
 		"集成执行引用的接口不符合当前运行契约",
+	)
+	ErrIntegrationExecutionInputStorageTooLarge = NewBusinessError(
+		http.StatusRequestEntityTooLarge,
+		ErrorCodeIntegrationExecutionInputStorageTooLarge,
+		"集成执行输入存储大小超过平台限制",
+	)
+	ErrIntegrationExecutionInputSizeMismatch = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationExecutionInputSizeMismatch,
+		"集成执行输入大小完整性校验失败",
 	)
 )

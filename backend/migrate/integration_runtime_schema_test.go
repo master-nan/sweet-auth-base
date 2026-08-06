@@ -153,6 +153,20 @@ func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 	}
 
 	system, definition := integrationRuntimeMigrationFixtures(t, db)
+	semanticSnapshot := validIntegrationExecutionFixture(508, "INT-508", system, definition, "request-508")
+	if err := db.Create(&semanticSnapshot).Error; err != nil {
+		t.Fatalf("create semantic snapshot fixture: %v", err)
+	}
+	var jsonbStorageBytes int
+	if err := db.Raw(`
+		SELECT octet_length(input_snapshot::text)
+		FROM integration_execution WHERE id = ?
+	`, semanticSnapshot.Id).Scan(&jsonbStorageBytes).Error; err != nil {
+		t.Fatalf("measure JSONB storage representation: %v", err)
+	}
+	if jsonbStorageBytes == semanticSnapshot.InputSnapshotSize {
+		t.Fatalf("fixture did not expose semantic/storage size distinction: both=%d", jsonbStorageBytes)
+	}
 	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).
 		Update("input_contract", datatypes.JSON([]byte(`{"version":2,"parameters":[]}`))).Error; err == nil {
 		t.Fatal("expected invalid interface input contract version to be rejected")

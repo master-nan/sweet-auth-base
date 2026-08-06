@@ -91,7 +91,7 @@ func TestExecutionInputSnapshotRejectsContractAndInputViolations(t *testing.T) {
 		}), want: myerrors.ErrIntegrationExecutionSensitiveInputRejected},
 		{name: "body too large", contract: contract, method: "POST", path: "/api/employees/{employee_id}", input: mutateInput(valid, func(v *ExecutionInputValues) {
 			v.JSONBody = json.RawMessage(`{"name":"` + strings.Repeat("a", MaxInputJSONBodyBytes) + `"}`)
-		}), want: myerrors.ErrIntegrationExecutionInputTooLarge},
+		}), want: myerrors.ErrIntegrationExecutionInputSemanticTooLarge},
 		{name: "sensitive contract", contract: []byte(`{"version":1,"parameters":[{"code":"token","location":"query","data_type":"string","required":false,"max_length":10,"allow_multiple":false,"sensitive":true}]}`), method: "POST", path: "/api/static", input: ExecutionInputValues{}, want: myerrors.ErrIntegrationExecutionSensitiveInputRejected},
 	}
 	for _, test := range tests {
@@ -111,7 +111,7 @@ func TestExecutionInputSnapshotComplexityAndIntegrity(t *testing.T) {
 		nested = `{"level":` + nested + `}`
 	}
 	_, _, _, err := BuildExecutionInputSnapshot(contract, "POST", "/api/static", 1, ExecutionInputValues{JSONBody: json.RawMessage(`{"payload":` + nested + `}`)})
-	if !errors.Is(err, myerrors.ErrIntegrationExecutionInputTooLarge) {
+	if !errors.Is(err, myerrors.ErrIntegrationExecutionInputSemanticTooLarge) {
 		t.Fatalf("depth error=%v", err)
 	}
 
@@ -121,6 +121,13 @@ func TestExecutionInputSnapshotComplexityAndIntegrity(t *testing.T) {
 	}
 	if _, err := LoadExecutionInputSnapshot(nil, "GET", "/api/static", 1, encoded, len(encoded), hash); err != nil {
 		t.Fatalf("load valid snapshot: %v", err)
+	}
+	jsonbStyle := []byte(`{"headers": {}, "path_params": {}, "query_params": {}, "version": 1}`)
+	if _, err := LoadExecutionInputSnapshot(nil, "GET", "/api/static", 1, jsonbStyle, len(encoded), hash); err != nil {
+		t.Fatalf("load semantically equal JSONB representation: %v", err)
+	}
+	if _, err := LoadExecutionInputSnapshot(nil, "GET", "/api/static", 1, jsonbStyle, len(encoded)+1, hash); !errors.Is(err, myerrors.ErrIntegrationExecutionInputSizeMismatch) {
+		t.Fatalf("size mismatch error=%v", err)
 	}
 	tampered := append([]byte(nil), encoded...)
 	tampered = append(tampered[:len(tampered)-1], []byte(`,"json_body":null}`)...)

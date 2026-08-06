@@ -21,19 +21,20 @@ const (
 	ExecutionInputSnapshotVersion = model.IntegrationExecutionInputSnapshotVersion
 	InputContractVersion          = 1
 
-	MaxInputParameterDefinitions = 128
-	MaxInputPathParameters       = 32
-	MaxInputPathBytes            = 4 * 1024
-	MaxInputQueryParameters      = 64
-	MaxInputQueryBytes           = 16 * 1024
-	MaxInputHeaderParameters     = 16
-	MaxInputHeaderBytes          = 8 * 1024
-	MaxInputJSONBodyBytes        = 256 * 1024
-	MaxInputSnapshotBytes        = 384 * 1024
-	MaxInputJSONDepth            = 16
-	MaxInputJSONArrayElements    = 256
-	MaxInputJSONFields           = 256
-	MaxInputJSONStringBytes      = 4 * 1024
+	MaxInputParameterDefinitions  = 128
+	MaxInputPathParameters        = 32
+	MaxInputPathBytes             = 4 * 1024
+	MaxInputQueryParameters       = 64
+	MaxInputQueryBytes            = 16 * 1024
+	MaxInputHeaderParameters      = 16
+	MaxInputHeaderBytes           = 8 * 1024
+	MaxInputJSONBodyBytes         = 256 * 1024
+	MaxInputSnapshotSemanticBytes = 384 * 1024
+	MaxInputSnapshotStorageBytes  = 512 * 1024
+	MaxInputJSONDepth             = 16
+	MaxInputJSONArrayElements     = 256
+	MaxInputJSONFields            = 256
+	MaxInputJSONStringBytes       = 4 * 1024
 )
 
 const (
@@ -126,24 +127,9 @@ func BuildExecutionInputSnapshot(
 	interfaceVersion int,
 	input ExecutionInputValues,
 ) (ExecutionInputSnapshot, []byte, string, error) {
-	contractBytes, err := NormalizeInputContract(contractRaw, method, relativePath)
+	snapshot, encoded, err := normalizeExecutionInputSnapshot(contractRaw, method, relativePath, input)
 	if err != nil {
 		return ExecutionInputSnapshot{}, nil, "", err
-	}
-	var contract InterfaceInputContract
-	if err := decodeStrictJSON(contractBytes, &contract); err != nil {
-		return ExecutionInputSnapshot{}, nil, "", myerrors.ErrIntegrationExecutionInputContractMismatch
-	}
-	snapshot, err := normalizeExecutionInput(contract, method, input)
-	if err != nil {
-		return ExecutionInputSnapshot{}, nil, "", err
-	}
-	encoded, err := json.Marshal(snapshot)
-	if err != nil {
-		return ExecutionInputSnapshot{}, nil, "", myerrors.ErrIntegrationExecutionInputInvalid
-	}
-	if len(encoded) > MaxInputSnapshotBytes {
-		return ExecutionInputSnapshot{}, nil, "", myerrors.ErrIntegrationExecutionInputTooLarge
 	}
 	hash, err := executionInputHash(interfaceVersion, encoded)
 	if err != nil {
@@ -152,7 +138,7 @@ func BuildExecutionInputSnapshot(
 	return snapshot, encoded, hash, nil
 }
 
-// LoadExecutionInputSnapshot 在 Worker 执行前重新校验规范化字节、大小和 Hash。
+// LoadExecutionInputSnapshot 在 Worker 执行前按 JSON 语义重新规范化并校验大小和 Hash。
 func LoadExecutionInputSnapshot(
 	contractRaw []byte,
 	method string,
@@ -165,8 +151,8 @@ func LoadExecutionInputSnapshot(
 	if len(snapshotRaw) == 0 || expectedSize <= 0 {
 		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputMissing
 	}
-	if len(snapshotRaw) != expectedSize || len(snapshotRaw) > MaxInputSnapshotBytes {
-		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputTooLarge
+	if len(snapshotRaw) > MaxInputSnapshotStorageBytes {
+		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputStorageTooLarge
 	}
 	var stored ExecutionInputSnapshot
 	if err := decodeStrictJSON(snapshotRaw, &stored); err != nil {
@@ -175,11 +161,10 @@ func LoadExecutionInputSnapshot(
 	if stored.Version != ExecutionInputSnapshotVersion {
 		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputVersionUnsupported
 	}
-	rebuilt, canonical, hash, err := BuildExecutionInputSnapshot(
+	rebuilt, canonical, err := normalizeExecutionInputSnapshot(
 		contractRaw,
 		method,
 		relativePath,
-		interfaceVersion,
 		ExecutionInputValues{
 			PathParams: stored.PathParams, QueryParams: stored.QueryParams,
 			Headers: stored.Headers, JSONBody: stored.JSONBody,
@@ -188,10 +173,45 @@ func LoadExecutionInputSnapshot(
 	if err != nil {
 		return ExecutionInputSnapshot{}, err
 	}
-	if !bytes.Equal(canonical, snapshotRaw) || !strings.EqualFold(hash, strings.TrimSpace(expectedHash)) {
+	if len(canonical) != expectedSize {
+		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputSizeMismatch
+	}
+	hash, err := executionInputHash(interfaceVersion, canonical)
+	if err != nil {
+		return ExecutionInputSnapshot{}, err
+	}
+	if !strings.EqualFold(hash, strings.TrimSpace(expectedHash)) {
 		return ExecutionInputSnapshot{}, myerrors.ErrIntegrationExecutionInputHashMismatch
 	}
 	return rebuilt, nil
+}
+
+func normalizeExecutionInputSnapshot(
+	contractRaw []byte,
+	method string,
+	relativePath string,
+	input ExecutionInputValues,
+) (ExecutionInputSnapshot, []byte, error) {
+	contractBytes, err := NormalizeInputContract(contractRaw, method, relativePath)
+	if err != nil {
+		return ExecutionInputSnapshot{}, nil, err
+	}
+	var contract InterfaceInputContract
+	if err := decodeStrictJSON(contractBytes, &contract); err != nil {
+		return ExecutionInputSnapshot{}, nil, myerrors.ErrIntegrationExecutionInputContractMismatch
+	}
+	snapshot, err := normalizeExecutionInput(contract, method, input)
+	if err != nil {
+		return ExecutionInputSnapshot{}, nil, err
+	}
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return ExecutionInputSnapshot{}, nil, myerrors.ErrIntegrationExecutionInputInvalid
+	}
+	if len(encoded) > MaxInputSnapshotSemanticBytes {
+		return ExecutionInputSnapshot{}, nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
+	}
+	return snapshot, encoded, nil
 }
 
 func SummarizeExecutionInput(snapshotRaw []byte, version, size int) ExecutionInputSummary {
@@ -325,7 +345,7 @@ func normalizeExecutionInput(contract InterfaceInputContract, method string, inp
 
 func normalizePathInput(input map[string]string, definitions map[string]InputParameterDefinition) (map[string]string, error) {
 	if len(input) > MaxInputPathParameters {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	result := make(map[string]string, len(input))
 	total := 0
@@ -349,14 +369,14 @@ func normalizePathInput(input map[string]string, definitions map[string]InputPar
 		}
 	}
 	if total > MaxInputPathBytes {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	return result, nil
 }
 
 func normalizeQueryInput(input map[string][]string, definitions map[string]InputParameterDefinition) (map[string][]string, error) {
 	if len(input) > MaxInputQueryParameters {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	result := make(map[string][]string, len(input))
 	total := 0
@@ -386,14 +406,14 @@ func normalizeQueryInput(input map[string][]string, definitions map[string]Input
 		}
 	}
 	if total > MaxInputQueryBytes {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	return result, nil
 }
 
 func normalizeHeaderInput(input map[string][]string, definitions map[string]InputParameterDefinition) (map[string][]string, error) {
 	if len(input) > MaxInputHeaderParameters {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	result := make(map[string][]string, len(input))
 	total := 0
@@ -421,7 +441,7 @@ func normalizeHeaderInput(input map[string][]string, definitions map[string]Inpu
 		}
 	}
 	if total > MaxInputHeaderBytes {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	return result, nil
 }
@@ -443,7 +463,7 @@ func normalizeBodyInput(raw json.RawMessage, method string, definitions map[stri
 	}
 	if method == "GET" || len(raw) > MaxInputJSONBodyBytes || len(bodyDefinitions) == 0 {
 		if len(raw) > MaxInputJSONBodyBytes {
-			return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+			return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 		}
 		return nil, myerrors.ErrIntegrationExecutionBodyInvalid
 	}
@@ -474,20 +494,20 @@ func normalizeBodyInput(raw json.RawMessage, method string, definitions map[stri
 	}
 	encoded, err := json.Marshal(object)
 	if err != nil || len(encoded) > MaxInputJSONBodyBytes {
-		return nil, myerrors.ErrIntegrationExecutionInputTooLarge
+		return nil, myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	return encoded, nil
 }
 
 func validateJSONComplexity(value any, depth int, fields *int) error {
 	if depth > MaxInputJSONDepth {
-		return myerrors.ErrIntegrationExecutionInputTooLarge
+		return myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 	}
 	switch item := value.(type) {
 	case map[string]any:
 		*fields += len(item)
 		if *fields > MaxInputJSONFields {
-			return myerrors.ErrIntegrationExecutionInputTooLarge
+			return myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 		}
 		for name, child := range item {
 			if len(name) > 64 || containsControlCharacter(name) || forbiddenInputName(name) {
@@ -499,7 +519,7 @@ func validateJSONComplexity(value any, depth int, fields *int) error {
 		}
 	case []any:
 		if len(item) > MaxInputJSONArrayElements {
-			return myerrors.ErrIntegrationExecutionInputTooLarge
+			return myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 		}
 		for _, child := range item {
 			if err := validateJSONComplexity(child, depth+1, fields); err != nil {
@@ -508,7 +528,7 @@ func validateJSONComplexity(value any, depth int, fields *int) error {
 		}
 	case string:
 		if len(item) > MaxInputJSONStringBytes || containsControlCharacter(item) {
-			return myerrors.ErrIntegrationExecutionInputTooLarge
+			return myerrors.ErrIntegrationExecutionInputSemanticTooLarge
 		}
 	}
 	return nil

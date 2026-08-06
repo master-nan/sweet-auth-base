@@ -257,8 +257,12 @@ func executionInputReasonCode(err error) string {
 	switch {
 	case errors.Is(err, myerrors.ErrIntegrationExecutionInputMissing):
 		return "execution_input_missing"
-	case errors.Is(err, myerrors.ErrIntegrationExecutionInputTooLarge):
-		return "execution_input_too_large"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputStorageTooLarge):
+		return "execution_input_storage_too_large"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputSemanticTooLarge):
+		return "execution_input_semantic_too_large"
+	case errors.Is(err, myerrors.ErrIntegrationExecutionInputSizeMismatch):
+		return "execution_input_size_mismatch"
 	case errors.Is(err, myerrors.ErrIntegrationExecutionInputContractMismatch):
 		return "execution_input_contract_mismatch"
 	case errors.Is(err, myerrors.ErrIntegrationExecutionInputHashMismatch):

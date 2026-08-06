@@ -58,7 +58,7 @@ type IntegrationExecution struct {
 	InputHash             string         `gorm:"size:64;not null" json:"input_hash"`
 	InputSnapshot         datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"-"`
 	InputSnapshotVersion  int            `gorm:"not null;default:0" json:"-"`
-	InputSnapshotSize     int            `gorm:"not null;default:0" json:"-"`
+	InputSnapshotSize     int            `gorm:"not null;default:0" json:"-"` // 统一规范化后的语义字节长度，不是 JSONB 返回文本长度。
 	CurrentAttempt        int            `gorm:"not null;default:0" json:"current_attempt"`
 	LeaseOwner            string         `gorm:"size:128;index:idx_integration_execution_lease_owner" json:"-"`
 	LeaseExpiresAt        *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_lease_expires_at" json:"-"`

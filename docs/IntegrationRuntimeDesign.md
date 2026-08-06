@@ -132,6 +132,12 @@ V1 选择“受控 JSONB 明文存储、只允许已声明非敏感字段”的�
 
 `request_id`、`trace_id`、Worker ID、Credential 秘密、创建时间和数据库 ID 不参与 Hash。客户端 `input_hash` 仅可作为可选比对值，不能覆盖服务端结果。相同幂等键且 Hash 相同返回原 Execution；Hash 不同返回稳定幂等冲突。
 
+`input_snapshot_size` 固定表示版本 1 快照经过上述统一规范化后的**语义字节长度**，不是数据库驱动返回的 JSONB 文本长度。创建和 Worker 加载必须调用同一个规范化入口；Worker 从 PostgreSQL JSONB 读取结构化快照后，依次执行严格解码、版本检查、契约复核、重新规范化，再以规范化结果计算语义大小和 Hash，并与 Execution 保存的摘要比较。只有两项均一致才能构造 TransportRequest。
+
+PostgreSQL JSONB 只承诺 JSON 语义，不承诺保留写入时的对象键顺序、空白或等价转义表达。完整性校验不得比较 JSONB 返回原始字节与创建时字节，也不得用 JSONB 返回字节长度代替 `input_snapshot_size`。平台另设 512 KiB 的 `max_snapshot_storage_bytes` 作为读取前存储防御上限；该上限只用于阻止异常巨大的数据库值进入解码流程，与 384 KiB 的语义快照上限相互独立。
+
+当前 Hash 信封按固定顺序包含 `interface_version` 和规范化快照，不包含 InterfaceDefinition 数据库 ID。接口版本已随 Execution 冻结，创建和 Worker 必须使用同一信封编码；任何 Path、Query、Header 或 Body 语义变化都会导致 Hash 不一致。
+
 #### 3.4.3 V1 服务端上限
 
 | 限制 | 上限 |
@@ -141,7 +147,8 @@ V1 选择“受控 JSONB 明文存储、只允许已声明非敏感字段”的�
 | Query 参数 | 64 项、总计 16 KiB |
 | 普通 Header | 16 项、总计 8 KiB |
 | JSON Body | 256 KiB |
-| 完整规范化快照 | 384 KiB |
+| 完整规范化快照语义字节 | 384 KiB |
+| JSONB 读取存储防御上限 | 512 KiB |
 | JSON 最大嵌套深度 | 16 层 |
 | 单数组元素数 | 256 项 |
 | JSON 字段总数 | 256 项 |
