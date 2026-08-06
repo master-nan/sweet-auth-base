@@ -29,4 +29,32 @@ func (r *CredentialRepositoryImpl) GetCredentialList(
 	return response.ListResult[model.Credential]{Data: values, Total: int(total)}, err
 }
 
+// GetRuntimeCredential 仅读取执行期解析认证所需的固定字段。
+// 配置 API 和普通 Service 不应调用此方法获取秘密材料。
+func (r *CredentialRepositoryImpl) GetRuntimeCredential(
+	ctx context.Context,
+	id int,
+) (repository.CredentialRuntimeRecord, error) {
+	var value repository.CredentialRuntimeRecord
+	err := r.DBWithContext(ctx).
+		Model(&model.Credential{}).
+		Select([]string{
+			"id",
+			"external_system_id",
+			"credential_code",
+			"credential_type",
+			"status",
+			"state",
+			"secret_storage_ref",
+			"secret_ciphertext",
+			"secret_nonce",
+			"secret_fingerprint",
+			"expires_at",
+			"version",
+		}).
+		Where("id = ?", id).
+		First(&value).Error
+	return value, err
+}
+
 var _ repository.CredentialRepository = (*CredentialRepositoryImpl)(nil)

@@ -17,6 +17,17 @@ func TestIntegrationRuntimeErrorsExposeStableCodes(t *testing.T) {
 		{name: "status", err: ErrIntegrationExecutionStatusInvalid, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionStatusInvalid},
 		{name: "revision", err: ErrIntegrationExecutionRevisionConflict, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationExecutionRevisionConflict},
 		{name: "configuration", err: ErrIntegrationExecutionConfigurationInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationExecutionConfigurationInvalid},
+		{name: "credential not found", err: ErrIntegrationCredentialNotFound, statusCode: http.StatusNotFound, errorCode: ErrorCodeIntegrationCredentialNotFound},
+		{name: "credential system mismatch", err: ErrIntegrationCredentialSystemMismatch, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialSystemMismatch},
+		{name: "credential interface mismatch", err: ErrIntegrationCredentialInterfaceMismatch, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialInterfaceMismatch},
+		{name: "credential inactive", err: ErrIntegrationCredentialInactive, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialInactive},
+		{name: "credential expired", err: ErrIntegrationCredentialExpired, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialExpired},
+		{name: "credential revoked", err: ErrIntegrationCredentialRevoked, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialRevoked},
+		{name: "credential type unsupported", err: ErrIntegrationCredentialTypeUnsupported, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationCredentialTypeUnsupported},
+		{name: "credential secret missing", err: ErrIntegrationCredentialSecretMissing, statusCode: http.StatusConflict, errorCode: ErrorCodeIntegrationCredentialSecretMissing},
+		{name: "credential decrypt failed", err: ErrIntegrationCredentialDecryptFailed, statusCode: http.StatusInternalServerError, errorCode: ErrorCodeIntegrationCredentialDecryptFailed},
+		{name: "credential material invalid", err: ErrIntegrationCredentialMaterialInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationCredentialMaterialInvalid},
+		{name: "credential injection invalid", err: ErrIntegrationCredentialInjectionInvalid, statusCode: http.StatusBadRequest, errorCode: ErrorCodeIntegrationCredentialInjectionInvalid},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

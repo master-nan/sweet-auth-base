@@ -31,6 +31,20 @@ func (r *InterfaceDefinitionRepositoryImpl) GetInterfaceDefinitionList(
 	return response.ListResult[model.InterfaceDefinition]{Data: values, Total: int(total)}, err
 }
 
+// GetRuntimeInterfaceDefinition 仅读取运行时凭证归属校验需要的字段。
+func (r *InterfaceDefinitionRepositoryImpl) GetRuntimeInterfaceDefinition(
+	ctx context.Context,
+	id int,
+) (repository.InterfaceDefinitionRuntimeRecord, error) {
+	var value repository.InterfaceDefinitionRuntimeRecord
+	err := r.DBWithContext(ctx).
+		Model(&model.InterfaceDefinition{}).
+		Select([]string{"id", "external_system_id", "credential_id"}).
+		Where("id = ?", id).
+		First(&value).Error
+	return value, err
+}
+
 func (r *InterfaceDefinitionRepositoryImpl) NextVersion(tx *gorm.DB, systemID int, code string) (int, error) {
 	var maxVersion int
 	err := tx.Model(&model.InterfaceDefinition{}).
