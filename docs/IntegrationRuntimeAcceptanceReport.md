@@ -10,6 +10,7 @@
 | 首次验收基线 | `6412875ab0a603a777f3fb16bcc6c5e671a25f4a`（实现集成运行管理页面） |
 | INT-003B-7R 复验基线 | `d6a28b5a4b98521c44097e103bc54aa2754c64f1`（统一集成运行参数与租约契约） |
 | INT-003B-7D 整改基线 | `44ad3b2fd77c69ad2a500c21fcb7dff6db518fbb`（完成集成运行时复验与冻结） |
+| INT-003B-7R2 最终复验基线 | `4b5302c269243a8e3b4987edc20dd6de7e540be2`（修复集成输入快照语义校验） |
 | 验收环境 | macOS arm64、Go 1.26.2、Node.js 22、PostgreSQL 16、Redis 6.2.7、Docker Compose 本地环境 |
 | 适用阶段 | Integration Runtime 第一期验收，不包含 Retry Worker、SyncTask/SyncBatch、OAuth Token 流程和业务同步规则 |
 
@@ -17,13 +18,11 @@
 
 ## 2. 验收结论摘要
 
-**INT-003B-7R 最终结论：不通过。**
+**INT-003B-7R2 最终结论：通过。**
 
-首次验收识别的五项阻塞中，状态机唯一入口、配置与 Transport 上限、租约安全余量、Execution 与 Attempt 权限边界已经通过本次代码、测试、PostgreSQL 与浏览器复核。受控输入快照的结构、契约、服务端 Hash 和 Worker 重建代码也已经存在。
+本次以 `4b5302c269243a8e3b4987edc20dd6de7e540be2` 为真实基线，重新审计代码、Router、Seed、页面和权限，并实际执行 PostgreSQL 16 门控、常驻 Runner + 本地 TLS Server、后端全量、Integration 专项 race、前端全量和真实浏览器登录态验收。首次验收的五项阻塞及 7R 发现的 JSONB 语义校验阻塞均已关闭，当前没有代码、安全、权限、事务或执行真实性阻塞项。
 
-但真实 PostgreSQL 16 + 常驻 Runner + 本地 TLS Server 复验发现新的核心阻塞：输入快照以 JSONB 保存后，PostgreSQL 会按 JSONB 语义重新序列化字节；Worker 当前却要求数据库读取的原始字节长度和内容与创建时规范化字节完全相等。因此合法快照在真实 PostgreSQL 往返后被稳定判定为 `execution_input_too_large`，Execution 在发出 HTTP 前收敛为 `failed`。这意味着 INT-003B-7B 的“Worker 可独立重建并执行真实请求”结论未成立。
-
-本 Task 按正式规则不修改该核心快照语义，也不生成冻结评审文档。详细复验证据见第 16 节；第 3 至 15 节保留首次验收和历次整改记录，用于追溯结论变化。
+第 3 至 17 节保留首次验收、7A 至 7D 整改和 7R 不通过的历史记录；第 18 节是当前正式结论的唯一依据。Integration Runtime 第一期允许冻结，并允许进入 INT-004 Retry，但后续只能扩展 `retry_waiting` 调度和追加 Attempt，不得绕过或重建当前执行链。
 
 ## 3. 当前实现链路
 
@@ -274,7 +273,7 @@ yarn build
 8. Attempt 尚未持久化 Method、目标 Host 摘要、请求大小/Hash 和最终重试资格摘要等完整诊断字段。
 9. 历史 Organization/Gin Controller race 仍存在，与 Integration Runtime 专项无关。
 
-## 13. 阻塞项与后续动作
+## 13. 首次验收阻塞项与后续动作（历史）
 
 ### 13.1 阻塞项
 
@@ -291,7 +290,7 @@ yarn build
 3. 增加从提交、常驻 Runner、真实 Provider/Transport 到最终查询 DTO 的单一端到端测试。
 4. 补充 TransportAuthentication 显式防序列化和防 String 泄露边界。
 
-## 14. 最终结论
+## 14. 首次验收结论（历史）
 
 **不通过。**
 
@@ -444,7 +443,7 @@ PostgreSQL Migration 会将历史超限 `enabled` 接口安全停用，保留原
 
 本次以 `d6a28b5a4b98521c44097e103bc54aa2754c64f1` 为验收基线，逐项审计 INT-003B-7A、7B、7C 的真实代码、Router、Migration、Seed、前端页面和测试。环境使用 Docker PostgreSQL 16、Redis、后端与前端，并使用本地 TLS Server 构造不访问公网的真实 Transport 场景。
 
-本节是当前正式结论依据。首次验收和整改章节继续保留，但不得覆盖本节实际结果。
+本节保留 INT-003B-7R 当次复验的历史结论。当前正式结论以第 18 节 INT-003B-7R2 为准。
 
 ### 16.2 原五项阻塞复核
 
@@ -556,7 +555,7 @@ yarn build
 
 ### 16.10 复验结论与冻结判断
 
-**最终验收结论：不通过。**
+**INT-003B-7R 当次验收结论：不通过。**
 
 状态机、权限、统一上限和租约四项原阻塞已经关闭，但真实 PostgreSQL 环境中的输入快照无法被 Worker 成功重建，导致一期 Runtime 不能完成最基本的常驻 Worker 成功调用。这是代码与执行真实性阻塞项，不属于环境或后续能力限制。
 
@@ -640,3 +639,90 @@ PostgreSQL JSONB 往返、Migration、CHECK、唯一约束、行锁和 Runner + 
 本 Task 没有修改前端 DTO 或页面，因此未重复执行 Yarn。
 
 INT-003B-7D 已关闭当前已知的 JSONB 语义校验代码阻塞，但按 Task 约束，本节不把第 16.10 节的总体验收结论改为通过，也不生成冻结评审。当前没有已知剩余代码阻塞项；仍需执行精简的 INT-003B-7R2 最终复验，复核后再决定是否通过和冻结。
+
+## 18. INT-003B-7R2 最终精简复验
+
+### 18.1 验收基线与范围
+
+本次以 `4b5302c269243a8e3b4987edc20dd6de7e540be2` 为验收基线，重新读取并验证 INT-003B-7A 至 7D 的真实实现。工作区在验收开始时无未提交改动；环境为 PostgreSQL 16、Redis 6.2.7、Go 1.26.2、Node.js 22、Docker Compose 后端和前端，以及本地 TLS Server。验收覆盖 Execution、Attempt、Worker、Transport、Credential Provider、权限、脱敏和 Runtime 页面。
+
+### 18.2 JSONB 语义快照复验
+
+| 验收项 | 结果 | 说明 |
+| --- | --- | --- |
+| semantic_size 定义 | 通过 | `input_snapshot_size` 为统一规范化后的语义字节长度，不再使用 JSONB 返回原始字节长度 |
+| 存储防御上限 | 通过 | 语义上限为 384 KiB，独立 JSONB 存储防御上限为 512 KiB，错误分类稳定区分 |
+| 统一规范化入口 | 通过 | 创建和 Worker 加载复用同一入口，Header 名称、Query 多值和 JSON 对象均按冻结规则规范化 |
+| Hash 信封 | 通过 | SHA-256 输入包含明确 `interface_version` 和规范化快照，不包含数据库 ID、request_id、trace_id、Worker ID 或 Credential |
+| PostgreSQL JSONB 往返 | 通过 | 对象键顺序、空白、Unicode 等价转义、Query 多值顺序和 Header 大小写变化后 semantic_size 与 Hash 保持一致 |
+| 篡改拒绝 | 通过 | Path、Query、Header、Body、size 摘要和 version 篡改均在 HTTP 前稳定拒绝 |
+| 存储超限 | 通过 | 超过 512 KiB 的数据库返回 JSONB 触发 `execution_input_storage_too_large`，不发送 HTTP |
+
+PostgreSQL 16 门控测试实际启用，未使用 SQLite 或纯 Mock 替代。数据库读取 JSONB 后先执行独立存储防御检查，再严格解码、版本检查、接口契约复核、重新规范化、semantic_size 比较和 Hash 比较；只有全部通过才构造 TransportRequest。
+
+### 18.3 常驻 Runner + TLS 完整链路
+
+真实端到端门控测试通过以下完整链路：Application Service 提交 Execution，原提交 Context 结束，真实 `IntegrationWorkerRunner` 自动领取 created Execution，在同一领取事务创建 running Attempt，从 PostgreSQL JSONB 加载并复核快照，Credential Provider 最后注入 Bearer 认证，Transport 调用本地 TLS Server，Attempt 和 Execution 均收敛为 succeeded。测试没有直接调用 `RunOnce`。
+
+TLS Server 实际校验了 Path、Query、普通 Header、JSON Body 和 Authorization。Response DTO、Audit、IntegrationLog 普通字段和结构化日志未出现完整输入、Authorization、Token、密文或安全存储引用；临时 Schema 和验收数据由测试清理。
+
+### 18.4 原阻塞项与运行边界回归
+
+| 原阻塞项 | 最终结果 | 复核结论 |
+| --- | --- | --- |
+| 状态机唯一入口 | 通过 | `start`、`complete`、`fail` Router、Controller、前端 API、按钮和 Casbin 路径不存在；状态只能由 Worker/Engine 的租约与 Attempt 原语推进 |
+| 受控输入快照 | 通过 | Worker 不依赖原始 HTTP 请求，可独立重建；缺失、篡改和历史无快照记录均不发送 HTTP |
+| Runtime Limits | 通过 | timeout 为 1 至 120 秒、默认 30 秒；response_limit 为 1 KiB 至 64 MiB、默认 10 MiB；配置与 Transport 使用同一硬边界 |
+| 租约安全余量 | 通过 | 最小 165 秒、默认 180 秒、最大 600 秒；Runner/Engine 拒绝非法配置，租约和恢复条件使用数据库时间 |
+| Execution/Attempt 权限边界 | 通过 | Execution 不内嵌 Attempt 技术内容；Log query/detail 通过独立功能权限和 Data Permission 校验 |
+
+Worker 默认关闭，显式启用、SKIP LOCKED 并发领取、Attempt 唯一约束、panic 恢复、优雅关闭和过期租约恢复均通过。`retry_waiting` 不被一期 Worker 自动领取；真正过期后收敛为 `failed + unknown`，不自动重发。Credential 失败不发 HTTP；429、500、503、超时、结果 unknown、响应超限和 SSRF 场景保持稳定收敛。
+
+Transport 的 HTTPS、SSRF、DNS Rebinding、Header 黑名单、重定向拒绝、超时、响应上限、Content-Type、429/5xx、响应 Hash 和 race 全部通过。Credential Provider 的 Basic、API Key、Bearer、OAuth 稳定不支持、disabled/revoked/expired、密文损坏、主密钥缺失、轮换和不回退历史秘密全部通过；CredentialMaterial 和 TransportAuthentication 的 String、GoString 与 JSON 防泄露边界通过。
+
+### 18.5 权限、脱敏与浏览器人工验收
+
+使用真实浏览器登录态完成管理员和无权限账号复验：集成中心按“外部系统、接口定义、集成凭证、执行记录、调用日志”顺序展示；Execution 详情只显示快照版本、semantic_size、参数数量、是否含 JSON Body 和 input_hash，不展示输入原值；Attempt 通过独立 Log API 加载并导航到脱敏详情。Worker 未启用显示中性“当前实例状态”。
+
+页面在深色模式下正常可读，不存在 start、complete、fail、Retry、完整 Payload 或在线调试入口。管理员临时 Fixture 验证完成后，Execution、Attempt 和 InterfaceDefinition 记录均已删除。无集成权限账号登录后可访问菜单数为 0，直接访问执行记录路由进入 404，前端未发起 Attempt 请求；后端功能权限和 Data Permission 拒绝场景由自动化测试确认不泄露记录存在性。
+
+### 18.6 自动化测试结果
+
+```text
+SWEET_TEST_POSTGRES_DSN=<本地 Docker PostgreSQL 16>
+SWEET_REQUIRE_POSTGRES_TESTS=true
+
+cd backend && go test ./... -count=1
+结果：通过；PostgreSQL 门控未跳过。
+
+go test -race ./internal/integration/... ./repository/impl ./service ./initialize -count=1
+结果：通过。
+
+go test -race ./controller -run Integration -count=1
+结果：通过。
+
+PostgreSQL 16 专项
+结果：Migration 重复执行、JSONB/CHECK、语义与存储大小分离、幂等与 Attempt 唯一约束、SKIP LOCKED、数据库时间租约、JSONB 往返、篡改拒绝及常驻 Runner + TLS 链路全部通过。
+
+yarn test
+结果：30 个测试文件、113 项测试通过。
+
+yarn lint
+yarn typecheck
+yarn build
+结果：全部通过；构建仅保留既有大体积 Chunk 提示。
+```
+
+前端测试使用 Node.js 22 执行。系统级 `yarn` 首次被旧 Node.js 16 包装器启动而拒绝运行，切换到仓库要求的 Node.js 22 后完整测试通过；该现象属于本地工具链入口差异，不是代码缺陷。
+
+### 18.7 非阻塞限制
+
+以下能力仍不在 Runtime 第一期范围内：Retry Worker、RetryPolicy 配置中心、SyncTask/SyncBatch、HR Organization 业务同步、OAuth Token 获取与刷新、敏感或大型输入、动态输入表单完整产品化、完整 Payload 查看、在线调试代理、集群 Worker 汇总、前端高级筛选/完整 i18n/平台一致性治理，以及历史 Organization/Gin race。指定 Integration Controller race 本次通过，未把历史问题表述为已治理完成。
+
+### 18.8 最终结论与准入
+
+**最终验收结论：通过。**
+
+本次未发现代码、安全、权限、事务或执行真实性阻塞项，原五项阻塞及 JSONB 语义校验阻塞均已关闭。Integration Runtime 第一期具备冻结条件，冻结结论记录于 `docs/IntegrationRuntimeFreezeReview.md`。
+
+**允许进入 INT-004 Retry。** Retry 只能围绕现有 `retry_waiting` 状态进行调度，继续使用同一 Execution、追加 Attempt、Credential Provider、Transport、租约和状态收敛原语，不得创建平行执行链。
