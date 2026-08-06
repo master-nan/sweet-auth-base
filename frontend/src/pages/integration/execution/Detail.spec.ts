@@ -35,6 +35,14 @@ const detail = {
   idempotency_scope: 'manual',
   idempotency_key: 'req-51',
   input_hash: 'a'.repeat(64),
+  input_summary: {
+    snapshot_version: 1,
+    size_bytes: 128,
+    path_count: 1,
+    query_count: 2,
+    header_count: 1,
+    has_body: true,
+  },
   result_size_bytes: 0,
 }
 
@@ -79,6 +87,17 @@ describe('integration execution detail permissions', () => {
     expect(apiMocks.getExecution).toHaveBeenCalledWith(51)
     expect(apiMocks.queryLogs).not.toHaveBeenCalled()
     expect((wrapper.vm as unknown as { canQueryLogs: boolean }).canQueryLogs).toBe(false)
+  })
+
+  it('renders only the safe execution input summary', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('输入快照摘要')
+    expect(wrapper.text()).toContain('128 字节')
+    expect(wrapper.text()).toContain('JSON Body')
+    expect(wrapper.text()).not.toContain('Authorization')
+    expect(wrapper.text()).not.toContain('Payload')
   })
 
   it('loads Attempt data through the independent log query API', async () => {

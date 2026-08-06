@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -349,6 +350,26 @@ func TestTransportAuthenticationIsSeparatedFromRegularHeaders(t *testing.T) {
 	}
 	_, err = NewTransportAuthentication(map[string]string{"Cookie": "not allowed"})
 	assertTransportCategory(t, err, TransportErrorInvalidConfig)
+}
+
+func TestTransportAuthenticationCannotLeakThroughFormattingOrJSON(t *testing.T) {
+	authentication, err := NewTransportAuthentication(map[string]string{
+		"Authorization": "Bearer transport-authentication-secret",
+	})
+	if err != nil {
+		t.Fatalf("new authentication: %v", err)
+	}
+	for _, formatted := range []string{
+		fmt.Sprint(authentication),
+		fmt.Sprintf("%#v", authentication),
+	} {
+		if strings.Contains(formatted, "transport-authentication-secret") || strings.Contains(strings.ToLower(formatted), "bearer") {
+			t.Fatalf("authentication formatting leaked secret: %s", formatted)
+		}
+	}
+	if encoded, marshalErr := json.Marshal(authentication); marshalErr == nil || len(encoded) != 0 {
+		t.Fatalf("authentication JSON must be rejected: encoded=%q err=%v", encoded, marshalErr)
+	}
 }
 
 func TestHTTPTransportClientClassifiesResponseTimeoutCancellationAndRemoteError(t *testing.T) {

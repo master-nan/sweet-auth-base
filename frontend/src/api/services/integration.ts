@@ -235,6 +235,14 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
   idempotency_scope: string
   idempotency_key: string
   input_hash: string
+  input_summary: {
+    snapshot_version: number
+    size_bytes: number
+    path_count: number
+    query_count: number
+    header_count: number
+    has_body: boolean
+  }
   result_http_status?: number
   result_size_bytes: number
   result_hash?: string

@@ -131,6 +131,21 @@ type TransportAuthentication struct {
 	headers map[string]string
 }
 
+// String 防止认证 Header 被格式化日志或错误消息意外展开。
+func (TransportAuthentication) String() string {
+	return "TransportAuthentication{redacted}"
+}
+
+// GoString 防止 %#v 等调试格式泄露认证材料。
+func (TransportAuthentication) GoString() string {
+	return "TransportAuthentication{redacted}"
+}
+
+// MarshalJSON 阻止认证注入结果被误用为 API 响应或持久化载荷。
+func (TransportAuthentication) MarshalJSON() ([]byte, error) {
+	return nil, newTransportError(TransportErrorInvalidConfig)
+}
+
 // NewTransportAuthentication 创建受控认证注入结果。当前只接受平台一期所需的认证 Header。
 func NewTransportAuthentication(headers map[string]string) (TransportAuthentication, error) {
 	cloned := make(map[string]string, len(headers))

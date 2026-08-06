@@ -41,6 +41,41 @@
       >
       <q-card flat bordered class="q-mb-md"
         ><q-card-section
+          ><div class="text-subtitle1 text-weight-bold q-mb-md">输入快照摘要</div>
+          <div class="row q-col-gutter-lg">
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">快照版本</div>
+              <div>v{{ detail.input_summary.snapshot_version }}</div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">快照大小</div>
+              <div>{{ detail.input_summary.size_bytes }} 字节</div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">Path 参数</div>
+              <div>{{ detail.input_summary.path_count }}</div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">Query 参数</div>
+              <div>{{ detail.input_summary.query_count }}</div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">Header 参数</div>
+              <div>{{ detail.input_summary.header_count }}</div>
+            </div>
+            <div class="col-6 col-md-2">
+              <div class="text-caption text-grey-7">JSON Body</div>
+              <div>{{ detail.input_summary.has_body ? '有' : '无' }}</div>
+            </div>
+          </div>
+          <div class="q-mt-md">
+            <div class="text-caption text-grey-7">输入 Hash</div>
+            <div class="text-mono text-break">{{ detail.input_hash }}</div>
+          </div></q-card-section
+        ></q-card
+      >
+      <q-card flat bordered class="q-mb-md"
+        ><q-card-section
           ><div class="text-subtitle1 text-weight-bold q-mb-md">状态与结果摘要</div>
           <div class="row q-col-gutter-lg">
             <div class="col-6 col-md-3">
