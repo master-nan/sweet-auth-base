@@ -288,9 +288,9 @@ export interface IntegrationWorkerStatus {
   enabled: boolean
   running: boolean
   worker_id: string
-  started_at: string
-  last_poll_at: string
-  last_success_at: string
+  started_at?: string | null
+  last_poll_at?: string | null
+  last_success_at?: string | null
   last_error_category: string
   active_execution_count: number
   claimed_total: number

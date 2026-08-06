@@ -402,13 +402,18 @@ func (r *IntegrationLogRepositoryImpl) GetIntegrationLogList(
 		pattern := "%" + keyword + "%"
 		query = query.Where("(integration_execution.execution_no LIKE ? OR integration_execution.external_system_code LIKE ? OR integration_execution.external_system_name LIKE ? OR integration_execution.interface_code LIKE ? OR integration_execution.interface_name LIKE ? OR integration_log.worker_id LIKE ?)", pattern, pattern, pattern, pattern, pattern, pattern)
 	}
-	query = query.Preload("Execution")
 	query, err := queryutil.ApplyGeneralizationPermission(query, permission, table)
 	if err != nil {
 		return response.ListResult[model.IntegrationLog]{}, err
 	}
-	total, err := r.PaginateAndCountQuery(query, &values)
-	return response.ListResult[model.IntegrationLog]{Data: values, Total: int(total)}, err
+	total, err := r.Count(query.Session(&gorm.Session{}))
+	if err != nil {
+		return response.ListResult[model.IntegrationLog]{}, err
+	}
+	if err = query.Preload("Execution").Find(&values).Error; err != nil {
+		return response.ListResult[model.IntegrationLog]{}, err
+	}
+	return response.ListResult[model.IntegrationLog]{Data: values, Total: int(total)}, nil
 }
 
 func (r *IntegrationLogRepositoryImpl) FindByIDWithPermission(

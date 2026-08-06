@@ -172,6 +172,7 @@ import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -232,7 +233,7 @@ const columns: QTableProps['columns'] = [
   { name: 'actions', label: '操作', field: 'actions', align: 'center' },
 ]
 
-const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : '-')
+const formatDate = formatRuntimeDateTime
 const fetchData = async () => {
   const response = await api.queryExecutions(query.value)
   rows.value = response.data || []
@@ -243,7 +244,8 @@ const fetchWorker = async () => {
   if (response.data) workerStatus.value = response.data
 }
 const refresh = async () => {
-  await Promise.all([fetchData(), fetchWorker()])
+  await fetchData()
+  await fetchWorker().catch(() => undefined)
 }
 const search = () => {
   query.value.page = 1

@@ -70,6 +70,15 @@ func TestIntegrationExecutionRepositoryDomainQueriesAndPagination(t *testing.T) 
 	if err != nil || len(items) != 2 || items[0].AttemptNo != 1 || items[1].AttemptNo != 2 {
 		t.Fatalf("logs = %+v err=%v", items, err)
 	}
+	logPage, err := logs.GetIntegrationLogList(
+		context.Background(),
+		request.IntegrationLogQueryReq{Page: 1, Num: 10},
+		integrationLogQueryTableForTest(),
+		permission,
+	)
+	if err != nil || logPage.Total != 2 || len(logPage.Data) != 2 || logPage.Data[0].Execution.ExecutionNo != "INT-001" {
+		t.Fatalf("log page = %+v err=%v", logPage, err)
+	}
 }
 
 func TestIntegrationExecutionRepositoryClaimCompleteAndRecover(t *testing.T) {
@@ -180,5 +189,14 @@ func integrationExecutionQueryTableForTest() model.SysTable {
 		{Basic: model.Basic{State: true}, FieldCode: "interface_definition_id", FieldType: enum.BigIntFieldType},
 		{Basic: model.Basic{State: true}, FieldCode: "trigger_source", FieldType: enum.VarcharFieldType},
 		{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
+	}}
+}
+
+func integrationLogQueryTableForTest() model.SysTable {
+	return model.SysTable{TableCode: "integration_log", TableFields: []model.SysTableField{
+		{Basic: model.Basic{State: true}, FieldCode: "execution_id", FieldType: enum.BigIntFieldType},
+		{Basic: model.Basic{State: true}, FieldCode: "attempt_no", FieldType: enum.IntFieldType},
+		{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
+		{Basic: model.Basic{State: true}, FieldCode: "started_at", FieldType: enum.DatetimeFieldType},
 	}}
 }

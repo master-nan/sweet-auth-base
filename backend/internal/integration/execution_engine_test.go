@@ -50,22 +50,24 @@ func TestIntegrationExecutionEngineClaimRunAndConverge(t *testing.T) {
 }
 
 func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T) {
-	t.Run("remote 503 enters retry waiting without automatic retry", func(t *testing.T) {
-		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusServiceUnavailable)
-		defer closeServer()
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
-		if err != nil || len(claimed) != 1 {
-			t.Fatalf("claim = %+v err=%v", claimed, err)
-		}
-		result, err := engine.RunExecution(context.Background(), claimed[0])
-		if err != nil || !result.RetryEligible || result.Certainty != model.IntegrationResultCertaintyConfirmed {
-			t.Fatalf("retry result = %+v err=%v", result, err)
-		}
-		var stored model.IntegrationExecution
-		if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusRetryWaiting {
-			t.Fatalf("retry waiting execution = %+v err=%v", stored, err)
-		}
-	})
+	for _, statusCode := range []int{http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable} {
+		t.Run(http.StatusText(statusCode), func(t *testing.T) {
+			engine, db, execution, closeServer := newExecutionEngineFixture(t, statusCode)
+			defer closeServer()
+			claimed, err := engine.ClaimCreatedExecutions(context.Background())
+			if err != nil || len(claimed) != 1 {
+				t.Fatalf("claim = %+v err=%v", claimed, err)
+			}
+			result, err := engine.RunExecution(context.Background(), claimed[0])
+			if err != nil || !result.RetryEligible || result.Certainty != model.IntegrationResultCertaintyConfirmed {
+				t.Fatalf("retry result = %+v err=%v", result, err)
+			}
+			var stored model.IntegrationExecution
+			if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusRetryWaiting {
+				t.Fatalf("retry waiting execution = %+v err=%v", stored, err)
+			}
+		})
+	}
 	t.Run("expired lease becomes unknown failed without HTTP retry", func(t *testing.T) {
 		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 		defer closeServer()

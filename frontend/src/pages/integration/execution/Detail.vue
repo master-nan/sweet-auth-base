@@ -119,6 +119,7 @@ import { useIntegrationApi, type IntegrationExecutionDetail } from 'src/api/serv
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
 import type { QTableProps } from 'quasar'
+import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,7 +148,7 @@ const attemptColumns: QTableProps['columns'] = [
   { name: 'error_category', label: '错误分类', field: 'error_category', align: 'left' },
   { name: 'result_certainty', label: '结果确定性', field: 'result_certainty', align: 'left' },
 ]
-const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : '-')
+const formatDate = formatRuntimeDateTime
 const openLog = (logId: number) => {
   if (detail.value)
     void router.push({
