@@ -567,6 +567,24 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "集成调用状态",
+			code: "integration_log_status",
+			items: []systemDictItemSeed{
+				{name: "执行中", code: "integration_log_status_running", value: model.IntegrationLogStatusRunning},
+				{name: "成功", code: "integration_log_status_succeeded", value: model.IntegrationLogStatusSucceeded},
+				{name: "失败", code: "integration_log_status_failed", value: model.IntegrationLogStatusFailed},
+				{name: "已取消", code: "integration_log_status_cancelled", value: model.IntegrationLogStatusCancelled},
+			},
+		},
+		{
+			name: "集成结果确定性",
+			code: "integration_result_certainty",
+			items: []systemDictItemSeed{
+				{name: "结果已确认", code: "integration_result_certainty_confirmed", value: model.IntegrationResultCertaintyConfirmed},
+				{name: "结果未知", code: "integration_result_certainty_unknown", value: model.IntegrationResultCertaintyUnknown},
+			},
+		},
+		{
 			name: "集成错误分类",
 			code: "integration_error_category",
 			items: []systemDictItemSeed{
@@ -2017,6 +2035,9 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: "report_execution_log", name: "报表执行日志"},
 		{code: externalSystemTableCode, name: "外部系统"},
 		{code: interfaceDefinitionTableCode, name: "接口定义"},
+		{code: credentialTableCode, name: "集成凭证"},
+		{code: integrationExecutionTableCode, name: "执行记录"},
+		{code: integrationLogTableCode, name: "调用日志"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }
@@ -2199,6 +2220,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyCredentialFieldDefaults(tableCode, &field)
 	applyIntegrationExecutionFieldDefaults(tableCode, &field)
+	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field
 }
@@ -2364,6 +2386,16 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "integration_execution_status"
 		case "trigger_source":
 			return "integration_trigger_source"
+		case "error_category":
+			return "integration_error_category"
+		}
+	}
+	if tableCode == integrationLogTableCode {
+		switch fieldCode {
+		case "status":
+			return "integration_log_status"
+		case "result_certainty":
+			return "integration_result_certainty"
 		case "error_category":
 			return "integration_error_category"
 		}
@@ -2669,6 +2701,39 @@ func applyIntegrationExecutionFieldDefaults(tableCode string, field *model.SysTa
 	case "completed_at":
 		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "完成时间", true, enum.DatetimePickerInputType, 16
 	case "idempotency_scope", "idempotency_key", "input_hash", "result_hash", "result_summary":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationLogFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationLogTableCode {
+		return
+	}
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "execution_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "执行记录", true, 1
+	case "attempt_no":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Attempt", true, true, 2
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_log_status"), 3
+	case "http_status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "HTTP状态", true, true, 4
+	case "error_category":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "错误分类", true, true, enum.SelectInputType, utils.StringPtr("integration_error_category"), 5
+	case "result_certainty":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "结果确定性", true, true, enum.SelectInputType, utils.StringPtr("integration_result_certainty"), 6
+	case "started_at":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "开始时间", true, true, enum.DatetimePickerInputType, 7
+	case "ended_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "结束时间", true, enum.DatetimePickerInputType, 8
+	case "duration_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "耗时（毫秒）", true, 9
+	case "result_summary", "result_hash", "request_id", "trace_id", "worker_id", "response_content_type", "credential_code", "credential_version", "credential_fingerprint_summary":
 		field.IsSort = false
 	}
 }

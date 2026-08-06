@@ -38,6 +38,8 @@ func (s *integrationExecutionApplicationStub) GetExecution(
 	_ int,
 	_ model.SysTable,
 	_ repository.GeneralizationPermission,
+	_ model.SysTable,
+	_ repository.GeneralizationPermission,
 ) (response.IntegrationExecutionDetailRes, error) {
 	s.detailCalls++
 	return response.IntegrationExecutionDetailRes{
@@ -51,7 +53,7 @@ type integrationExecutionTableProviderStub struct {
 }
 
 func (s integrationExecutionTableProviderStub) GetTableByTableCode(code string) (model.SysTable, error) {
-	if code != integrationExecutionTableCode {
+	if code != integrationExecutionTableCode && code != integrationLogTableCode {
 		return model.SysTable{}, apperrors.ErrParamInvalid
 	}
 	return s.table, s.err
@@ -94,9 +96,10 @@ func TestIntegrationExecutionControllerResolvesDataPermissionForQueryAndDetail(t
 	if app.pageCalls != 1 || app.detailCalls != 1 {
 		t.Fatalf("service calls page=%d detail=%d", app.pageCalls, app.detailCalls)
 	}
-	if len(permissionResolver.operations) != 2 ||
+	if len(permissionResolver.operations) != 3 ||
 		permissionResolver.operations[0] != model.DataPermissionOperationQuery ||
-		permissionResolver.operations[1] != model.DataPermissionOperationDetail {
+		permissionResolver.operations[1] != model.DataPermissionOperationDetail ||
+		permissionResolver.operations[2] != model.DataPermissionOperationDetail {
 		t.Fatalf("permission operations = %v", permissionResolver.operations)
 	}
 }

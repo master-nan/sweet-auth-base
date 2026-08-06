@@ -358,5 +358,73 @@ func (r *IntegrationLogRepositoryImpl) ListByExecutionID(
 	return values, err
 }
 
+func (r *IntegrationLogRepositoryImpl) ListByExecutionIDWithPermission(
+	ctx context.Context,
+	executionID int,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) ([]model.IntegrationLog, error) {
+	var values []model.IntegrationLog
+	query, err := queryutil.ApplyGeneralizationPermission(r.DBWithContext(ctx).Table(table.TableCode), permission, table)
+	if err != nil {
+		return nil, err
+	}
+	err = query.Preload("Execution").Where(table.TableCode+".execution_id = ?", executionID).Order("attempt_no ASC").Find(&values).Error
+	return values, err
+}
+
+func (r *IntegrationLogRepositoryImpl) GetIntegrationLogList(
+	ctx context.Context,
+	req request.IntegrationLogQueryReq,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (response.ListResult[model.IntegrationLog], error) {
+	var values []model.IntegrationLog
+	basic := req.ToBasic()
+	query := queryutil.ExecuteQuery(r.DBWithContext(ctx).Table(table.TableCode), &basic, table)
+	keyword := ""
+	if req.QuickQuery != nil {
+		keyword = strings.TrimSpace(req.QuickQuery.Keyword)
+	}
+	if req.ExecutionNo != "" || req.ExternalSystemID > 0 || req.InterfaceDefinitionID > 0 || keyword != "" {
+		query = query.Joins("JOIN integration_execution ON integration_execution.id = integration_log.execution_id")
+	}
+	if req.ExecutionNo != "" {
+		query = query.Where("integration_execution.execution_no = ?", strings.TrimSpace(req.ExecutionNo))
+	}
+	if req.ExternalSystemID > 0 {
+		query = query.Where("integration_execution.external_system_id = ?", req.ExternalSystemID)
+	}
+	if req.InterfaceDefinitionID > 0 {
+		query = query.Where("integration_execution.interface_definition_id = ?", req.InterfaceDefinitionID)
+	}
+	if keyword != "" {
+		pattern := "%" + keyword + "%"
+		query = query.Where("(integration_execution.execution_no LIKE ? OR integration_execution.external_system_code LIKE ? OR integration_execution.external_system_name LIKE ? OR integration_execution.interface_code LIKE ? OR integration_execution.interface_name LIKE ? OR integration_log.worker_id LIKE ?)", pattern, pattern, pattern, pattern, pattern, pattern)
+	}
+	query = query.Preload("Execution")
+	query, err := queryutil.ApplyGeneralizationPermission(query, permission, table)
+	if err != nil {
+		return response.ListResult[model.IntegrationLog]{}, err
+	}
+	total, err := r.PaginateAndCountQuery(query, &values)
+	return response.ListResult[model.IntegrationLog]{Data: values, Total: int(total)}, err
+}
+
+func (r *IntegrationLogRepositoryImpl) FindByIDWithPermission(
+	ctx context.Context,
+	id int,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (model.IntegrationLog, error) {
+	var value model.IntegrationLog
+	query, err := queryutil.ApplyGeneralizationPermission(r.DBWithContext(ctx).Table(table.TableCode), permission, table)
+	if err != nil {
+		return value, err
+	}
+	err = query.Preload("Execution").Where(table.TableCode+".id = ?", id).Take(&value).Error
+	return value, err
+}
+
 var _ repository.IntegrationExecutionRepository = (*IntegrationExecutionRepositoryImpl)(nil)
 var _ repository.IntegrationLogRepository = (*IntegrationLogRepositoryImpl)(nil)

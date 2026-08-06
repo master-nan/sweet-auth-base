@@ -142,6 +142,8 @@ func (s *IntegrationExecutionService) GetExecution(
 	id int,
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
+	logTable model.SysTable,
+	logPermission repository.GeneralizationPermission,
 ) (response.IntegrationExecutionDetailRes, error) {
 	value, err := s.executions.FindByIDWithPermission(ctx, id, table, permission)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -150,11 +152,47 @@ func (s *IntegrationExecutionService) GetExecution(
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, integrationExecutionReadError(err)
 	}
-	logs, err := s.logs.ListByExecutionID(ctx, value.Id)
+	logs, err := s.logs.ListByExecutionIDWithPermission(ctx, value.Id, logTable, logPermission)
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, myerrors.WrapDatabaseError(err)
 	}
 	return response.NewIntegrationExecutionDetailRes(value, logs), nil
+}
+
+func (s *IntegrationExecutionService) GetLog(
+	ctx context.Context,
+	id int,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (response.IntegrationLogDetailRes, error) {
+	value, err := s.logs.FindByIDWithPermission(ctx, id, table, permission)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return response.IntegrationLogDetailRes{}, myerrors.ErrIntegrationExecutionNotFound
+	}
+	if err != nil {
+		return response.IntegrationLogDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return response.NewIntegrationLogDetailRes(value), nil
+}
+
+func (s *IntegrationExecutionService) PageLogs(
+	ctx context.Context,
+	req request.IntegrationLogQueryReq,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (response.ListResult[response.IntegrationLogListRes], error) {
+	if req.StartedFrom != nil && req.StartedTo != nil && req.StartedFrom.After(*req.StartedTo) {
+		return response.ListResult[response.IntegrationLogListRes]{}, myerrors.ErrIntegrationExecutionConfigurationInvalid
+	}
+	result, err := s.logs.GetIntegrationLogList(ctx, req, table, permission)
+	if err != nil {
+		return response.ListResult[response.IntegrationLogListRes]{}, integrationExecutionReadError(err)
+	}
+	items := make([]response.IntegrationLogListRes, 0, len(result.Data))
+	for _, value := range result.Data {
+		items = append(items, response.NewIntegrationLogListRes(value))
+	}
+	return response.ListResult[response.IntegrationLogListRes]{Data: items, Total: result.Total}, nil
 }
 
 func (s *IntegrationExecutionService) PageExecution(

@@ -2,6 +2,7 @@ package initialize
 
 import (
 	_ "backend/docs"
+	"backend/dto/response"
 	"backend/middleware"
 	"context"
 	"net/http"
@@ -239,6 +240,44 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/execution/:id/complete", app.IntegrationExecutionController.Complete)
 		adminGroup.PUT("/integration/execution/:id/fail", app.IntegrationExecutionController.Fail)
 		adminGroup.PUT("/integration/execution/:id/cancel", app.IntegrationExecutionController.Cancel)
+		adminGroup.POST("/integration/log/query", app.IntegrationExecutionController.QueryLogs)
+		adminGroup.GET("/integration/log/:id", app.IntegrationExecutionController.LogDetail)
+		adminGroup.GET("/integration/worker/status", func(ctx *gin.Context) {
+			resp := response.NewResponse()
+			ctx.Set("response", resp)
+			if app.IntegrationWorker == nil {
+				resp.SetData(map[string]any{
+					"enabled":                false,
+					"running":                false,
+					"worker_id":              "",
+					"started_at":             nil,
+					"last_poll_at":           nil,
+					"last_success_at":        nil,
+					"last_error_category":    "",
+					"active_execution_count": 0,
+					"claimed_total":          0,
+					"completed_total":        0,
+					"failed_total":           0,
+					"recovered_total":        0,
+				})
+				return
+			}
+			status := app.IntegrationWorker.Status()
+			resp.SetData(map[string]any{
+				"enabled":                status.Enabled,
+				"running":                status.Running,
+				"worker_id":              status.WorkerID,
+				"started_at":             status.StartedAt,
+				"last_poll_at":           status.LastPollAt,
+				"last_success_at":        status.LastSuccessAt,
+				"last_error_category":    status.LastErrorCategory,
+				"active_execution_count": status.ActiveExecutionCount,
+				"claimed_total":          status.ClaimedTotal,
+				"completed_total":        status.CompletedTotal,
+				"failed_total":           status.FailedTotal,
+				"recovered_total":        status.RecoveredTotal,
+			})
+		})
 
 		// 组织法人主体只读镜像
 		adminGroup.POST("/org/legal-entity/query", app.OrgController.QueryLegalEntities)

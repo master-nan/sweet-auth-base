@@ -42,3 +42,36 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegrationLogResponseDTOWhitelist(t *testing.T) {
+	startedAt := model.Now()
+	value := model.IntegrationLog{
+		Basic:     model.Basic{Id: 2, State: true},
+		AttemptNo: 1, Status: model.IntegrationLogStatusSucceeded, StartedAt: startedAt,
+		WorkerID: "worker-with-sensitive-context", ResponseContentType: "application/json",
+		CredentialCode: "hr-token", CredentialVersion: "v2", CredentialFingerprintSummary: "abcd...wxyz",
+		ResultSummary: "safe summary", ResultHash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		RequestID: "request-id", TraceID: "trace-id",
+		Execution: model.IntegrationExecution{
+			ExecutionNo: "INT-001", ExternalSystemCode: "demo_hr", InterfaceCode: "org_list",
+		},
+	}
+	payload, err := json.Marshal(NewIntegrationLogDetailRes(value))
+	if err != nil {
+		t.Fatalf("marshal log response: %v", err)
+	}
+	text := strings.ToLower(string(payload))
+	for _, forbidden := range []string{
+		"worker-with-sensitive-context", "authorization", "cookie", "api_key", "token-value",
+		"ciphertext", "nonce", "storage_reference", "payload", "response_body",
+	} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("log response leaked %q: %s", forbidden, payload)
+		}
+	}
+	for _, required := range []string{"execution_no", "attempt_no", "result_hash", "credential_code", "credential_version"} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("log response missing %q: %s", required, payload)
+		}
+	}
+}

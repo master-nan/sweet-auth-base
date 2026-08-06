@@ -80,7 +80,11 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 	}
 	testutil.MustCreate(t, db, &log)
 	table := integrationExecutionServiceQueryTable()
-	detail, err := svc.GetExecution(ctx, created.Id, table, integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable))
+	logTable := table
+	logTable.TableCode = "integration_log"
+	detail, err := svc.GetExecution(ctx, created.Id, table,
+		integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable),
+		logTable, integrationExecutionPermission(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable))
 	if err != nil || len(detail.Attempts) != 1 || detail.Attempts[0].AttemptNo != 1 {
 		t.Fatalf("detail = %+v err=%v", detail, err)
 	}

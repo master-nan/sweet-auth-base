@@ -8,7 +8,7 @@ export default {
       database: '数据管理',
       dictionary: '字典管理',
       configure: '配置管理',
-      generalization: '通用页面'
+      generalization: '通用页面',
     },
     organization: {
       default: '组织管理',
@@ -23,6 +23,9 @@ export default {
       externalSystem: '外部系统',
       interfaceDefinition: '接口定义',
       credential: '集成凭证',
+      execution: '执行记录',
+      log: '调用日志',
+      executionDetail: '执行详情',
     },
     report: {
       default: '报表',
@@ -39,8 +42,8 @@ export default {
       role: '角色管理',
       user: '用户管理',
       dataPermission: '数据权限',
-      audit: '审计日志'
-    }
+      audit: '审计日志',
+    },
   },
 
   report: {
@@ -123,7 +126,7 @@ export default {
     notification: '通知',
     user: '使用者',
     signedInAs: '当前登录',
-    signOut: '退出登录'
+    signOut: '退出登录',
   },
 
   themeSetting: {
@@ -151,8 +154,8 @@ export default {
       export: '导出',
       navigate: '页面跳转',
       detail: '查看详情',
-      custom: '自定义'
-    }
+      custom: '自定义',
+    },
   },
 
   generalization: {
@@ -168,6 +171,6 @@ export default {
     noData: '暂无数据',
     retry: '重试',
     paramsInvalid: '参数校验失败',
-    hookAborted: '前置条件未满足，操作已取消'
-  }
+    hookAborted: '前置条件未满足，操作已取消',
+  },
 }

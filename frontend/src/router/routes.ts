@@ -47,6 +47,18 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
+    component: () => import('pages/integration/execution/Detail.vue'),
+    path: 'detail/integration/execution/:id',
+    name: 'integration_execution_detail_page',
+    meta: {
+      title: 'router.integration.executionDetail',
+      icon: 'play_circle',
+      keepAlive: false,
+      isHidden: true,
+      showTag: true,
+    },
+  },
+  {
     component: () => import('pages/dashboard/Dashboard.vue'),
     path: 'home',
     name: 'home',
@@ -288,6 +300,26 @@ const asyncRoutesChildren: Route[] = [
         meta: {
           title: 'router.integration.credential',
           icon: 'key',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/integration/execution/Index.vue'),
+        path: 'execution',
+        name: 'integration_execution',
+        meta: {
+          title: 'router.integration.execution',
+          icon: 'play_circle',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/integration/log/Index.vue'),
+        path: 'log',
+        name: 'integration_log',
+        meta: {
+          title: 'router.integration.log',
+          icon: 'history',
           keepAlive: true,
         },
       },

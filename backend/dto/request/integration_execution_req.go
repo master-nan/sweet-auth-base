@@ -18,6 +18,53 @@ type IntegrationExecutionQueryReq struct {
 	CreatedTo             *time.Time  `form:"created_to" json:"created_to"`
 }
 
+type IntegrationLogQueryReq struct {
+	Page                  int         `form:"page" json:"page" binding:"omitempty,gte=1"`
+	Num                   int         `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
+	Order                 Order       `form:"order" json:"order"`
+	QuickQuery            *QuickQuery `form:"quick_query" json:"quick_query"`
+	ExecutionID           int         `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
+	ExecutionNo           string      `form:"execution_no" json:"execution_no" binding:"omitempty,max=64"`
+	ExternalSystemID      int         `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
+	InterfaceDefinitionID int         `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
+	AttemptNo             int         `form:"attempt_no" json:"attempt_no" binding:"omitempty,gt=0"`
+	Status                string      `form:"status" json:"status" binding:"omitempty,oneof=running succeeded failed cancelled"`
+	ErrorCategory         string      `form:"error_category" json:"error_category" binding:"omitempty,oneof=configuration credential network timeout remote response business concurrency system"`
+	StartedFrom           *time.Time  `form:"started_from" json:"started_from"`
+	StartedTo             *time.Time  `form:"started_to" json:"started_to"`
+}
+
+func (r IntegrationLogQueryReq) ToBasic() Basic {
+	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, QuickQuery: r.QuickQuery}
+	filters := make(map[string]any, 4)
+	if r.ExecutionID > 0 {
+		filters["execution_id"] = r.ExecutionID
+	}
+	if r.AttemptNo > 0 {
+		filters["attempt_no"] = r.AttemptNo
+	}
+	if r.Status != "" {
+		filters["status"] = r.Status
+	}
+	if r.ErrorCategory != "" {
+		filters["error_category"] = r.ErrorCategory
+	}
+	if len(filters) > 0 {
+		basic.Filters = filters
+	}
+	timeRules := make([]QueryRule, 0, 2)
+	if r.StartedFrom != nil {
+		timeRules = append(timeRules, QueryRule{Field: "started_at", ExpressionType: enum.Gte, Value: *r.StartedFrom, Type: enum.DatetimeFieldType})
+	}
+	if r.StartedTo != nil {
+		timeRules = append(timeRules, QueryRule{Field: "started_at", ExpressionType: enum.Lte, Value: *r.StartedTo, Type: enum.DatetimeFieldType})
+	}
+	if len(timeRules) > 0 {
+		basic.Expressions = append(basic.Expressions, ExpressionGroup{Logic: enum.And, Rules: timeRules})
+	}
+	return basic
+}
+
 func (r IntegrationExecutionQueryReq) ToBasic() Basic {
 	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, QuickQuery: r.QuickQuery}
 	filters := make(map[string]any, 4)

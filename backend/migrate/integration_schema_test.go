@@ -123,14 +123,19 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if rootMenu.Title != "router.integration.default" {
 		t.Fatalf("integration root menu title = %q", rootMenu.Title)
 	}
+	var executionMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_execution").First(&executionMenu).Error; err != nil {
+		t.Fatalf("load execution menu: %v", err)
+	}
+	if executionMenu.TableCode != integrationExecutionTableCode || executionMenu.Title != "router.integration.execution" {
+		t.Fatalf("unexpected execution menu: %+v", executionMenu)
+	}
 	var executionButtonCount int64
-	if err := db.Model(&model.SysMenuButton{}).
-		Where("menu_id = ? AND code LIKE ?", rootMenu.Id, "integration_execution_%").
-		Count(&executionButtonCount).Error; err != nil {
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", executionMenu.Id).Count(&executionButtonCount).Error; err != nil {
 		t.Fatalf("count execution permissions: %v", err)
 	}
-	if executionButtonCount != 7 {
-		t.Fatalf("execution permission count = %d, want 7", executionButtonCount)
+	if executionButtonCount != 3 {
+		t.Fatalf("execution permission count = %d, want 3", executionButtonCount)
 	}
 	var executionCasbinCount int64
 	if err := db.Model(&model.CasbinRule{}).
@@ -140,6 +145,27 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if executionCasbinCount != 7 {
 		t.Fatalf("execution Casbin policy count = %d, want 7", executionCasbinCount)
+	}
+	var logMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_log").First(&logMenu).Error; err != nil {
+		t.Fatalf("load log menu: %v", err)
+	}
+	if logMenu.TableCode != integrationLogTableCode || logMenu.Title != "router.integration.log" {
+		t.Fatalf("unexpected log menu: %+v", logMenu)
+	}
+	var logButtonCount int64
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", logMenu.Id).Count(&logButtonCount).Error; err != nil {
+		t.Fatalf("count log permissions: %v", err)
+	}
+	if logButtonCount != 2 {
+		t.Fatalf("log permission count = %d, want 2", logButtonCount)
+	}
+	var logCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/log%").Count(&logCasbinCount).Error; err != nil {
+		t.Fatalf("count log Casbin policies: %v", err)
+	}
+	if logCasbinCount != 2 {
+		t.Fatalf("log Casbin policy count = %d, want 2", logCasbinCount)
 	}
 	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", interfaceMenu.Id).Count(&buttonCount).Error; err != nil {
 		t.Fatalf("count interface definition buttons: %v", err)

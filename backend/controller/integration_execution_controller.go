@@ -17,6 +17,7 @@ import (
 )
 
 const integrationExecutionTableCode = "integration_execution"
+const integrationLogTableCode = "integration_log"
 
 type integrationExecutionApplication interface {
 	CreateExecution(context.Context, request.IntegrationExecutionCreateReq) (response.IntegrationExecutionDetailRes, error)
@@ -24,8 +25,10 @@ type integrationExecutionApplication interface {
 	CompleteExecution(context.Context, int, request.IntegrationExecutionCompleteReq) (response.IntegrationExecutionDetailRes, error)
 	FailExecution(context.Context, int, request.IntegrationExecutionFailReq) (response.IntegrationExecutionDetailRes, error)
 	CancelExecution(context.Context, int, int) (response.IntegrationExecutionDetailRes, error)
-	GetExecution(context.Context, int, model.SysTable, repository.GeneralizationPermission) (response.IntegrationExecutionDetailRes, error)
+	GetExecution(context.Context, int, model.SysTable, repository.GeneralizationPermission, model.SysTable, repository.GeneralizationPermission) (response.IntegrationExecutionDetailRes, error)
 	PageExecution(context.Context, request.IntegrationExecutionQueryReq, model.SysTable, repository.GeneralizationPermission) (response.ListResult[response.IntegrationExecutionListRes], error)
+	GetLog(context.Context, int, model.SysTable, repository.GeneralizationPermission) (response.IntegrationLogDetailRes, error)
+	PageLogs(context.Context, request.IntegrationLogQueryReq, model.SysTable, repository.GeneralizationPermission) (response.ListResult[response.IntegrationLogListRes], error)
 }
 
 type integrationExecutionTableProvider interface {
@@ -86,7 +89,37 @@ func (c *IntegrationExecutionController) Detail(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := c.service.GetExecution(ctx.Request.Context(), id, table, permission)
+	logTable, logPermission, ok := c.resolvePermissionForTable(ctx, integrationLogTableCode, model.DataPermissionOperationDetail)
+	if !ok {
+		return
+	}
+	result, err := c.service.GetExecution(ctx.Request.Context(), id, table, permission, logTable, logPermission)
+	c.setResult(ctx, result, err, false)
+}
+
+func (c *IntegrationExecutionController) QueryLogs(ctx *gin.Context) {
+	var req request.IntegrationLogQueryReq
+	if !bindIntegrationExecution(ctx, &req, c.translators) {
+		return
+	}
+	table, permission, ok := c.resolvePermissionForTable(ctx, integrationLogTableCode, model.DataPermissionOperationQuery)
+	if !ok {
+		return
+	}
+	result, err := c.service.PageLogs(ctx.Request.Context(), req, table, permission)
+	c.setListResult(ctx, result.Data, result.Total, err)
+}
+
+func (c *IntegrationExecutionController) LogDetail(ctx *gin.Context) {
+	id, ok := integrationExecutionPathID(ctx)
+	if !ok {
+		return
+	}
+	table, permission, ok := c.resolvePermissionForTable(ctx, integrationLogTableCode, model.DataPermissionOperationDetail)
+	if !ok {
+		return
+	}
+	result, err := c.service.GetLog(ctx.Request.Context(), id, table, permission)
 	c.setResult(ctx, result, err, false)
 }
 
@@ -158,6 +191,24 @@ func (c *IntegrationExecutionController) resolveReadPermission(
 	operation string,
 ) (model.SysTable, repository.GeneralizationPermission, bool) {
 	table, err := c.tableProvider.GetTableByTableCode(integrationExecutionTableCode)
+	if err != nil {
+		_ = ctx.Error(err)
+		return model.SysTable{}, repository.GeneralizationPermission{}, false
+	}
+	permission, err := c.permissionResolver.ResolveDataPermission(ctx, table, operation)
+	if err != nil {
+		_ = ctx.Error(err)
+		return model.SysTable{}, repository.GeneralizationPermission{}, false
+	}
+	return table, permission, true
+}
+
+func (c *IntegrationExecutionController) resolvePermissionForTable(
+	ctx *gin.Context,
+	tableCode string,
+	operation string,
+) (model.SysTable, repository.GeneralizationPermission, bool) {
+	table, err := c.tableProvider.GetTableByTableCode(tableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return model.SysTable{}, repository.GeneralizationPermission{}, false

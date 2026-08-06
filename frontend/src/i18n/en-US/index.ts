@@ -23,6 +23,9 @@ export default {
       externalSystem: 'External Systems',
       interfaceDefinition: 'Interface Definitions',
       credential: 'Integration Credentials',
+      execution: 'Executions',
+      log: 'Call Logs',
+      executionDetail: 'Execution Detail',
     },
     report: {
       default: 'Reports',
@@ -35,7 +38,7 @@ export default {
       default: 'System Management',
       menu: 'Menu Management',
       application: 'Application Management',
-      sms : 'SMS Management',
+      sms: 'SMS Management',
       role: 'Role Management',
       user: 'User Management',
       dataPermission: 'Data Permissions',
