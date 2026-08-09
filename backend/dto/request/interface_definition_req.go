@@ -43,6 +43,7 @@ type InterfaceDefinitionCreateReq struct {
 	TimeoutSeconds   int             `form:"timeout_seconds" json:"timeout_seconds" binding:"required,gte=1"`
 	ResponseLimit    int64           `form:"response_limit" json:"response_limit" binding:"required,gte=1024"`
 	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
+	IdempotencyMode  string          `form:"idempotency_mode" json:"idempotency_mode" binding:"omitempty,oneof=none safe_method idempotent_method remote_key_header"`
 	Description      string          `form:"description" json:"description" binding:"omitempty,max=512"`
 }
 
@@ -61,6 +62,7 @@ type InterfaceDefinitionUpdateReq struct {
 	ResponseLimit    *int64          `form:"response_limit" json:"response_limit" binding:"omitempty,gte=1024"`
 	RetryPolicyID    *int            `form:"retry_policy_id" json:"retry_policy_id" binding:"omitempty,gt=0"`
 	ClearRetryPolicy bool            `form:"clear_retry_policy" json:"clear_retry_policy"`
+	IdempotencyMode  *string         `form:"idempotency_mode" json:"idempotency_mode" binding:"omitempty,oneof=none safe_method idempotent_method remote_key_header"`
 	Description      *string         `form:"description" json:"description" binding:"omitempty,max=512"`
 	Revision         int             `form:"revision" json:"revision" binding:"required,gt=0"`
 }

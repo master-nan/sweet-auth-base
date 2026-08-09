@@ -215,11 +215,20 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			"credential_code":                completion.CredentialCode,
 			"credential_version":             completion.CredentialVersion,
 			"credential_fingerprint_summary": completion.CredentialFingerprintSummary,
+			"retryable":                      completion.Retryable,
+			"retry_reason_code":              completion.RetryReasonCode,
+			"retry_delay_ms":                 completion.RetryDelayMs,
+			"retry_scheduled_at":             completion.RetryScheduledAt,
+			"retry_after_source":             completion.RetryAfterSource,
 		}
 		if result := tx.Model(&model.IntegrationLog{}).Where("id = ? AND status = ?", attempt.Id, model.IntegrationLogStatusRunning).Updates(attemptUpdates); result.Error != nil {
 			return result.Error
 		} else if result.RowsAffected != 1 {
 			return repository.ErrIntegrationAttemptAlreadyCompleted
+		}
+		var completedAt any = completion.CompletedAt
+		if completion.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting {
+			completedAt = nil
 		}
 		executionUpdates := map[string]any{
 			"status":             completion.ExecutionStatus,
@@ -230,8 +239,10 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			"result_hash":        completion.ResultHash,
 			"result_summary":     completion.ResultSummary,
 			"error_category":     completion.ErrorCategory,
-			"completed_at":       completion.CompletedAt,
-			"next_run_at":        nil,
+			"completed_at":       completedAt,
+			"next_run_at":        completion.RetryScheduledAt,
+			"last_attempt_at":    completion.CompletedAt,
+			"retry_reason_code":  completion.RetryReasonCode,
 			"revision":           execution.Revision + 1,
 		}
 		result := tx.Model(&model.IntegrationExecution{}).
@@ -253,6 +264,12 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		completed.ResultSummary = completion.ResultSummary
 		completed.ErrorCategory = completion.ErrorCategory
 		completed.CompletedAt = &completion.CompletedAt
+		if completion.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting {
+			completed.CompletedAt = nil
+		}
+		completed.NextRunAt = completion.RetryScheduledAt
+		completed.LastAttemptAt = &completion.CompletedAt
+		completed.RetryReasonCode = completion.RetryReasonCode
 		completed.Revision++
 		return nil
 	})

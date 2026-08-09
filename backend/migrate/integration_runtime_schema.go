@@ -47,6 +47,35 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
+		if err := tx.Exec(`
+			UPDATE integration_execution AS execution
+			SET remote_idempotency_mode = definition.idempotency_mode,
+			    remote_idempotency_header = definition.remote_idempotency_header,
+			    remote_idempotency_key = CASE WHEN definition.idempotency_mode = 'remote_key_header' THEN execution.execution_no ELSE '' END
+			FROM integration_interface_definition AS definition
+			WHERE execution.interface_definition_id = definition.id
+			  AND (btrim(COALESCE(execution.remote_idempotency_mode, '')) = ''
+			       OR (execution.remote_idempotency_mode = 'none' AND definition.idempotency_mode <> 'none')
+			       OR (execution.remote_idempotency_mode = 'remote_key_header' AND btrim(COALESCE(execution.remote_idempotency_key, '')) = ''))
+		`).Error; err != nil {
+			return fmt.Errorf("backfill execution idempotency contract: %w", err)
+		}
+		if err := tx.Exec(`
+			UPDATE integration_execution AS execution
+			SET retry_policy_snapshot = jsonb_set(
+				jsonb_set(execution.retry_policy_snapshot, '{idempotency_mode}', to_jsonb(definition.idempotency_mode), true),
+				'{remote_idempotency_header}', to_jsonb(definition.remote_idempotency_header), true
+			)
+			FROM integration_interface_definition AS definition
+			WHERE execution.interface_definition_id = definition.id
+			  AND execution.retry_policy_snapshot_version = 1
+			  AND (NOT execution.retry_policy_snapshot ? 'idempotency_mode' OR NOT execution.retry_policy_snapshot ? 'remote_idempotency_header')
+		`).Error; err != nil {
+			return fmt.Errorf("backfill retry snapshot idempotency contract: %w", err)
+		}
+		if err := tx.Exec(`ALTER TABLE integration_execution DROP CONSTRAINT IF EXISTS chk_integration_execution_retry_snapshot_json`).Error; err != nil {
+			return fmt.Errorf("refresh retry snapshot constraint: %w", err)
+		}
 
 		checks := []postgresCheckConstraint{
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_status", expression: "status IN ('created','running','retry_waiting','succeeded','failed','cancelled')"},
@@ -61,7 +90,8 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_input_snapshot_version", expression: "input_snapshot_version IN (0, 1)"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_input_snapshot_size", expression: "input_snapshot_size BETWEEN 0 AND 393216 AND (input_snapshot_version = 0 OR input_snapshot_size > 0)"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_snapshot_version", expression: "retry_policy_snapshot_version IN (0, 1)"},
-			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_snapshot_json", expression: "jsonb_typeof(retry_policy_snapshot) = 'object' AND ((retry_policy_snapshot_version = 0 AND retry_policy_snapshot = '{}'::jsonb AND retry_policy_id IS NULL) OR (retry_policy_snapshot_version = 1 AND retry_policy_id IS NOT NULL AND retry_policy_snapshot ? 'version' AND retry_policy_snapshot->>'version' = '1' AND retry_policy_snapshot ? 'policy_code' AND retry_policy_snapshot ? 'policy_version'))"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_remote_idempotency", expression: "(remote_idempotency_mode IN ('none','safe_method','idempotent_method') AND remote_idempotency_header = '' AND remote_idempotency_key = '') OR (remote_idempotency_mode = 'remote_key_header' AND remote_idempotency_header = 'Idempotency-Key' AND btrim(remote_idempotency_key) <> '')"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_snapshot_json", expression: "jsonb_typeof(retry_policy_snapshot) = 'object' AND ((retry_policy_snapshot_version = 0 AND retry_policy_snapshot = '{}'::jsonb AND retry_policy_id IS NULL) OR (retry_policy_snapshot_version = 1 AND retry_policy_id IS NOT NULL AND retry_policy_snapshot ? 'version' AND retry_policy_snapshot->>'version' = '1' AND retry_policy_snapshot ? 'policy_code' AND retry_policy_snapshot ? 'policy_version' AND retry_policy_snapshot ? 'idempotency_mode' AND retry_policy_snapshot ? 'remote_idempotency_header'))"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_result_size", expression: "result_size_bytes >= 0"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_http_status", expression: "result_http_status IS NULL OR result_http_status BETWEEN 100 AND 599"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_error_category", expression: "error_category = '' OR error_category IN ('configuration','credential','network','timeout','remote','response','business','concurrency','system')"},
@@ -74,6 +104,9 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_error_category", expression: "error_category = '' OR error_category IN ('configuration','credential','network','timeout','remote','response','business','concurrency','system')"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_certainty", expression: "result_certainty IN ('confirmed','unknown')"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_time_range", expression: "ended_at IS NULL OR ended_at >= started_at"},
+			{model: &model.IntegrationLog{}, name: "chk_integration_log_retry_delay", expression: "retry_delay_ms >= 0"},
+			{model: &model.IntegrationLog{}, name: "chk_integration_log_retry_source", expression: "retry_after_source IN ('none','local','http_delta','http_date','ignored','invalid_fallback')"},
+			{model: &model.IntegrationLog{}, name: "chk_integration_log_retry_schedule", expression: "(retryable = FALSE AND retry_scheduled_at IS NULL) OR (retryable = TRUE AND retry_scheduled_at IS NOT NULL AND retry_delay_ms > 0)"},
 		}
 		for _, check := range checks {
 			if err := createPostgresCheckConstraint(tx, check); err != nil {

@@ -45,16 +45,18 @@ type InterfaceRetryPolicySummaryRes struct {
 
 type InterfaceDefinitionDetailRes struct {
 	InterfaceDefinitionListRes
-	RelativePath   string                          `json:"relative_path"`
-	InputContract  json.RawMessage                 `json:"input_contract"`
-	CredentialID   *int                            `json:"credential_id,omitempty"`
-	Credential     *InterfaceCredentialSummaryRes  `json:"credential,omitempty"`
-	TimeoutSeconds int                             `json:"timeout_seconds"`
-	ResponseLimit  int64                           `json:"response_limit"`
-	RetryPolicyID  *int                            `json:"retry_policy_id,omitempty"`
-	RetryPolicy    *InterfaceRetryPolicySummaryRes `json:"retry_policy,omitempty"`
-	Description    string                          `json:"description"`
-	GmtCreate      model.CustomTime                `json:"gmt_create"`
+	RelativePath            string                          `json:"relative_path"`
+	InputContract           json.RawMessage                 `json:"input_contract"`
+	CredentialID            *int                            `json:"credential_id,omitempty"`
+	Credential              *InterfaceCredentialSummaryRes  `json:"credential,omitempty"`
+	TimeoutSeconds          int                             `json:"timeout_seconds"`
+	ResponseLimit           int64                           `json:"response_limit"`
+	RetryPolicyID           *int                            `json:"retry_policy_id,omitempty"`
+	RetryPolicy             *InterfaceRetryPolicySummaryRes `json:"retry_policy,omitempty"`
+	IdempotencyMode         string                          `json:"idempotency_mode"`
+	RemoteIdempotencyHeader string                          `json:"remote_idempotency_header,omitempty"`
+	Description             string                          `json:"description"`
+	GmtCreate               model.CustomTime                `json:"gmt_create"`
 }
 
 func NewInterfaceDefinitionListRes(value model.InterfaceDefinition, system model.ExternalSystem, credential *model.Credential, now time.Time, policies ...*model.RetryPolicy) InterfaceDefinitionListRes {
@@ -83,6 +85,7 @@ func NewInterfaceDefinitionDetailRes(value model.InterfaceDefinition, system mod
 		InputContract:  append(json.RawMessage(nil), value.InputContract...),
 		TimeoutSeconds: value.TimeoutSeconds, ResponseLimit: value.ResponseLimit,
 		RetryPolicyID: value.RetryPolicyID, Description: value.Description, GmtCreate: value.GmtCreate,
+		IdempotencyMode: value.IdempotencyMode, RemoteIdempotencyHeader: value.RemoteIdempotencyHeader,
 	}
 	if credential != nil {
 		result.Credential = &InterfaceCredentialSummaryRes{

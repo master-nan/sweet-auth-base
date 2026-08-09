@@ -674,7 +674,7 @@ func maxParameterLength(location string) int {
 
 func allowedSnapshotHeader(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "accept", "accept-language", "user-agent", "x-correlation-id", "idempotency-key", "x-idempotency-key":
+	case "accept", "accept-language", "user-agent", "x-correlation-id":
 		return true
 	default:
 		return false

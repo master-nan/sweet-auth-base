@@ -308,6 +308,10 @@ func TestIntegrationExecutionServiceFreezesRetryPolicySnapshot(t *testing.T) {
 	if stored.RetryPolicySnapshotVersion != 1 || stored.RetryPolicyID == nil || *stored.RetryPolicyID != policy.Id {
 		t.Fatalf("stored retry snapshot metadata=%+v", stored)
 	}
+	if stored.RemoteIdempotencyMode != model.InterfaceIdempotencyModeSafeMethod ||
+		!strings.Contains(string(stored.RetryPolicySnapshot), `"idempotency_mode":"safe_method"`) {
+		t.Fatalf("remote idempotency was not frozen: %+v snapshot=%s", stored, stored.RetryPolicySnapshot)
+	}
 	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", policy.Id).Updates(map[string]any{"status": model.RetryPolicyStatusDisabled, "max_attempts": 9}).Error; err != nil {
 		t.Fatalf("mutate source policy: %v", err)
 	}
@@ -316,6 +320,39 @@ func TestIntegrationExecutionServiceFreezesRetryPolicySnapshot(t *testing.T) {
 	}
 	if string(stored.RetryPolicySnapshot) != string(before) || !strings.Contains(string(stored.RetryPolicySnapshot), `"max_attempts":3`) {
 		t.Fatalf("execution snapshot drifted: %s", stored.RetryPolicySnapshot)
+	}
+}
+
+func TestIntegrationExecutionServiceGeneratesRemoteIdempotencyKey(t *testing.T) {
+	svc, db, system, definition, _ := newIntegrationExecutionTestSubject(t)
+	policy := model.RetryPolicy{
+		Basic: model.Basic{Id: 851, State: true}, PolicyCode: "remote_key_retry", PolicyName: "Remote Key Retry",
+		Version: 1, Status: model.RetryPolicyStatusEnabled, MaxAttempts: 2,
+		InitialDelayMs: 1000, MaxDelayMs: 2000, BackoffType: model.RetryBackoffTypeFixed, BackoffMultiplier: 1,
+		JitterType: model.RetryJitterTypeFull, JitterRatio: 1, RetryWindowMs: 60000,
+		RetryableErrorCategories: datatypes.JSON([]byte(`["remote"]`)), RetryableHTTPStatuses: datatypes.JSON([]byte(`[503]`)), Revision: 1,
+	}
+	testutil.MustCreate(t, db, &policy)
+	if err := validateRetryPolicyConfiguration(policy); err != nil {
+		t.Fatalf("retry policy fixture invalid: %v", err)
+	}
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).Updates(map[string]any{
+		"http_method": model.InterfaceMethodPOST, "retry_policy_id": policy.Id,
+		"idempotency_mode": model.InterfaceIdempotencyModeRemoteKeyHeader, "remote_idempotency_header": "Idempotency-Key",
+	}).Error; err != nil {
+		t.Fatalf("prepare remote key interface: %v", err)
+	}
+	created, err := svc.CreateExecution(context.Background(), integrationExecutionCreateRequest(system.Id, definition.Id, "remote-key"))
+	if err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, created.Id).Error; err != nil {
+		t.Fatalf("load execution: %v", err)
+	}
+	if stored.RemoteIdempotencyMode != model.InterfaceIdempotencyModeRemoteKeyHeader || len(stored.RemoteIdempotencyKey) != 64 ||
+		strings.Contains(string(stored.RetryPolicySnapshot), stored.RemoteIdempotencyKey) {
+		t.Fatalf("remote key freeze=%+v snapshot=%s", stored, stored.RetryPolicySnapshot)
 	}
 }
 
@@ -337,7 +374,7 @@ func newIntegrationExecutionTestSubject(
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/api/organizations", TimeoutSeconds: 30, ResponseLimit: 1024,
 		InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[{"code":"page","location":"query","data_type":"integer","required":false,"max_length":8,"allow_multiple":false,"sensitive":false}]}`)),
-		Status:        model.InterfaceDefinitionStatusEnabled, Revision: 1,
+		Status:        model.InterfaceDefinitionStatusEnabled, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod, Revision: 1,
 	}
 	testutil.MustCreate(t, db, &definition)
 	sf, err := utils.NewSnowflake(1)

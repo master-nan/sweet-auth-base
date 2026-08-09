@@ -62,6 +62,9 @@ type IntegrationExecution struct {
 	RetryPolicyID              *int           `gorm:"type:bigint;index:idx_integration_execution_retry_policy" json:"-"`
 	RetryPolicySnapshot        datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"-"`
 	RetryPolicySnapshotVersion int            `gorm:"not null;default:0" json:"-"`
+	RemoteIdempotencyMode      string         `gorm:"size:32;not null;default:none" json:"-"`
+	RemoteIdempotencyHeader    string         `gorm:"size:64" json:"-"`
+	RemoteIdempotencyKey       string         `gorm:"size:128" json:"-"`
 	CurrentAttempt             int            `gorm:"not null;default:0" json:"current_attempt"`
 	LeaseOwner                 string         `gorm:"size:128;index:idx_integration_execution_lease_owner" json:"-"`
 	LeaseExpiresAt             *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_lease_expires_at" json:"-"`
@@ -73,6 +76,8 @@ type IntegrationExecution struct {
 	StartedAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_started_at" json:"started_at"`
 	CompletedAt                *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_completed_at" json:"completed_at"`
 	NextRunAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_next_run_at" json:"next_run_at"`
+	LastAttemptAt              *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_last_attempt_at" json:"last_attempt_at"`
+	RetryReasonCode            string         `gorm:"size:64;index:idx_integration_execution_retry_reason" json:"retry_reason_code"`
 	CancelledAt                *time.Time     `gorm:"type:timestamp" json:"cancelled_at"`
 	Revision                   int            `gorm:"not null;default:1" json:"revision"`
 
@@ -108,6 +113,11 @@ type IntegrationLog struct {
 	CredentialCode               string     `gorm:"size:64" json:"-"`
 	CredentialVersion            string     `gorm:"size:32" json:"-"`
 	CredentialFingerprintSummary string     `gorm:"size:32" json:"-"`
+	Retryable                    bool       `gorm:"not null;default:false" json:"retryable"`
+	RetryReasonCode              string     `gorm:"size:64;index:idx_integration_log_retry_reason" json:"retry_reason_code"`
+	RetryDelayMs                 int64      `gorm:"not null;default:0" json:"retry_delay_ms"`
+	RetryScheduledAt             *time.Time `gorm:"type:timestamp;index:idx_integration_log_retry_scheduled" json:"retry_scheduled_at"`
+	RetryAfterSource             string     `gorm:"size:32;not null;default:none" json:"retry_after_source"`
 
 	Execution IntegrationExecution `gorm:"foreignKey:ExecutionID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
 }

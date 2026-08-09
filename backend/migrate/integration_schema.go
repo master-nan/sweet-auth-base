@@ -18,6 +18,15 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 		}
 		limits := integration.RuntimeLimits()
 		if err := tx.Exec(`
+			UPDATE integration_interface_definition
+			SET idempotency_mode = CASE WHEN http_method = 'GET' THEN 'safe_method' ELSE 'none' END,
+			    remote_idempotency_header = ''
+			WHERE btrim(COALESCE(idempotency_mode, '')) = ''
+			   OR (http_method = 'GET' AND idempotency_mode = 'none')
+		`).Error; err != nil {
+			return fmt.Errorf("normalize interface idempotency contract: %w", err)
+		}
+		if err := tx.Exec(`
 			UPDATE integration_interface_definition AS definition
 			SET status = 'disabled', state = FALSE, revision = revision + 1, gmt_modify = CURRENT_TIMESTAMP
 			WHERE definition.gmt_delete IS NULL
@@ -70,6 +79,7 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_enabled_timeout", expression: fmt.Sprintf("timeout_seconds >= 1 AND (status <> 'enabled' OR timeout_seconds <= %d)", int(limits.MaxRequestTimeout.Seconds()))},
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_enabled_response_limit", expression: fmt.Sprintf("response_limit >= %d AND (status <> 'enabled' OR response_limit <= %d)", limits.MinResponseBytes, limits.MaxResponseBytes)},
 			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_input_contract", expression: "jsonb_typeof(input_contract) = 'object' AND input_contract ? 'version' AND input_contract->>'version' = '1' AND input_contract ? 'parameters' AND jsonb_typeof(input_contract->'parameters') = 'array'"},
+			{model: &model.InterfaceDefinition{}, name: "chk_integration_interface_idempotency", expression: "(http_method = 'GET' AND idempotency_mode = 'safe_method' AND remote_idempotency_header = '') OR (http_method IN ('PUT','DELETE') AND idempotency_mode IN ('none','idempotent_method') AND remote_idempotency_header = '') OR (http_method IN ('POST','PATCH') AND ((idempotency_mode = 'none' AND remote_idempotency_header = '') OR (idempotency_mode = 'remote_key_header' AND remote_idempotency_header = 'Idempotency-Key')))"},
 			{model: &model.Credential{}, name: "chk_integration_credential_type", expression: "credential_type IN ('basic','api_key','bearer_token','oauth_client')"},
 			{model: &model.Credential{}, name: "chk_integration_credential_status", expression: "status IN ('draft','active','disabled','revoked')"},
 			{model: &model.Credential{}, name: "chk_integration_credential_version", expression: "version > 0"},

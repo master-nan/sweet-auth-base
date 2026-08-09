@@ -9,6 +9,8 @@ import (
 	"backend/model"
 	"backend/repository"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -128,6 +130,10 @@ func (s *IntegrationExecutionService) CreateExecution(
 		if err != nil {
 			return myerrors.WrapSystemError(err)
 		}
+		remoteIdempotencyKey, err := generateRemoteIdempotencyKey(definition.IdempotencyMode)
+		if err != nil {
+			return myerrors.WrapSystemError(err)
+		}
 		value = model.IntegrationExecution{
 			Basic:                      model.Basic{Id: int(id), State: true},
 			ExecutionNo:                fmt.Sprintf("INT-%d", id),
@@ -149,6 +155,9 @@ func (s *IntegrationExecutionService) CreateExecution(
 			RetryPolicyID:              retryPolicyID,
 			RetryPolicySnapshot:        datatypes.JSON(retryPolicySnapshot),
 			RetryPolicySnapshotVersion: retryPolicySnapshotVersion,
+			RemoteIdempotencyMode:      definition.IdempotencyMode,
+			RemoteIdempotencyHeader:    definition.RemoteIdempotencyHeader,
+			RemoteIdempotencyKey:       remoteIdempotencyKey,
 			Revision:                   1,
 		}
 		if err := s.executions.Create(tx, &value); err != nil {
@@ -168,6 +177,17 @@ func (s *IntegrationExecutionService) CreateExecution(
 	return response.NewIntegrationExecutionDetailRes(value), nil
 }
 
+func generateRemoteIdempotencyKey(mode string) (string, error) {
+	if mode != model.InterfaceIdempotencyModeRemoteKeyHeader {
+		return "", nil
+	}
+	value := make([]byte, 32)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(value), nil
+}
+
 func (s *IntegrationExecutionService) freezeRetryPolicy(tx *gorm.DB, definition model.InterfaceDefinition) (*int, []byte, int, error) {
 	if definition.RetryPolicyID == nil {
 		return nil, []byte(`{}`), 0, nil
@@ -185,7 +205,9 @@ func (s *IntegrationExecutionService) freezeRetryPolicy(tx *gorm.DB, definition 
 	if err := validateRetryPolicyConfiguration(policy); err != nil {
 		return nil, nil, 0, myerrors.ErrInterfaceRetryPolicyInvalid
 	}
-	snapshot, err := integration.BuildRetryPolicySnapshot(policy)
+	snapshot, err := integration.BuildRetryPolicySnapshot(policy, integration.RetryPolicySnapshotOptions{
+		IdempotencyMode: definition.IdempotencyMode, RemoteIdempotencyHeader: definition.RemoteIdempotencyHeader,
+	})
 	if err != nil {
 		return nil, nil, 0, myerrors.ErrRetryPolicyConfigurationInvalid
 	}

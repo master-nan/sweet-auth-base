@@ -54,16 +54,21 @@ type IntegrationLogListRes struct {
 
 type IntegrationLogDetailRes struct {
 	IntegrationLogListRes
-	ErrorCode                    string `json:"error_code,omitempty"`
-	ResultSummary                string `json:"result_summary,omitempty"`
-	ResultSizeBytes              int64  `json:"result_size_bytes"`
-	ResultHash                   string `json:"result_hash,omitempty"`
-	ResponseContentType          string `json:"response_content_type,omitempty"`
-	CredentialCode               string `json:"credential_code,omitempty"`
-	CredentialVersion            string `json:"credential_version,omitempty"`
-	CredentialFingerprintSummary string `json:"credential_fingerprint_summary,omitempty"`
-	RequestID                    string `json:"request_id,omitempty"`
-	TraceID                      string `json:"trace_id,omitempty"`
+	ErrorCode                    string     `json:"error_code,omitempty"`
+	ResultSummary                string     `json:"result_summary,omitempty"`
+	ResultSizeBytes              int64      `json:"result_size_bytes"`
+	ResultHash                   string     `json:"result_hash,omitempty"`
+	ResponseContentType          string     `json:"response_content_type,omitempty"`
+	CredentialCode               string     `json:"credential_code,omitempty"`
+	CredentialVersion            string     `json:"credential_version,omitempty"`
+	CredentialFingerprintSummary string     `json:"credential_fingerprint_summary,omitempty"`
+	RequestID                    string     `json:"request_id,omitempty"`
+	TraceID                      string     `json:"trace_id,omitempty"`
+	Retryable                    bool       `json:"retryable"`
+	RetryReasonCode              string     `json:"retry_reason_code,omitempty"`
+	RetryDelayMs                 int64      `json:"retry_delay_ms"`
+	RetryScheduledAt             *time.Time `json:"retry_scheduled_at,omitempty"`
+	RetryAfterSource             string     `json:"retry_after_source"`
 }
 
 func integrationWorkerSummary(value string) string {
@@ -110,6 +115,11 @@ func NewIntegrationLogDetailRes(value model.IntegrationLog) IntegrationLogDetail
 		CredentialFingerprintSummary: value.CredentialFingerprintSummary,
 		RequestID:                    value.RequestID,
 		TraceID:                      value.TraceID,
+		Retryable:                    value.Retryable,
+		RetryReasonCode:              value.RetryReasonCode,
+		RetryDelayMs:                 value.RetryDelayMs,
+		RetryScheduledAt:             value.RetryScheduledAt,
+		RetryAfterSource:             value.RetryAfterSource,
 	}
 }
 
@@ -128,6 +138,8 @@ type IntegrationExecutionDetailRes struct {
 	LeaseExpiresAt    *time.Time                                 `json:"lease_expires_at,omitempty"`
 	NextRunAt         *time.Time                                 `json:"next_run_at,omitempty"`
 	CancelledAt       *time.Time                                 `json:"cancelled_at,omitempty"`
+	RetryReasonCode   string                                     `json:"retry_reason_code,omitempty"`
+	LastAttemptAt     *time.Time                                 `json:"last_attempt_at,omitempty"`
 }
 
 type IntegrationExecutionRetryPolicySummaryRes struct {
@@ -178,6 +190,7 @@ func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) Integrat
 		ResultSummary:     value.ResultSummary,
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
 		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt,
+		RetryReasonCode: value.RetryReasonCode, LastAttemptAt: value.LastAttemptAt,
 	}
 	if value.RetryPolicySnapshotVersion > 0 && len(value.RetryPolicySnapshot) > 0 {
 		var snapshot struct {

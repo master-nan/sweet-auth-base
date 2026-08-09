@@ -32,6 +32,7 @@ func TestIntegrationExecutionResponseDTOWhitelist(t *testing.T) {
 		"secret", "ciphertext", "nonce", "payload", "external_system_id\"", "interface_definition_id\"",
 		"attempts", "http_status", "result_certainty", "request_id", "trace_id",
 		"employee_id", "10001", "corr-1", "private-business-value", "json_body", "path_params",
+		"remote_idempotency_key",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("response leaked %q: %s", forbidden, payload)

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	myerrors "backend/internal/errors"
 	"backend/model"
 	"encoding/json"
 	"sort"
@@ -25,9 +26,16 @@ type RetryPolicySnapshot struct {
 	RetryableErrorCategories []string `json:"retryable_error_categories"`
 	RetryableHTTPStatuses    []int    `json:"retryable_http_statuses"`
 	RespectRetryAfter        bool     `json:"respect_retry_after"`
+	IdempotencyMode          string   `json:"idempotency_mode"`
+	RemoteIdempotencyHeader  string   `json:"remote_idempotency_header"`
 }
 
-func BuildRetryPolicySnapshot(value model.RetryPolicy) ([]byte, error) {
+type RetryPolicySnapshotOptions struct {
+	IdempotencyMode         string
+	RemoteIdempotencyHeader string
+}
+
+func BuildRetryPolicySnapshot(value model.RetryPolicy, options ...RetryPolicySnapshotOptions) ([]byte, error) {
 	var categories []string
 	if err := json.Unmarshal(value.RetryableErrorCategories, &categories); err != nil {
 		return nil, err
@@ -38,12 +46,32 @@ func BuildRetryPolicySnapshot(value model.RetryPolicy) ([]byte, error) {
 	}
 	sort.Strings(categories)
 	sort.Ints(statuses)
-	return json.Marshal(RetryPolicySnapshot{
+	configuration := RetryPolicySnapshotOptions{IdempotencyMode: RemoteIdempotencyNone}
+	if len(options) > 0 {
+		configuration = options[0]
+	}
+	snapshot := RetryPolicySnapshot{
 		Version: RetryPolicySnapshotVersion, PolicyCode: value.PolicyCode, PolicyVersion: value.Version,
 		MaxAttempts: value.MaxAttempts, InitialDelayMs: value.InitialDelayMs, MaxDelayMs: value.MaxDelayMs,
 		BackoffType: value.BackoffType, BackoffMultiplier: strconv.FormatFloat(value.BackoffMultiplier, 'f', -1, 64),
 		JitterType: value.JitterType, JitterRatio: strconv.FormatFloat(value.JitterRatio, 'f', -1, 64),
 		RetryWindowMs: value.RetryWindowMs, RetryableErrorCategories: categories,
 		RetryableHTTPStatuses: statuses, RespectRetryAfter: value.RespectRetryAfter,
-	})
+		IdempotencyMode: configuration.IdempotencyMode, RemoteIdempotencyHeader: configuration.RemoteIdempotencyHeader,
+	}
+	if err := ValidateRetryPolicySnapshot(snapshot); err != nil {
+		return nil, err
+	}
+	return json.Marshal(snapshot)
+}
+
+func ParseRetryPolicySnapshot(raw []byte) (RetryPolicySnapshot, error) {
+	var snapshot RetryPolicySnapshot
+	if len(raw) == 0 || !json.Valid(raw) || json.Unmarshal(raw, &snapshot) != nil {
+		return RetryPolicySnapshot{}, myerrors.ErrIntegrationRetrySnapshotInvalid
+	}
+	if err := ValidateRetryPolicySnapshot(snapshot); err != nil {
+		return RetryPolicySnapshot{}, err
+	}
+	return snapshot, nil
 }

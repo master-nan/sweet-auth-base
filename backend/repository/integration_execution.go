@@ -58,6 +58,11 @@ type IntegrationAttemptCompletion struct {
 	CredentialCode               string
 	CredentialVersion            string
 	CredentialFingerprintSummary string
+	Retryable                    bool
+	RetryReasonCode              string
+	RetryDelayMs                 int64
+	RetryScheduledAt             *time.Time
+	RetryAfterSource             string
 }
 
 // ExpiredExecutionRecovery 用于将已过期租约的执行安全收敛为未知失败。

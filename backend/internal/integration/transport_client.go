@@ -45,7 +45,7 @@ func NewHTTPTransportClient(policy EndpointPolicy, options TransportClientOption
 
 func (c *HTTPTransportClient) Execute(ctx context.Context, request TransportRequest) (TransportResult, error) {
 	startedAt := time.Now()
-	result := TransportResult{Determinacy: TransportDeterminacyConfirmed}
+	result := TransportResult{Determinacy: TransportDeterminacyConfirmed, RequestProgress: TransportRequestNotSent}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -72,6 +72,7 @@ func (c *HTTPTransportClient) Execute(ctx context.Context, request TransportRequ
 		}
 		category := classifyTransportFailure(requestContext, err)
 		result.Determinacy = TransportDeterminacyUnknown
+		result.RequestProgress = TransportRequestSentUnknown
 		return c.finish(ctx, request, target, result, startedAt, category, newTransportError(category))
 	}
 	if response == nil || response.Body == nil {
@@ -80,6 +81,7 @@ func (c *HTTPTransportClient) Execute(ctx context.Context, request TransportRequ
 	}
 
 	result.StatusCode = response.StatusCode
+	result.RequestProgress = TransportRequestResponseReceived
 	result.ContentType = normalizedContentType(response.Header.Get("Content-Type"))
 	result.responseHeaders = safeResponseHeaders(response.Header)
 	if response.StatusCode >= http.StatusMultipleChoices && response.StatusCode < http.StatusBadRequest {

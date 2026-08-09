@@ -63,6 +63,9 @@ const (
 	ErrorCodeIntegrationExecutionRuntimeIncompatible     = 130358
 	ErrorCodeIntegrationExecutionInputStorageTooLarge    = 130359
 	ErrorCodeIntegrationExecutionInputSizeMismatch       = 130360
+	ErrorCodeIntegrationRetrySnapshotInvalid             = 130361
+	ErrorCodeIntegrationRetryPolicyInvalid               = 130362
+	ErrorCodeIntegrationRetryScheduleInvalid             = 130363
 )
 
 var (
@@ -365,5 +368,20 @@ var (
 		http.StatusConflict,
 		ErrorCodeIntegrationExecutionInputSizeMismatch,
 		"集成执行输入大小完整性校验失败",
+	)
+	ErrIntegrationRetrySnapshotInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetrySnapshotInvalid,
+		"集成重试策略快照无效",
+	)
+	ErrIntegrationRetryPolicyInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryPolicyInvalid,
+		"集成重试策略无效",
+	)
+	ErrIntegrationRetryScheduleInvalid = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryScheduleInvalid,
+		"集成重试调度参数无效",
 	)
 )

@@ -59,7 +59,7 @@ func TestIntegrationExecutionEngineClaimRunAndConverge(t *testing.T) {
 }
 
 func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T) {
-	for _, statusCode := range []int{http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable} {
+	for _, statusCode := range []int{http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {
 			engine, db, execution, closeServer := newExecutionEngineFixture(t, statusCode)
 			defer closeServer()
@@ -68,15 +68,59 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 				t.Fatalf("claim = %+v err=%v", claimed, err)
 			}
 			result, err := engine.RunExecution(context.Background(), claimed[0])
-			if err != nil || !result.RetryEligible || result.Certainty != model.IntegrationResultCertaintyConfirmed {
+			if err != nil || result.ExecutionStatus != model.IntegrationExecutionStatusRetryWaiting || result.Certainty != model.IntegrationResultCertaintyConfirmed {
 				t.Fatalf("retry result = %+v err=%v", result, err)
 			}
 			var stored model.IntegrationExecution
-			if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusRetryWaiting {
+			if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusRetryWaiting ||
+				stored.NextRunAt == nil || stored.CompletedAt != nil || stored.RetryReasonCode != RetryReasonAllowed {
 				t.Fatalf("retry waiting execution = %+v err=%v", stored, err)
+			}
+			var attempt model.IntegrationLog
+			if err := db.Where("execution_id = ?", execution.Id).First(&attempt).Error; err != nil || !attempt.Retryable ||
+				attempt.RetryScheduledAt == nil || attempt.RetryDelayMs != 1000 || attempt.RetryAfterSource != RetryAfterSourceLocal {
+				t.Fatalf("retry diagnostics = %+v err=%v", attempt, err)
 			}
 		})
 	}
+	t.Run("500 is not a V1 retry status", func(t *testing.T) {
+		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusInternalServerError)
+		defer closeServer()
+		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		if err != nil || len(claimed) != 1 {
+			t.Fatalf("claim = %+v err=%v", claimed, err)
+		}
+		result, err := engine.RunExecution(context.Background(), claimed[0])
+		if err != nil || result.ExecutionStatus != model.IntegrationExecutionStatusFailed || result.RetryReasonCode != RetryReasonHTTPStatusNotAllowed {
+			t.Fatalf("500 decision = %+v err=%v", result, err)
+		}
+		var stored model.IntegrationExecution
+		if err := db.First(&stored, execution.Id).Error; err != nil || stored.Status != model.IntegrationExecutionStatusFailed || stored.NextRunAt != nil {
+			t.Fatalf("500 execution = %+v err=%v", stored, err)
+		}
+	})
+	t.Run("Retry-After is persisted as a safe schedule summary", func(t *testing.T) {
+		engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			writer.Header().Set("Retry-After", "5")
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = writer.Write([]byte(`{"error":"busy"}`))
+		}))
+		defer closeServer()
+		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		if err != nil || len(claimed) != 1 {
+			t.Fatalf("claim=%+v err=%v", claimed, err)
+		}
+		result, err := engine.RunExecution(context.Background(), claimed[0])
+		if err != nil || result.RetryDelay != 5*time.Second || result.RetryAfterSource != RetryAfterSourceHTTPDelta {
+			t.Fatalf("retry-after result=%+v err=%v", result, err)
+		}
+		var attempt model.IntegrationLog
+		if err := db.Where("execution_id = ?", execution.Id).First(&attempt).Error; err != nil ||
+			attempt.RetryDelayMs != 5000 || attempt.RetryAfterSource != RetryAfterSourceHTTPDelta {
+			t.Fatalf("retry-after attempt=%+v err=%v", attempt, err)
+		}
+	})
 	t.Run("expired lease becomes unknown failed without HTTP retry", func(t *testing.T) {
 		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 		defer closeServer()
@@ -192,6 +236,7 @@ func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(
 	contract := snapshotTestContract()
 	definitionUpdates := map[string]any{
 		"http_method": "POST", "relative_path": "/api/runtime/{employee_id}", "input_contract": datatypes.JSON(contract),
+		"idempotency_mode": model.InterfaceIdempotencyModeNone, "remote_idempotency_header": "",
 	}
 	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", execution.InterfaceDefinitionID).Updates(definitionUpdates).Error; err != nil {
 		t.Fatalf("update interface contract: %v", err)
@@ -207,6 +252,7 @@ func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(
 	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(map[string]any{
 		"input_snapshot": datatypes.JSON(snapshot), "input_snapshot_version": model.IntegrationExecutionInputSnapshotVersion,
 		"input_snapshot_size": len(snapshot), "input_hash": hash,
+		"remote_idempotency_mode": model.InterfaceIdempotencyModeNone, "remote_idempotency_header": "",
 	}).Error; err != nil {
 		t.Fatalf("update execution snapshot: %v", err)
 	}
@@ -228,6 +274,52 @@ func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(
 		if strings.Contains(logs, forbidden) {
 			t.Fatalf("runtime log leaked input value %q: %s", forbidden, logs)
 		}
+	}
+}
+
+func TestIntegrationExecutionEngineInjectsFrozenRemoteIdempotencyKey(t *testing.T) {
+	var received string
+	engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+		received = req.Header.Get(RemoteIdempotencyHeaderName)
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = writer.Write([]byte(`{"error":"busy"}`))
+	}))
+	defer closeServer()
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", execution.InterfaceDefinitionID).Updates(map[string]any{
+		"http_method": model.InterfaceMethodPOST, "idempotency_mode": model.InterfaceIdempotencyModeRemoteKeyHeader,
+		"remote_idempotency_header": RemoteIdempotencyHeaderName,
+	}).Error; err != nil {
+		t.Fatalf("update interface idempotency: %v", err)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, execution.Id).Error; err != nil {
+		t.Fatalf("load execution: %v", err)
+	}
+	policy, err := ParseRetryPolicySnapshot(stored.RetryPolicySnapshot)
+	if err != nil {
+		t.Fatalf("parse retry policy: %v", err)
+	}
+	policy.IdempotencyMode = RemoteIdempotencyKeyHeader
+	policy.RemoteIdempotencyHeader = RemoteIdempotencyHeaderName
+	encoded, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatalf("marshal retry policy: %v", err)
+	}
+	remoteKey := "server-generated-remote-key"
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(map[string]any{
+		"retry_policy_snapshot": datatypes.JSON(encoded), "remote_idempotency_mode": model.InterfaceIdempotencyModeRemoteKeyHeader,
+		"remote_idempotency_header": RemoteIdempotencyHeaderName, "remote_idempotency_key": remoteKey,
+	}).Error; err != nil {
+		t.Fatalf("freeze execution idempotency: %v", err)
+	}
+	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim=%+v err=%v", claimed, err)
+	}
+	result, err := engine.RunExecution(context.Background(), claimed[0])
+	if err != nil || received != remoteKey || result.ExecutionStatus != model.IntegrationExecutionStatusRetryWaiting {
+		t.Fatalf("remote idempotency received=%q result=%+v err=%v", received, result, err)
 	}
 }
 
@@ -303,7 +395,7 @@ func newExecutionEngineFixture(t *testing.T, responseStatus int, credentialTypes
 
 func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, credentialTypes ...string) (*IntegrationExecutionEngine, *gorm.DB, model.IntegrationExecution, func()) {
 	t.Helper()
-	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
+	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
 	client, _, closeServer := newTestTransportClient(t, false, handler)
 	protector, err := security.NewCredentialSecretProtectorWithKey("execution-engine-master-key")
 	if err != nil {
@@ -339,7 +431,18 @@ func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, cr
 	credentialID := credential.Id
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 103, State: true}, ExternalSystemID: system.Id, InterfaceCode: "runtime_list", Name: "运行时列表", Version: 1,
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/runtime", CredentialID: &credentialID,
-		TimeoutSeconds: 15, ResponseLimit: 1024, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
+		TimeoutSeconds: 15, ResponseLimit: 1024, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+		IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod}
+	policy := model.RetryPolicy{Basic: model.Basic{Id: 105, State: true}, PolicyCode: "runtime_retry", PolicyName: "运行时重试", Version: 1,
+		Status: model.RetryPolicyStatusEnabled, MaxAttempts: 3, InitialDelayMs: 1000, MaxDelayMs: 5000,
+		BackoffType: model.RetryBackoffTypeFixed, BackoffMultiplier: 1, JitterType: model.RetryJitterTypeNone, JitterRatio: 0,
+		RetryWindowMs: 60000, RetryableErrorCategories: datatypes.JSON([]byte(`["network","remote","timeout"]`)),
+		RetryableHTTPStatuses: datatypes.JSON([]byte(`[429,502,503,504]`)), RespectRetryAfter: true, Revision: 1}
+	retrySnapshot, err := BuildRetryPolicySnapshot(policy, RetryPolicySnapshotOptions{IdempotencyMode: RemoteIdempotencySafeMethod})
+	if err != nil {
+		closeServer()
+		t.Fatalf("build retry snapshot: %v", err)
+	}
 	_, snapshot, inputHash, err := BuildExecutionInputSnapshot(
 		definition.InputContract, definition.HTTPMethod, definition.RelativePath, definition.Version, ExecutionInputValues{},
 	)
@@ -352,8 +455,10 @@ func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, cr
 		InterfaceName: definition.Name, InterfaceVersion: definition.Version, TriggerSource: model.IntegrationTriggerSourceManual,
 		Status: model.IntegrationExecutionStatusCreated, IdempotencyScope: "runtime", IdempotencyKey: "execution-104",
 		InputHash: inputHash, InputSnapshot: datatypes.JSON(snapshot),
-		InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion, InputSnapshotSize: len(snapshot), Revision: 1}
-	for _, value := range []any{&system, &credential, &definition, &execution} {
+		InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion, InputSnapshotSize: len(snapshot),
+		RetryPolicyID: &policy.Id, RetryPolicySnapshot: datatypes.JSON(retrySnapshot), RetryPolicySnapshotVersion: RetryPolicySnapshotVersion,
+		RemoteIdempotencyMode: model.InterfaceIdempotencyModeSafeMethod, Revision: 1}
+	for _, value := range []any{&system, &credential, &policy, &definition, &execution} {
 		testutil.MustCreate(t, db, value)
 	}
 	primary := &database.PrimaryDB{DB: db}

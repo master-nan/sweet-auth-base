@@ -31,6 +31,7 @@ type ExecutionEngineOptions struct {
 // AttemptResult 是一次真实调用的受控事实摘要。它不包含 Payload、认证信息或密文。
 type AttemptResult struct {
 	Succeeded                    bool
+	HTTPMethod                   string
 	HTTPStatus                   *int
 	ResponseSize                 int64
 	ResponseHash                 string
@@ -42,7 +43,13 @@ type AttemptResult struct {
 	ReasonCode                   string
 	SafeMessage                  string
 	Certainty                    string
-	RetryEligible                bool
+	RequestProgress              string
+	RetryAfterRaw                string
+	ExecutionStatus              string
+	RetryReasonCode              string
+	RetryDelay                   time.Duration
+	RetryScheduledAt             *time.Time
+	RetryAfterSource             string
 	CredentialCode               string
 	CredentialVersion            string
 	CredentialFingerprintSummary string
@@ -63,6 +70,7 @@ type IntegrationExecutionEngine struct {
 	leaseDuration time.Duration
 	batchSize     int
 	now           func() time.Time
+	retryDecision *RetryDecisionService
 }
 
 // NewIntegrationExecutionEngine 构造可直接调用的受控 Engine。
@@ -98,10 +106,14 @@ func NewIntegrationExecutionEngine(
 	if batchSize < 1 || batchSize > maxExecutionBatchSize {
 		return nil, myerrors.ErrIntegrationConfigurationUnavailable
 	}
+	retryDecision, err := NewRetryDecisionService(NewRetryRandomSource(model.Now().UnixNano()))
+	if err != nil {
+		return nil, err
+	}
 	return &IntegrationExecutionEngine{
 		executions: executions, systems: systems, interfaces: interfaces, credentials: credentials,
 		provider: provider, transport: transport, guard: guard, sf: sf, workerID: workerID,
-		leaseDuration: leaseDuration, batchSize: batchSize, now: model.Now,
+		leaseDuration: leaseDuration, batchSize: batchSize, now: model.Now, retryDecision: retryDecision,
 	}, nil
 }
 
@@ -163,7 +175,8 @@ func (e *IntegrationExecutionEngine) RunExecution(
 		if recover() == nil {
 			return
 		}
-		result = e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategorySystem, "worker_panic_recovered", "集成执行发生内部异常", model.IntegrationResultCertaintyConfirmed, false)
+		result = e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategorySystem, "worker_panic_recovered", "集成执行发生内部异常", model.IntegrationResultCertaintyConfirmed)
+		e.applyRetryDecision(claimed, &result)
 		if completeErr := e.completeClaim(ctx, claimed, result); completeErr != nil {
 			err = myerrors.ErrIntegrationExecutionResultUnknown
 			return
@@ -173,12 +186,14 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	}()
 	release, err := e.guard.Acquire(claimed.Execution.ExternalSystemID, claimed.Execution.InterfaceDefinitionID)
 	if err != nil {
-		result := e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategoryConcurrency, "concurrency_limit_reached", "集成执行并发已达上限", model.IntegrationResultCertaintyConfirmed, false)
+		result := e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategoryConcurrency, "concurrency_limit_reached", "集成执行并发已达上限", model.IntegrationResultCertaintyConfirmed)
+		e.applyRetryDecision(claimed, &result)
 		return result, e.completeClaim(ctx, claimed, result)
 	}
 	defer release()
 
 	result = e.executeAttempt(ctx, claimed)
+	e.applyRetryDecision(claimed, &result)
 	if err := e.completeClaim(ctx, claimed, result); err != nil {
 		// 远端调用完成后若持久化失败，不能宣称成功；后续仅能通过租约恢复收敛为 unknown。
 		e.logAttempt(ctx, claimed, result, "complete_failed")
@@ -193,9 +208,9 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	system, definition, credentialIdentity, err := e.loadRuntimeConfiguration(ctx, claimed.Execution)
 	if err != nil {
 		if errors.Is(err, myerrors.ErrIntegrationExecutionRuntimeIncompatible) {
-			return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "integration_execution_runtime_incompatible", "集成执行引用的接口不符合当前运行契约", model.IntegrationResultCertaintyConfirmed, false)
+			return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "integration_execution_runtime_incompatible", "集成执行引用的接口不符合当前运行契约", model.IntegrationResultCertaintyConfirmed)
 		}
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "configuration_unavailable", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "configuration_unavailable", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed)
 	}
 	snapshot, err := LoadExecutionInputSnapshot(
 		definition.InputContract,
@@ -207,9 +222,13 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 		claimed.Execution.InputHash,
 	)
 	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, executionInputReasonCode(err), "集成执行输入快照不可用", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, executionInputReasonCode(err), "集成执行输入快照不可用", model.IntegrationResultCertaintyConfirmed)
 	}
 	headers := snapshotTransportHeaders(snapshot.Headers)
+	if claimed.Execution.RemoteIdempotencyMode == RemoteIdempotencyKeyHeader &&
+		strings.EqualFold(claimed.Execution.RemoteIdempotencyHeader, RemoteIdempotencyHeaderName) {
+		headers[RemoteIdempotencyHeaderName] = claimed.Execution.RemoteIdempotencyKey
+	}
 	correlation := audit.GetCorrelationIDs(ctx)
 	if correlation.RequestID != "" {
 		headers["X-Request-ID"] = correlation.RequestID
@@ -225,22 +244,24 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 		MaxResponseBytes: definition.ResponseLimit,
 	})
 	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "transport_request_invalid", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "transport_request_invalid", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed)
 	}
 	resolveRequest, err := NewCredentialResolveRequest(system.Id, definition.Id, credentialIdentity.ID, credentialIdentity.CredentialCode, credentialIdentity.CredentialType, claimed.Execution.ExecutionNo)
 	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
 	}
 	resolution, err := e.provider.Resolve(ctx, resolveRequest)
 	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false)
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
 	}
 	request, err = request.WithAuthentication(resolution.Authentication())
 	if err != nil {
-		return withCredentialSummary(e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_injection_invalid", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed, false), resolution)
+		return withCredentialSummary(e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_injection_invalid", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed), resolution)
 	}
 	transportResult, transportErr := e.transport.Execute(ctx, request)
-	return withCredentialSummary(attemptResultFromTransport(startedAt, definition.HTTPMethod, transportResult, transportErr), resolution)
+	result := attemptResultFromTransport(startedAt, transportResult, transportErr, e.now())
+	result.HTTPMethod = definition.HTTPMethod
+	return withCredentialSummary(result, resolution)
 }
 
 func snapshotTransportHeaders(values map[string][]string) map[string]string {
@@ -292,6 +313,10 @@ func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(
 	if err := ValidateInterfaceRuntimeContract(definition.TimeoutSeconds, definition.ResponseLimit); err != nil {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationExecutionRuntimeIncompatible
 	}
+	if !ValidRemoteIdempotencyContract(definition.HTTPMethod, definition.IdempotencyMode, definition.RemoteIdempotencyHeader) ||
+		definition.IdempotencyMode != execution.RemoteIdempotencyMode || definition.RemoteIdempotencyHeader != execution.RemoteIdempotencyHeader {
+		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationExecutionRuntimeIncompatible
+	}
 	identity, err := e.credentials.GetRuntimeCredentialIdentity(ctx, *definition.CredentialID)
 	if err != nil || identity.ID != *definition.CredentialID || identity.ExternalSystemID != system.Id {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationConfigurationUnavailable
@@ -300,11 +325,9 @@ func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(
 }
 
 func (e *IntegrationExecutionEngine) completeClaim(ctx context.Context, claimed repository.ClaimedIntegrationExecution, result AttemptResult) error {
-	status := model.IntegrationExecutionStatusFailed
-	if result.Succeeded {
-		status = model.IntegrationExecutionStatusSucceeded
-	} else if result.RetryEligible && result.Certainty == model.IntegrationResultCertaintyConfirmed {
-		status = model.IntegrationExecutionStatusRetryWaiting
+	status := result.ExecutionStatus
+	if status == "" {
+		status = model.IntegrationExecutionStatusFailed
 	}
 	_, err := e.executions.CompleteAttemptAndExecution(ctx, repository.IntegrationAttemptCompletion{
 		ExecutionID: claimed.Execution.Id, AttemptID: claimed.Attempt.Id, AttemptNo: claimed.Attempt.AttemptNo,
@@ -314,6 +337,9 @@ func (e *IntegrationExecutionEngine) completeClaim(ctx context.Context, claimed 
 		ErrorCode: result.ReasonCode, ResultCertainty: result.Certainty, ResponseContentType: result.ContentType,
 		CredentialCode: result.CredentialCode, CredentialVersion: result.CredentialVersion,
 		CredentialFingerprintSummary: result.CredentialFingerprintSummary,
+		Retryable:                    result.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting,
+		RetryReasonCode:              result.RetryReasonCode, RetryDelayMs: result.RetryDelay.Milliseconds(),
+		RetryScheduledAt: result.RetryScheduledAt, RetryAfterSource: result.RetryAfterSource,
 	})
 	if err == nil {
 		return nil
@@ -325,6 +351,60 @@ func (e *IntegrationExecutionEngine) completeClaim(ctx context.Context, claimed 
 		return myerrors.ErrIntegrationAttemptAlreadyCompleted
 	}
 	return myerrors.ErrIntegrationExecutionCompleteFailed
+}
+
+func (e *IntegrationExecutionEngine) applyRetryDecision(claimed repository.ClaimedIntegrationExecution, result *AttemptResult) {
+	if result == nil {
+		return
+	}
+	if result.Succeeded {
+		result.ExecutionStatus = model.IntegrationExecutionStatusSucceeded
+		result.RetryAfterSource = RetryAfterSourceNone
+		return
+	}
+	result.ExecutionStatus = model.IntegrationExecutionStatusFailed
+	result.RetryAfterSource = RetryAfterSourceNone
+	if claimed.Execution.RetryPolicySnapshotVersion != RetryPolicySnapshotVersion {
+		result.RetryReasonCode = RetryReasonErrorNotAllowed
+		return
+	}
+	policy, err := ParseRetryPolicySnapshot(claimed.Execution.RetryPolicySnapshot)
+	if err != nil {
+		result.RetryReasonCode = RetryReasonPolicyInvalid
+		return
+	}
+	firstAttemptAt := claimed.Attempt.StartedAt
+	if claimed.Execution.StartedAt != nil {
+		firstAttemptAt = *claimed.Execution.StartedAt
+	}
+	progress := result.RequestProgress
+	if progress == "" {
+		progress = RequestProgressSentUnknown
+	}
+	status := 0
+	if result.HTTPStatus != nil {
+		status = *result.HTTPStatus
+	}
+	decision, err := e.retryDecision.Decide(RetryDecisionInput{
+		PolicySnapshot: policy, HTTPMethod: result.HTTPMethod, AttemptNo: claimed.Attempt.AttemptNo,
+		ErrorCategory: result.ErrorCategory, ReasonCode: result.ReasonCode, HTTPStatus: status,
+		ResultDeterminacy: result.Certainty, RequestProgress: progress, RetryAfterRaw: result.RetryAfterRaw,
+		FirstAttemptAt: firstAttemptAt, CurrentTime: result.CompletedAt, ExecutionStatus: claimed.Execution.Status,
+		RemoteIdempotencyMode:   claimed.Execution.RemoteIdempotencyMode,
+		HasRemoteIdempotencyKey: claimed.Execution.RemoteIdempotencyMode == RemoteIdempotencyKeyHeader && strings.TrimSpace(claimed.Execution.RemoteIdempotencyKey) != "",
+	})
+	if err != nil {
+		result.RetryReasonCode = RetryReasonPolicyInvalid
+		return
+	}
+	result.ExecutionStatus = decision.FinalState()
+	result.RetryReasonCode = decision.ReasonCode()
+	result.RetryDelay = decision.RetryDelay()
+	result.RetryAfterSource = decision.RetryAfterSource()
+	if decision.Retryable() {
+		next := decision.NextRetryAt()
+		result.RetryScheduledAt = &next
+	}
 }
 
 func withCredentialSummary(result AttemptResult, resolution CredentialResolution) AttemptResult {
@@ -357,17 +437,19 @@ func (e *IntegrationExecutionEngine) RecoverExpiredLease(ctx context.Context, li
 	return recovered, nil
 }
 
-func (e *IntegrationExecutionEngine) failureResult(startedAt time.Time, category, reason, message, certainty string, retryEligible bool) AttemptResult {
+func (e *IntegrationExecutionEngine) failureResult(startedAt time.Time, category, reason, message, certainty string) AttemptResult {
 	completedAt := e.now()
 	return AttemptResult{StartedAt: startedAt, CompletedAt: completedAt, Duration: completedAt.Sub(startedAt),
-		ErrorCategory: category, ReasonCode: reason, SafeMessage: message, Certainty: certainty, RetryEligible: retryEligible}
+		ErrorCategory: category, ReasonCode: reason, SafeMessage: message, Certainty: certainty,
+		RequestProgress: RequestProgressNotSent, ExecutionStatus: model.IntegrationExecutionStatusFailed, RetryAfterSource: RetryAfterSourceNone}
 }
 
-func attemptResultFromTransport(startedAt time.Time, method string, transportResult TransportResult, transportErr error) AttemptResult {
-	completedAt := time.Now()
+func attemptResultFromTransport(startedAt time.Time, transportResult TransportResult, transportErr error, completedAt time.Time) AttemptResult {
 	result := AttemptResult{HTTPStatus: optionalHTTPStatus(transportResult.StatusCode), ResponseSize: transportResult.ResponseSize,
 		ResponseHash: transportResult.ResponseHash, ContentType: transportResult.ContentType, StartedAt: startedAt,
-		CompletedAt: completedAt, Duration: completedAt.Sub(startedAt), Certainty: string(transportResult.Determinacy)}
+		CompletedAt: completedAt, Duration: completedAt.Sub(startedAt), Certainty: string(transportResult.Determinacy),
+		RequestProgress: string(transportResult.RequestProgress), ExecutionStatus: model.IntegrationExecutionStatusFailed,
+		RetryAfterSource: RetryAfterSourceNone, RetryAfterRaw: transportResult.ResponseHeaders()["retry-after"]}
 	if result.Certainty == "" {
 		result.Certainty = model.IntegrationResultCertaintyUnknown
 	}
@@ -375,21 +457,10 @@ func attemptResultFromTransport(startedAt time.Time, method string, transportRes
 		result.Succeeded = true
 		result.Certainty = model.IntegrationResultCertaintyConfirmed
 		result.SafeMessage = "远端调用成功"
+		result.ExecutionStatus = model.IntegrationExecutionStatusSucceeded
 		return result
 	}
 	result.ErrorCategory, result.ReasonCode, result.SafeMessage = mapTransportError(transportResult.ErrorCategory, transportErr)
-	if result.ErrorCategory == model.IntegrationErrorCategoryRemote && transportResult.StatusCode == http.StatusTooManyRequests ||
-		(result.ErrorCategory == model.IntegrationErrorCategoryRemote && transportResult.StatusCode >= http.StatusInternalServerError) {
-		result.RetryEligible = result.Certainty == model.IntegrationResultCertaintyConfirmed
-	}
-	if (result.ErrorCategory == model.IntegrationErrorCategoryNetwork || result.ErrorCategory == model.IntegrationErrorCategoryTimeout) &&
-		isReadOnlyMethod(method) && result.Certainty == model.IntegrationResultCertaintyUnknown {
-		result.RetryEligible = true
-	}
-	// 写操作在结果 unknown 时不能证明远端幂等，绝不标记为可自动重试。
-	if result.Certainty == model.IntegrationResultCertaintyUnknown && !isReadOnlyMethod(method) {
-		result.RetryEligible = false
-	}
 	return result
 }
 
@@ -408,8 +479,10 @@ func mapTransportError(category TransportErrorCategory, err error) (string, stri
 	switch category {
 	case TransportErrorTimeout:
 		return model.IntegrationErrorCategoryTimeout, "timeout", "集成远程调用超时"
-	case TransportErrorNetwork, TransportErrorTLS:
+	case TransportErrorNetwork:
 		return model.IntegrationErrorCategoryNetwork, "network_error", "集成远程调用失败"
+	case TransportErrorTLS:
+		return model.IntegrationErrorCategoryNetwork, "tls_error", "集成远程调用安全校验失败"
 	case TransportErrorRemoteHTTP:
 		return model.IntegrationErrorCategoryRemote, "remote_http_error", "集成远端返回失败状态"
 	case TransportErrorResponseTooLarge, TransportErrorUnsupportedContentType:
@@ -423,10 +496,6 @@ func mapTransportError(category TransportErrorCategory, err error) (string, stri
 	}
 }
 
-func isReadOnlyMethod(method string) bool {
-	return strings.EqualFold(strings.TrimSpace(method), http.MethodGet)
-}
-
 func (e *IntegrationExecutionEngine) logAttempt(ctx context.Context, claimed repository.ClaimedIntegrationExecution, result AttemptResult, phase string) {
 	correlation := audit.GetCorrelationIDs(ctx)
 	zap.L().Info("integration execution attempt",
@@ -435,7 +504,9 @@ func (e *IntegrationExecutionEngine) logAttempt(ctx context.Context, claimed rep
 		zap.String("system_code", claimed.Execution.ExternalSystemCode), zap.String("interface_code", claimed.Execution.InterfaceCode),
 		zap.String("worker_id", e.workerID), zap.String("phase", phase), zap.Int("http_status", transportStatus(result.HTTPStatus)),
 		zap.Duration("duration", result.Duration), zap.String("error_category", result.ErrorCategory),
-		zap.String("result_certainty", result.Certainty), zap.Bool("retry_eligible", result.RetryEligible),
+		zap.String("result_certainty", result.Certainty),
+		zap.Bool("retryable", result.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting),
+		zap.String("retry_reason_code", result.RetryReasonCode),
 	)
 }
 

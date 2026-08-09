@@ -74,7 +74,11 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 		Protocol: strings.ToLower(strings.TrimSpace(req.Protocol)), HTTPMethod: strings.ToUpper(strings.TrimSpace(req.HTTPMethod)),
 		RelativePath: path, InputContract: datatypes.JSON(contract), CredentialID: req.CredentialID, TimeoutSeconds: req.TimeoutSeconds,
 		ResponseLimit: req.ResponseLimit, RetryPolicyID: req.RetryPolicyID,
-		Status: model.InterfaceDefinitionStatusDraft, Description: strings.TrimSpace(req.Description), Revision: 1,
+		IdempotencyMode: normalizedInterfaceIdempotencyMode(req.HTTPMethod, req.IdempotencyMode),
+		Status:          model.InterfaceDefinitionStatusDraft, Description: strings.TrimSpace(req.Description), Revision: 1,
+	}
+	if value.IdempotencyMode == model.InterfaceIdempotencyModeRemoteKeyHeader {
+		value.RemoteIdempotencyHeader = integration.RemoteIdempotencyHeaderName
 	}
 	if err := validateInterfaceConfiguration(value); err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
@@ -510,6 +514,10 @@ func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.I
 	if req.HTTPMethod != nil {
 		next.HTTPMethod = strings.ToUpper(strings.TrimSpace(*req.HTTPMethod))
 		updates["http_method"] = next.HTTPMethod
+		if req.IdempotencyMode == nil {
+			next.IdempotencyMode = normalizedInterfaceIdempotencyMode(next.HTTPMethod, "")
+			updates["idempotency_mode"] = next.IdempotencyMode
+		}
 	}
 	if req.RelativePath != nil {
 		path, err := normalizeInterfaceRelativePath(*req.RelativePath)
@@ -545,6 +553,15 @@ func interfaceDefinitionUpdates(current model.InterfaceDefinition, req request.I
 		next.RetryPolicyID = req.RetryPolicyID
 		updates["retry_policy_id"] = *req.RetryPolicyID
 	}
+	if req.IdempotencyMode != nil {
+		next.IdempotencyMode = normalizedInterfaceIdempotencyMode(next.HTTPMethod, *req.IdempotencyMode)
+		updates["idempotency_mode"] = next.IdempotencyMode
+	}
+	next.RemoteIdempotencyHeader = ""
+	if next.IdempotencyMode == model.InterfaceIdempotencyModeRemoteKeyHeader {
+		next.RemoteIdempotencyHeader = integration.RemoteIdempotencyHeaderName
+	}
+	updates["remote_idempotency_header"] = next.RemoteIdempotencyHeader
 	if req.Description != nil {
 		next.Description = strings.TrimSpace(*req.Description)
 		updates["description"] = next.Description
@@ -572,12 +589,26 @@ func validateInterfaceConfiguration(value model.InterfaceDefinition) error {
 	if err := integration.ValidateInterfaceRuntimeContract(value.TimeoutSeconds, value.ResponseLimit); err != nil {
 		return err
 	}
+	if !integration.ValidRemoteIdempotencyContract(value.HTTPMethod, value.IdempotencyMode, value.RemoteIdempotencyHeader) {
+		return myerrors.ErrInterfaceConfigurationInvalid
+	}
 	path, err := normalizeInterfaceRelativePath(value.RelativePath)
 	if err != nil {
 		return err
 	}
 	_, err = integration.NormalizeInputContract(value.InputContract, value.HTTPMethod, path)
 	return err
+}
+
+func normalizedInterfaceIdempotencyMode(method, requested string) string {
+	requested = strings.ToLower(strings.TrimSpace(requested))
+	if requested != "" {
+		return requested
+	}
+	if strings.EqualFold(strings.TrimSpace(method), model.InterfaceMethodGET) {
+		return model.InterfaceIdempotencyModeSafeMethod
+	}
+	return model.InterfaceIdempotencyModeNone
 }
 
 func validInterfaceProtocol(value string) bool {

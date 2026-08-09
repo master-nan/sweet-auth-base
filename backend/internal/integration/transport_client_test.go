@@ -157,7 +157,8 @@ func TestHTTPTransportClientExecutesHTTPSRequestWithSafeEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if result.StatusCode != http.StatusOK || result.ContentType != "application/json" || !result.CompleteResponse || result.Determinacy != TransportDeterminacyConfirmed {
+	if result.StatusCode != http.StatusOK || result.ContentType != "application/json" || !result.CompleteResponse ||
+		result.Determinacy != TransportDeterminacyConfirmed || result.RequestProgress != TransportRequestResponseReceived {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	if result.ResponseHash != responseHash([]byte(`{"ok":true}`)) || string(result.Body()) != `{"ok":true}` {
@@ -387,7 +388,7 @@ func TestHTTPTransportClientClassifiesResponseTimeoutCancellationAndRemoteError(
 	request := newRequest(t, http.MethodGet, "/timeout", func(input *TransportRequestInput) { input.Timeouts.Request = time.Millisecond })
 	result, err := timeoutClient.Execute(context.Background(), request)
 	assertTransportCategory(t, err, TransportErrorTimeout)
-	if result.Determinacy != TransportDeterminacyUnknown {
+	if result.Determinacy != TransportDeterminacyUnknown || result.RequestProgress != TransportRequestSentUnknown {
 		t.Fatal("timeout must not claim remote result is known")
 	}
 
@@ -395,7 +396,7 @@ func TestHTTPTransportClientClassifiesResponseTimeoutCancellationAndRemoteError(
 	cancel()
 	result, err = timeoutClient.Execute(cancelledContext, newRequest(t, http.MethodGet, "/cancel", nil))
 	assertTransportCategory(t, err, TransportErrorCancelled)
-	if result.Determinacy != TransportDeterminacyUnknown {
+	if result.Determinacy != TransportDeterminacyUnknown || result.RequestProgress != TransportRequestSentUnknown {
 		t.Fatal("cancelled request must not claim remote result is known")
 	}
 
@@ -403,7 +404,8 @@ func TestHTTPTransportClientClassifiesResponseTimeoutCancellationAndRemoteError(
 		return &http.Response{StatusCode: http.StatusBadGateway, Header: http.Header{"Content-Type": {"application/json"}}, ContentLength: 17, Body: io.NopCloser(strings.NewReader(`{"error":"remote"}`))}, nil
 	})})
 	result, err = remoteClient.Execute(context.Background(), newRequest(t, http.MethodGet, "/remote", nil))
-	if err != nil || result.ErrorCategory != TransportErrorRemoteHTTP || result.StatusCode != http.StatusBadGateway || !result.CompleteResponse {
+	if err != nil || result.ErrorCategory != TransportErrorRemoteHTTP || result.StatusCode != http.StatusBadGateway ||
+		!result.CompleteResponse || result.RequestProgress != TransportRequestResponseReceived {
 		t.Fatalf("remote HTTP result should remain structured: result=%+v err=%v", result, err)
 	}
 	tlsClient, _ := NewHTTPTransportClient(policy, TransportClientOptions{RoundTripper: roundTripperFunc(func(*http.Request) (*http.Response, error) {

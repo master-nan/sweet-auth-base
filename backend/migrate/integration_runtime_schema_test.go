@@ -233,7 +233,8 @@ func integrationRuntimeMigrationFixtures(
 		InterfaceCode: "employee_list", Name: "员工列表", Version: 1,
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/api/employees", TimeoutSeconds: 30, ResponseLimit: 1024,
-		Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+		IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Status:          model.InterfaceDefinitionStatusEnabled, Revision: 1,
 	}
 	if err := db.Create(&definition).Error; err != nil {
 		t.Fatalf("create runtime interface fixture: %v", err)
@@ -258,6 +259,7 @@ func validIntegrationExecutionFixture(
 		IdempotencyScope: "acceptance", IdempotencyKey: idempotencyKey,
 		InputHash:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		InputSnapshot: snapshot, InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion,
-		InputSnapshotSize: len(snapshot), Revision: 1,
+		InputSnapshotSize: len(snapshot), RemoteIdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Revision: 1,
 	}
 }

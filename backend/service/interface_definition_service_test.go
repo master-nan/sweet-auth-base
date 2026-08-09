@@ -73,6 +73,34 @@ func TestInterfaceDefinitionServiceVersionLifecycleAndAudit(t *testing.T) {
 	}
 }
 
+func TestInterfaceDefinitionServiceRemoteIdempotencyContract(t *testing.T) {
+	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	ctx := context.Background()
+	get, err := svc.Create(ctx, interfaceDefinitionCreateRequest(system.Id, "safe_read"))
+	if err != nil || get.IdempotencyMode != model.InterfaceIdempotencyModeSafeMethod || get.RemoteIdempotencyHeader != "" {
+		t.Fatalf("GET idempotency=%+v err=%v", get, err)
+	}
+	postRequest := interfaceDefinitionCreateRequest(system.Id, "idempotent_post")
+	postRequest.HTTPMethod = model.InterfaceMethodPOST
+	postRequest.IdempotencyMode = model.InterfaceIdempotencyModeRemoteKeyHeader
+	post, err := svc.Create(ctx, postRequest)
+	if err != nil || post.IdempotencyMode != model.InterfaceIdempotencyModeRemoteKeyHeader || post.RemoteIdempotencyHeader != "Idempotency-Key" {
+		t.Fatalf("POST idempotency=%+v err=%v", post, err)
+	}
+	invalid := interfaceDefinitionCreateRequest(system.Id, "invalid_put")
+	invalid.HTTPMethod = model.InterfaceMethodPUT
+	invalid.IdempotencyMode = model.InterfaceIdempotencyModeRemoteKeyHeader
+	if _, err := svc.Create(ctx, invalid); !errors.Is(err, apperrors.ErrInterfaceConfigurationInvalid) {
+		t.Fatalf("invalid PUT idempotency err=%v", err)
+	}
+	contract := postRequest
+	contract.InterfaceCode = "client_idempotency_header"
+	contract.InputContract = json.RawMessage(`{"version":1,"parameters":[{"code":"Idempotency-Key","location":"header","data_type":"string","required":false,"max_length":64,"allow_multiple":false,"sensitive":false}]}`)
+	if _, err := svc.Create(ctx, contract); !errors.Is(err, apperrors.ErrIntegrationExecutionHeaderNotAllowed) {
+		t.Fatalf("client idempotency header contract err=%v", err)
+	}
+}
+
 func TestInterfaceDefinitionServiceValidationReferencesAndDTOWhitelist(t *testing.T) {
 	svc, db, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
 	ctx := context.Background()

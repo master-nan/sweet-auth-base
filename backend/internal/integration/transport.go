@@ -59,6 +59,14 @@ const (
 	TransportDeterminacyUnknown   TransportDeterminacy = "unknown"
 )
 
+type TransportRequestProgress string
+
+const (
+	TransportRequestNotSent          TransportRequestProgress = RequestProgressNotSent
+	TransportRequestSentUnknown      TransportRequestProgress = RequestProgressSentUnknown
+	TransportRequestResponseReceived TransportRequestProgress = RequestProgressResponseReceived
+)
+
 // TransportError 仅暴露稳定分类；底层错误只保留在内部日志中。
 type TransportError struct {
 	category TransportErrorCategory
@@ -306,6 +314,7 @@ type TransportResult struct {
 	CompleteResponse bool
 	Determinacy      TransportDeterminacy
 	ErrorCategory    TransportErrorCategory
+	RequestProgress  TransportRequestProgress
 
 	responseHeaders map[string]string
 	body            []byte

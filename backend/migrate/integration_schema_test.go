@@ -64,7 +64,8 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	definition := model.InterfaceDefinition{
 		Basic: model.Basic{Id: 11}, ExternalSystemID: 1, InterfaceCode: "order_query", Name: "订单查询", Version: 1,
 		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/orders",
-		TimeoutSeconds: 30, ResponseLimit: 1024, Status: model.InterfaceDefinitionStatusDraft, Revision: 1,
+		TimeoutSeconds: 30, ResponseLimit: 1024, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Status: model.InterfaceDefinitionStatusDraft, Revision: 1,
 	}
 	if err := db.Create(&definition).Error; err != nil {
 		t.Fatalf("create interface definition: %v", err)
@@ -113,7 +114,8 @@ func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 		Basic: model.Basic{Id: 7002, State: true}, ExternalSystemID: system.Id, InterfaceCode: "legacy_limit",
 		Name: "Legacy Limit", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/api/legacy", InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)),
-		TimeoutSeconds: 200, ResponseLimit: 80 * 1024 * 1024, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+		TimeoutSeconds: 200, ResponseLimit: 80 * 1024 * 1024, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
 	}
 	if err := db.Create(&definition).Error; err != nil {
 		t.Fatalf("create legacy enabled interface: %v", err)
@@ -185,7 +187,7 @@ func TestRetryPolicyPostgresConstraintsAndExecutionSnapshot(t *testing.T) {
 	}
 
 	system := model.ExternalSystem{Basic: model.Basic{Id: 9201, State: true}, SystemCode: "retry_pg", Name: "Retry PG", SystemType: model.ExternalSystemTypeERP, BaseURL: "https://example.com", OwnerIdentifier: "owner", OwnerName: "owner", Status: model.ExternalSystemStatusEnabled, Revision: 1}
-	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 9202, State: true}, ExternalSystemID: system.Id, InterfaceCode: "retry_call", Name: "Retry Call", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/retry", InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)), TimeoutSeconds: 30, ResponseLimit: 1024, RetryPolicyID: &policy.Id, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
+	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 9202, State: true}, ExternalSystemID: system.Id, InterfaceCode: "retry_call", Name: "Retry Call", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/retry", InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)), TimeoutSeconds: 30, ResponseLimit: 1024, RetryPolicyID: &policy.Id, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
 	if err := db.Create(&system).Error; err != nil {
 		t.Fatalf("create system: %v", err)
 	}
@@ -206,8 +208,9 @@ func TestRetryPolicyPostgresConstraintsAndExecutionSnapshot(t *testing.T) {
 		IdempotencyScope: "retry-pg", IdempotencyKey: "snapshot", InputHash: strings.Repeat("a", 64),
 		InputSnapshot: datatypes.JSON([]byte(`{"version":1,"path_params":{},"query_params":{},"headers":{}}`)), InputSnapshotVersion: 1, InputSnapshotSize: 68,
 		RetryPolicyID:              &policy.Id,
-		RetryPolicySnapshot:        datatypes.JSON([]byte(`{"version":1,"policy_code":"pg_retry","policy_version":1,"max_attempts":3,"initial_delay_ms":5000,"max_delay_ms":300000,"backoff_type":"exponential","backoff_multiplier":"2","jitter_type":"full","jitter_ratio":"1","retry_window_ms":86400000,"retryable_error_categories":["network","remote","timeout"],"retryable_http_statuses":[429,502,503,504],"respect_retry_after":true}`)),
+		RetryPolicySnapshot:        datatypes.JSON([]byte(`{"version":1,"policy_code":"pg_retry","policy_version":1,"max_attempts":3,"initial_delay_ms":5000,"max_delay_ms":300000,"backoff_type":"exponential","backoff_multiplier":"2","jitter_type":"full","jitter_ratio":"1","retry_window_ms":86400000,"retryable_error_categories":["network","remote","timeout"],"retryable_http_statuses":[429,502,503,504],"respect_retry_after":true,"idempotency_mode":"safe_method","remote_idempotency_header":""}`)),
 		RetryPolicySnapshotVersion: 1, Revision: 1,
+		RemoteIdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
 	}
 	if err := db.Create(&execution).Error; err != nil {
 		t.Fatalf("persist execution retry snapshot: %v", err)

@@ -635,6 +635,17 @@ Execution 延续 query/detail/create/cancel；不增加 start/complete/fail/立�
 
 该范围保留了最常见的临时故障恢复能力，同时避免在第一版引入人工强制调度、表达式引擎和第二套调度基础设施。
 
+### 21.3 INT-004C-1 决策边界补充
+
+- `RetryDecision` 使用调用方传入的单一 UTC 基准时间，不在纯决策函数内调用 `time.Now()`；生产 Engine 使用同一次 Attempt 完成基准，后续到期领取继续使用数据库时间。
+- Retry Window 在 `current_time >= first_attempt_at + retry_window` 时视为到期；计算出的 `next_retry_at` 到达或超过截止点同样不调度，避免生成永远无法合法领取的等待记录。
+- Transport 只输出 `not_sent`、`sent_unknown`、`response_received` 三种受控请求进度。无法从底层错误可靠证明“未发送”时一律使用 `sent_unknown`，不得解析原始错误文本推断。
+- TLS 证书和握手失败保留为独立 `tls_error`，属于平台硬禁止自动重试；不得降级为普通 `network_error` 绕过安全优先级。
+- full jitter 在闭区间 `[0, base_delay]` 取整毫秒，随后应用 1 秒平台最小延迟；随机源由 Decision 构造时注入并保证并发安全。
+- 非法 `Retry-After` 回退本地退避并记录 `invalid_fallback/retry_after_invalid`；合法值超过 `max_delay` 不截断，直接形成 `retry_schedule_invalid` 的不可重试决定。
+- 远端幂等键由 Application Service 随 Execution 创建生成 256 bit 随机值并冻结，不复用客户端 `idempotency_key`。普通输入快照禁止声明或提交 `Idempotency-Key`；Engine 在请求重建后、Credential 注入前写入该 Header。
+- Attempt 完成事务一次性保存 retryable、reason、delay、scheduled_at 和 Retry-After 来源；进入 `retry_waiting` 时 `completed_at` 保持为空，Execution 只保存安全调度摘要。
+
 ## 22. 后续 Task 拆分建议
 
 考虑 PostgreSQL 领取、策略决策与页面验收的风险不同，建议将原计划细分为：
