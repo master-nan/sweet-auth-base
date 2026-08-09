@@ -130,6 +130,18 @@
           </div></q-td
         >
       </template>
+      <template #body-cell-current_attempt="props">
+        <q-td :props="props">{{ props.row.current_attempt }} / {{ props.row.max_attempts }}</q-td>
+      </template>
+      <template #body-cell-next_run_at="props">
+        <q-td :props="props">{{ formatDate(props.row.next_run_at) }}</q-td>
+      </template>
+      <template #body-cell-started_at="props">
+        <q-td :props="props">{{ formatDate(props.row.started_at) }}</q-td>
+      </template>
+      <template #body-cell-completed_at="props">
+        <q-td :props="props">{{ formatDate(props.row.completed_at) }}</q-td>
+      </template>
       <template #body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs no-wrap">
           <q-btn
@@ -176,7 +188,7 @@ import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -234,6 +246,8 @@ const columns: QTableProps['columns'] = [
   { name: 'trigger_source', label: '触发来源', field: 'trigger_source', align: 'center' },
   { name: 'status', label: '状态', field: 'status', align: 'center' },
   { name: 'current_attempt', label: 'Attempt', field: 'current_attempt', align: 'center' },
+  { name: 'next_run_at', label: '下次重试', field: 'next_run_at', align: 'left' },
+  { name: 'retry_reason_code', label: '重试原因', field: (row) => formatRetryReason(row.retry_reason_code), align: 'left' },
   { name: 'started_at', label: '开始时间', field: 'started_at', align: 'left' },
   { name: 'completed_at', label: '结束时间', field: 'completed_at', align: 'left' },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' },

@@ -29,6 +29,10 @@ const detail = {
   trigger_source: 'manual',
   status: 'succeeded',
   current_attempt: 1,
+  max_attempts: 3,
+  attempts_remaining: 2,
+  retry_policy: { policy_code: 'safe_retry', policy_version: 2, max_attempts: 3 },
+  retry_reason_code: 'retry_allowed',
   revision: 3,
   gmt_create: '2026-08-06 10:00:00',
   duration_ms: 20,
@@ -98,6 +102,19 @@ describe('integration execution detail permissions', () => {
     expect(wrapper.text()).toContain('JSON Body')
     expect(wrapper.text()).not.toContain('Authorization')
     expect(wrapper.text()).not.toContain('Payload')
+  })
+
+  it('renders the safe retry summary without exposing the policy snapshot', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('自动重试摘要')
+    expect(wrapper.text()).toContain('safe_retry')
+    expect(wrapper.text()).toContain('1 / 3')
+    expect(wrapper.text()).toContain('符合自动重试条件')
+    expect(wrapper.text()).not.toContain('retry_allowed')
+    expect(wrapper.text()).not.toContain('RetryPolicySnapshot')
+    expect(wrapper.text()).not.toContain('retryable_error_categories')
   })
 
   it('loads Attempt data through the independent log query API', async () => {

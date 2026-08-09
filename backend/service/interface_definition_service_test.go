@@ -258,6 +258,17 @@ func TestInterfaceDefinitionServiceUsesExplicitEnabledRetryPolicyVersion(t *test
 	if err != nil {
 		t.Fatalf("create with enabled policy: %v", err)
 	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", draft.Id).Update("retry_window_ms", 5000).Error; err != nil {
+		t.Fatalf("corrupt policy fixture: %v", err)
+	}
+	invalidReq := interfaceDefinitionCreateRequest(system.Id, "invalid_retry_reference")
+	invalidReq.RetryPolicyID = &draft.Id
+	if _, err := svc.Create(context.Background(), invalidReq); !errors.Is(err, apperrors.ErrInterfaceRetryPolicyInvalid) {
+		t.Fatalf("invalid enabled retry policy reference error=%v", err)
+	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", draft.Id).Update("retry_window_ms", int64(86400000)).Error; err != nil {
+		t.Fatalf("restore policy fixture: %v", err)
+	}
 	if created.RetryPolicy == nil || created.RetryPolicy.Id != draft.Id || created.RetryPolicy.Version != 1 {
 		t.Fatalf("retry policy summary=%+v", created.RetryPolicy)
 	}

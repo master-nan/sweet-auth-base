@@ -40,7 +40,19 @@ describe('integration log detail permission', () => {
     apiMocks.queryLogs.mockReset()
     apiMocks.getLog.mockReset()
     apiMocks.queryLogs.mockResolvedValue({ data: [], total: 0 })
-    apiMocks.getLog.mockResolvedValue({ data: { id: 91 } })
+    apiMocks.getLog.mockResolvedValue({
+      data: {
+        id: 91,
+        execution_no: 'INT-51',
+        attempt_no: 2,
+        retryable: true,
+        retry_reason_code: 'retry_allowed',
+        retry_delay_ms: 2000,
+        retry_scheduled_at: '2026-08-09T10:00:02Z',
+        retry_after_source: 'http_delta',
+        result_size_bytes: 0,
+      },
+    })
   })
 
   it('does not request logs without the log query permission', async () => {
@@ -63,9 +75,15 @@ describe('integration log detail permission', () => {
   it('loads routed log detail when the detail permission is present', async () => {
     permissionCodes.push('integration_log_query')
     detailButtons.push({ id: 1, name: '详情', event_action: 'detail' })
-    mountPage()
+    const wrapper = mountPage()
     await flushPromises()
 
     expect(apiMocks.getLog).toHaveBeenCalledWith(91)
+    expect(wrapper.text()).toContain('自动重试')
+    expect(wrapper.text()).toContain('符合自动重试条件')
+    expect(wrapper.text()).not.toContain('retry_allowed')
+    expect(wrapper.text()).toContain('Retry-After 秒数')
+    expect(wrapper.text()).not.toContain('Authorization')
+    expect(wrapper.text()).not.toContain('Payload')
   })
 })

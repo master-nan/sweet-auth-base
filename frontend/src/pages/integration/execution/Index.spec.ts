@@ -1,0 +1,89 @@
+import { computed, defineComponent, h } from 'vue'
+import { flushPromises, shallowMount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const apiMocks = vi.hoisted(() => ({
+  queryExecutions: vi.fn(),
+  getWorkerStatus: vi.fn(),
+  cancelExecution: vi.fn(),
+}))
+const permissionCodes = vi.hoisted(() => ['integration_execution_detail'])
+const lineButtons = vi.hoisted(() => [
+  { id: 1, name: '详情', event_action: 'detail' },
+  { id: 2, name: '取消', event_action: 'cancel' },
+])
+
+vi.mock('quasar', () => ({ useQuasar: () => ({}) }))
+vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('src/composables/page-buttons', () => ({
+  usePageButtons: () => ({
+    line_buttons: computed(() => lineButtons),
+    top_buttons: computed(() => []),
+  }),
+}))
+vi.mock('src/composables/confirm-dialog', () => ({
+  useConfirmDialog: () => ({ confirmAction: vi.fn(() => ({ onOk: vi.fn() })) }),
+}))
+vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+  default: { template: '<div><slot /></div>' },
+}))
+vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
+
+import ExecutionPage from './Index.vue'
+
+const SlotStub = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
+const TableStub = defineComponent({
+  props: { rows: { type: Array, default: () => [] } },
+  setup(props, { slots }) {
+    return () => h('section', { 'data-testid': 'table', 'data-row-count': props.rows.length }, [slots.top?.(), slots.bottom?.()])
+  },
+})
+const mountPage = () => shallowMount(ExecutionPage, {
+  global: {
+    plugins: [createPinia()],
+    stubs: {
+      BaseContent: SlotStub, QTable: TableStub, QCard: SlotStub, QCardSection: SlotStub,
+      QInput: true, QSelect: true, QBtn: true, QIcon: true, QSpace: true, QChip: true,
+      QTooltip: true, QTd: SlotStub, TablePagination: true,
+    },
+  },
+})
+
+describe('integration execution retry summary', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    Object.values(apiMocks).forEach((mock) => mock.mockReset())
+    apiMocks.queryExecutions.mockResolvedValue({
+      data: [{
+        id: 51, execution_no: 'INT-51', external_system: { name: 'HR', system_code: 'hr' },
+        interface: { name: '组织', interface_code: 'org', version: 1 }, trigger_source: 'manual',
+        status: 'retry_waiting', current_attempt: 1, max_attempts: 3,
+        next_run_at: '2026-08-09T10:00:02Z', retry_reason_code: 'retry_allowed', revision: 2,
+        started_at: '2026-08-09T10:00:00Z', completed_at: '',
+      }],
+      total: 1,
+    })
+    apiMocks.getWorkerStatus.mockResolvedValue({ data: { enabled: false, running: false } })
+  })
+
+  it('loads safe retry list summaries and exposes no runtime mutation actions', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as {
+      columns: Array<{ name: string }>
+      availableButtons: (row: { status: string }) => Array<{ event_action: string }>
+    }
+    expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
+    expect(vm.columns.map((column) => column.name)).toEqual(expect.arrayContaining([
+      'current_attempt', 'next_run_at', 'retry_reason_code', 'started_at', 'completed_at',
+    ]))
+    expect(vm.availableButtons({ status: 'retry_waiting' }).map((button) => button.event_action)).toEqual(['detail', 'cancel'])
+    expect(lineButtons.map((button) => button.event_action)).not.toEqual(expect.arrayContaining([
+      'retry_now', 'replay', 'start', 'complete', 'fail',
+    ]))
+  })
+})

@@ -256,6 +256,9 @@ export interface IntegrationExecutionListItem {
   trigger_source: string
   status: IntegrationExecutionStatus
   current_attempt: number
+  max_attempts: number
+  next_run_at?: string
+  retry_reason_code?: string
   revision: number
   gmt_create: string
   started_at?: string
@@ -291,6 +294,11 @@ export interface IntegrationLogDetail extends IntegrationLogListItem {
   credential_fingerprint_summary?: string
   request_id?: string
   trace_id?: string
+  retryable: boolean
+  retry_reason_code?: string
+  retry_delay_ms: number
+  retry_scheduled_at?: string
+  retry_after_source: string
 }
 
 export interface IntegrationExecutionDetail extends IntegrationExecutionListItem {
@@ -305,6 +313,12 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
     header_count: number
     has_body: boolean
   }
+  retry_policy?: {
+    policy_code: string
+    policy_version: number
+    max_attempts: number
+  }
+  attempts_remaining: number
   result_http_status?: number
   result_size_bytes: number
   result_hash?: string
@@ -312,8 +326,8 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
   error_category?: string
   lease_owner_summary?: string
   lease_expires_at?: string
-  next_run_at?: string
   cancelled_at?: string
+  last_attempt_at?: string
 }
 
 export interface IntegrationExecutionQuery extends Query {

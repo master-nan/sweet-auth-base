@@ -50,10 +50,14 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 	primary := &database.PrimaryDB{DB: db}
 	first := NewIntegrationExecutionRepositoryImpl(primary)
 	second := NewIntegrationExecutionRepositoryImpl(primary)
-	now := model.Now()
+	databaseBefore, err := first.CurrentDatabaseTime(context.Background())
+	if err != nil {
+		t.Fatalf("read database time: %v", err)
+	}
+	applicationNow := databaseBefore.Add(8 * time.Hour)
 	requests := []repository.IntegrationExecutionClaimRequest{
-		{WorkerID: "postgres-worker-a", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7101}},
-		{WorkerID: "postgres-worker-b", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7102}},
+		{WorkerID: "postgres-worker-a", StartedAt: applicationNow, LeaseExpiresAt: applicationNow.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7101}},
+		{WorkerID: "postgres-worker-b", StartedAt: applicationNow, LeaseExpiresAt: applicationNow.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7102}},
 	}
 	start := make(chan struct{})
 	var group sync.WaitGroup
@@ -98,22 +102,36 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 	if err := db.First(&running, execution.Id).Error; err != nil {
 		t.Fatalf("load claimed execution: %v", err)
 	}
-	if running.LeaseExpiresAt == nil || running.LeaseExpiresAt.Sub(now) < integration.IntegrationMinimumLeaseDuration {
+	if running.StartedAt == nil || running.StartedAt.Sub(databaseBefore) > 5*time.Second || databaseBefore.Sub(*running.StartedAt) > 5*time.Second {
+		t.Fatalf("claim did not use database time: started_at=%v database_before=%v application_now=%v", running.StartedAt, databaseBefore, applicationNow)
+	}
+	if running.LeaseExpiresAt == nil || running.LeaseExpiresAt.Sub(*running.StartedAt) != integration.IntegrationDefaultLeaseDuration {
 		t.Fatalf("claimed lease does not include safety margin: %+v", running.LeaseExpiresAt)
 	}
-	if candidates, err := first.FindExpiredRunningExecutions(context.Background(), now.Add(integration.IntegrationMinimumLeaseDuration-time.Second), 1); err != nil || len(candidates) != 0 {
+	if candidates, err := first.FindExpiredRunningExecutions(context.Background(), 1); err != nil || len(candidates) != 0 {
 		t.Fatalf("valid maximum-duration lease was recovered early: values=%+v err=%v", candidates, err)
 	}
-	expiredAt := now.Add(-time.Second)
+	expiredAt := databaseBefore.Add(-time.Second)
 	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Update("lease_expires_at", expiredAt).Error; err != nil {
 		t.Fatalf("expire lease: %v", err)
 	}
-	recoveryAt := model.Now().Add(time.Minute)
-	expiredCandidates, err := first.FindExpiredRunningExecutions(context.Background(), recoveryAt, 1)
+	var runningAttempt model.IntegrationLog
+	if err := db.Where("execution_id = ?", execution.Id).First(&runningAttempt).Error; err != nil {
+		t.Fatalf("load running attempt: %v", err)
+	}
+	if _, err := first.CompleteAttemptAndExecution(context.Background(), repository.IntegrationAttemptCompletion{
+		ExecutionID: execution.Id, AttemptID: runningAttempt.Id, AttemptNo: runningAttempt.AttemptNo,
+		WorkerID: running.LeaseOwner, ExpectedRevision: running.Revision,
+		ExecutionStatus: model.IntegrationExecutionStatusSucceeded,
+		CompletedAt:     databaseBefore.Add(-time.Hour), ResultCertainty: model.IntegrationResultCertaintyConfirmed,
+	}); err != repository.ErrIntegrationExecutionLeaseLost {
+		t.Fatalf("expired lease accepted application completion time: %v", err)
+	}
+	expiredCandidates, err := first.FindExpiredRunningExecutions(context.Background(), 1)
 	if err != nil || len(expiredCandidates) != 1 {
 		t.Fatalf("expired lease was not visible: values=%+v err=%v", expiredCandidates, err)
 	}
-	recovered, err := first.RecoverExpiredExecution(context.Background(), repository.ExpiredExecutionRecovery{ExecutionID: execution.Id, RecoveredAt: recoveryAt})
+	recovered, err := first.RecoverExpiredExecution(context.Background(), repository.ExpiredExecutionRecovery{ExecutionID: execution.Id})
 	if err != nil || !recovered {
 		t.Fatalf("recover expired execution = %t err=%v", recovered, err)
 	}
@@ -145,7 +163,7 @@ func TestIntegrationExecutionPostgreSQLRetryClaimUsesDatabaseTimeAndSkipLocked(t
 	if err := db.Create(&firstAttempt).Error; err != nil {
 		t.Fatalf("create first attempt: %v", err)
 	}
-	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP WHERE id = ?", execution.Id).Error; err != nil {
+	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = ?", execution.Id).Error; err != nil {
 		t.Fatalf("schedule retry with database time: %v", err)
 	}
 

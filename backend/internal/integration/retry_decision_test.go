@@ -166,6 +166,8 @@ func TestRetryDecisionBackoffJitterAndRetryAfter(t *testing.T) {
 			{name: "date", raw: now.Add(4 * time.Second).Format(http.TimeFormat), delay: 4 * time.Second, source: RetryAfterSourceHTTPDate, reason: RetryReasonAllowed},
 			{name: "lower than local", raw: "1", delay: 2 * time.Second, source: RetryAfterSourceHTTPDelta, reason: RetryReasonAllowed},
 			{name: "invalid", raw: "later", delay: 2 * time.Second, source: RetryAfterSourceInvalidFallback, reason: RetryReasonAfterInvalid},
+			{name: "negative", raw: "-1", delay: 2 * time.Second, source: RetryAfterSourceInvalidFallback, reason: RetryReasonAfterInvalid},
+			{name: "overflow", raw: "999999999999999999999999", delay: 2 * time.Second, source: RetryAfterSourceInvalidFallback, reason: RetryReasonAfterInvalid},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				input := retryDecisionInput(retryDecisionSnapshot(), now, 1, model.IntegrationErrorCategoryRemote, 503)
@@ -175,6 +177,13 @@ func TestRetryDecisionBackoffJitterAndRetryAfter(t *testing.T) {
 					t.Fatalf("decision=%+v err=%v", decision, err)
 				}
 			})
+		}
+		input := retryDecisionInput(retryDecisionSnapshot(), now, 1, model.IntegrationErrorCategoryRemote, 503)
+		input.PolicySnapshot.RespectRetryAfter = false
+		input.RetryAfterRaw = "5"
+		decision, err := service.Decide(input)
+		if err != nil || decision.RetryDelay() != 2*time.Second || decision.RetryAfterSource() != RetryAfterSourceIgnored {
+			t.Fatalf("respect=false decision=%+v err=%v", decision, err)
 		}
 	})
 }

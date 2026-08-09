@@ -91,6 +91,7 @@ import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useLoadingStore } from 'src/stores/loading'
+import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { Query } from 'src/types/global'
@@ -102,6 +103,7 @@ const $q = useQuasar()
 const route = useRoute()
 const api = useIntegrationApi()
 const tableApi = useTableApi()
+const userStore = useUserStore()
 const { loading } = storeToRefs(useLoadingStore())
 const { confirmAction } = useConfirmDialog($q)
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integration_interface_definition')
@@ -185,7 +187,13 @@ const handleFormSubmit = async (form: { external_system_id: number | null; inter
   }
   await fetchData()
 }
-onMounted(async () => { await Promise.all([fetchMetadata(), fetchSystems(), fetchCredentials(), fetchRetryPolicies(), fetchData()]); if (!has_line_buttons.value) visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions'); initialized.value = true })
+onMounted(async () => {
+  const requests = [fetchMetadata(), fetchSystems(), fetchCredentials(), fetchData()]
+  if (userStore.buttons.includes('integration_retry_policy_query')) requests.push(fetchRetryPolicies())
+  await Promise.all(requests)
+  if (!has_line_buttons.value) visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions')
+  initialized.value = true
+})
 watch(() => [query.value.page, query.value.num] as const, ([page]) => { if (!initialized.value) return; pagination.value.page = page; void fetchData() })
 watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; query.value.order = { field: sortBy || '', is_asc: sortBy ? !descending : false }; resetAndFetch() })
 watch(showAdvancedQuery, (open) => { if (open) tempAdvancedQuery.value = cloneDeep(query.value) })

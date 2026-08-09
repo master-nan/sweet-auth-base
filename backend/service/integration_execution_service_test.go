@@ -191,7 +191,7 @@ func TestIntegrationExecutionServiceCreateIdempotencyDetailAndPage(t *testing.T)
 		t.Fatalf("marshal detail: %v", err)
 	}
 	for _, forbidden := range []string{
-		"authorization", "secret", "ciphertext", "payload", "gmt_delete", "attempts",
+		"authorization", "secret", "ciphertext", "payload", "gmt_delete", `"attempts":`,
 		"http_status", "result_certainty", "request_id", "trace_id",
 	} {
 		if strings.Contains(strings.ToLower(string(payload)), forbidden) {

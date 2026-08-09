@@ -152,7 +152,7 @@ func TestIntegrationExecutionRepositoryClaimCompleteAndRecover(t *testing.T) {
 	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", claimed[1].Execution.Id).Update("lease_expires_at", expired).Error; err != nil {
 		t.Fatalf("expire claimed lease: %v", err)
 	}
-	recovered, err := executions.RecoverExpiredExecution(context.Background(), repository.ExpiredExecutionRecovery{ExecutionID: claimed[1].Execution.Id, RecoveredAt: now})
+	recovered, err := executions.RecoverExpiredExecution(context.Background(), repository.ExpiredExecutionRecovery{ExecutionID: claimed[1].Execution.Id})
 	if err != nil || !recovered {
 		t.Fatalf("recover expired execution = %v err=%v", recovered, err)
 	}

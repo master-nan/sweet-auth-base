@@ -51,6 +51,21 @@ describe('retry policy form', () => {
     expect(text).not.toContain('重放')
   })
 
+  it('requires the retry window to cover the complete backoff schedule', () => {
+    const wrapper = mountForm()
+    const vm = wrapper.vm as unknown as {
+      form: Record<string, string | number | boolean | string[] | number[]>
+      retryWindowRule: (value: number) => true | string
+    }
+    vm.form.max_attempts = 10
+    vm.form.initial_delay_ms = 3600000
+    vm.form.max_delay_ms = 3600000
+    vm.form.backoff_type = 'fixed'
+    vm.form.backoff_multiplier = 1
+    expect(vm.retryWindowRule(3600)).toBeTypeOf('string')
+    expect(vm.retryWindowRule(32400)).toBe(true)
+  })
+
   it('preserves a valid exponential multiplier when loading a version draft', async () => {
     const wrapper = mountForm()
     const vm = wrapper.vm as unknown as { form: Record<string, string | number | boolean | string[] | number[]> }

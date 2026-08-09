@@ -115,8 +115,10 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 		if err != nil {
 			return err
 		}
-		dueExpression := "next_run_at <= CURRENT_TIMESTAMP"
-		leaseExpression := "lease_expires_at IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP"
+		leaseDuration := request.LeaseExpiresAt.Sub(request.StartedAt)
+		leaseExpiresAt := databaseNow.Add(leaseDuration)
+		dueExpression := "next_run_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+		leaseExpression := "lease_expires_at IS NULL OR lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
 		if tx.Dialector.Name() == "sqlite" {
 			dueExpression = "datetime(next_run_at) <= CURRENT_TIMESTAMP"
 			leaseExpression = "lease_expires_at IS NULL OR datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
@@ -150,14 +152,14 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 			updates := map[string]any{
 				"status":           model.IntegrationExecutionStatusRunning,
 				"lease_owner":      request.WorkerID,
-				"lease_expires_at": request.LeaseExpiresAt,
-				"last_attempt_at":  request.StartedAt,
+				"lease_expires_at": leaseExpiresAt,
+				"last_attempt_at":  databaseNow,
 				"next_run_at":      nil,
 				"current_attempt":  nextAttempt,
 				"revision":         execution.Revision + 1,
 			}
 			if execution.Status == model.IntegrationExecutionStatusCreated {
-				updates["started_at"] = request.StartedAt
+				updates["started_at"] = databaseNow
 			}
 			result := tx.Model(&model.IntegrationExecution{}).
 				Where("id = ? AND status = ? AND revision = ?", execution.Id, execution.Status, execution.Revision).
@@ -171,7 +173,7 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 			attempt := model.IntegrationLog{
 				Basic:       model.Basic{Id: request.AttemptIDs[index], State: true},
 				ExecutionID: execution.Id, AttemptNo: nextAttempt,
-				Status: model.IntegrationLogStatusRunning, StartedAt: request.StartedAt,
+				Status: model.IntegrationLogStatusRunning, StartedAt: databaseNow,
 				ResultCertainty: model.IntegrationResultCertaintyUnknown,
 				RequestID:       request.RequestID, TraceID: request.TraceID, WorkerID: request.WorkerID,
 			}
@@ -183,11 +185,11 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 			}
 			execution.Status = model.IntegrationExecutionStatusRunning
 			execution.LeaseOwner = request.WorkerID
-			execution.LeaseExpiresAt = &request.LeaseExpiresAt
+			execution.LeaseExpiresAt = &leaseExpiresAt
 			if execution.StartedAt == nil {
-				execution.StartedAt = &request.StartedAt
+				execution.StartedAt = &databaseNow
 			}
-			execution.LastAttemptAt = &request.StartedAt
+			execution.LastAttemptAt = &databaseNow
 			execution.NextRunAt = nil
 			execution.CurrentAttempt = nextAttempt
 			execution.Revision++
@@ -201,6 +203,10 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 	return claimed, nil
 }
 
+func (r *IntegrationExecutionRepositoryImpl) CurrentDatabaseTime(ctx context.Context) (time.Time, error) {
+	return integrationDatabaseNow(r.DBWithContext(ctx))
+}
+
 func integrationDatabaseNow(tx *gorm.DB) (time.Time, error) {
 	var value struct {
 		Now model.CustomTime `gorm:"column:now"`
@@ -208,7 +214,9 @@ func integrationDatabaseNow(tx *gorm.DB) (time.Time, error) {
 	if err := tx.Raw("SELECT CURRENT_TIMESTAMP AS now").Scan(&value).Error; err != nil {
 		return time.Time{}, err
 	}
-	return time.Time(value.Now), nil
+	// Runtime timestamp columns are UTC-naive. Convert the database instant to
+	// UTC before writing it back so the driver cannot persist a local wall clock.
+	return time.Time(value.Now).UTC(), nil
 }
 
 func retryClaimRejection(execution model.IntegrationExecution, databaseNow time.Time) (string, string) {
@@ -272,6 +280,10 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		return completed, repository.ErrIntegrationExecutionLeaseLost
 	}
 	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		databaseNow, err := integrationDatabaseNow(tx)
+		if err != nil {
+			return err
+		}
 		execution, err := r.FindByIdForUpdate(tx, completion.ExecutionID)
 		if err != nil {
 			return err
@@ -289,13 +301,13 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		if attempt.Status != model.IntegrationLogStatusRunning {
 			return repository.ErrIntegrationAttemptAlreadyCompleted
 		}
-		duration := completion.CompletedAt.Sub(attempt.StartedAt).Milliseconds()
+		duration := databaseNow.Sub(attempt.StartedAt).Milliseconds()
 		if duration < 0 {
 			duration = 0
 		}
 		attemptUpdates := map[string]any{
 			"status":                         attemptTerminalStatus(completion.ExecutionStatus),
-			"ended_at":                       completion.CompletedAt,
+			"ended_at":                       databaseNow,
 			"duration_ms":                    duration,
 			"http_status":                    completion.HTTPStatus,
 			"error_category":                 completion.ErrorCategory,
@@ -319,7 +331,7 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		} else if result.RowsAffected != 1 {
 			return repository.ErrIntegrationAttemptAlreadyCompleted
 		}
-		var completedAt any = completion.CompletedAt
+		var completedAt any = databaseNow
 		if completion.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting {
 			completedAt = nil
 		}
@@ -334,12 +346,12 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			"error_category":     completion.ErrorCategory,
 			"completed_at":       completedAt,
 			"next_run_at":        completion.RetryScheduledAt,
-			"last_attempt_at":    completion.CompletedAt,
+			"last_attempt_at":    databaseNow,
 			"retry_reason_code":  completion.RetryReasonCode,
 			"revision":           execution.Revision + 1,
 		}
 		result := tx.Model(&model.IntegrationExecution{}).
-			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ? AND lease_expires_at > ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID, completion.CompletedAt).
+			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ? AND lease_expires_at > ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID, databaseNow).
 			Updates(executionUpdates)
 		if result.Error != nil {
 			return result.Error
@@ -356,12 +368,12 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		completed.ResultHash = completion.ResultHash
 		completed.ResultSummary = completion.ResultSummary
 		completed.ErrorCategory = completion.ErrorCategory
-		completed.CompletedAt = &completion.CompletedAt
+		completed.CompletedAt = &databaseNow
 		if completion.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting {
 			completed.CompletedAt = nil
 		}
 		completed.NextRunAt = completion.RetryScheduledAt
-		completed.LastAttemptAt = &completion.CompletedAt
+		completed.LastAttemptAt = &databaseNow
 		completed.RetryReasonCode = completion.RetryReasonCode
 		completed.Revision++
 		return nil
@@ -371,15 +383,18 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 
 func (r *IntegrationExecutionRepositoryImpl) FindExpiredRunningExecutions(
 	ctx context.Context,
-	now time.Time,
 	limit int,
 ) ([]model.IntegrationExecution, error) {
 	if limit <= 0 {
 		return []model.IntegrationExecution{}, nil
 	}
 	var values []model.IntegrationExecution
+	expiredExpression := "lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+	if r.DBWithContext(ctx).Dialector.Name() == "sqlite" {
+		expiredExpression = "datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
+	}
 	err := r.DBWithContext(ctx).Model(&model.IntegrationExecution{}).
-		Where("status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?", model.IntegrationExecutionStatusRunning, now).
+		Where("status = ? AND lease_expires_at IS NOT NULL AND "+expiredExpression, model.IntegrationExecutionStatusRunning).
 		Order("lease_expires_at ASC, id ASC").Limit(limit).Find(&values).Error
 	return values, err
 }
@@ -389,14 +404,22 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 	ctx context.Context,
 	recovery repository.ExpiredExecutionRecovery,
 ) (bool, error) {
-	if recovery.ExecutionID <= 0 || recovery.RecoveredAt.IsZero() {
+	if recovery.ExecutionID <= 0 {
 		return false, repository.ErrIntegrationExecutionLeaseLost
 	}
 	recovered := false
 	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		databaseNow, err := integrationDatabaseNow(tx)
+		if err != nil {
+			return err
+		}
+		expiredExpression := "lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+		if tx.Dialector.Name() == "sqlite" {
+			expiredExpression = "datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
+		}
 		var execution model.IntegrationExecution
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND status = ? AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?", recovery.ExecutionID, model.IntegrationExecutionStatusRunning, recovery.RecoveredAt).
+		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND status = ? AND lease_expires_at IS NOT NULL AND "+expiredExpression, recovery.ExecutionID, model.IntegrationExecutionStatusRunning).
 			First(&execution).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -413,12 +436,12 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 		if attempt.Status != model.IntegrationLogStatusRunning {
 			return repository.ErrIntegrationAttemptAlreadyCompleted
 		}
-		duration := recovery.RecoveredAt.Sub(attempt.StartedAt).Milliseconds()
+		duration := databaseNow.Sub(attempt.StartedAt).Milliseconds()
 		if duration < 0 {
 			duration = 0
 		}
 		if result := tx.Model(&model.IntegrationLog{}).Where("id = ? AND status = ?", attempt.Id, model.IntegrationLogStatusRunning).Updates(map[string]any{
-			"status": model.IntegrationLogStatusFailed, "ended_at": recovery.RecoveredAt, "duration_ms": duration,
+			"status": model.IntegrationLogStatusFailed, "ended_at": databaseNow, "duration_ms": duration,
 			"error_category": model.IntegrationErrorCategoryConcurrency, "error_code": "lease_expired",
 			"result_summary": "执行租约已过期，远端处理结果无法确认", "result_certainty": model.IntegrationResultCertaintyUnknown,
 		}); result.Error != nil {
@@ -427,10 +450,10 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 			return repository.ErrIntegrationAttemptAlreadyCompleted
 		}
 		result := tx.Model(&model.IntegrationExecution{}).
-			Where("id = ? AND status = ? AND revision = ? AND lease_expires_at <= ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, recovery.RecoveredAt).
+			Where("id = ? AND status = ? AND revision = ? AND "+expiredExpression, execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision).
 			Updates(map[string]any{
 				"status": model.IntegrationExecutionStatusFailed, "lease_owner": "", "lease_expires_at": nil,
-				"completed_at": recovery.RecoveredAt, "next_run_at": nil,
+				"completed_at": databaseNow, "next_run_at": nil,
 				"error_category": model.IntegrationErrorCategoryConcurrency,
 				"result_summary": "执行租约已过期，远端处理结果无法确认", "revision": execution.Revision + 1,
 			})

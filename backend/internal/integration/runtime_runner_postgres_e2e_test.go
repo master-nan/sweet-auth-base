@@ -245,20 +245,87 @@ func TestIntegrationWorkerRunnerPostgreSQLJSONBAndTLSEndToEnd(t *testing.T) {
 }
 
 func TestIntegrationWorkerRunnerPostgreSQLRetry503ThenSuccess(t *testing.T) {
-	runRuntimeRetryEndToEnd(t, []int{http.StatusServiceUnavailable, http.StatusOK}, 3, model.IntegrationExecutionStatusSucceeded)
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		statuses: []int{http.StatusServiceUnavailable, http.StatusOK}, maxAttempts: 3,
+		expectedStatus: model.IntegrationExecutionStatusSucceeded, expectedAttempts: 2,
+	})
 }
 
 func TestIntegrationWorkerRunnerPostgreSQLRetryExhaustsMaxAttempts(t *testing.T) {
-	runRuntimeRetryEndToEnd(t, []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable}, 2, model.IntegrationExecutionStatusFailed)
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		statuses: []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable}, maxAttempts: 2,
+		expectedStatus: model.IntegrationExecutionStatusFailed, expectedAttempts: 2,
+	})
 }
 
-func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expectedStatus string) {
+func TestIntegrationWorkerRunnerPostgreSQLSingleAttemptNeverCreatesRetry(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		statuses: []int{http.StatusServiceUnavailable}, maxAttempts: 1,
+		expectedStatus: model.IntegrationExecutionStatusFailed, expectedAttempts: 1,
+	})
+}
+
+func TestIntegrationWorkerRunnerPostgreSQLRetryAfter429ThenSuccess(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		statuses: []int{http.StatusTooManyRequests, http.StatusOK}, maxAttempts: 2,
+		retryAfter: "2", expectedRetrySource: integration.RetryAfterSourceHTTPDelta,
+		expectedMinimumDelay: 1900 * time.Millisecond,
+		expectedStatus:       model.IntegrationExecutionStatusSucceeded, expectedAttempts: 2,
+	})
+}
+
+func TestIntegrationWorkerRunnerPostgreSQLUnknownPostWithoutRemoteKeyDoesNotRetry(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		method: http.MethodPost, idempotencyMode: model.InterfaceIdempotencyModeNone,
+		firstResponseDelay: 1200 * time.Millisecond, timeoutSeconds: 1, maxAttempts: 2,
+		expectedStatus: model.IntegrationExecutionStatusFailed, expectedAttempts: 1,
+	})
+}
+
+func TestIntegrationWorkerRunnerPostgreSQLUnknownPostReusesRemoteIdempotencyKey(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, runtimeRetryScenario{
+		method: http.MethodPost, idempotencyMode: model.InterfaceIdempotencyModeRemoteKeyHeader,
+		firstResponseDelay: 1200 * time.Millisecond, timeoutSeconds: 1, maxAttempts: 2,
+		expectedStatus: model.IntegrationExecutionStatusSucceeded, expectedAttempts: 2,
+		expectRemoteIdempotencyKey: true,
+	})
+}
+
+type runtimeRetryScenario struct {
+	statuses                   []int
+	maxAttempts                int
+	expectedStatus             string
+	expectedAttempts           int
+	method                     string
+	idempotencyMode            string
+	retryAfter                 string
+	expectedRetrySource        string
+	expectedMinimumDelay       time.Duration
+	firstResponseDelay         time.Duration
+	timeoutSeconds             int
+	expectRemoteIdempotencyKey bool
+}
+
+func runRuntimeRetryEndToEnd(t *testing.T, scenario runtimeRetryScenario) {
 	t.Helper()
-	expectedAttempts := len(statuses)
+	if scenario.method == "" {
+		scenario.method = http.MethodGet
+	}
+	if scenario.idempotencyMode == "" {
+		scenario.idempotencyMode = model.InterfaceIdempotencyModeSafeMethod
+	}
+	if scenario.timeoutSeconds == 0 {
+		scenario.timeoutSeconds = 10
+	}
+	if scenario.expectedMinimumDelay == 0 && scenario.expectedAttempts > 1 {
+		scenario.expectedMinimumDelay = 900 * time.Millisecond
+	}
 	db := openRuntimeAcceptancePostgreSQL(t)
 	var callCount atomic.Int32
 	var firstCallAt atomic.Int64
 	var secondCallAt atomic.Int64
+	var firstRemoteKey atomic.Value
+	var secondRemoteKey atomic.Value
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		call := int(callCount.Add(1))
 		if call == 1 {
@@ -266,16 +333,33 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 		} else if call == 2 {
 			secondCallAt.Store(time.Now().UnixNano())
 		}
-		if req.Method != http.MethodGet || req.URL.Path != "/base/retry" {
+		if req.Method != scenario.method || req.URL.Path != "/base/retry" {
 			t.Errorf("unexpected retry target: %s %s", req.Method, req.URL.String())
 		}
 		if req.Header.Get("Authorization") != "Bearer retry-runner-token" {
 			t.Errorf("retry credential was not injected")
 		}
+		if scenario.expectRemoteIdempotencyKey {
+			key := req.Header.Get(integration.RemoteIdempotencyHeaderName)
+			if call == 1 {
+				firstRemoteKey.Store(key)
+			} else if call == 2 {
+				secondRemoteKey.Store(key)
+			}
+		}
+		if call == 1 && scenario.firstResponseDelay > 0 {
+			time.Sleep(scenario.firstResponseDelay)
+		}
 		writer.Header().Set("Content-Type", "application/json")
-		status := statuses[len(statuses)-1]
-		if call <= len(statuses) {
-			status = statuses[call-1]
+		if call == 1 && scenario.retryAfter != "" {
+			writer.Header().Set("Retry-After", scenario.retryAfter)
+		}
+		status := http.StatusOK
+		if len(scenario.statuses) > 0 {
+			status = scenario.statuses[len(scenario.statuses)-1]
+			if call <= len(scenario.statuses) {
+				status = scenario.statuses[call-1]
+			}
 		}
 		writer.WriteHeader(status)
 		_, _ = writer.Write([]byte("{\"retry\":true}"))
@@ -306,23 +390,23 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	if err != nil {
 		t.Fatalf("seal retry credential: %v", err)
 	}
-	baseID := 7300 + maxAttempts*10
+	baseID := 7300 + scenario.maxAttempts*10
 	system := model.ExternalSystem{
-		Basic: model.Basic{Id: baseID + 1, State: true}, SystemCode: fmt.Sprintf("runtime_retry_%d", maxAttempts), Name: "Runtime Retry",
+		Basic: model.Basic{Id: baseID + 1, State: true}, SystemCode: fmt.Sprintf("runtime_retry_%d", scenario.maxAttempts), Name: "Runtime Retry",
 		SystemType: model.ExternalSystemTypeHR, BaseURL: "https://retry.runtime.acceptance.test/base",
 		OwnerIdentifier: "retry-owner", OwnerName: "重试验收负责人", Status: model.ExternalSystemStatusEnabled, Revision: 1,
 	}
 	credential := model.Credential{
 		Basic: model.Basic{Id: baseID + 2, State: true}, ExternalSystemID: system.Id,
-		CredentialCode: fmt.Sprintf("runtime_retry_token_%d", maxAttempts), Name: "Runtime Retry Token",
+		CredentialCode: fmt.Sprintf("runtime_retry_token_%d", scenario.maxAttempts), Name: "Runtime Retry Token",
 		CredentialType: model.CredentialTypeBearerToken, Status: model.CredentialStatusActive,
 		SecretStorageRef: envelope.StorageRef, SecretCiphertext: envelope.Ciphertext, SecretNonce: envelope.Nonce,
 		SecretFingerprint: envelope.Fingerprint, Version: 1, Revision: 1,
 	}
 	policy := model.RetryPolicy{
-		Basic: model.Basic{Id: baseID + 3, State: true}, PolicyCode: fmt.Sprintf("runtime_retry_policy_%d", maxAttempts),
+		Basic: model.Basic{Id: baseID + 3, State: true}, PolicyCode: fmt.Sprintf("runtime_retry_policy_%d", scenario.maxAttempts),
 		PolicyName: "Runtime Retry Policy", Version: 1, Status: model.RetryPolicyStatusEnabled,
-		MaxAttempts: maxAttempts, InitialDelayMs: 1000, MaxDelayMs: 1000,
+		MaxAttempts: scenario.maxAttempts, InitialDelayMs: 1000, MaxDelayMs: 5000,
 		BackoffType: model.RetryBackoffTypeFixed, BackoffMultiplier: 1,
 		JitterType: model.RetryJitterTypeNone, JitterRatio: 0, RetryWindowMs: 60000,
 		RetryableErrorCategories: datatypes.JSON([]byte("[\"network\",\"remote\",\"timeout\"]")),
@@ -332,12 +416,15 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	policyID := policy.Id
 	definition := model.InterfaceDefinition{
 		Basic: model.Basic{Id: baseID + 4, State: true}, ExternalSystemID: system.Id,
-		InterfaceCode: fmt.Sprintf("runtime_retry_call_%d", maxAttempts), Name: "Runtime Retry Call", Version: 1,
-		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/retry",
-		CredentialID: &credentialID, RetryPolicyID: &policyID, TimeoutSeconds: 10, ResponseLimit: 1024 * 1024,
+		InterfaceCode: fmt.Sprintf("runtime_retry_call_%d", scenario.maxAttempts), Name: "Runtime Retry Call", Version: 1,
+		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: scenario.method, RelativePath: "/retry",
+		CredentialID: &credentialID, RetryPolicyID: &policyID, TimeoutSeconds: scenario.timeoutSeconds, ResponseLimit: 1024 * 1024,
 		InputContract:   datatypes.JSON([]byte("{\"version\":1,\"parameters\":[]}")),
-		IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		IdempotencyMode: scenario.idempotencyMode,
 		Status:          model.InterfaceDefinitionStatusEnabled, Revision: 1,
+	}
+	if scenario.idempotencyMode == integration.RemoteIdempotencyKeyHeader {
+		definition.RemoteIdempotencyHeader = integration.RemoteIdempotencyHeaderName
 	}
 	for _, value := range []any{&system, &credential, &policy, &definition} {
 		if err := db.Create(value).Error; err != nil {
@@ -355,7 +442,7 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	interfaces := impl.NewInterfaceDefinitionRepositoryImpl(primary)
 	policies := impl.NewRetryPolicyRepositoryImpl(primary)
 	credentials := impl.NewCredentialRepositoryImpl(primary)
-	snowflake, err := utils.NewSnowflake(int64(8 - maxAttempts))
+	snowflake, err := utils.NewSnowflake(3)
 	if err != nil {
 		t.Fatalf("create retry snowflake: %v", err)
 	}
@@ -364,7 +451,7 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	created, err := applicationService.CreateExecution(submitContext, request.IntegrationExecutionCreateReq{
 		ExternalSystemID: system.Id, InterfaceDefinitionID: definition.Id,
 		TriggerSource:    model.IntegrationTriggerSourceManual,
-		IdempotencyScope: "runtime-retry", IdempotencyKey: fmt.Sprintf("runner-retry-%d", maxAttempts),
+		IdempotencyScope: "runtime-retry", IdempotencyKey: fmt.Sprintf("runner-retry-%d", scenario.maxAttempts),
 		Input: request.IntegrationExecutionInputReq{},
 	})
 	cancelSubmit()
@@ -380,7 +467,7 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	if err != nil {
 		t.Fatalf("create retry concurrency guard: %v", err)
 	}
-	workerID := fmt.Sprintf("runtime-retry-worker-%d", maxAttempts)
+	workerID := fmt.Sprintf("runtime-retry-worker-%d", scenario.maxAttempts)
 	engine, err := integration.NewIntegrationExecutionEngine(
 		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
 		integration.ExecutionEngineOptions{WorkerID: workerID, LeaseDuration: integration.IntegrationDefaultLeaseDuration, BatchSize: 2},
@@ -402,18 +489,15 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 		t.Fatalf("start retry runner: %v", err)
 	}
 	t.Cleanup(func() { _ = runner.Stop(context.Background()) })
-	waitRuntimeAcceptance(t, 7*time.Second, func() bool {
+	waitRuntimeAcceptance(t, 12*time.Second, func() bool {
 		var execution model.IntegrationExecution
-		return db.First(&execution, created.Id).Error == nil && execution.Status == expectedStatus && execution.CurrentAttempt == expectedAttempts
+		return db.First(&execution, created.Id).Error == nil && execution.Status == scenario.expectedStatus && execution.CurrentAttempt == scenario.expectedAttempts
 	})
 	if err := runner.Stop(context.Background()); err != nil {
 		t.Fatalf("stop retry runner: %v", err)
 	}
-	if calls := int(callCount.Load()); calls != expectedAttempts {
-		t.Fatalf("retry HTTP count = %d, want %d", calls, expectedAttempts)
-	}
-	if first := firstCallAt.Load(); first == 0 || secondCallAt.Load()-first < int64(900*time.Millisecond) {
-		t.Fatalf("retry was not delayed by persisted next_run_at: first=%d second=%d", first, secondCallAt.Load())
+	if calls := int(callCount.Load()); calls != scenario.expectedAttempts {
+		t.Fatalf("retry HTTP count = %d, want %d", calls, scenario.expectedAttempts)
 	}
 	var stored model.IntegrationExecution
 	var attempts []model.IntegrationLog
@@ -423,7 +507,18 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 	if err := db.Where("execution_id = ?", created.Id).Order("attempt_no ASC").Find(&attempts).Error; err != nil {
 		t.Fatalf("load retry attempts: %v", err)
 	}
-	if stored.Status != expectedStatus || stored.CurrentAttempt != expectedAttempts || stored.NextRunAt != nil || len(attempts) != expectedAttempts {
+	if first := firstCallAt.Load(); scenario.expectedAttempts > 1 &&
+		(first == 0 || secondCallAt.Load()-first < int64(scenario.expectedMinimumDelay)) {
+		t.Fatalf("retry was not delayed by persisted next_run_at: first=%d second=%d attempts=%+v", first, secondCallAt.Load(), attempts)
+	}
+	if scenario.expectRemoteIdempotencyKey {
+		first, _ := firstRemoteKey.Load().(string)
+		second, _ := secondRemoteKey.Load().(string)
+		if first == "" || first != second {
+			t.Fatalf("remote idempotency key was not frozen across attempts: first=%q second=%q", first, second)
+		}
+	}
+	if stored.Status != scenario.expectedStatus || stored.CurrentAttempt != scenario.expectedAttempts || stored.NextRunAt != nil || len(attempts) != scenario.expectedAttempts {
 		t.Fatalf("unexpected retry convergence: execution=%+v attempts=%+v", stored, attempts)
 	}
 	for index := range attempts {
@@ -431,8 +526,11 @@ func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expe
 			t.Fatalf("attempt sequence is not monotonic: %+v", attempts)
 		}
 	}
-	if maxAttempts > 1 && (!attempts[0].Retryable || attempts[0].RetryScheduledAt == nil || attempts[0].RetryReasonCode != integration.RetryReasonAllowed) {
+	if scenario.expectedAttempts > 1 && (!attempts[0].Retryable || attempts[0].RetryScheduledAt == nil || attempts[0].RetryReasonCode != integration.RetryReasonAllowed) {
 		t.Fatalf("first attempt lacks retry diagnostics: %+v", attempts[0])
+	}
+	if scenario.expectedRetrySource != "" && attempts[0].RetryAfterSource != scenario.expectedRetrySource {
+		t.Fatalf("retry source = %q, want %q", attempts[0].RetryAfterSource, scenario.expectedRetrySource)
 	}
 }
 

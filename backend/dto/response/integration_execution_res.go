@@ -20,20 +20,23 @@ type IntegrationExecutionInterfaceRes struct {
 }
 
 type IntegrationExecutionListRes struct {
-	Id             int                              `json:"id"`
-	ExecutionNo    string                           `json:"execution_no"`
-	ExternalSystem IntegrationExecutionSystemRes    `json:"external_system"`
-	Interface      IntegrationExecutionInterfaceRes `json:"interface"`
-	TriggerSource  string                           `json:"trigger_source"`
-	Status         string                           `json:"status"`
-	CurrentAttempt int                              `json:"current_attempt"`
-	Revision       int                              `json:"revision"`
-	GmtCreate      model.CustomTime                 `json:"gmt_create"`
-	GmtModify      model.CustomTime                 `json:"gmt_modify"`
-	StartedAt      *time.Time                       `json:"started_at,omitempty"`
-	CompletedAt    *time.Time                       `json:"completed_at,omitempty"`
-	DurationMs     int64                            `json:"duration_ms"`
-	ErrorCategory  string                           `json:"error_category,omitempty"`
+	Id              int                              `json:"id"`
+	ExecutionNo     string                           `json:"execution_no"`
+	ExternalSystem  IntegrationExecutionSystemRes    `json:"external_system"`
+	Interface       IntegrationExecutionInterfaceRes `json:"interface"`
+	TriggerSource   string                           `json:"trigger_source"`
+	Status          string                           `json:"status"`
+	CurrentAttempt  int                              `json:"current_attempt"`
+	MaxAttempts     int                              `json:"max_attempts"`
+	NextRunAt       *time.Time                       `json:"next_run_at,omitempty"`
+	RetryReasonCode string                           `json:"retry_reason_code,omitempty"`
+	Revision        int                              `json:"revision"`
+	GmtCreate       model.CustomTime                 `json:"gmt_create"`
+	GmtModify       model.CustomTime                 `json:"gmt_modify"`
+	StartedAt       *time.Time                       `json:"started_at,omitempty"`
+	CompletedAt     *time.Time                       `json:"completed_at,omitempty"`
+	DurationMs      int64                            `json:"duration_ms"`
+	ErrorCategory   string                           `json:"error_category,omitempty"`
 }
 
 type IntegrationLogListRes struct {
@@ -130,15 +133,14 @@ type IntegrationExecutionDetailRes struct {
 	InputHash         string                                     `json:"input_hash"`
 	InputSummary      IntegrationExecutionInputSummaryRes        `json:"input_summary"`
 	RetryPolicy       *IntegrationExecutionRetryPolicySummaryRes `json:"retry_policy,omitempty"`
+	AttemptsRemaining int                                        `json:"attempts_remaining"`
 	ResultHTTPStatus  *int                                       `json:"result_http_status,omitempty"`
 	ResultSizeBytes   int64                                      `json:"result_size_bytes"`
 	ResultHash        string                                     `json:"result_hash,omitempty"`
 	ResultSummary     string                                     `json:"result_summary,omitempty"`
 	LeaseOwnerSummary string                                     `json:"lease_owner_summary,omitempty"`
 	LeaseExpiresAt    *time.Time                                 `json:"lease_expires_at,omitempty"`
-	NextRunAt         *time.Time                                 `json:"next_run_at,omitempty"`
 	CancelledAt       *time.Time                                 `json:"cancelled_at,omitempty"`
-	RetryReasonCode   string                                     `json:"retry_reason_code,omitempty"`
 	LastAttemptAt     *time.Time                                 `json:"last_attempt_at,omitempty"`
 }
 
@@ -158,6 +160,11 @@ type IntegrationExecutionInputSummaryRes struct {
 }
 
 func NewIntegrationExecutionListRes(value model.IntegrationExecution) IntegrationExecutionListRes {
+	policy := integrationExecutionRetryPolicySummary(value)
+	maxAttempts := 1
+	if policy != nil {
+		maxAttempts = policy.MaxAttempts
+	}
 	return IntegrationExecutionListRes{
 		Id: value.Id, ExecutionNo: value.ExecutionNo,
 		ExternalSystem: IntegrationExecutionSystemRes{
@@ -168,6 +175,7 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 			Name: value.InterfaceName, Version: value.InterfaceVersion,
 		},
 		TriggerSource: value.TriggerSource, Status: value.Status, CurrentAttempt: value.CurrentAttempt,
+		MaxAttempts: maxAttempts, NextRunAt: value.NextRunAt, RetryReasonCode: value.RetryReasonCode,
 		Revision: value.Revision, GmtCreate: value.GmtCreate, GmtModify: value.GmtModify,
 		StartedAt: value.StartedAt, CompletedAt: value.CompletedAt, DurationMs: integrationExecutionDuration(value),
 		ErrorCategory: value.ErrorCategory,
@@ -176,6 +184,7 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 
 func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) IntegrationExecutionDetailRes {
 	inputSummary := integrationExecutionInputSummary(value)
+	policy := integrationExecutionRetryPolicySummary(value)
 	result := IntegrationExecutionDetailRes{
 		IntegrationExecutionListRes: NewIntegrationExecutionListRes(value),
 		IdempotencyScope:            value.IdempotencyScope, IdempotencyKey: integrationIdentifierSummary(value.IdempotencyKey),
@@ -189,22 +198,28 @@ func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) Integrat
 		ResultSizeBytes:  value.ResultSizeBytes, ResultHash: value.ResultHash,
 		ResultSummary:     value.ResultSummary,
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
-		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt,
-		RetryReasonCode: value.RetryReasonCode, LastAttemptAt: value.LastAttemptAt,
+		CancelledAt: value.CancelledAt, LastAttemptAt: value.LastAttemptAt,
 	}
-	if value.RetryPolicySnapshotVersion > 0 && len(value.RetryPolicySnapshot) > 0 {
-		var snapshot struct {
-			PolicyCode    string `json:"policy_code"`
-			PolicyVersion int    `json:"policy_version"`
-			MaxAttempts   int    `json:"max_attempts"`
-		}
-		if json.Unmarshal(value.RetryPolicySnapshot, &snapshot) == nil && snapshot.PolicyCode != "" {
-			result.RetryPolicy = &IntegrationExecutionRetryPolicySummaryRes{
-				PolicyCode: snapshot.PolicyCode, PolicyVersion: snapshot.PolicyVersion, MaxAttempts: snapshot.MaxAttempts,
-			}
-		}
-	}
+	result.RetryPolicy = policy
+	result.AttemptsRemaining = max(0, result.MaxAttempts-value.CurrentAttempt)
 	return result
+}
+
+func integrationExecutionRetryPolicySummary(value model.IntegrationExecution) *IntegrationExecutionRetryPolicySummaryRes {
+	if value.RetryPolicySnapshotVersion <= 0 || len(value.RetryPolicySnapshot) == 0 {
+		return nil
+	}
+	var snapshot struct {
+		PolicyCode    string `json:"policy_code"`
+		PolicyVersion int    `json:"policy_version"`
+		MaxAttempts   int    `json:"max_attempts"`
+	}
+	if json.Unmarshal(value.RetryPolicySnapshot, &snapshot) != nil || snapshot.PolicyCode == "" || snapshot.MaxAttempts < 1 {
+		return nil
+	}
+	return &IntegrationExecutionRetryPolicySummaryRes{
+		PolicyCode: snapshot.PolicyCode, PolicyVersion: snapshot.PolicyVersion, MaxAttempts: snapshot.MaxAttempts,
+	}
 }
 
 func integrationExecutionInputSummary(value model.IntegrationExecution) IntegrationExecutionInputSummaryRes {

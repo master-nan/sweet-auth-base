@@ -39,6 +39,36 @@
           </div></q-card-section
         ></q-card
       >
+      <q-card flat bordered class="q-mb-md">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold q-mb-md">自动重试摘要</div>
+          <div class="row q-col-gutter-lg">
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">重试策略</div>
+              <div>
+                {{ detail.retry_policy?.policy_code || '未配置' }}
+                <span v-if="detail.retry_policy"> · v{{ detail.retry_policy.policy_version }}</span>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">Attempt</div>
+              <div>{{ detail.current_attempt }} / {{ detail.max_attempts }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">剩余次数</div>
+              <div>{{ detail.attempts_remaining }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">下次重试</div>
+              <div>{{ formatDate(detail.next_run_at) }}</div>
+            </div>
+            <div class="col-12">
+              <div class="text-caption text-grey-7">重试原因</div>
+              <div>{{ formatRetryReason(detail.retry_reason_code) }}</div>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
       <q-card flat bordered class="q-mb-md"
         ><q-card-section
           ><div class="text-subtitle1 text-weight-bold q-mb-md">输入快照摘要</div>
@@ -167,7 +197,7 @@ import { useLoadingStore } from 'src/stores/loading'
 import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import type { QTableProps } from 'quasar'
-import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const route = useRoute()
 const router = useRouter()

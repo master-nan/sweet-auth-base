@@ -121,6 +121,30 @@
               <div class="text-caption text-grey-7">安全错误消息</div>
               <div>{{ detail.result_summary || detail.error_code || '-' }}</div>
             </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">调用类型</div>
+              <div>{{ detail.attempt_no > 1 ? '自动重试' : '首次调用' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">可重试</div>
+              <div>{{ detail.retryable ? '是' : '否' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">重试原因</div>
+              <div>{{ formatRetryReason(detail.retry_reason_code) }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">重试延迟</div>
+              <div>{{ detail.retry_delay_ms }} 毫秒</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">计划重试时间</div>
+              <div>{{ formatDate(detail.retry_scheduled_at) }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-grey-7">调度来源</div>
+              <div>{{ retryAfterSourceLabel(detail.retry_after_source) }}</div>
+            </div>
           </div></q-card-section
         ></q-card
       ></q-dialog
@@ -146,6 +170,7 @@ import { useLoadingStore } from 'src/stores/loading'
 import { useUserStore } from 'src/stores/user'
 import { storeToRefs } from 'pinia'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const route = useRoute()
 const api = useIntegrationApi()
@@ -184,6 +209,16 @@ const statusMeta: Record<string, { label: string; color: string }> = {
   failed: { label: '失败', color: 'negative' },
   cancelled: { label: '已取消', color: 'grey-6' },
 }
+const retryAfterSourceLabel = (value: string) =>
+  ({
+    none: '无',
+    local: '本地退避',
+    http_delta: 'Retry-After 秒数',
+    http_date: 'Retry-After 日期',
+    ignored: '已忽略',
+    invalid_fallback: '无效值，回退本地退避',
+  })[value] || value || '-'
+const formatDate = formatRuntimeDateTime
 const columns: QTableProps['columns'] = [
   { name: 'execution_no', label: '执行编号', field: 'execution_no', align: 'left' },
   { name: 'attempt_no', label: 'Attempt', field: 'attempt_no', align: 'center' },

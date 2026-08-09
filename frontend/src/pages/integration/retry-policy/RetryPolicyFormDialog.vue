@@ -130,7 +130,18 @@ const requiredName = (value: string) => Boolean(value?.trim()) || '请输入策�
 const attemptRule = (value: number) => Number.isInteger(value) && value >= 1 && value <= 10 || '最大尝试次数必须在 1 至 10 之间'
 const initialDelayRule = (value: number) => value >= 1 && value <= 3600 || '初始延迟必须在 1 至 3,600 秒之间'
 const maxDelayRule = (value: number) => value >= initialDelaySeconds.value && value <= 86400 || '最大延迟不能小于初始延迟，且不能超过 86,400 秒'
-const retryWindowRule = (value: number) => value >= 60 && value <= 604800 && value >= initialDelaySeconds.value || '重试窗口必须在 60 至 604,800 秒之间且不小于初始延迟'
+const requiredRetryWindowSeconds = () => {
+  let delayMs = form.initial_delay_ms
+  let totalMs = 0
+  for (let attempt = 1; attempt < form.max_attempts; attempt += 1) {
+    totalMs += delayMs
+    if (form.backoff_type === 'exponential') {
+      delayMs = Math.min(form.max_delay_ms, Math.ceil(delayMs * form.backoff_multiplier))
+    }
+  }
+  return Math.ceil(totalMs / 1000)
+}
+const retryWindowRule = (value: number) => value >= 60 && value <= 604800 && value >= requiredRetryWindowSeconds() || '重试窗口必须在 60 至 604,800 秒之间，并覆盖完整重试计划'
 const multiplierRule = (value: number) => value >= 1.1 && value <= 4 || '指数退避倍数必须在 1.1 至 4 之间'
 
 watch(() => [props.modelValue, props.editData] as const, ([open, detail]) => {

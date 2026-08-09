@@ -443,7 +443,7 @@ func (s *InterfaceDefinitionService) validateReferences(tx *gorm.DB, value model
 		if err != nil {
 			return nil, myerrors.WrapDatabaseError(err)
 		}
-		if policy.Status != model.RetryPolicyStatusEnabled || !policy.State {
+		if policy.Status != model.RetryPolicyStatusEnabled || !policy.State || validateRetryPolicyConfiguration(policy) != nil {
 			return nil, myerrors.ErrInterfaceRetryPolicyInvalid
 		}
 	}

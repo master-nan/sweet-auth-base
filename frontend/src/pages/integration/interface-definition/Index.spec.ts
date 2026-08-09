@@ -1,6 +1,6 @@
 import { computed, defineComponent, h } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   enableInterfaceDefinition: vi.fn(), disableInterfaceDefinition: vi.fn(),
 }))
 const tableApiMocks = vi.hoisted(() => ({ queryTableByCode: vi.fn() }))
+const permissionCodes = vi.hoisted(() => [] as string[])
 const buttons = vi.hoisted(() => ({
   top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
   line: [
@@ -22,6 +23,7 @@ vi.mock('boot/axios', () => ({ instance: {} }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
 vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true) }) }))
 vi.mock('src/composables/confirm-dialog', () => ({ useConfirmDialog: () => ({ confirmAction: vi.fn(() => ({ onOk: vi.fn() })) }) }))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({ default: { template: '<div><slot /></div>' } }))
@@ -41,7 +43,8 @@ const ButtonStub = defineComponent({
   name: 'QBtn', props: { label: { type: String, default: '' } }, emits: ['click'],
   setup(props, { emit }) { return () => h('button', { onClick: () => emit('click') }, props.label) },
 })
-const mountPage = () => shallowMount(InterfaceDefinitionPage, { global: { plugins: [createPinia()], stubs: {
+let pinia: Pinia
+const mountPage = () => shallowMount(InterfaceDefinitionPage, { global: { plugins: [pinia], stubs: {
   BaseContent: SlotStub, QTable: TableStub, QInput: true, QSelect: true, QBtn: ButtonStub, QIcon: true, QSpace: true,
   QBadge: true, QTooltip: true, QChip: true, QTd: SlotStub, TablePagination: true, AdvancedQuery: true,
   InterfaceDefinitionFormDialog: true, InterfaceDefinitionDetailDialog: true,
@@ -52,7 +55,9 @@ const row = { id: 31, external_system: { id: 10, system_code: 'demo_erp', name: 
 
 describe('interface definition management page', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    pinia = createPinia()
+    setActivePinia(pinia)
+    permissionCodes.splice(0, permissionCodes.length, 'integration_retry_policy_query')
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     tableApiMocks.queryTableByCode.mockReset()
     apiMocks.queryInterfaceDefinitions.mockResolvedValue({ data: [row], total: 1 })
@@ -60,6 +65,14 @@ describe('interface definition management page', () => {
     apiMocks.queryRetryPolicies.mockResolvedValue({ data: [], total: 0 })
     apiMocks.queryCredentials.mockResolvedValue({ data: [], total: 0 })
     tableApiMocks.queryTableByCode.mockResolvedValue({ data: { table_fields: [] } })
+  })
+
+  it('does not request retry policies without independent query permission', async () => {
+    permissionCodes.splice(0)
+    mountPage()
+    await flushPromises()
+    expect(apiMocks.queryRetryPolicies).not.toHaveBeenCalled()
+    expect(apiMocks.queryInterfaceDefinitions).toHaveBeenCalled()
   })
 
   it('loads metadata, systems and the paged interface list', async () => {

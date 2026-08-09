@@ -649,7 +649,7 @@ Execution 延续 query/detail/create/cancel；不增加 start/complete/fail/立�
 ### 21.4 INT-004C-2 调度闭环补充
 
 - Repository 统一使用 `ClaimReadyExecutions` 领取 `created` 与已到期 `retry_waiting`，候选按 `COALESCE(next_run_at, gmt_create), gmt_create, id` 排序并共享单批上限。V1 不设置独立 Retry lane；首次调用和重试均进入同一个 Runner、实例并发限制与 ConcurrencyGuard。
-- `retry_waiting` 到期条件由 PostgreSQL `CURRENT_TIMESTAMP` 在 `FOR UPDATE SKIP LOCKED` 事务内判断；应用时间不参与候选筛选。领取事务读取同一数据库时间复核 Retry Window，避免多实例时区或时钟差异改变调度结果。
+- `retry_waiting` 到期条件由 PostgreSQL `CURRENT_TIMESTAMP AT TIME ZONE 'UTC'` 在 `FOR UPDATE SKIP LOCKED` 事务内判断；这是与当前 UTC 语义 `timestamp without time zone` 字段匹配的数据库时间表达式，禁止依赖会话时区隐式转换。应用时间不参与候选筛选，领取事务读取同一数据库时钟复核 Retry Window，避免多实例时区或时钟差异改变调度结果。
 - 领取前先复核冻结策略版本、`current_attempt < max_attempts`、首次开始时间、Retry Window 和输入快照基本完整性。策略损坏、次数耗尽或窗口过期直接由该短事务收敛为 `failed`，不创建没有实际技术执行过程的新 Attempt。
 - 真正可运行的重试在同一短事务内写入 `running`、租约 owner 和到期时间、`current_attempt + 1`、revision、`last_attempt_at`，追加新的 running Attempt，并清空 Execution 当前调度字段 `next_run_at`。首次 `started_at` 保留不变，上一轮调度事实保留在历史 Attempt 的 `retry_scheduled_at`。
 - 取消与领取通过同一记录的行锁、状态和 revision 竞争。取消先提交时 Worker 无候选；领取先提交时状态已为 running，重试取消返回稳定冲突，不会出现 cancelled 与新增 HTTP 并存。

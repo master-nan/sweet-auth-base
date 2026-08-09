@@ -171,7 +171,11 @@ func (e *IntegrationExecutionEngine) RunExecution(
 		claimed.Execution.LeaseOwner != e.workerID || claimed.Execution.LeaseExpiresAt == nil {
 		return AttemptResult{}, myerrors.ErrIntegrationExecutionClaimConflict
 	}
-	if !claimed.Execution.LeaseExpiresAt.After(e.now()) {
+	databaseNow, timeErr := e.executions.CurrentDatabaseTime(ctx)
+	if timeErr != nil {
+		return AttemptResult{}, myerrors.ErrIntegrationExecutionResultUnknown
+	}
+	if !claimed.Execution.LeaseExpiresAt.After(databaseNow) {
 		return AttemptResult{}, myerrors.ErrIntegrationExecutionLeaseLost
 	}
 	defer func() {
@@ -179,6 +183,10 @@ func (e *IntegrationExecutionEngine) RunExecution(
 			return
 		}
 		result = e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategorySystem, "worker_panic_recovered", "集成执行发生内部异常", model.IntegrationResultCertaintyConfirmed)
+		if syncErr := e.syncCompletionTime(ctx, claimed.Attempt.StartedAt, &result); syncErr != nil {
+			err = myerrors.ErrIntegrationExecutionResultUnknown
+			return
+		}
 		e.applyRetryDecision(claimed, &result)
 		if completeErr := e.completeClaim(ctx, claimed, result); completeErr != nil {
 			err = myerrors.ErrIntegrationExecutionResultUnknown
@@ -190,12 +198,18 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	release, err := e.guard.Acquire(claimed.Execution.ExternalSystemID, claimed.Execution.InterfaceDefinitionID)
 	if err != nil {
 		result := e.failureResult(claimed.Attempt.StartedAt, model.IntegrationErrorCategoryConcurrency, "concurrency_limit_reached", "集成执行并发已达上限", model.IntegrationResultCertaintyConfirmed)
+		if syncErr := e.syncCompletionTime(ctx, claimed.Attempt.StartedAt, &result); syncErr != nil {
+			return result, myerrors.ErrIntegrationExecutionResultUnknown
+		}
 		e.applyRetryDecision(claimed, &result)
 		return result, e.completeClaim(ctx, claimed, result)
 	}
 	defer release()
 
 	result = e.executeAttempt(ctx, claimed)
+	if syncErr := e.syncCompletionTime(ctx, claimed.Attempt.StartedAt, &result); syncErr != nil {
+		return result, myerrors.ErrIntegrationExecutionResultUnknown
+	}
 	e.applyRetryDecision(claimed, &result)
 	if err := e.completeClaim(ctx, claimed, result); err != nil {
 		// 远端调用完成后若持久化失败，不能宣称成功；后续仅能通过租约恢复收敛为 unknown。
@@ -204,6 +218,19 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	}
 	e.logAttempt(ctx, claimed, result, "completed")
 	return result, nil
+}
+
+func (e *IntegrationExecutionEngine) syncCompletionTime(ctx context.Context, startedAt time.Time, result *AttemptResult) error {
+	databaseNow, err := e.executions.CurrentDatabaseTime(ctx)
+	if err != nil {
+		return err
+	}
+	result.CompletedAt = databaseNow
+	result.Duration = databaseNow.Sub(startedAt)
+	if result.Duration < 0 {
+		result.Duration = 0
+	}
+	return nil
 }
 
 func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed repository.ClaimedIntegrationExecution) AttemptResult {
@@ -425,14 +452,13 @@ func (e *IntegrationExecutionEngine) RecoverExpiredLease(ctx context.Context, li
 	if e == nil || limit <= 0 || limit > maxExecutionBatchSize {
 		return 0, myerrors.ErrIntegrationLeaseRecoveryFailed
 	}
-	now := e.now()
-	values, err := e.executions.FindExpiredRunningExecutions(ctx, now, limit)
+	values, err := e.executions.FindExpiredRunningExecutions(ctx, limit)
 	if err != nil {
 		return 0, myerrors.ErrIntegrationLeaseRecoveryFailed
 	}
 	recovered := 0
 	for _, value := range values {
-		changed, recoverErr := e.executions.RecoverExpiredExecution(ctx, repository.ExpiredExecutionRecovery{ExecutionID: value.Id, RecoveredAt: now})
+		changed, recoverErr := e.executions.RecoverExpiredExecution(ctx, repository.ExpiredExecutionRecovery{ExecutionID: value.Id})
 		if recoverErr != nil && !errors.Is(recoverErr, repository.ErrIntegrationExecutionLeaseLost) && !errors.Is(recoverErr, repository.ErrIntegrationAttemptAlreadyCompleted) {
 			return recovered, myerrors.ErrIntegrationLeaseRecoveryFailed
 		}

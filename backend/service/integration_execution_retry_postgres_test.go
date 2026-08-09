@@ -26,7 +26,7 @@ import (
 
 func TestIntegrationExecutionPostgreSQLRetryCancelAndClaimRace(t *testing.T) {
 	db := openIntegrationExecutionRetryPostgreSQL(t)
-	now := model.Now()
+	now := model.Now().UTC()
 	retrySnapshot := datatypes.JSON([]byte("{\"version\":1,\"policy_code\":\"cancel_claim\",\"policy_version\":1,\"max_attempts\":3,\"initial_delay_ms\":1000,\"max_delay_ms\":1000,\"backoff_type\":\"fixed\",\"backoff_multiplier\":\"1\",\"jitter_type\":\"none\",\"jitter_ratio\":\"0\",\"retry_window_ms\":60000,\"retryable_error_categories\":[\"network\",\"remote\",\"timeout\"],\"retryable_http_statuses\":[429,502,503,504],\"respect_retry_after\":true,\"idempotency_mode\":\"safe_method\",\"remote_idempotency_header\":\"\"}"))
 	inputSnapshot := datatypes.JSON([]byte("{\"version\":1,\"path_params\":{},\"query_params\":{},\"headers\":{}}"))
 	startedAt := now.Add(-10 * time.Second)
@@ -53,7 +53,7 @@ func TestIntegrationExecutionPostgreSQLRetryCancelAndClaimRace(t *testing.T) {
 	if err := db.Create(&firstAttempt).Error; err != nil {
 		t.Fatalf("create first attempt: %v", err)
 	}
-	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP WHERE id = ?", execution.Id).Error; err != nil {
+	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = ?", execution.Id).Error; err != nil {
 		t.Fatalf("schedule retry with database time: %v", err)
 	}
 
@@ -127,6 +127,99 @@ func TestIntegrationExecutionPostgreSQLRetryCancelAndClaimRace(t *testing.T) {
 	default:
 		t.Fatalf("unexpected cancel/claim race error: %v", cancelErr)
 	}
+}
+
+func TestIntegrationExecutionPostgreSQLRetryCancelAndClaimOrderedOutcomes(t *testing.T) {
+	db := openIntegrationExecutionRetryPostgreSQL(t)
+	now := model.Now().UTC()
+	primary := &database.PrimaryDB{DB: db}
+	executionRepository := impl.NewIntegrationExecutionRepositoryImpl(primary)
+	sf, err := utils.NewSnowflake(8)
+	if err != nil {
+		t.Fatalf("create snowflake: %v", err)
+	}
+	svc := NewIntegrationExecutionService(
+		executionRepository,
+		impl.NewIntegrationLogRepositoryImpl(primary),
+		impl.NewExternalSystemRepositoryImpl(primary),
+		impl.NewInterfaceDefinitionRepositoryImpl(primary),
+		impl.NewRetryPolicyRepositoryImpl(primary),
+		sf,
+		&integrationExecutionAuditWriter{},
+	)
+	createFixture := func(id int, executionNo string) model.IntegrationExecution {
+		t.Helper()
+		retrySnapshot := datatypes.JSON([]byte("{\"version\":1,\"policy_code\":\"cancel_claim\",\"policy_version\":1,\"max_attempts\":3,\"initial_delay_ms\":1000,\"max_delay_ms\":1000,\"backoff_type\":\"fixed\",\"backoff_multiplier\":\"1\",\"jitter_type\":\"none\",\"jitter_ratio\":\"0\",\"retry_window_ms\":60000,\"retryable_error_categories\":[\"network\",\"remote\",\"timeout\"],\"retryable_http_statuses\":[429,502,503,504],\"respect_retry_after\":true,\"idempotency_mode\":\"safe_method\",\"remote_idempotency_header\":\"\"}"))
+		inputSnapshot := datatypes.JSON([]byte("{\"version\":1,\"path_params\":{},\"query_params\":{},\"headers\":{}}"))
+		startedAt := now.Add(-10 * time.Second)
+		execution := model.IntegrationExecution{
+			Basic: model.Basic{Id: id, State: true}, ExecutionNo: executionNo,
+			ExternalSystemID: 1, ExternalSystemCode: "cancel_claim", ExternalSystemName: "Cancel Claim",
+			InterfaceDefinitionID: 2, InterfaceCode: "cancel_claim_api", InterfaceName: "Cancel Claim API", InterfaceVersion: 1,
+			TriggerSource: model.IntegrationTriggerSourceManual, Status: model.IntegrationExecutionStatusRetryWaiting,
+			IdempotencyScope: executionNo, IdempotencyKey: executionNo,
+			InputHash:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			InputSnapshot: inputSnapshot, InputSnapshotVersion: model.IntegrationExecutionInputSnapshotVersion, InputSnapshotSize: len(inputSnapshot),
+			RetryPolicySnapshot: retrySnapshot, RetryPolicySnapshotVersion: integration.RetryPolicySnapshotVersion,
+			RemoteIdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+			CurrentAttempt:        1, StartedAt: &startedAt, LastAttemptAt: &startedAt, NextRunAt: &now, Revision: 1,
+		}
+		attempt := model.IntegrationLog{
+			Basic: model.Basic{Id: id + 1, State: true}, ExecutionID: execution.Id, AttemptNo: 1,
+			Status: model.IntegrationLogStatusFailed, StartedAt: startedAt, EndedAt: &now,
+			ResultCertainty: model.IntegrationResultCertaintyConfirmed,
+		}
+		if err := db.Create(&execution).Error; err != nil {
+			t.Fatalf("create execution fixture: %v", err)
+		}
+		if err := db.Create(&attempt).Error; err != nil {
+			t.Fatalf("create attempt fixture: %v", err)
+		}
+		if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = ?", execution.Id).Error; err != nil {
+			t.Fatalf("schedule retry fixture: %v", err)
+		}
+		return execution
+	}
+
+	t.Run("cancel commits first", func(t *testing.T) {
+		execution := createFixture(8201, "INT-PG-CANCEL-FIRST")
+		if _, err := svc.CancelExecution(context.Background(), execution.Id, execution.Revision); err != nil {
+			t.Fatalf("cancel retry: %v", err)
+		}
+		claimed, err := executionRepository.ClaimReadyExecutions(context.Background(), repository.IntegrationExecutionClaimRequest{
+			WorkerID: "cancel-first-worker", StartedAt: now,
+			LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{8221},
+		})
+		if err != nil || len(claimed) != 0 {
+			t.Fatalf("cancelled execution was claimed: claimed=%+v err=%v", claimed, err)
+		}
+		var attemptCount int64
+		_ = db.Model(&model.IntegrationLog{}).Where("execution_id = ?", execution.Id).Count(&attemptCount).Error
+		if attemptCount != 1 {
+			t.Fatalf("cancel-first attempt count=%d", attemptCount)
+		}
+	})
+
+	t.Run("claim commits first", func(t *testing.T) {
+		execution := createFixture(8301, "INT-PG-CLAIM-FIRST")
+		claimed, err := executionRepository.ClaimReadyExecutions(context.Background(), repository.IntegrationExecutionClaimRequest{
+			WorkerID: "claim-first-worker", StartedAt: now,
+			LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{8321},
+		})
+		if err != nil || len(claimed) != 1 {
+			t.Fatalf("claim retry: claimed=%+v err=%v", claimed, err)
+		}
+		if _, err := svc.CancelExecution(context.Background(), execution.Id, execution.Revision); !errors.Is(err, apperrors.ErrIntegrationRetryCancelConflict) {
+			t.Fatalf("claim-first cancel error=%v", err)
+		}
+		var stored model.IntegrationExecution
+		var attemptCount int64
+		_ = db.First(&stored, execution.Id).Error
+		_ = db.Model(&model.IntegrationLog{}).Where("execution_id = ?", execution.Id).Count(&attemptCount).Error
+		if stored.Status != model.IntegrationExecutionStatusRunning || attemptCount != 2 {
+			t.Fatalf("claim-first result execution=%+v attempts=%d", stored, attemptCount)
+		}
+	})
 }
 
 func openIntegrationExecutionRetryPostgreSQL(t *testing.T) *gorm.DB {

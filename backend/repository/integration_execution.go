@@ -70,7 +70,6 @@ type IntegrationAttemptCompletion struct {
 // ExpiredExecutionRecovery 用于将已过期租约的执行安全收敛为未知失败。
 type ExpiredExecutionRecovery struct {
 	ExecutionID int
-	RecoveredAt time.Time
 }
 
 type IntegrationExecutionRepository interface {
@@ -79,9 +78,10 @@ type IntegrationExecutionRepository interface {
 	FindByIDWithPermission(context.Context, int, model.SysTable, GeneralizationPermission) (model.IntegrationExecution, error)
 	FindByIdempotency(*gorm.DB, int, int, string, string) (model.IntegrationExecution, error)
 	ListCandidatesByStatus(context.Context, []string, int) ([]model.IntegrationExecution, error)
+	CurrentDatabaseTime(context.Context) (time.Time, error)
 	ClaimReadyExecutions(context.Context, IntegrationExecutionClaimRequest) ([]ClaimedIntegrationExecution, error)
 	CompleteAttemptAndExecution(context.Context, IntegrationAttemptCompletion) (model.IntegrationExecution, error)
-	FindExpiredRunningExecutions(context.Context, time.Time, int) ([]model.IntegrationExecution, error)
+	FindExpiredRunningExecutions(context.Context, int) ([]model.IntegrationExecution, error)
 	RecoverExpiredExecution(context.Context, ExpiredExecutionRecovery) (bool, error)
 }
 
