@@ -115,18 +115,25 @@ func NewIntegrationLogDetailRes(value model.IntegrationLog) IntegrationLogDetail
 
 type IntegrationExecutionDetailRes struct {
 	IntegrationExecutionListRes
-	IdempotencyScope  string                              `json:"idempotency_scope"`
-	IdempotencyKey    string                              `json:"idempotency_key"`
-	InputHash         string                              `json:"input_hash"`
-	InputSummary      IntegrationExecutionInputSummaryRes `json:"input_summary"`
-	ResultHTTPStatus  *int                                `json:"result_http_status,omitempty"`
-	ResultSizeBytes   int64                               `json:"result_size_bytes"`
-	ResultHash        string                              `json:"result_hash,omitempty"`
-	ResultSummary     string                              `json:"result_summary,omitempty"`
-	LeaseOwnerSummary string                              `json:"lease_owner_summary,omitempty"`
-	LeaseExpiresAt    *time.Time                          `json:"lease_expires_at,omitempty"`
-	NextRunAt         *time.Time                          `json:"next_run_at,omitempty"`
-	CancelledAt       *time.Time                          `json:"cancelled_at,omitempty"`
+	IdempotencyScope  string                                     `json:"idempotency_scope"`
+	IdempotencyKey    string                                     `json:"idempotency_key"`
+	InputHash         string                                     `json:"input_hash"`
+	InputSummary      IntegrationExecutionInputSummaryRes        `json:"input_summary"`
+	RetryPolicy       *IntegrationExecutionRetryPolicySummaryRes `json:"retry_policy,omitempty"`
+	ResultHTTPStatus  *int                                       `json:"result_http_status,omitempty"`
+	ResultSizeBytes   int64                                      `json:"result_size_bytes"`
+	ResultHash        string                                     `json:"result_hash,omitempty"`
+	ResultSummary     string                                     `json:"result_summary,omitempty"`
+	LeaseOwnerSummary string                                     `json:"lease_owner_summary,omitempty"`
+	LeaseExpiresAt    *time.Time                                 `json:"lease_expires_at,omitempty"`
+	NextRunAt         *time.Time                                 `json:"next_run_at,omitempty"`
+	CancelledAt       *time.Time                                 `json:"cancelled_at,omitempty"`
+}
+
+type IntegrationExecutionRetryPolicySummaryRes struct {
+	PolicyCode    string `json:"policy_code"`
+	PolicyVersion int    `json:"policy_version"`
+	MaxAttempts   int    `json:"max_attempts"`
 }
 
 type IntegrationExecutionInputSummaryRes struct {
@@ -157,7 +164,7 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 
 func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) IntegrationExecutionDetailRes {
 	inputSummary := integrationExecutionInputSummary(value)
-	return IntegrationExecutionDetailRes{
+	result := IntegrationExecutionDetailRes{
 		IntegrationExecutionListRes: NewIntegrationExecutionListRes(value),
 		IdempotencyScope:            value.IdempotencyScope, IdempotencyKey: integrationIdentifierSummary(value.IdempotencyKey),
 		InputHash: value.InputHash,
@@ -172,6 +179,19 @@ func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) Integrat
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
 		NextRunAt: value.NextRunAt, CancelledAt: value.CancelledAt,
 	}
+	if value.RetryPolicySnapshotVersion > 0 && len(value.RetryPolicySnapshot) > 0 {
+		var snapshot struct {
+			PolicyCode    string `json:"policy_code"`
+			PolicyVersion int    `json:"policy_version"`
+			MaxAttempts   int    `json:"max_attempts"`
+		}
+		if json.Unmarshal(value.RetryPolicySnapshot, &snapshot) == nil && snapshot.PolicyCode != "" {
+			result.RetryPolicy = &IntegrationExecutionRetryPolicySummaryRes{
+				PolicyCode: snapshot.PolicyCode, PolicyVersion: snapshot.PolicyVersion, MaxAttempts: snapshot.MaxAttempts,
+			}
+		}
+	}
+	return result
 }
 
 func integrationExecutionInputSummary(value model.IntegrationExecution) IntegrationExecutionInputSummaryRes {

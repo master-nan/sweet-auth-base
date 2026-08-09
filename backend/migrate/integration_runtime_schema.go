@@ -30,6 +30,20 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			}).Error; err != nil {
 			return fmt.Errorf("close legacy executions without input snapshot: %w", err)
 		}
+		if err := tx.Model(&model.IntegrationExecution{}).
+			Where("retry_policy_snapshot_version = 0 AND status = ?", model.IntegrationExecutionStatusRetryWaiting).
+			Updates(map[string]any{
+				"status":           model.IntegrationExecutionStatusFailed,
+				"error_category":   model.IntegrationErrorCategoryConfiguration,
+				"result_summary":   "历史等待重试记录缺少冻结策略，已安全停止",
+				"completed_at":     model.Now(),
+				"next_run_at":      nil,
+				"lease_owner":      "",
+				"lease_expires_at": nil,
+				"revision":         gorm.Expr("revision + 1"),
+			}).Error; err != nil {
+			return fmt.Errorf("close legacy retry executions without policy snapshot: %w", err)
+		}
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
@@ -46,6 +60,8 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_input_snapshot_json", expression: "jsonb_typeof(input_snapshot) = 'object' AND (input_snapshot_version = 0 OR (input_snapshot ? 'version' AND input_snapshot->>'version' = '1' AND input_snapshot ? 'path_params' AND jsonb_typeof(input_snapshot->'path_params') = 'object' AND input_snapshot ? 'query_params' AND jsonb_typeof(input_snapshot->'query_params') = 'object' AND input_snapshot ? 'headers' AND jsonb_typeof(input_snapshot->'headers') = 'object'))"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_input_snapshot_version", expression: "input_snapshot_version IN (0, 1)"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_input_snapshot_size", expression: "input_snapshot_size BETWEEN 0 AND 393216 AND (input_snapshot_version = 0 OR input_snapshot_size > 0)"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_snapshot_version", expression: "retry_policy_snapshot_version IN (0, 1)"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_snapshot_json", expression: "jsonb_typeof(retry_policy_snapshot) = 'object' AND ((retry_policy_snapshot_version = 0 AND retry_policy_snapshot = '{}'::jsonb AND retry_policy_id IS NULL) OR (retry_policy_snapshot_version = 1 AND retry_policy_id IS NOT NULL AND retry_policy_snapshot ? 'version' AND retry_policy_snapshot->>'version' = '1' AND retry_policy_snapshot ? 'policy_code' AND retry_policy_snapshot ? 'policy_version'))"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_result_size", expression: "result_size_bytes >= 0"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_http_status", expression: "result_http_status IS NULL OR result_http_status BETWEEN 100 AND 599"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_error_category", expression: "error_category = '' OR error_category IN ('configuration','credential','network','timeout','remote','response','business','concurrency','system')"},
@@ -68,6 +84,7 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 		foreignKeys := []postgresForeignKeyConstraint{
 			{model: &model.IntegrationExecution{}, name: "fk_integration_execution_system", columns: []string{"external_system_id"}, referenceModel: &model.ExternalSystem{}, referenceFields: []string{"id"}},
 			{model: &model.IntegrationExecution{}, name: "fk_integration_execution_interface", columns: []string{"interface_definition_id"}, referenceModel: &model.InterfaceDefinition{}, referenceFields: []string{"id"}},
+			{model: &model.IntegrationExecution{}, name: "fk_integration_execution_retry_policy", columns: []string{"retry_policy_id"}, referenceModel: &model.RetryPolicy{}, referenceFields: []string{"id"}},
 			{model: &model.IntegrationLog{}, name: "fk_integration_log_execution", columns: []string{"execution_id"}, referenceModel: &model.IntegrationExecution{}, referenceFields: []string{"id"}},
 		}
 		for _, foreignKey := range foreignKeys {

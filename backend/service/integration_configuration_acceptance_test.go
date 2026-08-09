@@ -32,9 +32,10 @@ func TestIntegrationConfigurationAcceptanceFlow(t *testing.T) {
 	systems := impl.NewExternalSystemRepositoryImpl(primary)
 	credentials := impl.NewCredentialRepositoryImpl(primary)
 	interfaces := impl.NewInterfaceDefinitionRepositoryImpl(primary)
+	policies := impl.NewRetryPolicyRepositoryImpl(primary)
 	systemService := NewExternalSystemService(systems, sf, auditWriter)
 	credentialService := NewCredentialService(credentials, systems, protector, sf, auditWriter)
-	interfaceService := NewInterfaceDefinitionService(interfaces, systems, credentials, sf, auditWriter)
+	interfaceService := NewInterfaceDefinitionService(interfaces, systems, credentials, policies, sf, auditWriter)
 	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(88, "integration-acceptance-admin"))
 	ctx = audit.WithCorrelationIDs(ctx, audit.CorrelationIDs{RequestID: "int-acceptance-request", TraceID: "int-acceptance-trace"})
 

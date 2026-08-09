@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -206,6 +207,45 @@ func TestInterfaceDefinitionServiceFreezesVersionedInputContract(t *testing.T) {
 	}
 }
 
+func TestInterfaceDefinitionServiceUsesExplicitEnabledRetryPolicyVersion(t *testing.T) {
+	svc, db, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
+	draft := model.RetryPolicy{
+		Basic: model.Basic{Id: 610}, PolicyCode: "interface_retry", PolicyName: "Interface Retry",
+		Version: 1, Status: model.RetryPolicyStatusDraft, MaxAttempts: 3,
+		InitialDelayMs: 5000, MaxDelayMs: 300000, BackoffType: model.RetryBackoffTypeExponential,
+		BackoffMultiplier: 2, JitterType: model.RetryJitterTypeFull, JitterRatio: 1, RetryWindowMs: 86400000,
+		RetryableErrorCategories: datatypes.JSON([]byte(`["network","timeout","remote"]`)),
+		RetryableHTTPStatuses:    datatypes.JSON([]byte(`[429,502,503,504]`)), RespectRetryAfter: true, Revision: 1,
+	}
+	testutil.MustCreate(t, db, &draft)
+	req := interfaceDefinitionCreateRequest(system.Id, "retry_reference")
+	req.RetryPolicyID = &draft.Id
+	if _, err := svc.Create(context.Background(), req); !errors.Is(err, apperrors.ErrInterfaceRetryPolicyInvalid) {
+		t.Fatalf("draft retry policy reference error=%v", err)
+	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", draft.Id).Updates(map[string]any{"status": model.RetryPolicyStatusEnabled, "state": true}).Error; err != nil {
+		t.Fatalf("enable policy fixture: %v", err)
+	}
+	created, err := svc.Create(context.Background(), req)
+	if err != nil {
+		t.Fatalf("create with enabled policy: %v", err)
+	}
+	if created.RetryPolicy == nil || created.RetryPolicy.Id != draft.Id || created.RetryPolicy.Version != 1 {
+		t.Fatalf("retry policy summary=%+v", created.RetryPolicy)
+	}
+	enabled, err := svc.Enable(context.Background(), created.Id, created.Revision)
+	if err != nil {
+		t.Fatalf("enable interface: %v", err)
+	}
+	if _, err := svc.Update(context.Background(), enabled.Id, request.InterfaceDefinitionUpdateReq{ClearRetryPolicy: true, Revision: enabled.Revision}); !errors.Is(err, apperrors.ErrInterfaceStatusInvalid) {
+		t.Fatalf("enabled retry reference mutation error=%v", err)
+	}
+	v2, err := svc.CreateVersion(context.Background(), enabled.Id, enabled.Revision)
+	if err != nil || v2.RetryPolicyID == nil || *v2.RetryPolicyID != draft.Id {
+		t.Fatalf("version retry reference=%+v err=%v", v2.RetryPolicyID, err)
+	}
+}
+
 func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 	svc, _, system := newInterfaceDefinitionTestSubject(t, &externalSystemAuditWriter{})
 	if _, err := svc.Create(context.Background(), interfaceDefinitionCreateRequest(system.Id, "shipment_query")); err != nil {
@@ -258,7 +298,7 @@ func TestInterfaceDefinitionServiceUsesRuntimeHardLimits(t *testing.T) {
 
 func newInterfaceDefinitionTestSubject(t *testing.T, writer StandardContextAuditWriter) (*InterfaceDefinitionService, *gorm.DB, model.ExternalSystem) {
 	t.Helper()
-	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.InterfaceDefinition{}, &model.Credential{})
+	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.Credential{})
 	system := model.ExternalSystem{
 		Basic: model.Basic{Id: 100, State: true}, SystemCode: "demo_erp", Name: "Demo ERP",
 		SystemType: model.ExternalSystemTypeERP, BaseURL: "https://api.example.com",
@@ -274,7 +314,7 @@ func newInterfaceDefinitionTestSubject(t *testing.T, writer StandardContextAudit
 	primary := &database.PrimaryDB{DB: db}
 	return NewInterfaceDefinitionService(
 		impl.NewInterfaceDefinitionRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary),
-		impl.NewCredentialRepositoryImpl(primary), sf, writer,
+		impl.NewCredentialRepositoryImpl(primary), impl.NewRetryPolicyRepositoryImpl(primary), sf, writer,
 	), db, system
 }
 

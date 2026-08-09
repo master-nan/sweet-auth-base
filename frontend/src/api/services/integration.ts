@@ -88,8 +88,70 @@ export interface InterfaceDefinitionDetail extends InterfaceDefinitionListItem {
   timeout_seconds: number
   response_limit: number
   retry_policy_id?: number
+  retry_policy?: RetryPolicySummary
   description: string
   gmt_create: string
+}
+
+export type RetryPolicyStatus = 'draft' | 'enabled' | 'disabled'
+export type RetryBackoffType = 'fixed' | 'exponential'
+export type RetryJitterType = 'none' | 'full'
+export type RetryErrorCategory = 'network' | 'timeout' | 'remote'
+export type RetryHTTPStatus = 429 | 502 | 503 | 504
+
+export interface RetryPolicySummary {
+  id: number
+  policy_code: string
+  policy_name: string
+  version: number
+  status: RetryPolicyStatus
+}
+
+export interface RetryPolicyListItem extends RetryPolicySummary {
+  max_attempts: number
+  backoff_type: RetryBackoffType
+  initial_delay_ms: number
+  max_delay_ms: number
+  retry_window_ms: number
+  revision: number
+  gmt_modify: string
+}
+
+export interface RetryPolicyDetail extends RetryPolicyListItem {
+  description: string
+  backoff_multiplier: number
+  jitter_type: RetryJitterType
+  jitter_ratio: number
+  retryable_error_categories: RetryErrorCategory[]
+  retryable_http_statuses: RetryHTTPStatus[]
+  respect_retry_after: boolean
+  gmt_create: string
+}
+
+export interface RetryPolicyCreateRequest {
+  policy_code: string
+  policy_name: string
+  description?: string
+  max_attempts: number
+  initial_delay_ms: number
+  max_delay_ms: number
+  backoff_type: RetryBackoffType
+  backoff_multiplier: number
+  jitter_type: RetryJitterType
+  jitter_ratio: number
+  retry_window_ms: number
+  retryable_error_categories: RetryErrorCategory[]
+  retryable_http_statuses: RetryHTTPStatus[]
+  respect_retry_after: boolean
+}
+
+export interface RetryPolicyUpdateRequest extends Omit<RetryPolicyCreateRequest, 'policy_code'> {
+  revision: number
+}
+
+export interface RetryPolicyQuery extends Query {
+  status?: RetryPolicyStatus | ''
+  backoff_type?: RetryBackoffType | ''
 }
 
 export interface InterfaceDefinitionCreateRequest {
@@ -360,6 +422,40 @@ export const useIntegrationApi = () => ({
       .put<
         ResponseData<InterfaceDefinitionDetail>
       >(`/admin/integration/interface-definition/${id}/disable`, { revision })
+      .then((response) => response.data),
+  queryRetryPolicies: (query: RetryPolicyQuery) =>
+    instance
+      .post<ResponseData<RetryPolicyListItem[]>>('/admin/integration/retry-policy/query', query)
+      .then((response) => response.data),
+  getRetryPolicy: (id: number) =>
+    instance
+      .get<ResponseData<RetryPolicyDetail>>(`/admin/integration/retry-policy/${id}`)
+      .then((response) => response.data),
+  createRetryPolicy: (request: RetryPolicyCreateRequest) =>
+    instance
+      .post<ResponseData<RetryPolicyDetail>>('/admin/integration/retry-policy', request)
+      .then((response) => response.data),
+  updateRetryPolicy: (id: number, request: RetryPolicyUpdateRequest) =>
+    instance
+      .put<ResponseData<RetryPolicyDetail>>(`/admin/integration/retry-policy/${id}`, request)
+      .then((response) => response.data),
+  createRetryPolicyVersion: (id: number, revision: number) =>
+    instance
+      .post<ResponseData<RetryPolicyDetail>>(`/admin/integration/retry-policy/${id}/versions`, {
+        revision,
+      })
+      .then((response) => response.data),
+  enableRetryPolicy: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<RetryPolicyDetail>>(`/admin/integration/retry-policy/${id}/enable`, {
+        revision,
+      })
+      .then((response) => response.data),
+  disableRetryPolicy: (id: number, revision: number) =>
+    instance
+      .put<ResponseData<RetryPolicyDetail>>(`/admin/integration/retry-policy/${id}/disable`, {
+        revision,
+      })
       .then((response) => response.data),
   queryCredentials: (query: CredentialQuery) =>
     instance

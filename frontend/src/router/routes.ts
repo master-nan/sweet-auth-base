@@ -304,6 +304,16 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
+        component: () => import('pages/integration/retry-policy/Index.vue'),
+        path: 'retry-policy',
+        name: 'integration_retry_policy',
+        meta: {
+          title: 'router.integration.retryPolicy',
+          icon: 'autorenew',
+          keepAlive: true,
+        },
+      },
+      {
         component: () => import('pages/integration/execution/Index.vue'),
         path: 'execution',
         name: 'integration_execution',

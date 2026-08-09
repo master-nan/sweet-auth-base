@@ -232,6 +232,15 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/credential/:id/disable", app.CredentialController.Disable)
 		adminGroup.PUT("/integration/credential/:id/revoke", app.CredentialController.Revoke)
 
+		// 集成中心 - 重试策略配置，仅管理版本化策略，不触发运行时重试。
+		adminGroup.POST("/integration/retry-policy/query", app.RetryPolicyController.Query)
+		adminGroup.GET("/integration/retry-policy/:id", app.RetryPolicyController.Detail)
+		adminGroup.POST("/integration/retry-policy", app.RetryPolicyController.Create)
+		adminGroup.PUT("/integration/retry-policy/:id", app.RetryPolicyController.Update)
+		adminGroup.POST("/integration/retry-policy/:id/versions", app.RetryPolicyController.CreateVersion)
+		adminGroup.PUT("/integration/retry-policy/:id/enable", app.RetryPolicyController.Enable)
+		adminGroup.PUT("/integration/retry-policy/:id/disable", app.RetryPolicyController.Disable)
+
 		// 集成执行与调用日志只暴露管理查询、提交和安全取消；状态收敛由 Worker 与 Engine 完成。
 		adminGroup.POST("/integration/execution/query", app.IntegrationExecutionController.Query)
 		adminGroup.GET("/integration/execution/:id", app.IntegrationExecutionController.Detail)

@@ -47,6 +47,7 @@ type App struct {
 	ExternalSystemController       *controller.ExternalSystemController
 	InterfaceDefinitionController  *controller.InterfaceDefinitionController
 	CredentialController           *controller.CredentialController
+	RetryPolicyController          *controller.RetryPolicyController
 	IntegrationExecutionController *controller.IntegrationExecutionController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
@@ -94,6 +95,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewExternalSystemRepositoryImpl,
 	impl.NewInterfaceDefinitionRepositoryImpl,
 	impl.NewCredentialRepositoryImpl,
+	impl.NewRetryPolicyRepositoryImpl,
 	impl.NewIntegrationExecutionRepositoryImpl,
 	impl.NewIntegrationLogRepositoryImpl,
 	impl.NewGeneralizationRepositoryImpl,
@@ -144,6 +146,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.ExternalSystemRepository), new(*impl.ExternalSystemRepositoryImpl)),
 	wire.Bind(new(repository.InterfaceDefinitionRepository), new(*impl.InterfaceDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.CredentialRepository), new(*impl.CredentialRepositoryImpl)),
+	wire.Bind(new(repository.RetryPolicyRepository), new(*impl.RetryPolicyRepositoryImpl)),
 	wire.Bind(new(repository.IntegrationExecutionRepository), new(*impl.IntegrationExecutionRepositoryImpl)),
 	wire.Bind(new(repository.IntegrationLogRepository), new(*impl.IntegrationLogRepositoryImpl)),
 	wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)),
@@ -241,6 +244,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewInterfaceDefinitionService,
 	security.NewCredentialSecretProtector,
 	service.NewCredentialService,
+	service.NewRetryPolicyService,
 	service.NewIntegrationExecutionService,
 	integration.NewCredentialProvider,
 	service.NewDingTalkService,
@@ -259,6 +263,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewExternalSystemController,
 	controller.NewInterfaceDefinitionController,
 	controller.NewCredentialController,
+	controller.NewRetryPolicyController,
 	controller.NewIntegrationExecutionController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,

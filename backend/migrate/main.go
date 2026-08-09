@@ -546,6 +546,31 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "集成重试策略状态",
+			code: "integration_retry_policy_status",
+			items: []systemDictItemSeed{
+				{name: "草稿", code: "integration_retry_policy_status_draft", value: model.RetryPolicyStatusDraft},
+				{name: "已启用", code: "integration_retry_policy_status_enabled", value: model.RetryPolicyStatusEnabled},
+				{name: "已停用", code: "integration_retry_policy_status_disabled", value: model.RetryPolicyStatusDisabled},
+			},
+		},
+		{
+			name: "集成重试退避类型",
+			code: "integration_retry_backoff_type",
+			items: []systemDictItemSeed{
+				{name: "固定间隔", code: "integration_retry_backoff_type_fixed", value: model.RetryBackoffTypeFixed},
+				{name: "指数退避", code: "integration_retry_backoff_type_exponential", value: model.RetryBackoffTypeExponential},
+			},
+		},
+		{
+			name: "集成重试抖动类型",
+			code: "integration_retry_jitter_type",
+			items: []systemDictItemSeed{
+				{name: "无抖动", code: "integration_retry_jitter_type_none", value: model.RetryJitterTypeNone},
+				{name: "全抖动", code: "integration_retry_jitter_type_full", value: model.RetryJitterTypeFull},
+			},
+		},
+		{
 			name: "集成执行状态",
 			code: "integration_execution_status",
 			items: []systemDictItemSeed{
@@ -2036,6 +2061,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: externalSystemTableCode, name: "外部系统"},
 		{code: interfaceDefinitionTableCode, name: "接口定义"},
 		{code: credentialTableCode, name: "集成凭证"},
+		{code: retryPolicyTableCode, name: "重试策略"},
 		{code: integrationExecutionTableCode, name: "执行记录"},
 		{code: integrationLogTableCode, name: "调用日志"},
 		{code: "casbin_rule", name: "接口权限规则"},
@@ -2219,6 +2245,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyExternalSystemFieldDefaults(tableCode, &field)
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyCredentialFieldDefaults(tableCode, &field)
+	applyRetryPolicyFieldDefaults(tableCode, &field)
 	applyIntegrationExecutionFieldDefaults(tableCode, &field)
 	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
@@ -2378,6 +2405,16 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 			return "integration_credential_type"
 		case "status":
 			return "integration_credential_status"
+		}
+	}
+	if tableCode == retryPolicyTableCode {
+		switch fieldCode {
+		case "status":
+			return "integration_retry_policy_status"
+		case "backoff_type":
+			return "integration_retry_backoff_type"
+		case "jitter_type":
+			return "integration_retry_jitter_type"
 		}
 	}
 	if tableCode == integrationExecutionTableCode {
@@ -2653,6 +2690,42 @@ func applyCredentialFieldDefaults(tableCode string, field *model.SysTableField) 
 		field.InputType = enum.DatetimePickerInputType
 		field.Sequence = 10
 	case "secret_storage_ref", "secret_ciphertext", "secret_nonce", "secret_fingerprint":
+		field.IsSort = false
+	}
+}
+
+func applyRetryPolicyFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != retryPolicyTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "policy_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "策略编码", true, true, true, 1
+	case "policy_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "策略名称", true, true, true, 2
+	case "version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "版本", true, true, 3
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_retry_policy_status"), 4
+	case "max_attempts":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "最大尝试次数", true, true, 5
+	case "backoff_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "退避方式", true, true, enum.SelectInputType, utils.StringPtr("integration_retry_backoff_type"), 6
+	case "initial_delay_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "初始延迟（毫秒）", true, 7
+	case "max_delay_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "最大延迟（毫秒）", true, 8
+	case "retry_window_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "重试窗口（毫秒）", true, 9
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "更新时间", true, true, enum.DatetimePickerInputType, 10
+	case "retryable_error_categories", "retryable_http_statuses", "description", "respect_retry_after", "backoff_multiplier", "jitter_type", "jitter_ratio":
 		field.IsSort = false
 	}
 }

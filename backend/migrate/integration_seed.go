@@ -16,9 +16,11 @@ const (
 	credentialMenuID              = 1203
 	executionMenuID               = 1204
 	logMenuID                     = 1205
+	retryPolicyMenuID             = 1206
 	externalSystemTableCode       = "integration_external_system"
 	interfaceDefinitionTableCode  = "integration_interface_definition"
 	credentialTableCode           = "integration_credential"
+	retryPolicyTableCode          = "integration_retry_policy"
 	integrationExecutionTableCode = "integration_execution"
 	integrationLogTableCode       = "integration_log"
 )
@@ -55,16 +57,23 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	if err != nil {
 		return err
 	}
+	retryPolicyMenu, err := seedMenu(db, sf, menuWithTable(menu(
+		retryPolicyMenuID, root.Id, "integration_retry_policy", "retry-policy",
+		"pages/integration/retry-policy/Index.vue", "router.integration.retryPolicy", "autorenew", 4,
+	), retryPolicyTableCode))
+	if err != nil {
+		return err
+	}
 	executionMenu, err := seedMenu(db, sf, menuWithTable(menu(
 		executionMenuID, root.Id, "integration_execution", "execution",
-		"pages/integration/execution/Index.vue", "router.integration.execution", "play_circle", 4,
+		"pages/integration/execution/Index.vue", "router.integration.execution", "play_circle", 5,
 	), integrationExecutionTableCode))
 	if err != nil {
 		return err
 	}
 	logMenu, err := seedMenu(db, sf, menuWithTable(menu(
 		logMenuID, root.Id, "integration_log", "log",
-		"pages/integration/log/Index.vue", "router.integration.log", "history", 5,
+		"pages/integration/log/Index.vue", "router.integration.log", "history", 6,
 	), integrationLogTableCode))
 	if err != nil {
 		return err
@@ -74,7 +83,7 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	if err != nil {
 		return err
 	}
-	for _, item := range []model.SysMenu{root, child, interfaceMenu, credentialMenu, executionMenu, logMenu} {
+	for _, item := range []model.SysMenu{root, child, interfaceMenu, credentialMenu, retryPolicyMenu, executionMenu, logMenu} {
 		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.SysRoleMenu{
 			RoleId: role.Id,
 			MenuId: item.Id,
@@ -117,6 +126,14 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 		menuButtonWithAPI(12207, credentialMenu.Id, "启用", "integration_credential_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/credential/:id/enable", "PUT"),
 		menuButtonWithAPI(12208, credentialMenu.Id, "停用", "integration_credential_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/credential/:id/disable", "PUT"),
 		menuButtonWithAPI(12209, credentialMenu.Id, "吊销", "integration_credential_revoke", enum.Line, "revoke", "gpp_bad", "negative", 5, "/admin/integration/credential/:id/revoke", "PUT"),
+		apiPermissionWithAPI(12401, retryPolicyMenu.Id, "列表查询", "integration_retry_policy_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/retry-policy/query", "POST"),
+		menuButtonWithAPI(12402, retryPolicyMenu.Id, "详情", "integration_retry_policy_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/retry-policy/:id", "GET"),
+		apiPermissionWithAPI(12403, retryPolicyMenu.Id, "页面元数据", "integration_retry_policy_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
+		menuButtonWithAPI(12404, retryPolicyMenu.Id, "新增", "integration_retry_policy_create", enum.Top, "create", "add", "primary", 1, "/admin/integration/retry-policy", "POST"),
+		menuButtonWithAPI(12405, retryPolicyMenu.Id, "编辑", "integration_retry_policy_update", enum.Line, "update", "edit", "primary", 1, "/admin/integration/retry-policy/:id", "PUT"),
+		menuButtonWithAPI(12406, retryPolicyMenu.Id, "创建版本", "integration_retry_policy_create_version", enum.Line, "create_version", "content_copy", "primary", 2, "/admin/integration/retry-policy/:id/versions", "POST"),
+		menuButtonWithAPI(12407, retryPolicyMenu.Id, "启用", "integration_retry_policy_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/retry-policy/:id/enable", "PUT"),
+		menuButtonWithAPI(12408, retryPolicyMenu.Id, "停用", "integration_retry_policy_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/retry-policy/:id/disable", "PUT"),
 		apiPermissionWithAPI(12301, executionMenu.Id, "执行列表查询", "integration_execution_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/execution/query", "POST"),
 		menuButtonWithAPI(12302, executionMenu.Id, "执行详情", "integration_execution_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/execution/:id", "GET"),
 		apiPermissionWithAPI(12303, root.Id, "提交执行", "integration_execution_create", enum.Top, "create", "add", "primary", 120, "/admin/integration/execution", "POST"),

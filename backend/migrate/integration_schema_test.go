@@ -6,6 +6,7 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,6 +133,102 @@ func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 	}
 	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).Updates(map[string]any{"status": model.InterfaceDefinitionStatusEnabled, "state": true}).Error; err == nil {
 		t.Fatal("expected PostgreSQL runtime contract CHECK to reject incompatible enable")
+	}
+}
+
+func TestRetryPolicyPostgresConstraintsAndExecutionSnapshot(t *testing.T) {
+	dsn := testutil.PostgreSQLDSN(t)
+	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	schemaName := fmt.Sprintf("integration_retry_policy_%d", time.Now().UnixNano())
+	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)).Error; err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() { _ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
+	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
+	})
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL schema: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("initial configuration migration: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("repeat configuration migration: %v", err)
+	}
+
+	policy := postgresRetryPolicyFixture(9101, 1, model.RetryPolicyStatusEnabled)
+	if err := db.Create(&policy).Error; err != nil {
+		t.Fatalf("create enabled retry policy: %v", err)
+	}
+	conflict := postgresRetryPolicyFixture(9102, 2, model.RetryPolicyStatusEnabled)
+	if err := db.Create(&conflict).Error; err == nil {
+		t.Fatal("expected partial unique index to reject two enabled versions")
+	}
+	invalidAttempts := postgresRetryPolicyFixture(9103, 2, model.RetryPolicyStatusDraft)
+	invalidAttempts.MaxAttempts = 11
+	if err := db.Create(&invalidAttempts).Error; err == nil {
+		t.Fatal("expected max_attempts CHECK to reject invalid value")
+	}
+	invalidHTTP := postgresRetryPolicyFixture(9104, 2, model.RetryPolicyStatusDraft)
+	invalidHTTP.RetryableHTTPStatuses = datatypes.JSON([]byte(`[500]`))
+	if err := db.Create(&invalidHTTP).Error; err == nil {
+		t.Fatal("expected HTTP status whitelist CHECK to reject invalid value")
+	}
+	var indexCount int64
+	if err := db.Raw(`SELECT COUNT(*) FROM pg_indexes WHERE schemaname = current_schema() AND indexname = 'uni_integration_retry_policy_enabled'`).Scan(&indexCount).Error; err != nil || indexCount != 1 {
+		t.Fatalf("partial index count=%d err=%v", indexCount, err)
+	}
+
+	system := model.ExternalSystem{Basic: model.Basic{Id: 9201, State: true}, SystemCode: "retry_pg", Name: "Retry PG", SystemType: model.ExternalSystemTypeERP, BaseURL: "https://example.com", OwnerIdentifier: "owner", OwnerName: "owner", Status: model.ExternalSystemStatusEnabled, Revision: 1}
+	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 9202, State: true}, ExternalSystemID: system.Id, InterfaceCode: "retry_call", Name: "Retry Call", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/retry", InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)), TimeoutSeconds: 30, ResponseLimit: 1024, RetryPolicyID: &policy.Id, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
+	if err := db.Create(&system).Error; err != nil {
+		t.Fatalf("create system: %v", err)
+	}
+	if err := db.Create(&definition).Error; err != nil {
+		t.Fatalf("create interface: %v", err)
+	}
+	if err := migrateIntegrationRuntimeSchema(db); err != nil {
+		t.Fatalf("runtime migration: %v", err)
+	}
+	if err := migrateIntegrationRuntimeSchema(db); err != nil {
+		t.Fatalf("repeat runtime migration: %v", err)
+	}
+	execution := model.IntegrationExecution{
+		Basic: model.Basic{Id: 9301}, ExecutionNo: "EXEC-RETRY-PG", ExternalSystemID: system.Id,
+		ExternalSystemCode: system.SystemCode, ExternalSystemName: system.Name, InterfaceDefinitionID: definition.Id,
+		InterfaceCode: definition.InterfaceCode, InterfaceName: definition.Name, InterfaceVersion: definition.Version,
+		TriggerSource: model.IntegrationTriggerSourceManual, Status: model.IntegrationExecutionStatusSucceeded,
+		IdempotencyScope: "retry-pg", IdempotencyKey: "snapshot", InputHash: strings.Repeat("a", 64),
+		InputSnapshot: datatypes.JSON([]byte(`{"version":1,"path_params":{},"query_params":{},"headers":{}}`)), InputSnapshotVersion: 1, InputSnapshotSize: 68,
+		RetryPolicyID:              &policy.Id,
+		RetryPolicySnapshot:        datatypes.JSON([]byte(`{"version":1,"policy_code":"pg_retry","policy_version":1,"max_attempts":3,"initial_delay_ms":5000,"max_delay_ms":300000,"backoff_type":"exponential","backoff_multiplier":"2","jitter_type":"full","jitter_ratio":"1","retry_window_ms":86400000,"retryable_error_categories":["network","remote","timeout"],"retryable_http_statuses":[429,502,503,504],"respect_retry_after":true}`)),
+		RetryPolicySnapshotVersion: 1, Revision: 1,
+	}
+	if err := db.Create(&execution).Error; err != nil {
+		t.Fatalf("persist execution retry snapshot: %v", err)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, execution.Id).Error; err != nil {
+		t.Fatalf("load execution retry snapshot: %v", err)
+	}
+	if stored.RetryPolicyID == nil || *stored.RetryPolicyID != policy.Id || stored.RetryPolicySnapshotVersion != 1 || !strings.Contains(string(stored.RetryPolicySnapshot), `"policy_code": "pg_retry"`) {
+		t.Fatalf("unexpected PostgreSQL retry snapshot: id=%v version=%d snapshot=%s", stored.RetryPolicyID, stored.RetryPolicySnapshotVersion, stored.RetryPolicySnapshot)
+	}
+}
+
+func postgresRetryPolicyFixture(id, version int, status string) model.RetryPolicy {
+	return model.RetryPolicy{
+		Basic: model.Basic{Id: id, State: status == model.RetryPolicyStatusEnabled}, PolicyCode: "pg_retry", PolicyName: "PG Retry",
+		Version: version, Status: status, MaxAttempts: 3, InitialDelayMs: 5000, MaxDelayMs: 300000,
+		BackoffType: model.RetryBackoffTypeExponential, BackoffMultiplier: 2,
+		JitterType: model.RetryJitterTypeFull, JitterRatio: 1, RetryWindowMs: 86400000,
+		RetryableErrorCategories: datatypes.JSON([]byte(`["network","timeout","remote"]`)),
+		RetryableHTTPStatuses:    datatypes.JSON([]byte(`[429,502,503,504]`)), RespectRetryAfter: true, Revision: 1,
 	}
 }
 
@@ -330,6 +427,30 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	}
 	if buttonCount != 9 {
 		t.Fatalf("credential button count = %d, want 9", buttonCount)
+	}
+	var retryPolicyMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_retry_policy").First(&retryPolicyMenu).Error; err != nil {
+		t.Fatalf("load retry policy menu: %v", err)
+	}
+	if retryPolicyMenu.TableCode != retryPolicyTableCode || retryPolicyMenu.Title != "router.integration.retryPolicy" || retryPolicyMenu.Sequence != 4 {
+		t.Fatalf("unexpected retry policy menu: %+v", retryPolicyMenu)
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", retryPolicyMenu.Id).Count(&buttonCount).Error; err != nil {
+		t.Fatalf("count retry policy buttons: %v", err)
+	}
+	if buttonCount != 8 {
+		t.Fatalf("retry policy button count = %d, want 8", buttonCount)
+	}
+	var forbiddenRetryButtons int64
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND event_action IN ?", retryPolicyMenu.Id, []string{"delete", "retry_now", "replay"}).Count(&forbiddenRetryButtons).Error; err != nil || forbiddenRetryButtons != 0 {
+		t.Fatalf("forbidden retry buttons=%d err=%v", forbiddenRetryButtons, err)
+	}
+	var retryPolicyCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/retry-policy%").Count(&retryPolicyCasbinCount).Error; err != nil {
+		t.Fatalf("count retry policy Casbin policies: %v", err)
+	}
+	if retryPolicyCasbinCount != 7 {
+		t.Fatalf("retry policy Casbin policy count = %d, want 7", retryPolicyCasbinCount)
 	}
 	var credentialCasbinCount int64
 	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/credential%").Count(&credentialCasbinCount).Error; err != nil {

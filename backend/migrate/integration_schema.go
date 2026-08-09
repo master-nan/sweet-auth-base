@@ -10,13 +10,28 @@ import (
 
 func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{}); err != nil {
+		if err := tx.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}); err != nil {
 			return fmt.Errorf("auto migrate external system: %w", err)
 		}
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
 		limits := integration.RuntimeLimits()
+		if err := tx.Exec(`
+			UPDATE integration_interface_definition AS definition
+			SET status = 'disabled', state = FALSE, revision = revision + 1, gmt_modify = CURRENT_TIMESTAMP
+			WHERE definition.gmt_delete IS NULL
+			  AND definition.status = 'enabled'
+			  AND definition.retry_policy_id IS NOT NULL
+			  AND NOT EXISTS (
+				SELECT 1 FROM integration_retry_policy AS policy
+				WHERE policy.id = definition.retry_policy_id
+				  AND policy.status = 'enabled'
+				  AND policy.gmt_delete IS NULL
+			  )
+		`).Error; err != nil {
+			return fmt.Errorf("disable interface definitions with invalid retry policy: %w", err)
+		}
 		if err := tx.Exec(`
 			UPDATE integration_interface_definition
 			SET status = 'disabled', state = FALSE, revision = revision + 1, gmt_modify = CURRENT_TIMESTAMP
@@ -59,6 +74,17 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 			{model: &model.Credential{}, name: "chk_integration_credential_status", expression: "status IN ('draft','active','disabled','revoked')"},
 			{model: &model.Credential{}, name: "chk_integration_credential_version", expression: "version > 0"},
 			{model: &model.Credential{}, name: "chk_integration_credential_revision", expression: "revision > 0"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_status", expression: "status IN ('draft','enabled','disabled')"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_version", expression: "version > 0"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_attempts", expression: "max_attempts BETWEEN 1 AND 10"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_initial_delay", expression: "initial_delay_ms BETWEEN 1000 AND 3600000"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_max_delay", expression: "max_delay_ms >= initial_delay_ms AND max_delay_ms <= 86400000"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_backoff", expression: "(backoff_type = 'fixed' AND backoff_multiplier = 1) OR (backoff_type = 'exponential' AND backoff_multiplier BETWEEN 1.1 AND 4)"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_jitter", expression: "(jitter_type = 'none' AND jitter_ratio = 0) OR (jitter_type = 'full' AND jitter_ratio = 1)"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_window", expression: "retry_window_ms BETWEEN 60000 AND 604800000 AND retry_window_ms >= initial_delay_ms"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_error_categories", expression: "jsonb_typeof(retryable_error_categories) = 'array' AND retryable_error_categories <@ '[\"network\",\"timeout\",\"remote\"]'::jsonb"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_http_statuses", expression: "jsonb_typeof(retryable_http_statuses) = 'array' AND retryable_http_statuses <@ '[429,502,503,504]'::jsonb"},
+			{model: &model.RetryPolicy{}, name: "chk_integration_retry_policy_revision", expression: "revision > 0"},
 		}
 		for _, check := range checks {
 			if err := createPostgresCheckConstraint(tx, check); err != nil {
@@ -71,6 +97,19 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 			WHERE status = 'enabled' AND gmt_delete IS NULL
 		`).Error; err != nil {
 			return fmt.Errorf("create enabled interface version index: %w", err)
+		}
+		if err := tx.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS uni_integration_retry_policy_enabled
+			ON integration_retry_policy (policy_code)
+			WHERE status = 'enabled' AND gmt_delete IS NULL
+		`).Error; err != nil {
+			return fmt.Errorf("create enabled retry policy version index: %w", err)
+		}
+		if err := createPostgresForeignKeyConstraint(tx, postgresForeignKeyConstraint{
+			model: &model.InterfaceDefinition{}, name: "fk_integration_interface_retry_policy",
+			columns: []string{"retry_policy_id"}, referenceModel: &model.RetryPolicy{}, referenceFields: []string{"id"},
+		}); err != nil {
+			return err
 		}
 		return nil
 	})

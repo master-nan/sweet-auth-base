@@ -61,13 +61,4 @@ func (r *InterfaceDefinitionRepositoryImpl) HasEnabledVersion(tx *gorm.DB, syste
 	return count > 0, err
 }
 
-func (r *InterfaceDefinitionRepositoryImpl) RetryPolicyReferenceValid(tx *gorm.DB, id int) (bool, error) {
-	if !tx.Migrator().HasTable("integration_retry_policy") {
-		return false, nil
-	}
-	var count int64
-	err := tx.Table("integration_retry_policy").Where("id = ? AND state = ? AND gmt_delete IS NULL", id, true).Count(&count).Error
-	return count == 1, err
-}
-
 var _ repository.InterfaceDefinitionRepository = (*InterfaceDefinitionRepositoryImpl)(nil)

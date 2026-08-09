@@ -161,13 +161,14 @@ func TestIntegrationWorkerRunnerPostgreSQLJSONBAndTLSEndToEnd(t *testing.T) {
 	logs := impl.NewIntegrationLogRepositoryImpl(primary)
 	systems := impl.NewExternalSystemRepositoryImpl(primary)
 	interfaces := impl.NewInterfaceDefinitionRepositoryImpl(primary)
+	policies := impl.NewRetryPolicyRepositoryImpl(primary)
 	credentials := impl.NewCredentialRepositoryImpl(primary)
 	snowflake, err := utils.NewSnowflake(9)
 	if err != nil {
 		t.Fatalf("create snowflake: %v", err)
 	}
 	applicationService := service.NewIntegrationExecutionService(
-		executions, logs, systems, interfaces, snowflake, runtimeAcceptanceAuditWriter{},
+		executions, logs, systems, interfaces, policies, snowflake, runtimeAcceptanceAuditWriter{},
 	)
 	submitContext, cancelSubmit := context.WithCancel(context.Background())
 	created, err := applicationService.CreateExecution(submitContext, request.IntegrationExecutionCreateReq{

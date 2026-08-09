@@ -23,6 +23,7 @@ export default {
       externalSystem: 'External Systems',
       interfaceDefinition: 'Interface Definitions',
       credential: 'Integration Credentials',
+      retryPolicy: 'Retry Policies',
       execution: 'Executions',
       log: 'Call Logs',
       executionDetail: 'Execution Detail',

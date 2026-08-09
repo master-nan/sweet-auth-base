@@ -22,5 +22,4 @@ type InterfaceDefinitionRepository interface {
 	GetRuntimeInterfaceDefinition(context.Context, int) (InterfaceDefinitionRuntimeRecord, error)
 	NextVersion(*gorm.DB, int, string) (int, error)
 	HasEnabledVersion(*gorm.DB, int, string, int) (bool, error)
-	RetryPolicyReferenceValid(*gorm.DB, int) (bool, error)
 }

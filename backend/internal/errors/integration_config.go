@@ -35,6 +35,15 @@ const (
 	ErrorCodeCredentialExternalSystemInvalid = 130209
 	ErrorCodeCredentialExpired               = 130210
 	ErrorCodeCredentialProtectionFailed      = 130211
+	ErrorCodeRetryPolicyNotFound             = 130301
+	ErrorCodeRetryPolicyCodeDuplicate        = 130302
+	ErrorCodeRetryPolicyCodeInvalid          = 130303
+	ErrorCodeRetryPolicyFieldImmutable       = 130304
+	ErrorCodeRetryPolicyStatusInvalid        = 130305
+	ErrorCodeRetryPolicyConfigurationInvalid = 130306
+	ErrorCodeRetryPolicyRevisionConflict     = 130307
+	ErrorCodeRetryPolicyEnabledConflict      = 130308
+	ErrorCodeRetryPolicyReferenced           = 130309
 )
 
 var (
@@ -70,4 +79,13 @@ var (
 	ErrCredentialExternalSystemInvalid = NewBusinessError(http.StatusConflict, ErrorCodeCredentialExternalSystemInvalid, "所属外部系统不存在或状态不允许")
 	ErrCredentialExpired               = NewBusinessError(http.StatusConflict, ErrorCodeCredentialExpired, "凭证已经过期，不能启用")
 	ErrCredentialProtectionFailed      = NewBusinessError(http.StatusInternalServerError, ErrorCodeCredentialProtectionFailed, "凭证秘密保护失败")
+	ErrRetryPolicyNotFound             = NewBusinessError(http.StatusNotFound, ErrorCodeRetryPolicyNotFound, "重试策略不存在")
+	ErrRetryPolicyCodeDuplicate        = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyCodeDuplicate, "重试策略编码已存在")
+	ErrRetryPolicyCodeInvalid          = NewBusinessError(http.StatusBadRequest, ErrorCodeRetryPolicyCodeInvalid, "重试策略编码格式不合法")
+	ErrRetryPolicyFieldImmutable       = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyFieldImmutable, "重试策略身份字段不可修改")
+	ErrRetryPolicyStatusInvalid        = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyStatusInvalid, "重试策略当前状态不允许执行该操作")
+	ErrRetryPolicyConfigurationInvalid = NewBusinessError(http.StatusBadRequest, ErrorCodeRetryPolicyConfigurationInvalid, "重试策略参数组合不合法")
+	ErrRetryPolicyRevisionConflict     = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyRevisionConflict, "重试策略已被其他操作修改，请刷新后重试")
+	ErrRetryPolicyEnabledConflict      = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyEnabledConflict, "同一策略编码已有启用版本")
+	ErrRetryPolicyReferenced           = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyReferenced, "重试策略仍被已启用接口引用")
 )

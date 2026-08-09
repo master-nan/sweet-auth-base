@@ -279,11 +279,51 @@ func TestIntegrationExecutionServiceRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
+func TestIntegrationExecutionServiceFreezesRetryPolicySnapshot(t *testing.T) {
+	svc, db, system, definition, _ := newIntegrationExecutionTestSubject(t)
+	policy := model.RetryPolicy{
+		Basic: model.Basic{Id: 850, State: true}, PolicyCode: "runtime_retry", PolicyName: "Runtime Retry",
+		Version: 1, Status: model.RetryPolicyStatusEnabled, MaxAttempts: 3,
+		InitialDelayMs: 5000, MaxDelayMs: 300000, BackoffType: model.RetryBackoffTypeExponential,
+		BackoffMultiplier: 2, JitterType: model.RetryJitterTypeFull, JitterRatio: 1,
+		RetryWindowMs: 86400000, RetryableErrorCategories: datatypes.JSON([]byte(`["network","timeout","remote"]`)),
+		RetryableHTTPStatuses: datatypes.JSON([]byte(`[429,502,503,504]`)), RespectRetryAfter: true, Revision: 1,
+	}
+	testutil.MustCreate(t, db, &policy)
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", definition.Id).Update("retry_policy_id", policy.Id).Error; err != nil {
+		t.Fatalf("attach retry policy: %v", err)
+	}
+	created, err := svc.CreateExecution(context.Background(), integrationExecutionCreateRequest(system.Id, definition.Id, "retry-snapshot"))
+	if err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+	if created.RetryPolicy == nil || created.RetryPolicy.PolicyCode != policy.PolicyCode || created.RetryPolicy.PolicyVersion != 1 || created.RetryPolicy.MaxAttempts != 3 {
+		t.Fatalf("retry summary=%+v", created.RetryPolicy)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, created.Id).Error; err != nil {
+		t.Fatalf("load execution: %v", err)
+	}
+	before := append([]byte(nil), stored.RetryPolicySnapshot...)
+	if stored.RetryPolicySnapshotVersion != 1 || stored.RetryPolicyID == nil || *stored.RetryPolicyID != policy.Id {
+		t.Fatalf("stored retry snapshot metadata=%+v", stored)
+	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", policy.Id).Updates(map[string]any{"status": model.RetryPolicyStatusDisabled, "max_attempts": 9}).Error; err != nil {
+		t.Fatalf("mutate source policy: %v", err)
+	}
+	if err := db.First(&stored, created.Id).Error; err != nil {
+		t.Fatalf("reload execution: %v", err)
+	}
+	if string(stored.RetryPolicySnapshot) != string(before) || !strings.Contains(string(stored.RetryPolicySnapshot), `"max_attempts":3`) {
+		t.Fatalf("execution snapshot drifted: %s", stored.RetryPolicySnapshot)
+	}
+}
+
 func newIntegrationExecutionTestSubject(
 	t *testing.T,
 ) (*IntegrationExecutionService, *gorm.DB, model.ExternalSystem, model.InterfaceDefinition, *integrationExecutionAuditWriter) {
 	t.Helper()
-	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
+	db := testutil.OpenSQLite(t, &model.ExternalSystem{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationExecution{}, &model.IntegrationLog{})
 	system := model.ExternalSystem{
 		Basic: model.Basic{Id: 100, State: true}, SystemCode: "runtime_hr", Name: "Runtime HR",
 		SystemType: model.ExternalSystemTypeHR, BaseURL: "https://hr.example.com",
@@ -311,6 +351,7 @@ func newIntegrationExecutionTestSubject(
 		impl.NewIntegrationLogRepositoryImpl(primary),
 		impl.NewExternalSystemRepositoryImpl(primary),
 		impl.NewInterfaceDefinitionRepositoryImpl(primary),
+		impl.NewRetryPolicyRepositoryImpl(primary),
 		sf,
 		auditWriter,
 	), db, system, definition, auditWriter

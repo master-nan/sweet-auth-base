@@ -23,6 +23,7 @@ export default {
       externalSystem: '外部系统',
       interfaceDefinition: '接口定义',
       credential: '集成凭证',
+      retryPolicy: '重试策略',
       execution: '执行记录',
       log: '调用日志',
       executionDetail: '执行详情',

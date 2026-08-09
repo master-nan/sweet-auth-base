@@ -37,6 +37,7 @@ type InterfaceDefinitionService struct {
 	repository  repository.InterfaceDefinitionRepository
 	systems     repository.ExternalSystemRepository
 	credentials repository.CredentialRepository
+	policies    repository.RetryPolicyRepository
 	sf          *utils.Snowflake
 	audit       StandardContextAuditWriter
 	now         func() time.Time
@@ -46,11 +47,12 @@ func NewInterfaceDefinitionService(
 	repository repository.InterfaceDefinitionRepository,
 	systems repository.ExternalSystemRepository,
 	credentials repository.CredentialRepository,
+	policies repository.RetryPolicyRepository,
 	sf *utils.Snowflake,
 	audit StandardContextAuditWriter,
 ) *InterfaceDefinitionService {
 	return &InterfaceDefinitionService{
-		repository: repository, systems: systems, credentials: credentials, sf: sf, audit: audit, now: time.Now,
+		repository: repository, systems: systems, credentials: credentials, policies: policies, sf: sf, audit: audit, now: time.Now,
 	}
 }
 
@@ -107,7 +109,11 @@ func (s *InterfaceDefinitionService) Create(ctx context.Context, req request.Int
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now()), nil
+	policy, err := s.loadRetryPolicySummary(ctx, value.RetryPolicyID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now(), policy), nil
 }
 
 func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.InterfaceDefinitionDetailRes, error) {
@@ -126,7 +132,11 @@ func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now()), nil
+	policy, err := s.loadRetryPolicySummary(ctx, value.RetryPolicyID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now(), policy), nil
 }
 
 func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq, table model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error) {
@@ -137,6 +147,7 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 	}
 	ids := make([]int, 0, len(result.Data))
 	credentialIDs := make([]int, 0, len(result.Data))
+	policyIDs := make([]int, 0, len(result.Data))
 	seen := make(map[int]struct{}, len(result.Data))
 	for _, item := range result.Data {
 		if _, exists := seen[item.ExternalSystemID]; !exists {
@@ -145,6 +156,9 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 		}
 		if item.CredentialID != nil {
 			credentialIDs = append(credentialIDs, *item.CredentialID)
+		}
+		if item.RetryPolicyID != nil {
+			policyIDs = append(policyIDs, *item.RetryPolicyID)
 		}
 	}
 	systems, err := s.systems.WithContext(ctx).FindListByFieldIn("id", ids)
@@ -163,6 +177,14 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 	for _, credential := range credentials {
 		credentialsByID[credential.Id] = credential
 	}
+	policies, err := s.policies.WithContext(ctx).FindListByFieldIn("id", policyIDs)
+	if err != nil {
+		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	policiesByID := make(map[int]model.RetryPolicy, len(policies))
+	for _, policy := range policies {
+		policiesByID[policy.Id] = policy
+	}
 	now := s.now()
 	items := make([]response.InterfaceDefinitionListRes, 0, len(result.Data))
 	for _, value := range result.Data {
@@ -172,7 +194,13 @@ func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.Inter
 				credential = &item
 			}
 		}
-		items = append(items, response.NewInterfaceDefinitionListRes(value, byID[value.ExternalSystemID], credential, now))
+		var policy *model.RetryPolicy
+		if value.RetryPolicyID != nil {
+			if item, ok := policiesByID[*value.RetryPolicyID]; ok {
+				policy = &item
+			}
+		}
+		items = append(items, response.NewInterfaceDefinitionListRes(value, byID[value.ExternalSystemID], credential, now, policy))
 	}
 	return response.ListResult[response.InterfaceDefinitionListRes]{Data: items, Total: result.Total}, nil
 }
@@ -224,7 +252,11 @@ func (s *InterfaceDefinitionService) Update(ctx context.Context, id int, req req
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now()), nil
+	policy, err := s.loadRetryPolicySummary(ctx, updated.RetryPolicyID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now(), policy), nil
 }
 
 func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
@@ -276,7 +308,11 @@ func (s *InterfaceDefinitionService) CreateVersion(ctx context.Context, id, revi
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(created, system, credential, s.now()), nil
+	policy, err := s.loadRetryPolicySummary(ctx, created.RetryPolicyID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(created, system, credential, s.now(), policy), nil
 }
 
 func (s *InterfaceDefinitionService) Enable(ctx context.Context, id, revision int) (response.InterfaceDefinitionDetailRes, error) {
@@ -356,7 +392,11 @@ func (s *InterfaceDefinitionService) changeStatus(ctx context.Context, id, revis
 	if err != nil {
 		return response.InterfaceDefinitionDetailRes{}, err
 	}
-	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now()), nil
+	policy, err := s.loadRetryPolicySummary(ctx, updated.RetryPolicyID)
+	if err != nil {
+		return response.InterfaceDefinitionDetailRes{}, err
+	}
+	return response.NewInterfaceDefinitionDetailRes(updated, system, credential, s.now(), policy), nil
 }
 
 func (s *InterfaceDefinitionService) loadSystemForConfiguration(tx *gorm.DB, id int, requireEnabled bool) (model.ExternalSystem, error) {
@@ -392,15 +432,32 @@ func (s *InterfaceDefinitionService) validateReferences(tx *gorm.DB, value model
 		credential = &item
 	}
 	if value.RetryPolicyID != nil {
-		valid, err := s.repository.RetryPolicyReferenceValid(tx, *value.RetryPolicyID)
+		policy, err := s.policies.FindByIdForUpdate(tx, *value.RetryPolicyID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, myerrors.ErrInterfaceRetryPolicyInvalid
+		}
 		if err != nil {
 			return nil, myerrors.WrapDatabaseError(err)
 		}
-		if !valid {
+		if policy.Status != model.RetryPolicyStatusEnabled || !policy.State {
 			return nil, myerrors.ErrInterfaceRetryPolicyInvalid
 		}
 	}
 	return credential, nil
+}
+
+func (s *InterfaceDefinitionService) loadRetryPolicySummary(ctx context.Context, id *int) (*model.RetryPolicy, error) {
+	if id == nil {
+		return nil, nil
+	}
+	policy, err := s.policies.WithContext(ctx).FindById(*id)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, myerrors.WrapDatabaseError(err)
+	}
+	return &policy, nil
 }
 
 func (s *InterfaceDefinitionService) loadCredentialSummary(ctx context.Context, id *int) (*model.Credential, error) {

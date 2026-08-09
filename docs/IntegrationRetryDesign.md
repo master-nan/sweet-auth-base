@@ -93,7 +93,7 @@ Application Service
 | `backoff_multiplier` | fixed 必须为 1；exponential 为 1.1-4.0，默认 2.0 |
 | `jitter_type` | V1 仅 `none`、`full` |
 | `jitter_ratio` | none 必须为 0；full 必须为 1；预留后续受控扩展 |
-| `retry_window_ms` | 60,000-604,800,000，默认 86,400,000 |
+| `retry_window_ms` | 60,000-604,800,000，默认 86,400,000；不得小于按 max_attempts 和未抖动 backoff 上界计算的累计调度窗口 |
 | `retryable_error_categories` | 受控数组，V1 仅允许 `network`、`timeout`、`remote` 的子集 |
 | `retryable_http_statuses` | 受控数组，V1 只能从 429、502、503、504 中选择 |
 | `respect_retry_after` | 是否接受合法 `Retry-After`，默认 true |
@@ -112,9 +112,10 @@ disabled -> enabled
 
 - draft 可修改；启用后技术字段永久不可原地修改。
 - 修改已启用策略必须“创建新版本”，由服务端生成下一版本号。
-- 不同版本可在切换期同时保持 enabled，因为不同 InterfaceDefinition 版本必须继续引用明确策略版本；不存在“最新版本自动替换旧引用”。
+- 同一 `policy_code` 同一时刻最多存在一个 enabled 版本，由 PostgreSQL 部分唯一索引和 Service 事务共同保证；不存在“最新版本自动替换旧引用”。
 - 禁用策略前必须检查是否仍被 enabled InterfaceDefinition 引用；存在引用时拒绝禁用。
 - draft 或 disabled 被引用时，InterfaceDefinition 不得启用。
+- 策略切换必须按受控顺序完成：先停用引用旧策略的 InterfaceDefinition 版本，再停用旧策略版本、启用新策略版本，最后通过新的 InterfaceDefinition 版本引用并启用新策略。不得原地替换已启用接口的策略引用。
 - V1 不提供物理删除。未引用 draft 如未来需要清理，只允许软删除并保留审计；不作为本期页面能力。
 - `policy_code` 不因创建版本改变，`policy_code + version` 是技术唯一键。
 
@@ -535,6 +536,7 @@ Execution 延续 query/detail/create/cancel；不增加 start/complete/fail/立�
 
 - 新建 `integration_retry_policy` 及状态、数值、数组和版本 CHECK。
 - 建立 `(policy_code, version)` 唯一约束。
+- 建立 `status = 'enabled' AND gmt_delete IS NULL` 条件下按 `policy_code` 唯一的部分索引，确保同编码单启用版本。
 - 为 `InterfaceDefinition.retry_policy_id` 增加受控外键和引用索引。
 - 为 Execution 增加策略快照、快照版本、last_attempt_at、retry_reason_code。
 - 为 `status + next_run_at` 增加到期领取索引。
@@ -639,8 +641,8 @@ Execution 延续 query/detail/create/cancel；不增加 start/complete/fail/立�
 
 | Task | 范围 |
 | --- | --- |
-| INT-004B | RetryPolicy Model、Migration、Repository、Service、DTO、权限和配置页面；InterfaceDefinition 版本引用与幂等声明 |
-| INT-004C-1 | RetryPolicySnapshot、RetryDecision、Backoff/Jitter、Retry-After 和单元/属性测试 |
+| INT-004B | RetryPolicy Model、Migration、Repository、Service、DTO、权限和配置页面；InterfaceDefinition 版本引用；Execution 创建时冻结 RetryPolicySnapshot 基础能力 |
+| INT-004C-1 | 远端幂等声明、RetryDecision、Backoff/Jitter、Retry-After 和单元/属性测试 |
 | INT-004C-2 | 现有 Runner/Engine/Repository 的到期领取、Attempt 追加、完成事务、取消竞争和 PostgreSQL 并发测试 |
 | INT-004D | Execution/Attempt 重试摘要页面、权限回归、端到端验收、正式报告与 Retry 冻结评审 |
 

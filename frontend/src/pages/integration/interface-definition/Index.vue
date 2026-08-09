@@ -59,7 +59,7 @@
     </q-table>
 
     <advanced-query v-model="showAdvancedQuery" v-model:query-model="tempAdvancedQuery" :fields="advancedFields" @search="handleAdvancedSearch" />
-    <interface-definition-form-dialog v-model="showFormDialog" :edit-data="currentEditData" :systems="systems" :credentials="credentials" :loading="loading" @submit="handleFormSubmit" />
+    <interface-definition-form-dialog v-model="showFormDialog" :edit-data="currentEditData" :systems="systems" :credentials="credentials" :retry-policies="retryPolicies" :loading="loading" @submit="handleFormSubmit" />
     <interface-definition-detail-dialog v-model="showDetailDialog" :id="currentDetailId" />
   </base-content>
 </template>
@@ -84,6 +84,7 @@ import {
   type InterfaceDefinitionListItem,
   type InterfaceDefinitionQuery,
   type InterfaceDefinitionUpdateRequest,
+  type RetryPolicyListItem,
   useIntegrationApi,
 } from 'src/api/services/integration'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
@@ -107,6 +108,7 @@ const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integrat
 const rows = ref<InterfaceDefinitionListItem[]>([])
 const systems = ref<ExternalSystemListItem[]>([])
 const credentials = ref<CredentialListItem[]>([])
+const retryPolicies = ref<RetryPolicyListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
 const showAdvancedQuery = ref(false)
@@ -141,6 +143,7 @@ const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true }
 const fetchData = async () => { const response = await api.queryInterfaceDefinitions(query.value); rows.value = response.data || []; total.value = response.total || 0 }
 const fetchSystems = async () => { const response = await api.queryExternalSystems({ page: 1, num: 500, order: { field: 'name', is_asc: true }, quick_query: { keyword: '' }, expressions: [] }); systems.value = response.data || [] }
 const fetchCredentials = async () => { const response = await api.queryCredentials({ page: 1, num: 500, order: { field: 'credential_code', is_asc: true }, quick_query: { keyword: '' }, expressions: [] }); credentials.value = response.data || [] }
+const fetchRetryPolicies = async () => { const response = await api.queryRetryPolicies({ page: 1, num: 500, order: { field: 'policy_code', is_asc: true }, quick_query: { keyword: '' }, expressions: [], status: 'enabled' }); retryPolicies.value = response.data || [] }
 const fetchMetadata = async () => { const response = await tableApi.queryTableByCode('integration_interface_definition'); advancedFields.value = (response.data?.table_fields || []).filter((field) => field.is_advanced_search && field.field_code !== 'external_system_id') }
 const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
 const handleBasicSearch = () => { query.value.expressions = emptyExpressions(); appliedAdvancedQuery.value = cloneDeep(query.value); resetAndFetch() }
@@ -166,20 +169,23 @@ const actionHandlers: Record<string, (row?: InterfaceDefinitionListItem) => void
   enable: (row) => row && changeState(row, true), disable: (row) => row && changeState(row, false),
 }
 const handleButtonClick = (button: MenuButton, row?: InterfaceDefinitionListItem) => { actionHandlers[button.event_action]?.(row) }
-const handleFormSubmit = async (form: { external_system_id: number | null; interface_code: string; name: string; protocol: 'http' | 'https'; http_method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; relative_path: string; credential_id: number | null; timeout_seconds: number; response_limit: number; description: string }) => {
+const handleFormSubmit = async (form: { external_system_id: number | null; interface_code: string; name: string; protocol: 'http' | 'https'; http_method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; relative_path: string; credential_id: number | null; retry_policy_id: number | null; timeout_seconds: number; response_limit: number; description: string }) => {
   if (currentEditData.value) {
     const request: InterfaceDefinitionUpdateRequest = { name: form.name, protocol: form.protocol, http_method: form.http_method, relative_path: form.relative_path, timeout_seconds: form.timeout_seconds, response_limit: form.response_limit, description: form.description, revision: currentEditData.value.revision }
     if (form.credential_id) request.credential_id = form.credential_id
     else request.clear_credential = true
+    if (form.retry_policy_id) request.retry_policy_id = form.retry_policy_id
+    else request.clear_retry_policy = true
     if ((await api.updateInterfaceDefinition(currentEditData.value.id, request)).success) showFormDialog.value = false
   } else {
     const request: InterfaceDefinitionCreateRequest = { external_system_id: form.external_system_id!, interface_code: form.interface_code, name: form.name, protocol: form.protocol, http_method: form.http_method, relative_path: form.relative_path, timeout_seconds: form.timeout_seconds, response_limit: form.response_limit, description: form.description }
     if (form.credential_id) request.credential_id = form.credential_id
+    if (form.retry_policy_id) request.retry_policy_id = form.retry_policy_id
     if ((await api.createInterfaceDefinition(request)).success) showFormDialog.value = false
   }
   await fetchData()
 }
-onMounted(async () => { await Promise.all([fetchMetadata(), fetchSystems(), fetchCredentials(), fetchData()]); if (!has_line_buttons.value) visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions'); initialized.value = true })
+onMounted(async () => { await Promise.all([fetchMetadata(), fetchSystems(), fetchCredentials(), fetchRetryPolicies(), fetchData()]); if (!has_line_buttons.value) visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions'); initialized.value = true })
 watch(() => [query.value.page, query.value.num] as const, ([page]) => { if (!initialized.value) return; pagination.value.page = page; void fetchData() })
 watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; query.value.order = { field: sortBy || '', is_asc: sortBy ? !descending : false }; resetAndFetch() })
 watch(showAdvancedQuery, (open) => { if (open) tempAdvancedQuery.value = cloneDeep(query.value) })

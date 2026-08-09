@@ -35,6 +35,13 @@
         label="认证凭证"
         hint="仅显示当前外部系统的受控凭证"
       />
+      <q-select
+        v-model="form.retry_policy_id"
+        outlined dense emit-value map-options clearable
+        :options="retryPolicyOptions"
+        label="重试策略"
+        hint="仅显示已启用策略，引用变更属于接口技术契约"
+      />
       <q-select v-model="form.protocol" outlined dense emit-value map-options :options="protocolOptions" label="协议 *" />
       <q-select v-model="form.http_method" outlined dense emit-value map-options :options="methodOptions" label="HTTP Method *" />
       <q-input
@@ -77,6 +84,7 @@ import type {
   InterfaceDefinitionDetail,
   InterfaceHTTPMethod,
   InterfaceProtocol,
+  RetryPolicyListItem,
 } from 'src/api/services/integration'
 
 type InterfaceFormValue = {
@@ -90,6 +98,7 @@ type InterfaceFormValue = {
   response_limit: number
   description: string
   credential_id: number | null
+  retry_policy_id: number | null
 }
 
 const props = withDefaults(defineProps<{
@@ -97,8 +106,9 @@ const props = withDefaults(defineProps<{
   editData: InterfaceDefinitionDetail | null
   systems: ExternalSystemListItem[]
   credentials: CredentialListItem[]
+  retryPolicies?: RetryPolicyListItem[]
   loading?: boolean
-}>(), { loading: false })
+}>(), { retryPolicies: () => [], loading: false })
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void
   (event: 'submit', value: InterfaceFormValue): void
@@ -110,6 +120,9 @@ const systemOptions = computed(() => props.systems.map((item) => ({ label: `${it
 const credentialOptions = computed(() => props.credentials
   .filter((item) => item.external_system.id === form.external_system_id && item.status !== 'revoked')
   .map((item) => ({ label: `${item.name}（${item.credential_code}）`, value: item.id })))
+const retryPolicyOptions = computed(() => props.retryPolicies
+  .filter((item) => item.status === 'enabled')
+  .map((item) => ({ label: `${item.policy_name}（${item.policy_code} · v${item.version}）`, value: item.id })))
 const protocolOptions = [{ label: 'HTTPS', value: 'https' }, { label: 'HTTP', value: 'http' }]
 const methodOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
 const MAX_TIMEOUT_SECONDS = 120
@@ -125,7 +138,7 @@ function updateResponseLimitKiB(value: string | number | null) {
 }
 
 function emptyForm(): InterfaceFormValue {
-  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, timeout_seconds: 30, response_limit: 10485760, description: '' }
+  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, retry_policy_id: null, timeout_seconds: 30, response_limit: 10485760, description: '' }
 }
 
 watch(
@@ -140,6 +153,7 @@ watch(
       http_method: detail.http_method,
       relative_path: detail.relative_path,
       credential_id: detail.credential_id || null,
+      retry_policy_id: detail.retry_policy_id || null,
       timeout_seconds: detail.timeout_seconds,
       response_limit: detail.response_limit,
       description: detail.description || '',

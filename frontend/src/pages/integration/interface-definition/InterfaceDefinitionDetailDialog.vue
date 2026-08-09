@@ -65,7 +65,8 @@ const contractItems = computed(() => detail.value ? [
   { label: '响应大小限制', value: `${(detail.value.response_limit / 1024).toLocaleString()} KiB`, mono: false },
   { label: '认证引用', value: detail.value.credential ? `${detail.value.credential.name}（${detail.value.credential.credential_code}）` : '未配置', mono: false },
   { label: '凭证状态', value: detail.value.credential?.effective_status || '-', mono: false },
-  { label: '重试策略', value: detail.value.retry_policy_id ? '已配置重试策略' : '未配置', mono: false },
+  { label: '重试策略', value: detail.value.retry_policy ? `${detail.value.retry_policy.policy_name}（${detail.value.retry_policy.policy_code} · v${detail.value.retry_policy.version}）` : '未配置', mono: false },
+  { label: '策略状态', value: detail.value.retry_policy ? statusLabels[detail.value.retry_policy.status] : '-', mono: false },
 ] : [])
 
 const load = async () => {

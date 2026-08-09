@@ -38,6 +38,7 @@ type IntegrationExecutionService struct {
 	logs       repository.IntegrationLogRepository
 	systems    repository.ExternalSystemRepository
 	interfaces repository.InterfaceDefinitionRepository
+	policies   repository.RetryPolicyRepository
 	sf         *utils.Snowflake
 	audit      StandardContextAuditWriter
 	now        func() time.Time
@@ -48,6 +49,7 @@ func NewIntegrationExecutionService(
 	logs repository.IntegrationLogRepository,
 	systems repository.ExternalSystemRepository,
 	interfaces repository.InterfaceDefinitionRepository,
+	policies repository.RetryPolicyRepository,
 	sf *utils.Snowflake,
 	audit StandardContextAuditWriter,
 ) *IntegrationExecutionService {
@@ -56,6 +58,7 @@ func NewIntegrationExecutionService(
 		logs:       logs,
 		systems:    systems,
 		interfaces: interfaces,
+		policies:   policies,
 		sf:         sf,
 		audit:      audit,
 		now:        model.Now,
@@ -116,29 +119,37 @@ func (s *IntegrationExecutionService) CreateExecution(
 			return myerrors.WrapDatabaseError(err)
 		}
 
+		retryPolicyID, retryPolicySnapshot, retryPolicySnapshotVersion, err := s.freezeRetryPolicy(tx, definition)
+		if err != nil {
+			return err
+		}
+
 		id, err := s.sf.GenerateUniqueID()
 		if err != nil {
 			return myerrors.WrapSystemError(err)
 		}
 		value = model.IntegrationExecution{
-			Basic:                 model.Basic{Id: int(id), State: true},
-			ExecutionNo:           fmt.Sprintf("INT-%d", id),
-			ExternalSystemID:      system.Id,
-			ExternalSystemCode:    system.SystemCode,
-			ExternalSystemName:    system.Name,
-			InterfaceDefinitionID: definition.Id,
-			InterfaceCode:         definition.InterfaceCode,
-			InterfaceName:         definition.Name,
-			InterfaceVersion:      definition.Version,
-			TriggerSource:         req.TriggerSource,
-			Status:                model.IntegrationExecutionStatusCreated,
-			IdempotencyScope:      req.IdempotencyScope,
-			IdempotencyKey:        req.IdempotencyKey,
-			InputHash:             serverInputHash,
-			InputSnapshot:         datatypes.JSON(snapshot),
-			InputSnapshotVersion:  integration.ExecutionInputSnapshotVersion,
-			InputSnapshotSize:     len(snapshot),
-			Revision:              1,
+			Basic:                      model.Basic{Id: int(id), State: true},
+			ExecutionNo:                fmt.Sprintf("INT-%d", id),
+			ExternalSystemID:           system.Id,
+			ExternalSystemCode:         system.SystemCode,
+			ExternalSystemName:         system.Name,
+			InterfaceDefinitionID:      definition.Id,
+			InterfaceCode:              definition.InterfaceCode,
+			InterfaceName:              definition.Name,
+			InterfaceVersion:           definition.Version,
+			TriggerSource:              req.TriggerSource,
+			Status:                     model.IntegrationExecutionStatusCreated,
+			IdempotencyScope:           req.IdempotencyScope,
+			IdempotencyKey:             req.IdempotencyKey,
+			InputHash:                  serverInputHash,
+			InputSnapshot:              datatypes.JSON(snapshot),
+			InputSnapshotVersion:       integration.ExecutionInputSnapshotVersion,
+			InputSnapshotSize:          len(snapshot),
+			RetryPolicyID:              retryPolicyID,
+			RetryPolicySnapshot:        datatypes.JSON(retryPolicySnapshot),
+			RetryPolicySnapshotVersion: retryPolicySnapshotVersion,
+			Revision:                   1,
 		}
 		if err := s.executions.Create(tx, &value); err != nil {
 			if isIntegrationExecutionIdempotencyDuplicate(err) {
@@ -155,6 +166,30 @@ func (s *IntegrationExecutionService) CreateExecution(
 		return response.IntegrationExecutionDetailRes{}, err
 	}
 	return response.NewIntegrationExecutionDetailRes(value), nil
+}
+
+func (s *IntegrationExecutionService) freezeRetryPolicy(tx *gorm.DB, definition model.InterfaceDefinition) (*int, []byte, int, error) {
+	if definition.RetryPolicyID == nil {
+		return nil, []byte(`{}`), 0, nil
+	}
+	policy, err := s.policies.FindByIdForUpdate(tx, *definition.RetryPolicyID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, 0, myerrors.ErrInterfaceRetryPolicyInvalid
+	}
+	if err != nil {
+		return nil, nil, 0, myerrors.WrapDatabaseError(err)
+	}
+	if policy.Status != model.RetryPolicyStatusEnabled || !policy.State {
+		return nil, nil, 0, myerrors.ErrInterfaceRetryPolicyInvalid
+	}
+	if err := validateRetryPolicyConfiguration(policy); err != nil {
+		return nil, nil, 0, myerrors.ErrInterfaceRetryPolicyInvalid
+	}
+	snapshot, err := integration.BuildRetryPolicySnapshot(policy)
+	if err != nil {
+		return nil, nil, 0, myerrors.ErrRetryPolicyConfigurationInvalid
+	}
+	return definition.RetryPolicyID, snapshot, integration.RetryPolicySnapshotVersion, nil
 }
 
 func (s *IntegrationExecutionService) GetExecution(
