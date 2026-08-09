@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -243,6 +244,198 @@ func TestIntegrationWorkerRunnerPostgreSQLJSONBAndTLSEndToEnd(t *testing.T) {
 	}
 }
 
+func TestIntegrationWorkerRunnerPostgreSQLRetry503ThenSuccess(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, []int{http.StatusServiceUnavailable, http.StatusOK}, 3, model.IntegrationExecutionStatusSucceeded)
+}
+
+func TestIntegrationWorkerRunnerPostgreSQLRetryExhaustsMaxAttempts(t *testing.T) {
+	runRuntimeRetryEndToEnd(t, []int{http.StatusServiceUnavailable, http.StatusServiceUnavailable}, 2, model.IntegrationExecutionStatusFailed)
+}
+
+func runRuntimeRetryEndToEnd(t *testing.T, statuses []int, maxAttempts int, expectedStatus string) {
+	t.Helper()
+	expectedAttempts := len(statuses)
+	db := openRuntimeAcceptancePostgreSQL(t)
+	var callCount atomic.Int32
+	var firstCallAt atomic.Int64
+	var secondCallAt atomic.Int64
+	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+		call := int(callCount.Add(1))
+		if call == 1 {
+			firstCallAt.Store(time.Now().UnixNano())
+		} else if call == 2 {
+			secondCallAt.Store(time.Now().UnixNano())
+		}
+		if req.Method != http.MethodGet || req.URL.Path != "/base/retry" {
+			t.Errorf("unexpected retry target: %s %s", req.Method, req.URL.String())
+		}
+		if req.Header.Get("Authorization") != "Bearer retry-runner-token" {
+			t.Errorf("retry credential was not injected")
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		status := statuses[len(statuses)-1]
+		if call <= len(statuses) {
+			status = statuses[call-1]
+		}
+		writer.WriteHeader(status)
+		_, _ = writer.Write([]byte("{\"retry\":true}"))
+	}))
+	defer tlsServer.Close()
+	target, err := url.Parse(tlsServer.URL)
+	if err != nil {
+		t.Fatalf("parse retry TLS server URL: %v", err)
+	}
+	endpointPolicy, err := integration.NewEndpointPolicy(false, nil, runtimeAcceptanceResolver{
+		"retry.runtime.acceptance.test": {net.ParseIP("93.184.216.34")},
+	})
+	if err != nil {
+		t.Fatalf("create retry endpoint policy: %v", err)
+	}
+	transport, err := integration.NewHTTPTransportClient(endpointPolicy, integration.TransportClientOptions{
+		RoundTripper: runtimeAcceptanceRoundTripper{target: target, base: tlsServer.Client().Transport},
+	})
+	if err != nil {
+		t.Fatalf("create retry transport: %v", err)
+	}
+	protector, err := security.NewCredentialSecretProtectorWithKey("runtime-retry-master-key")
+	if err != nil {
+		t.Fatalf("create retry credential protector: %v", err)
+	}
+	secret, _ := json.Marshal(map[string]string{"token": "retry-runner-token"})
+	envelope, err := protector.Seal(secret)
+	if err != nil {
+		t.Fatalf("seal retry credential: %v", err)
+	}
+	baseID := 7300 + maxAttempts*10
+	system := model.ExternalSystem{
+		Basic: model.Basic{Id: baseID + 1, State: true}, SystemCode: fmt.Sprintf("runtime_retry_%d", maxAttempts), Name: "Runtime Retry",
+		SystemType: model.ExternalSystemTypeHR, BaseURL: "https://retry.runtime.acceptance.test/base",
+		OwnerIdentifier: "retry-owner", OwnerName: "重试验收负责人", Status: model.ExternalSystemStatusEnabled, Revision: 1,
+	}
+	credential := model.Credential{
+		Basic: model.Basic{Id: baseID + 2, State: true}, ExternalSystemID: system.Id,
+		CredentialCode: fmt.Sprintf("runtime_retry_token_%d", maxAttempts), Name: "Runtime Retry Token",
+		CredentialType: model.CredentialTypeBearerToken, Status: model.CredentialStatusActive,
+		SecretStorageRef: envelope.StorageRef, SecretCiphertext: envelope.Ciphertext, SecretNonce: envelope.Nonce,
+		SecretFingerprint: envelope.Fingerprint, Version: 1, Revision: 1,
+	}
+	policy := model.RetryPolicy{
+		Basic: model.Basic{Id: baseID + 3, State: true}, PolicyCode: fmt.Sprintf("runtime_retry_policy_%d", maxAttempts),
+		PolicyName: "Runtime Retry Policy", Version: 1, Status: model.RetryPolicyStatusEnabled,
+		MaxAttempts: maxAttempts, InitialDelayMs: 1000, MaxDelayMs: 1000,
+		BackoffType: model.RetryBackoffTypeFixed, BackoffMultiplier: 1,
+		JitterType: model.RetryJitterTypeNone, JitterRatio: 0, RetryWindowMs: 60000,
+		RetryableErrorCategories: datatypes.JSON([]byte("[\"network\",\"remote\",\"timeout\"]")),
+		RetryableHTTPStatuses:    datatypes.JSON([]byte("[429,502,503,504]")), RespectRetryAfter: true, Revision: 1,
+	}
+	credentialID := credential.Id
+	policyID := policy.Id
+	definition := model.InterfaceDefinition{
+		Basic: model.Basic{Id: baseID + 4, State: true}, ExternalSystemID: system.Id,
+		InterfaceCode: fmt.Sprintf("runtime_retry_call_%d", maxAttempts), Name: "Runtime Retry Call", Version: 1,
+		Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/retry",
+		CredentialID: &credentialID, RetryPolicyID: &policyID, TimeoutSeconds: 10, ResponseLimit: 1024 * 1024,
+		InputContract:   datatypes.JSON([]byte("{\"version\":1,\"parameters\":[]}")),
+		IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Status:          model.InterfaceDefinitionStatusEnabled, Revision: 1,
+	}
+	for _, value := range []any{&system, &credential, &policy, &definition} {
+		if err := db.Create(value).Error; err != nil {
+			t.Fatalf("create retry runtime fixture: %v", err)
+		}
+	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", policy.Id).Update("jitter_ratio", 0).Error; err != nil {
+		t.Fatalf("normalize no-jitter policy fixture: %v", err)
+	}
+
+	primary := &database.PrimaryDB{DB: db}
+	executions := impl.NewIntegrationExecutionRepositoryImpl(primary)
+	logs := impl.NewIntegrationLogRepositoryImpl(primary)
+	systems := impl.NewExternalSystemRepositoryImpl(primary)
+	interfaces := impl.NewInterfaceDefinitionRepositoryImpl(primary)
+	policies := impl.NewRetryPolicyRepositoryImpl(primary)
+	credentials := impl.NewCredentialRepositoryImpl(primary)
+	snowflake, err := utils.NewSnowflake(int64(8 - maxAttempts))
+	if err != nil {
+		t.Fatalf("create retry snowflake: %v", err)
+	}
+	applicationService := service.NewIntegrationExecutionService(executions, logs, systems, interfaces, policies, snowflake, runtimeAcceptanceAuditWriter{})
+	submitContext, cancelSubmit := context.WithCancel(context.Background())
+	created, err := applicationService.CreateExecution(submitContext, request.IntegrationExecutionCreateReq{
+		ExternalSystemID: system.Id, InterfaceDefinitionID: definition.Id,
+		TriggerSource:    model.IntegrationTriggerSourceManual,
+		IdempotencyScope: "runtime-retry", IdempotencyKey: fmt.Sprintf("runner-retry-%d", maxAttempts),
+		Input: request.IntegrationExecutionInputReq{},
+	})
+	cancelSubmit()
+	if err != nil {
+		var storedPolicy model.RetryPolicy
+		var storedDefinition model.InterfaceDefinition
+		_ = db.First(&storedPolicy, policy.Id).Error
+		_ = db.First(&storedDefinition, definition.Id).Error
+		t.Fatalf("submit retry execution: %v policy=%+v definition_retry=%v", err, storedPolicy, storedDefinition.RetryPolicyID)
+	}
+	provider := integration.NewCredentialProvider(credentials, interfaces, protector)
+	guard, err := integration.NewInMemoryConcurrencyGuard(4, 2, 1)
+	if err != nil {
+		t.Fatalf("create retry concurrency guard: %v", err)
+	}
+	workerID := fmt.Sprintf("runtime-retry-worker-%d", maxAttempts)
+	engine, err := integration.NewIntegrationExecutionEngine(
+		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
+		integration.ExecutionEngineOptions{WorkerID: workerID, LeaseDuration: integration.IntegrationDefaultLeaseDuration, BatchSize: 2},
+	)
+	if err != nil {
+		t.Fatalf("create retry engine: %v", err)
+	}
+	runner, err := integration.NewIntegrationWorkerRunner(engine, integration.WorkerRunnerConfig{
+		Enabled: true, WorkerID: workerID, PollInterval: time.Second, ClaimBatchSize: 2,
+		InstanceConcurrency: 2, LeaseRecoveryInterval: 10 * time.Second,
+		ShutdownTimeout: 3 * time.Second, LeaseDuration: integration.IntegrationDefaultLeaseDuration,
+	})
+	if err != nil {
+		t.Fatalf("create retry runner: %v", err)
+	}
+	runnerContext, cancelRunner := context.WithCancel(context.Background())
+	defer cancelRunner()
+	if err := runner.Start(runnerContext); err != nil {
+		t.Fatalf("start retry runner: %v", err)
+	}
+	t.Cleanup(func() { _ = runner.Stop(context.Background()) })
+	waitRuntimeAcceptance(t, 7*time.Second, func() bool {
+		var execution model.IntegrationExecution
+		return db.First(&execution, created.Id).Error == nil && execution.Status == expectedStatus && execution.CurrentAttempt == expectedAttempts
+	})
+	if err := runner.Stop(context.Background()); err != nil {
+		t.Fatalf("stop retry runner: %v", err)
+	}
+	if calls := int(callCount.Load()); calls != expectedAttempts {
+		t.Fatalf("retry HTTP count = %d, want %d", calls, expectedAttempts)
+	}
+	if first := firstCallAt.Load(); first == 0 || secondCallAt.Load()-first < int64(900*time.Millisecond) {
+		t.Fatalf("retry was not delayed by persisted next_run_at: first=%d second=%d", first, secondCallAt.Load())
+	}
+	var stored model.IntegrationExecution
+	var attempts []model.IntegrationLog
+	if err := db.First(&stored, created.Id).Error; err != nil {
+		t.Fatalf("load retry execution: %v", err)
+	}
+	if err := db.Where("execution_id = ?", created.Id).Order("attempt_no ASC").Find(&attempts).Error; err != nil {
+		t.Fatalf("load retry attempts: %v", err)
+	}
+	if stored.Status != expectedStatus || stored.CurrentAttempt != expectedAttempts || stored.NextRunAt != nil || len(attempts) != expectedAttempts {
+		t.Fatalf("unexpected retry convergence: execution=%+v attempts=%+v", stored, attempts)
+	}
+	for index := range attempts {
+		if attempts[index].AttemptNo != index+1 {
+			t.Fatalf("attempt sequence is not monotonic: %+v", attempts)
+		}
+	}
+	if maxAttempts > 1 && (!attempts[0].Retryable || attempts[0].RetryScheduledAt == nil || attempts[0].RetryReasonCode != integration.RetryReasonAllowed) {
+		t.Fatalf("first attempt lacks retry diagnostics: %+v", attempts[0])
+	}
+}
+
 func openRuntimeAcceptancePostgreSQL(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := testutil.PostgreSQLDSN(t)
@@ -271,7 +464,7 @@ func openRuntimeAcceptancePostgreSQL(t *testing.T) *gorm.DB {
 		t.Fatalf("open isolated PostgreSQL schema: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&model.ExternalSystem{}, &model.Credential{}, &model.InterfaceDefinition{},
+		&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{},
 		&model.IntegrationExecution{}, &model.IntegrationLog{},
 	); err != nil {
 		t.Fatalf("migrate runtime acceptance schema: %v", err)

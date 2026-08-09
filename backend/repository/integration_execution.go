@@ -18,6 +18,8 @@ var (
 	ErrIntegrationExecutionLeaseLost = errors.New("integration execution lease lost")
 	// ErrIntegrationAttemptAlreadyCompleted 表示 Attempt 已经被其他流程收敛。
 	ErrIntegrationAttemptAlreadyCompleted = errors.New("integration attempt already completed")
+	// ErrIntegrationRetryAttemptCreateFailed 表示重试领取事务未能原子追加 Attempt。
+	ErrIntegrationRetryAttemptCreateFailed = errors.New("integration retry attempt create failed")
 )
 
 // IntegrationExecutionClaimRequest 描述一个短事务内的批量领取请求。
@@ -77,7 +79,7 @@ type IntegrationExecutionRepository interface {
 	FindByIDWithPermission(context.Context, int, model.SysTable, GeneralizationPermission) (model.IntegrationExecution, error)
 	FindByIdempotency(*gorm.DB, int, int, string, string) (model.IntegrationExecution, error)
 	ListCandidatesByStatus(context.Context, []string, int) ([]model.IntegrationExecution, error)
-	ClaimCreatedExecutions(context.Context, IntegrationExecutionClaimRequest) ([]ClaimedIntegrationExecution, error)
+	ClaimReadyExecutions(context.Context, IntegrationExecutionClaimRequest) ([]ClaimedIntegrationExecution, error)
 	CompleteAttemptAndExecution(context.Context, IntegrationAttemptCompletion) (model.IntegrationExecution, error)
 	FindExpiredRunningExecutions(context.Context, time.Time, int) ([]model.IntegrationExecution, error)
 	RecoverExpiredExecution(context.Context, ExpiredExecutionRecovery) (bool, error)

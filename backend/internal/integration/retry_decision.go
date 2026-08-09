@@ -2,9 +2,9 @@ package integration
 
 import (
 	myerrors "backend/internal/errors"
+	"backend/internal/integration/retrycontract"
 	"backend/model"
 	"math"
-	"math/big"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	RemoteIdempotencyNone             = "none"
-	RemoteIdempotencySafeMethod       = "safe_method"
-	RemoteIdempotencyIdempotentMethod = "idempotent_method"
-	RemoteIdempotencyKeyHeader        = "remote_key_header"
-	RemoteIdempotencyHeaderName       = "Idempotency-Key"
+	RemoteIdempotencyNone             = retrycontract.RemoteIdempotencyNone
+	RemoteIdempotencySafeMethod       = retrycontract.RemoteIdempotencySafeMethod
+	RemoteIdempotencyIdempotentMethod = retrycontract.RemoteIdempotencyIdempotentMethod
+	RemoteIdempotencyKeyHeader        = retrycontract.RemoteIdempotencyKeyHeader
+	RemoteIdempotencyHeaderName       = retrycontract.RemoteIdempotencyHeaderName
 
 	RequestProgressNotSent          = "not_sent"
 	RequestProgressSentUnknown      = "sent_unknown"
@@ -216,83 +216,11 @@ func validateRetryDecisionInput(input RetryDecisionInput) error {
 }
 
 func ValidateRetryPolicySnapshot(value RetryPolicySnapshot) error {
-	if value.Version != RetryPolicySnapshotVersion || strings.TrimSpace(value.PolicyCode) == "" || value.PolicyVersion < 1 ||
-		value.MaxAttempts < 1 || value.MaxAttempts > 10 || value.InitialDelayMs < 1000 || value.InitialDelayMs > 3600000 ||
-		value.MaxDelayMs < value.InitialDelayMs || value.MaxDelayMs > 86400000 || value.RetryWindowMs < 60000 || value.RetryWindowMs > 604800000 {
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	multiplier, ok := new(big.Rat).SetString(value.BackoffMultiplier)
-	if !ok {
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	switch value.BackoffType {
-	case model.RetryBackoffTypeFixed:
-		if multiplier.Cmp(big.NewRat(1, 1)) != 0 {
-			return myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-	case model.RetryBackoffTypeExponential:
-		if multiplier.Cmp(big.NewRat(11, 10)) < 0 || multiplier.Cmp(big.NewRat(4, 1)) > 0 {
-			return myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-	default:
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	if value.JitterType == model.RetryJitterTypeNone && value.JitterRatio != "0" ||
-		value.JitterType == model.RetryJitterTypeFull && value.JitterRatio != "1" ||
-		value.JitterType != model.RetryJitterTypeNone && value.JitterType != model.RetryJitterTypeFull {
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	for _, category := range value.RetryableErrorCategories {
-		if category != model.IntegrationErrorCategoryNetwork && category != model.IntegrationErrorCategoryTimeout && category != model.IntegrationErrorCategoryRemote {
-			return myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-	}
-	for _, status := range value.RetryableHTTPStatuses {
-		if !isPlatformRetryHTTPStatus(status) {
-			return myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-	}
-	if !validRemoteIdempotency(value.IdempotencyMode, value.RemoteIdempotencyHeader) {
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	var requiredWindow int64
-	for attempt := 1; attempt < value.MaxAttempts; attempt++ {
-		delay, err := calculateRetryBackoff(value, attempt)
-		if err != nil || delay.Milliseconds() > math.MaxInt64-requiredWindow {
-			return myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-		requiredWindow += delay.Milliseconds()
-	}
-	if value.RetryWindowMs < requiredWindow {
-		return myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	return nil
+	return retrycontract.Validate(value)
 }
 
 func calculateRetryBackoff(snapshot RetryPolicySnapshot, attemptNo int) (time.Duration, error) {
-	if attemptNo < 1 {
-		return 0, myerrors.ErrIntegrationRetryScheduleInvalid
-	}
-	value := big.NewRat(snapshot.InitialDelayMs, 1)
-	if snapshot.BackoffType == model.RetryBackoffTypeExponential {
-		multiplier, ok := new(big.Rat).SetString(snapshot.BackoffMultiplier)
-		if !ok {
-			return 0, myerrors.ErrIntegrationRetrySnapshotInvalid
-		}
-		for index := 1; index < attemptNo; index++ {
-			value.Mul(value, multiplier)
-			if value.Cmp(big.NewRat(snapshot.MaxDelayMs, 1)) >= 0 {
-				return time.Duration(snapshot.MaxDelayMs) * time.Millisecond, nil
-			}
-		}
-	}
-	numerator, denominator := value.Num(), value.Denom()
-	rounded := new(big.Int).Add(numerator, new(big.Int).Sub(denominator, big.NewInt(1)))
-	rounded.Quo(rounded, denominator)
-	if !rounded.IsInt64() || rounded.Int64() > snapshot.MaxDelayMs || rounded.Int64() > math.MaxInt64/int64(time.Millisecond) {
-		return time.Duration(snapshot.MaxDelayMs) * time.Millisecond, nil
-	}
-	return time.Duration(rounded.Int64()) * time.Millisecond, nil
+	return retrycontract.CalculateBackoff(snapshot, attemptNo)
 }
 
 func applyRetryAfter(input RetryDecisionInput, local time.Duration) (time.Duration, string, string) {
@@ -413,14 +341,7 @@ func containsInt(values []int, target int) bool {
 }
 
 func validRemoteIdempotency(mode, header string) bool {
-	switch mode {
-	case RemoteIdempotencyNone, RemoteIdempotencySafeMethod, RemoteIdempotencyIdempotentMethod:
-		return strings.TrimSpace(header) == ""
-	case RemoteIdempotencyKeyHeader:
-		return strings.EqualFold(strings.TrimSpace(header), RemoteIdempotencyHeaderName)
-	default:
-		return false
-	}
+	return retrycontract.ValidRemoteIdempotency(mode, header)
 }
 
 // ValidRemoteIdempotencyContract 校验 InterfaceDefinition 的 Method 与远端幂等声明组合。

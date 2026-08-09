@@ -66,6 +66,14 @@ const (
 	ErrorCodeIntegrationRetrySnapshotInvalid             = 130361
 	ErrorCodeIntegrationRetryPolicyInvalid               = 130362
 	ErrorCodeIntegrationRetryScheduleInvalid             = 130363
+	ErrorCodeIntegrationRetryClaimConflict               = 130364
+	ErrorCodeIntegrationRetryNotDue                      = 130365
+	ErrorCodeIntegrationRetryAttemptsExhausted           = 130366
+	ErrorCodeIntegrationRetryWindowExpired               = 130367
+	ErrorCodeIntegrationRetryExecutionNotRunnable        = 130368
+	ErrorCodeIntegrationRetryCancelConflict              = 130369
+	ErrorCodeIntegrationRetryAttemptCreateFailed         = 130370
+	ErrorCodeIntegrationRetryExecutionCompleteFailed     = 130371
 )
 
 var (
@@ -383,5 +391,45 @@ var (
 		http.StatusConflict,
 		ErrorCodeIntegrationRetryScheduleInvalid,
 		"集成重试调度参数无效",
+	)
+	ErrIntegrationRetryClaimConflict = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryClaimConflict,
+		"集成重试任务已被其他执行器领取",
+	)
+	ErrIntegrationRetryNotDue = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryNotDue,
+		"集成重试任务尚未到调度时间",
+	)
+	ErrIntegrationRetryAttemptsExhausted = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryAttemptsExhausted,
+		"集成重试次数已耗尽",
+	)
+	ErrIntegrationRetryWindowExpired = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryWindowExpired,
+		"集成重试窗口已过期",
+	)
+	ErrIntegrationRetryExecutionNotRunnable = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryExecutionNotRunnable,
+		"集成重试任务不满足运行条件",
+	)
+	ErrIntegrationRetryCancelConflict = NewBusinessError(
+		http.StatusConflict,
+		ErrorCodeIntegrationRetryCancelConflict,
+		"集成重试任务已被领取，无法取消",
+	)
+	ErrIntegrationRetryAttemptCreateFailed = NewBusinessError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationRetryAttemptCreateFailed,
+		"集成重试调用记录创建失败",
+	)
+	ErrIntegrationRetryExecutionCompleteFailed = NewBusinessError(
+		http.StatusInternalServerError,
+		ErrorCodeIntegrationRetryExecutionCompleteFailed,
+		"集成重试执行结果收敛失败",
 	)
 )

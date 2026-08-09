@@ -52,7 +52,7 @@ type IntegrationExecution struct {
 	InterfaceName              string         `gorm:"size:128;not null" json:"interface_name"`
 	InterfaceVersion           int            `gorm:"not null;uniqueIndex:uni_integration_execution_idempotency,priority:2" json:"interface_version"`
 	TriggerSource              string         `gorm:"size:32;not null;index:idx_integration_execution_trigger" json:"trigger_source"`
-	Status                     string         `gorm:"size:32;not null;default:created;index:idx_integration_execution_status" json:"status"`
+	Status                     string         `gorm:"size:32;not null;default:created;index:idx_integration_execution_status;index:idx_integration_execution_status_next_run,priority:1" json:"status"`
 	IdempotencyScope           string         `gorm:"size:64;not null;uniqueIndex:uni_integration_execution_idempotency,priority:3" json:"idempotency_scope"`
 	IdempotencyKey             string         `gorm:"size:128;not null;uniqueIndex:uni_integration_execution_idempotency,priority:4" json:"idempotency_key"`
 	InputHash                  string         `gorm:"size:64;not null" json:"input_hash"`
@@ -75,7 +75,7 @@ type IntegrationExecution struct {
 	ErrorCategory              string         `gorm:"size:32;index:idx_integration_execution_error_category" json:"error_category"`
 	StartedAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_started_at" json:"started_at"`
 	CompletedAt                *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_completed_at" json:"completed_at"`
-	NextRunAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_next_run_at" json:"next_run_at"`
+	NextRunAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_next_run_at;index:idx_integration_execution_status_next_run,priority:2" json:"next_run_at"`
 	LastAttemptAt              *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_last_attempt_at" json:"last_attempt_at"`
 	RetryReasonCode            string         `gorm:"size:64;index:idx_integration_execution_retry_reason" json:"retry_reason_code"`
 	CancelledAt                *time.Time     `gorm:"type:timestamp" json:"cancelled_at"`

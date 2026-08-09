@@ -44,6 +44,25 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			}).Error; err != nil {
 			return fmt.Errorf("close legacy retry executions without policy snapshot: %w", err)
 		}
+		if err := tx.Model(&model.IntegrationExecution{}).
+			Where("status = ? AND next_run_at IS NULL", model.IntegrationExecutionStatusRetryWaiting).
+			Updates(map[string]any{
+				"status":            model.IntegrationExecutionStatusFailed,
+				"error_category":    model.IntegrationErrorCategoryConfiguration,
+				"result_summary":    "历史等待重试记录缺少调度时间，已安全停止",
+				"retry_reason_code": "retry_schedule_invalid",
+				"completed_at":      model.Now(),
+				"lease_owner":       "",
+				"lease_expires_at":  nil,
+				"revision":          gorm.Expr("revision + 1"),
+			}).Error; err != nil {
+			return fmt.Errorf("close legacy retry executions without schedule: %w", err)
+		}
+		if err := tx.Model(&model.IntegrationExecution{}).
+			Where("status <> ? AND next_run_at IS NOT NULL", model.IntegrationExecutionStatusRetryWaiting).
+			Update("next_run_at", nil).Error; err != nil {
+			return fmt.Errorf("clear stale retry schedule: %w", err)
+		}
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
@@ -96,6 +115,7 @@ func migrateIntegrationRuntimeSchema(db *gorm.DB) error {
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_http_status", expression: "result_http_status IS NULL OR result_http_status BETWEEN 100 AND 599"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_error_category", expression: "error_category = '' OR error_category IN ('configuration','credential','network','timeout','remote','response','business','concurrency','system')"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_lease", expression: "lease_expires_at IS NULL OR btrim(lease_owner) <> ''"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_retry_schedule", expression: "(status = 'retry_waiting' AND next_run_at IS NOT NULL) OR (status <> 'retry_waiting' AND next_run_at IS NULL)"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_attempt", expression: "attempt_no > 0"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_status", expression: "status IN ('running','succeeded','failed','cancelled')"},
 			{model: &model.IntegrationLog{}, name: "chk_integration_log_duration", expression: "duration_ms >= 0"},

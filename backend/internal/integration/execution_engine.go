@@ -117,8 +117,8 @@ func NewIntegrationExecutionEngine(
 	}, nil
 }
 
-// ClaimCreatedExecutions 在领取事务提交后返回可运行的 Execution；领取失败不会触发 HTTP。
-func (e *IntegrationExecutionEngine) ClaimCreatedExecutions(ctx context.Context) ([]repository.ClaimedIntegrationExecution, error) {
+// ClaimReadyExecutions 在领取事务提交后返回首次调用或到期重试；领取失败不会触发 HTTP。
+func (e *IntegrationExecutionEngine) ClaimReadyExecutions(ctx context.Context) ([]repository.ClaimedIntegrationExecution, error) {
 	if e == nil {
 		return nil, myerrors.ErrIntegrationConfigurationUnavailable
 	}
@@ -132,11 +132,14 @@ func (e *IntegrationExecutionEngine) ClaimCreatedExecutions(ctx context.Context)
 	}
 	now := e.now()
 	correlation := audit.GetCorrelationIDs(ctx)
-	claimed, err := e.executions.ClaimCreatedExecutions(ctx, repository.IntegrationExecutionClaimRequest{
+	claimed, err := e.executions.ClaimReadyExecutions(ctx, repository.IntegrationExecutionClaimRequest{
 		WorkerID: e.workerID, LeaseExpiresAt: now.Add(e.leaseDuration), StartedAt: now,
 		RequestID: correlation.RequestID, TraceID: correlation.TraceID, AttemptIDs: attemptIDs,
 	})
 	if err != nil {
+		if errors.Is(err, repository.ErrIntegrationRetryAttemptCreateFailed) {
+			return nil, myerrors.ErrIntegrationRetryAttemptCreateFailed
+		}
 		if errors.Is(err, repository.ErrIntegrationExecutionClaimUnavailable) {
 			return nil, myerrors.ErrIntegrationExecutionClaimConflict
 		}
@@ -147,7 +150,7 @@ func (e *IntegrationExecutionEngine) ClaimCreatedExecutions(ctx context.Context)
 
 // RunOnce 领取最多一个受控批次并逐项执行。批量有上限，未创建后台 goroutine。
 func (e *IntegrationExecutionEngine) RunOnce(ctx context.Context) (int, error) {
-	claimed, err := e.ClaimCreatedExecutions(ctx)
+	claimed, err := e.ClaimReadyExecutions(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -350,6 +353,9 @@ func (e *IntegrationExecutionEngine) completeClaim(ctx context.Context, claimed 
 	if errors.Is(err, repository.ErrIntegrationAttemptAlreadyCompleted) {
 		return myerrors.ErrIntegrationAttemptAlreadyCompleted
 	}
+	if claimed.Attempt.AttemptNo > 1 {
+		return myerrors.ErrIntegrationRetryExecutionCompleteFailed
+	}
 	return myerrors.ErrIntegrationExecutionCompleteFailed
 }
 
@@ -498,6 +504,12 @@ func mapTransportError(category TransportErrorCategory, err error) (string, stri
 
 func (e *IntegrationExecutionEngine) logAttempt(ctx context.Context, claimed repository.ClaimedIntegrationExecution, result AttemptResult, phase string) {
 	correlation := audit.GetCorrelationIDs(ctx)
+	policyCode := ""
+	policyVersion := 0
+	if policy, err := ParseRetryPolicySnapshot(claimed.Execution.RetryPolicySnapshot); err == nil {
+		policyCode = policy.PolicyCode
+		policyVersion = policy.PolicyVersion
+	}
 	zap.L().Info("integration execution attempt",
 		zap.String("request_id", correlation.RequestID), zap.String("trace_id", correlation.TraceID),
 		zap.String("execution_no", claimed.Execution.ExecutionNo), zap.Int("attempt_no", claimed.Attempt.AttemptNo),
@@ -505,9 +517,19 @@ func (e *IntegrationExecutionEngine) logAttempt(ctx context.Context, claimed rep
 		zap.String("worker_id", e.workerID), zap.String("phase", phase), zap.Int("http_status", transportStatus(result.HTTPStatus)),
 		zap.Duration("duration", result.Duration), zap.String("error_category", result.ErrorCategory),
 		zap.String("result_certainty", result.Certainty),
+		zap.Bool("is_retry", claimed.Attempt.AttemptNo > 1),
 		zap.Bool("retryable", result.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting),
 		zap.String("retry_reason_code", result.RetryReasonCode),
+		zap.Time("retry_scheduled_at", retryScheduledAt(result.RetryScheduledAt)),
+		zap.String("policy_code", policyCode), zap.Int("policy_version", policyVersion),
 	)
+}
+
+func retryScheduledAt(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
 }
 
 func transportStatus(status *int) int {

@@ -68,7 +68,7 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 			if index == 1 {
 				repositoryValue = second
 			}
-			claimed, claimErr := repositoryValue.ClaimCreatedExecutions(context.Background(), request)
+			claimed, claimErr := repositoryValue.ClaimReadyExecutions(context.Background(), request)
 			if claimErr != nil {
 				errorsChannel <- claimErr
 				return
@@ -128,6 +128,108 @@ func TestIntegrationExecutionPostgreSQLClaimUsesRowLock(t *testing.T) {
 	if recoveredExecution.Status != model.IntegrationExecutionStatusFailed || recoveredAttempt.ResultCertainty != model.IntegrationResultCertaintyUnknown {
 		t.Fatalf("unexpected recovery result: execution=%+v attempt=%+v", recoveredExecution, recoveredAttempt)
 	}
+}
+
+func TestIntegrationExecutionPostgreSQLRetryClaimUsesDatabaseTimeAndSkipLocked(t *testing.T) {
+	db := openPostgresClaimSchema(t, "integration_retry_claim")
+	now := model.Now()
+	execution := repositoryRetryWaitingFixture(7201, "INT-PG-RETRY-7201", now, now.Add(-10*time.Second), 1, 3)
+	firstAttempt := model.IntegrationLog{
+		Basic: model.Basic{Id: 7211, State: true}, ExecutionID: execution.Id, AttemptNo: 1,
+		Status: model.IntegrationLogStatusFailed, StartedAt: *execution.StartedAt, EndedAt: &now,
+		ResultCertainty: model.IntegrationResultCertaintyConfirmed,
+	}
+	if err := db.Create(&execution).Error; err != nil {
+		t.Fatalf("create retry execution: %v", err)
+	}
+	if err := db.Create(&firstAttempt).Error; err != nil {
+		t.Fatalf("create first attempt: %v", err)
+	}
+	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP WHERE id = ?", execution.Id).Error; err != nil {
+		t.Fatalf("schedule retry with database time: %v", err)
+	}
+
+	primary := &database.PrimaryDB{DB: db}
+	repositories := []*IntegrationExecutionRepositoryImpl{
+		NewIntegrationExecutionRepositoryImpl(primary),
+		NewIntegrationExecutionRepositoryImpl(primary),
+	}
+	requests := []repository.IntegrationExecutionClaimRequest{
+		{WorkerID: "retry-worker-a", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7221}},
+		{WorkerID: "retry-worker-b", StartedAt: now, LeaseExpiresAt: now.Add(integration.IntegrationDefaultLeaseDuration), AttemptIDs: []int{7222}},
+	}
+	start := make(chan struct{})
+	results := make(chan []repository.ClaimedIntegrationExecution, 2)
+	errorsChannel := make(chan error, 2)
+	var group sync.WaitGroup
+	for index := range repositories {
+		group.Add(1)
+		go func(index int) {
+			defer group.Done()
+			<-start
+			claimed, err := repositories[index].ClaimReadyExecutions(context.Background(), requests[index])
+			if err != nil {
+				errorsChannel <- err
+				return
+			}
+			results <- claimed
+		}(index)
+	}
+	close(start)
+	group.Wait()
+	close(results)
+	close(errorsChannel)
+	for err := range errorsChannel {
+		t.Fatalf("claim due retry: %v", err)
+	}
+	claimedTotal := 0
+	for values := range results {
+		claimedTotal += len(values)
+		if len(values) == 1 && values[0].Attempt.AttemptNo != 2 {
+			t.Fatalf("retry attempt number = %d", values[0].Attempt.AttemptNo)
+		}
+	}
+	if claimedTotal != 1 {
+		var diagnostic model.IntegrationExecution
+		_ = db.First(&diagnostic, execution.Id).Error
+		t.Fatalf("PostgreSQL concurrent retry claim total = %d, want 1; execution=%+v", claimedTotal, diagnostic)
+	}
+	var stored model.IntegrationExecution
+	if err := db.First(&stored, execution.Id).Error; err != nil {
+		t.Fatalf("load claimed retry: %v", err)
+	}
+	if stored.Status != model.IntegrationExecutionStatusRunning || stored.CurrentAttempt != 2 || stored.NextRunAt != nil || stored.LeaseOwner == "" || stored.Revision != execution.Revision+1 {
+		t.Fatalf("unexpected claimed retry: %+v", stored)
+	}
+	var attempts int64
+	if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", execution.Id).Count(&attempts).Error; err != nil || attempts != 2 {
+		t.Fatalf("retry attempt count = %d err=%v", attempts, err)
+	}
+}
+
+func openPostgresClaimSchema(t *testing.T, prefix string) *gorm.DB {
+	t.Helper()
+	dsn := testutil.PostgreSQLDSN(t)
+	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	schemaName := fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
+	if err := admin.Exec(fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)).Error; err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() { _ = admin.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
+	db, err := gorm.Open(postgres.Open(postgresClaimDSN(t, dsn, schemaName)), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
+	})
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL schema: %v", err)
+	}
+	if err := db.AutoMigrate(&model.IntegrationExecution{}, &model.IntegrationLog{}); err != nil {
+		t.Fatalf("migrate runtime tables: %v", err)
+	}
+	return db
 }
 
 func postgresClaimDSN(t *testing.T, dsn string, schemaName string) string {

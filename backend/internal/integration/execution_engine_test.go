@@ -27,7 +27,7 @@ func TestIntegrationExecutionEngineClaimRunAndConverge(t *testing.T) {
 	engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 	defer closeServer()
 
-	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("claim executions = %+v err=%v", claimed, err)
 	}
@@ -63,7 +63,7 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 		t.Run(http.StatusText(statusCode), func(t *testing.T) {
 			engine, db, execution, closeServer := newExecutionEngineFixture(t, statusCode)
 			defer closeServer()
-			claimed, err := engine.ClaimCreatedExecutions(context.Background())
+			claimed, err := engine.ClaimReadyExecutions(context.Background())
 			if err != nil || len(claimed) != 1 {
 				t.Fatalf("claim = %+v err=%v", claimed, err)
 			}
@@ -86,7 +86,7 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 	t.Run("500 is not a V1 retry status", func(t *testing.T) {
 		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusInternalServerError)
 		defer closeServer()
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		claimed, err := engine.ClaimReadyExecutions(context.Background())
 		if err != nil || len(claimed) != 1 {
 			t.Fatalf("claim = %+v err=%v", claimed, err)
 		}
@@ -107,7 +107,7 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 			_, _ = writer.Write([]byte(`{"error":"busy"}`))
 		}))
 		defer closeServer()
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		claimed, err := engine.ClaimReadyExecutions(context.Background())
 		if err != nil || len(claimed) != 1 {
 			t.Fatalf("claim=%+v err=%v", claimed, err)
 		}
@@ -124,7 +124,7 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 	t.Run("expired lease becomes unknown failed without HTTP retry", func(t *testing.T) {
 		engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 		defer closeServer()
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		claimed, err := engine.ClaimReadyExecutions(context.Background())
 		if err != nil || len(claimed) != 1 {
 			t.Fatalf("claim = %+v err=%v", claimed, err)
 		}
@@ -153,7 +153,7 @@ func TestIntegrationExecutionEngineRetryEligibilityAndLeaseRecovery(t *testing.T
 func TestIntegrationExecutionEngineConfigurationFailureDoesNotCallTransport(t *testing.T) {
 	engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 	defer closeServer()
-	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("claim = %+v err=%v", claimed, err)
 	}
@@ -173,7 +173,7 @@ func TestIntegrationExecutionEngineConfigurationFailureDoesNotCallTransport(t *t
 func TestIntegrationExecutionEngineRejectsRuntimeIncompatibleDirtyConfiguration(t *testing.T) {
 	engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 	defer closeServer()
-	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("claim = %+v err=%v", claimed, err)
 	}
@@ -195,7 +195,7 @@ func TestIntegrationExecutionEngineUsesSupportedCredentialTypes(t *testing.T) {
 		t.Run(credentialType, func(t *testing.T) {
 			engine, _, _, closeServer := newExecutionEngineFixture(t, http.StatusOK, credentialType)
 			defer closeServer()
-			claimed, err := engine.ClaimCreatedExecutions(context.Background())
+			claimed, err := engine.ClaimReadyExecutions(context.Background())
 			if err != nil || len(claimed) != 1 {
 				t.Fatalf("claim = %+v err=%v", claimed, err)
 			}
@@ -256,7 +256,7 @@ func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(
 	}).Error; err != nil {
 		t.Fatalf("update execution snapshot: %v", err)
 	}
-	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("claim dynamic execution = %+v err=%v", claimed, err)
 	}
@@ -313,7 +313,7 @@ func TestIntegrationExecutionEngineInjectsFrozenRemoteIdempotencyKey(t *testing.
 	}).Error; err != nil {
 		t.Fatalf("freeze execution idempotency: %v", err)
 	}
-	claimed, err := engine.ClaimCreatedExecutions(context.Background())
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
 	if err != nil || len(claimed) != 1 {
 		t.Fatalf("claim=%+v err=%v", claimed, err)
 	}
@@ -335,7 +335,7 @@ func TestIntegrationExecutionEngineRejectsMissingOrTamperedSnapshotWithoutHTTP(t
 		}).Error; err != nil {
 			t.Fatalf("remove snapshot: %v", err)
 		}
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		claimed, err := engine.ClaimReadyExecutions(context.Background())
 		if err != nil || len(claimed) != 0 || calls.Load() != 0 {
 			t.Fatalf("missing snapshot claim=%+v calls=%d err=%v", claimed, calls.Load(), err)
 		}
@@ -350,7 +350,7 @@ func TestIntegrationExecutionEngineRejectsMissingOrTamperedSnapshotWithoutHTTP(t
 		if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Update("input_hash", strings.Repeat("0", 64)).Error; err != nil {
 			t.Fatalf("tamper hash: %v", err)
 		}
-		claimed, err := engine.ClaimCreatedExecutions(context.Background())
+		claimed, err := engine.ClaimReadyExecutions(context.Background())
 		if err != nil || len(claimed) != 1 {
 			t.Fatalf("claim tampered execution=%+v err=%v", claimed, err)
 		}

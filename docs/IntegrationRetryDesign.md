@@ -646,6 +646,17 @@ Execution 延续 query/detail/create/cancel；不增加 start/complete/fail/立�
 - 远端幂等键由 Application Service 随 Execution 创建生成 256 bit 随机值并冻结，不复用客户端 `idempotency_key`。普通输入快照禁止声明或提交 `Idempotency-Key`；Engine 在请求重建后、Credential 注入前写入该 Header。
 - Attempt 完成事务一次性保存 retryable、reason、delay、scheduled_at 和 Retry-After 来源；进入 `retry_waiting` 时 `completed_at` 保持为空，Execution 只保存安全调度摘要。
 
+### 21.4 INT-004C-2 调度闭环补充
+
+- Repository 统一使用 `ClaimReadyExecutions` 领取 `created` 与已到期 `retry_waiting`，候选按 `COALESCE(next_run_at, gmt_create), gmt_create, id` 排序并共享单批上限。V1 不设置独立 Retry lane；首次调用和重试均进入同一个 Runner、实例并发限制与 ConcurrencyGuard。
+- `retry_waiting` 到期条件由 PostgreSQL `CURRENT_TIMESTAMP` 在 `FOR UPDATE SKIP LOCKED` 事务内判断；应用时间不参与候选筛选。领取事务读取同一数据库时间复核 Retry Window，避免多实例时区或时钟差异改变调度结果。
+- 领取前先复核冻结策略版本、`current_attempt < max_attempts`、首次开始时间、Retry Window 和输入快照基本完整性。策略损坏、次数耗尽或窗口过期直接由该短事务收敛为 `failed`，不创建没有实际技术执行过程的新 Attempt。
+- 真正可运行的重试在同一短事务内写入 `running`、租约 owner 和到期时间、`current_attempt + 1`、revision、`last_attempt_at`，追加新的 running Attempt，并清空 Execution 当前调度字段 `next_run_at`。首次 `started_at` 保留不变，上一轮调度事实保留在历史 Attempt 的 `retry_scheduled_at`。
+- 取消与领取通过同一记录的行锁、状态和 revision 竞争。取消先提交时 Worker 无候选；领取先提交时状态已为 running，重试取消返回稳定冲突，不会出现 cancelled 与新增 HTTP 并存。
+- Runner 不解析 Retry-After、不重新计算 Backoff，也不循环立即执行。每轮只消费已持久化且到期的 `next_run_at`；新的失败仍由统一 RetryDecision 决定下一状态和调度时间。
+- Retry Attempt 继续调用原 `RunExecution`，复用 ExecutionInputSnapshot、Runtime Limits、CredentialProvider、TransportClient、完成事务和租约恢复。租约恢复仍最终收敛 `failed + unknown`，不重新放回 `retry_waiting`。
+- PostgreSQL 强制门控覆盖数据库时间、到期边界、SKIP LOCKED 多实例领取、Attempt 唯一追加、取消竞争，以及真实常驻 Runner + TLS 的 503→200 和最大次数耗尽链路。
+
 ## 22. 后续 Task 拆分建议
 
 考虑 PostgreSQL 领取、策略决策与页面验收的风险不同，建议将原计划细分为：
@@ -673,4 +684,4 @@ Integration Retry V1 采用“版本化 RetryPolicy + Execution 最小策略快�
 6. 调度时间由服务端根据数据库 UTC 时间计算并持久化。
 7. Controller、页面和管理员权限不能绕过退避或执行链。
 
-本设计可以作为 INT-004B 及后续 Retry 实施的正式基线；在实现和验收完成前，现有 `retry_waiting` 仍不得由临时任务或手工 API 自动推进。
+本设计可以作为 INT-004B 及后续 Retry 实施的正式基线。INT-004C-2 完成后，`retry_waiting` 只允许由统一 Runner 在数据库调度时间到期后自动推进；临时任务、Controller 和手工 API 仍不得绕过该执行链。

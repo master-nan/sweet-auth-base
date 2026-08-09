@@ -4,11 +4,13 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/internal/database"
+	"backend/internal/integration/retrycontract"
 	"backend/model"
 	"backend/repository"
 	queryutil "backend/repository/util"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -97,9 +99,9 @@ func (r *IntegrationExecutionRepositoryImpl) ListCandidatesByStatus(
 	return values, err
 }
 
-// ClaimCreatedExecutions 在一个短事务中使用行锁领取 created Execution 并创建 running Attempt。
+// ClaimReadyExecutions 在一个短事务中领取 created 或已到期 retry_waiting Execution，并创建 running Attempt。
 // PostgreSQL 会生成 FOR UPDATE SKIP LOCKED；SQLite 测试仅验证状态条件和原子回滚，不替代行锁专项验证。
-func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
+func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 	ctx context.Context,
 	request repository.IntegrationExecutionClaimRequest,
 ) ([]repository.ClaimedIntegrationExecution, error) {
@@ -109,14 +111,25 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
 	}
 	claimed := make([]repository.ClaimedIntegrationExecution, 0, len(request.AttemptIDs))
 	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		databaseNow, err := integrationDatabaseNow(tx)
+		if err != nil {
+			return err
+		}
+		dueExpression := "next_run_at <= CURRENT_TIMESTAMP"
+		leaseExpression := "lease_expires_at IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP"
+		if tx.Dialector.Name() == "sqlite" {
+			dueExpression = "datetime(next_run_at) <= CURRENT_TIMESTAMP"
+			leaseExpression = "lease_expires_at IS NULL OR datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
+		}
 		var executions []model.IntegrationExecution
 		query := tx.Model(&model.IntegrationExecution{}).
 			Where(
-				"status = ? AND input_snapshot_version = ? AND input_snapshot_size > 0",
-				model.IntegrationExecutionStatusCreated,
-				model.IntegrationExecutionInputSnapshotVersion,
+				"(status = ? AND input_snapshot_version = ? AND input_snapshot_size > 0) OR "+
+					"(status = ? AND next_run_at IS NOT NULL AND "+dueExpression+" AND ("+leaseExpression+"))",
+				model.IntegrationExecutionStatusCreated, model.IntegrationExecutionInputSnapshotVersion,
+				model.IntegrationExecutionStatusRetryWaiting,
 			).
-			Order("gmt_create ASC, id ASC").
+			Order("COALESCE(next_run_at, gmt_create) ASC, gmt_create ASC, id ASC").
 			Limit(len(request.AttemptIDs)).
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})
 		if err := query.Find(&executions).Error; err != nil {
@@ -124,17 +137,30 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
 		}
 		for index := range executions {
 			execution := executions[index]
+			if execution.Status == model.IntegrationExecutionStatusRetryWaiting {
+				reasonCode, summary := retryClaimRejection(execution, databaseNow)
+				if reasonCode != "" {
+					if err := closeUnrunnableRetry(tx, execution, databaseNow, reasonCode, summary); err != nil {
+						return err
+					}
+					continue
+				}
+			}
 			nextAttempt := execution.CurrentAttempt + 1
 			updates := map[string]any{
 				"status":           model.IntegrationExecutionStatusRunning,
 				"lease_owner":      request.WorkerID,
 				"lease_expires_at": request.LeaseExpiresAt,
-				"started_at":       request.StartedAt,
+				"last_attempt_at":  request.StartedAt,
+				"next_run_at":      nil,
 				"current_attempt":  nextAttempt,
 				"revision":         execution.Revision + 1,
 			}
+			if execution.Status == model.IntegrationExecutionStatusCreated {
+				updates["started_at"] = request.StartedAt
+			}
 			result := tx.Model(&model.IntegrationExecution{}).
-				Where("id = ? AND status = ? AND revision = ?", execution.Id, model.IntegrationExecutionStatusCreated, execution.Revision).
+				Where("id = ? AND status = ? AND revision = ?", execution.Id, execution.Status, execution.Revision).
 				Updates(updates)
 			if result.Error != nil {
 				return result.Error
@@ -150,12 +176,19 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
 				RequestID:       request.RequestID, TraceID: request.TraceID, WorkerID: request.WorkerID,
 			}
 			if err := tx.Create(&attempt).Error; err != nil {
+				if execution.Status == model.IntegrationExecutionStatusRetryWaiting {
+					return fmt.Errorf("%w: %v", repository.ErrIntegrationRetryAttemptCreateFailed, err)
+				}
 				return err
 			}
 			execution.Status = model.IntegrationExecutionStatusRunning
 			execution.LeaseOwner = request.WorkerID
 			execution.LeaseExpiresAt = &request.LeaseExpiresAt
-			execution.StartedAt = &request.StartedAt
+			if execution.StartedAt == nil {
+				execution.StartedAt = &request.StartedAt
+			}
+			execution.LastAttemptAt = &request.StartedAt
+			execution.NextRunAt = nil
 			execution.CurrentAttempt = nextAttempt
 			execution.Revision++
 			claimed = append(claimed, repository.ClaimedIntegrationExecution{Execution: execution, Attempt: attempt})
@@ -166,6 +199,66 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimCreatedExecutions(
 		return nil, err
 	}
 	return claimed, nil
+}
+
+func integrationDatabaseNow(tx *gorm.DB) (time.Time, error) {
+	var value struct {
+		Now model.CustomTime `gorm:"column:now"`
+	}
+	if err := tx.Raw("SELECT CURRENT_TIMESTAMP AS now").Scan(&value).Error; err != nil {
+		return time.Time{}, err
+	}
+	return time.Time(value.Now), nil
+}
+
+func retryClaimRejection(execution model.IntegrationExecution, databaseNow time.Time) (string, string) {
+	policy, err := retrycontract.Parse(execution.RetryPolicySnapshot)
+	if err != nil || execution.RetryPolicySnapshotVersion != retrycontract.SnapshotVersion || execution.CurrentAttempt < 1 {
+		return retrycontract.ReasonPolicyInvalid, "冻结重试策略无效，执行已安全停止"
+	}
+	if execution.CurrentAttempt >= policy.MaxAttempts {
+		return retrycontract.ReasonAttemptsExhausted, "重试次数已耗尽，执行已停止"
+	}
+	if execution.StartedAt == nil {
+		return "retry_execution_not_runnable", "首次执行时间缺失，执行已安全停止"
+	}
+	windowDeadline := execution.StartedAt.Add(time.Duration(policy.RetryWindowMs) * time.Millisecond)
+	if !databaseNow.Before(windowDeadline) || execution.NextRunAt == nil || !execution.NextRunAt.Before(windowDeadline) {
+		return retrycontract.ReasonWindowExpired, "重试窗口已过期，执行已停止"
+	}
+	if execution.InputSnapshotVersion != model.IntegrationExecutionInputSnapshotVersion || execution.InputSnapshotSize <= 0 || len(execution.InputHash) != 64 {
+		return "retry_execution_not_runnable", "执行输入快照不可用，执行已安全停止"
+	}
+	return "", ""
+}
+
+func closeUnrunnableRetry(
+	tx *gorm.DB,
+	execution model.IntegrationExecution,
+	completedAt time.Time,
+	reasonCode string,
+	summary string,
+) error {
+	updates := map[string]any{
+		"status":            model.IntegrationExecutionStatusFailed,
+		"completed_at":      completedAt,
+		"next_run_at":       nil,
+		"lease_owner":       "",
+		"lease_expires_at":  nil,
+		"retry_reason_code": reasonCode,
+		"result_summary":    summary,
+		"revision":          execution.Revision + 1,
+	}
+	result := tx.Model(&model.IntegrationExecution{}).
+		Where("id = ? AND status = ? AND revision = ?", execution.Id, model.IntegrationExecutionStatusRetryWaiting, execution.Revision).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return repository.ErrIntegrationExecutionClaimUnavailable
+	}
+	return nil
 }
 
 // CompleteAttemptAndExecution 在新的短事务内验证租约并原子收敛 Attempt 和 Execution。

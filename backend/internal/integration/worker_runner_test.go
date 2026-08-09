@@ -170,7 +170,7 @@ func TestIntegrationWorkerRunnerAutomaticallyExecutesCreatedExecution(t *testing
 	}
 }
 
-func TestIntegrationWorkerRunnerDoesNotReclaimRetryWaitingExecution(t *testing.T) {
+func TestIntegrationWorkerRunnerDoesNotReclaimRetryBeforeNextRunAt(t *testing.T) {
 	engine, db, execution, closeServer := newExecutionEngineFixture(t, 503)
 	defer closeServer()
 	runner, err := NewIntegrationWorkerRunner(engine, WorkerRunnerConfig{
@@ -231,7 +231,7 @@ type workerRuntimeStub struct {
 	maxExecuting int
 }
 
-func (s *workerRuntimeStub) ClaimCreatedExecutions(context.Context) ([]repository.ClaimedIntegrationExecution, error) {
+func (s *workerRuntimeStub) ClaimReadyExecutions(context.Context) ([]repository.ClaimedIntegrationExecution, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.claims++

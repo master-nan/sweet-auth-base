@@ -75,6 +75,13 @@ func TestIntegrationRuntimeSchemaClosesLegacyPendingExecutionWithoutSnapshot(t *
 	if err := db.Create(&legacy).Error; err != nil {
 		t.Fatalf("create legacy execution: %v", err)
 	}
+	missingSchedule := validIntegrationExecutionFixture(602, "INT-LEGACY-602", system, definition, "legacy-602")
+	missingSchedule.Status = model.IntegrationExecutionStatusRetryWaiting
+	missingSchedule.RetryPolicySnapshotVersion = 1
+	missingSchedule.RetryPolicySnapshot = datatypes.JSON([]byte(`{"version":1}`))
+	if err := db.Create(&missingSchedule).Error; err != nil {
+		t.Fatalf("create retry execution without schedule: %v", err)
+	}
 	if err := migrateIntegrationRuntimeSchema(db); err != nil {
 		t.Fatalf("rerun runtime migration: %v", err)
 	}
@@ -86,6 +93,14 @@ func TestIntegrationRuntimeSchemaClosesLegacyPendingExecutionWithoutSnapshot(t *
 		stored.ErrorCategory != model.IntegrationErrorCategoryConfiguration ||
 		stored.CompletedAt == nil || stored.Revision != legacy.Revision+1 {
 		t.Fatalf("legacy execution was not safely closed: status=%s category=%s", stored.Status, stored.ErrorCategory)
+	}
+	var storedMissingSchedule model.IntegrationExecution
+	if err := db.First(&storedMissingSchedule, missingSchedule.Id).Error; err != nil {
+		t.Fatalf("load retry execution without schedule: %v", err)
+	}
+	if storedMissingSchedule.Status != model.IntegrationExecutionStatusFailed || storedMissingSchedule.NextRunAt != nil ||
+		storedMissingSchedule.RetryReasonCode != "retry_schedule_invalid" || storedMissingSchedule.CompletedAt == nil {
+		t.Fatalf("retry execution without schedule was not safely closed: %+v", storedMissingSchedule)
 	}
 }
 

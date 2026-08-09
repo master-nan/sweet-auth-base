@@ -1,34 +1,17 @@
 package integration
 
 import (
-	myerrors "backend/internal/errors"
+	"backend/internal/integration/retrycontract"
 	"backend/model"
 	"encoding/json"
 	"sort"
 	"strconv"
 )
 
-const RetryPolicySnapshotVersion = 1
+const RetryPolicySnapshotVersion = retrycontract.SnapshotVersion
 
 // RetryPolicySnapshot 是 Execution 创建时冻结的最小策略值对象。
-type RetryPolicySnapshot struct {
-	Version                  int      `json:"version"`
-	PolicyCode               string   `json:"policy_code"`
-	PolicyVersion            int      `json:"policy_version"`
-	MaxAttempts              int      `json:"max_attempts"`
-	InitialDelayMs           int64    `json:"initial_delay_ms"`
-	MaxDelayMs               int64    `json:"max_delay_ms"`
-	BackoffType              string   `json:"backoff_type"`
-	BackoffMultiplier        string   `json:"backoff_multiplier"`
-	JitterType               string   `json:"jitter_type"`
-	JitterRatio              string   `json:"jitter_ratio"`
-	RetryWindowMs            int64    `json:"retry_window_ms"`
-	RetryableErrorCategories []string `json:"retryable_error_categories"`
-	RetryableHTTPStatuses    []int    `json:"retryable_http_statuses"`
-	RespectRetryAfter        bool     `json:"respect_retry_after"`
-	IdempotencyMode          string   `json:"idempotency_mode"`
-	RemoteIdempotencyHeader  string   `json:"remote_idempotency_header"`
-}
+type RetryPolicySnapshot = retrycontract.Snapshot
 
 type RetryPolicySnapshotOptions struct {
 	IdempotencyMode         string
@@ -66,12 +49,5 @@ func BuildRetryPolicySnapshot(value model.RetryPolicy, options ...RetryPolicySna
 }
 
 func ParseRetryPolicySnapshot(raw []byte) (RetryPolicySnapshot, error) {
-	var snapshot RetryPolicySnapshot
-	if len(raw) == 0 || !json.Valid(raw) || json.Unmarshal(raw, &snapshot) != nil {
-		return RetryPolicySnapshot{}, myerrors.ErrIntegrationRetrySnapshotInvalid
-	}
-	if err := ValidateRetryPolicySnapshot(snapshot); err != nil {
-		return RetryPolicySnapshot{}, err
-	}
-	return snapshot, nil
+	return retrycontract.Parse(raw)
 }

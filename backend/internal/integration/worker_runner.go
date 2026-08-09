@@ -27,7 +27,7 @@ const (
 
 // ExecutionRuntime 只暴露已冻结的 Execution Engine 原语；Runner 不重新实现领取或状态机。
 type ExecutionRuntime interface {
-	ClaimCreatedExecutions(context.Context) ([]repository.ClaimedIntegrationExecution, error)
+	ClaimReadyExecutions(context.Context) ([]repository.ClaimedIntegrationExecution, error)
 	RunExecution(context.Context, repository.ClaimedIntegrationExecution) (AttemptResult, error)
 	RecoverExpiredLease(context.Context, int) (int, error)
 }
@@ -241,7 +241,7 @@ func (r *IntegrationWorkerRunner) runPoll(ctx context.Context) (failed bool) {
 		return false
 	}
 	r.setLastPoll(time.Now())
-	claimed, err := r.runtime.ClaimCreatedExecutions(ctx)
+	claimed, err := r.runtime.ClaimReadyExecutions(ctx)
 	if err != nil {
 		r.setErrorCategory("worker_claim_failed")
 		zap.L().Warn("integration worker claim failed", zap.String("worker_id", r.config.WorkerID), zap.String("error_category", "worker_claim_failed"))

@@ -304,12 +304,15 @@ func (s *IntegrationExecutionService) CancelExecution(
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
-		if current.Revision != revision {
-			return myerrors.ErrIntegrationExecutionRevisionConflict
-		}
 		if current.Status != model.IntegrationExecutionStatusCreated &&
 			current.Status != model.IntegrationExecutionStatusRetryWaiting {
+			if current.Status == model.IntegrationExecutionStatusRunning && current.CurrentAttempt > 1 {
+				return myerrors.ErrIntegrationRetryCancelConflict
+			}
 			return myerrors.ErrIntegrationExecutionStatusInvalid
+		}
+		if current.Revision != revision {
+			return myerrors.ErrIntegrationExecutionRevisionConflict
 		}
 		now := s.now()
 		updates := map[string]any{
