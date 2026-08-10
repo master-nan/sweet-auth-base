@@ -164,7 +164,12 @@ func newSyncTaskTestSubject(t *testing.T) (*SyncTaskService, *gorm.DB, *external
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: 9702, State: true}, ExternalSystemID: system.Id, InterfaceCode: "employees", Name: "Employees", Version: 3, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/employees", TimeoutSeconds: 30, ResponseLimit: 1024 * 1024, InputContract: contract, IdempotencyMode: model.InterfaceIdempotencyModeNone, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
 	testutil.MustCreate(t, db, &system)
 	testutil.MustCreate(t, db, &definition)
-	registry := integration.NewStaticSyncConsumerRegistry(integration.SyncConsumerMetadata{Code: "test_sync_consumer", Version: 1, Name: "Test Consumer", Enabled: true, ContentTypes: []string{"application/json"}, MaxResponseBytes: 2 * 1024 * 1024, MaxDuration: 10 * time.Second, CheckpointModes: []string{"none", "timestamp"}})
+	registry, err := integration.NewStaticSyncConsumerRegistry(integration.SyncConsumerRegistration{Metadata: integration.SyncConsumerMetadata{Code: "test_sync_consumer", Version: 1, Name: "Test Consumer", Status: integration.SyncConsumerStatusEnabled, ContentTypes: []string{"application/json"}, MaxResponseBytes: 2 * 1024 * 1024, MaxDuration: 10 * time.Second, CheckpointModes: []string{"none", "timestamp"}}, Consumer: integration.SyncResultConsumerFunc(func(context.Context, integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+		return integration.NewSyncConsumptionResult(true, "", 1, 0, "")
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
 	sf, _ := utils.NewSnowflake(1)
 	writer := &externalSystemAuditWriter{}
 	svc := NewSyncTaskService(impl.NewIntegrationSyncTaskRepositoryImpl(primary), impl.NewIntegrationSyncBatchRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary), impl.NewInterfaceDefinitionRepositoryImpl(primary), impl.NewRetryPolicyRepositoryImpl(primary), registry, sf, writer, &config.Server{})

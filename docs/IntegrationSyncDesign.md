@@ -487,9 +487,17 @@ Integration SyncBatch 是技术调度批次，不等于 Organization `org_sync_b
 
 协调器不读取 Attempt Body、不调用 Credential/Transport、不修改 Retry `next_run_at`。
 
-### 13.4 INT-005C-1 Consumer 过渡边界
+### 13.4 INT-005C-2 Consumer 交付边界
 
-INT-005C-1 只冻结 `SyncBusinessResultProvider` 读取端口，不执行 Consumer。生产默认 Provider 始终返回 `pending`，因此技术成功的 Execution 会保持 Batch running，不会伪造业务成功或推进 Checkpoint。测试可注入确定性 Provider 验证连续推进；真实响应交付、Consumer 执行和业务结果持久化由 INT-005C-2 接入。
+INT-005C-2 将 `SyncResultConsumerRegistry` 接入既有 `IntegrationExecutionEngine`。Registry 是进程启动时构造的不可变服务端注册集合，以 `consumer_code + consumer_version` 唯一解析实现；不支持动态加载、脚本、SQL、反射方法名或插件。未注册、已停用、版本漂移或运行契约不兼容时，Engine 在 HTTP 前安全失败，不能回退同 code 的其他版本。
+
+同步 Execution 的唯一完成顺序为：受控响应完整读取 -> Consumer 调用 -> Consumer 结果校验 -> Attempt 与 Execution 短事务收敛。`SyncConsumptionRequest` 使用私有字段和只读副本方法，只在调用栈内传递 Body；它不携带 Credential、Authorization、Cookie、Token 或完整响应 Header。Body、完整响应和业务数据均不写入 Integration Model、Audit 或结构化日志。
+
+Execution 仅持久化以下安全业务摘要：`sync_business_status`、稳定 `sync_business_reason_code`、成功/失败计数和长度受限的 `sync_business_reference`。普通 Execution 的这些字段必须为空；Sync Execution 创建时为 `pending`，Consumer 成功后为 `succeeded`，Consumer 失败、超时或 panic 后为 `failed`。数据库不增加 Response Body 或 Response Artifact 字段。
+
+HTTP 2xx 只有在 Consumer 返回合法成功结果后才收敛 Execution succeeded。Consumer 返回业务失败、错误、超时或 panic 时，Execution 收敛 `failed + confirmed + business_processing_failed`；详细诊断只保存稳定安全 reason code。该分支由 Engine 在 RetryDecision 前硬性终止，不进入 `retry_waiting`。
+
+协调器使用已落库的 Consumer 摘要作为 Checkpoint 前置条件。只有 Execution succeeded 且业务状态 succeeded 才能推进连续 Checkpoint；HTTP 成功但 Consumer 失败时 Batch failed，技术成功计数增加、业务失败计数增加，Checkpoint 保持不变。
 
 ### 13.5 禁止长事务
 
@@ -502,6 +510,10 @@ Batch/Task 行锁只在短事务内持有。Cron 等待、Execution 执行、Ret
 - Batch 创建与 Task schedule 游标更新属于同一短事务；事务提交后由协调轮次调用 Integration Application Service 创建唯一切片 Execution。
 - 切片幂等键固定为 Batch + slice，数据库 `(sync_batch_id, sync_slice_no)` 部分唯一索引为最终防线。
 - Checkpoint 推进事务同时锁定 Batch、Task 并复核 Execution succeeded、连续窗口、`task_revision` 与 revision；重复协调不会重复累计计数。
+
+### 13.7 Consumer 注册示例边界
+
+未来 Organization 模块只需实现 `SyncResultConsumer` 并由应用初始化层显式提供一个固定版本的 `SyncConsumerRegistration`。注册元数据声明 Content-Type、响应上限、最大处理时长和 Checkpoint 模式；业务实现通过 `Consume(ctx, request)` 管理自己的短事务并以 `NewSyncConsumptionResult` 返回安全摘要。Integration 不引用 Organization Repository，不创建 Organization 事务，也不注册伪 HR Consumer。当前生产注册表为空，因此在真实 Organization Consumer 接入前，相关 SyncTask 不能启用。
 
 ## 14. 失败、取消与并发
 

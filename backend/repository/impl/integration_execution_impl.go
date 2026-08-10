@@ -356,6 +356,13 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 			"retry_reason_code":  completion.RetryReasonCode,
 			"revision":           execution.Revision + 1,
 		}
+		if completion.SyncBusinessStatus != "" {
+			executionUpdates["sync_business_status"] = completion.SyncBusinessStatus
+			executionUpdates["sync_business_reason_code"] = completion.SyncBusinessReasonCode
+			executionUpdates["sync_business_success_count"] = completion.SyncBusinessSuccessCount
+			executionUpdates["sync_business_failed_count"] = completion.SyncBusinessFailedCount
+			executionUpdates["sync_business_reference"] = completion.SyncBusinessReference
+		}
 		result := tx.Model(&model.IntegrationExecution{}).
 			Where("id = ? AND status = ? AND revision = ? AND lease_owner = ? AND lease_expires_at > ?", execution.Id, model.IntegrationExecutionStatusRunning, execution.Revision, completion.WorkerID, databaseNow).
 			Updates(executionUpdates)
@@ -381,6 +388,13 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		completed.NextRunAt = completion.RetryScheduledAt
 		completed.LastAttemptAt = &databaseNow
 		completed.RetryReasonCode = completion.RetryReasonCode
+		if completion.SyncBusinessStatus != "" {
+			completed.SyncBusinessStatus = completion.SyncBusinessStatus
+			completed.SyncBusinessReasonCode = completion.SyncBusinessReasonCode
+			completed.SyncBusinessSuccessCount = completion.SyncBusinessSuccessCount
+			completed.SyncBusinessFailedCount = completion.SyncBusinessFailedCount
+			completed.SyncBusinessReference = completion.SyncBusinessReference
+		}
 		completed.Revision++
 		return nil
 	})

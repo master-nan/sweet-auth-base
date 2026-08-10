@@ -36,3 +36,22 @@ func NewPendingSyncBusinessResultProvider() *PendingSyncBusinessResultProvider {
 func (*PendingSyncBusinessResultProvider) Result(context.Context, model.IntegrationExecution) (SyncBusinessResult, error) {
 	return SyncBusinessResult{Status: SyncBusinessResultPending}, nil
 }
+
+// PersistedSyncBusinessResultProvider 读取 Engine 原子落库的安全 Consumer 结果摘要。
+// 它不读取响应正文，也不会再次调用 Consumer。
+type PersistedSyncBusinessResultProvider struct{}
+
+func NewPersistedSyncBusinessResultProvider() *PersistedSyncBusinessResultProvider {
+	return &PersistedSyncBusinessResultProvider{}
+}
+
+func (*PersistedSyncBusinessResultProvider) Result(_ context.Context, execution model.IntegrationExecution) (SyncBusinessResult, error) {
+	status := execution.SyncBusinessStatus
+	if status == "" {
+		status = SyncBusinessResultPending
+	}
+	return SyncBusinessResult{
+		Status: status, SuccessCount: execution.SyncBusinessSuccessCount, FailedCount: execution.SyncBusinessFailedCount,
+		ReasonCode: execution.SyncBusinessReasonCode,
+	}, nil
+}

@@ -386,7 +386,7 @@ func (s *SyncTaskService) ListSyncConsumers(context.Context) []response.SyncCons
 	result := make([]response.SyncConsumerMetadataRes, 0, len(values))
 	for _, value := range values {
 		result = append(result, response.SyncConsumerMetadataRes{
-			Code: value.Code, Version: value.Version, Name: value.Name,
+			Code: value.Code, Version: value.Version, Name: value.Name, Status: value.Status,
 			ContentTypes: append([]string(nil), value.ContentTypes...), MaxResponseBytes: value.MaxResponseBytes,
 			MaxDurationMs: value.MaxDuration.Milliseconds(), CheckpointModes: append([]string(nil), value.CheckpointModes...),
 		})

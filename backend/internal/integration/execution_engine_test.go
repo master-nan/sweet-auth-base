@@ -170,6 +170,91 @@ func TestIntegrationExecutionEngineConfigurationFailureDoesNotCallTransport(t *t
 	}
 }
 
+func TestIntegrationExecutionEngineSyncConsumerDefinesBusinessSuccess(t *testing.T) {
+	tests := []struct {
+		name       string
+		consumer   SyncResultConsumer
+		wantStatus string
+		wantBiz    string
+	}{
+		{name: "consumer success", consumer: SyncResultConsumerFunc(func(_ context.Context, request SyncConsumptionRequest) (SyncConsumptionResult, error) {
+			if request.ExecutionNo() == "" || request.SyncBatchNo() != "SYNC-RUNTIME-1" || request.TaskCode() != "runtime_sync" || request.SliceNo() != 1 || string(request.Body()) != `{"result":"ok"}` {
+				return SyncConsumptionResult{}, fmt.Errorf("unexpected controlled request")
+			}
+			return NewSyncConsumptionResult(true, "", 3, 0, "ORG-BATCH-1")
+		}), wantStatus: model.IntegrationExecutionStatusSucceeded, wantBiz: model.IntegrationSyncBusinessStatusSucceeded},
+		{name: "consumer failure is not retried", consumer: SyncResultConsumerFunc(func(context.Context, SyncConsumptionRequest) (SyncConsumptionResult, error) {
+			return NewSyncConsumptionResult(false, "org_record_invalid", 0, 2, "ORG-BATCH-2")
+		}), wantStatus: model.IntegrationExecutionStatusFailed, wantBiz: model.IntegrationSyncBusinessStatusFailed},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
+			defer closeServer()
+			configureSyncExecutionFixture(t, engine, db, &execution, test.consumer)
+			claimed, err := engine.ClaimReadyExecutions(context.Background())
+			if err != nil || len(claimed) != 1 {
+				t.Fatalf("claim=%+v err=%v", claimed, err)
+			}
+			result, err := engine.RunExecution(context.Background(), claimed[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var stored model.IntegrationExecution
+			if err := db.First(&stored, execution.Id).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.Status != test.wantStatus || stored.SyncBusinessStatus != test.wantBiz || stored.NextRunAt != nil {
+				t.Fatalf("execution=%+v result=%+v", stored, result)
+			}
+			if test.wantBiz == model.IntegrationSyncBusinessStatusSucceeded && (stored.SyncBusinessSuccessCount != 3 || stored.SyncBusinessReference != "ORG-BATCH-1") {
+				t.Fatalf("success summary=%+v", stored)
+			}
+			if test.wantBiz == model.IntegrationSyncBusinessStatusFailed {
+				if result.ErrorCategory != model.IntegrationErrorCategoryBusiness || result.ReasonCode != SyncBusinessReasonProcessingFailed ||
+					stored.SyncBusinessReasonCode != "org_record_invalid" || stored.SyncBusinessFailedCount != 2 {
+					t.Fatalf("failure summary execution=%+v result=%+v", stored, result)
+				}
+			}
+		})
+	}
+}
+
+func configureSyncExecutionFixture(t *testing.T, engine *IntegrationExecutionEngine, db *gorm.DB, execution *model.IntegrationExecution, consumer SyncResultConsumer) {
+	t.Helper()
+	if err := db.AutoMigrate(&model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}); err != nil {
+		t.Fatal(err)
+	}
+	task := model.IntegrationSyncTask{Basic: model.Basic{Id: 201, State: true}, TaskCode: "runtime_sync", TaskName: "Runtime Sync", Version: 1,
+		Status: model.IntegrationSyncTaskStatusEnabled, ExternalSystemID: execution.ExternalSystemID, InterfaceDefinitionID: execution.InterfaceDefinitionID,
+		ConsumerCode: "test_sync", ConsumerVersion: 1, ScheduleType: model.IntegrationSyncScheduleNone, Timezone: "UTC",
+		CheckpointMode: model.IntegrationSyncCheckpointNone, InputPlan: datatypes.JSON([]byte(`{"version":1,"static_input":{}}`)), Revision: 1}
+	batch := model.IntegrationSyncBatch{Basic: model.Basic{Id: 202, State: true}, BatchNo: "SYNC-RUNTIME-1", SyncTaskID: task.Id,
+		TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version, TaskRevision: task.Revision,
+		SystemCode: execution.ExternalSystemCode, InterfaceCode: execution.InterfaceCode, InterfaceVersion: execution.InterfaceVersion,
+		ConsumerCode: "test_sync", ConsumerVersion: 1, TriggerType: model.IntegrationSyncTriggerManual, TriggerKey: "manual:runtime-sync:1",
+		Status: model.IntegrationSyncBatchStatusRunning, CheckpointMode: model.IntegrationSyncCheckpointNone, PlannedSliceCount: 1, CurrentSliceNo: 1, Revision: 1}
+	testutil.MustCreate(t, db, &task)
+	testutil.MustCreate(t, db, &batch)
+	slice := 1
+	consumerVersion := 1
+	updates := map[string]any{"sync_batch_id": batch.Id, "sync_slice_no": slice, "sync_consumer_code": "test_sync", "sync_consumer_version": consumerVersion,
+		"sync_business_status": model.IntegrationSyncBusinessStatusPending}
+	if err := db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(updates).Error; err != nil {
+		t.Fatal(err)
+	}
+	execution.SyncBatchID, execution.SyncSliceNo, execution.SyncConsumerCode, execution.SyncConsumerVersion = &batch.Id, &slice, "test_sync", &consumerVersion
+	registry, err := NewStaticSyncConsumerRegistry(SyncConsumerRegistration{Metadata: SyncConsumerMetadata{
+		Code: "test_sync", Version: 1, Name: "Test Sync", Status: SyncConsumerStatusEnabled,
+		ContentTypes: []string{"application/json"}, MaxResponseBytes: 1024, MaxDuration: time.Second,
+		CheckpointModes: []string{model.IntegrationSyncCheckpointNone},
+	}, Consumer: consumer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.syncConsumers = registry
+}
+
 func TestIntegrationExecutionEngineRejectsRuntimeIncompatibleDirtyConfiguration(t *testing.T) {
 	engine, db, execution, closeServer := newExecutionEngineFixture(t, http.StatusOK)
 	defer closeServer()
@@ -476,7 +561,8 @@ func newExecutionEngineFixtureWithHandler(t *testing.T, handler http.Handler, cr
 	}
 	engine, err := NewIntegrationExecutionEngine(
 		impl.NewIntegrationExecutionRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary), impl.NewInterfaceDefinitionRepositoryImpl(primary), credentialRepository,
-		provider, client, guard, sf, ExecutionEngineOptions{WorkerID: "runtime-worker-1", LeaseDuration: IntegrationDefaultLeaseDuration, BatchSize: 2},
+		impl.NewIntegrationSyncBatchRepositoryImpl(primary), provider, client, guard, NewSyncConsumerRegistry(), sf,
+		ExecutionEngineOptions{WorkerID: "runtime-worker-1", LeaseDuration: IntegrationDefaultLeaseDuration, BatchSize: 2},
 	)
 	if err != nil {
 		closeServer()

@@ -37,6 +37,10 @@ const (
 	IntegrationErrorCategoryBusiness      = "business"
 	IntegrationErrorCategoryConcurrency   = "concurrency"
 	IntegrationErrorCategorySystem        = "system"
+
+	IntegrationSyncBusinessStatusPending   = "pending"
+	IntegrationSyncBusinessStatusSucceeded = "succeeded"
+	IntegrationSyncBusinessStatusFailed    = "failed"
 )
 
 // IntegrationExecution 表示一次逻辑集成调用，只保存经过契约校验的非敏感输入快照。
@@ -85,6 +89,11 @@ type IntegrationExecution struct {
 	SyncWindowEnd              *time.Time     `gorm:"type:timestamp" json:"-"`
 	SyncConsumerCode           string         `gorm:"size:64" json:"-"`
 	SyncConsumerVersion        *int           `json:"-"`
+	SyncBusinessStatus         string         `gorm:"size:16;index:idx_integration_execution_sync_business_status" json:"-"`
+	SyncBusinessReasonCode     string         `gorm:"size:64" json:"-"`
+	SyncBusinessSuccessCount   int            `gorm:"not null;default:0" json:"-"`
+	SyncBusinessFailedCount    int            `gorm:"not null;default:0" json:"-"`
+	SyncBusinessReference      string         `gorm:"size:128" json:"-"`
 	Revision                   int            `gorm:"not null;default:1" json:"revision"`
 
 	ExternalSystem      ExternalSystem        `gorm:"foreignKey:ExternalSystemID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`

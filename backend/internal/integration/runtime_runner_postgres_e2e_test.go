@@ -194,7 +194,7 @@ func TestIntegrationWorkerRunnerPostgreSQLJSONBAndTLSEndToEnd(t *testing.T) {
 		t.Fatalf("create concurrency guard: %v", err)
 	}
 	engine, err := integration.NewIntegrationExecutionEngine(
-		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
+		executions, systems, interfaces, credentials, impl.NewIntegrationSyncBatchRepositoryImpl(primary), provider, transport, guard, integration.NewSyncConsumerRegistry(), snowflake,
 		integration.ExecutionEngineOptions{
 			WorkerID: "runtime-acceptance-worker", LeaseDuration: integration.IntegrationDefaultLeaseDuration, BatchSize: 2,
 		},
@@ -469,7 +469,7 @@ func runRuntimeRetryEndToEnd(t *testing.T, scenario runtimeRetryScenario) {
 	}
 	workerID := fmt.Sprintf("runtime-retry-worker-%d", scenario.maxAttempts)
 	engine, err := integration.NewIntegrationExecutionEngine(
-		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
+		executions, systems, interfaces, credentials, impl.NewIntegrationSyncBatchRepositoryImpl(primary), provider, transport, guard, integration.NewSyncConsumerRegistry(), snowflake,
 		integration.ExecutionEngineOptions{WorkerID: workerID, LeaseDuration: integration.IntegrationDefaultLeaseDuration, BatchSize: 2},
 	)
 	if err != nil {

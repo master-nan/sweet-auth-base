@@ -165,11 +165,13 @@ func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 	slice := 1
 	consumerVersion := 1
 	execution.SyncBatchID, execution.SyncSliceNo, execution.SyncConsumerCode, execution.SyncConsumerVersion = &batch.Id, &slice, "test_sync_consumer", &consumerVersion
+	execution.SyncBusinessStatus = model.IntegrationSyncBusinessStatusPending
 	if err := db.Create(&execution).Error; err != nil {
 		t.Fatalf("create sync execution: %v", err)
 	}
 	duplicateSlice := validIntegrationExecutionFixture(8952, "INT-SYNC-8952", system, definition, "sync-8952")
 	duplicateSlice.SyncBatchID, duplicateSlice.SyncSliceNo, duplicateSlice.SyncConsumerCode, duplicateSlice.SyncConsumerVersion = &batch.Id, &slice, "test_sync_consumer", &consumerVersion
+	duplicateSlice.SyncBusinessStatus = model.IntegrationSyncBusinessStatusPending
 	if err := db.Create(&duplicateSlice).Error; err == nil {
 		t.Fatal("expected batch/slice unique violation")
 	}
@@ -181,6 +183,19 @@ func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 	plainExecution := validIntegrationExecutionFixture(8954, "INT-SYNC-8954", system, definition, "sync-8954")
 	if err := db.Create(&plainExecution).Error; err != nil {
 		t.Fatalf("ordinary execution must allow empty sync source: %v", err)
+	}
+	invalidBusiness := validIntegrationExecutionFixture(8955, "INT-SYNC-8955", system, definition, "sync-8955")
+	secondSlice := 2
+	invalidBusiness.SyncBatchID, invalidBusiness.SyncSliceNo, invalidBusiness.SyncConsumerCode, invalidBusiness.SyncConsumerVersion = &batch.Id, &secondSlice, "test_sync_consumer", &consumerVersion
+	invalidBusiness.SyncBusinessStatus = model.IntegrationSyncBusinessStatusSucceeded
+	invalidBusiness.SyncBusinessFailedCount = 1
+	if err := db.Create(&invalidBusiness).Error; err == nil {
+		t.Fatal("expected sync business summary check violation")
+	}
+	for _, forbiddenColumn := range []string{"response_body", "sync_response_body", "consumer_body"} {
+		if db.Migrator().HasColumn(&model.IntegrationExecution{}, forbiddenColumn) {
+			t.Fatalf("response body column must not exist: %s", forbiddenColumn)
+		}
 	}
 
 	for _, index := range []string{"uni_integration_sync_task_enabled", "uni_integration_sync_batch_active", "uni_integration_sync_batch_scheduled", "uni_integration_execution_sync_slice"} {

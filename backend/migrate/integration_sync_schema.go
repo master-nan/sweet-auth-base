@@ -13,6 +13,13 @@ func migrateIntegrationSyncSchema(db *gorm.DB) error {
 		if err := tx.AutoMigrate(&model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}); err != nil {
 			return fmt.Errorf("auto migrate integration sync schema: %w", err)
 		}
+		// C-1 期间已有关联的开发记录没有业务结果摘要；保留 Execution 历史状态，
+		// 仅标记为 pending，禁止据此伪造 Consumer 成功或推进 Checkpoint。
+		if err := tx.Model(&model.IntegrationExecution{}).
+			Where("sync_batch_id IS NOT NULL AND sync_business_status = ''").
+			Update("sync_business_status", model.IntegrationSyncBusinessStatusPending).Error; err != nil {
+			return fmt.Errorf("backfill sync business status: %w", err)
+		}
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
@@ -32,6 +39,7 @@ func migrateIntegrationSyncSchema(db *gorm.DB) error {
 			{model: &model.IntegrationSyncBatch{}, name: "chk_integration_sync_batch_counts", expression: "planned_slice_count >= 0 AND current_slice_no >= 0 AND execution_count >= 0 AND technical_success_count >= 0 AND technical_failed_count >= 0 AND business_success_count >= 0 AND business_failed_count >= 0"},
 			{model: &model.IntegrationSyncBatch{}, name: "chk_integration_sync_batch_revision", expression: "revision > 0"},
 			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_sync_source", expression: "(sync_batch_id IS NULL AND sync_slice_no IS NULL AND sync_window_start IS NULL AND sync_window_end IS NULL AND sync_consumer_code = '' AND sync_consumer_version IS NULL) OR (sync_batch_id IS NOT NULL AND sync_slice_no >= 1 AND btrim(sync_consumer_code) <> '' AND sync_consumer_version > 0 AND ((sync_window_start IS NULL AND sync_window_end IS NULL) OR (sync_window_start IS NOT NULL AND sync_window_end IS NOT NULL AND sync_window_end > sync_window_start)))"},
+			{model: &model.IntegrationExecution{}, name: "chk_integration_execution_sync_business", expression: "(sync_batch_id IS NULL AND sync_business_status = '' AND sync_business_reason_code = '' AND sync_business_success_count = 0 AND sync_business_failed_count = 0 AND sync_business_reference = '') OR (sync_batch_id IS NOT NULL AND sync_business_status IN ('pending','succeeded','failed') AND sync_business_success_count >= 0 AND sync_business_failed_count >= 0 AND ((sync_business_status = 'pending' AND sync_business_reason_code = '' AND sync_business_success_count = 0 AND sync_business_failed_count = 0 AND sync_business_reference = '') OR (sync_business_status = 'succeeded' AND sync_business_reason_code = '' AND sync_business_failed_count = 0) OR (sync_business_status = 'failed' AND btrim(sync_business_reason_code) <> '' AND sync_business_failed_count > 0)))"},
 		}
 		for _, check := range checks {
 			if err := createPostgresCheckConstraint(tx, check); err != nil {

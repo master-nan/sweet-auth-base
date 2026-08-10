@@ -53,6 +53,11 @@ type AttemptResult struct {
 	CredentialCode               string
 	CredentialVersion            string
 	CredentialFingerprintSummary string
+	SyncBusinessStatus           string
+	SyncBusinessReasonCode       string
+	SyncBusinessSuccessCount     int
+	SyncBusinessFailedCount      int
+	SyncBusinessReference        string
 }
 
 // IntegrationExecutionEngine 负责编排领取、凭证解析、HTTP 调用和原子状态收敛。
@@ -71,6 +76,8 @@ type IntegrationExecutionEngine struct {
 	batchSize     int
 	now           func() time.Time
 	retryDecision *RetryDecisionService
+	syncBatches   repository.IntegrationSyncBatchRepository
+	syncConsumers SyncResultConsumerRegistry
 }
 
 // NewIntegrationExecutionEngine 构造可直接调用的受控 Engine。
@@ -79,13 +86,15 @@ func NewIntegrationExecutionEngine(
 	systems repository.ExternalSystemRepository,
 	interfaces repository.InterfaceDefinitionRepository,
 	credentials repository.CredentialRepository,
+	syncBatches repository.IntegrationSyncBatchRepository,
 	provider *CredentialProvider,
 	transport TransportClient,
 	guard ConcurrencyGuard,
+	syncConsumers SyncResultConsumerRegistry,
 	sf *utils.Snowflake,
 	options ExecutionEngineOptions,
 ) (*IntegrationExecutionEngine, error) {
-	if executions == nil || systems == nil || interfaces == nil || credentials == nil || provider == nil || transport == nil || guard == nil || sf == nil {
+	if executions == nil || systems == nil || interfaces == nil || credentials == nil || syncBatches == nil || provider == nil || transport == nil || guard == nil || syncConsumers == nil || sf == nil {
 		return nil, myerrors.ErrIntegrationConfigurationUnavailable
 	}
 	workerID := strings.TrimSpace(options.WorkerID)
@@ -114,6 +123,7 @@ func NewIntegrationExecutionEngine(
 		executions: executions, systems: systems, interfaces: interfaces, credentials: credentials,
 		provider: provider, transport: transport, guard: guard, sf: sf, workerID: workerID,
 		leaseDuration: leaseDuration, batchSize: batchSize, now: model.Now, retryDecision: retryDecision,
+		syncBatches: syncBatches, syncConsumers: syncConsumers,
 	}, nil
 }
 
@@ -242,6 +252,10 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 		}
 		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "configuration_unavailable", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed)
 	}
+	syncRuntime, err := e.loadSyncRuntime(ctx, claimed.Execution, definition)
+	if err != nil {
+		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "sync_consumer_not_registered", "同步 Consumer 配置不可用", model.IntegrationResultCertaintyConfirmed)
+	}
 	snapshot, err := LoadExecutionInputSnapshot(
 		definition.InputContract,
 		definition.HTTPMethod,
@@ -291,7 +305,110 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	transportResult, transportErr := e.transport.Execute(ctx, request)
 	result := attemptResultFromTransport(startedAt, transportResult, transportErr, e.now())
 	result.HTTPMethod = definition.HTTPMethod
+	if result.Succeeded && syncRuntime != nil {
+		result = e.consumeSyncResult(ctx, claimed.Execution, *syncRuntime, transportResult, result)
+	}
 	return withCredentialSummary(result, resolution)
+}
+
+type syncExecutionRuntime struct {
+	batch    model.IntegrationSyncBatch
+	consumer ResolvedSyncResultConsumer
+}
+
+func (e *IntegrationExecutionEngine) loadSyncRuntime(ctx context.Context, execution model.IntegrationExecution, definition model.InterfaceDefinition) (*syncExecutionRuntime, error) {
+	if execution.SyncBatchID == nil {
+		return nil, nil
+	}
+	if execution.SyncSliceNo == nil || *execution.SyncSliceNo <= 0 || execution.SyncConsumerVersion == nil ||
+		strings.TrimSpace(execution.SyncConsumerCode) == "" {
+		return nil, myerrors.ErrSyncConsumerIncompatible
+	}
+	batch, err := e.syncBatches.WithContext(ctx).FindById(*execution.SyncBatchID)
+	if err != nil || batch.Id != *execution.SyncBatchID || batch.ConsumerCode != execution.SyncConsumerCode ||
+		batch.ConsumerVersion != *execution.SyncConsumerVersion || batch.InterfaceVersion != execution.InterfaceVersion ||
+		batch.InterfaceCode != execution.InterfaceCode || batch.SystemCode != execution.ExternalSystemCode ||
+		batch.Status != model.IntegrationSyncBatchStatusRunning || batch.TaskCode == "" || batch.TaskVersion <= 0 {
+		return nil, myerrors.ErrSyncConsumerIncompatible
+	}
+	if _, err := e.syncConsumers.ValidateReference(SyncConsumerReference{
+		Code: execution.SyncConsumerCode, Version: *execution.SyncConsumerVersion, ResponseLimit: definition.ResponseLimit,
+		CheckpointMode: batch.CheckpointMode, RequestTimeout: time.Duration(definition.TimeoutSeconds) * time.Second,
+		LeaseDuration: e.leaseDuration,
+	}); err != nil {
+		return nil, err
+	}
+	consumer, err := e.syncConsumers.Resolve(execution.SyncConsumerCode, *execution.SyncConsumerVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &syncExecutionRuntime{batch: batch, consumer: consumer}, nil
+}
+
+func (e *IntegrationExecutionEngine) consumeSyncResult(
+	ctx context.Context,
+	execution model.IntegrationExecution,
+	runtime syncExecutionRuntime,
+	transport TransportResult,
+	result AttemptResult,
+) AttemptResult {
+	metadata := runtime.consumer.Metadata()
+	if transport.ResponseSize > metadata.MaxResponseBytes || !containsFold(metadata.ContentTypes, transport.ContentType) {
+		return syncBusinessFailure(result, "sync_consumer_incompatible", 1, "")
+	}
+	request, err := NewSyncConsumptionRequest(SyncConsumptionRequestInput{
+		ExecutionNo: execution.ExecutionNo, SyncBatchNo: runtime.batch.BatchNo, TaskCode: runtime.batch.TaskCode,
+		TaskVersion: runtime.batch.TaskVersion, SliceNo: *execution.SyncSliceNo, WindowStart: execution.SyncWindowStart,
+		WindowEnd: execution.SyncWindowEnd, ContentType: transport.ContentType, ResponseSize: transport.ResponseSize,
+		ResponseHash: transport.ResponseHash, Body: transport.Body(),
+	})
+	if err != nil {
+		return syncBusinessFailure(result, "sync_consumption_request_invalid", 1, "")
+	}
+	consumed, err := runtime.consumer.Consume(ctx, request)
+	if err != nil {
+		reason := SyncBusinessReasonProcessingFailed
+		switch {
+		case errors.Is(err, myerrors.ErrSyncConsumerTimeout):
+			reason = "sync_consumer_timeout"
+		case errors.Is(err, myerrors.ErrSyncConsumerPanic):
+			reason = "sync_consumer_panic"
+		case errors.Is(err, myerrors.ErrSyncConsumptionResultInvalid):
+			reason = "sync_consumer_result_invalid"
+		}
+		return syncBusinessFailure(result, reason, 1, "")
+	}
+	if !consumed.Success() {
+		failedCount := consumed.BusinessFailedCount()
+		if failedCount < 1 {
+			failedCount = 1
+		}
+		return syncBusinessFailure(result, consumed.ReasonCode(), failedCount, consumed.BusinessReference())
+	}
+	result.SyncBusinessStatus = model.IntegrationSyncBusinessStatusSucceeded
+	result.SyncBusinessSuccessCount = consumed.BusinessSuccessCount()
+	result.SyncBusinessFailedCount = 0
+	result.SyncBusinessReference = consumed.BusinessReference()
+	result.SafeMessage = "远端调用及同步业务处理成功"
+	return result
+}
+
+func syncBusinessFailure(result AttemptResult, reason string, failedCount int, reference string) AttemptResult {
+	result.Succeeded = false
+	result.ErrorCategory = model.IntegrationErrorCategoryBusiness
+	result.ReasonCode = SyncBusinessReasonProcessingFailed
+	result.SafeMessage = "同步业务处理失败"
+	result.Certainty = model.IntegrationResultCertaintyConfirmed
+	result.ExecutionStatus = model.IntegrationExecutionStatusFailed
+	result.RetryReasonCode = RetryReasonErrorNotAllowed
+	result.RetryScheduledAt = nil
+	result.RetryDelay = 0
+	result.RetryAfterSource = RetryAfterSourceNone
+	result.SyncBusinessStatus = model.IntegrationSyncBusinessStatusFailed
+	result.SyncBusinessReasonCode = strings.TrimSpace(reason)
+	result.SyncBusinessFailedCount = failedCount
+	result.SyncBusinessReference = strings.TrimSpace(reference)
+	return result
 }
 
 func snapshotTransportHeaders(values map[string][]string) map[string]string {
@@ -370,6 +487,9 @@ func (e *IntegrationExecutionEngine) completeClaim(ctx context.Context, claimed 
 		Retryable:                    result.ExecutionStatus == model.IntegrationExecutionStatusRetryWaiting,
 		RetryReasonCode:              result.RetryReasonCode, RetryDelayMs: result.RetryDelay.Milliseconds(),
 		RetryScheduledAt: result.RetryScheduledAt, RetryAfterSource: result.RetryAfterSource,
+		SyncBusinessStatus: result.SyncBusinessStatus, SyncBusinessReasonCode: result.SyncBusinessReasonCode,
+		SyncBusinessSuccessCount: result.SyncBusinessSuccessCount, SyncBusinessFailedCount: result.SyncBusinessFailedCount,
+		SyncBusinessReference: result.SyncBusinessReference,
 	})
 	if err == nil {
 		return nil
@@ -393,6 +513,14 @@ func (e *IntegrationExecutionEngine) applyRetryDecision(claimed repository.Claim
 	if result.Succeeded {
 		result.ExecutionStatus = model.IntegrationExecutionStatusSucceeded
 		result.RetryAfterSource = RetryAfterSourceNone
+		return
+	}
+	if result.ErrorCategory == model.IntegrationErrorCategoryBusiness {
+		result.ExecutionStatus = model.IntegrationExecutionStatusFailed
+		result.RetryReasonCode = RetryReasonErrorNotAllowed
+		result.RetryAfterSource = RetryAfterSourceNone
+		result.RetryScheduledAt = nil
+		result.RetryDelay = 0
 		return
 	}
 	result.ExecutionStatus = model.IntegrationExecutionStatusFailed

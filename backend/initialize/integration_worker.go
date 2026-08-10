@@ -45,14 +45,16 @@ func ProvideIntegrationExecutionEngine(
 	systems repository.ExternalSystemRepository,
 	interfaces repository.InterfaceDefinitionRepository,
 	credentials repository.CredentialRepository,
+	syncBatches repository.IntegrationSyncBatchRepository,
 	provider *integration.CredentialProvider,
 	transport *integration.HTTPTransportClient,
 	guard *integration.InMemoryConcurrencyGuard,
+	syncConsumers integration.SyncResultConsumerRegistry,
 	snowflake *utils.Snowflake,
 	worker integration.WorkerRunnerConfig,
 ) (*integration.IntegrationExecutionEngine, error) {
 	return integration.NewIntegrationExecutionEngine(
-		executions, systems, interfaces, credentials, provider, transport, guard, snowflake,
+		executions, systems, interfaces, credentials, syncBatches, provider, transport, guard, syncConsumers, snowflake,
 		integration.ExecutionEngineOptions{WorkerID: worker.WorkerID, LeaseDuration: worker.LeaseDuration, BatchSize: worker.ClaimBatchSize},
 	)
 }

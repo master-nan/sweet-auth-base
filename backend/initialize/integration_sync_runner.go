@@ -21,7 +21,7 @@ func ProvideIntegrationSyncRunnerConfig(server *config.Server) (integration.Sync
 }
 
 func ProvideSyncBusinessResultProvider() integration.SyncBusinessResultProvider {
-	return integration.NewPendingSyncBusinessResultProvider()
+	return integration.NewPersistedSyncBusinessResultProvider()
 }
 
 func ProvideIntegrationSyncRunner(coordinator *service.IntegrationSyncCoordinator, config integration.SyncRunnerConfig) (*integration.IntegrationSyncRunner, error) {

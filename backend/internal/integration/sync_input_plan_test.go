@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -62,7 +63,12 @@ func TestNormalizeSyncExecutionInputPlanRejectsUnsafeOrOverlappingInput(t *testi
 }
 
 func TestStaticSyncConsumerRegistryValidationAndIsolation(t *testing.T) {
-	registry := NewStaticSyncConsumerRegistry(SyncConsumerMetadata{Code: "test_sync", Version: 1, Name: "Test", Enabled: true, ContentTypes: []string{"application/json"}, MaxResponseBytes: 1 << 20, MaxDuration: 10 * time.Second, CheckpointModes: []string{"timestamp"}})
+	registry, err := NewStaticSyncConsumerRegistry(SyncConsumerRegistration{Metadata: SyncConsumerMetadata{Code: "test_sync", Version: 1, Name: "Test", Status: SyncConsumerStatusEnabled, ContentTypes: []string{"application/json"}, MaxResponseBytes: 1 << 20, MaxDuration: 10 * time.Second, CheckpointModes: []string{"timestamp"}}, Consumer: SyncResultConsumerFunc(func(context.Context, SyncConsumptionRequest) (SyncConsumptionResult, error) {
+		return NewSyncConsumptionResult(true, "", 1, 0, "")
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
 	metadata, err := registry.ValidateReference(SyncConsumerReference{Code: "test_sync", Version: 1, ContentType: "application/json; charset=utf-8", ResponseLimit: 1024, CheckpointMode: "timestamp", RequestTimeout: 30 * time.Second, LeaseDuration: IntegrationDefaultLeaseDuration})
 	if err != nil || metadata.Code != "test_sync" {
 		t.Fatalf("validate registry: metadata=%+v err=%v", metadata, err)

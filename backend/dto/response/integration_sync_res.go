@@ -17,6 +17,7 @@ type SyncConsumerMetadataRes struct {
 	Code             string   `json:"code"`
 	Version          int      `json:"version"`
 	Name             string   `json:"name"`
+	Status           string   `json:"status"`
 	ContentTypes     []string `json:"content_types"`
 	MaxResponseBytes int64    `json:"max_response_bytes"`
 	MaxDurationMs    int64    `json:"max_duration_ms"`

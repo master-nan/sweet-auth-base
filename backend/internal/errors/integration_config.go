@@ -73,6 +73,13 @@ const (
 	ErrorCodeSyncRunnerAlreadyRunning        = 130509
 	ErrorCodeSyncRunnerStartFailed           = 130510
 	ErrorCodeSyncRunnerShutdownTimeout       = 130511
+	ErrorCodeSyncConsumerDuplicate           = 130512
+	ErrorCodeSyncConsumerRegistrationInvalid = 130513
+	ErrorCodeSyncConsumptionRequestInvalid   = 130514
+	ErrorCodeSyncConsumptionResultInvalid    = 130515
+	ErrorCodeSyncConsumerTimeout             = 130516
+	ErrorCodeSyncConsumerPanic               = 130517
+	ErrorCodeSyncBusinessProcessingFailed    = 130518
 )
 
 var (
@@ -146,4 +153,11 @@ var (
 	ErrSyncRunnerAlreadyRunning        = NewBusinessError(http.StatusConflict, ErrorCodeSyncRunnerAlreadyRunning, "同步 Runner 已在运行")
 	ErrSyncRunnerStartFailed           = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncRunnerStartFailed, "同步 Runner 启动失败")
 	ErrSyncRunnerShutdownTimeout       = NewBusinessError(http.StatusServiceUnavailable, ErrorCodeSyncRunnerShutdownTimeout, "同步 Runner 关闭等待超时")
+	ErrSyncConsumerDuplicate           = NewBusinessError(http.StatusConflict, ErrorCodeSyncConsumerDuplicate, "同步 Consumer 编码和版本重复")
+	ErrSyncConsumerRegistrationInvalid = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncConsumerRegistrationInvalid, "同步 Consumer 注册信息不合法")
+	ErrSyncConsumptionRequestInvalid   = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncConsumptionRequestInvalid, "同步 Consumer 请求摘要不合法")
+	ErrSyncConsumptionResultInvalid    = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncConsumptionResultInvalid, "同步 Consumer 结果摘要不合法")
+	ErrSyncConsumerTimeout             = NewBusinessError(http.StatusGatewayTimeout, ErrorCodeSyncConsumerTimeout, "同步 Consumer 处理超时")
+	ErrSyncConsumerPanic               = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncConsumerPanic, "同步 Consumer 发生内部异常")
+	ErrSyncBusinessProcessingFailed    = NewBusinessError(http.StatusUnprocessableEntity, ErrorCodeSyncBusinessProcessingFailed, "同步业务处理失败")
 )

@@ -213,7 +213,7 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	integrationExecutionEngine, err := ProvideIntegrationExecutionEngine(integrationExecutionRepositoryImpl, externalSystemRepositoryImpl, interfaceDefinitionRepositoryImpl, credentialRepositoryImpl, credentialProvider, httpTransportClient, inMemoryConcurrencyGuard, snowflake, workerRunnerConfig)
+	integrationExecutionEngine, err := ProvideIntegrationExecutionEngine(integrationExecutionRepositoryImpl, externalSystemRepositoryImpl, interfaceDefinitionRepositoryImpl, credentialRepositoryImpl, integrationSyncBatchRepositoryImpl, credentialProvider, httpTransportClient, inMemoryConcurrencyGuard, staticSyncConsumerRegistry, snowflake, workerRunnerConfig)
 	if err != nil {
 		return nil, err
 	}

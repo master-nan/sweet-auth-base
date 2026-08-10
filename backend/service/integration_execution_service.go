@@ -224,6 +224,7 @@ func (s *IntegrationExecutionService) createExecution(
 			value.SyncWindowEnd = cloneExecutionTime(source.WindowEnd)
 			value.SyncConsumerCode = source.ConsumerCode
 			value.SyncConsumerVersion = &source.ConsumerVersion
+			value.SyncBusinessStatus = model.IntegrationSyncBusinessStatusPending
 		}
 		if err := s.executions.Create(tx, &value); err != nil {
 			if isIntegrationExecutionIdempotencyDuplicate(err) {

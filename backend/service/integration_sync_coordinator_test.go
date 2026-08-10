@@ -137,6 +137,38 @@ func TestIntegrationSyncCoordinatorFailureRetryWaitingAndRestartRecovery(t *test
 	})
 }
 
+func TestIntegrationSyncCoordinatorConsumerFailureDoesNotAdvanceCheckpoint(t *testing.T) {
+	env := newSyncCoordinatorTestEnv(t, integration.SyncBusinessResultSucceeded)
+	env.coordinator.business = integration.NewPersistedSyncBusinessResultProvider()
+	if _, err := env.coordinator.RunOnce(context.Background(), 4, 4); err != nil {
+		t.Fatal(err)
+	}
+	batch := loadOnlySyncBatch(t, env.db)
+	execution := loadSyncExecution(t, env.db, batch.Id, 1)
+	now := time.Now().UTC()
+	if err := env.db.Model(&model.IntegrationExecution{}).Where("id = ?", execution.Id).Updates(map[string]any{
+		"status": model.IntegrationExecutionStatusFailed, "completed_at": &now,
+		"error_category":            model.IntegrationErrorCategoryBusiness,
+		"sync_business_status":      model.IntegrationSyncBusinessStatusFailed,
+		"sync_business_reason_code": "org_payload_invalid", "sync_business_failed_count": 2,
+		"revision": gorm.Expr("revision + 1"),
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.coordinator.RunOnce(context.Background(), 4, 4); err != nil {
+		t.Fatal(err)
+	}
+	batch = loadOnlySyncBatch(t, env.db)
+	if batch.Status != model.IntegrationSyncBatchStatusFailed || batch.CheckpointAfter != nil ||
+		batch.TechnicalSuccessCount != 1 || batch.TechnicalFailedCount != 0 || batch.BusinessFailedCount != 2 {
+		t.Fatalf("consumer failure advanced checkpoint or lost boundary: %+v", batch)
+	}
+	var task model.IntegrationSyncTask
+	if err := env.db.First(&task, env.task.Id).Error; err != nil || task.CheckpointAt == nil || !task.CheckpointAt.Equal(*env.task.CheckpointAt) {
+		t.Fatalf("checkpoint changed: task=%+v err=%v", task, err)
+	}
+}
+
 func TestIntegrationSyncCoordinatorRevisionConflictAndIdempotentExecution(t *testing.T) {
 	env := newSyncCoordinatorTestEnv(t, integration.SyncBusinessResultSucceeded)
 	if _, err := env.coordinator.RunOnce(context.Background(), 4, 4); err != nil {

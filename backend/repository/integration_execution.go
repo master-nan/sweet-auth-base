@@ -65,6 +65,11 @@ type IntegrationAttemptCompletion struct {
 	RetryDelayMs                 int64
 	RetryScheduledAt             *time.Time
 	RetryAfterSource             string
+	SyncBusinessStatus           string
+	SyncBusinessReasonCode       string
+	SyncBusinessSuccessCount     int
+	SyncBusinessFailedCount      int
+	SyncBusinessReference        string
 }
 
 // ExpiredExecutionRecovery 用于将已过期租约的执行安全收敛为未知失败。

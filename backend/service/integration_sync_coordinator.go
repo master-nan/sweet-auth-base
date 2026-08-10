@@ -267,6 +267,13 @@ func (s *IntegrationSyncCoordinator) CoordinateBatch(ctx context.Context, batchI
 			return myerrors.ErrSyncBusinessResultPending
 		}
 	case model.IntegrationExecutionStatusFailed, model.IntegrationExecutionStatusCancelled:
+		if execution.SyncBusinessStatus == model.IntegrationSyncBusinessStatusFailed {
+			result, resultErr := s.business.Result(ctx, execution)
+			if resultErr != nil {
+				return resultErr
+			}
+			return s.failBatch(ctx, batch, execution, syncBatchReasonBusinessFailed, result)
+		}
 		return s.failBatch(ctx, batch, execution, syncBatchReasonExecutionFailed, integration.SyncBusinessResult{})
 	default:
 		return myerrors.ErrSyncBatchStateInvalid
@@ -504,7 +511,10 @@ func (s *IntegrationSyncCoordinator) failBatch(ctx context.Context, batch model.
 			"status": model.IntegrationSyncBatchStatusFailed, "completed_at": &now, "reason_code": reason,
 			"result_summary": safeSyncSummary(result.Summary), "revision": current.Revision + 1,
 		}
-		if execution.Status == model.IntegrationExecutionStatusFailed || execution.Status == model.IntegrationExecutionStatusCancelled {
+		if execution.SyncBusinessStatus == model.IntegrationSyncBusinessStatusFailed {
+			updates["technical_success_count"] = current.TechnicalSuccessCount + 1
+			updates["business_failed_count"] = current.BusinessFailedCount + maxInt(1, result.FailedCount)
+		} else if execution.Status == model.IntegrationExecutionStatusFailed || execution.Status == model.IntegrationExecutionStatusCancelled {
 			updates["technical_failed_count"] = current.TechnicalFailedCount + 1
 		} else {
 			updates["technical_success_count"] = current.TechnicalSuccessCount + 1

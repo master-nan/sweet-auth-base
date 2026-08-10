@@ -138,10 +138,19 @@ type IntegrationExecutionDetailRes struct {
 	ResultSizeBytes   int64                                      `json:"result_size_bytes"`
 	ResultHash        string                                     `json:"result_hash,omitempty"`
 	ResultSummary     string                                     `json:"result_summary,omitempty"`
+	SyncBusiness      *IntegrationExecutionSyncBusinessRes       `json:"sync_business,omitempty"`
 	LeaseOwnerSummary string                                     `json:"lease_owner_summary,omitempty"`
 	LeaseExpiresAt    *time.Time                                 `json:"lease_expires_at,omitempty"`
 	CancelledAt       *time.Time                                 `json:"cancelled_at,omitempty"`
 	LastAttemptAt     *time.Time                                 `json:"last_attempt_at,omitempty"`
+}
+
+type IntegrationExecutionSyncBusinessRes struct {
+	Status       string `json:"status"`
+	ReasonCode   string `json:"reason_code,omitempty"`
+	SuccessCount int    `json:"success_count"`
+	FailedCount  int    `json:"failed_count"`
+	Reference    string `json:"reference,omitempty"`
 }
 
 type IntegrationExecutionRetryPolicySummaryRes struct {
@@ -199,6 +208,13 @@ func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) Integrat
 		ResultSummary:     value.ResultSummary,
 		LeaseOwnerSummary: integrationWorkerSummary(value.LeaseOwner), LeaseExpiresAt: value.LeaseExpiresAt,
 		CancelledAt: value.CancelledAt, LastAttemptAt: value.LastAttemptAt,
+	}
+	if value.SyncBatchID != nil {
+		result.SyncBusiness = &IntegrationExecutionSyncBusinessRes{
+			Status: value.SyncBusinessStatus, ReasonCode: value.SyncBusinessReasonCode,
+			SuccessCount: value.SyncBusinessSuccessCount, FailedCount: value.SyncBusinessFailedCount,
+			Reference: value.SyncBusinessReference,
+		}
 	}
 	result.RetryPolicy = policy
 	result.AttemptsRemaining = max(0, result.MaxAttempts-value.CurrentAttempt)
