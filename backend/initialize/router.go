@@ -241,6 +241,19 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/retry-policy/:id/enable", app.RetryPolicyController.Enable)
 		adminGroup.PUT("/integration/retry-policy/:id/disable", app.RetryPolicyController.Disable)
 
+		// 集成中心 - 同步任务配置与批次查询。本阶段不暴露手工运行和取消。
+		adminGroup.POST("/integration/sync-task/query", app.IntegrationSyncController.QueryTasks)
+		adminGroup.GET("/integration/sync-task/consumers", app.IntegrationSyncController.ConsumerMetadata)
+		adminGroup.GET("/integration/sync-task/:id", app.IntegrationSyncController.TaskDetail)
+		adminGroup.GET("/integration/sync-task/:id/edit", app.IntegrationSyncController.TaskEdit)
+		adminGroup.POST("/integration/sync-task", app.IntegrationSyncController.CreateTask)
+		adminGroup.PUT("/integration/sync-task/:id", app.IntegrationSyncController.UpdateTask)
+		adminGroup.POST("/integration/sync-task/:id/versions", app.IntegrationSyncController.CreateTaskVersion)
+		adminGroup.PUT("/integration/sync-task/:id/enable", app.IntegrationSyncController.EnableTask)
+		adminGroup.PUT("/integration/sync-task/:id/disable", app.IntegrationSyncController.DisableTask)
+		adminGroup.POST("/integration/sync-batch/query", app.IntegrationSyncController.QueryBatches)
+		adminGroup.GET("/integration/sync-batch/:id", app.IntegrationSyncController.BatchDetail)
+
 		// 集成执行与调用日志只暴露管理查询、提交和安全取消；状态收敛由 Worker 与 Engine 完成。
 		adminGroup.POST("/integration/execution/query", app.IntegrationExecutionController.Query)
 		adminGroup.GET("/integration/execution/:id", app.IntegrationExecutionController.Detail)

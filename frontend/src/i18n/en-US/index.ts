@@ -24,6 +24,8 @@ export default {
       interfaceDefinition: 'Interface Definitions',
       credential: 'Integration Credentials',
       retryPolicy: 'Retry Policies',
+      syncTask: 'Sync Tasks',
+      syncBatch: 'Sync Batches',
       execution: 'Executions',
       log: 'Call Logs',
       executionDetail: 'Execution Detail',

@@ -455,6 +455,38 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if retryPolicyCasbinCount != 7 {
 		t.Fatalf("retry policy Casbin policy count = %d, want 7", retryPolicyCasbinCount)
 	}
+	var syncTaskMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_sync_task").First(&syncTaskMenu).Error; err != nil {
+		t.Fatalf("load sync task menu: %v", err)
+	}
+	if syncTaskMenu.TableCode != integrationSyncTaskTableCode || syncTaskMenu.Title != "router.integration.syncTask" || syncTaskMenu.Sequence != 5 {
+		t.Fatalf("unexpected sync task menu: %+v", syncTaskMenu)
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", syncTaskMenu.Id).Count(&buttonCount).Error; err != nil || buttonCount != 10 {
+		t.Fatalf("sync task button count=%d err=%v", buttonCount, err)
+	}
+	var forbiddenSyncTaskButtons int64
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND event_action IN ?", syncTaskMenu.Id, []string{"run", "cancel", "delete", "checkpoint"}).Count(&forbiddenSyncTaskButtons).Error; err != nil || forbiddenSyncTaskButtons != 0 {
+		t.Fatalf("forbidden sync task buttons=%d err=%v", forbiddenSyncTaskButtons, err)
+	}
+	var syncTaskCasbinCount int64
+	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/sync-task%").Count(&syncTaskCasbinCount).Error; err != nil || syncTaskCasbinCount != 9 {
+		t.Fatalf("sync task Casbin policies=%d err=%v", syncTaskCasbinCount, err)
+	}
+	var syncBatchMenu model.SysMenu
+	if err := db.Where("name = ?", "integration_sync_batch").First(&syncBatchMenu).Error; err != nil {
+		t.Fatalf("load sync batch menu: %v", err)
+	}
+	if syncBatchMenu.TableCode != integrationSyncBatchTableCode || syncBatchMenu.Title != "router.integration.syncBatch" || syncBatchMenu.Sequence != 6 {
+		t.Fatalf("unexpected sync batch menu: %+v", syncBatchMenu)
+	}
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", syncBatchMenu.Id).Count(&buttonCount).Error; err != nil || buttonCount != 3 {
+		t.Fatalf("sync batch button count=%d err=%v", buttonCount, err)
+	}
+	var forbiddenSyncBatchButtons int64
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND event_action IN ?", syncBatchMenu.Id, []string{"run", "cancel", "delete"}).Count(&forbiddenSyncBatchButtons).Error; err != nil || forbiddenSyncBatchButtons != 0 {
+		t.Fatalf("forbidden sync batch buttons=%d err=%v", forbiddenSyncBatchButtons, err)
+	}
 	var credentialCasbinCount int64
 	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/credential%").Count(&credentialCasbinCount).Error; err != nil {
 		t.Fatalf("count credential Casbin policies: %v", err)

@@ -314,6 +314,26 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
+        component: () => import('pages/integration/sync-task/Index.vue'),
+        path: 'sync-task',
+        name: 'integration_sync_task',
+        meta: {
+          title: 'router.integration.syncTask',
+          icon: 'sync_alt',
+          keepAlive: true,
+        },
+      },
+      {
+        component: () => import('pages/integration/sync-batch/Index.vue'),
+        path: 'sync-batch',
+        name: 'integration_sync_batch',
+        meta: {
+          title: 'router.integration.syncBatch',
+          icon: 'view_timeline',
+          keepAlive: true,
+        },
+      },
+      {
         component: () => import('pages/integration/execution/Index.vue'),
         path: 'execution',
         name: 'integration_execution',

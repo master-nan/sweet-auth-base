@@ -571,6 +571,14 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			},
 		},
 		{
+			name: "集成同步任务状态", code: "integration_sync_task_status",
+			items: []systemDictItemSeed{{name: "草稿", code: "integration_sync_task_status_draft", value: model.IntegrationSyncTaskStatusDraft}, {name: "已启用", code: "integration_sync_task_status_enabled", value: model.IntegrationSyncTaskStatusEnabled}, {name: "已停用", code: "integration_sync_task_status_disabled", value: model.IntegrationSyncTaskStatusDisabled}},
+		},
+		{
+			name: "集成同步批次状态", code: "integration_sync_batch_status",
+			items: []systemDictItemSeed{{name: "待运行", code: "integration_sync_batch_status_created", value: model.IntegrationSyncBatchStatusCreated}, {name: "运行中", code: "integration_sync_batch_status_running", value: model.IntegrationSyncBatchStatusRunning}, {name: "成功", code: "integration_sync_batch_status_succeeded", value: model.IntegrationSyncBatchStatusSucceeded}, {name: "失败", code: "integration_sync_batch_status_failed", value: model.IntegrationSyncBatchStatusFailed}},
+		},
+		{
 			name: "集成执行状态",
 			code: "integration_execution_status",
 			items: []systemDictItemSeed{
@@ -2062,6 +2070,8 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: interfaceDefinitionTableCode, name: "接口定义"},
 		{code: credentialTableCode, name: "集成凭证"},
 		{code: retryPolicyTableCode, name: "重试策略"},
+		{code: integrationSyncTaskTableCode, name: "同步任务"},
+		{code: integrationSyncBatchTableCode, name: "同步批次"},
 		{code: integrationExecutionTableCode, name: "执行记录"},
 		{code: integrationLogTableCode, name: "调用日志"},
 		{code: "casbin_rule", name: "接口权限规则"},
@@ -2246,6 +2256,8 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyCredentialFieldDefaults(tableCode, &field)
 	applyRetryPolicyFieldDefaults(tableCode, &field)
+	applyIntegrationSyncTaskFieldDefaults(tableCode, &field)
+	applyIntegrationSyncBatchFieldDefaults(tableCode, &field)
 	applyIntegrationExecutionFieldDefaults(tableCode, &field)
 	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
@@ -2416,6 +2428,12 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 		case "jitter_type":
 			return "integration_retry_jitter_type"
 		}
+	}
+	if tableCode == integrationSyncTaskTableCode && fieldCode == "status" {
+		return "integration_sync_task_status"
+	}
+	if tableCode == integrationSyncBatchTableCode && fieldCode == "status" {
+		return "integration_sync_batch_status"
 	}
 	if tableCode == integrationExecutionTableCode {
 		switch fieldCode {
@@ -2726,6 +2744,86 @@ func applyRetryPolicyFieldDefaults(tableCode string, field *model.SysTableField)
 	case "gmt_modify":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "更新时间", true, true, enum.DatetimePickerInputType, 10
 	case "retryable_error_categories", "retryable_http_statuses", "description", "respect_retry_after", "backoff_multiplier", "jitter_type", "jitter_ratio":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationSyncTaskFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationSyncTaskTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "task_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务编码", true, true, true, 1
+	case "task_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务名称", true, true, true, 2
+	case "version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "版本", true, true, 3
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_task_status"), 4
+	case "external_system_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 5
+	case "interface_definition_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 6
+	case "consumer_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "Consumer", true, true, 7
+	case "schedule_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "调度方式", true, true, 8
+	case "checkpoint_mode":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Checkpoint模式", true, true, 9
+	case "checkpoint_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "当前Checkpoint", true, enum.DatetimePickerInputType, 10
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "更新时间", true, true, enum.DatetimePickerInputType, 11
+	case "input_plan", "description", "cron_expression", "timezone", "next_scheduled_at", "last_scheduled_at", "initial_checkpoint_at":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationSyncBatchFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationSyncBatchTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "batch_no":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "批次编号", true, true, true, 1
+	case "task_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务编码", true, true, true, 2
+	case "task_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "任务名称", true, true, 3
+	case "task_version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "任务版本", true, true, 4
+	case "trigger_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "触发类型", true, true, 5
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_batch_status"), 6
+	case "window_start":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "窗口开始", true, enum.DatetimePickerInputType, 7
+	case "window_end":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "窗口结束", true, enum.DatetimePickerInputType, 8
+	case "current_slice_no":
+		field.FieldName, field.IsListShow, field.Sequence = "当前切片", true, 9
+	case "planned_slice_count":
+		field.FieldName, field.IsListShow, field.Sequence = "计划切片", true, 10
+	case "execution_count":
+		field.FieldName, field.IsListShow, field.Sequence = "执行数", true, 11
+	case "started_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "开始时间", true, enum.DatetimePickerInputType, 12
+	case "completed_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "结束时间", true, enum.DatetimePickerInputType, 13
+	case "result_summary", "trigger_key", "triggered_by_user_name":
 		field.IsSort = false
 	}
 }

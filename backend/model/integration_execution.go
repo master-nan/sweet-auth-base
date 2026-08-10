@@ -79,10 +79,17 @@ type IntegrationExecution struct {
 	LastAttemptAt              *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_last_attempt_at" json:"last_attempt_at"`
 	RetryReasonCode            string         `gorm:"size:64;index:idx_integration_execution_retry_reason" json:"retry_reason_code"`
 	CancelledAt                *time.Time     `gorm:"type:timestamp" json:"cancelled_at"`
+	SyncBatchID                *int           `gorm:"type:bigint;index:idx_integration_execution_sync_batch" json:"-"`
+	SyncSliceNo                *int           `gorm:"index:idx_integration_execution_sync_slice" json:"-"`
+	SyncWindowStart            *time.Time     `gorm:"type:timestamp" json:"-"`
+	SyncWindowEnd              *time.Time     `gorm:"type:timestamp" json:"-"`
+	SyncConsumerCode           string         `gorm:"size:64" json:"-"`
+	SyncConsumerVersion        *int           `json:"-"`
 	Revision                   int            `gorm:"not null;default:1" json:"revision"`
 
-	ExternalSystem      ExternalSystem      `gorm:"foreignKey:ExternalSystemID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
-	InterfaceDefinition InterfaceDefinition `gorm:"foreignKey:InterfaceDefinitionID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
+	ExternalSystem      ExternalSystem        `gorm:"foreignKey:ExternalSystemID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
+	InterfaceDefinition InterfaceDefinition   `gorm:"foreignKey:InterfaceDefinitionID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
+	SyncBatch           *IntegrationSyncBatch `gorm:"foreignKey:SyncBatchID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
 }
 
 func (IntegrationExecution) TableName() string {

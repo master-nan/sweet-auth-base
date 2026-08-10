@@ -44,6 +44,25 @@ const (
 	ErrorCodeRetryPolicyRevisionConflict     = 130307
 	ErrorCodeRetryPolicyEnabledConflict      = 130308
 	ErrorCodeRetryPolicyReferenced           = 130309
+	ErrorCodeSyncTaskNotFound                = 130401
+	ErrorCodeSyncTaskCodeDuplicate           = 130402
+	ErrorCodeSyncTaskCodeInvalid             = 130403
+	ErrorCodeSyncTaskFieldImmutable          = 130404
+	ErrorCodeSyncTaskStatusInvalid           = 130405
+	ErrorCodeSyncTaskConfigurationInvalid    = 130406
+	ErrorCodeSyncTaskRevisionConflict        = 130407
+	ErrorCodeSyncTaskEnabledConflict         = 130408
+	ErrorCodeSyncTaskActiveBatch             = 130409
+	ErrorCodeSyncInterfaceInvalid            = 130410
+	ErrorCodeSyncConsumerNotRegistered       = 130411
+	ErrorCodeSyncConsumerIncompatible        = 130412
+	ErrorCodeSyncLeaseBudgetInsufficient     = 130413
+	ErrorCodeSyncScheduleInvalid             = 130414
+	ErrorCodeSyncTimezoneInvalid             = 130415
+	ErrorCodeSyncCheckpointInvalid           = 130416
+	ErrorCodeSyncInputPlanInvalid            = 130417
+	ErrorCodeSyncInputPlanContractMismatch   = 130418
+	ErrorCodeSyncBatchNotFound               = 130501
 )
 
 var (
@@ -88,4 +107,23 @@ var (
 	ErrRetryPolicyRevisionConflict     = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyRevisionConflict, "重试策略已被其他操作修改，请刷新后重试")
 	ErrRetryPolicyEnabledConflict      = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyEnabledConflict, "同一策略编码已有启用版本")
 	ErrRetryPolicyReferenced           = NewBusinessError(http.StatusConflict, ErrorCodeRetryPolicyReferenced, "重试策略仍被已启用接口引用")
+	ErrSyncTaskNotFound                = NewBusinessError(http.StatusNotFound, ErrorCodeSyncTaskNotFound, "同步任务不存在")
+	ErrSyncTaskCodeDuplicate           = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskCodeDuplicate, "同步任务编码已存在")
+	ErrSyncTaskCodeInvalid             = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncTaskCodeInvalid, "同步任务编码格式不合法")
+	ErrSyncTaskFieldImmutable          = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskFieldImmutable, "同步任务技术配置不可直接修改")
+	ErrSyncTaskStatusInvalid           = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskStatusInvalid, "同步任务当前状态不允许执行该操作")
+	ErrSyncTaskConfigurationInvalid    = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncTaskConfigurationInvalid, "同步任务参数组合不合法")
+	ErrSyncTaskRevisionConflict        = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskRevisionConflict, "同步任务已被其他操作修改，请刷新后重试")
+	ErrSyncTaskEnabledConflict         = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskEnabledConflict, "同一同步任务编码已有启用版本")
+	ErrSyncTaskActiveBatch             = NewBusinessError(http.StatusConflict, ErrorCodeSyncTaskActiveBatch, "同步任务存在活动批次")
+	ErrSyncInterfaceInvalid            = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncInterfaceInvalid, "同步任务接口引用不存在或不兼容")
+	ErrSyncConsumerNotRegistered       = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncConsumerNotRegistered, "同步 Consumer 未注册或不可用")
+	ErrSyncConsumerIncompatible        = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncConsumerIncompatible, "同步 Consumer 与接口运行契约不兼容")
+	ErrSyncLeaseBudgetInsufficient     = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncLeaseBudgetInsufficient, "同步 Consumer 执行时长超出租约安全预算")
+	ErrSyncScheduleInvalid             = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncScheduleInvalid, "同步任务 Cron 配置不合法")
+	ErrSyncTimezoneInvalid             = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncTimezoneInvalid, "同步任务时区不合法")
+	ErrSyncCheckpointInvalid           = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncCheckpointInvalid, "同步任务 Checkpoint 配置不合法")
+	ErrSyncInputPlanInvalid            = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncInputPlanInvalid, "同步输入计划格式不合法")
+	ErrSyncInputPlanContractMismatch   = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncInputPlanContractMismatch, "同步输入计划不满足接口输入契约")
+	ErrSyncBatchNotFound               = NewBusinessError(http.StatusNotFound, ErrorCodeSyncBatchNotFound, "同步批次不存在")
 )

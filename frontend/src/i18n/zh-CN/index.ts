@@ -24,6 +24,8 @@ export default {
       interfaceDefinition: '接口定义',
       credential: '集成凭证',
       retryPolicy: '重试策略',
+      syncTask: '同步任务',
+      syncBatch: '同步批次',
       execution: '执行记录',
       log: '调用日志',
       executionDetail: '执行详情',

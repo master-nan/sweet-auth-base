@@ -17,10 +17,14 @@ const (
 	executionMenuID               = 1204
 	logMenuID                     = 1205
 	retryPolicyMenuID             = 1206
+	syncTaskMenuID                = 1207
+	syncBatchMenuID               = 1208
 	externalSystemTableCode       = "integration_external_system"
 	interfaceDefinitionTableCode  = "integration_interface_definition"
 	credentialTableCode           = "integration_credential"
 	retryPolicyTableCode          = "integration_retry_policy"
+	integrationSyncTaskTableCode  = "integration_sync_task"
+	integrationSyncBatchTableCode = "integration_sync_batch"
 	integrationExecutionTableCode = "integration_execution"
 	integrationLogTableCode       = "integration_log"
 )
@@ -64,16 +68,30 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	if err != nil {
 		return err
 	}
+	syncTaskMenu, err := seedMenu(db, sf, menuWithTable(menu(
+		syncTaskMenuID, root.Id, "integration_sync_task", "sync-task",
+		"pages/integration/sync-task/Index.vue", "router.integration.syncTask", "sync_alt", 5,
+	), integrationSyncTaskTableCode))
+	if err != nil {
+		return err
+	}
+	syncBatchMenu, err := seedMenu(db, sf, menuWithTable(menu(
+		syncBatchMenuID, root.Id, "integration_sync_batch", "sync-batch",
+		"pages/integration/sync-batch/Index.vue", "router.integration.syncBatch", "view_timeline", 6,
+	), integrationSyncBatchTableCode))
+	if err != nil {
+		return err
+	}
 	executionMenu, err := seedMenu(db, sf, menuWithTable(menu(
 		executionMenuID, root.Id, "integration_execution", "execution",
-		"pages/integration/execution/Index.vue", "router.integration.execution", "play_circle", 5,
+		"pages/integration/execution/Index.vue", "router.integration.execution", "play_circle", 7,
 	), integrationExecutionTableCode))
 	if err != nil {
 		return err
 	}
 	logMenu, err := seedMenu(db, sf, menuWithTable(menu(
 		logMenuID, root.Id, "integration_log", "log",
-		"pages/integration/log/Index.vue", "router.integration.log", "history", 6,
+		"pages/integration/log/Index.vue", "router.integration.log", "history", 8,
 	), integrationLogTableCode))
 	if err != nil {
 		return err
@@ -83,7 +101,7 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 	if err != nil {
 		return err
 	}
-	for _, item := range []model.SysMenu{root, child, interfaceMenu, credentialMenu, retryPolicyMenu, executionMenu, logMenu} {
+	for _, item := range []model.SysMenu{root, child, interfaceMenu, credentialMenu, retryPolicyMenu, syncTaskMenu, syncBatchMenu, executionMenu, logMenu} {
 		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.SysRoleMenu{
 			RoleId: role.Id,
 			MenuId: item.Id,
@@ -134,6 +152,19 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 		menuButtonWithAPI(12406, retryPolicyMenu.Id, "创建版本", "integration_retry_policy_create_version", enum.Line, "create_version", "content_copy", "primary", 2, "/admin/integration/retry-policy/:id/versions", "POST"),
 		menuButtonWithAPI(12407, retryPolicyMenu.Id, "启用", "integration_retry_policy_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/retry-policy/:id/enable", "PUT"),
 		menuButtonWithAPI(12408, retryPolicyMenu.Id, "停用", "integration_retry_policy_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/retry-policy/:id/disable", "PUT"),
+		apiPermissionWithAPI(12501, syncTaskMenu.Id, "列表查询", "integration_sync_task_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/sync-task/query", "POST"),
+		menuButtonWithAPI(12502, syncTaskMenu.Id, "详情", "integration_sync_task_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/sync-task/:id", "GET"),
+		apiPermissionWithAPI(12503, syncTaskMenu.Id, "页面元数据", "integration_sync_task_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
+		apiPermissionWithAPI(12504, syncTaskMenu.Id, "编辑数据", "integration_sync_task_edit_data", enum.Top, "edit_data", "edit", "primary", 93, "/admin/integration/sync-task/:id/edit", "GET"),
+		apiPermissionWithAPI(12505, syncTaskMenu.Id, "Consumer元数据", "integration_sync_task_consumer_metadata", enum.Top, "consumer_metadata", "list", "primary", 94, "/admin/integration/sync-task/consumers", "GET"),
+		menuButtonWithAPI(12506, syncTaskMenu.Id, "新增", "integration_sync_task_create", enum.Top, "create", "add", "primary", 1, "/admin/integration/sync-task", "POST"),
+		menuButtonWithAPI(12507, syncTaskMenu.Id, "编辑", "integration_sync_task_update", enum.Line, "update", "edit", "primary", 1, "/admin/integration/sync-task/:id", "PUT"),
+		menuButtonWithAPI(12508, syncTaskMenu.Id, "创建版本", "integration_sync_task_create_version", enum.Line, "create_version", "content_copy", "primary", 2, "/admin/integration/sync-task/:id/versions", "POST"),
+		menuButtonWithAPI(12509, syncTaskMenu.Id, "启用", "integration_sync_task_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/sync-task/:id/enable", "PUT"),
+		menuButtonWithAPI(12510, syncTaskMenu.Id, "停用", "integration_sync_task_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/sync-task/:id/disable", "PUT"),
+		apiPermissionWithAPI(12601, syncBatchMenu.Id, "列表查询", "integration_sync_batch_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/sync-batch/query", "POST"),
+		menuButtonWithAPI(12602, syncBatchMenu.Id, "详情", "integration_sync_batch_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/sync-batch/:id", "GET"),
+		apiPermissionWithAPI(12603, syncBatchMenu.Id, "页面元数据", "integration_sync_batch_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
 		apiPermissionWithAPI(12301, executionMenu.Id, "执行列表查询", "integration_execution_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/execution/query", "POST"),
 		menuButtonWithAPI(12302, executionMenu.Id, "执行详情", "integration_execution_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/execution/:id", "GET"),
 		apiPermissionWithAPI(12303, root.Id, "提交执行", "integration_execution_create", enum.Top, "create", "add", "primary", 120, "/admin/integration/execution", "POST"),

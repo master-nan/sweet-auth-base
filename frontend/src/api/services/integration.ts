@@ -53,6 +53,24 @@ export type InterfaceDefinitionStatus = 'draft' | 'enabled' | 'disabled'
 export type InterfaceDefinitionEffectiveStatus = InterfaceDefinitionStatus | 'unavailable'
 export type InterfaceProtocol = 'http' | 'https'
 export type InterfaceHTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+export type InterfaceInputLocation = 'path' | 'query' | 'header' | 'body'
+export type InterfaceInputDataType = 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array'
+
+export interface InterfaceInputParameter {
+  code: string
+  name?: string
+  location: InterfaceInputLocation
+  data_type: InterfaceInputDataType
+  required: boolean
+  allow_multiple: boolean
+  sensitive: boolean
+  max_length?: number
+}
+
+export interface InterfaceInputContract {
+  version: number
+  parameters: InterfaceInputParameter[]
+}
 
 export interface InterfaceSystemSummary {
   id: number
@@ -77,6 +95,7 @@ export interface InterfaceDefinitionListItem {
 
 export interface InterfaceDefinitionDetail extends InterfaceDefinitionListItem {
   relative_path: string
+  input_contract: InterfaceInputContract
   credential_id?: number
   credential?: {
     id: number
@@ -366,6 +385,152 @@ export interface IntegrationWorkerStatus {
   recovered_total: number
 }
 
+export type SyncTaskStatus = 'draft' | 'enabled' | 'disabled'
+export type SyncScheduleType = 'none' | 'cron'
+export type SyncCheckpointMode = 'none' | 'timestamp'
+export type SyncTimeFormat = 'rfc3339' | 'unix_seconds' | 'unix_milliseconds'
+
+export interface SyncWindowBinding {
+  location: InterfaceInputLocation
+  code: string
+  format: SyncTimeFormat
+}
+
+export interface SyncStaticInput {
+  path_params: Record<string, string>
+  query_params: Record<string, string[]>
+  headers: Record<string, string[]>
+  json_body?: Record<string, unknown>
+}
+
+export interface SyncExecutionInputPlan {
+  version: 1
+  static_input: SyncStaticInput
+  window_start_binding?: SyncWindowBinding
+  window_end_binding?: SyncWindowBinding
+}
+
+export interface SyncConsumerMetadata {
+  code: string
+  version: number
+  name: string
+  content_types: string[]
+  max_response_bytes: number
+  max_duration_ms: number
+  checkpoint_modes: SyncCheckpointMode[]
+}
+
+export interface SyncTaskListItem {
+  id: number
+  task_code: string
+  task_name: string
+  version: number
+  status: SyncTaskStatus
+  external_system: { id: number; code: string; name: string }
+  interface_definition: { id: number; code: string; name: string; version: number }
+  consumer: { code: string; name: string; version: number }
+  schedule_type: SyncScheduleType
+  cron_summary?: string
+  timezone: string
+  checkpoint_mode: SyncCheckpointMode
+  checkpoint_at?: string
+  lookback_seconds: number
+  window_slice_seconds: number
+  input_plan_summary: { version: number; static_parameter_count: number; has_window_bindings: boolean }
+  revision: number
+  gmt_modify: string
+}
+
+export interface SyncTaskDetail extends SyncTaskListItem {
+  description: string
+  initial_checkpoint_at?: string
+  next_scheduled_at?: string
+  last_scheduled_at?: string
+  gmt_create: string
+}
+
+export interface SyncTaskEdit extends SyncTaskDetail {
+  input_plan: SyncExecutionInputPlan
+}
+
+export interface SyncTaskCreateRequest {
+  task_code: string
+  task_name: string
+  description?: string
+  external_system_id: number
+  interface_definition_id: number
+  consumer_code: string
+  consumer_version: number
+  schedule_type: SyncScheduleType
+  cron_expression: string
+  timezone: string
+  checkpoint_mode: SyncCheckpointMode
+  initial_checkpoint_at?: string
+  lookback_seconds: number
+  window_slice_seconds: number
+  input_plan: SyncExecutionInputPlan
+}
+
+export interface SyncTaskUpdateRequest extends Omit<SyncTaskCreateRequest, 'task_code'> {
+  revision: number
+  clear_initial_checkpoint?: boolean
+}
+
+export interface SyncTaskQuery extends Query {
+  status?: SyncTaskStatus | ''
+  schedule_type?: SyncScheduleType | ''
+  checkpoint_mode?: SyncCheckpointMode | ''
+  external_system_id?: number
+}
+
+export type SyncBatchStatus = 'created' | 'running' | 'succeeded' | 'failed'
+export type SyncTriggerType = 'manual' | 'scheduled'
+
+export interface SyncBatchListItem {
+  id: number
+  batch_no: string
+  sync_task_id: number
+  task_code: string
+  task_name: string
+  task_version: number
+  trigger_type: SyncTriggerType
+  status: SyncBatchStatus
+  window_start?: string
+  window_end?: string
+  checkpoint_before?: string
+  checkpoint_after?: string
+  planned_slice_count: number
+  current_slice_no: number
+  execution_count: number
+  technical_success_count: number
+  technical_failed_count: number
+  business_success_count: number
+  business_failed_count: number
+  reason_code?: string
+  started_at?: string
+  completed_at?: string
+  gmt_create: string
+}
+
+export interface SyncBatchDetail extends SyncBatchListItem {
+  system_code: string
+  interface_code: string
+  interface_version: number
+  consumer_code: string
+  consumer_version: number
+  checkpoint_mode: SyncCheckpointMode
+  lookback_seconds: number
+  window_slice_seconds: number
+  result_summary?: string
+  revision: number
+}
+
+export interface SyncBatchQuery extends Query {
+  status?: SyncBatchStatus | ''
+  trigger_type?: SyncTriggerType | ''
+  sync_task_id?: number
+}
+
 export const useIntegrationApi = () => ({
   queryExternalSystems: (query: ExternalSystemQuery) =>
     instance
@@ -471,6 +636,28 @@ export const useIntegrationApi = () => ({
         revision,
       })
       .then((response) => response.data),
+  querySyncTasks: (query: SyncTaskQuery) =>
+    instance.post<ResponseData<SyncTaskListItem[]>>('/admin/integration/sync-task/query', query).then((response) => response.data),
+  getSyncTask: (id: number) =>
+    instance.get<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}`).then((response) => response.data),
+  getSyncTaskForEdit: (id: number) =>
+    instance.get<ResponseData<SyncTaskEdit>>(`/admin/integration/sync-task/${id}/edit`).then((response) => response.data),
+  listSyncConsumers: () =>
+    instance.get<ResponseData<SyncConsumerMetadata[]>>('/admin/integration/sync-task/consumers').then((response) => response.data),
+  createSyncTask: (request: SyncTaskCreateRequest) =>
+    instance.post<ResponseData<SyncTaskDetail>>('/admin/integration/sync-task', request).then((response) => response.data),
+  updateSyncTask: (id: number, request: SyncTaskUpdateRequest) =>
+    instance.put<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}`, request).then((response) => response.data),
+  createSyncTaskVersion: (id: number, revision: number) =>
+    instance.post<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}/versions`, { revision }).then((response) => response.data),
+  enableSyncTask: (id: number, revision: number) =>
+    instance.put<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}/enable`, { revision }).then((response) => response.data),
+  disableSyncTask: (id: number, revision: number) =>
+    instance.put<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}/disable`, { revision }).then((response) => response.data),
+  querySyncBatches: (query: SyncBatchQuery) =>
+    instance.post<ResponseData<SyncBatchListItem[]>>('/admin/integration/sync-batch/query', query).then((response) => response.data),
+  getSyncBatch: (id: number) =>
+    instance.get<ResponseData<SyncBatchDetail>>(`/admin/integration/sync-batch/${id}`).then((response) => response.data),
   queryCredentials: (query: CredentialQuery) =>
     instance
       .post<ResponseData<CredentialListItem[]>>('/admin/integration/credential/query', query)

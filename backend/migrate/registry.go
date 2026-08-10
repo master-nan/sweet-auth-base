@@ -25,6 +25,7 @@ func migrationSteps() []migrationStep {
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
 		{name: "integration_configuration_schema", run: migrateIntegrationConfigurationSchema},
 		{name: "integration_runtime_schema", run: migrateIntegrationRuntimeSchema},
+		{name: "integration_sync_schema", run: migrateIntegrationSyncSchema},
 		{name: "data_permission_domain_schema", run: migrateDataPermissionSchema},
 		{name: "remove_legacy_data_permission_schema", run: removeLegacyDataPermissionSchema},
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},

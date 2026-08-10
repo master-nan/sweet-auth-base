@@ -48,6 +48,7 @@ type App struct {
 	InterfaceDefinitionController  *controller.InterfaceDefinitionController
 	CredentialController           *controller.CredentialController
 	RetryPolicyController          *controller.RetryPolicyController
+	IntegrationSyncController      *controller.IntegrationSyncController
 	IntegrationExecutionController *controller.IntegrationExecutionController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
@@ -96,6 +97,8 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewInterfaceDefinitionRepositoryImpl,
 	impl.NewCredentialRepositoryImpl,
 	impl.NewRetryPolicyRepositoryImpl,
+	impl.NewIntegrationSyncTaskRepositoryImpl,
+	impl.NewIntegrationSyncBatchRepositoryImpl,
 	impl.NewIntegrationExecutionRepositoryImpl,
 	impl.NewIntegrationLogRepositoryImpl,
 	impl.NewGeneralizationRepositoryImpl,
@@ -147,6 +150,8 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.InterfaceDefinitionRepository), new(*impl.InterfaceDefinitionRepositoryImpl)),
 	wire.Bind(new(repository.CredentialRepository), new(*impl.CredentialRepositoryImpl)),
 	wire.Bind(new(repository.RetryPolicyRepository), new(*impl.RetryPolicyRepositoryImpl)),
+	wire.Bind(new(repository.IntegrationSyncTaskRepository), new(*impl.IntegrationSyncTaskRepositoryImpl)),
+	wire.Bind(new(repository.IntegrationSyncBatchRepository), new(*impl.IntegrationSyncBatchRepositoryImpl)),
 	wire.Bind(new(repository.IntegrationExecutionRepository), new(*impl.IntegrationExecutionRepositoryImpl)),
 	wire.Bind(new(repository.IntegrationLogRepository), new(*impl.IntegrationLogRepositoryImpl)),
 	wire.Bind(new(repository.GeneralizationRepository), new(*impl.GeneralizationRepositoryImpl)),
@@ -245,6 +250,10 @@ var ServiceProvider = wire.NewSet(
 	security.NewCredentialSecretProtector,
 	service.NewCredentialService,
 	service.NewRetryPolicyService,
+	integration.NewSyncConsumerRegistry,
+	wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)),
+	service.NewSyncTaskService,
+	service.NewSyncBatchService,
 	service.NewIntegrationExecutionService,
 	integration.NewCredentialProvider,
 	service.NewDingTalkService,
@@ -264,6 +273,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewInterfaceDefinitionController,
 	controller.NewCredentialController,
 	controller.NewRetryPolicyController,
+	controller.NewIntegrationSyncController,
 	controller.NewIntegrationExecutionController,
 	controller.NewBasicController,
 	controller.NewGeneralizationController,
