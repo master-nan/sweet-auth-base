@@ -221,6 +221,16 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	syncBusinessResultProvider := ProvideSyncBusinessResultProvider()
+	integrationSyncCoordinator := service.NewIntegrationSyncCoordinator(integrationSyncTaskRepositoryImpl, integrationSyncBatchRepositoryImpl, integrationExecutionRepositoryImpl, externalSystemRepositoryImpl, interfaceDefinitionRepositoryImpl, integrationExecutionService, syncBusinessResultProvider, snowflake)
+	syncRunnerConfig, err := ProvideIntegrationSyncRunnerConfig(server)
+	if err != nil {
+		return nil, err
+	}
+	integrationSyncRunner, err := ProvideIntegrationSyncRunner(integrationSyncCoordinator, syncRunnerConfig)
+	if err != nil {
+		return nil, err
+	}
 	app := &App{
 		Config:                         server,
 		DBs:                            v,
@@ -261,6 +271,7 @@ func InitializeApp() (*App, error) {
 		TokenBlackCache:                tokenBlackCache,
 		ApplicationCache:               applicationCache,
 		IntegrationWorker:              integrationWorkerRunner,
+		IntegrationSyncRunner:          integrationSyncRunner,
 	}
 	return app, nil
 }
@@ -307,6 +318,7 @@ type App struct {
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
 	IntegrationWorker              *integration.IntegrationWorkerRunner
+	IntegrationSyncRunner          *integration.IntegrationSyncRunner
 }
 
 // Repository 提供者
@@ -322,7 +334,7 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, wire.Bind(new(service.Tr
 ), wire.Bind(
 	new(datapermission.OwnershipFieldOperationValidator),
 	new(*datapermission.OwnershipFieldRegistry),
-), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, integration.NewSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
+), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, integration.NewSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationSyncCoordinator, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
 )
 
 // Controller 提供者
@@ -365,6 +377,9 @@ var Providers = wire.NewSet(
 	ProvideIntegrationConcurrencyGuard,
 	ProvideIntegrationExecutionEngine,
 	ProvideIntegrationWorkerRunner,
+	ProvideIntegrationSyncRunnerConfig,
+	ProvideSyncBusinessResultProvider,
+	ProvideIntegrationSyncRunner,
 
 	RepositoryProvider,
 	CacheProvider,

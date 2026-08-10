@@ -79,6 +79,26 @@ func TestStaticSyncConsumerRegistryValidationAndIsolation(t *testing.T) {
 	}
 }
 
+func TestMaterializeSyncExecutionInputPlan(t *testing.T) {
+	raw := []byte(`{"version":1,"static_input":{"query_params":{"tenant":["sweet"]}},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"},"window_end_binding":{"location":"body","code":"updated_to","format":"unix_milliseconds"}}`)
+	start := time.Date(2026, 8, 10, 1, 2, 3, 456000000, time.UTC)
+	end := start.Add(time.Hour)
+	input, err := MaterializeSyncExecutionInputPlan(raw, &start, &end)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := input.QueryParams["updated_from"]; len(got) != 1 || got[0] != start.Format(time.RFC3339Nano) {
+		t.Fatalf("start binding=%v", got)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(input.JSONBody, &body); err != nil || body["updated_to"].(float64) != float64(end.UnixMilli()) {
+		t.Fatalf("body=%s err=%v", input.JSONBody, err)
+	}
+	if input.QueryParams["tenant"][0] != "sweet" {
+		t.Fatal("static input was not preserved")
+	}
+}
+
 func syncPlanContract(t *testing.T, sensitive bool) []byte {
 	t.Helper()
 	value := InterfaceInputContract{Version: 1, Parameters: []InputParameterDefinition{

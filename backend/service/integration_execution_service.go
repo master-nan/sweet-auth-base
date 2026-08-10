@@ -46,6 +46,20 @@ type IntegrationExecutionService struct {
 	now        func() time.Time
 }
 
+// SyncExecutionCreateCommand 是 Sync Coordinator 调用 Application Service 的受控命令。
+// 窗口与 Consumer 来源由服务端生成，客户端 DTO 无法构造这些字段。
+type SyncExecutionCreateCommand struct {
+	ExternalSystemID      int
+	InterfaceDefinitionID int
+	BatchID               int
+	SliceNo               int
+	WindowStart           *time.Time
+	WindowEnd             *time.Time
+	ConsumerCode          string
+	ConsumerVersion       int
+	Input                 integration.ExecutionInputValues
+}
+
 func NewIntegrationExecutionService(
 	executions repository.IntegrationExecutionRepository,
 	logs repository.IntegrationLogRepository,
@@ -71,9 +85,52 @@ func (s *IntegrationExecutionService) CreateExecution(
 	ctx context.Context,
 	req request.IntegrationExecutionCreateReq,
 ) (response.IntegrationExecutionDetailRes, error) {
-	req, err := normalizeIntegrationExecutionCreateReq(req)
+	value, err := s.createExecution(ctx, req, nil, true)
 	if err != nil {
 		return response.IntegrationExecutionDetailRes{}, err
+	}
+	return response.NewIntegrationExecutionDetailRes(value), nil
+}
+
+// CreateSyncExecution 复用正式 Execution 创建链，原子冻结输入、Retry 与 Sync 来源。
+func (s *IntegrationExecutionService) CreateSyncExecution(ctx context.Context, command SyncExecutionCreateCommand) (model.IntegrationExecution, error) {
+	if command.BatchID <= 0 || command.SliceNo <= 0 || strings.TrimSpace(command.ConsumerCode) == "" || command.ConsumerVersion <= 0 ||
+		(command.WindowStart == nil) != (command.WindowEnd == nil) ||
+		(command.WindowStart != nil && !command.WindowEnd.After(*command.WindowStart)) {
+		return model.IntegrationExecution{}, myerrors.ErrSyncExecutionCreateFailed
+	}
+	req := request.IntegrationExecutionCreateReq{
+		ExternalSystemID: command.ExternalSystemID, InterfaceDefinitionID: command.InterfaceDefinitionID,
+		TriggerSource: model.IntegrationTriggerSourceScheduled, IdempotencyScope: "sync",
+		IdempotencyKey: fmt.Sprintf("batch:%d:slice:%d", command.BatchID, command.SliceNo),
+		Input: request.IntegrationExecutionInputReq{
+			PathParams: command.Input.PathParams, QueryParams: command.Input.QueryParams,
+			Headers: command.Input.Headers, JSONBody: command.Input.JSONBody,
+		},
+	}
+	source := &syncExecutionSource{
+		BatchID: command.BatchID, SliceNo: command.SliceNo, WindowStart: cloneExecutionTime(command.WindowStart),
+		WindowEnd: cloneExecutionTime(command.WindowEnd), ConsumerCode: strings.TrimSpace(command.ConsumerCode), ConsumerVersion: command.ConsumerVersion,
+	}
+	return s.createExecution(ctx, req, source, false)
+}
+
+type syncExecutionSource struct {
+	BatchID, SliceNo       int
+	WindowStart, WindowEnd *time.Time
+	ConsumerCode           string
+	ConsumerVersion        int
+}
+
+func (s *IntegrationExecutionService) createExecution(
+	ctx context.Context,
+	req request.IntegrationExecutionCreateReq,
+	source *syncExecutionSource,
+	writeAudit bool,
+) (model.IntegrationExecution, error) {
+	req, err := normalizeIntegrationExecutionCreateReq(req)
+	if err != nil {
+		return model.IntegrationExecution{}, err
 	}
 
 	var value model.IntegrationExecution
@@ -111,7 +168,7 @@ func (s *IntegrationExecutionService) CreateExecution(
 			req.IdempotencyKey,
 		)
 		if err == nil {
-			if existing.InputHash != serverInputHash {
+			if existing.InputHash != serverInputHash || !sameSyncExecutionSource(existing, source) {
 				return myerrors.ErrIntegrationExecutionIdempotencyConflict
 			}
 			value = existing
@@ -160,21 +217,32 @@ func (s *IntegrationExecutionService) CreateExecution(
 			RemoteIdempotencyKey:       remoteIdempotencyKey,
 			Revision:                   1,
 		}
+		if source != nil {
+			value.SyncBatchID = &source.BatchID
+			value.SyncSliceNo = &source.SliceNo
+			value.SyncWindowStart = cloneExecutionTime(source.WindowStart)
+			value.SyncWindowEnd = cloneExecutionTime(source.WindowEnd)
+			value.SyncConsumerCode = source.ConsumerCode
+			value.SyncConsumerVersion = &source.ConsumerVersion
+		}
 		if err := s.executions.Create(tx, &value); err != nil {
 			if isIntegrationExecutionIdempotencyDuplicate(err) {
 				return errIntegrationIdempotencyRace
 			}
 			return myerrors.WrapDatabaseError(err)
 		}
-		return s.writeAudit(ctx, tx, integrationExecutionAuditCreate, value, "", value.Status)
+		if writeAudit {
+			return s.writeAudit(ctx, tx, integrationExecutionAuditCreate, value, "", value.Status)
+		}
+		return nil
 	})
 	if errors.Is(err, errIntegrationIdempotencyRace) {
-		return s.resolveIdempotencyRace(ctx, req, interfaceVersion, serverInputHash)
+		return s.resolveIdempotencyRace(ctx, req, interfaceVersion, serverInputHash, source)
 	}
 	if err != nil {
-		return response.IntegrationExecutionDetailRes{}, err
+		return model.IntegrationExecution{}, err
 	}
-	return response.NewIntegrationExecutionDetailRes(value), nil
+	return value, nil
 }
 
 func generateRemoteIdempotencyKey(mode string) (string, error) {
@@ -403,7 +471,8 @@ func (s *IntegrationExecutionService) resolveIdempotencyRace(
 	req request.IntegrationExecutionCreateReq,
 	interfaceVersion int,
 	serverInputHash string,
-) (response.IntegrationExecutionDetailRes, error) {
+	source *syncExecutionSource,
+) (model.IntegrationExecution, error) {
 	value, err := s.executions.FindByIdempotency(
 		s.executions.DBWithContext(ctx),
 		req.InterfaceDefinitionID,
@@ -412,12 +481,36 @@ func (s *IntegrationExecutionService) resolveIdempotencyRace(
 		req.IdempotencyKey,
 	)
 	if err != nil {
-		return response.IntegrationExecutionDetailRes{}, myerrors.WrapDatabaseError(err)
+		return model.IntegrationExecution{}, myerrors.WrapDatabaseError(err)
 	}
-	if value.InputHash != serverInputHash {
-		return response.IntegrationExecutionDetailRes{}, myerrors.ErrIntegrationExecutionIdempotencyConflict
+	if value.InputHash != serverInputHash || !sameSyncExecutionSource(value, source) {
+		return model.IntegrationExecution{}, myerrors.ErrIntegrationExecutionIdempotencyConflict
 	}
-	return response.NewIntegrationExecutionDetailRes(value), nil
+	return value, nil
+}
+
+func sameSyncExecutionSource(value model.IntegrationExecution, source *syncExecutionSource) bool {
+	if source == nil {
+		return value.SyncBatchID == nil
+	}
+	return value.SyncBatchID != nil && *value.SyncBatchID == source.BatchID && value.SyncSliceNo != nil && *value.SyncSliceNo == source.SliceNo &&
+		value.SyncConsumerCode == source.ConsumerCode && value.SyncConsumerVersion != nil && *value.SyncConsumerVersion == source.ConsumerVersion &&
+		sameExecutionTime(value.SyncWindowStart, source.WindowStart) && sameExecutionTime(value.SyncWindowEnd, source.WindowEnd)
+}
+
+func sameExecutionTime(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.Equal(*right)
+}
+
+func cloneExecutionTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := value.UTC()
+	return &copy
 }
 
 func normalizeIntegrationExecutionCreateReq(
@@ -451,7 +544,7 @@ func validIntegrationTriggerSource(value string) bool {
 func isIntegrationExecutionIdempotencyDuplicate(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505" && pgErr.ConstraintName == "uni_integration_execution_idempotency"
+		return pgErr.Code == "23505" && (pgErr.ConstraintName == "uni_integration_execution_idempotency" || pgErr.ConstraintName == "uni_integration_execution_sync_slice")
 	}
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "unique constraint") &&

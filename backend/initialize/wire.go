@@ -69,6 +69,7 @@ type App struct {
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
 	IntegrationWorker              *integration.IntegrationWorkerRunner
+	IntegrationSyncRunner          *integration.IntegrationSyncRunner
 }
 
 // Repository 提供者
@@ -254,6 +255,7 @@ var ServiceProvider = wire.NewSet(
 	wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)),
 	service.NewSyncTaskService,
 	service.NewSyncBatchService,
+	service.NewIntegrationSyncCoordinator,
 	service.NewIntegrationExecutionService,
 	integration.NewCredentialProvider,
 	service.NewDingTalkService,
@@ -336,6 +338,9 @@ var Providers = wire.NewSet(
 	ProvideIntegrationConcurrencyGuard,
 	ProvideIntegrationExecutionEngine,
 	ProvideIntegrationWorkerRunner,
+	ProvideIntegrationSyncRunnerConfig,
+	ProvideSyncBusinessResultProvider,
+	ProvideIntegrationSyncRunner,
 
 	RepositoryProvider,
 	CacheProvider,

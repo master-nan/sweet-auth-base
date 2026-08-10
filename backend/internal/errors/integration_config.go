@@ -63,6 +63,16 @@ const (
 	ErrorCodeSyncInputPlanInvalid            = 130417
 	ErrorCodeSyncInputPlanContractMismatch   = 130418
 	ErrorCodeSyncBatchNotFound               = 130501
+	ErrorCodeSyncSchedulerClaimFailed        = 130502
+	ErrorCodeSyncBatchConflict               = 130503
+	ErrorCodeSyncBatchStateInvalid           = 130504
+	ErrorCodeSyncCheckpointConflict          = 130505
+	ErrorCodeSyncExecutionCreateFailed       = 130506
+	ErrorCodeSyncBusinessResultPending       = 130507
+	ErrorCodeSyncRunnerInvalidConfig         = 130508
+	ErrorCodeSyncRunnerAlreadyRunning        = 130509
+	ErrorCodeSyncRunnerStartFailed           = 130510
+	ErrorCodeSyncRunnerShutdownTimeout       = 130511
 )
 
 var (
@@ -126,4 +136,14 @@ var (
 	ErrSyncInputPlanInvalid            = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncInputPlanInvalid, "同步输入计划格式不合法")
 	ErrSyncInputPlanContractMismatch   = NewBusinessError(http.StatusBadRequest, ErrorCodeSyncInputPlanContractMismatch, "同步输入计划不满足接口输入契约")
 	ErrSyncBatchNotFound               = NewBusinessError(http.StatusNotFound, ErrorCodeSyncBatchNotFound, "同步批次不存在")
+	ErrSyncSchedulerClaimFailed        = NewBusinessError(http.StatusConflict, ErrorCodeSyncSchedulerClaimFailed, "同步调度领取失败")
+	ErrSyncBatchConflict               = NewBusinessError(http.StatusConflict, ErrorCodeSyncBatchConflict, "同步批次已由其他调度实例创建或推进")
+	ErrSyncBatchStateInvalid           = NewBusinessError(http.StatusConflict, ErrorCodeSyncBatchStateInvalid, "同步批次当前状态不允许协调")
+	ErrSyncCheckpointConflict          = NewBusinessError(http.StatusConflict, ErrorCodeSyncCheckpointConflict, "同步 Checkpoint 已被其他运行实例推进")
+	ErrSyncExecutionCreateFailed       = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncExecutionCreateFailed, "同步 Execution 创建失败")
+	ErrSyncBusinessResultPending       = NewBusinessError(http.StatusConflict, ErrorCodeSyncBusinessResultPending, "同步业务结果尚未确认")
+	ErrSyncRunnerInvalidConfig         = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncRunnerInvalidConfig, "同步 Runner 配置不合法")
+	ErrSyncRunnerAlreadyRunning        = NewBusinessError(http.StatusConflict, ErrorCodeSyncRunnerAlreadyRunning, "同步 Runner 已在运行")
+	ErrSyncRunnerStartFailed           = NewBusinessError(http.StatusInternalServerError, ErrorCodeSyncRunnerStartFailed, "同步 Runner 启动失败")
+	ErrSyncRunnerShutdownTimeout       = NewBusinessError(http.StatusServiceUnavailable, ErrorCodeSyncRunnerShutdownTimeout, "同步 Runner 关闭等待超时")
 )

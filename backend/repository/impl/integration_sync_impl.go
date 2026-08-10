@@ -4,6 +4,7 @@ import (
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -58,14 +59,35 @@ func (r *IntegrationSyncBatchRepositoryImpl) FindByTriggerKey(value string) (mod
 	return r.FindByField("trigger_key", value)
 }
 
-func (r *IntegrationSyncBatchRepositoryImpl) FindScheduledCandidates(tx *gorm.DB, now time.Time, limit int) ([]model.IntegrationSyncTask, error) {
+func (r *IntegrationSyncBatchRepositoryImpl) CurrentDatabaseTime(tx *gorm.DB) (time.Time, error) {
+	var now time.Time
+	if tx.Dialector.Name() == "postgres" {
+		err := tx.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&now).Error
+		return now.UTC(), err
+	}
+	var epoch int64
+	err := tx.Raw("SELECT unixepoch()").Scan(&epoch).Error
+	return time.Unix(epoch, 0).UTC(), err
+}
+
+func (r *IntegrationSyncBatchRepositoryImpl) FindScheduledCandidates(tx *gorm.DB, limit int) ([]model.IntegrationSyncTask, error) {
 	var values []model.IntegrationSyncTask
 	if limit <= 0 {
 		return values, nil
 	}
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("status = ? AND schedule_type = ? AND next_scheduled_at IS NOT NULL AND next_scheduled_at <= ?", model.IntegrationSyncTaskStatusEnabled, model.IntegrationSyncScheduleCron, now).
+		Where("status = ? AND schedule_type = ? AND next_scheduled_at IS NOT NULL AND next_scheduled_at <= CURRENT_TIMESTAMP", model.IntegrationSyncTaskStatusEnabled, model.IntegrationSyncScheduleCron).
 		Order("next_scheduled_at ASC, id ASC").Limit(limit).Find(&values).Error
+	return values, err
+}
+
+func (r *IntegrationSyncBatchRepositoryImpl) FindActiveBatches(ctx context.Context, limit int) ([]model.IntegrationSyncBatch, error) {
+	values := make([]model.IntegrationSyncBatch, 0)
+	if limit <= 0 {
+		return values, nil
+	}
+	err := r.DBWithContext(ctx).Where("status IN ?", []string{model.IntegrationSyncBatchStatusCreated, model.IntegrationSyncBatchStatusRunning}).
+		Order("gmt_create ASC, id ASC").Limit(limit).Find(&values).Error
 	return values, err
 }
 

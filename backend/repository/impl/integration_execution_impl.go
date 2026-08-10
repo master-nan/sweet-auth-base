@@ -81,6 +81,12 @@ func (r *IntegrationExecutionRepositoryImpl) FindByIdempotency(
 	return value, err
 }
 
+func (r *IntegrationExecutionRepositoryImpl) FindBySyncBatchSlice(tx *gorm.DB, batchID, sliceNo int) (model.IntegrationExecution, error) {
+	var value model.IntegrationExecution
+	err := tx.Where("sync_batch_id = ? AND sync_slice_no = ?", batchID, sliceNo).First(&value).Error
+	return value, err
+}
+
 func (r *IntegrationExecutionRepositoryImpl) ListCandidatesByStatus(
 	ctx context.Context,
 	statuses []string,

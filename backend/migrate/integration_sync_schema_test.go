@@ -144,6 +144,14 @@ func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 	if err := db.Create(&badBatchCounts).Error; err == nil {
 		t.Fatal("expected batch count check violation")
 	}
+	badTaskRevision := validSyncBatchMigrationFixture(8909, task)
+	badTaskRevision.Status, badTaskRevision.BatchNo, badTaskRevision.TriggerKey = model.IntegrationSyncBatchStatusSucceeded, "SYNC-8909", "manual:8909"
+	if err := db.Create(&badTaskRevision).Error; err != nil {
+		t.Fatalf("create task revision fixture: %v", err)
+	}
+	if err := db.Model(&model.IntegrationSyncBatch{}).Where("id = ?", badTaskRevision.Id).Update("task_revision", 0).Error; err == nil {
+		t.Fatal("expected batch task revision check violation")
+	}
 	badFK := validSyncBatchMigrationFixture(8903, task)
 	badFK.BatchNo = "SYNC-8903"
 	badFK.TriggerKey = "manual:8903"
@@ -188,5 +196,5 @@ func validSyncTaskMigrationFixture(id int, code string, version, systemID, inter
 }
 
 func validSyncBatchMigrationFixture(id int, task model.IntegrationSyncTask) model.IntegrationSyncBatch {
-	return model.IntegrationSyncBatch{Basic: model.Basic{Id: id, State: true}, BatchNo: "SYNC-8901", SyncTaskID: task.Id, TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version, SystemCode: "system", InterfaceCode: "interface", InterfaceVersion: 1, ConsumerCode: task.ConsumerCode, ConsumerVersion: task.ConsumerVersion, TriggerType: model.IntegrationSyncTriggerManual, TriggerKey: "manual:8901", Status: model.IntegrationSyncBatchStatusCreated, CheckpointMode: model.IntegrationSyncCheckpointNone, Revision: 1}
+	return model.IntegrationSyncBatch{Basic: model.Basic{Id: id, State: true}, BatchNo: "SYNC-8901", SyncTaskID: task.Id, TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version, TaskRevision: task.Revision, SystemCode: "system", InterfaceCode: "interface", InterfaceVersion: 1, ConsumerCode: task.ConsumerCode, ConsumerVersion: task.ConsumerVersion, TriggerType: model.IntegrationSyncTriggerManual, TriggerKey: "manual:8901", Status: model.IntegrationSyncBatchStatusCreated, CheckpointMode: model.IntegrationSyncCheckpointNone, Revision: 1}
 }

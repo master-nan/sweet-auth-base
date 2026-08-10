@@ -37,6 +37,13 @@ integration:
     lease_recovery_interval: 60
     shutdown_timeout: 15
     lease_duration: 180
+  sync_runner:
+    enabled: false
+    runner_id: 'integration-sync-dev-1'
+    poll_interval: 10
+    schedule_batch_size: 8
+    coordinate_batch_size: 16
+    shutdown_timeout: 15
 conf:
   salt: '4342cb18dff878975cd8b4d578029300811759ffe3fda56e5fb86f9ea5c549f3'
   enable: false

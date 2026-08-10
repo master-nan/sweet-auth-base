@@ -2,6 +2,7 @@ package repository
 
 import (
 	"backend/model"
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -19,5 +20,7 @@ type IntegrationSyncBatchRepository interface {
 	CountActiveByTaskCode(*gorm.DB, string) (int64, error)
 	FindByBatchNo(string) (model.IntegrationSyncBatch, error)
 	FindByTriggerKey(string) (model.IntegrationSyncBatch, error)
-	FindScheduledCandidates(*gorm.DB, time.Time, int) ([]model.IntegrationSyncTask, error)
+	CurrentDatabaseTime(*gorm.DB) (time.Time, error)
+	FindScheduledCandidates(*gorm.DB, int) ([]model.IntegrationSyncTask, error)
+	FindActiveBatches(context.Context, int) ([]model.IntegrationSyncBatch, error)
 }

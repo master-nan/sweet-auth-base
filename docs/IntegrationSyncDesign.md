@@ -190,7 +190,7 @@ Batch 只观察 Execution 的最终状态。Execution 处于 `retry_waiting` 时
 | --- | --- |
 | `id`、`batch_no` | 平台 ID；全局唯一业务编号 |
 | `sync_task_id` | 创建本 Batch 的明确 Task 版本 |
-| Task 摘要 | `task_code`、`task_name`、`task_version` |
+| Task 摘要 | `task_code`、`task_name`、`task_version`、`task_revision`；revision 随每次调度/Checkpoint 推进同步更新，用于拒绝陈旧协调器提交 |
 | 接口摘要 | system/interface code、interface version |
 | Consumer 摘要 | `consumer_code`、`consumer_version` |
 | `trigger_type` | `manual`、`scheduled` |
@@ -246,7 +246,7 @@ V1 使用五段式 Cron：`minute hour day-of-month month day-of-week`，不支�
 当前平台全局 `initialize/corn.go` 是进程内 cron 注册器，没有数据库唯一调度和完整生命周期，不作为 Sync 的调度真值。V1 新增独立 `IntegrationSyncRunner`，通过现有 initialize/Wire 装配：
 
 - 默认 `enabled=false`，生产必须显式开启。
-- 安全默认建议：poll 15 秒、claim batch 8、实例并发 4、shutdown 30 秒。
+- 实现默认：poll 10 秒、单轮调度 8 个 Task、单轮协调 16 个 Batch、协调并发 1、shutdown 15 秒；所有值均有服务端边界且禁止零间隔。
 - 接收应用级 Context，支持幂等 Start、有限 Stop 和 panic 恢复。
 - 只创建/推进 Batch 与 Execution，不执行 HTTP。
 
@@ -254,7 +254,7 @@ V1 使用五段式 Cron：`minute hour day-of-month month day-of-week`，不支�
 
 Runner 每轮在短事务内查询 `status=enabled AND next_scheduled_at <= database_now`，使用 PostgreSQL `FOR UPDATE SKIP LOCKED`。领取后：
 
-1. 以数据库 UTC 计算应处理的计划点。
+1. 以数据库 UTC 读取到期计划点；`scheduled_for` 使用持久化的到期 `next_scheduled_at`。
 2. 创建唯一 scheduled Batch。
 3. 更新 Task 的 `last_scheduled_at` 和下一计划时间。
 4. 提交事务后再创建第一个 Execution。
@@ -271,7 +271,7 @@ Runner 每轮在短事务内查询 `status=enabled AND next_scheduled_at <= data
 
 ### 7.4 Missed Schedule 与 DST
 
-V1 固定 `coalesce_one`：应用恢复后为一个 Task 最多创建一条补偿 Batch，窗口从当前 Checkpoint 覆盖到“最近已到期计划点”，不会逐条补发停机期间每个 Cron 点。下一调度点从数据库当前时刻之后计算。
+V1 固定 `coalesce_one`：应用恢复后为一个 Task 最多创建一条补偿 Batch，窗口从当前 Checkpoint 覆盖到持久化的首个到期计划点，不会逐条补发停机期间每个 Cron 点。Batch 与 Task schedule 游标在同一事务提交，下一调度点从本次数据库当前时刻之后计算。
 
 - 所有 `scheduled_for`、窗口和 Checkpoint 持久化为 UTC。
 - PostgreSQL `timestamp without time zone` 字段使用与 Runtime 一致的 `CURRENT_TIMESTAMP AT TIME ZONE 'UTC'` 取得数据库 UTC，不依赖应用 `time.Now()` 或会话时区。
@@ -480,16 +480,28 @@ Integration SyncBatch 是技术调度批次，不等于 Organization `org_sync_b
 协调器轮询关联 Execution 的安全状态：
 
 - created/running/retry_waiting：保持 Batch running。
-- succeeded：锁定 Batch 与 Task，复核连续窗口并推进 Checkpoint，然后创建下一片或完成 Batch。
+- succeeded：先读取受控业务结果标记；仅业务结果也为 succeeded 时，才锁定 Batch 与 Task，复核连续窗口并推进 Checkpoint，然后在后续轮次创建下一片或完成 Batch。
 - failed/cancelled：Batch failed，不创建后续片。
 
 若 timestamp Batch 的 `window_start == window_end`，协调器创建一条零 Execution 的 succeeded Batch，Checkpoint 保持不变；若 start 大于 end，则配置或时钟事实非法，Batch failed。none 模式始终创建一条静态 Execution。
 
 协调器不读取 Attempt Body、不调用 Credential/Transport、不修改 Retry `next_run_at`。
 
-### 13.4 禁止长事务
+### 13.4 INT-005C-1 Consumer 过渡边界
+
+INT-005C-1 只冻结 `SyncBusinessResultProvider` 读取端口，不执行 Consumer。生产默认 Provider 始终返回 `pending`，因此技术成功的 Execution 会保持 Batch running，不会伪造业务成功或推进 Checkpoint。测试可注入确定性 Provider 验证连续推进；真实响应交付、Consumer 执行和业务结果持久化由 INT-005C-2 接入。
+
+### 13.5 禁止长事务
 
 Batch/Task 行锁只在短事务内持有。Cron 等待、Execution 执行、Retry 退避、HTTP、Consumer 处理和 Batch 等待都不持有数据库事务。
+
+### 13.6 INT-005C-1 实现落点
+
+- `IntegrationSyncRunner` 是独立生命周期组件，默认关闭；启动顺序为 Execution Worker 后启动 Sync Runner，关闭顺序相反。
+- 调度候选直接使用 PostgreSQL `CURRENT_TIMESTAMP` 条件与 `FOR UPDATE SKIP LOCKED`，应用时钟只用于状态观测。
+- Batch 创建与 Task schedule 游标更新属于同一短事务；事务提交后由协调轮次调用 Integration Application Service 创建唯一切片 Execution。
+- 切片幂等键固定为 Batch + slice，数据库 `(sync_batch_id, sync_slice_no)` 部分唯一索引为最终防线。
+- Checkpoint 推进事务同时锁定 Batch、Task 并复核 Execution succeeded、连续窗口、`task_revision` 与 revision；重复协调不会重复累计计数。
 
 ## 14. 失败、取消与并发
 

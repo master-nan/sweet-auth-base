@@ -33,6 +33,10 @@ func main() {
 	if err := app.IntegrationWorker.Start(context.Background()); err != nil {
 		zap.L().Fatal("failed to start integration worker", zap.Error(err))
 	}
+	if err := app.IntegrationSyncRunner.Start(context.Background()); err != nil {
+		_ = app.IntegrationWorker.Stop(context.Background())
+		zap.L().Fatal("failed to start integration sync runner", zap.Error(err))
+	}
 	initialize.InitCron(app)
 	router := initialize.InitRouter(app)
 	port := app.Config.Port
@@ -57,6 +61,9 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit // 阻塞，直到接收到信号
 	zap.L().Info("Shutting down server...")
+	if err := app.IntegrationSyncRunner.Stop(context.Background()); err != nil {
+		zap.L().Warn("integration sync runner did not stop cleanly", zap.Error(err))
+	}
 	if err := app.IntegrationWorker.Stop(context.Background()); err != nil {
 		zap.L().Warn("integration worker did not stop cleanly", zap.Error(err))
 	}

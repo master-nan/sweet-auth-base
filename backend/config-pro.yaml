@@ -37,6 +37,13 @@ integration:
     lease_recovery_interval: 60
     shutdown_timeout: 15
     lease_duration: 180
+  sync_runner:
+    enabled: false
+    runner_id: ''
+    poll_interval: 10
+    schedule_batch_size: 8
+    coordinate_batch_size: 16
+    shutdown_timeout: 15
 conf:
   salt: 'replace-with-at-least-32-random-characters'
   enable: true

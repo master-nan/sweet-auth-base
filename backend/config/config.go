@@ -61,7 +61,8 @@ type Audit struct {
 
 // Integration 仅保存集成运行时的服务端配置，不由普通请求修改。
 type Integration struct {
-	Worker IntegrationWorker `mapstructure:"worker"`
+	Worker     IntegrationWorker     `mapstructure:"worker"`
+	SyncRunner IntegrationSyncRunner `mapstructure:"sync_runner"`
 }
 
 // IntegrationWorker 的时间字段单位均为秒，避免配置文件中使用无单位 duration。
@@ -74,6 +75,16 @@ type IntegrationWorker struct {
 	LeaseRecoveryInterval int    `mapstructure:"lease_recovery_interval"`
 	ShutdownTimeout       int    `mapstructure:"shutdown_timeout"`
 	LeaseDuration         int    `mapstructure:"lease_duration"`
+}
+
+// IntegrationSyncRunner 的时间字段单位为秒；默认关闭并且只接受服务端配置。
+type IntegrationSyncRunner struct {
+	Enabled             bool   `mapstructure:"enabled"`
+	RunnerID            string `mapstructure:"runner_id"`
+	PollInterval        int    `mapstructure:"poll_interval"`
+	ScheduleBatchSize   int    `mapstructure:"schedule_batch_size"`
+	CoordinateBatchSize int    `mapstructure:"coordinate_batch_size"`
+	ShutdownTimeout     int    `mapstructure:"shutdown_timeout"`
 }
 
 type Conf struct {

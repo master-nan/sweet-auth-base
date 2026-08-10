@@ -67,6 +67,7 @@ type IntegrationSyncBatch struct {
 	TaskCode              string     `gorm:"size:64;not null;index:idx_integration_sync_batch_task_code" json:"task_code"`
 	TaskName              string     `gorm:"size:128;not null" json:"task_name"`
 	TaskVersion           int        `gorm:"not null" json:"task_version"`
+	TaskRevision          int        `gorm:"not null;default:1" json:"task_revision"`
 	SystemCode            string     `gorm:"size:64;not null" json:"system_code"`
 	InterfaceCode         string     `gorm:"size:64;not null" json:"interface_code"`
 	InterfaceVersion      int        `gorm:"not null" json:"interface_version"`

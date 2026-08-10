@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,6 +113,52 @@ func DecodeSyncExecutionInputPlan(raw []byte) (SyncExecutionInputPlan, error) {
 		return SyncExecutionInputPlan{}, myerrors.ErrSyncInputPlanInvalid
 	}
 	return plan, nil
+}
+
+// MaterializeSyncExecutionInputPlan 将已校验的计划绑定到当前切片窗口。
+// 返回值仍需由 Integration Application Service 通过正式快照规范化器复核。
+func MaterializeSyncExecutionInputPlan(raw []byte, windowStart, windowEnd *time.Time) (ExecutionInputValues, error) {
+	plan, err := DecodeSyncExecutionInputPlan(raw)
+	if err != nil {
+		return ExecutionInputValues{}, err
+	}
+	input := cloneExecutionInputValues(plan.StaticInput)
+	bindings := []struct {
+		binding *SyncWindowBinding
+		value   *time.Time
+	}{
+		{binding: plan.WindowStartBinding, value: windowStart},
+		{binding: plan.WindowEndBinding, value: windowEnd},
+	}
+	for _, item := range bindings {
+		if item.binding == nil && item.value == nil {
+			continue
+		}
+		if item.binding == nil || item.value == nil {
+			return ExecutionInputValues{}, myerrors.ErrSyncInputPlanInvalid
+		}
+		value, err := formatSyncWindowValue(item.value.UTC(), item.binding.Format)
+		if err != nil {
+			return ExecutionInputValues{}, err
+		}
+		if err := setSyncWindowValue(&input, *item.binding, value); err != nil {
+			return ExecutionInputValues{}, err
+		}
+	}
+	return input, nil
+}
+
+func formatSyncWindowValue(value time.Time, format string) (any, error) {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case SyncTimeFormatRFC3339:
+		return value.Format(time.RFC3339Nano), nil
+	case SyncTimeFormatUnixSeconds:
+		return json.Number(strconv.FormatInt(value.Unix(), 10)), nil
+	case SyncTimeFormatUnixMilliseconds:
+		return json.Number(strconv.FormatInt(value.UnixMilli(), 10)), nil
+	default:
+		return nil, myerrors.ErrSyncInputPlanInvalid
+	}
 }
 
 func validSyncTimeBinding(definition InputParameterDefinition, format string) bool {
