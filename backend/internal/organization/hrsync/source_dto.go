@@ -34,22 +34,27 @@ func (value *SourceEnableStatus) UnmarshalJSON(raw []byte) error {
 // 源 DTO 只描述 HR V1 映射需要的字段。未知 JSON 字段由 encoding/json 忽略。
 type HRCompanySourceDTO struct {
 	SourceID       string             `json:"zjkid_ignore"`
+	SourceRecordID string             `json:"id"`
 	SourceCode     string             `json:"pk_corp"`
 	Name           string             `json:"name"`
 	ShortName      string             `json:"shortname"`
 	ParentSourceID string             `json:"fatherpkzjkid_ignore"`
 	Enabled        SourceEnableStatus `json:"isenable"`
 	ChangeTime     string             `json:"changeTime"`
+	Level          int                `json:"level"`
 }
 
 type HRDepartmentSourceDTO struct {
 	SourceID            string             `json:"zjkid_ignore"`
+	SourceRecordID      string             `json:"id"`
 	SourceCode          string             `json:"code"`
 	Name                string             `json:"name"`
 	ParentSourceID      string             `json:"pk_fathedeptzjkid_ignore"`
 	LegalEntitySourceID string             `json:"orgidzjkid_ignore"`
 	Enabled             SourceEnableStatus `json:"isenable"`
 	ChangeTime          string             `json:"changeTime"`
+	Level               int                `json:"ilevel"`
+	Sort                string             `json:"disorder"`
 }
 
 type HRPositionSourceDTO struct {

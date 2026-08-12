@@ -608,3 +608,19 @@ INT-006B 建立 `backend/internal/organization/hrsync` 源适配边界：
 人员按公司分区仍是后续受控配置能力：partition ID 必须由服务端批准并作为非敏感 static input 固定在 Task 版本中；不得提供任意 ID 输入、动态读取 Organization fan-out 或 Organization Scheduler。该设计不能替代 P0-8 的生产响应量验证。
 
 截至 INT-006B，以下 P0 继续打开：BIP ID 永久稳定/不可复用；changeTime 权威字段、时区、正式精度和同秒完整性；法人/组织/岗位编码命名空间；员工编号生命周期；主任职及其稳定 assignment ID；`sendpost` 权威性和兼职 ID 体系；开放任职日期规则；人员大响应生产方案；源物理删除表达。代码没有以布尔开关或环境变量伪造关闭这些 Gate，相关生产 Consumer 不注册。
+
+## 28. INT-006C 法人和组织结构 Consumer 实现
+
+INT-006C 按对象职责实现四个静态 Consumer：`org.hr.legal_entity`、`org.hr.management_company`、`org.hr.management_department`、`org.hr.legal_department`，版本均为 v1。法人公司只写 `org_legal_entity`；管理公司写 `org_unit(unit_type=business_unit)` 和 `hr_management` 节点；管理部门写 `org_unit(unit_type=department)` 和 `hr_management` 节点；法人部门写独立 `org_unit(unit_type=department)`、`primary_legal_entity_id` 和 `hr_legal` 节点。名称不参与身份识别，管理与法人视图不会因名称相同自动合并。
+
+领域持久身份使用 `SourceKey.PersistenceID()`；独立领域表由表边界隔离对象类别，共享的 `org_unit` 则把 `object_kind` 纳入 `source_id` 空间。原始 Source ID 不写日志或业务追踪记录，`OrgSyncRecord.source_id` 保存不可逆短摘要，依赖键也只保存摘要。源业务编码仍是受控属性和冲突边界，不替代 SourceKey；与另一稳定身份发生唯一编码冲突时整片失败，不拼接随机后缀。
+
+公司和部门采用两阶段处理。Phase 1 在每个最多 500 条的短事务中 upsert 全部主体，并为组织主体建立不可执行的结构节点占位；Phase 2 从当前 Slice 和历史数据共同解析父关系，计算路径和层级。父节点在 Body 中晚到不受返回顺序影响；历史已同步父节点可复用；停用但关系完整的父节点保留为历史父引用。父缺失、父仍在 `dependency_waiting` 或法人引用缺失时记录为 `deferred`/`dependency_waiting`；self-parent、两节点或多节点循环、跨结构引用与稳定身份冲突记录为 `error`/`failed`。两类异常都写稳定 Reason Code，使 Consumer 整体失败且 Checkpoint 不推进；不会自动转根、造假父节点或按名称查父级。
+
+源 inactive 只映射领域对象和节点 `disabled`，`source_deleted` 始终保持 false，不物理删除对象或结构事实。Lookback 和同一 Execution 的重复 Consume 通过领域 SourceKey、业务 Batch 唯一关系、Record 唯一约束和陈旧事实检查收敛；future-of-logical-window 记录不写领域对象，也不写当前 Slice 成功 Record。
+
+每个 Sync Execution 仍只对应一个 `OrgSyncBatch`。Consumer 开始时复核 Execution、IntegrationSyncBatch、Task、Slice 和 Consumer code/version；业务 Record 只保存对象类型、Source 摘要、目标 ID、Action、状态、Reason Code 和脱敏依赖摘要。任何关键记录失败都返回业务失败，Runtime 将其收敛为 confirmed `business_processing_failed`，不得进入 Integration Retry。
+
+`hr_management` 和 `hr_legal` 由平台 Seed 幂等创建，结构类型固定为 `management`/`legal`。生产装配静态注册上述四个 code/version，但在当前源 P0 未关闭时元数据状态为 `disabled`，因此 Task 配置无法选择、Resolve 或启用它们。PostgreSQL/E2E 测试通过显式 `SourceContract(source_system_code, source timezone)` 启用同一实现；不存在按环境猜测主职或时区的临时开关。
+
+INT-006C 未关闭任何既有源 Gate。BIP ID 永久稳定和不可复用、changeTime 权威性/时区/精度/同秒完整性、编码命名空间、法人部门根边界、员工编号、主任职、`sendpost`、兼职 ID、开放任职日期、人员大响应和物理删除表达继续保持 P0/P1 原结论。进入 INT-006D 只允许实现岗位已确认范围；生产 HR Task 仍不得启用。

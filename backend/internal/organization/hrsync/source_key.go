@@ -50,6 +50,21 @@ func (key SourceKey) SourceSystemCode() string { return key.sourceSystemCode }
 func (key SourceKey) ObjectKind() ObjectKind   { return key.objectKind }
 func (key SourceKey) RawSourceID() string      { return key.rawSourceID }
 
+// PersistenceID 只在共享 org_unit 身份空间加入对象类别；独立领域表由表本身
+// 隔离对象类别。过长组合使用确定性摘要，不通过随机后缀掩盖冲突。
+func (key SourceKey) PersistenceID() string {
+	if key.objectKind != ObjectKindManagementCompany && key.objectKind != ObjectKindManagementUnit && key.objectKind != ObjectKindLegalUnit {
+		return key.rawSourceID
+	}
+	prefix := string(key.objectKind) + ":"
+	value := prefix + key.rawSourceID
+	if len(value) <= MaxRawSourceIDLength {
+		return value
+	}
+	digest := sha256.Sum256([]byte(key.rawSourceID))
+	return prefix + "sha256:" + hex.EncodeToString(digest[:])
+}
+
 func (key SourceKey) Digest() string {
 	sum := sha256.Sum256([]byte(key.sourceSystemCode + "\x00" + string(key.objectKind) + "\x00" + key.rawSourceID))
 	return hex.EncodeToString(sum[:12])

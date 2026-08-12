@@ -311,6 +311,13 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.SysTable{}, "table_code IN ?", organizationTableCodes()); got != 9 {
 		t.Fatalf("organization table metadata count = %d, want 9", got)
 	}
+	if got := countWhere(t, db, &model.OrgStructure{}, "code IN ?", []string{"hr_management", "hr_legal"}); got != 2 {
+		t.Fatalf("controlled organization structure count = %d, want 2", got)
+	}
+	var legalStructure model.OrgStructure
+	if err := db.Where("code = ?", "hr_legal").First(&legalStructure).Error; err != nil || legalStructure.StructureType != model.OrgStructureTypeLegal {
+		t.Fatalf("legal structure=%+v err=%v", legalStructure, err)
+	}
 	if got := countWhere(t, db, &model.SysMenu{}, "pid <> 0 AND name LIKE ?", "organization_%"); got != 5 {
 		t.Fatalf("organization functional menu count = %d, want 5", got)
 	}

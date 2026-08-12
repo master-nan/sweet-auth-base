@@ -2,6 +2,7 @@ package hrsync
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,7 +19,19 @@ func (n Normalizer) NormalizeLegalEntitySource(source HRCompanySourceDTO) (Legal
 	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" {
 		return LegalEntitySyncInput{}, normalizeRequiredError(err)
 	}
-	return LegalEntitySyncInput{Key: key, Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), ShortName: strings.TrimSpace(source.ShortName), ParentSourceID: strings.TrimSpace(source.ParentSourceID), Status: status, SourceChangedAt: changedAt}, nil
+	return LegalEntitySyncInput{Key: key, SourceCode: strings.TrimSpace(source.SourceRecordID), Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), ShortName: strings.TrimSpace(source.ShortName), ParentSourceID: strings.TrimSpace(source.ParentSourceID), Status: status, SourceChangedAt: changedAt}, nil
+}
+
+func (n Normalizer) NormalizeManagementCompanySource(source HRCompanySourceDTO) (OrgUnitSyncInput, error) {
+	key, changedAt, status, err := n.common(ObjectKindManagementCompany, source.SourceID, source.ChangeTime, source.Enabled)
+	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" {
+		return OrgUnitSyncInput{}, normalizeRequiredError(err)
+	}
+	return OrgUnitSyncInput{
+		Key: key, SourceCode: strings.TrimSpace(source.SourceRecordID), Code: strings.TrimSpace(source.SourceCode),
+		Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID),
+		Status: status, SourceChangedAt: changedAt, Level: source.Level,
+	}, nil
 }
 
 func (n Normalizer) NormalizeOrgUnitSource(source HRDepartmentSourceDTO, kind ObjectKind) (OrgUnitSyncInput, error) {
@@ -29,7 +42,11 @@ func (n Normalizer) NormalizeOrgUnitSource(source HRDepartmentSourceDTO, kind Ob
 	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" {
 		return OrgUnitSyncInput{}, normalizeRequiredError(err)
 	}
-	return OrgUnitSyncInput{Key: key, Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID), LegalEntitySourceID: strings.TrimSpace(source.LegalEntitySourceID), Status: status, SourceChangedAt: changedAt}, nil
+	sort, err := parseSourceSort(source.Sort)
+	if err != nil {
+		return OrgUnitSyncInput{}, err
+	}
+	return OrgUnitSyncInput{Key: key, SourceCode: strings.TrimSpace(source.SourceRecordID), Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID), LegalEntitySourceID: strings.TrimSpace(source.LegalEntitySourceID), Status: status, SourceChangedAt: changedAt, Level: source.Level, Sort: sort}, nil
 }
 
 func (n Normalizer) NormalizePositionSource(source HRPositionSourceDTO) (PositionSyncInput, error) {
@@ -76,4 +93,16 @@ func normalizeRequiredError(err error) error {
 		return err
 	}
 	return ErrSourceKeyInvalid
+}
+
+func parseSourceSort(value string) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0, ErrSourceContractUnconfirmed
+	}
+	return parsed, nil
 }

@@ -4,6 +4,7 @@ import (
 	"backend/enum"
 	"backend/internal/utils"
 	"backend/model"
+	"errors"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -18,6 +19,9 @@ const (
 func seedOrganizationFoundation(db *gorm.DB, sf *utils.Snowflake) error {
 	if err := seedOrganizationDictionaries(db, sf); err != nil {
 		return fmt.Errorf("seed organization dictionaries: %w", err)
+	}
+	if err := seedOrganizationStructures(db, sf); err != nil {
+		return fmt.Errorf("seed organization structures: %w", err)
 	}
 	if err := seedOrganizationTableMetadata(db, sf); err != nil {
 		return fmt.Errorf("seed organization table metadata: %w", err)
@@ -79,6 +83,7 @@ func organizationDictionarySeeds() []systemDictSeed {
 			code: "org_structure_type",
 			items: []systemDictItemSeed{
 				{name: "管理架构", code: "org_structure_type_management", value: "management"},
+				{name: "法人架构", code: "org_structure_type_legal", value: "legal"},
 			},
 		},
 		{
@@ -187,6 +192,38 @@ func organizationDictionarySeeds() []systemDictSeed {
 			},
 		},
 	}
+}
+
+func seedOrganizationStructures(db *gorm.DB, sf *utils.Snowflake) error {
+	if !db.Migrator().HasTable(&model.OrgStructure{}) {
+		return nil
+	}
+	seeds := []model.OrgStructure{
+		{Code: "hr_management", Name: "HR 管理架构", StructureType: model.OrgStructureTypeManagement, SourceSystemCode: "platform", Status: "enabled", IsDefault: true, SyncStatus: "synced"},
+		{Code: "hr_legal", Name: "HR 法人架构", StructureType: model.OrgStructureTypeLegal, SourceSystemCode: "platform", Status: "enabled", IsDefault: false, SyncStatus: "synced"},
+	}
+	for _, seed := range seeds {
+		var existing model.OrgStructure
+		err := db.Where("code = ?", seed.Code).First(&existing).Error
+		if err == nil {
+			if existing.StructureType != seed.StructureType || existing.SourceSystemCode != seed.SourceSystemCode {
+				return fmt.Errorf("organization structure %s conflicts with controlled contract", seed.Code)
+			}
+			continue
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		id, err := sf.GenerateUniqueID()
+		if err != nil {
+			return err
+		}
+		seed.Basic = model.Basic{Id: int(id), State: true}
+		if err := db.Create(&seed).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type organizationFieldRule struct {

@@ -262,21 +262,31 @@ func TestIntegrationSyncPostgreSQLRunnerSequentialE2E(t *testing.T) {
 }
 
 func TestIntegrationSyncPostgreSQLRunnerTransportRetryConsumerCheckpointE2E(t *testing.T) {
-	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, false)
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "")
 }
 
 func TestIntegrationSyncPostgreSQLConsumerFailureStopsCheckpointE2E(t *testing.T) {
-	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, true, false)
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, true, "")
 }
 
 func TestIntegrationSyncPostgreSQLLowerBoundOnlyOrganizationConsumerE2E(t *testing.T) {
-	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, true)
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "success")
 }
 
-func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer, lowerBoundOnly bool) {
+func TestIntegrationSyncPostgreSQLOrganizationDeferredReplayE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "deferred_replay")
+}
+
+func TestIntegrationSyncPostgreSQLOrganizationCycleStopsCheckpointE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "cycle")
+}
+
+func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool, organizationScenario string) {
 	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
 	var httpCalls atomic.Int32
+	var organizationRepaired atomic.Bool
+	lowerBoundOnly := organizationScenario != ""
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		call := httpCalls.Add(1)
 		if lowerBoundOnly {
@@ -298,11 +308,30 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			if parseErr != nil {
 				t.Errorf("parse changed_since: %v", parseErr)
 			}
-			body, _ := json.Marshal(map[string]any{"data": []map[string]any{
-				{"zjkid_ignore": fmt.Sprintf("replay-%d", lower.Unix()), "pk_corp": "C0", "name": "Replay", "isenable": 1, "changeTime": lower.UTC().Format("2006-01-02T15:04:05")},
-				{"zjkid_ignore": fmt.Sprintf("current-%d", lower.Unix()), "pk_corp": "C1", "name": "Current", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "pk_corp": "C2", "name": "Future", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-			}})
+			if organizationScenario == "deferred_replay" && !organizationRepaired.Load() {
+				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}})
+				_, _ = writer.Write(body)
+				return
+			}
+			if organizationScenario == "cycle" {
+				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
+					{"zjkid_ignore": "cycle-a", "code": "CYCLE-A", "name": "A", "pk_fathedeptzjkid_ignore": "cycle-b", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "cycle-b", "code": "CYCLE-B", "name": "B", "pk_fathedeptzjkid_ignore": "cycle-a", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				}})
+				_, _ = writer.Write(body)
+				return
+			}
+			parentID := fmt.Sprintf("parent-%d", lower.Unix())
+			data := []map[string]any{
+				{"zjkid_ignore": fmt.Sprintf("child-%d", lower.Unix()), "code": fmt.Sprintf("CHILD-%d", lower.Unix()), "name": "Child", "pk_fathedeptzjkid_ignore": parentID, "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": parentID, "code": fmt.Sprintf("PARENT-%d", lower.Unix()), "name": "Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": "lookback-shared", "code": "LOOKBACK-SHARED", "name": "Replay", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "code": fmt.Sprintf("FUTURE-%d", lower.Unix()), "name": "Future", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+			}
+			if organizationScenario == "deferred_replay" {
+				data = append(data, map[string]any{"zjkid_ignore": "deferred-parent", "code": "DEFERRED-PARENT", "name": "Repaired Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")}, map[string]any{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")})
+			}
+			body, _ := json.Marshal(map[string]any{"success": true, "data": data})
 			_, _ = writer.Write(body)
 			return
 		}
@@ -322,20 +351,34 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		t.Fatal(err)
 	}
 	consumerCalled := make(chan integration.SyncConsumptionRequest, 2)
+	primary := &database.PrimaryDB{DB: db}
+	snowflake, _ := utils.NewSnowflake(4)
+	consumerCode := "test_sync_consumer"
+	consumer := integration.SyncResultConsumer(integration.SyncResultConsumerFunc(func(_ context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+		consumerCalled <- request
+		if failSecondConsumer && request.SliceNo() == 2 {
+			return integration.NewSyncConsumptionResult(false, "business_validation_failed", 0, 1, "")
+		}
+		return integration.NewSyncConsumptionResult(true, "", 1, 0, "ORG-SYNC-1")
+	}))
+	if lowerBoundOnly {
+		contract, contractErr := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+		if contractErr != nil {
+			t.Fatal(contractErr)
+		}
+		domain := NewOrganizationHRSyncService(impl.NewOrganizationHRSyncRepositoryImpl(primary), snowflake)
+		formalConsumer := hrsync.NewManagementDepartmentConsumer(domain, contract)
+		consumerCode = hrsync.ConsumerCodeManagementDepartment
+		consumer = integration.SyncResultConsumerFunc(func(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+			consumerCalled <- request
+			return formalConsumer.Consume(ctx, request)
+		})
+	}
 	registry, err := integration.NewStaticSyncConsumerRegistry(integration.SyncConsumerRegistration{
-		Metadata: integration.SyncConsumerMetadata{Code: "test_sync_consumer", Version: 1, Name: "Test Consumer", Status: integration.SyncConsumerStatusEnabled,
+		Metadata: integration.SyncConsumerMetadata{Code: consumerCode, Version: 1, Name: "Test Consumer", Status: integration.SyncConsumerStatusEnabled,
 			ContentTypes: []string{"application/json"}, MaxResponseBytes: 1 << 20, MaxDuration: time.Second,
 			CheckpointModes: []string{model.IntegrationSyncCheckpointTimestamp}},
-		Consumer: integration.SyncResultConsumerFunc(func(_ context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
-			consumerCalled <- request
-			if lowerBoundOnly {
-				return consumeLowerBoundOrganizationTestResult(db, request)
-			}
-			if failSecondConsumer && request.SliceNo() == 2 {
-				return integration.NewSyncConsumptionResult(false, "business_validation_failed", 0, 1, "")
-			}
-			return integration.NewSyncConsumptionResult(true, "", 1, 0, "ORG-SYNC-1")
-		}),
+		Consumer: consumer,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -388,7 +431,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	plan, _ := json.Marshal(inputPlan)
 	task := model.IntegrationSyncTask{Basic: model.Basic{Id: nextSyncTestID(), State: true}, TaskCode: "sync_consumer_e2e", TaskName: "Sync Consumer E2E",
 		Version: 1, Status: model.IntegrationSyncTaskStatusEnabled, ExternalSystemID: system.Id, InterfaceDefinitionID: definition.Id,
-		ConsumerCode: "test_sync_consumer", ConsumerVersion: 1, ScheduleType: model.IntegrationSyncScheduleCron, CronExpression: "* * * * *",
+		ConsumerCode: consumerCode, ConsumerVersion: 1, ScheduleType: model.IntegrationSyncScheduleCron, CronExpression: "* * * * *",
 		Timezone: "UTC", NextScheduledAt: &due, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
 		InitialCheckpointAt: &checkpoint, CheckpointAt: &checkpoint, LookbackSeconds: lookback, WindowSliceSeconds: 3600, InputPlan: datatypes.JSON(plan), Revision: 1}
 	for _, value := range []any{&system, &credential, &retryPolicy, &definition, &task} {
@@ -407,14 +450,12 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		t.Fatalf("stored retry fixture is invalid: %+v err=%v", storedRetryPolicy, err)
 	}
 
-	primary := &database.PrimaryDB{DB: db}
 	executions := impl.NewIntegrationExecutionRepositoryImpl(primary)
 	systems := impl.NewExternalSystemRepositoryImpl(primary)
 	interfaces := impl.NewInterfaceDefinitionRepositoryImpl(primary)
 	credentials := impl.NewCredentialRepositoryImpl(primary)
 	batches := impl.NewIntegrationSyncBatchRepositoryImpl(primary)
 	tasks := impl.NewIntegrationSyncTaskRepositoryImpl(primary)
-	snowflake, _ := utils.NewSnowflake(4)
 	executionService := NewIntegrationExecutionService(executions, impl.NewIntegrationLogRepositoryImpl(primary), systems, interfaces,
 		impl.NewRetryPolicyRepositoryImpl(primary), snowflake, &integrationExecutionAuditWriter{})
 	coordinator := NewIntegrationSyncCoordinator(tasks, batches, executions, systems, interfaces, executionService,
@@ -447,10 +488,50 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	t.Cleanup(func() { _ = syncRunner.Stop(context.Background()); _ = worker.Stop(context.Background()) })
 	expectedBatchStatus := model.IntegrationSyncBatchStatusSucceeded
-	if failSecondConsumer {
+	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" {
 		expectedBatchStatus = model.IntegrationSyncBatchStatusFailed
 	}
 	waitForPostgreSQLSyncBatchStatus(t, db, expectedBatchStatus, 20*time.Second)
+	if organizationScenario == "cycle" {
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonParentCycle)
+		if err := syncRunner.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := worker.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if organizationScenario == "deferred_replay" {
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonParentUnresolved)
+		organizationRepaired.Store(true)
+		replayScheduledFor := checkpoint.Add(30 * time.Minute)
+		if err := db.Model(&model.IntegrationSyncTask{}).Where("id = ?", task.Id).Update("next_scheduled_at", replayScheduledFor).Error; err != nil {
+			t.Fatal(err)
+		}
+		waitForPostgreSQLSyncBatchOrdinalStatus(t, db, 2, model.IntegrationSyncBatchStatusSucceeded, 40*time.Second)
+		if err := syncRunner.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := worker.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		var refreshed model.IntegrationSyncTask
+		if err := db.First(&refreshed, task.Id).Error; err != nil || refreshed.CheckpointAt == nil || !refreshed.CheckpointAt.After(checkpoint) {
+			t.Fatalf("repaired checkpoint=%v err=%v", refreshed.CheckpointAt, err)
+		}
+		var units, deferredChildren int64
+		if err := db.Model(&model.OrgUnit{}).Count(&units).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgUnit{}).Where("source_id = ?", "management_unit:deferred-child").Count(&deferredChildren).Error; err != nil || deferredChildren != 1 {
+			t.Fatalf("replayed child count=%d err=%v", deferredChildren, err)
+		}
+		if units < 2 {
+			t.Fatalf("repaired units=%d", units)
+		}
+		return
+	}
 	if err := syncRunner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -488,8 +569,8 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		t.Fatalf("successful checkpoint boundary executions=%+v checkpoint=%v", executionRows, refreshedTask.CheckpointAt)
 	}
 	if lowerBoundOnly {
-		var futureCount, recordCount, batchCount int64
-		if err := db.Model(&model.OrgSyncRecord{}).Where("source_id LIKE ?", "future-%").Count(&futureCount).Error; err != nil {
+		var futureCount, recordCount, batchCount, unitCount int64
+		if err := db.Model(&model.OrgUnit{}).Where("code LIKE ?", "FUTURE-%").Count(&futureCount).Error; err != nil {
 			t.Fatal(err)
 		}
 		if err := db.Model(&model.OrgSyncRecord{}).Count(&recordCount).Error; err != nil {
@@ -498,8 +579,11 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		if err := db.Model(&model.OrgSyncBatch{}).Count(&batchCount).Error; err != nil {
 			t.Fatal(err)
 		}
-		if futureCount != 0 || recordCount != 4 || batchCount != 2 {
-			t.Fatalf("organization filter result: future=%d records=%d batches=%d", futureCount, recordCount, batchCount)
+		if err := db.Model(&model.OrgUnit{}).Count(&unitCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if futureCount != 0 || recordCount != 6 || batchCount != 2 || unitCount != 5 {
+			t.Fatalf("organization filter result: future=%d records=%d batches=%d units=%d", futureCount, recordCount, batchCount, unitCount)
 		}
 		for _, forbiddenColumn := range []string{"response_body", "source_dto", "payload"} {
 			if db.Migrator().HasColumn(&model.OrgSyncRecord{}, forbiddenColumn) || db.Migrator().HasColumn(&model.OrgSyncBatch{}, forbiddenColumn) {
@@ -507,51 +591,6 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			}
 		}
 	}
-}
-
-func consumeLowerBoundOrganizationTestResult(db *gorm.DB, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
-	var envelope struct {
-		Data []hrsync.HRCompanySourceDTO `json:"data"`
-	}
-	if err := json.Unmarshal(request.Body(), &envelope); err != nil {
-		return integration.NewSyncConsumptionResult(false, string(hrsync.ReasonEnvelopeInvalid), 0, 1, "")
-	}
-	var execution model.IntegrationExecution
-	if err := db.Where("execution_no = ?", request.ExecutionNo()).First(&execution).Error; err != nil {
-		return integration.SyncConsumptionResult{}, err
-	}
-	orgBatch := model.OrgSyncBatch{Basic: model.Basic{Id: nextSyncTestID(), State: true}, BatchNo: "ORG-" + request.ExecutionNo(), ExecutionId: &execution.Id, SyncType: "incremental", ObjectScope: "legal_entity", Status: "processing"}
-	if err := db.Create(&orgBatch).Error; err != nil {
-		return integration.SyncConsumptionResult{}, err
-	}
-	normalizer := hrsync.Normalizer{SourceSystemCode: "hr_source", SourceLocation: time.UTC}
-	processed := 0
-	for _, source := range envelope.Data {
-		input, err := normalizer.NormalizeLegalEntitySource(source)
-		if err != nil {
-			return integration.NewSyncConsumptionResult(false, string(hrsync.ReasonEnvelopeInvalid), processed, 1, orgBatch.BatchNo)
-		}
-		classification, err := hrsync.ClassifySourceChangeTime(input.SourceChangedAt, *request.WindowStart(), *request.WindowEnd())
-		if err != nil {
-			return integration.SyncConsumptionResult{}, err
-		}
-		if classification == hrsync.WindowRecordFuture {
-			continue
-		}
-		action := model.OrgSyncRecordActionCreate
-		if classification == hrsync.WindowRecordReplay {
-			action = model.OrgSyncRecordActionNoop
-		}
-		record := model.OrgSyncRecord{Basic: model.Basic{Id: nextSyncTestID(), State: true}, BatchId: orgBatch.Id, ExecutionId: &execution.Id, ObjectType: string(hrsync.ObjectKindLegalEntity), SourceId: input.Key.RawSourceID(), Action: action, Status: "success"}
-		if err := db.Create(&record).Error; err != nil {
-			return integration.SyncConsumptionResult{}, err
-		}
-		processed++
-	}
-	if err := db.Model(&orgBatch).Updates(map[string]any{"status": "success", "total_count": processed, "success_count": processed}).Error; err != nil {
-		return integration.SyncConsumptionResult{}, err
-	}
-	return integration.NewSyncConsumptionResult(true, "", processed, 0, orgBatch.BatchNo)
 }
 
 func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
@@ -578,7 +617,7 @@ func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
+	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, statement := range []string{
@@ -665,6 +704,33 @@ func waitForPostgreSQLSyncBatchStatus(t *testing.T, db *gorm.DB, status string, 
 	_ = db.Order("sync_slice_no ASC").Find(&executions).Error
 	_ = db.Order("execution_id ASC, attempt_no ASC").Find(&attempts).Error
 	t.Fatalf("batch did not reach %s: batch=%+v executions=%+v attempts=%+v", status, batch, executions, attempts)
+}
+
+func waitForPostgreSQLSyncBatchOrdinalStatus(t *testing.T, db *gorm.DB, ordinal int, status string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		var values []model.IntegrationSyncBatch
+		if err := db.Order("id ASC").Find(&values).Error; err == nil && len(values) >= ordinal && values[ordinal-1].Status == status {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	var values []model.IntegrationSyncBatch
+	_ = db.Order("id ASC").Find(&values).Error
+	t.Fatalf("batch %d did not reach %s: %+v", ordinal, status, values)
+}
+
+func assertOrganizationFailedCheckpoint(t *testing.T, db *gorm.DB, taskID int, initial time.Time, reason hrsync.ReasonCode) {
+	t.Helper()
+	var task model.IntegrationSyncTask
+	if err := db.First(&task, taskID).Error; err != nil || task.CheckpointAt == nil || !task.CheckpointAt.Equal(initial) {
+		t.Fatalf("failed checkpoint advanced: checkpoint=%v initial=%v err=%v", task.CheckpointAt, initial, err)
+	}
+	var records int64
+	if err := db.Model(&model.OrgSyncRecord{}).Where("error_code = ?", reason).Count(&records).Error; err != nil || records == 0 {
+		t.Fatalf("reason %s records=%d err=%v", reason, records, err)
+	}
 }
 
 var syncTestIDMu sync.Mutex

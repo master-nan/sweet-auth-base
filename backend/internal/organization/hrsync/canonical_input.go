@@ -11,6 +11,7 @@ const (
 
 type LegalEntitySyncInput struct {
 	Key             SourceKey
+	SourceCode      string
 	Code            string
 	Name            string
 	ShortName       string
@@ -21,12 +22,15 @@ type LegalEntitySyncInput struct {
 
 type OrgUnitSyncInput struct {
 	Key                 SourceKey
+	SourceCode          string
 	Code                string
 	Name                string
 	ParentSourceID      string
 	LegalEntitySourceID string
 	Status              CanonicalStatus
 	SourceChangedAt     time.Time
+	Level               int
+	Sort                int
 }
 
 type PositionSyncInput struct {

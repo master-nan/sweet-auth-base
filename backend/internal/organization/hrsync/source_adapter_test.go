@@ -75,6 +75,38 @@ func TestLogicalWindowClassifiesLookbackCurrentAndFuture(t *testing.T) {
 	}
 }
 
+func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplicit(t *testing.T) {
+	domain := &organizationSyncDomainStub{}
+	disabled, err := integration.NewStaticSyncConsumerRegistry(DisabledConsumerRegistrations(domain)...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := disabled.ListMetadata(); len(got) != 0 {
+		t.Fatalf("disabled production registrations leaked into selectable metadata: %+v", got)
+	}
+	if _, err := disabled.Resolve(ConsumerCodeLegalEntity, ConsumerVersionV1); err == nil {
+		t.Fatal("disabled consumer resolved")
+	}
+	contract, err := NewExplicitSourceContract(OrganizationHRSourceSystemCode, time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewExplicitSourceContract("client_selected_source", time.UTC); !errors.Is(err, ErrSourceContractInvalid) {
+		t.Fatalf("expected fixed source system rejection, got %v", err)
+	}
+	registrations, err := EnabledConsumerRegistrations(domain, contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled, err := integration.NewStaticSyncConsumerRegistry(registrations...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := enabled.ListMetadata(); len(got) != 4 {
+		t.Fatalf("enabled registrations=%d, want 4", len(got))
+	}
+}
+
 func TestOrganizationConsumerHarnessFiltersLogicalWindowAndPersistsNoBody(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:hrsync-harness?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
@@ -104,10 +136,13 @@ func TestOrganizationConsumerHarnessFiltersLogicalWindowAndPersistsNoBody(t *tes
 	if err := db.Order("source_id").Find(&records).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 2 || records[0].SourceId != "inside" || records[1].SourceId != "lookback" {
+	if len(records) != 2 {
 		t.Fatalf("records=%+v", records)
 	}
 	for _, record := range records {
+		if record.SourceId == "inside" || record.SourceId == "lookback" || len(record.SourceId) != 24 {
+			t.Fatalf("raw source ID was persisted: %+v", record)
+		}
 		if strings.Contains(record.ErrorMessage, "Current") || strings.Contains(record.ErrorMessage, "Replay") {
 			t.Fatal("source body was persisted")
 		}
@@ -117,6 +152,16 @@ func TestOrganizationConsumerHarnessFiltersLogicalWindowAndPersistsNoBody(t *tes
 type organizationConsumerHarness struct {
 	db         *gorm.DB
 	normalizer Normalizer
+}
+
+type organizationSyncDomainStub struct{}
+
+func (*organizationSyncDomainStub) SynchronizeLegalEntities(context.Context, BusinessSyncContext, []LegalEntitySyncInput, []SourceIssue) (BusinessSyncSummary, error) {
+	return BusinessSyncSummary{}, nil
+}
+
+func (*organizationSyncDomainStub) SynchronizeOrgUnits(context.Context, BusinessSyncContext, ObjectKind, string, []OrgUnitSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
+	return BusinessSyncSummary{}, nil
 }
 
 var _ integration.SyncResultConsumer = organizationConsumerHarness{}
@@ -149,7 +194,7 @@ func (h organizationConsumerHarness) Consume(_ context.Context, request integrat
 		if classification == WindowRecordReplay {
 			action = model.OrgSyncRecordActionNoop
 		}
-		record := model.OrgSyncRecord{BatchId: batch.Id, ObjectType: string(ObjectKindLegalEntity), SourceId: input.Key.RawSourceID(), Action: action, Status: "success"}
+		record := model.OrgSyncRecord{BatchId: batch.Id, ObjectType: string(ObjectKindLegalEntity), SourceId: input.Key.Digest(), Action: action, Status: "success"}
 		if err := h.db.Where("batch_id = ? AND object_type = ? AND source_id = ?", batch.Id, record.ObjectType, record.SourceId).FirstOrCreate(&record).Error; err != nil {
 			return integration.SyncConsumptionResult{}, err
 		}
