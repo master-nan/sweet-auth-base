@@ -53,6 +53,17 @@ func TestSourceDTOAndNormalizersKeepSourceFieldsAtAdapterBoundary(t *testing.T) 
 	if _, err := normalizer.NormalizeAssignmentSource(HRAssignmentSourceDTO{SourceID: "assignment-1"}); !errors.Is(err, ErrSourceContractUnconfirmed) {
 		t.Fatalf("assignment P0 must remain gated: %v", err)
 	}
+	position, err := normalizer.NormalizePositionSource(HRPositionSourceDTO{
+		SourceID: "position-1", SourceCode: "POST-001", Name: "同名岗位", OrgUnitSourceID: "unit-1",
+		JobLevel: "L1", Enabled: SourceEnableEnabled, ChangeTime: "2026-08-12T10:31:00",
+	})
+	if err != nil || position.Key.ObjectKind() != ObjectKindPosition || position.Code != "POST-001" || position.OrgUnitSourceID != "unit-1" {
+		t.Fatalf("position normalized=%+v err=%v", position, err)
+	}
+	var invalidPosition HRPositionSourceDTO
+	if err := json.Unmarshal([]byte(`{"postidzjkid_ignore":"position-2","postCode":"POST-002","postname":"岗位","isenable":"unknown"}`), &invalidPosition); !errors.Is(err, ErrSourceEnumInvalid) {
+		t.Fatalf("invalid position enum err=%v", err)
+	}
 }
 
 func TestLogicalWindowClassifiesLookbackCurrentAndFuture(t *testing.T) {
@@ -87,6 +98,9 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if _, err := disabled.Resolve(ConsumerCodeLegalEntity, ConsumerVersionV1); err == nil {
 		t.Fatal("disabled consumer resolved")
 	}
+	if _, err := disabled.Resolve(ConsumerCodePosition, ConsumerVersionV1); err == nil {
+		t.Fatal("disabled position consumer resolved")
+	}
 	contract, err := NewExplicitSourceContract(OrganizationHRSourceSystemCode, time.UTC)
 	if err != nil {
 		t.Fatal(err)
@@ -102,8 +116,8 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := enabled.ListMetadata(); len(got) != 4 {
-		t.Fatalf("enabled registrations=%d, want 4", len(got))
+	if got := enabled.ListMetadata(); len(got) != 5 {
+		t.Fatalf("enabled registrations=%d, want 5", len(got))
 	}
 }
 
@@ -161,6 +175,10 @@ func (*organizationSyncDomainStub) SynchronizeLegalEntities(context.Context, Bus
 }
 
 func (*organizationSyncDomainStub) SynchronizeOrgUnits(context.Context, BusinessSyncContext, ObjectKind, string, []OrgUnitSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
+	return BusinessSyncSummary{}, nil
+}
+
+func (*organizationSyncDomainStub) SynchronizePositions(context.Context, BusinessSyncContext, []PositionSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
 	return BusinessSyncSummary{}, nil
 }
 

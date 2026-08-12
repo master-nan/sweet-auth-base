@@ -15,6 +15,7 @@ const (
 	ConsumerCodeManagementCompany    = "org.hr.management_company"
 	ConsumerCodeManagementDepartment = "org.hr.management_department"
 	ConsumerCodeLegalDepartment      = "org.hr.legal_department"
+	ConsumerCodePosition             = "org.hr.position"
 	ConsumerVersionV1                = 1
 )
 
@@ -83,4 +84,5 @@ func (s BusinessSyncSummary) Success() bool {
 type OrganizationSyncDomain interface {
 	SynchronizeLegalEntities(context.Context, BusinessSyncContext, []LegalEntitySyncInput, []SourceIssue) (BusinessSyncSummary, error)
 	SynchronizeOrgUnits(context.Context, BusinessSyncContext, ObjectKind, string, []OrgUnitSyncInput, []SourceIssue) (BusinessSyncSummary, error)
+	SynchronizePositions(context.Context, BusinessSyncContext, []PositionSyncInput, []SourceIssue) (BusinessSyncSummary, error)
 }

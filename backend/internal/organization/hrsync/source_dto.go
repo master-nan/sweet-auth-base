@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var ErrSourceEnumInvalid = errors.New("org_sync_source_enum_invalid")
+
 type SourceEnableStatus int
 
 const (
@@ -26,7 +28,7 @@ func (value *SourceEnableStatus) UnmarshalJSON(raw []byte) error {
 	case "0", "2", "false":
 		*value = SourceEnableDisabled
 	default:
-		return errors.New("org_sync_source_status_invalid")
+		return ErrSourceEnumInvalid
 	}
 	return nil
 }

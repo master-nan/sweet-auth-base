@@ -281,12 +281,21 @@ func TestIntegrationSyncPostgreSQLOrganizationCycleStopsCheckpointE2E(t *testing
 	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "cycle")
 }
 
+func TestIntegrationSyncPostgreSQLPositionConsumerE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "position_success")
+}
+
+func TestIntegrationSyncPostgreSQLPositionDeferredReplayE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "position_deferred_replay")
+}
+
 func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool, organizationScenario string) {
 	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
 	var httpCalls atomic.Int32
 	var organizationRepaired atomic.Bool
 	lowerBoundOnly := organizationScenario != ""
+	positionScenario := strings.HasPrefix(organizationScenario, "position_")
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		call := httpCalls.Add(1)
 		if lowerBoundOnly {
@@ -310,6 +319,30 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			}
 			if organizationScenario == "deferred_replay" && !organizationRepaired.Load() {
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}})
+				_, _ = writer.Write(body)
+				return
+			}
+			if positionScenario {
+				if organizationScenario == "position_deferred_replay" && !organizationRepaired.Load() {
+					body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{
+						"postidzjkid_ignore": "position-deferred", "postCode": "POST-DEFERRED", "postname": "待补组织岗位",
+						"deptidzjkid_ignore": "position-dept-missing", "posLevel": "", "isenable": 1,
+						"changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05"),
+					}}})
+					_, _ = writer.Write(body)
+					return
+				}
+				data := []map[string]any{
+					{"postidzjkid_ignore": "position-a", "postCode": "POST-A", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"postidzjkid_ignore": "position-b", "postCode": "POST-B", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-b", "posLevel": "L2", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"postidzjkid_ignore": "position-future", "postCode": "POST-FUTURE", "postname": "未来岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				}
+				if organizationScenario == "position_deferred_replay" {
+					data = []map[string]any{{"postidzjkid_ignore": "position-deferred", "postCode": "POST-DEFERRED", "postname": "待补组织岗位", "deptidzjkid_ignore": "position-dept-missing", "posLevel": "", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}
+				} else if call > 2 {
+					data[0]["isenable"] = 0
+				}
+				body, _ := json.Marshal(map[string]any{"success": true, "data": data})
 				_, _ = writer.Write(body)
 				return
 			}
@@ -367,8 +400,12 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			t.Fatal(contractErr)
 		}
 		domain := NewOrganizationHRSyncService(impl.NewOrganizationHRSyncRepositoryImpl(primary), snowflake)
-		formalConsumer := hrsync.NewManagementDepartmentConsumer(domain, contract)
+		formalConsumer := integration.SyncResultConsumer(hrsync.NewManagementDepartmentConsumer(domain, contract))
 		consumerCode = hrsync.ConsumerCodeManagementDepartment
+		if positionScenario {
+			formalConsumer = hrsync.NewPositionConsumer(domain, contract)
+			consumerCode = hrsync.ConsumerCodePosition
+		}
 		consumer = integration.SyncResultConsumerFunc(func(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
 			consumerCalled <- request
 			return formalConsumer.Consume(ctx, request)
@@ -439,6 +476,16 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			t.Fatal(err)
 		}
 	}
+	if positionScenario {
+		for _, unit := range []model.OrgUnit{
+			organizationHRPositionUnit(nextSyncTestID(), "position-dept-a", "POSITION-DEPT-A"),
+			organizationHRPositionUnit(nextSyncTestID(), "position-dept-b", "POSITION-DEPT-B"),
+		} {
+			if err := db.Create(&unit).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", retryPolicy.Id).Update("jitter_ratio", 0).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -488,7 +535,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	t.Cleanup(func() { _ = syncRunner.Stop(context.Background()); _ = worker.Stop(context.Background()) })
 	expectedBatchStatus := model.IntegrationSyncBatchStatusSucceeded
-	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" {
+	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" || organizationScenario == "position_deferred_replay" {
 		expectedBatchStatus = model.IntegrationSyncBatchStatusFailed
 	}
 	waitForPostgreSQLSyncBatchStatus(t, db, expectedBatchStatus, 20*time.Second)
@@ -532,6 +579,42 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		}
 		return
 	}
+	if organizationScenario == "position_deferred_replay" {
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonReferenceMissing)
+		var failedExecution model.IntegrationExecution
+		if err := db.Order("id ASC").First(&failedExecution).Error; err != nil || failedExecution.Status != model.IntegrationExecutionStatusFailed || failedExecution.CurrentAttempt != 2 {
+			t.Fatalf("position business failure retried unexpectedly: execution=%+v err=%v", failedExecution, err)
+		}
+		var failedAttempts int64
+		if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", failedExecution.Id).Count(&failedAttempts).Error; err != nil || failedAttempts != 2 {
+			t.Fatalf("position business failure attempts=%d err=%v", failedAttempts, err)
+		}
+		organizationRepaired.Store(true)
+		unit := organizationHRPositionUnit(nextSyncTestID(), "position-dept-missing", "POSITION-DEPT-MISSING")
+		if err := db.Create(&unit).Error; err != nil {
+			t.Fatal(err)
+		}
+		replayScheduledFor := checkpoint.Add(30 * time.Minute)
+		if err := db.Model(&model.IntegrationSyncTask{}).Where("id = ?", task.Id).Update("next_scheduled_at", replayScheduledFor).Error; err != nil {
+			t.Fatal(err)
+		}
+		waitForPostgreSQLSyncBatchOrdinalStatus(t, db, 2, model.IntegrationSyncBatchStatusSucceeded, 40*time.Second)
+		if err := syncRunner.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := worker.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		var refreshed model.IntegrationSyncTask
+		if err := db.First(&refreshed, task.Id).Error; err != nil || refreshed.CheckpointAt == nil || !refreshed.CheckpointAt.After(checkpoint) {
+			t.Fatalf("repaired position checkpoint=%v err=%v", refreshed.CheckpointAt, err)
+		}
+		var positions int64
+		if err := db.Model(&model.OrgPosition{}).Where("source_id = ?", "position-deferred").Count(&positions).Error; err != nil || positions != 1 {
+			t.Fatalf("replayed position count=%d err=%v", positions, err)
+		}
+		return
+	}
 	if err := syncRunner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -568,7 +651,28 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	} else if executionRows[1].Status != model.IntegrationExecutionStatusSucceeded || executionRows[1].SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded || executionRows[1].CurrentAttempt != 1 || executionRows[1].SyncWindowEnd == nil || !refreshedTask.CheckpointAt.Equal(*executionRows[1].SyncWindowEnd) {
 		t.Fatalf("successful checkpoint boundary executions=%+v checkpoint=%v", executionRows, refreshedTask.CheckpointAt)
 	}
-	if lowerBoundOnly {
+	if positionScenario {
+		var positions []model.OrgPosition
+		if err := db.Order("source_id ASC").Find(&positions).Error; err != nil || len(positions) != 2 {
+			t.Fatalf("position e2e rows=%+v err=%v", positions, err)
+		}
+		if positions[0].Name != positions[1].Name || positions[0].OrgUnitId == positions[1].OrgUnitId || positions[0].Status != "disabled" || positions[0].SourceDeleted || positions[0].IsManagerPosition {
+			t.Fatalf("position e2e semantics=%+v", positions)
+		}
+		var futureCount, recordCount, batchCount int64
+		if err := db.Model(&model.OrgPosition{}).Where("source_id = ?", "position-future").Count(&futureCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncRecord{}).Count(&recordCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncBatch{}).Count(&batchCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if futureCount != 0 || recordCount != 4 || batchCount != 2 {
+			t.Fatalf("position e2e filter: future=%d records=%d batches=%d", futureCount, recordCount, batchCount)
+		}
+	} else if lowerBoundOnly {
 		var futureCount, recordCount, batchCount, unitCount int64
 		if err := db.Model(&model.OrgUnit{}).Where("code LIKE ?", "FUTURE-%").Count(&futureCount).Error; err != nil {
 			t.Fatal(err)
@@ -617,7 +721,7 @@ func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
+	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, statement := range []string{

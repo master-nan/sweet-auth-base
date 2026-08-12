@@ -624,3 +624,19 @@ INT-006C 按对象职责实现四个静态 Consumer：`org.hr.legal_entity`、`o
 `hr_management` 和 `hr_legal` 由平台 Seed 幂等创建，结构类型固定为 `management`/`legal`。生产装配静态注册上述四个 code/version，但在当前源 P0 未关闭时元数据状态为 `disabled`，因此 Task 配置无法选择、Resolve 或启用它们。PostgreSQL/E2E 测试通过显式 `SourceContract(source_system_code, source timezone)` 启用同一实现；不存在按环境猜测主职或时区的临时开关。
 
 INT-006C 未关闭任何既有源 Gate。BIP ID 永久稳定和不可复用、changeTime 权威性/时区/精度/同秒完整性、编码命名空间、法人部门根边界、员工编号、主任职、`sendpost`、兼职 ID、开放任职日期、人员大响应和物理删除表达继续保持 P0/P1 原结论。进入 INT-006D 只允许实现岗位已确认范围；生产 HR Task 仍不得启用。
+
+## 29. INT-006D 岗位 Consumer 实现
+
+INT-006D 增加静态 `org.hr.position` v1 Consumer，保持 `HRPositionSourceDTO -> NormalizePositionSource -> PositionSyncInput -> OrganizationHRSyncService` 边界。岗位身份只使用 `SourceKey(hr_source, position, postidzjkid_ignore)`；名称、`postCode`、部门名称、NCID 和数组位置都不参与身份回退。生产注册在岗位 BIP ID、changeTime 和编码命名空间 Gate 关闭前保持 `disabled`，不能被 SyncTask 选择或 Runtime Resolve；PostgreSQL/E2E 通过显式 SourceContract 启用同一实现。
+
+岗位只写 `org_position`。`deptidzjkid_ignore` 必须解析已同步且业务同步状态为 `synced` 的管理部门 `org_unit`，不会按名称搜索、创建假组织、使用结构节点 ID 或跨到法人结构。依赖缺失时不创建岗位，写 `deferred/dependency_waiting + org_sync_reference_missing`，Consumer 整体失败且 Checkpoint 不推进；组织补齐后由下一轮 Lookback 依靠稳定键收敛。
+
+`postCode` 是受控业务属性，不是同步身份。现有模型同时具有源内 `(source_system_code, code)` 唯一约束和启用岗位的组织内 code 约束；INT-006D 不降低这些约束。不同 Source ID 使用相同 `postCode` 时返回 `org_sync_business_conflict`，不覆盖、不拼随机后缀或临时组织前缀。不同 Source ID、不同 code、同名岗位可以在不同 `org_unit` 独立存在。
+
+缺少权威岗位序列规则时，`position_type` 固定为平台受控 `professional`，`is_manager_position=false`；不按岗位名称或等级猜测管理岗。`posLevel` 仅作为最长 64 字符、允许为空的非敏感 `job_level` 显示属性，不创建等级、Role、Casbin 或权限。源 inactive 映射 `status=disabled`，保留历史引用并保持 `source_deleted=false`。
+
+岗位每个 Chunk 最多 500 条，在短事务中完成稳定身份锁、管理部门引用解析、code 冲突检查、领域 upsert 和 OrgSyncRecord；解码、窗口过滤与 Normalize 在事务外。持久化 `source_version=SourceChangedAt.UTC().Format(RFC3339Nano)`，旧版本只产生 no-op，同一源时间但事实冲突返回 `org_sync_source_id_conflict`，不使用数据库当前时间伪造源版本。
+
+每个 Position Slice Execution 仍只对应一个 OrgSyncBatch。Record 只保存 `object_type=position`、Source ID 摘要、目标岗位 ID、`create|update|disable|noop|error|deferred`、状态、Reason Code 和脱敏依赖摘要；不保存岗位 DTO、Body、Header、Credential、Attempt 或 Retry。future-of-logical-window 岗位不落库、不写当前 Slice 成功记录；任何关键记录失败都由 Runtime 收敛为 confirmed `business_processing_failed`，不会进入自动 Retry。
+
+PostgreSQL 16 的 Runner/TLS E2E 覆盖：首次 503 后技术 Retry 成功、同名岗位跨组织独立创建、Lookback 重放不重复、后一 Slice 停用、future 过滤和 Checkpoint 推进；另一路覆盖缺组织导致业务失败、Checkpoint 保持、无额外 Retry，以及补齐组织后自动重放成功。INT-006D 不关闭 BIP ID 永久稳定/不可复用、changeTime 权威性/时区/精度/同秒完整性、岗位编码命名空间、员工编号、主任职、`sendpost`、兼职 ID、开放任职日期、人员大响应或物理删除表达 Gate。

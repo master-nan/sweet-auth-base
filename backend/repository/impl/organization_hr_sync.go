@@ -121,6 +121,26 @@ func (r *OrganizationHRSyncRepositoryImpl) ListOrgUnits(tx *gorm.DB, sourceSyste
 	return values, err
 }
 
+func (r *OrganizationHRSyncRepositoryImpl) FindPositionBySource(tx *gorm.DB, sourceSystem, sourceID string) (model.OrgPosition, error) {
+	var value model.OrgPosition
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("source_system_code = ? AND source_id = ?", sourceSystem, sourceID).First(&value).Error
+	return value, err
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) FindPositionByCode(tx *gorm.DB, sourceSystem, code string) (model.OrgPosition, error) {
+	var value model.OrgPosition
+	err := tx.Where("source_system_code = ? AND code = ?", sourceSystem, code).First(&value).Error
+	return value, err
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) CreatePosition(tx *gorm.DB, value *model.OrgPosition) error {
+	return tx.Create(value).Error
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) UpdatePosition(tx *gorm.DB, id int, values map[string]any) error {
+	return updateOrganizationFields(tx, &model.OrgPosition{}, id, values, orgPositionSourceFields)
+}
+
 func (r *OrganizationHRSyncRepositoryImpl) FindStructureByCode(tx *gorm.DB, code string) (model.OrgStructure, error) {
 	var value model.OrgStructure
 	err := tx.Where("code = ?", code).First(&value).Error

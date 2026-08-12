@@ -200,13 +200,121 @@ func TestOrganizationHRConsumerFiltersFutureAndFailsWholeSlice(t *testing.T) {
 	}
 }
 
+func TestOrganizationHRPositionConsumerIdentityReferenceStateAndIdempotency(t *testing.T) {
+	service, db := newOrganizationHRSyncTestService(t)
+	contract, _ := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+	consumer := hrsync.NewPositionConsumer(service, contract)
+	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+	units := []model.OrgUnit{
+		organizationHRPositionUnit(nextSyncTestID(), "dept-a", "DEPT-A"),
+		organizationHRPositionUnit(nextSyncTestID(), "dept-b", "DEPT-B"),
+	}
+	if err := db.Create(&units).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION", "SYNC-POSITION", "task_position", hrsync.ConsumerCodePosition, 1)
+	body := `{"success":true,"data":[` +
+		`{"postidzjkid_ignore":"position-a","postCode":"POST-A","postname":"同名岗位","deptidzjkid_ignore":"dept-a","posLevel":"","isenable":1,"changeTime":"2026-08-12T10:10:00"},` +
+		`{"postidzjkid_ignore":"position-b","postCode":"POST-B","postname":"同名岗位","deptidzjkid_ignore":"dept-b","posLevel":"L2","isenable":1,"changeTime":"2026-08-12T10:11:00"},` +
+		`{"postidzjkid_ignore":"position-a","postCode":"POST-A","postname":"同名岗位","deptidzjkid_ignore":"dept-a","posLevel":"","isenable":1,"changeTime":"2026-08-12T10:10:00"}]}`
+	result := consumeOrganizationHRBody(t, consumer, "EXEC-POSITION", "SYNC-POSITION", "task_position", start, end, body)
+	if !result.Success() || result.BusinessSuccessCount() != 2 {
+		t.Fatalf("position create=%+v", result)
+	}
+	var positions []model.OrgPosition
+	if err := db.Order("source_id ASC").Find(&positions).Error; err != nil || len(positions) != 2 {
+		t.Fatalf("positions=%+v err=%v", positions, err)
+	}
+	if positions[0].Name != positions[1].Name || positions[0].OrgUnitId == positions[1].OrgUnitId ||
+		positions[0].PositionType != "professional" || positions[0].IsManagerPosition || positions[1].JobLevel != "L2" {
+		t.Fatalf("same-name position mapping=%+v", positions)
+	}
+	assertOrganizationPositionRecordAction(t, db, "position-a", model.OrgSyncRecordActionCreate)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION", "SYNC-POSITION", "task_position", start, end, body)
+	if !result.Success() {
+		t.Fatalf("position replay=%+v", result)
+	}
+	assertOrganizationPositionRecordAction(t, db, "position-a", model.OrgSyncRecordActionNoop)
+	assertOrganizationPositionCounts(t, db, 2, 2)
+
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION", "SYNC-POSITION", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-a","postCode":"POST-A","postname":"岗位更新","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T10:30:00"}]}`)
+	if !result.Success() {
+		t.Fatalf("position update=%+v", result)
+	}
+	assertOrganizationPositionRecordAction(t, db, "position-a", model.OrgSyncRecordActionUpdate)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION", "SYNC-POSITION", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-a","postCode":"POST-A","postname":"陈旧名称","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T10:20:00"}]}`)
+	if !result.Success() {
+		t.Fatalf("stale position=%+v", result)
+	}
+	var positionA model.OrgPosition
+	if err := db.Where("source_id = ?", "position-a").First(&positionA).Error; err != nil || positionA.Name != "岗位更新" {
+		t.Fatalf("stale overwrite position=%+v err=%v", positionA, err)
+	}
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION", "SYNC-POSITION", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-a","postCode":"POST-A","postname":"岗位更新","deptidzjkid_ignore":"dept-a","isenable":0,"changeTime":"2026-08-12T10:40:00"}]}`)
+	if !result.Success() {
+		t.Fatalf("position disable=%+v", result)
+	}
+	assertOrganizationPositionRecordAction(t, db, "position-a", model.OrgSyncRecordActionDisable)
+	if err := db.Where("source_id = ?", "position-a").First(&positionA).Error; err != nil || positionA.Status != "disabled" || positionA.SourceDeleted || positionA.IsManagerPosition {
+		t.Fatalf("disabled position=%+v err=%v", positionA, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-CODE", "SYNC-POSITION-CODE", "task_position", hrsync.ConsumerCodePosition, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-CODE", "SYNC-POSITION-CODE", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-code-conflict","postCode":"POST-B","postname":"编码冲突","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T10:41:00"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonBusinessConflict) {
+		t.Fatalf("position code conflict=%+v", result)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-MISSING", "SYNC-POSITION-MISSING", "task_position", hrsync.ConsumerCodePosition, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-MISSING", "SYNC-POSITION-MISSING", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-missing","postCode":"POST-MISSING","postname":"缺组织岗位","deptidzjkid_ignore":"missing-unit","isenable":1,"changeTime":"2026-08-12T10:42:00"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonReferenceMissing) {
+		t.Fatalf("position missing reference=%+v", result)
+	}
+	assertOrganizationRecord(t, db, "EXEC-POSITION-MISSING", "dependency_waiting", model.OrgSyncRecordActionDeferred, hrsync.ReasonReferenceMissing)
+	var missingPosition int64
+	if err := db.Model(&model.OrgPosition{}).Where("source_id = ?", "position-missing").Count(&missingPosition).Error; err != nil || missingPosition != 0 {
+		t.Fatalf("missing-reference position count=%d err=%v", missingPosition, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-INVALID", "SYNC-POSITION-INVALID", "task_position", hrsync.ConsumerCodePosition, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-INVALID", "SYNC-POSITION-INVALID", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"","postCode":"POST-NO-ID","postname":"缺身份","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T10:43:00"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonSourceIDMissing) {
+		t.Fatalf("position missing source id=%+v", result)
+	}
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-ENUM", "SYNC-POSITION-ENUM", "task_position", hrsync.ConsumerCodePosition, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-ENUM", "SYNC-POSITION-ENUM", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-enum","postCode":"POST-ENUM","postname":"枚举异常","deptidzjkid_ignore":"dept-a","isenable":9,"changeTime":"2026-08-12T10:43:00"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonEnumUnknown) {
+		t.Fatalf("position enum=%+v", result)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-WINDOW", "SYNC-POSITION-WINDOW", "task_position", hrsync.ConsumerCodePosition, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-WINDOW", "SYNC-POSITION-WINDOW", "task_position", start, end,
+		`{"success":true,"data":[{"postidzjkid_ignore":"position-future","postCode":"POST-FUTURE","postname":"未来岗位","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T11:00:00"}]}`)
+	if !result.Success() {
+		t.Fatalf("future-only position=%+v", result)
+	}
+	var futurePosition int64
+	if err := db.Model(&model.OrgPosition{}).Where("source_id = ?", "position-future").Count(&futurePosition).Error; err != nil || futurePosition != 0 {
+		t.Fatalf("future position count=%d err=%v", futurePosition, err)
+	}
+}
+
 func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:org-hr-%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "-"))), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
+	if err := db.AutoMigrate(&model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	sf, err := utils.NewSnowflake(11)
@@ -215,6 +323,41 @@ func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService,
 	}
 	repository := impl.NewOrganizationHRSyncRepositoryImpl(&database.PrimaryDB{DB: db})
 	return NewOrganizationHRSyncService(repository, sf), db
+}
+
+func organizationHRPositionUnit(id int, rawSourceID, code string) model.OrgUnit {
+	changedAt := time.Date(2026, 8, 12, 9, 0, 0, 0, time.UTC)
+	return model.OrgUnit{
+		Basic: model.Basic{Id: id, State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: "management_unit:" + rawSourceID, Code: code, Name: code, UnitType: "department",
+		Status: "enabled", SourceUpdatedAt: &changedAt, SourceVersion: changedAt.Format(time.RFC3339Nano),
+		LastSyncAt: &changedAt, SourceStatus: "enabled", SourceDeleted: false, SyncStatus: "synced",
+	}
+}
+
+func assertOrganizationPositionCounts(t *testing.T, db *gorm.DB, positions, records int64) {
+	t.Helper()
+	for _, item := range []struct {
+		model any
+		want  int64
+	}{{&model.OrgPosition{}, positions}, {&model.OrgSyncRecord{}, records}} {
+		var got int64
+		if err := db.Model(item.model).Count(&got).Error; err != nil || got != item.want {
+			t.Fatalf("model=%T count=%d want=%d err=%v", item.model, got, item.want, err)
+		}
+	}
+}
+
+func assertOrganizationPositionRecordAction(t *testing.T, db *gorm.DB, rawSourceID, action string) {
+	t.Helper()
+	key, err := hrsync.NewSourceKey(hrsync.OrganizationHRSourceSystemCode, hrsync.ObjectKindPosition, rawSourceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record model.OrgSyncRecord
+	if err := db.Where("object_type = ? AND source_id = ?", hrsync.ObjectKindPosition, key.Digest()).First(&record).Error; err != nil || record.Action != action {
+		t.Fatalf("position record=%+v action=%s err=%v", record, action, err)
+	}
 }
 
 func seedOrganizationHRSyncContext(t *testing.T, db *gorm.DB, executionNo, batchNo, taskCode, consumerCode string, sliceNo int) {

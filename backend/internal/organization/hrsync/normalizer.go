@@ -51,10 +51,17 @@ func (n Normalizer) NormalizeOrgUnitSource(source HRDepartmentSourceDTO, kind Ob
 
 func (n Normalizer) NormalizePositionSource(source HRPositionSourceDTO) (PositionSyncInput, error) {
 	key, changedAt, status, err := n.common(ObjectKindPosition, source.SourceID, source.ChangeTime, source.Enabled)
-	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" || strings.TrimSpace(source.OrgUnitSourceID) == "" {
+	code := strings.TrimSpace(source.SourceCode)
+	name := strings.TrimSpace(source.Name)
+	orgUnitSourceID := strings.TrimSpace(source.OrgUnitSourceID)
+	jobLevel := strings.TrimSpace(source.JobLevel)
+	if err != nil || code == "" || name == "" {
 		return PositionSyncInput{}, normalizeRequiredError(err)
 	}
-	return PositionSyncInput{Key: key, Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), OrgUnitSourceID: strings.TrimSpace(source.OrgUnitSourceID), JobLevel: strings.TrimSpace(source.JobLevel), Status: status, SourceChangedAt: changedAt}, nil
+	if len(code) > 128 || len(name) > 255 || len(orgUnitSourceID) > MaxRawSourceIDLength || len(jobLevel) > 64 {
+		return PositionSyncInput{}, ErrSourceKeyInvalid
+	}
+	return PositionSyncInput{Key: key, Code: code, Name: name, OrgUnitSourceID: orgUnitSourceID, JobLevel: jobLevel, Status: status, SourceChangedAt: changedAt}, nil
 }
 
 func (n Normalizer) NormalizeEmployeeSource(source HREmployeeSourceDTO) (EmployeeSyncInput, error) {

@@ -34,11 +34,17 @@ type LegalDepartmentConsumer struct {
 	normalizer Normalizer
 }
 
+type PositionConsumer struct {
+	domain     OrganizationSyncDomain
+	normalizer Normalizer
+}
+
 var (
 	_ integration.SyncResultConsumer = (*LegalEntityConsumer)(nil)
 	_ integration.SyncResultConsumer = (*ManagementCompanyConsumer)(nil)
 	_ integration.SyncResultConsumer = (*ManagementDepartmentConsumer)(nil)
 	_ integration.SyncResultConsumer = (*LegalDepartmentConsumer)(nil)
+	_ integration.SyncResultConsumer = (*PositionConsumer)(nil)
 )
 
 func NewLegalEntityConsumer(domain OrganizationSyncDomain, contract SourceContract) *LegalEntityConsumer {
@@ -55,6 +61,10 @@ func NewManagementDepartmentConsumer(domain OrganizationSyncDomain, contract Sou
 
 func NewLegalDepartmentConsumer(domain OrganizationSyncDomain, contract SourceContract) *LegalDepartmentConsumer {
 	return &LegalDepartmentConsumer{domain: domain, normalizer: contract.normalizer()}
+}
+
+func NewPositionConsumer(domain OrganizationSyncDomain, contract SourceContract) *PositionConsumer {
+	return &PositionConsumer{domain: domain, normalizer: contract.normalizer()}
 }
 
 func (c *LegalEntityConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
@@ -85,6 +95,12 @@ func (c *LegalDepartmentConsumer) Consume(ctx context.Context, request integrati
 	return consumptionResult(summary, err)
 }
 
+func (c *PositionConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+	inputs, issues := normalizeWindowedSources(request, ObjectKindPosition, c.normalizer.NormalizePositionSource)
+	summary, err := c.domain.SynchronizePositions(ctx, NewBusinessSyncContext(request), inputs, issues)
+	return consumptionResult(summary, err)
+}
+
 func EnabledConsumerRegistrations(domain OrganizationSyncDomain, contract SourceContract) ([]integration.SyncConsumerRegistration, error) {
 	if domain == nil || !contract.valid() {
 		return nil, ErrSourceContractInvalid
@@ -103,6 +119,7 @@ func consumerRegistrations(domain OrganizationSyncDomain, contract SourceContrac
 		consumerRegistration(ConsumerCodeManagementCompany, "HR 管理公司", 4<<20, status, NewManagementCompanyConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodeManagementDepartment, "HR 管理部门", 8<<20, status, NewManagementDepartmentConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodeLegalDepartment, "HR 法人部门", 8<<20, status, NewLegalDepartmentConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodePosition, "HR 岗位", 8<<20, status, NewPositionConsumer(domain, contract)),
 	}
 }
 
@@ -133,10 +150,10 @@ func consumptionResult(summary BusinessSyncSummary, err error) (integration.Sync
 }
 
 type changedSource interface {
-	LegalEntitySyncInput | OrgUnitSyncInput
+	LegalEntitySyncInput | OrgUnitSyncInput | PositionSyncInput
 }
 
-func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO, T changedSource](
+func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO, T changedSource](
 	request integration.SyncConsumptionRequest,
 	kind ObjectKind,
 	normalize func(S) (T, error),
@@ -165,6 +182,9 @@ func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO, T ch
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, ErrSourceEnumInvalid) {
+			return nil, []SourceIssue{{ObjectKind: kind, ReasonCode: ReasonEnumUnknown, Action: model.OrgSyncRecordActionError}}
+		}
 		return nil, []SourceIssue{{ReasonCode: ReasonEnvelopeInvalid, Action: model.OrgSyncRecordActionError}}
 	}
 	return inputs, issues
@@ -176,17 +196,21 @@ func sourceChangedAt[T changedSource](value T) time.Time {
 		return typed.SourceChangedAt
 	case OrgUnitSyncInput:
 		return typed.SourceChangedAt
+	case PositionSyncInput:
+		return typed.SourceChangedAt
 	default:
 		return time.Time{}
 	}
 }
 
-func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
+func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
 	var sourceID string
 	switch value := any(source).(type) {
 	case HRCompanySourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	case HRDepartmentSourceDTO:
+		sourceID = strings.TrimSpace(value.SourceID)
+	case HRPositionSourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	}
 	reason := ReasonEnvelopeInvalid
