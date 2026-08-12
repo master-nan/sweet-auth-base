@@ -5,7 +5,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | Task | INT-006A |
-| 状态 | 详细设计完成；实现受第 22 章 P0 源契约问题门控 |
+| 状态 | 详细设计完成；INT-006B 已提供单下界平台兼容契约，其余第 22 章 P0 继续门控生产 Consumer |
 | 日期 | 2026-08-12 |
 | 范围 | Organization HR 源映射与服务端 `SyncResultConsumer` 设计 |
 | Runtime 基线 | `IntegrationRuntimeFreezeReview.md` |
@@ -71,17 +71,15 @@ Consumer 业务失败属于 `confirmed`，不进入 Integration Retry。后续�
 - 源端提供启停状态，但没有可靠物理删除事件；
 - 管理、法人视图彼此独立，视图 `99` 的业务语义未确认。
 
-### 3.1 P0 兼容性结论：源接口只有单侧时间下界
+### 3.1 已解决的平台兼容项：源接口只有单侧时间下界
 
 真实 Swagger 只提供一个下界 `{time}` 参数，没有结束时间参数。已冻结的 timestamp `SyncExecutionInputPlan` 要求 `window_start_binding` 和 `window_end_binding` 指向两个不同目标。
 
-因此，在以下任一方案经过正式确认前，真实 HR 接口不能被声明为可正确配置的 timestamp SyncTask：
+INT-006B 通过 `SyncExecutionInputPlan version=2 + window_mode=lower_bound_only` 解决平台表达缺口：HTTP 只绑定真实下界参数，IntegrationExecution 仍冻结逻辑起止窗口，Organization Consumer 按权威 source change timestamp 过滤半开区间。V1 和 V2 `bounded_window` 仍要求真实起止双绑定。
 
-1. 源系统增加有文档约束的结束时间参数；
-2. Integration Sync 经独立评审增加并冻结 `lower_bound_only` 源契约，保留逻辑窗口，同时明确它不能限制响应大小；
-3. 从权威 Swagger 中确认另一个同时支持起止边界的现有接口。
+禁止把 `window_end` 绑定到无关字段、虚构 Query 或重复绑定同一参数。`logical_window_end` 只提供给 Consumer 和 Checkpoint，不是 HTTP 参数。该能力只关闭“平台无法表达单下界接口”的兼容问题，不关闭 P0-7 的 changeTime 权威性、时区、精度、同秒完整性，也不关闭 P0-8 的人员大响应问题。
 
-禁止把 `window_end` 绑定到无关字段、虚构 Query、重复绑定同一参数，或以下载后的 Consumer 过滤冒充 Transport 响应切片。Consumer 过滤可以维护逻辑半开区间，却不能减少已经下载的响应。该 P0 关闭前，不得启用生产 timestamp Task。
+Consumer 过滤不能减少已经下载的响应。`lower_bound_only` 不限制源响应上界，不等于真正时间切片，也不允许放宽 Transport 64 MiB、持久化 Response Artifact 或落磁盘临时 Payload。初始化和 Catch-up 必须先通过实际响应量门控；超限 Task 安全失败。
 
 ## 4. Organization 九表适配审计
 
@@ -590,4 +588,23 @@ P0 源契约确认是正式 Gate，不属于隐藏开发工作。
 15. 任一影响 Checkpoint 的记录失败都会使 Consumer 失败并保持 Checkpoint。
 16. 一个 Sync Execution 对应一个 Organization 业务批次，技术事实继续留在 Integration。
 17. 响应大小只能由源端有界查询或受控分区解决，不提高 Runtime 上限、不存 Payload。
-18. 单下界时间契约及相关 P0 未关闭前，禁止生产启用。
+18. 单下界平台表达缺口已由 V2 受控扩展解决；changeTime 权威性、时区、精度、同秒完整性和人员响应规模 P0 未关闭前，禁止生产启用。
+
+## 27. INT-006B 实现基础与 Gate 状态
+
+INT-006B 建立 `backend/internal/organization/hrsync` 源适配边界：
+
+- 强类型 `SourceKey(source_system_code, object_kind, raw_source_id)`，对象类别白名单、长度限制，日志格式只输出 SHA-256 摘要；
+- 按公司、部门、岗位、员工、离职员工和任职拆分的最小源 DTO，未知 JSON 字段忽略，证件、地址、银行等敏感字段不进入 DTO；
+- source-independent 的 LegalEntity/OrgUnit/Position/Employee canonical input；
+- 法人、组织、岗位、员工纯 Normalizer；
+- Assignment Normalizer 只保留接口并返回 `org_sync_source_contract_unconfirmed`，不猜主任职、`sendpost` 权威性、内部 ID 或开放日期；
+- 全部 Organization HR 稳定 Reason Code；
+- `management`、`legal` 两个固定 structure type；
+- test consumer harness 验证 Source DTO -> Normalizer -> OrgSyncBatch -> OrgSyncRecord -> SyncConsumptionResult，不注册生产 HR Consumer。
+
+数据库完整性采用 `OrgSyncBatch.execution_id -> IntegrationExecution.id` RESTRICT FK 和非空部分唯一索引；每个 Integration Execution 最多对应一个 Organization 业务批次。`OrgSyncRecord` 对非空稳定源 ID 使用 `(batch_id, object_type, source_id)` 部分唯一约束；源 ID 缺失的错误记录允许空 ID，但必须使用 `action=error`。动作固定为 `create/update/disable/close/noop/error/deferred`，状态继续使用现有受控集合。旧开发动作编码按显式表迁移，`skip/no_change` 统一收敛为 `noop`；不增加 `integration_sync_batch_id`。
+
+人员按公司分区仍是后续受控配置能力：partition ID 必须由服务端批准并作为非敏感 static input 固定在 Task 版本中；不得提供任意 ID 输入、动态读取 Organization fan-out 或 Organization Scheduler。该设计不能替代 P0-8 的生产响应量验证。
+
+截至 INT-006B，以下 P0 继续打开：BIP ID 永久稳定/不可复用；changeTime 权威字段、时区、正式精度和同秒完整性；法人/组织/岗位编码命名空间；员工编号生命周期；主任职及其稳定 assignment ID；`sendpost` 权威性和兼职 ID 体系；开放任职日期规则；人员大响应生产方案；源物理删除表达。代码没有以布尔开关或环境变量伪造关闭这些 Gate，相关生产 Consumer 不注册。

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -105,6 +106,59 @@ func TestMaterializeSyncExecutionInputPlan(t *testing.T) {
 	}
 }
 
+func TestSyncExecutionInputPlanV1RemainsBounded(t *testing.T) {
+	raw := []byte(`{"version":1,"static_input":{"json_body":{"tenant":"north"}},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"},"window_end_binding":{"location":"query","code":"updated_to","format":"rfc3339"}}`)
+	normalized, summary, err := NormalizeSyncExecutionInputPlan(raw, syncPlanContract(t, false), "POST", "/employees", 3, "timestamp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Version != SyncExecutionInputPlanVersionV1 || summary.WindowMode != SyncWindowModeBoundedWindow || !summary.ResponseBounded {
+		t.Fatalf("unexpected V1 summary: %+v", summary)
+	}
+	if bytes.Contains(normalized, []byte(`"window_mode"`)) {
+		t.Fatalf("V1 representation changed: %s", normalized)
+	}
+}
+
+func TestSyncExecutionInputPlanV2WindowModes(t *testing.T) {
+	bounded := []byte(`{"version":2,"window_mode":"bounded_window","static_input":{"json_body":{"tenant":"north"}},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"},"window_end_binding":{"location":"query","code":"updated_to","format":"rfc3339"}}`)
+	if _, summary, err := NormalizeSyncExecutionInputPlan(bounded, syncPlanContract(t, false), "POST", "/employees", 3, "timestamp"); err != nil || !summary.ResponseBounded {
+		t.Fatalf("V2 bounded plan: summary=%+v err=%v", summary, err)
+	}
+	lowerContract := syncLowerBoundPlanContract(t)
+	lower := []byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"query","code":"changed_since","format":"rfc3339"}}`)
+	normalized, summary, err := NormalizeSyncExecutionInputPlan(lower, lowerContract, "GET", "/employees", 4, "timestamp")
+	if err != nil || summary.WindowMode != SyncWindowModeLowerBoundOnly || summary.ResponseBounded || !summary.HasWindowBindings {
+		t.Fatalf("V2 lower-bound plan: summary=%+v err=%v", summary, err)
+	}
+	start := time.Date(2026, 8, 10, 9, 50, 0, 0, time.UTC)
+	end := start.Add(70 * time.Minute)
+	input, err := MaterializeSyncExecutionInputPlan(normalized, &start, &end)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := input.QueryParams["changed_since"]; len(got) != 1 || got[0] != start.Format(time.RFC3339Nano) {
+		t.Fatalf("lower bound=%v", got)
+	}
+	if len(input.QueryParams) != 1 {
+		t.Fatalf("lower-bound plan injected an end parameter: %+v", input.QueryParams)
+	}
+}
+
+func TestSyncExecutionInputPlanV2LowerBoundRejectsEndBinding(t *testing.T) {
+	raw := []byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"},"window_end_binding":{"location":"query","code":"updated_to","format":"rfc3339"}}`)
+	if _, _, err := NormalizeSyncExecutionInputPlan(raw, syncPlanContract(t, false), "POST", "/employees", 3, "timestamp"); !errors.Is(err, myerrors.ErrSyncInputPlanInvalid) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSyncExecutionInputPlanV1CannotBehaveAsLowerBound(t *testing.T) {
+	raw := []byte(`{"version":1,"static_input":{},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"}}`)
+	if _, err := DecodeSyncExecutionInputPlan(raw); !errors.Is(err, myerrors.ErrSyncInputPlanInvalid) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func syncPlanContract(t *testing.T, sensitive bool) []byte {
 	t.Helper()
 	value := InterfaceInputContract{Version: 1, Parameters: []InputParameterDefinition{
@@ -112,6 +166,18 @@ func syncPlanContract(t *testing.T, sensitive bool) []byte {
 		{Code: "updated_to", Location: "query", DataType: "string", Required: true, MaxLength: 64},
 		{Code: "X-Correlation-ID", Location: "header", DataType: "string", MaxLength: 64, Sensitive: sensitive},
 		{Code: "tenant", Location: "body", DataType: "string", Required: true, MaxLength: 64},
+	}}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func syncLowerBoundPlanContract(t *testing.T) []byte {
+	t.Helper()
+	value := InterfaceInputContract{Version: 1, Parameters: []InputParameterDefinition{
+		{Code: "changed_since", Location: "query", DataType: "string", Required: true, MaxLength: 64},
 	}}
 	raw, err := json.Marshal(value)
 	if err != nil {

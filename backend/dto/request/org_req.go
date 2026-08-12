@@ -80,7 +80,7 @@ type OrgStructureQueryReq struct {
 	OrgReadScopeReq
 	SourceSystemCode string `form:"source_system_code" json:"source_system_code" binding:"omitempty,max=64"`
 	LegalEntityId    *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
-	StructureType    string `form:"structure_type" json:"structure_type" binding:"omitempty,oneof=management"`
+	StructureType    string `form:"structure_type" json:"structure_type" binding:"omitempty,oneof=management legal"`
 	Status           string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`
 	IsDefault        *bool  `form:"is_default" json:"is_default"`
 }
@@ -244,7 +244,7 @@ type OrgSyncRecordQueryReq struct {
 	ExecutionId         *int   `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
 	ObjectType          string `form:"object_type" json:"object_type" binding:"omitempty,max=64"`
 	LocalId             *int   `form:"local_id" json:"local_id" binding:"omitempty,gt=0"`
-	Action              string `form:"action" json:"action" binding:"omitempty,oneof=insert update disable delete_to_disable skip no_change"`
+	Action              string `form:"action" json:"action" binding:"omitempty,oneof=create update disable close noop error deferred"`
 	Status              string `form:"status" json:"status" binding:"omitempty,oneof=pending processing success failed dependency_waiting ignored"`
 	DependencyType      string `form:"dependency_type" json:"dependency_type" binding:"omitempty,oneof=legal_entity org_unit structure_node employee position assignment"`
 	LocalHandlingStatus string `form:"local_handling_status" json:"local_handling_status" binding:"omitempty,max=32"`

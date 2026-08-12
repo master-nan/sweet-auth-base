@@ -19,7 +19,8 @@ type SyncStaticInputReq struct {
 }
 
 type SyncExecutionInputPlanReq struct {
-	Version            int                   `json:"version" binding:"required,eq=1"`
+	Version            int                   `json:"version" binding:"required,oneof=1 2"`
+	WindowMode         string                `json:"window_mode,omitempty" binding:"omitempty,oneof=bounded_window lower_bound_only"`
 	StaticInput        SyncStaticInputReq    `json:"static_input" binding:"required"`
 	WindowStartBinding *SyncWindowBindingReq `json:"window_start_binding,omitempty"`
 	WindowEndBinding   *SyncWindowBindingReq `json:"window_end_binding,omitempty"`

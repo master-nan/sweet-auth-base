@@ -2,7 +2,7 @@
   <form-dialog-shell v-model="visible" title="同步任务详情" :subtitle="detail ? `${detail.task_code} · v${detail.version}` : '正在读取任务配置'" icon="sync_alt" readonly :loading="loading" width="min(980px, calc(100vw - 48px))">
     <div v-if="detail" class="sync-task-detail">
       <div v-for="item in items" :key="item.label" class="sync-task-detail__item"><div class="text-caption text-grey-7">{{ item.label }}</div><div class="text-body1">{{ item.value }}</div></div>
-      <div class="sync-task-detail__item sync-task-detail__wide"><div class="text-caption text-grey-7">输入计划摘要</div><div class="text-body1">版本 {{ detail.input_plan_summary.version }} · 静态参数 {{ detail.input_plan_summary.static_parameter_count }} 个 · {{ detail.input_plan_summary.has_window_bindings ? '含窗口绑定' : '无窗口绑定' }}</div></div>
+      <div class="sync-task-detail__item sync-task-detail__wide"><div class="text-caption text-grey-7">输入计划摘要</div><div class="text-body1">版本 {{ detail.input_plan_summary.version }} · 静态参数 {{ detail.input_plan_summary.static_parameter_count }} 个 · {{ detail.input_plan_summary.has_window_bindings ? '含窗口绑定' : '无窗口绑定' }} · {{ detail.input_plan_summary.window_mode === 'lower_bound_only' ? '仅下界，响应不受上界限制' : '完整起止窗口' }}</div></div>
       <div class="sync-task-detail__item sync-task-detail__wide"><div class="text-caption text-grey-7">描述</div><div class="text-body1">{{ detail.description || '-' }}</div></div>
     </div>
     <div v-else class="row justify-center q-pa-xl"><q-spinner-dots color="primary" size="36px" /></div>

@@ -23,6 +23,10 @@ func migrateIntegrationSyncSchema(db *gorm.DB) error {
 		if tx.Dialector.Name() != "postgres" {
 			return nil
 		}
+		// 该约束在冻结后受控扩展为 V1/V2；先删除旧定义，再由统一 helper 幂等重建。
+		if err := tx.Exec(`ALTER TABLE integration_sync_task DROP CONSTRAINT IF EXISTS chk_integration_sync_task_input_plan`).Error; err != nil {
+			return fmt.Errorf("replace integration sync input plan check: %w", err)
+		}
 		checks := []postgresCheckConstraint{
 			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_status", expression: "status IN ('draft','enabled','disabled')"},
 			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_version", expression: "version > 0"},
@@ -30,7 +34,7 @@ func migrateIntegrationSyncSchema(db *gorm.DB) error {
 			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_consumer", expression: "btrim(consumer_code) <> '' AND consumer_version > 0"},
 			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_schedule", expression: "(schedule_type = 'none' AND cron_expression = '' AND next_scheduled_at IS NULL) OR (schedule_type = 'cron' AND btrim(cron_expression) <> '' AND (status <> 'enabled' OR next_scheduled_at IS NOT NULL))"},
 			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_checkpoint", expression: "(checkpoint_mode = 'none' AND initial_checkpoint_at IS NULL AND checkpoint_at IS NULL AND lookback_seconds = 0 AND window_slice_seconds = 0) OR (checkpoint_mode = 'timestamp' AND initial_checkpoint_at IS NOT NULL AND lookback_seconds BETWEEN 0 AND 604800 AND window_slice_seconds BETWEEN 60 AND 604800 AND (status <> 'enabled' OR checkpoint_at IS NOT NULL))"},
-			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_input_plan", expression: fmt.Sprintf("jsonb_typeof(input_plan) = 'object' AND input_plan ? 'version' AND input_plan->>'version' = '%d' AND input_plan ? 'static_input' AND jsonb_typeof(input_plan->'static_input') = 'object'", integration.SyncExecutionInputPlanVersion)},
+			{model: &model.IntegrationSyncTask{}, name: "chk_integration_sync_task_input_plan", expression: fmt.Sprintf("jsonb_typeof(input_plan) = 'object' AND input_plan ? 'version' AND input_plan->>'version' IN ('%d','%d') AND input_plan ? 'static_input' AND jsonb_typeof(input_plan->'static_input') = 'object' AND ((input_plan->>'version' = '%d' AND NOT (input_plan ? 'window_mode')) OR (input_plan->>'version' = '%d' AND COALESCE(input_plan->>'window_mode','') IN ('bounded_window','lower_bound_only')))", integration.SyncExecutionInputPlanVersionV1, integration.SyncExecutionInputPlanVersionV2, integration.SyncExecutionInputPlanVersionV1, integration.SyncExecutionInputPlanVersionV2)},
 			{model: &model.IntegrationSyncBatch{}, name: "chk_integration_sync_batch_status", expression: "status IN ('created','running','succeeded','failed')"},
 			{model: &model.IntegrationSyncBatch{}, name: "chk_integration_sync_batch_trigger", expression: "(trigger_type = 'manual' AND scheduled_for IS NULL) OR (trigger_type = 'scheduled' AND scheduled_for IS NOT NULL)"},
 			{model: &model.IntegrationSyncBatch{}, name: "chk_integration_sync_batch_identity", expression: "btrim(batch_no) <> '' AND btrim(trigger_key) <> '' AND task_version > 0 AND task_revision > 0 AND interface_version > 0 AND consumer_version > 0"},

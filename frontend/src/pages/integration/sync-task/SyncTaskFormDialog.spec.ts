@@ -44,4 +44,21 @@ describe('sync task controlled form', () => {
     const text = mountForm().text()
     for (const forbidden of ['自由 JSON', '运行一次', '取消批次', '修改 Checkpoint', '脚本', 'SQL']) expect(text).not.toContain(forbidden)
   })
+
+  it('builds V2 lower-bound plans without a fake end binding', async () => {
+    apiMocks.getInterfaceDefinition.mockResolvedValue({ data: interfaceDetail })
+    const wrapper = mountForm()
+    const vm = wrapper.vm as unknown as {
+      onInterfaceChanged: (id: number) => Promise<void>
+      form: Record<string, unknown>
+      windowMode: 'bounded_window' | 'lower_bound_only'
+      windowStartKey: string
+      buildInputPlan: () => Record<string, unknown>
+    }
+    await vm.onInterfaceChanged(12); await flushPromises()
+    vm.form.checkpoint_mode = 'timestamp'; vm.windowMode = 'lower_bound_only'; vm.windowStartKey = 'query:updated_from'
+    const plan = vm.buildInputPlan()
+    expect(plan).toMatchObject({ version: 2, window_mode: 'lower_bound_only', window_start_binding: { location: 'query', code: 'updated_from' } })
+    expect(plan).not.toHaveProperty('window_end_binding')
+  })
 })

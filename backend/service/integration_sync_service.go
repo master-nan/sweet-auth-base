@@ -689,6 +689,7 @@ func syncInputPlanSummary(raw []byte) response.SyncInputPlanSummaryRes {
 	value := integration.SummarizeSyncExecutionInputPlan(raw)
 	return response.SyncInputPlanSummaryRes{
 		Version: value.Version, StaticParameterCount: value.StaticParameterCount, HasWindowBindings: value.HasWindowBindings,
+		WindowMode: value.WindowMode, ResponseBounded: value.ResponseBounded,
 	}
 }
 

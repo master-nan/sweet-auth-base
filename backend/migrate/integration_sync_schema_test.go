@@ -64,6 +64,12 @@ func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 	if err := db.Create(&task).Error; err != nil {
 		t.Fatalf("create task: %v", err)
 	}
+	v2 := validSyncTaskMigrationFixture(8810, "lower_bound_sync", 1, system.Id, definition.Id)
+	v2.Status, v2.State = model.IntegrationSyncTaskStatusDraft, false
+	v2.InputPlan = datatypes.JSON([]byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"query","code":"changed_since","format":"rfc3339"}}`))
+	if err := db.Create(&v2).Error; err != nil {
+		t.Fatalf("create V2 lower-bound task: %v", err)
+	}
 	duplicateVersion := validSyncTaskMigrationFixture(8802, task.TaskCode, 1, system.Id, definition.Id)
 	if err := db.Create(&duplicateVersion).Error; err == nil {
 		t.Fatal("expected task code/version unique violation")

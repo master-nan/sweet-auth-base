@@ -25,9 +25,11 @@ type SyncConsumerMetadataRes struct {
 }
 
 type SyncInputPlanSummaryRes struct {
-	Version              int  `json:"version"`
-	StaticParameterCount int  `json:"static_parameter_count"`
-	HasWindowBindings    bool `json:"has_window_bindings"`
+	Version              int    `json:"version"`
+	StaticParameterCount int    `json:"static_parameter_count"`
+	HasWindowBindings    bool   `json:"has_window_bindings"`
+	WindowMode           string `json:"window_mode"`
+	ResponseBounded      bool   `json:"response_bounded"`
 }
 
 type SyncTaskListRes struct {

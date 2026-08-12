@@ -70,6 +70,14 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 	if err := validate.Struct(request.OrgEmployeeQueryReq{EmploymentStatus: "unknown"}); err == nil {
 		t.Fatal("expected invalid employment status to fail")
 	}
+	for _, structureType := range []string{"management", "legal"} {
+		if err := validate.Struct(request.OrgStructureQueryReq{StructureType: structureType}); err != nil {
+			t.Fatalf("expected valid structure type %s: %v", structureType, err)
+		}
+	}
+	if err := validate.Struct(request.OrgStructureQueryReq{StructureType: "matrix"}); err == nil {
+		t.Fatal("expected unknown structure type to fail")
+	}
 	if err := validate.Struct(request.OrgEmployeeQueryReq{BoundStatus: "bound"}); err != nil {
 		t.Fatalf("expected valid bound_status: %v", err)
 	}

@@ -82,6 +82,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"integration_configuration_schema",
 		"integration_runtime_schema",
 		"integration_sync_schema",
+		"organization_sync_integrity_schema",
 		"data_permission_domain_schema",
 		"remove_legacy_data_permission_schema",
 		"ensure_sys_menu_option_text",

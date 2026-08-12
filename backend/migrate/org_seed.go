@@ -144,12 +144,13 @@ func organizationDictionarySeeds() []systemDictSeed {
 			name: "组织同步动作",
 			code: "org_sync_action",
 			items: []systemDictItemSeed{
-				{name: "新增", code: "org_sync_action_insert", value: "insert"},
+				{name: "新增", code: "org_sync_action_create", value: "create"},
 				{name: "更新", code: "org_sync_action_update", value: "update"},
 				{name: "停用", code: "org_sync_action_disable", value: "disable"},
-				{name: "删除转停用", code: "org_sync_action_delete_to_disable", value: "delete_to_disable"},
-				{name: "跳过", code: "org_sync_action_skip", value: "skip"},
-				{name: "无变化", code: "org_sync_action_no_change", value: "no_change"},
+				{name: "关闭", code: "org_sync_action_close", value: "close"},
+				{name: "无变化", code: "org_sync_action_noop", value: "noop"},
+				{name: "错误", code: "org_sync_action_error", value: "error"},
+				{name: "等待依赖", code: "org_sync_action_deferred", value: "deferred"},
 			},
 		},
 		{

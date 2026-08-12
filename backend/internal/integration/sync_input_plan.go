@@ -10,7 +10,15 @@ import (
 	myerrors "backend/internal/errors"
 )
 
-const SyncExecutionInputPlanVersion = 1
+const (
+	SyncExecutionInputPlanVersionV1 = 1
+	SyncExecutionInputPlanVersionV2 = 2
+	// SyncExecutionInputPlanVersion 保留为 V1 别名，避免既有调用方静默改变冻结语义。
+	SyncExecutionInputPlanVersion = SyncExecutionInputPlanVersionV1
+
+	SyncWindowModeBoundedWindow  = "bounded_window"
+	SyncWindowModeLowerBoundOnly = "lower_bound_only"
+)
 
 const (
 	SyncTimeFormatRFC3339          = "rfc3339"
@@ -26,22 +34,32 @@ type SyncWindowBinding struct {
 
 type SyncExecutionInputPlan struct {
 	Version            int                  `json:"version"`
+	WindowMode         string               `json:"window_mode,omitempty"`
 	StaticInput        ExecutionInputValues `json:"static_input"`
 	WindowStartBinding *SyncWindowBinding   `json:"window_start_binding,omitempty"`
 	WindowEndBinding   *SyncWindowBinding   `json:"window_end_binding,omitempty"`
 }
 
 type SyncInputPlanSummary struct {
-	Version              int  `json:"version"`
-	StaticParameterCount int  `json:"static_parameter_count"`
-	HasWindowBindings    bool `json:"has_window_bindings"`
+	Version              int    `json:"version"`
+	StaticParameterCount int    `json:"static_parameter_count"`
+	HasWindowBindings    bool   `json:"has_window_bindings"`
+	WindowMode           string `json:"window_mode,omitempty"`
+	ResponseBounded      bool   `json:"response_bounded"`
 }
 
 // NormalizeSyncExecutionInputPlan 严格校验计划，并使用正式 ExecutionInputSnapshot 规范化器完成最终契约复核。
 func NormalizeSyncExecutionInputPlan(raw, contractRaw []byte, method, relativePath string, interfaceVersion int, checkpointMode string) ([]byte, SyncInputPlanSummary, error) {
 	var plan SyncExecutionInputPlan
-	if len(bytes.TrimSpace(raw)) == 0 || decodeStrictJSON(raw, &plan) != nil || plan.Version != SyncExecutionInputPlanVersion {
+	if len(bytes.TrimSpace(raw)) == 0 || decodeStrictJSON(raw, &plan) != nil || !validSyncInputPlanVersion(plan.Version) {
 		return nil, SyncInputPlanSummary{}, myerrors.ErrSyncInputPlanInvalid
+	}
+	windowMode, err := normalizeSyncWindowMode(plan)
+	if err != nil {
+		return nil, SyncInputPlanSummary{}, err
+	}
+	if plan.Version == SyncExecutionInputPlanVersionV2 {
+		plan.WindowMode = windowMode
 	}
 	contractBytes, err := NormalizeInputContract(contractRaw, method, relativePath)
 	if err != nil {
@@ -60,7 +78,8 @@ func NormalizeSyncExecutionInputPlan(raw, contractRaw []byte, method, relativePa
 			return nil, SyncInputPlanSummary{}, myerrors.ErrSyncInputPlanInvalid
 		}
 	} else if checkpointMode == "timestamp" {
-		if plan.WindowStartBinding == nil || plan.WindowEndBinding == nil {
+		if plan.WindowStartBinding == nil || (windowMode == SyncWindowModeBoundedWindow && plan.WindowEndBinding == nil) ||
+			(windowMode == SyncWindowModeLowerBoundOnly && plan.WindowEndBinding != nil) {
 			return nil, SyncInputPlanSummary{}, myerrors.ErrSyncInputPlanInvalid
 		}
 	} else {
@@ -109,7 +128,18 @@ func SummarizeSyncExecutionInputPlan(raw []byte) SyncInputPlanSummary {
 
 func DecodeSyncExecutionInputPlan(raw []byte) (SyncExecutionInputPlan, error) {
 	var plan SyncExecutionInputPlan
-	if decodeStrictJSON(raw, &plan) != nil || plan.Version != SyncExecutionInputPlanVersion {
+	if decodeStrictJSON(raw, &plan) != nil || !validSyncInputPlanVersion(plan.Version) {
+		return SyncExecutionInputPlan{}, myerrors.ErrSyncInputPlanInvalid
+	}
+	windowMode, err := normalizeSyncWindowMode(plan)
+	if err != nil {
+		return SyncExecutionInputPlan{}, err
+	}
+	plan.WindowMode = windowMode
+	if windowMode == SyncWindowModeBoundedWindow && ((plan.WindowStartBinding == nil) != (plan.WindowEndBinding == nil)) {
+		return SyncExecutionInputPlan{}, myerrors.ErrSyncInputPlanInvalid
+	}
+	if windowMode == SyncWindowModeLowerBoundOnly && (plan.WindowStartBinding == nil || plan.WindowEndBinding != nil) {
 		return SyncExecutionInputPlan{}, myerrors.ErrSyncInputPlanInvalid
 	}
 	return plan, nil
@@ -123,12 +153,20 @@ func MaterializeSyncExecutionInputPlan(raw []byte, windowStart, windowEnd *time.
 		return ExecutionInputValues{}, err
 	}
 	input := cloneExecutionInputValues(plan.StaticInput)
+	if (plan.WindowStartBinding == nil) != (windowStart == nil) || (plan.WindowStartBinding != nil && windowEnd == nil) {
+		return ExecutionInputValues{}, myerrors.ErrSyncInputPlanInvalid
+	}
 	bindings := []struct {
 		binding *SyncWindowBinding
 		value   *time.Time
 	}{
 		{binding: plan.WindowStartBinding, value: windowStart},
-		{binding: plan.WindowEndBinding, value: windowEnd},
+	}
+	if plan.WindowEndBinding != nil {
+		bindings = append(bindings, struct {
+			binding *SyncWindowBinding
+			value   *time.Time
+		}{binding: plan.WindowEndBinding, value: windowEnd})
 	}
 	for _, item := range bindings {
 		if item.binding == nil && item.value == nil {
@@ -146,6 +184,28 @@ func MaterializeSyncExecutionInputPlan(raw []byte, windowStart, windowEnd *time.
 		}
 	}
 	return input, nil
+}
+
+func validSyncInputPlanVersion(version int) bool {
+	return version == SyncExecutionInputPlanVersionV1 || version == SyncExecutionInputPlanVersionV2
+}
+
+func normalizeSyncWindowMode(plan SyncExecutionInputPlan) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(plan.WindowMode))
+	switch plan.Version {
+	case SyncExecutionInputPlanVersionV1:
+		if mode != "" {
+			return "", myerrors.ErrSyncInputPlanInvalid
+		}
+		return SyncWindowModeBoundedWindow, nil
+	case SyncExecutionInputPlanVersionV2:
+		if mode != SyncWindowModeBoundedWindow && mode != SyncWindowModeLowerBoundOnly {
+			return "", myerrors.ErrSyncInputPlanInvalid
+		}
+		return mode, nil
+	default:
+		return "", myerrors.ErrSyncInputPlanInvalid
+	}
 }
 
 func formatSyncWindowValue(value time.Time, format string) (any, error) {
@@ -278,5 +338,12 @@ func summarizeSyncInputPlan(plan SyncExecutionInputPlan) SyncInputPlanSummary {
 	if json.Unmarshal(plan.StaticInput.JSONBody, &body) == nil {
 		count += len(body)
 	}
-	return SyncInputPlanSummary{Version: plan.Version, StaticParameterCount: count, HasWindowBindings: plan.WindowStartBinding != nil && plan.WindowEndBinding != nil}
+	mode, err := normalizeSyncWindowMode(plan)
+	if err != nil {
+		return SyncInputPlanSummary{}
+	}
+	return SyncInputPlanSummary{
+		Version: plan.Version, StaticParameterCount: count, HasWindowBindings: plan.WindowStartBinding != nil,
+		WindowMode: mode, ResponseBounded: mode == SyncWindowModeBoundedWindow,
+	}
 }

@@ -403,6 +403,7 @@ export type SyncTaskStatus = 'draft' | 'enabled' | 'disabled'
 export type SyncScheduleType = 'none' | 'cron'
 export type SyncCheckpointMode = 'none' | 'timestamp'
 export type SyncTimeFormat = 'rfc3339' | 'unix_seconds' | 'unix_milliseconds'
+export type SyncWindowMode = 'bounded_window' | 'lower_bound_only'
 
 export interface SyncWindowBinding {
   location: InterfaceInputLocation
@@ -418,7 +419,8 @@ export interface SyncStaticInput {
 }
 
 export interface SyncExecutionInputPlan {
-  version: 1
+  version: 1 | 2
+  window_mode?: SyncWindowMode
   static_input: SyncStaticInput
   window_start_binding?: SyncWindowBinding
   window_end_binding?: SyncWindowBinding
@@ -450,7 +452,7 @@ export interface SyncTaskListItem {
   checkpoint_at?: string
   lookback_seconds: number
   window_slice_seconds: number
-  input_plan_summary: { version: number; static_parameter_count: number; has_window_bindings: boolean }
+  input_plan_summary: { version: number; static_parameter_count: number; has_window_bindings: boolean; window_mode: SyncWindowMode; response_bounded: boolean }
   revision: number
   gmt_modify: string
 }

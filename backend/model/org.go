@@ -6,6 +6,19 @@ import (
 	"gorm.io/datatypes"
 )
 
+const (
+	OrgStructureTypeManagement = "management"
+	OrgStructureTypeLegal      = "legal"
+
+	OrgSyncRecordActionCreate   = "create"
+	OrgSyncRecordActionUpdate   = "update"
+	OrgSyncRecordActionDisable  = "disable"
+	OrgSyncRecordActionClose    = "close"
+	OrgSyncRecordActionNoop     = "noop"
+	OrgSyncRecordActionError    = "error"
+	OrgSyncRecordActionDeferred = "deferred"
+)
+
 // OrgLegalEntity 是法律或核算主体的只读镜像。
 type OrgLegalEntity struct {
 	Basic

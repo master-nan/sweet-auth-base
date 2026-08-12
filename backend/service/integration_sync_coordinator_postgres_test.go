@@ -6,6 +6,7 @@ import (
 	"backend/internal/database"
 	myerrors "backend/internal/errors"
 	"backend/internal/integration"
+	"backend/internal/organization/hrsync"
 	"backend/internal/security"
 	testutil "backend/internal/test"
 	"backend/internal/utils"
@@ -261,21 +262,29 @@ func TestIntegrationSyncPostgreSQLRunnerSequentialE2E(t *testing.T) {
 }
 
 func TestIntegrationSyncPostgreSQLRunnerTransportRetryConsumerCheckpointE2E(t *testing.T) {
-	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false)
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, false)
 }
 
 func TestIntegrationSyncPostgreSQLConsumerFailureStopsCheckpointE2E(t *testing.T) {
-	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, true)
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, true, false)
 }
 
-func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool) {
+func TestIntegrationSyncPostgreSQLLowerBoundOnlyOrganizationConsumerE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, true)
+}
+
+func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer, lowerBoundOnly bool) {
 	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
 	var httpCalls atomic.Int32
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		call := httpCalls.Add(1)
-		if request.URL.Path != "/employees" || request.URL.Query().Get("updated_from") == "" || request.URL.Query().Get("updated_to") == "" {
-			t.Errorf("unexpected sync request: %s", request.URL.String())
+		if lowerBoundOnly {
+			if request.URL.Path != "/employees" || request.URL.Query().Get("changed_since") == "" || request.URL.Query().Get("updated_from") != "" || request.URL.Query().Get("updated_to") != "" || len(request.URL.Query()) != 1 {
+				t.Errorf("unexpected lower-bound request: %s", request.URL.String())
+			}
+		} else if request.URL.Path != "/employees" || request.URL.Query().Get("updated_from") == "" || request.URL.Query().Get("updated_to") == "" {
+			t.Errorf("unexpected bounded sync request: %s", request.URL.String())
 		}
 		if request.Header.Get("Authorization") != "Bearer sync-consumer-token" {
 			t.Errorf("credential was not injected")
@@ -283,6 +292,19 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		writer.Header().Set("Content-Type", "application/json")
 		if call == 1 {
 			writer.WriteHeader(http.StatusServiceUnavailable)
+		}
+		if lowerBoundOnly {
+			lower, parseErr := time.Parse(time.RFC3339Nano, request.URL.Query().Get("changed_since"))
+			if parseErr != nil {
+				t.Errorf("parse changed_since: %v", parseErr)
+			}
+			body, _ := json.Marshal(map[string]any{"data": []map[string]any{
+				{"zjkid_ignore": fmt.Sprintf("replay-%d", lower.Unix()), "pk_corp": "C0", "name": "Replay", "isenable": 1, "changeTime": lower.UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": fmt.Sprintf("current-%d", lower.Unix()), "pk_corp": "C1", "name": "Current", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "pk_corp": "C2", "name": "Future", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+			}})
+			_, _ = writer.Write(body)
+			return
 		}
 		_, _ = writer.Write([]byte(`{"employees":[{"id":"10001"}]}`))
 	}))
@@ -306,6 +328,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			CheckpointModes: []string{model.IntegrationSyncCheckpointTimestamp}},
 		Consumer: integration.SyncResultConsumerFunc(func(_ context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
 			consumerCalled <- request
+			if lowerBoundOnly {
+				return consumeLowerBoundOrganizationTestResult(db, request)
+			}
 			if failSecondConsumer && request.SliceNo() == 2 {
 				return integration.NewSyncConsumptionResult(false, "business_validation_failed", 0, 1, "")
 			}
@@ -332,10 +357,11 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		CredentialCode: "sync_consumer_token", Name: "Sync Consumer Token", CredentialType: model.CredentialTypeBearerToken,
 		Status: model.CredentialStatusActive, SecretStorageRef: envelope.StorageRef, SecretCiphertext: envelope.Ciphertext,
 		SecretNonce: envelope.Nonce, SecretFingerprint: envelope.Fingerprint, Version: 1, Revision: 1}
-	contract, _ := json.Marshal(integration.InterfaceInputContract{Version: 1, Parameters: []integration.InputParameterDefinition{
-		{Code: "updated_from", Location: "query", DataType: "string", Required: true, MaxLength: 64},
-		{Code: "updated_to", Location: "query", DataType: "string", Required: true, MaxLength: 64},
-	}})
+	parameters := []integration.InputParameterDefinition{{Code: "updated_from", Location: "query", DataType: "string", Required: true, MaxLength: 64}, {Code: "updated_to", Location: "query", DataType: "string", Required: true, MaxLength: 64}}
+	if lowerBoundOnly {
+		parameters = []integration.InputParameterDefinition{{Code: "changed_since", Location: "query", DataType: "string", Required: true, MaxLength: 64}}
+	}
+	contract, _ := json.Marshal(integration.InterfaceInputContract{Version: 1, Parameters: parameters})
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: nextSyncTestID(), State: true}, ExternalSystemID: system.Id,
 		InterfaceCode: "employees", Name: "Employees", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/employees", CredentialID: &credential.Id, TimeoutSeconds: 5, ResponseLimit: 1 << 20, InputContract: contract,
@@ -353,14 +379,18 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		t.Fatal(err)
 	}
 	checkpoint, due := databaseNow.UTC().Add(-90*time.Minute), databaseNow.UTC().Add(-time.Minute)
-	plan, _ := json.Marshal(integration.SyncExecutionInputPlan{Version: 1, StaticInput: integration.ExecutionInputValues{},
-		WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_from", Format: "rfc3339"},
-		WindowEndBinding:   &integration.SyncWindowBinding{Location: "query", Code: "updated_to", Format: "rfc3339"}})
+	inputPlan := integration.SyncExecutionInputPlan{Version: 1, StaticInput: integration.ExecutionInputValues{}, WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_from", Format: "rfc3339"}, WindowEndBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_to", Format: "rfc3339"}}
+	lookback := 0
+	if lowerBoundOnly {
+		inputPlan = integration.SyncExecutionInputPlan{Version: integration.SyncExecutionInputPlanVersionV2, WindowMode: integration.SyncWindowModeLowerBoundOnly, StaticInput: integration.ExecutionInputValues{}, WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "changed_since", Format: "rfc3339"}}
+		lookback = 600
+	}
+	plan, _ := json.Marshal(inputPlan)
 	task := model.IntegrationSyncTask{Basic: model.Basic{Id: nextSyncTestID(), State: true}, TaskCode: "sync_consumer_e2e", TaskName: "Sync Consumer E2E",
 		Version: 1, Status: model.IntegrationSyncTaskStatusEnabled, ExternalSystemID: system.Id, InterfaceDefinitionID: definition.Id,
 		ConsumerCode: "test_sync_consumer", ConsumerVersion: 1, ScheduleType: model.IntegrationSyncScheduleCron, CronExpression: "* * * * *",
 		Timezone: "UTC", NextScheduledAt: &due, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
-		InitialCheckpointAt: &checkpoint, CheckpointAt: &checkpoint, WindowSliceSeconds: 3600, InputPlan: datatypes.JSON(plan), Revision: 1}
+		InitialCheckpointAt: &checkpoint, CheckpointAt: &checkpoint, LookbackSeconds: lookback, WindowSliceSeconds: 3600, InputPlan: datatypes.JSON(plan), Revision: 1}
 	for _, value := range []any{&system, &credential, &retryPolicy, &definition, &task} {
 		if err := db.Create(value).Error; err != nil {
 			t.Fatal(err)
@@ -432,7 +462,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		select {
 		case request := <-consumerCalled:
 			if request.ExecutionNo() == "" || request.SyncBatchNo() == "" || request.TaskCode() != task.TaskCode || request.TaskVersion() != task.Version ||
-				request.SliceNo() != sliceNo || !strings.Contains(string(request.Body()), "10001") {
+				request.SliceNo() != sliceNo || (!lowerBoundOnly && !strings.Contains(string(request.Body()), "10001")) {
 				t.Fatalf("consumer request=%s", request.String())
 			}
 		default:
@@ -457,6 +487,71 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	} else if executionRows[1].Status != model.IntegrationExecutionStatusSucceeded || executionRows[1].SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded || executionRows[1].CurrentAttempt != 1 || executionRows[1].SyncWindowEnd == nil || !refreshedTask.CheckpointAt.Equal(*executionRows[1].SyncWindowEnd) {
 		t.Fatalf("successful checkpoint boundary executions=%+v checkpoint=%v", executionRows, refreshedTask.CheckpointAt)
 	}
+	if lowerBoundOnly {
+		var futureCount, recordCount, batchCount int64
+		if err := db.Model(&model.OrgSyncRecord{}).Where("source_id LIKE ?", "future-%").Count(&futureCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncRecord{}).Count(&recordCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncBatch{}).Count(&batchCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if futureCount != 0 || recordCount != 4 || batchCount != 2 {
+			t.Fatalf("organization filter result: future=%d records=%d batches=%d", futureCount, recordCount, batchCount)
+		}
+		for _, forbiddenColumn := range []string{"response_body", "source_dto", "payload"} {
+			if db.Migrator().HasColumn(&model.OrgSyncRecord{}, forbiddenColumn) || db.Migrator().HasColumn(&model.OrgSyncBatch{}, forbiddenColumn) {
+				t.Fatalf("Organization sync persisted forbidden body column: %s", forbiddenColumn)
+			}
+		}
+	}
+}
+
+func consumeLowerBoundOrganizationTestResult(db *gorm.DB, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+	var envelope struct {
+		Data []hrsync.HRCompanySourceDTO `json:"data"`
+	}
+	if err := json.Unmarshal(request.Body(), &envelope); err != nil {
+		return integration.NewSyncConsumptionResult(false, string(hrsync.ReasonEnvelopeInvalid), 0, 1, "")
+	}
+	var execution model.IntegrationExecution
+	if err := db.Where("execution_no = ?", request.ExecutionNo()).First(&execution).Error; err != nil {
+		return integration.SyncConsumptionResult{}, err
+	}
+	orgBatch := model.OrgSyncBatch{Basic: model.Basic{Id: nextSyncTestID(), State: true}, BatchNo: "ORG-" + request.ExecutionNo(), ExecutionId: &execution.Id, SyncType: "incremental", ObjectScope: "legal_entity", Status: "processing"}
+	if err := db.Create(&orgBatch).Error; err != nil {
+		return integration.SyncConsumptionResult{}, err
+	}
+	normalizer := hrsync.Normalizer{SourceSystemCode: "hr_source", SourceLocation: time.UTC}
+	processed := 0
+	for _, source := range envelope.Data {
+		input, err := normalizer.NormalizeLegalEntitySource(source)
+		if err != nil {
+			return integration.NewSyncConsumptionResult(false, string(hrsync.ReasonEnvelopeInvalid), processed, 1, orgBatch.BatchNo)
+		}
+		classification, err := hrsync.ClassifySourceChangeTime(input.SourceChangedAt, *request.WindowStart(), *request.WindowEnd())
+		if err != nil {
+			return integration.SyncConsumptionResult{}, err
+		}
+		if classification == hrsync.WindowRecordFuture {
+			continue
+		}
+		action := model.OrgSyncRecordActionCreate
+		if classification == hrsync.WindowRecordReplay {
+			action = model.OrgSyncRecordActionNoop
+		}
+		record := model.OrgSyncRecord{Basic: model.Basic{Id: nextSyncTestID(), State: true}, BatchId: orgBatch.Id, ExecutionId: &execution.Id, ObjectType: string(hrsync.ObjectKindLegalEntity), SourceId: input.Key.RawSourceID(), Action: action, Status: "success"}
+		if err := db.Create(&record).Error; err != nil {
+			return integration.SyncConsumptionResult{}, err
+		}
+		processed++
+	}
+	if err := db.Model(&orgBatch).Updates(map[string]any{"status": "success", "total_count": processed, "success_count": processed}).Error; err != nil {
+		return integration.SyncConsumptionResult{}, err
+	}
+	return integration.NewSyncConsumptionResult(true, "", processed, 0, orgBatch.BatchNo)
 }
 
 func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
@@ -483,7 +578,7 @@ func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}); err != nil {
+	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, statement := range []string{

@@ -23,6 +23,8 @@
       <q-input v-if="form.checkpoint_mode === 'timestamp'" v-model.number="form.lookback_seconds" outlined dense type="number" min="0" max="604800" label="Lookback（秒）" :rules="[lookbackRule]" />
       <q-input v-if="form.checkpoint_mode === 'timestamp'" v-model.number="form.window_slice_seconds" outlined dense type="number" min="60" max="604800" label="窗口切片（秒） *" :rules="[sliceRule]" />
 
+      <q-select v-if="form.checkpoint_mode === 'timestamp'" v-model="windowMode" outlined dense emit-value map-options :options="windowModeOptions" label="源时间窗口契约 *" />
+
       <div class="sync-task-form__wide text-subtitle2">受控输入计划</div>
       <q-select
         v-model="selectedStaticKeys"
@@ -47,8 +49,8 @@
 
       <q-select v-if="form.checkpoint_mode === 'timestamp'" v-model="windowStartKey" outlined dense emit-value map-options :options="windowParameterOptions" label="窗口开始参数 *" :rules="[requiredRule]" />
       <q-select v-if="form.checkpoint_mode === 'timestamp'" v-model="windowStartFormat" outlined dense emit-value map-options :options="formatOptions(windowStartKey)" label="窗口开始格式 *" />
-      <q-select v-if="form.checkpoint_mode === 'timestamp'" v-model="windowEndKey" outlined dense emit-value map-options :options="windowParameterOptions" label="窗口结束参数 *" :rules="[requiredRule]" />
-      <q-select v-if="form.checkpoint_mode === 'timestamp'" v-model="windowEndFormat" outlined dense emit-value map-options :options="formatOptions(windowEndKey)" label="窗口结束格式 *" />
+      <q-select v-if="form.checkpoint_mode === 'timestamp' && windowMode === 'bounded_window'" v-model="windowEndKey" outlined dense emit-value map-options :options="windowParameterOptions" label="窗口结束参数 *" :rules="[requiredRule]" />
+      <q-select v-if="form.checkpoint_mode === 'timestamp' && windowMode === 'bounded_window'" v-model="windowEndFormat" outlined dense emit-value map-options :options="formatOptions(windowEndKey)" label="窗口结束格式 *" />
       <q-input v-model="form.description" class="sync-task-form__wide" outlined dense type="textarea" autogrow maxlength="512" label="描述" />
     </q-form>
     <template #footer-status><span class="text-caption text-grey-7">任务启用后技术配置不可直接修改；Checkpoint 由服务端维护</span></template>
@@ -71,6 +73,7 @@ import {
   type SyncTaskCreateRequest,
   type SyncTaskEdit,
   type SyncTimeFormat,
+  type SyncWindowMode,
   useIntegrationApi,
 } from 'src/api/services/integration'
 
@@ -95,11 +98,16 @@ const windowStartKey = ref('')
 const windowEndKey = ref('')
 const windowStartFormat = ref<SyncTimeFormat>('rfc3339')
 const windowEndFormat = ref<SyncTimeFormat>('rfc3339')
+const windowMode = ref<SyncWindowMode>('bounded_window')
 const initialCheckpointLocal = ref('')
 const form = reactive<SyncTaskCreateRequest>(emptyForm())
 
 const scheduleOptions: { label: string; value: SyncScheduleType }[] = [{ label: '仅手工触发', value: 'none' }, { label: 'Cron 定时', value: 'cron' }]
 const checkpointOptions: { label: string; value: SyncCheckpointMode }[] = [{ label: '无 Checkpoint', value: 'none' }, { label: '时间戳', value: 'timestamp' }]
+const windowModeOptions: { label: string; value: SyncWindowMode }[] = [
+  { label: '完整起止窗口', value: 'bounded_window' },
+  { label: '仅时间下界（响应不受上界限制）', value: 'lower_bound_only' },
+]
 const systemOptions = computed(() => props.systems.map((item) => ({ label: `${item.name} (${item.system_code})`, value: item.id })))
 const interfaceOptions = computed(() => props.interfaces.filter((item) => item.external_system.id === form.external_system_id && item.status === 'enabled').map((item) => ({ label: `${item.name} (${item.interface_code} · v${item.version})`, value: item.id })))
 const consumerOptions = computed(() => props.consumers.map((item) => ({ label: `${item.name || item.code} (${item.code} · v${item.version})`, value: `${item.code}@${item.version}` })))
@@ -152,15 +160,20 @@ function buildInputPlan(): SyncExecutionInputPlan {
     if (parameter.location === 'body') (plan.static_input.json_body ||= {})[parameter.code] = parseStaticValue(parameter, raw)
   }
   if (form.checkpoint_mode === 'timestamp') {
+    plan.version = 2
+    plan.window_mode = windowMode.value
     const [startLocation, ...startCode] = windowStartKey.value.split(':')
-    const [endLocation, ...endCode] = windowEndKey.value.split(':')
     plan.window_start_binding = { location: startLocation as InterfaceInputParameter['location'], code: startCode.join(':'), format: windowStartFormat.value }
-    plan.window_end_binding = { location: endLocation as InterfaceInputParameter['location'], code: endCode.join(':'), format: windowEndFormat.value }
+    if (windowMode.value === 'bounded_window') {
+      const [endLocation, ...endCode] = windowEndKey.value.split(':')
+      plan.window_end_binding = { location: endLocation as InterfaceInputParameter['location'], code: endCode.join(':'), format: windowEndFormat.value }
+    }
   }
   return plan
 }
 function applyPlan(plan: SyncExecutionInputPlan) {
   resetPlan()
+  windowMode.value = plan.version === 2 ? plan.window_mode || 'bounded_window' : 'bounded_window'
   for (const parameter of eligibleParameters.value) {
     const key = parameterKey(parameter)
     let value: unknown
@@ -184,6 +197,7 @@ watch(() => [props.modelValue, props.editData] as const, async ([open, edit]) =>
 }, { immediate: true })
 watch(() => form.schedule_type, (value) => { if (value === 'none') form.cron_expression = '' })
 watch(() => form.checkpoint_mode, (value) => { if (value === 'none') { delete form.initial_checkpoint_at; form.lookback_seconds = 0; form.window_slice_seconds = 0; windowStartKey.value = ''; windowEndKey.value = '' } else if (!form.window_slice_seconds) form.window_slice_seconds = 3600 })
+watch(windowMode, (value) => { if (value === 'lower_bound_only') windowEndKey.value = '' })
 watch(consumerKey, (value) => { const [code, version] = value.split('@'); form.consumer_code = code || ''; form.consumer_version = Number(version) || 0 })
 
 async function submit() {

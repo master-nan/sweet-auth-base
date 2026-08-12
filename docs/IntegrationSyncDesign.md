@@ -798,3 +798,44 @@ Integration Sync V1 采用“版本化 SyncTask + 两表 Batch 模型 + Executio
 10. 后续 Organization、Retry 或补数能力不得绕过冻结执行链另建调度和 HTTP 路径。
 
 本设计可作为 INT-005B 及后续 Sync 实施的正式基线。
+
+## 24. INT-006B 冻结后受控扩展：Source Window Contract V2
+
+### 24.1 兼容目标
+
+真实 HR timestamp 接口只有包含式时间下界，不能满足 V1 必须同时绑定起止参数的要求。INT-006B 在不修改 V1 的前提下增加 `SyncExecutionInputPlan version=2`。V2 新增服务端白名单字段 `window_mode`：
+
+- `bounded_window`：必须同时提供 `window_start_binding`、`window_end_binding`，语义与 V1 完全一致；
+- `lower_bound_only`：timestamp Checkpoint 只允许 `window_start_binding`，且明确禁止 `window_end_binding`。
+
+V1 仍只接受 version 1、不接受 `window_mode`，并继续隐含 `bounded_window`。既有 JSONB、Task、Execution 和页面编辑数据不迁移、不重写。V2 的 JSONB CHECK 只接受上述两个固定编码，应用服务仍以统一 `NormalizeSyncExecutionInputPlan` 和 ExecutionInputSnapshot 契约作为最终边界。
+
+### 24.2 逻辑窗口与请求窗口
+
+两种模式都冻结逻辑半开区间 `[logical_window_start, logical_window_end)`，并继续把它写入 `IntegrationExecution.sync_window_start/end`。区别仅在 HTTP 输入：
+
+```text
+bounded_window:
+  request_start = first_slice ? logical_start - lookback : logical_start
+  request_end   = logical_end
+
+lower_bound_only:
+  request_start = first_slice ? logical_start - lookback : logical_start
+  request_end   = 不存在
+```
+
+协调器仍向计划物化器提供逻辑终点，但 `lower_bound_only` 不把该值注入 HTTP。Consumer 从受控 `SyncConsumptionRequest.WindowStart/WindowEnd` 获得逻辑窗口，并必须按已确认的权威 source change timestamp 分类：窗口内记录可处理；Lookback 记录只能做稳定键幂等重放；`source_change_time >= logical_window_end` 的 future 记录不得写业务对象、不得形成当前 Slice 成功记录，也不得提前影响 Checkpoint。
+
+Checkpoint 仍只由 Coordinator 在 Execution 技术成功、Consumer 业务成功和连续切片成立后推进到 `logical_window_end`。V2 不修改连续推进、stop-on-failure、revision 或数据库时间规则。
+
+### 24.3 响应大小与生产门控
+
+`lower_bound_only` 只解决逻辑窗口和 Checkpoint 正确性，不提供源响应上界。它不能减少 HTTP Body、冒充真正时间切片、解决历史积压或绕过 Transport 64 MiB 上限。对只支持下界的源接口，缩短逻辑 Slice 也不能证明响应会变小，因为源端仍可能返回下界之后直到当前时刻的全部数据。
+
+因此生产初始化和 Catch-up 必须先做受控响应量门控。单次响应超过 InterfaceDefinition 或 Consumer 上限时，Execution/Task 按既有 Runtime 规则失败；不得自动放宽 Transport、保存 Response Artifact、落磁盘临时 Payload 或增加旁路流式实现。人员按公司分区只能使用经服务端批准的静态 partition ID；不得让用户自由输入、动态遍历 Organization 后 fan-out，或在 Organization 内建立 Scheduler。
+
+### 24.4 验证与冻结结论
+
+INT-006B 覆盖 V1 回归、V2 bounded/lower-bound 规范化、禁止伪结束绑定、逻辑窗口过滤、Lookback 幂等、future 拒绝、JSONB CHECK，以及 PostgreSQL 16 + SyncRunner + WorkerRunner + TLS + Organization test consumer E2E。正式变更依据见 `IntegrationSyncSourceContractChangeReview.md`。
+
+该扩展不改变 Sync V1 两表模型、Scheduler、Execution 唯一创建链、Retry、Consumer 注册模型、Checkpoint 连续推进或无 Response Artifact 边界。V2 通过后，`lower_bound_only` 可以作为受控 Source Contract 使用；源 changeTime 时区、精度、同秒完整性及响应规模仍是独立生产 Gate。
