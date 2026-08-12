@@ -30,6 +30,7 @@ type syncTaskApplication interface {
 	CreateSyncTaskVersion(context.Context, int, int) (response.SyncTaskDetailRes, error)
 	EnableSyncTask(context.Context, int, int) (response.SyncTaskDetailRes, error)
 	DisableSyncTask(context.Context, int, int) (response.SyncTaskDetailRes, error)
+	RunSyncTask(context.Context, int, int) (response.SyncBatchDetailRes, error)
 	ListSyncConsumers(context.Context) []response.SyncConsumerMetadataRes
 }
 
@@ -112,6 +113,19 @@ func (c *IntegrationSyncController) CreateTaskVersion(ctx *gin.Context) {
 
 func (c *IntegrationSyncController) EnableTask(ctx *gin.Context)  { c.changeTaskState(ctx, true) }
 func (c *IntegrationSyncController) DisableTask(ctx *gin.Context) { c.changeTaskState(ctx, false) }
+
+func (c *IntegrationSyncController) RunTask(ctx *gin.Context) {
+	id, ok := integrationSyncPathID(ctx)
+	if !ok {
+		return
+	}
+	var req request.SyncTaskRunReq
+	if !bindIntegrationSync(ctx, &req, c.translators) {
+		return
+	}
+	result, err := c.tasks.RunSyncTask(ctx.Request.Context(), id, req.Revision)
+	c.setResult(ctx, result, err, true)
+}
 
 func (c *IntegrationSyncController) changeTaskState(ctx *gin.Context, enable bool) {
 	id, ok := integrationSyncPathID(ctx)

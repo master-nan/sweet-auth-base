@@ -13,6 +13,7 @@ type IntegrationExecutionQueryReq struct {
 	QuickQuery            *QuickQuery `form:"quick_query" json:"quick_query"`
 	ExternalSystemID      int         `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
 	InterfaceDefinitionID int         `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
+	SyncBatchID           int         `form:"sync_batch_id" json:"sync_batch_id" binding:"omitempty,gt=0"`
 	TriggerSource         string      `form:"trigger_source" json:"trigger_source" binding:"omitempty,oneof=manual system_event scheduled"`
 	Status                string      `form:"status" json:"status" binding:"omitempty,oneof=created running retry_waiting succeeded failed cancelled"`
 	CreatedFrom           *time.Time  `form:"created_from" json:"created_from"`
@@ -74,6 +75,9 @@ func (r IntegrationExecutionQueryReq) ToBasic() Basic {
 	}
 	if r.InterfaceDefinitionID > 0 {
 		filters["interface_definition_id"] = r.InterfaceDefinitionID
+	}
+	if r.SyncBatchID > 0 {
+		filters["sync_batch_id"] = r.SyncBatchID
 	}
 	if r.TriggerSource != "" {
 		filters["trigger_source"] = r.TriggerSource

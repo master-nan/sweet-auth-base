@@ -284,6 +284,12 @@ export interface IntegrationExecutionListItem {
   completed_at?: string
   duration_ms: number
   error_category?: string
+  sync_source?: {
+    batch_id: number
+    slice_no: number
+    window_start?: string
+    window_end?: string
+  }
 }
 
 export interface IntegrationLogListItem {
@@ -338,6 +344,13 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
     max_attempts: number
   }
   attempts_remaining: number
+  sync_business?: {
+    status: 'pending' | 'succeeded' | 'failed'
+    reason_code?: string
+    success_count: number
+    failed_count: number
+    reference?: string
+  }
   result_http_status?: number
   result_size_bytes: number
   result_hash?: string
@@ -352,6 +365,7 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
 export interface IntegrationExecutionQuery extends Query {
   external_system_id?: number
   interface_definition_id?: number
+  sync_batch_id?: number
   trigger_source?: string
   status?: IntegrationExecutionStatus | ''
   created_from?: string
@@ -654,6 +668,8 @@ export const useIntegrationApi = () => ({
     instance.put<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}/enable`, { revision }).then((response) => response.data),
   disableSyncTask: (id: number, revision: number) =>
     instance.put<ResponseData<SyncTaskDetail>>(`/admin/integration/sync-task/${id}/disable`, { revision }).then((response) => response.data),
+  runSyncTask: (id: number, revision: number) =>
+    instance.post<ResponseData<SyncBatchDetail>>(`/admin/integration/sync-task/${id}/run`, { revision }).then((response) => response.data),
   querySyncBatches: (query: SyncBatchQuery) =>
     instance.post<ResponseData<SyncBatchListItem[]>>('/admin/integration/sync-batch/query', query).then((response) => response.data),
   getSyncBatch: (id: number) =>

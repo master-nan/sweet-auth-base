@@ -4,6 +4,7 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/database"
 	myerrors "backend/internal/errors"
 	"backend/internal/integration"
@@ -152,6 +153,60 @@ func TestSyncTaskServiceNoneCheckpointClearsWindowConfiguration(t *testing.T) {
 	}
 	if created.InitialCheckpointAt != nil || created.CheckpointAt != nil || created.LookbackSeconds != 0 || created.WindowSliceSeconds != 0 {
 		t.Fatalf("none checkpoint was not normalized: %+v", created)
+	}
+}
+
+func TestSyncTaskServiceManualRunUsesDatabaseWindowAndAuditSubject(t *testing.T) {
+	svc, db, writer := newSyncTaskTestSubject(t)
+	initial := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Second)
+	created, err := svc.CreateSyncTask(context.Background(), syncTaskCreateRequest(initial))
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled, err := svc.EnableSyncTask(context.Background(), created.ID, created.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(88, "sync-admin"))
+	batch, err := svc.RunSyncTask(ctx, enabled.ID, enabled.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batch.TriggerType != model.IntegrationSyncTriggerManual || batch.Status != model.IntegrationSyncBatchStatusCreated || batch.WindowStart == nil || batch.WindowEnd == nil || batch.CheckpointBefore == nil || !batch.WindowStart.Equal(initial) || !batch.CheckpointBefore.Equal(initial) || !batch.WindowEnd.After(initial) {
+		t.Fatalf("manual batch=%+v", batch)
+	}
+	var stored model.IntegrationSyncBatch
+	if err := db.First(&stored, batch.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.ScheduledFor != nil || stored.TriggeredByUserID == nil || *stored.TriggeredByUserID != 88 || stored.TriggeredByUserName != "sync-admin" || stored.TriggerKey == "" {
+		t.Fatalf("stored manual batch=%+v", stored)
+	}
+	if _, err := svc.RunSyncTask(ctx, enabled.ID, enabled.Revision); !errors.Is(err, myerrors.ErrSyncTaskActiveBatch) {
+		t.Fatalf("second manual run=%v", err)
+	}
+	if len(writer.records) != 3 || writer.records[len(writer.records)-1].Action != syncTaskAuditRun {
+		t.Fatalf("audit records=%+v", writer.records)
+	}
+}
+
+func TestNextSyncScheduleHandlesDSTTransitions(t *testing.T) {
+	springFrom := time.Date(2026, 3, 8, 6, 0, 0, 0, time.UTC)
+	spring, err := nextSyncSchedule("30 2 * * *", "America/New_York", springFrom)
+	if err != nil || spring == nil || !spring.After(springFrom) {
+		t.Fatalf("spring schedule=%v err=%v", spring, err)
+	}
+	location, _ := time.LoadLocation("America/New_York")
+	if local := spring.In(location); local.Hour() != 2 || local.Minute() != 30 {
+		t.Fatalf("spring schedule selected nonexistent/incorrect local time: %v", local)
+	}
+	fallFrom := time.Date(2026, 11, 1, 4, 0, 0, 0, time.UTC)
+	fall, err := nextSyncSchedule("30 1 * * *", "America/New_York", fallFrom)
+	if err != nil || fall == nil || !fall.After(fallFrom) {
+		t.Fatalf("fall schedule=%v err=%v", fall, err)
+	}
+	if local := fall.In(location); local.Hour() != 1 || local.Minute() != 30 {
+		t.Fatalf("fall local time=%v", local)
 	}
 }
 

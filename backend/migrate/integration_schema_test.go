@@ -462,15 +462,15 @@ func TestIntegrationConfigurationSeedCreatesMenuButtonsAndCasbin(t *testing.T) {
 	if syncTaskMenu.TableCode != integrationSyncTaskTableCode || syncTaskMenu.Title != "router.integration.syncTask" || syncTaskMenu.Sequence != 5 {
 		t.Fatalf("unexpected sync task menu: %+v", syncTaskMenu)
 	}
-	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", syncTaskMenu.Id).Count(&buttonCount).Error; err != nil || buttonCount != 10 {
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ?", syncTaskMenu.Id).Count(&buttonCount).Error; err != nil || buttonCount != 11 {
 		t.Fatalf("sync task button count=%d err=%v", buttonCount, err)
 	}
 	var forbiddenSyncTaskButtons int64
-	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND event_action IN ?", syncTaskMenu.Id, []string{"run", "cancel", "delete", "checkpoint"}).Count(&forbiddenSyncTaskButtons).Error; err != nil || forbiddenSyncTaskButtons != 0 {
+	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND event_action IN ?", syncTaskMenu.Id, []string{"cancel", "delete", "checkpoint"}).Count(&forbiddenSyncTaskButtons).Error; err != nil || forbiddenSyncTaskButtons != 0 {
 		t.Fatalf("forbidden sync task buttons=%d err=%v", forbiddenSyncTaskButtons, err)
 	}
 	var syncTaskCasbinCount int64
-	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/sync-task%").Count(&syncTaskCasbinCount).Error; err != nil || syncTaskCasbinCount != 9 {
+	if err := db.Model(&model.CasbinRule{}).Where("v1 LIKE ?", "%/admin/integration/sync-task%").Count(&syncTaskCasbinCount).Error; err != nil || syncTaskCasbinCount != 10 {
 		t.Fatalf("sync task Casbin policies=%d err=%v", syncTaskCasbinCount, err)
 	}
 	var syncBatchMenu model.SysMenu

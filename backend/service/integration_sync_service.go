@@ -4,6 +4,7 @@ import (
 	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/internal/audit"
 	myerrors "backend/internal/errors"
 	"backend/internal/integration"
 	"backend/internal/utils"
@@ -12,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +32,7 @@ const (
 	syncTaskAuditVersion      = "integration.sync_task.create_version"
 	syncTaskAuditEnable       = "integration.sync_task.enable"
 	syncTaskAuditDisable      = "integration.sync_task.disable"
+	syncTaskAuditRun          = "integration.sync_task.run"
 
 	syncTaskMaxDurationSeconds = 604800
 )
@@ -381,6 +384,76 @@ func (s *SyncTaskService) DisableSyncTask(ctx context.Context, id, revision int)
 	return s.taskDetail(ctx, updated)
 }
 
+// RunSyncTask creates one manual Batch from the current server-owned checkpoint.
+// Execution generation remains the Sync Runner/Coordinator's responsibility.
+func (s *SyncTaskService) RunSyncTask(ctx context.Context, id, revision int) (response.SyncBatchDetailRes, error) {
+	var created model.IntegrationSyncBatch
+	err := RunInTransaction(ctx, s.batches.DBWithContext(ctx), func(tx *gorm.DB) error {
+		task, err := s.tasks.FindByIdForUpdate(tx, id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return myerrors.ErrSyncTaskNotFound
+		}
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if task.Revision != revision {
+			return myerrors.ErrSyncTaskRevisionConflict
+		}
+		if task.Status != model.IntegrationSyncTaskStatusEnabled || !task.State {
+			return myerrors.ErrSyncTaskStatusInvalid
+		}
+		if active, err := s.batches.CountActiveByTaskCode(tx, task.TaskCode); err != nil {
+			return myerrors.WrapDatabaseError(err)
+		} else if active > 0 {
+			return myerrors.ErrSyncTaskActiveBatch
+		}
+		if err := s.normalizeAndValidateTask(ctx, tx, &task, true); err != nil {
+			return err
+		}
+		system, err := s.systems.FindByIdWithDB(tx, task.ExternalSystemID)
+		if err != nil {
+			return myerrors.ErrSyncInterfaceInvalid
+		}
+		definition, err := s.interfaces.FindByIdWithDB(tx, task.InterfaceDefinitionID)
+		if err != nil || definition.ExternalSystemID != system.Id {
+			return myerrors.ErrSyncInterfaceInvalid
+		}
+		databaseNow, err := s.batches.CurrentDatabaseTime(tx)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		batchID, err := s.sf.GenerateUniqueID()
+		if err != nil {
+			return myerrors.WrapSystemError(err)
+		}
+		var userID *int
+		var userName string
+		if subject, ok := audit.GetAuditSubject(ctx); ok {
+			userID, userName = &subject.UserID, subject.UserName
+		}
+		created, err = newSyncBatchSnapshot(task, system, definition, int(batchID), syncBatchTrigger{
+			triggerType: model.IntegrationSyncTriggerManual,
+			triggerKey:  fmt.Sprintf("manual:%s:%d", task.TaskCode, batchID),
+			userID:      userID,
+			userName:    userName,
+		}, databaseNow)
+		if err != nil {
+			return err
+		}
+		if err := s.batches.Create(tx, &created); err != nil {
+			if isSyncDuplicate(err) {
+				return myerrors.ErrSyncBatchConflict
+			}
+			return myerrors.WrapDatabaseError(err)
+		}
+		return s.writeRunAudit(ctx, tx, task, created)
+	})
+	if err != nil {
+		return response.SyncBatchDetailRes{}, err
+	}
+	return response.NewSyncBatchDetailRes(created), nil
+}
+
 func (s *SyncTaskService) ListSyncConsumers(context.Context) []response.SyncConsumerMetadataRes {
 	values := s.registry.ListMetadata()
 	result := make([]response.SyncConsumerMetadataRes, 0, len(values))
@@ -695,6 +768,17 @@ func (s *SyncTaskService) writeAudit(ctx context.Context, tx *gorm.DB, action st
 		changes["revision"] = TransactionalAuditChange{OldValue: previous.Revision, NewValue: value.Revision}
 	}
 	return s.audit.RecordTransactionalAuditContext(ctx, tx, TransactionalAuditRecord{Action: action, ResourceType: syncTaskAuditResourceType, ResourceCode: value.TaskCode + "@" + strconv.Itoa(value.Version), ResourceId: strconv.Itoa(value.Id), Changes: changes})
+}
+
+func (s *SyncTaskService) writeRunAudit(ctx context.Context, tx *gorm.DB, task model.IntegrationSyncTask, batch model.IntegrationSyncBatch) error {
+	changes := map[string]TransactionalAuditChange{
+		"task_code": {NewValue: task.TaskCode}, "version": {NewValue: task.Version}, "batch_no": {NewValue: batch.BatchNo},
+		"trigger_type": {NewValue: batch.TriggerType}, "checkpoint_mode": {NewValue: batch.CheckpointMode},
+	}
+	return s.audit.RecordTransactionalAuditContext(ctx, tx, TransactionalAuditRecord{
+		Action: syncTaskAuditRun, ResourceType: syncTaskAuditResourceType,
+		ResourceCode: task.TaskCode + "@" + strconv.Itoa(task.Version), ResourceId: strconv.Itoa(task.Id), Changes: changes,
+	})
 }
 
 func isSyncDuplicate(err error) bool {

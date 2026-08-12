@@ -16,8 +16,34 @@ type syncTaskApplicationStub struct {
 	detail response.SyncTaskDetailRes
 }
 
+func (s syncTaskApplicationStub) RunSyncTask(context.Context, int, int) (response.SyncBatchDetailRes, error) {
+	return response.SyncBatchDetailRes{SyncBatchListRes: response.SyncBatchListRes{ID: 3, BatchNo: "SYNC-3", TriggerType: "manual", Status: "created"}}, nil
+}
+
 func (s syncTaskApplicationStub) GetSyncTask(context.Context, int) (response.SyncTaskDetailRes, error) {
 	return s.detail, nil
+}
+
+func TestIntegrationSyncControllerManualRunReturnsBatchWhitelist(t *testing.T) {
+	controller := &IntegrationSyncController{tasks: syncTaskApplicationStub{}}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/run", strings.NewReader(`{"revision":1}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	controller.RunTask(ctx)
+	value, ok := ctx.Get("response")
+	if !ok {
+		t.Fatal("controller did not set unified response")
+	}
+	payload, err := json.Marshal(value)
+	if err != nil || !strings.Contains(string(payload), "SYNC-3") {
+		t.Fatalf("payload=%s err=%v", payload, err)
+	}
+	for _, forbidden := range []string{"input_plan", "input_snapshot", "credential", "authorization", "trigger_key"} {
+		if strings.Contains(strings.ToLower(string(payload)), forbidden) {
+			t.Fatalf("run response leaked %q: %s", forbidden, payload)
+		}
+	}
 }
 
 type syncBatchApplicationStub struct {

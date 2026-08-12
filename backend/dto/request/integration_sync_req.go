@@ -102,6 +102,10 @@ type SyncTaskStateReq struct {
 	Revision int `json:"revision" binding:"required,gt=0"`
 }
 
+type SyncTaskRunReq struct {
+	Revision int `json:"revision" binding:"required,gt=0"`
+}
+
 type SyncBatchQueryReq struct {
 	Page        int               `form:"page" json:"page" binding:"omitempty,gte=1"`
 	Num         int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`

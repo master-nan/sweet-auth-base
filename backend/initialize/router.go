@@ -241,7 +241,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/integration/retry-policy/:id/enable", app.RetryPolicyController.Enable)
 		adminGroup.PUT("/integration/retry-policy/:id/disable", app.RetryPolicyController.Disable)
 
-		// 集成中心 - 同步任务配置与批次查询。本阶段不暴露手工运行和取消。
+		// 集成中心 - 同步任务配置、受控手工运行与批次查询；不暴露批次取消。
 		adminGroup.POST("/integration/sync-task/query", app.IntegrationSyncController.QueryTasks)
 		adminGroup.GET("/integration/sync-task/consumers", app.IntegrationSyncController.ConsumerMetadata)
 		adminGroup.GET("/integration/sync-task/:id", app.IntegrationSyncController.TaskDetail)
@@ -251,6 +251,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/integration/sync-task/:id/versions", app.IntegrationSyncController.CreateTaskVersion)
 		adminGroup.PUT("/integration/sync-task/:id/enable", app.IntegrationSyncController.EnableTask)
 		adminGroup.PUT("/integration/sync-task/:id/disable", app.IntegrationSyncController.DisableTask)
+		adminGroup.POST("/integration/sync-task/:id/run", app.IntegrationSyncController.RunTask)
 		adminGroup.POST("/integration/sync-batch/query", app.IntegrationSyncController.QueryBatches)
 		adminGroup.GET("/integration/sync-batch/:id", app.IntegrationSyncController.BatchDetail)
 

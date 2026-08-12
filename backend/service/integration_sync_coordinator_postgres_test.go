@@ -1,7 +1,10 @@
 package service
 
 import (
+	"backend/config"
+	"backend/internal/audit"
 	"backend/internal/database"
+	myerrors "backend/internal/errors"
 	"backend/internal/integration"
 	"backend/internal/security"
 	testutil "backend/internal/test"
@@ -10,6 +13,7 @@ import (
 	"backend/repository/impl"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -54,6 +58,14 @@ func (r syncConsumerTestRoundTripper) RoundTrip(request *http.Request) (*http.Re
 func TestIntegrationSyncPostgreSQLSkipLockedCreatesOneBatch(t *testing.T) {
 	db := openSyncCoordinatorPostgreSQL(t)
 	first := seedPostgreSQLSyncCoordinator(t, db, "pg_schedule_once")
+	var databaseNow time.Time
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+		t.Fatal(err)
+	}
+	missedSchedule := databaseNow.UTC().Add(-24 * time.Hour)
+	if err := db.Model(&model.IntegrationSyncTask{}).Where("task_code = ?", "pg_schedule_once").Update("next_scheduled_at", missedSchedule).Error; err != nil {
+		t.Fatal(err)
+	}
 	second := newPostgreSQLSyncCoordinator(t, db, integration.SyncBusinessResultSucceeded)
 	start := make(chan struct{})
 	results := make(chan error, 2)
@@ -80,8 +92,117 @@ func TestIntegrationSyncPostgreSQLSkipLockedCreatesOneBatch(t *testing.T) {
 		t.Fatalf("batch count=%d err=%v", count, err)
 	}
 	var task model.IntegrationSyncTask
-	if err := db.Where("task_code = ?", "pg_schedule_once").First(&task).Error; err != nil || task.LastScheduledAt == nil || task.NextScheduledAt == nil || !task.NextScheduledAt.After(*task.LastScheduledAt) {
+	if err := db.Where("task_code = ?", "pg_schedule_once").First(&task).Error; err != nil || task.LastScheduledAt == nil || task.NextScheduledAt == nil || !task.LastScheduledAt.Equal(missedSchedule) || !task.NextScheduledAt.After(databaseNow) {
 		t.Fatalf("scheduled task=%+v err=%v", task, err)
+	}
+}
+
+func TestIntegrationSyncPostgreSQLTwoRunnersCreateOneBatch(t *testing.T) {
+	db := openSyncCoordinatorPostgreSQL(t)
+	firstCoordinator := seedPostgreSQLSyncCoordinator(t, db, "pg_two_runners")
+	secondCoordinator := newPostgreSQLSyncCoordinator(t, db, integration.SyncBusinessResultSucceeded)
+	first, err := integration.NewIntegrationSyncRunner(firstCoordinator, integration.SyncRunnerConfig{Enabled: true, RunnerID: "sync-runner-a", PollInterval: time.Second, ScheduleBatchSize: 2, CoordinateBatchSize: 2, ShutdownTimeout: 3 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := integration.NewIntegrationSyncRunner(secondCoordinator, integration.SyncRunnerConfig{Enabled: true, RunnerID: "sync-runner-b", PollInterval: time.Second, ScheduleBatchSize: 2, CoordinateBatchSize: 2, ShutdownTimeout: 3 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := first.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = first.Stop(context.Background()); _ = second.Stop(context.Background()) })
+	waitForPostgreSQLSyncExecution(t, db, 1, 5*time.Second)
+	if err := first.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var batches int64
+	if err := db.Model(&model.IntegrationSyncBatch{}).Count(&batches).Error; err != nil || batches != 1 {
+		t.Fatalf("batch count=%d err=%v", batches, err)
+	}
+	var executions int64
+	if err := db.Model(&model.IntegrationExecution{}).Count(&executions).Error; err != nil || executions != 1 {
+		t.Fatalf("execution count=%d err=%v", executions, err)
+	}
+}
+
+func TestIntegrationSyncPostgreSQLManualAndScheduledCompeteForOneActiveBatch(t *testing.T) {
+	db := openSyncCoordinatorPostgreSQL(t)
+	coordinator := seedPostgreSQLSyncCoordinator(t, db, "pg_manual_schedule_race")
+	primary := &database.PrimaryDB{DB: db}
+	registry, err := integration.NewStaticSyncConsumerRegistry(integration.SyncConsumerRegistration{Metadata: integration.SyncConsumerMetadata{
+		Code: "test_sync_consumer", Version: 1, Name: "Test", Status: integration.SyncConsumerStatusEnabled,
+		ContentTypes: []string{"application/json"}, MaxResponseBytes: 2 << 20, MaxDuration: time.Second,
+		CheckpointModes: []string{model.IntegrationSyncCheckpointTimestamp},
+	}, Consumer: integration.SyncResultConsumerFunc(func(context.Context, integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+		return integration.NewSyncConsumptionResult(true, "", 1, 0, "")
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sf, _ := utils.NewSnowflake(5)
+	taskService := NewSyncTaskService(impl.NewIntegrationSyncTaskRepositoryImpl(primary), impl.NewIntegrationSyncBatchRepositoryImpl(primary), impl.NewExternalSystemRepositoryImpl(primary), impl.NewInterfaceDefinitionRepositoryImpl(primary), impl.NewRetryPolicyRepositoryImpl(primary), registry, sf, &externalSystemAuditWriter{}, &config.Server{})
+	var task model.IntegrationSyncTask
+	if err := db.Where("task_code = ?", "pg_manual_schedule_race").First(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	go func() {
+		<-start
+		_, runErr := taskService.RunSyncTask(audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(77, "sync-admin")), task.Id, task.Revision)
+		results <- runErr
+	}()
+	go func() {
+		<-start
+		_, scheduleErr := coordinator.ScheduleDueTasks(context.Background(), 1)
+		results <- scheduleErr
+	}()
+	close(start)
+	firstErr, secondErr := <-results, <-results
+	allowed := func(value error) bool {
+		return value == nil || errors.Is(value, myerrors.ErrSyncTaskActiveBatch) || errors.Is(value, myerrors.ErrSyncBatchConflict) || errors.Is(value, myerrors.ErrSyncTaskRevisionConflict)
+	}
+	if !allowed(firstErr) || !allowed(secondErr) || (firstErr != nil && secondErr != nil) {
+		t.Fatalf("manual/scheduled results=%v, %v", firstErr, secondErr)
+	}
+	var batches int64
+	if err := db.Model(&model.IntegrationSyncBatch{}).Count(&batches).Error; err != nil || batches != 1 {
+		t.Fatalf("active batch count=%d err=%v", batches, err)
+	}
+}
+
+func TestIntegrationSyncPostgreSQLDueQueryUsesUTCInNonUTCSession(t *testing.T) {
+	db := openSyncCoordinatorPostgreSQL(t)
+	seedPostgreSQLSyncCoordinator(t, db, "pg_schedule_timezone")
+	var databaseNow time.Time
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.IntegrationSyncTask{}).Where("task_code = ?", "pg_schedule_timezone").Update("next_scheduled_at", databaseNow.UTC().Add(time.Hour)).Error; err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	defer tx.Rollback()
+	if err := tx.Exec("SET LOCAL TIME ZONE 'Asia/Shanghai'").Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := impl.NewIntegrationSyncBatchRepositoryImpl(&database.PrimaryDB{DB: db})
+	values, err := repository.FindScheduledCandidates(tx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != 0 {
+		t.Fatalf("future UTC schedule was selected in non-UTC session: %+v", values)
 	}
 }
 
@@ -139,11 +260,20 @@ func TestIntegrationSyncPostgreSQLRunnerSequentialE2E(t *testing.T) {
 	}
 }
 
-func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testing.T) {
+func TestIntegrationSyncPostgreSQLRunnerTransportRetryConsumerCheckpointE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false)
+}
+
+func TestIntegrationSyncPostgreSQLConsumerFailureStopsCheckpointE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, true)
+}
+
+func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool) {
+	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
 	var httpCalls atomic.Int32
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		httpCalls.Add(1)
+		call := httpCalls.Add(1)
 		if request.URL.Path != "/employees" || request.URL.Query().Get("updated_from") == "" || request.URL.Query().Get("updated_to") == "" {
 			t.Errorf("unexpected sync request: %s", request.URL.String())
 		}
@@ -151,6 +281,9 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 			t.Errorf("credential was not injected")
 		}
 		writer.Header().Set("Content-Type", "application/json")
+		if call == 1 {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+		}
 		_, _ = writer.Write([]byte(`{"employees":[{"id":"10001"}]}`))
 	}))
 	defer tlsServer.Close()
@@ -166,13 +299,16 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	consumerCalled := make(chan integration.SyncConsumptionRequest, 1)
+	consumerCalled := make(chan integration.SyncConsumptionRequest, 2)
 	registry, err := integration.NewStaticSyncConsumerRegistry(integration.SyncConsumerRegistration{
 		Metadata: integration.SyncConsumerMetadata{Code: "test_sync_consumer", Version: 1, Name: "Test Consumer", Status: integration.SyncConsumerStatusEnabled,
 			ContentTypes: []string{"application/json"}, MaxResponseBytes: 1 << 20, MaxDuration: time.Second,
 			CheckpointModes: []string{model.IntegrationSyncCheckpointTimestamp}},
 		Consumer: integration.SyncResultConsumerFunc(func(_ context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
 			consumerCalled <- request
+			if failSecondConsumer && request.SliceNo() == 2 {
+				return integration.NewSyncConsumptionResult(false, "business_validation_failed", 0, 1, "")
+			}
 			return integration.NewSyncConsumptionResult(true, "", 1, 0, "ORG-SYNC-1")
 		}),
 	})
@@ -204,11 +340,19 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 		InterfaceCode: "employees", Name: "Employees", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET,
 		RelativePath: "/employees", CredentialID: &credential.Id, TimeoutSeconds: 5, ResponseLimit: 1 << 20, InputContract: contract,
 		IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
+	retryPolicy := model.RetryPolicy{Basic: model.Basic{Id: nextSyncTestID(), State: true}, PolicyCode: "sync_consumer_retry", PolicyName: "Sync Consumer Retry", Version: 1, Status: model.RetryPolicyStatusEnabled,
+		MaxAttempts: 2, InitialDelayMs: 1000, MaxDelayMs: 1000, BackoffType: model.RetryBackoffTypeFixed, BackoffMultiplier: 1,
+		JitterType: model.RetryJitterTypeNone, JitterRatio: 0, RetryWindowMs: 60000,
+		RetryableErrorCategories: datatypes.JSON([]byte(`["network","remote","timeout"]`)), RetryableHTTPStatuses: datatypes.JSON([]byte(`[429,502,503,504]`)), RespectRetryAfter: true, Revision: 1}
+	if _, err := integration.BuildRetryPolicySnapshot(retryPolicy, integration.RetryPolicySnapshotOptions{IdempotencyMode: integration.RemoteIdempotencySafeMethod}); err != nil {
+		t.Fatalf("retry fixture is invalid: %v", err)
+	}
+	definition.RetryPolicyID = &retryPolicy.Id
 	var databaseNow time.Time
 	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
-	checkpoint, due := databaseNow.UTC().Add(-30*time.Minute), databaseNow.UTC().Add(-time.Minute)
+	checkpoint, due := databaseNow.UTC().Add(-90*time.Minute), databaseNow.UTC().Add(-time.Minute)
 	plan, _ := json.Marshal(integration.SyncExecutionInputPlan{Version: 1, StaticInput: integration.ExecutionInputValues{},
 		WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_from", Format: "rfc3339"},
 		WindowEndBinding:   &integration.SyncWindowBinding{Location: "query", Code: "updated_to", Format: "rfc3339"}})
@@ -217,10 +361,20 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 		ConsumerCode: "test_sync_consumer", ConsumerVersion: 1, ScheduleType: model.IntegrationSyncScheduleCron, CronExpression: "* * * * *",
 		Timezone: "UTC", NextScheduledAt: &due, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
 		InitialCheckpointAt: &checkpoint, CheckpointAt: &checkpoint, WindowSliceSeconds: 3600, InputPlan: datatypes.JSON(plan), Revision: 1}
-	for _, value := range []any{&system, &credential, &definition, &task} {
+	for _, value := range []any{&system, &credential, &retryPolicy, &definition, &task} {
 		if err := db.Create(value).Error; err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", retryPolicy.Id).Update("jitter_ratio", 0).Error; err != nil {
+		t.Fatal(err)
+	}
+	var storedRetryPolicy model.RetryPolicy
+	if err := db.First(&storedRetryPolicy, retryPolicy.Id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRetryPolicyConfiguration(storedRetryPolicy); err != nil {
+		t.Fatalf("stored retry fixture is invalid: %+v err=%v", storedRetryPolicy, err)
 	}
 
 	primary := &database.PrimaryDB{DB: db}
@@ -262,7 +416,11 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = syncRunner.Stop(context.Background()); _ = worker.Stop(context.Background()) })
-	waitForPostgreSQLSyncBatchStatus(t, db, model.IntegrationSyncBatchStatusSucceeded, 12*time.Second)
+	expectedBatchStatus := model.IntegrationSyncBatchStatusSucceeded
+	if failSecondConsumer {
+		expectedBatchStatus = model.IntegrationSyncBatchStatusFailed
+	}
+	waitForPostgreSQLSyncBatchStatus(t, db, expectedBatchStatus, 20*time.Second)
 	if err := syncRunner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -270,26 +428,34 @@ func TestIntegrationSyncPostgreSQLRunnerTransportConsumerCheckpointE2E(t *testin
 		t.Fatal(err)
 	}
 
-	select {
-	case request := <-consumerCalled:
-		if request.ExecutionNo() == "" || request.SyncBatchNo() == "" || request.TaskCode() != task.TaskCode || request.TaskVersion() != task.Version ||
-			request.SliceNo() != 1 || !strings.Contains(string(request.Body()), "10001") {
-			t.Fatalf("consumer request=%s", request.String())
+	for sliceNo := 1; sliceNo <= 2; sliceNo++ {
+		select {
+		case request := <-consumerCalled:
+			if request.ExecutionNo() == "" || request.SyncBatchNo() == "" || request.TaskCode() != task.TaskCode || request.TaskVersion() != task.Version ||
+				request.SliceNo() != sliceNo || !strings.Contains(string(request.Body()), "10001") {
+				t.Fatalf("consumer request=%s", request.String())
+			}
+		default:
+			t.Fatalf("consumer was not called for slice %d", sliceNo)
 		}
-	default:
-		t.Fatal("consumer was not called")
 	}
-	var execution model.IntegrationExecution
-	if err := db.Where("sync_batch_id IS NOT NULL").First(&execution).Error; err != nil {
+	var executionRows []model.IntegrationExecution
+	if err := db.Where("sync_batch_id IS NOT NULL").Order("sync_slice_no ASC").Find(&executionRows).Error; err != nil {
 		t.Fatal(err)
 	}
-	if execution.Status != model.IntegrationExecutionStatusSucceeded || execution.SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded ||
-		execution.SyncBusinessSuccessCount != 1 || execution.SyncBusinessReference != "ORG-SYNC-1" || httpCalls.Load() != 1 {
-		t.Fatalf("execution=%+v http_calls=%d", execution, httpCalls.Load())
+	if len(executionRows) != 2 || executionRows[0].Status != model.IntegrationExecutionStatusSucceeded || executionRows[0].CurrentAttempt != 2 || executionRows[0].SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded || httpCalls.Load() != 3 {
+		t.Fatalf("executions=%+v http_calls=%d", executionRows, httpCalls.Load())
 	}
 	var refreshedTask model.IntegrationSyncTask
-	if err := db.First(&refreshedTask, task.Id).Error; err != nil || refreshedTask.CheckpointAt == nil || !refreshedTask.CheckpointAt.After(checkpoint) {
+	if err := db.First(&refreshedTask, task.Id).Error; err != nil || refreshedTask.CheckpointAt == nil {
 		t.Fatalf("checkpoint=%+v err=%v", refreshedTask.CheckpointAt, err)
+	}
+	if failSecondConsumer {
+		if executionRows[1].Status != model.IntegrationExecutionStatusFailed || executionRows[1].SyncBusinessStatus != model.IntegrationSyncBusinessStatusFailed || executionRows[1].CurrentAttempt != 1 || executionRows[0].SyncWindowEnd == nil || !refreshedTask.CheckpointAt.Equal(*executionRows[0].SyncWindowEnd) {
+			t.Fatalf("consumer failure boundary executions=%+v checkpoint=%v", executionRows, refreshedTask.CheckpointAt)
+		}
+	} else if executionRows[1].Status != model.IntegrationExecutionStatusSucceeded || executionRows[1].SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded || executionRows[1].CurrentAttempt != 1 || executionRows[1].SyncWindowEnd == nil || !refreshedTask.CheckpointAt.Equal(*executionRows[1].SyncWindowEnd) {
+		t.Fatalf("successful checkpoint boundary executions=%+v checkpoint=%v", executionRows, refreshedTask.CheckpointAt)
 	}
 }
 
@@ -397,7 +563,13 @@ func waitForPostgreSQLSyncBatchStatus(t *testing.T, db *gorm.DB, status string, 
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	t.Fatalf("batch did not reach %s", status)
+	var batch model.IntegrationSyncBatch
+	var executions []model.IntegrationExecution
+	var attempts []model.IntegrationLog
+	_ = db.First(&batch).Error
+	_ = db.Order("sync_slice_no ASC").Find(&executions).Error
+	_ = db.Order("execution_id ASC, attempt_no ASC").Find(&attempts).Error
+	t.Fatalf("batch did not reach %s: batch=%+v executions=%+v attempts=%+v", status, batch, executions, attempts)
 }
 
 var syncTestIDMu sync.Mutex

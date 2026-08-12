@@ -1,12 +1,14 @@
 import { defineComponent, h } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const api = vi.hoisted(() => ({ querySyncBatches: vi.fn(), getSyncBatch: vi.fn() }))
+const api = vi.hoisted(() => ({ querySyncBatches: vi.fn(), getSyncBatch: vi.fn(), queryExecutions: vi.fn() }))
+const permissions = vi.hoisted(() => ({ values: ['integration_sync_batch_detail'] }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => api }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: ['integration_sync_batch_detail'] }) }))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
 vi.mock('src/stores/loading', () => ({ useLoadingStore: () => ({ loading: false }) }))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({ default: { template: '<div><slot /></div>' } }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
@@ -17,11 +19,28 @@ const Slot = defineComponent({ setup(_, { slots }) { return () => h('div', slots
 const Table = defineComponent({ props: { rows: Array }, setup(props, { slots }) { return () => h('div', { 'data-count': props.rows?.length }, [slots.top?.(), slots.bottom?.()]) } })
 
 describe('sync batch query page', () => {
-  it('is query-only and exposes no run, cancel or checkpoint mutation command', async () => {
+  beforeEach(() => { permissions.values = ['integration_sync_batch_detail']; Object.values(api).forEach((mock) => mock.mockReset()) })
+  it('exposes no batch mutation command and does not request executions without permission', async () => {
     api.querySyncBatches.mockResolvedValue({ data: [], total: 0 })
     const wrapper = shallowMount(Page, { global: { stubs: { BaseContent: Slot, QTable: Table, QInput: true, QSelect: true, QBtn: true, QIcon: true, QChip: true, QTd: Slot, QSpace: true, TablePagination: true, FormDialogShell: true } } })
     await flushPromises()
     expect(api.querySyncBatches).toHaveBeenCalledOnce()
-    expect(wrapper.text()).not.toMatch(/运行|取消|修改 Checkpoint|补数|Dry Run/)
+    expect(wrapper.text()).not.toMatch(/取消批次|修改 Checkpoint|补数|Dry Run|重新运行/)
+    const vm = wrapper.vm as unknown as { openDetail: (id: number) => Promise<void> }
+    api.getSyncBatch.mockResolvedValue({ data: { id: 1, batch_no: 'SYNC-1', task_code: 'task', task_version: 1, trigger_type: 'manual', status: 'created', interface_code: 'employees', interface_version: 1, consumer_code: 'test', consumer_version: 1, checkpoint_mode: 'timestamp', planned_slice_count: 2, current_slice_no: 0, execution_count: 0, technical_success_count: 0, technical_failed_count: 0, business_success_count: 0, business_failed_count: 0 } })
+    await vm.openDetail(1)
+    expect(api.queryExecutions).not.toHaveBeenCalled()
+  })
+
+  it('loads batch executions through the protected execution query', async () => {
+    permissions.values = ['integration_sync_batch_detail', 'integration_execution_query', 'integration_execution_detail']
+    api.querySyncBatches.mockResolvedValue({ data: [], total: 0 })
+    api.getSyncBatch.mockResolvedValue({ data: { id: 1, batch_no: 'SYNC-1', task_code: 'task', task_version: 1, trigger_type: 'manual', status: 'running', interface_code: 'employees', interface_version: 1, consumer_code: 'test', consumer_version: 1, checkpoint_mode: 'timestamp', planned_slice_count: 2, current_slice_no: 1, execution_count: 1, technical_success_count: 0, technical_failed_count: 0, business_success_count: 0, business_failed_count: 0 } })
+    api.queryExecutions.mockResolvedValue({ data: [{ id: 9, execution_no: 'EX-9', status: 'running', sync_source: { batch_id: 1, slice_no: 1 } }], total: 1 })
+    const wrapper = shallowMount(Page, { global: { stubs: { BaseContent: Slot, QTable: Table, QInput: true, QSelect: true, QBtn: true, QIcon: true, QChip: true, QTd: Slot, QSpace: true, QSeparator: true, QList: Slot, QItem: Slot, QItemSection: Slot, QItemLabel: Slot, TablePagination: true, FormDialogShell: true } } })
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { openDetail: (id: number) => Promise<void> }
+    await vm.openDetail(1)
+    expect(api.queryExecutions).toHaveBeenCalledWith(expect.objectContaining({ sync_batch_id: 1 }))
   })
 })

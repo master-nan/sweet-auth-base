@@ -754,7 +754,33 @@ Scheduler 自动触发、Execution Worker 和 Consumer 技术处理不伪造管�
 
 如保持原三段编号，可将 C-1/C-2 作为 INT-005C 子任务，但不得把 Consumer 安全边界和 Scheduler 原子性压缩为一次无审计的大改动。
 
-## 22. 最终设计结论
+## 22. INT-005D 实现收口补充
+
+### 22.1 手工触发
+
+`POST /admin/integration/sync-task/:id/run` 只接受 Task ID 和 revision，不接受时间范围、Checkpoint、Execution 输入、Dry Run 或补数参数。Application Service 在一个短事务中锁定 enabled Task，使用数据库 UTC 时间作为 `window_end` 和 `scheduled_for`，复用与定时触发相同的 Batch 快照构造器，并通过 active Batch 与 `trigger_key` 唯一约束和定时触发竞争。
+
+手工触发只创建 `created` Batch；Execution 仍由 Sync Coordinator 通过 Integration Application Service 生成。成功命令写管理员 Audit，Scheduler 和 Consumer 不伪造管理员身份。
+
+### 22.2 数据库时间表达式
+
+Sync 时间字段使用 PostgreSQL `timestamp without time zone` 保存 UTC。候选扫描必须使用 `CURRENT_TIMESTAMP AT TIME ZONE 'UTC'` 与 `next_scheduled_at` 比较，不能直接用带时区的 `CURRENT_TIMESTAMP` 依赖数据库会话时区。验收环境刻意保持 `Asia/Shanghai` 会话时区，未来 UTC Task 不会被提前八小时领取。
+
+Cron 的下一触发点、missed schedule 的 `coalesce_one`、Batch 窗口和 Checkpoint 均以数据库 UTC 基准计算；业务 IANA timezone 只用于 Cron 日历解释。
+
+### 22.3 页面权限加载
+
+同步任务页面只在具备对应功能权限时加载 metadata、ExternalSystem、InterfaceDefinition 和 Consumer 引用；无权限时不得先请求再依赖 403 隐藏。`run` 按钮仅对 enabled Task 且具备 `integration_sync_task_run` 权限的用户显示。
+
+同步批次到 Execution 的明细查询复用 Execution 查询 API，并携带精确 `sync_batch_id`。前端只有具备 Execution query 权限时才发起请求，详情跳转还需要 Execution detail 权限；后端继续执行 Execution 功能权限与 Data Permission。Batch DTO 和 Execution Sync 摘要不返回输入、响应或 Consumer 内部信息。
+
+### 22.4 最终收敛证据
+
+PostgreSQL 16 强制门控覆盖 Migration、partial unique、SKIP LOCKED、数据库 UTC、双 Runner、manual/scheduled 竞争、Execution slice 唯一和 Checkpoint revision。真实 Runner + TLS + test Consumer 场景覆盖两片成功、503 自动 Retry 后继续切片、第二片业务失败停止和 Checkpoint 连续推进。
+
+这些实现细节不改变 Sync V1 的两表模型、顺序切片、stop-on-failure、registered Consumer、无 Response Artifact 和唯一 Runtime/Retry 执行链。
+
+## 23. 最终设计结论
 
 Integration Sync V1 采用“版本化 SyncTask + 两表 Batch 模型 + Execution 直接关联 + PostgreSQL 唯一调度 + 顺序时间切片 + 注册 Consumer”的单链方案。
 

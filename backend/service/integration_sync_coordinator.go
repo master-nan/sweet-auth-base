@@ -140,12 +140,29 @@ func (s *IntegrationSyncCoordinator) newScheduledBatch(tx *gorm.DB, task model.I
 	if err != nil {
 		return model.IntegrationSyncBatch{}, myerrors.WrapSystemError(err)
 	}
+	return newSyncBatchSnapshot(task, system, definition, int(id), syncBatchTrigger{
+		triggerType:  model.IntegrationSyncTriggerScheduled,
+		triggerKey:   fmt.Sprintf("schedule:%s:%d", task.TaskCode, scheduledFor.Unix()),
+		scheduledFor: &scheduledFor,
+	}, databaseNow)
+}
+
+type syncBatchTrigger struct {
+	triggerType  string
+	triggerKey   string
+	scheduledFor *time.Time
+	userID       *int
+	userName     string
+}
+
+func newSyncBatchSnapshot(task model.IntegrationSyncTask, system model.ExternalSystem, definition model.InterfaceDefinition, id int, trigger syncBatchTrigger, databaseNow time.Time) (model.IntegrationSyncBatch, error) {
 	batch := model.IntegrationSyncBatch{
 		Basic: model.Basic{Id: int(id), State: true}, BatchNo: fmt.Sprintf("SYNC-%d", id), SyncTaskID: task.Id,
 		TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version,
 		SystemCode: system.SystemCode, InterfaceCode: definition.InterfaceCode, InterfaceVersion: definition.Version,
 		ConsumerCode: task.ConsumerCode, ConsumerVersion: task.ConsumerVersion,
-		TriggerType: model.IntegrationSyncTriggerScheduled, TriggerKey: fmt.Sprintf("schedule:%s:%d", task.TaskCode, scheduledFor.Unix()), ScheduledFor: &scheduledFor,
+		TriggerType: trigger.triggerType, TriggerKey: trigger.triggerKey, ScheduledFor: trigger.scheduledFor,
+		TriggeredByUserID: trigger.userID, TriggeredByUserName: trigger.userName,
 		Status: model.IntegrationSyncBatchStatusCreated, CheckpointMode: task.CheckpointMode,
 		LookbackSeconds: task.LookbackSeconds, WindowSliceSeconds: task.WindowSliceSeconds, Revision: 1,
 	}
@@ -154,9 +171,9 @@ func (s *IntegrationSyncCoordinator) newScheduledBatch(tx *gorm.DB, task model.I
 			return model.IntegrationSyncBatch{}, myerrors.ErrSyncCheckpointInvalid
 		}
 		start := task.CheckpointAt.UTC()
-		end := scheduledFor
-		if databaseNow.Before(end) {
-			end = databaseNow
+		end := databaseNow
+		if trigger.scheduledFor != nil && trigger.scheduledFor.Before(end) {
+			end = trigger.scheduledFor.UTC()
 		}
 		batch.WindowStart, batch.WindowEnd, batch.CheckpointBefore = &start, &end, &start
 		if end.Before(start) {

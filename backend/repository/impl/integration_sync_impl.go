@@ -75,8 +75,12 @@ func (r *IntegrationSyncBatchRepositoryImpl) FindScheduledCandidates(tx *gorm.DB
 	if limit <= 0 {
 		return values, nil
 	}
+	dueExpression := "next_scheduled_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+	if tx.Dialector.Name() == "sqlite" {
+		dueExpression = "datetime(next_scheduled_at) <= CURRENT_TIMESTAMP"
+	}
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("status = ? AND schedule_type = ? AND next_scheduled_at IS NOT NULL AND next_scheduled_at <= CURRENT_TIMESTAMP", model.IntegrationSyncTaskStatusEnabled, model.IntegrationSyncScheduleCron).
+		Where("status = ? AND schedule_type = ? AND next_scheduled_at IS NOT NULL AND "+dueExpression, model.IntegrationSyncTaskStatusEnabled, model.IntegrationSyncScheduleCron).
 		Order("next_scheduled_at ASC, id ASC").Limit(limit).Find(&values).Error
 	return values, err
 }

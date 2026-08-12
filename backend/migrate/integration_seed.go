@@ -162,6 +162,7 @@ func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) er
 		menuButtonWithAPI(12508, syncTaskMenu.Id, "创建版本", "integration_sync_task_create_version", enum.Line, "create_version", "content_copy", "primary", 2, "/admin/integration/sync-task/:id/versions", "POST"),
 		menuButtonWithAPI(12509, syncTaskMenu.Id, "启用", "integration_sync_task_enable", enum.Line, "enable", "play_arrow", "positive", 3, "/admin/integration/sync-task/:id/enable", "PUT"),
 		menuButtonWithAPI(12510, syncTaskMenu.Id, "停用", "integration_sync_task_disable", enum.Line, string(enum.ButtonActionDisable), "block", "warning", 4, "/admin/integration/sync-task/:id/disable", "PUT"),
+		menuButtonWithAPI(12511, syncTaskMenu.Id, "运行一次", "integration_sync_task_run", enum.Line, "run", "play_circle", "primary", 5, "/admin/integration/sync-task/:id/run", "POST"),
 		apiPermissionWithAPI(12601, syncBatchMenu.Id, "列表查询", "integration_sync_batch_query", enum.Top, "query", "search", "primary", 90, "/admin/integration/sync-batch/query", "POST"),
 		menuButtonWithAPI(12602, syncBatchMenu.Id, "详情", "integration_sync_batch_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/integration/sync-batch/:id", "GET"),
 		apiPermissionWithAPI(12603, syncBatchMenu.Id, "页面元数据", "integration_sync_batch_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),

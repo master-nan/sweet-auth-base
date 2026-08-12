@@ -142,6 +142,17 @@
           </div></q-card-section
         ></q-card
       >
+      <q-card v-if="detail.sync_business" flat bordered class="q-mb-md">
+        <q-card-section>
+          <div class="text-subtitle1 text-weight-bold q-mb-md">同步业务结果</div>
+          <div class="row q-col-gutter-lg">
+            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">状态</div><div>{{ detail.sync_business.status }}</div></div>
+            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">成功 / 失败</div><div>{{ detail.sync_business.success_count }} / {{ detail.sync_business.failed_count }}</div></div>
+            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">原因</div><div>{{ detail.sync_business.reason_code || '-' }}</div></div>
+            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">业务引用</div><div>{{ detail.sync_business.reference || '-' }}</div></div>
+          </div>
+        </q-card-section>
+      </q-card>
       <q-card flat bordered
         ><q-card-section
           ><div class="text-subtitle1 text-weight-bold q-mb-sm">Attempt 记录</div>

@@ -20,23 +20,31 @@ type IntegrationExecutionInterfaceRes struct {
 }
 
 type IntegrationExecutionListRes struct {
-	Id              int                              `json:"id"`
-	ExecutionNo     string                           `json:"execution_no"`
-	ExternalSystem  IntegrationExecutionSystemRes    `json:"external_system"`
-	Interface       IntegrationExecutionInterfaceRes `json:"interface"`
-	TriggerSource   string                           `json:"trigger_source"`
-	Status          string                           `json:"status"`
-	CurrentAttempt  int                              `json:"current_attempt"`
-	MaxAttempts     int                              `json:"max_attempts"`
-	NextRunAt       *time.Time                       `json:"next_run_at,omitempty"`
-	RetryReasonCode string                           `json:"retry_reason_code,omitempty"`
-	Revision        int                              `json:"revision"`
-	GmtCreate       model.CustomTime                 `json:"gmt_create"`
-	GmtModify       model.CustomTime                 `json:"gmt_modify"`
-	StartedAt       *time.Time                       `json:"started_at,omitempty"`
-	CompletedAt     *time.Time                       `json:"completed_at,omitempty"`
-	DurationMs      int64                            `json:"duration_ms"`
-	ErrorCategory   string                           `json:"error_category,omitempty"`
+	Id              int                                `json:"id"`
+	ExecutionNo     string                             `json:"execution_no"`
+	ExternalSystem  IntegrationExecutionSystemRes      `json:"external_system"`
+	Interface       IntegrationExecutionInterfaceRes   `json:"interface"`
+	TriggerSource   string                             `json:"trigger_source"`
+	Status          string                             `json:"status"`
+	CurrentAttempt  int                                `json:"current_attempt"`
+	MaxAttempts     int                                `json:"max_attempts"`
+	NextRunAt       *time.Time                         `json:"next_run_at,omitempty"`
+	RetryReasonCode string                             `json:"retry_reason_code,omitempty"`
+	Revision        int                                `json:"revision"`
+	GmtCreate       model.CustomTime                   `json:"gmt_create"`
+	GmtModify       model.CustomTime                   `json:"gmt_modify"`
+	StartedAt       *time.Time                         `json:"started_at,omitempty"`
+	CompletedAt     *time.Time                         `json:"completed_at,omitempty"`
+	DurationMs      int64                              `json:"duration_ms"`
+	ErrorCategory   string                             `json:"error_category,omitempty"`
+	SyncSource      *IntegrationExecutionSyncSourceRes `json:"sync_source,omitempty"`
+}
+
+type IntegrationExecutionSyncSourceRes struct {
+	BatchID     int        `json:"batch_id"`
+	SliceNo     int        `json:"slice_no"`
+	WindowStart *time.Time `json:"window_start,omitempty"`
+	WindowEnd   *time.Time `json:"window_end,omitempty"`
 }
 
 type IntegrationLogListRes struct {
@@ -174,7 +182,7 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 	if policy != nil {
 		maxAttempts = policy.MaxAttempts
 	}
-	return IntegrationExecutionListRes{
+	result := IntegrationExecutionListRes{
 		Id: value.Id, ExecutionNo: value.ExecutionNo,
 		ExternalSystem: IntegrationExecutionSystemRes{
 			Id: value.ExternalSystemID, SystemCode: value.ExternalSystemCode, Name: value.ExternalSystemName,
@@ -189,6 +197,10 @@ func NewIntegrationExecutionListRes(value model.IntegrationExecution) Integratio
 		StartedAt: value.StartedAt, CompletedAt: value.CompletedAt, DurationMs: integrationExecutionDuration(value),
 		ErrorCategory: value.ErrorCategory,
 	}
+	if value.SyncBatchID != nil && value.SyncSliceNo != nil {
+		result.SyncSource = &IntegrationExecutionSyncSourceRes{BatchID: *value.SyncBatchID, SliceNo: *value.SyncSliceNo, WindowStart: value.SyncWindowStart, WindowEnd: value.SyncWindowEnd}
+	}
+	return result
 }
 
 func NewIntegrationExecutionDetailRes(value model.IntegrationExecution) IntegrationExecutionDetailRes {
