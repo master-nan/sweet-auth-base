@@ -11,6 +11,7 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ type accessAuditMeta struct {
 }
 
 type accessLogWriter interface {
-	CreateAccessLog(ctx *gin.Context, log model.AccessLog) error
+	CreateAccessLog(ctx context.Context, log model.AccessLog) error
 }
 
 type accessAuditResult struct {
@@ -119,7 +120,7 @@ func LogHandler(logService accessLogWriter) gin.HandlerFunc {
 			Response:     sanitizeAccessLogPayload(c.Request.URL.Path, responseBody),
 		}
 		if !AccessAuditPersisted(c) {
-			err := logService.CreateAccessLog(c, accessLog)
+			err := logService.CreateAccessLog(c.Request.Context(), accessLog)
 			if err != nil {
 				zap.L().Error(
 					"access log storage failed",

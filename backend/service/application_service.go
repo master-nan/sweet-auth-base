@@ -13,10 +13,10 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
@@ -93,7 +93,7 @@ func (a *ApplicationService) GetApplicationByAppKey(appKey string) (model.Applic
 }
 
 // CreateApplication 创建应用
-func (a *ApplicationService) CreateApplication(ctx *gin.Context, req request.ApplicationCreateReq) (model.Application, error) {
+func (a *ApplicationService) CreateApplication(ctx context.Context, req request.ApplicationCreateReq) (model.Application, error) {
 	var data model.Application
 	app, err := a.applicationRepo.FindByField("name", req.Name)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,7 +125,7 @@ func (a *ApplicationService) CreateApplication(ctx *gin.Context, req request.App
 }
 
 // UpdateApplication 更新应用
-func (a *ApplicationService) UpdateApplication(ctx *gin.Context, req request.ApplicationUpdateReq) error {
+func (a *ApplicationService) UpdateApplication(ctx context.Context, req request.ApplicationUpdateReq) error {
 	if strings.TrimSpace(req.DingSecret) == "" {
 		existing, err := a.applicationRepo.FindById(req.Id)
 		if err != nil {
@@ -142,7 +142,7 @@ func (a *ApplicationService) UpdateApplication(ctx *gin.Context, req request.App
 	return nil
 }
 
-func (a *ApplicationService) RotateApplicationSecret(ctx *gin.Context, id int) (model.Application, error) {
+func (a *ApplicationService) RotateApplicationSecret(ctx context.Context, id int) (model.Application, error) {
 	app, err := a.applicationRepo.FindById(id)
 	if err != nil {
 		return model.Application{}, err
@@ -162,7 +162,7 @@ func (a *ApplicationService) RotateApplicationSecret(ctx *gin.Context, id int) (
 }
 
 // DeleteApplicationById 根据id删除应用
-func (a *ApplicationService) DeleteApplicationById(ctx *gin.Context, id int) error {
+func (a *ApplicationService) DeleteApplicationById(ctx context.Context, id int) error {
 	app, findErr := a.applicationRepo.FindById(id)
 	tx := a.applicationRepo.DBWithContext(ctx)
 	err := a.applicationRepo.DeleteById(tx, id)

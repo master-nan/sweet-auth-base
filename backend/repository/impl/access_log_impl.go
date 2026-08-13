@@ -11,8 +11,8 @@ import (
 	"backend/enum"
 	"backend/internal/database"
 	"backend/model"
+	"context"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -28,7 +28,7 @@ func NewAccessLogRepositoryImpl(PrimaryDB *database.PrimaryDB) *AccessLogReposit
 	}
 }
 
-func (a *AccessLogRepositoryImpl) GetAccessLogList(ctx *gin.Context, basic *request.Basic) (response.ListResult[model.AccessLog], error) {
+func (a *AccessLogRepositoryImpl) GetAccessLogList(ctx context.Context, basic *request.Basic) (response.ListResult[model.AccessLog], error) {
 	var repo response.ListResult[model.AccessLog]
 	var accessLogList []model.AccessLog
 	total, err := a.

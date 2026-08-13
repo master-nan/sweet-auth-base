@@ -12,12 +12,10 @@ import (
 	"backend/repository/impl"
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -124,20 +122,9 @@ func TestLogServiceRecordTransactionalAuditUsesCallerTransactionAndSafeFields(t 
 	}
 	logService := NewLogServer(nil, impl.NewAccessLogRepositoryImpl(primaryDB), sf)
 
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = httptest.NewRequest(
-		http.MethodPost,
-		"/admin/org/employee/88/bind-user",
-		nil,
-	)
-	ctx.Set("user", model.SysUser{
-		Basic:        model.Basic{Id: 42},
-		UserName:     "binding_operator",
-		Password:     "password-must-not-leak",
-		AccessTokens: "token-must-not-leak",
-	})
-	ctx.Set(transactionalAuditRequestIDContextKey, "request-binding-audit")
-	ctx.Set(transactionalAuditTraceIDContextKey, "trace-binding-audit")
+	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(42, "binding_operator"))
+	ctx = audit.WithCorrelationIDs(ctx, audit.CorrelationIDs{RequestID: "request-binding-audit", TraceID: "trace-binding-audit"})
+	ctx = audit.WithRequestMetadata(ctx, audit.RequestMetadata{Method: http.MethodPost, Path: "/admin/org/employee/88/bind-user", ClientIP: "127.0.0.1"})
 
 	err = RunInTransaction(ctx, db.WithContext(ctx), func(tx *gorm.DB) error {
 		return logService.RecordTransactionalAudit(ctx, tx, TransactionalAuditRecord{

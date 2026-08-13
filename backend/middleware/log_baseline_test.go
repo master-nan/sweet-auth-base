@@ -4,6 +4,7 @@ import (
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
 	"backend/model"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,7 +18,7 @@ type captureAccessLogWriter struct {
 	err  error
 }
 
-func (writer *captureAccessLogWriter) CreateAccessLog(_ *gin.Context, log model.AccessLog) error {
+func (writer *captureAccessLogWriter) CreateAccessLog(_ context.Context, log model.AccessLog) error {
 	writer.logs = append(writer.logs, log)
 	return writer.err
 }

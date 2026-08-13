@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -216,8 +215,8 @@ func TestBasicRepositoryTransactionReadAndFieldUpdate(t *testing.T) {
 	if got, err := repo.FindById(1); err != nil || got.Name != "beta" {
 		t.Fatalf("find updated fixture: value=%+v err=%v", got, err)
 	}
-	var nilGinContext *gin.Context
-	if got, err := repo.WithContext(nilGinContext).FindById(1); err != nil || got.Name != "beta" {
+	var nilContext context.Context
+	if got, err := repo.WithContext(nilContext).FindById(1); err != nil || got.Name != "beta" {
 		t.Fatalf("typed nil context should be ignored: value=%+v err=%v", got, err)
 	}
 }

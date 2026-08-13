@@ -6,12 +6,12 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +21,7 @@ type orgPermissionTreeIndex struct {
 }
 
 func (s *OrgService) GetOrgAncestors(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureCode string,
 	orgUnitId int,
 	asOfDate string,
@@ -68,7 +68,7 @@ func (s *OrgService) GetOrgAncestors(
 }
 
 func (s *OrgService) GetOrgDescendants(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureCode string,
 	orgUnitId int,
 	asOfDate string,
@@ -125,7 +125,7 @@ func (s *OrgService) GetOrgDescendants(
 }
 
 func (s *OrgService) IsOrgDescendant(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureCode string,
 	ancestorOrgUnitId int,
 	descendantOrgUnitId int,
@@ -174,7 +174,7 @@ func (s *OrgService) IsOrgDescendant(
 }
 
 func (s *OrgService) loadPermissionTreeIndex(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureCode string,
 	requiredOrgUnitIds []int,
 	asOfDate string,
@@ -237,7 +237,7 @@ func (s *OrgService) loadPermissionTreeIndex(
 }
 
 func (s *OrgService) validatePermissionOrgUnit(
-	ctx *gin.Context,
+	ctx context.Context,
 	orgUnitId int,
 	asOf time.Time,
 ) error {

@@ -8,10 +8,10 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -39,7 +39,7 @@ func (f *FileRepositoryImpl) FindByFileMd5(md5 string) (model.File, error) {
 	return file, err
 }
 
-func (f *FileRepositoryImpl) DeleteFile(ctx *gin.Context, file model.File) error {
+func (f *FileRepositoryImpl) DeleteFile(ctx context.Context, file model.File) error {
 	return f.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		if err := f.Update(tx, map[string]interface{}{
 			"file_md5":  deletedFileUniqueValue(file.FileMd5, file.Id),

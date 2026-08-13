@@ -12,10 +12,10 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -64,7 +64,7 @@ func (s *SysRoleService) GetRoleList(basic *request.Basic, table model.SysTable)
 	return s.sysRoleRepo.GetRoleList(basic, table)
 }
 
-func (s *SysRoleService) CreateRole(ctx *gin.Context, req request.RoleCreateReq) error {
+func (s *SysRoleService) CreateRole(ctx context.Context, req request.RoleCreateReq) error {
 	var role model.SysRole
 	err := copier.Copy(&role, &req)
 	if err != nil {
@@ -79,11 +79,11 @@ func (s *SysRoleService) CreateRole(ctx *gin.Context, req request.RoleCreateReq)
 	return s.sysRoleRepo.Create(s.sysRoleRepo.DBWithContext(ctx), &role)
 }
 
-func (s *SysRoleService) UpdateRole(ctx *gin.Context, req request.RoleUpdateReq) error {
+func (s *SysRoleService) UpdateRole(ctx context.Context, req request.RoleUpdateReq) error {
 	return s.sysRoleRepo.Update(s.sysRoleRepo.DBWithContext(ctx), &req, req.Id)
 }
 
-func (s *SysRoleService) DeleteRole(ctx *gin.Context, id int) error {
+func (s *SysRoleService) DeleteRole(ctx context.Context, id int) error {
 	return s.sysRoleRepo.DeleteById(s.sysRoleRepo.DBWithContext(ctx), id)
 }
 
@@ -105,7 +105,7 @@ func (s *SysMenuService) GetRoleMenuButtons(roleId, menuId int) ([]model.SysMenu
 }
 
 // CreateRoleMenu 新增角色菜单
-func (s *SysRoleService) CreateRoleMenu(ctx *gin.Context, req request.RoleMenuCreateReq) error {
+func (s *SysRoleService) CreateRoleMenu(ctx context.Context, req request.RoleMenuCreateReq) error {
 	var data model.SysRoleMenu
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s *SysRoleService) CreateRoleMenu(ctx *gin.Context, req request.RoleMenuCr
 }
 
 // AssignPermissions 分配角色权限
-func (s *SysRoleService) AssignPermissions(ctx *gin.Context, data request.RoleAssignPermissionsReq) error {
+func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.RoleAssignPermissionsReq) error {
 	menuIDs := uniquePositiveInts(data.MenuIds)
 	buttonIDs := uniquePositiveInts(data.ButtonIds)
 	menuIDSet := intSet(menuIDs)
@@ -256,6 +256,6 @@ func filterAssignableRoleButtons(buttons []model.SysMenuButton, menuIDSet map[in
 }
 
 // DeleteRoleMenu 删除角色菜单
-func (s *SysRoleService) DeleteRoleMenu(ctx *gin.Context, roleId, menuId int) error {
+func (s *SysRoleService) DeleteRoleMenu(ctx context.Context, roleId, menuId int) error {
 	return s.sysRoleMenuRepo.DeleteRoleMenuByRoleIdAndMenuId(s.sysRoleMenuRepo.DBWithContext(ctx), roleId, menuId)
 }

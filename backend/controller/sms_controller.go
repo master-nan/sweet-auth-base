@@ -106,7 +106,7 @@ func (s *SmsController) CreateSmsTemplate(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	id, err := s.smsService.CreateSmsTemplate(ctx, data)
+	id, err := s.smsService.CreateSmsTemplate(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -140,7 +140,7 @@ func (s *SmsController) UpdateSmsTemplate(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = s.smsService.UpdateSmsTemplate(ctx, data)
+	err = s.smsService.UpdateSmsTemplate(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -165,7 +165,7 @@ func (s *SmsController) DeleteSmsTemplateById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = s.smsService.DeleteSmsTemplateById(ctx, id)
+	err = s.smsService.DeleteSmsTemplateById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

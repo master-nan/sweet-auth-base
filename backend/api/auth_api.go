@@ -588,7 +588,7 @@ func (a *AuthApi) CheckSmsStatus(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrParamInvalid)
 		return
 	}
-	result, err := a.smsService.CheckSmsStatus(ctx, bizId, mobile)
+	result, err := a.smsService.CheckSmsStatus(ctx.Request.Context(), bizId, mobile)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

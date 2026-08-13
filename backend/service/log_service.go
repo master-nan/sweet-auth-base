@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -31,11 +30,6 @@ var (
 	ErrTransactionalAuditRepositoryRequired = errors.New("transactional audit repository is required")
 	ErrTransactionalAuditGeneratorRequired  = errors.New("transactional audit id generator is required")
 	ErrLoginLogContextWriterRequired        = errors.New("login log context writer is required")
-)
-
-const (
-	transactionalAuditRequestIDContextKey = "sweet_platform_request_id"
-	transactionalAuditTraceIDContextKey   = "sweet_platform_trace_id"
 )
 
 type TransactionalAuditChange struct {
@@ -52,7 +46,7 @@ type TransactionalAuditRecord struct {
 }
 
 type TransactionalAuditWriter interface {
-	RecordTransactionalAudit(*gin.Context, *gorm.DB, TransactionalAuditRecord) error
+	RecordTransactionalAudit(context.Context, *gorm.DB, TransactionalAuditRecord) error
 }
 
 type StandardContextAuditWriter interface {
@@ -112,7 +106,7 @@ func (ls *LogService) CreateLoginLogAsync(taskContext asynctask.Context, log mod
 	})
 }
 
-func (ls *LogService) CreateAccessLog(ctx *gin.Context, log model.AccessLog) error {
+func (ls *LogService) CreateAccessLog(ctx context.Context, log model.AccessLog) error {
 	id, err := ls.sf.GenerateUniqueID()
 	if err != nil {
 		return err
@@ -125,56 +119,24 @@ func (ls *LogService) CreateAccessLog(ctx *gin.Context, log model.AccessLog) err
 // RecordTransactionalAudit 在领域写入事务中一并持久化成功的敏感操作。
 // 事务回滚后的失败请求仍由请求级 LogHandler 记录。
 func (ls *LogService) RecordTransactionalAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	record TransactionalAuditRecord,
 ) error {
-	if tx == nil {
-		return ErrTransactionDatabaseRequired
-	}
-	if ls == nil || ls.accessLogRepository == nil {
-		return ErrTransactionalAuditRepositoryRequired
-	}
-	if ls.sf == nil {
-		return ErrTransactionalAuditGeneratorRequired
-	}
-
-	id, err := ls.sf.GenerateUniqueID()
-	if err != nil {
-		return err
-	}
-	body, err := json.Marshal(map[string]any{
-		"resource_id": record.ResourceId,
-		"changes":     record.Changes,
-	})
-	if err != nil {
-		return err
-	}
-
-	userId, userName := transactionalAuditActor(ctx)
-	method, path, ip := transactionalAuditRequest(ctx)
-	return ls.accessLogRepository.Create(tx, &model.AccessLog{
-		Basic:        model.Basic{Id: int(id)},
-		UserId:       userId,
-		UserName:     userName,
-		RequestId:    transactionalAuditCorrelationID(ctx, transactionalAuditRequestIDContextKey),
-		TraceId:      transactionalAuditCorrelationID(ctx, transactionalAuditTraceIDContextKey),
-		Method:       method,
-		Ip:           ip,
-		Url:          path,
-		Action:       record.Action,
-		ResourceType: record.ResourceType,
-		ResourceCode: record.ResourceCode,
-		ResourceId:   record.ResourceId,
-		StatusCode:   http.StatusOK,
-		Success:      true,
-		Result:       "success",
-		Body:         string(body),
-	})
+	return ls.recordTransactionalAudit(ctx, tx, record)
 }
 
-// RecordTransactionalAuditContext 供非 HTTP 耦合的新 Service 使用标准 Context 写入事务审计。
+// RecordTransactionalAuditContext keeps the standard-context audit contract
+// used by Integration and other non-HTTP services.
 func (ls *LogService) RecordTransactionalAuditContext(
+	ctx context.Context,
+	tx *gorm.DB,
+	record TransactionalAuditRecord,
+) error {
+	return ls.recordTransactionalAudit(ctx, tx, record)
+}
+
+func (ls *LogService) recordTransactionalAudit(
 	ctx context.Context,
 	tx *gorm.DB,
 	record TransactionalAuditRecord,
@@ -188,6 +150,7 @@ func (ls *LogService) RecordTransactionalAuditContext(
 	if ls.sf == nil {
 		return ErrTransactionalAuditGeneratorRequired
 	}
+
 	id, err := ls.sf.GenerateUniqueID()
 	if err != nil {
 		return err
@@ -199,15 +162,23 @@ func (ls *LogService) RecordTransactionalAuditContext(
 	if err != nil {
 		return err
 	}
+
 	subject, _ := audit.GetAuditSubject(ctx)
 	correlation := audit.GetCorrelationIDs(ctx)
+	metadata := audit.GetRequestMetadata(ctx)
+	method := metadata.Method
+	if method == "" {
+		method = "AUDIT"
+	}
 	return ls.accessLogRepository.Create(tx.WithContext(ctx), &model.AccessLog{
 		Basic:        model.Basic{Id: int(id)},
 		UserId:       subject.UserID,
 		UserName:     subject.UserName,
 		RequestId:    correlation.RequestID,
 		TraceId:      correlation.TraceID,
-		Method:       "AUDIT",
+		Method:       method,
+		Ip:           metadata.ClientIP,
+		Url:          metadata.Path,
 		Action:       record.Action,
 		ResourceType: record.ResourceType,
 		ResourceCode: record.ResourceCode,
@@ -219,45 +190,7 @@ func (ls *LogService) RecordTransactionalAuditContext(
 	})
 }
 
-func transactionalAuditActor(ctx *gin.Context) (int, string) {
-	if ctx == nil {
-		return 0, ""
-	}
-	value, exists := ctx.Get("user")
-	if !exists {
-		return 0, ""
-	}
-	user, ok := value.(model.SysUser)
-	if !ok {
-		return 0, ""
-	}
-	return user.Id, user.UserName
-}
-
-func transactionalAuditRequest(ctx *gin.Context) (method, path, ip string) {
-	if ctx == nil || ctx.Request == nil {
-		return "AUDIT", "", ""
-	}
-	path = ctx.FullPath()
-	if path == "" && ctx.Request.URL != nil {
-		path = ctx.Request.URL.Path
-	}
-	return ctx.Request.Method, path, ctx.ClientIP()
-}
-
-func transactionalAuditCorrelationID(ctx *gin.Context, key string) string {
-	if ctx == nil {
-		return ""
-	}
-	value, exists := ctx.Get(key)
-	if !exists {
-		return ""
-	}
-	correlationID, _ := value.(string)
-	return correlationID
-}
-
-func (ls *LogService) QueryAccessLogs(ctx *gin.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {
+func (ls *LogService) QueryAccessLogs(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {
 	basic, err := buildAccessLogQueryBasic(req)
 	if err != nil {
 		return response.ListResult[model.AccessLog]{}, err
@@ -348,6 +281,6 @@ func parseAccessLogQueryTime(value string) (*time.Time, error) {
 	return nil, error2.NewBadRequestError("时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss")
 }
 
-func (ls *LogService) GetAccessLogById(ctx *gin.Context, id int) (model.AccessLog, error) {
+func (ls *LogService) GetAccessLogById(ctx context.Context, id int) (model.AccessLog, error) {
 	return ls.accessLogRepository.WithContext(ctx).FindById(id)
 }

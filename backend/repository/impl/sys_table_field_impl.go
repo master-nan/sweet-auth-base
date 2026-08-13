@@ -6,10 +6,10 @@
 package impl
 
 import (
+	"backend/internal/audit"
 	"backend/internal/database"
 	"backend/model"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -114,10 +114,8 @@ func sysTableFieldCreateMap(tx *gorm.DB, field *model.SysTableField) map[string]
 	if field.ModifyUser != nil {
 		row["modify_user"] = field.ModifyUser
 	}
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if ok {
-		user := ctx.MustGet("user").(model.SysUser)
-		row["create_user"] = user.Id
+	if subject, ok := audit.GetAuditSubject(tx.Statement.Context); ok {
+		row["create_user"] = subject.UserID
 	}
 	return row
 }

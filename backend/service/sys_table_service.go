@@ -16,6 +16,7 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/go-cmp/cmp"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
@@ -144,7 +144,7 @@ func (s *SysTableService) GetTableByTableCode(code string) (model.SysTable, erro
 	return data, nil
 }
 
-func (s *SysTableService) CreateTable(ctx *gin.Context, req request.TableCreateReq) error {
+func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCreateReq) error {
 	tableCode, err := normalizeDBIdentifier("表编码", req.TableCode)
 	if err != nil {
 		return err
@@ -271,7 +271,7 @@ func newBaseTableFields(tableID int) []model.SysTableField {
 	return fields
 }
 
-func (s *SysTableService) UpdateTable(ctx *gin.Context, req request.TableUpdateReq) error {
+func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpdateReq) error {
 	if strings.TrimSpace(req.TableCode) != "" {
 		tableCode, err := normalizeDBIdentifier("表编码", req.TableCode)
 		if err != nil {
@@ -372,7 +372,7 @@ func (s *SysTableService) UpdateTable(ctx *gin.Context, req request.TableUpdateR
 	return nil
 }
 
-func (s *SysTableService) DeleteTableById(ctx *gin.Context, id int) error {
+func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 	err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		if e := s.sysTableRepo.DeleteById(tx, id); e != nil {
 			return e
@@ -464,7 +464,7 @@ func (s *SysTableService) GetTableFieldsByTableId(tableId int) ([]model.SysTable
 	return fields, nil
 }
 
-func (s *SysTableService) CreateTableField(ctx *gin.Context, req request.TableFieldCreateReq) error {
+func (s *SysTableService) CreateTableField(ctx context.Context, req request.TableFieldCreateReq) error {
 	fieldCode, err := normalizeDBIdentifier("字段编码", req.FieldCode)
 	if err != nil {
 		return err
@@ -520,7 +520,7 @@ func (s *SysTableService) CreateTableField(ctx *gin.Context, req request.TableFi
 	return nil
 }
 
-func (s *SysTableService) UpdateTableField(ctx *gin.Context, req request.TableFieldUpdateReq) error {
+func (s *SysTableService) UpdateTableField(ctx context.Context, req request.TableFieldUpdateReq) error {
 	fieldCode, err := normalizeDBIdentifier("字段编码", req.FieldCode)
 	if err != nil {
 		return err
@@ -935,7 +935,7 @@ func escapePostgresLiteral(value string) string {
 	return strings.ReplaceAll(value, "'", "''")
 }
 
-func (s *SysTableService) DeleteTableFieldById(ctx *gin.Context, id int) error {
+func (s *SysTableService) DeleteTableFieldById(ctx context.Context, id int) error {
 	field, err := s.GetTableFieldById(id)
 	if err != nil {
 		return err
@@ -984,7 +984,7 @@ func (s *SysTableService) GetTableRelationById(id int) (model.SysTableRelation, 
 	return data, nil
 }
 
-func (s *SysTableService) CreateTableRelation(ctx *gin.Context, req request.TableRelationCreateReq) error {
+func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.TableRelationCreateReq) error {
 	var err error
 	if req.ReferenceKey, err = normalizeDBIdentifier("主表字段", req.ReferenceKey); err != nil {
 		return err
@@ -1059,7 +1059,7 @@ func (s *SysTableService) CreateTableRelation(ctx *gin.Context, req request.Tabl
 	return nil
 }
 
-func (s *SysTableService) UpdateTableRelation(ctx *gin.Context, req request.TableRelationUpdateReq) error {
+func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.TableRelationUpdateReq) error {
 	oldRelation, err := s.sysTableRelationRepo.FindById(req.Id)
 	if err != nil {
 		return err
@@ -1136,7 +1136,7 @@ func (s *SysTableService) UpdateTableRelation(ctx *gin.Context, req request.Tabl
 	return nil
 }
 
-func (s *SysTableService) DeleteTableRelationById(ctx *gin.Context, id int) error {
+func (s *SysTableService) DeleteTableRelationById(ctx context.Context, id int) error {
 	relation, err := s.sysTableRelationRepo.FindById(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1176,7 +1176,7 @@ func (s *SysTableService) GetTableIndexesByTableId(tableId int) ([]model.SysTabl
 	return s.sysTableIndexRepo.GetTableIndexesByTableId(tableId)
 }
 
-func (s *SysTableService) CreateTableIndex(ctx *gin.Context, req request.TableIndexCreateReq) error {
+func (s *SysTableService) CreateTableIndex(ctx context.Context, req request.TableIndexCreateReq) error {
 	var err error
 	if req.IndexName, err = normalizeDBIdentifier("索引名称", req.IndexName); err != nil {
 		return err
@@ -1232,7 +1232,7 @@ func (s *SysTableService) CreateTableIndex(ctx *gin.Context, req request.TableIn
 	return nil
 }
 
-func (s *SysTableService) UpdateTableIndex(ctx *gin.Context, req request.TableIndexUpdateReq) error {
+func (s *SysTableService) UpdateTableIndex(ctx context.Context, req request.TableIndexUpdateReq) error {
 	oldIndex, err := s.sysTableIndexRepo.FindById(req.Id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1299,7 +1299,7 @@ func (s *SysTableService) UpdateTableIndex(ctx *gin.Context, req request.TableIn
 	return nil
 }
 
-func (s *SysTableService) DeleteTableIndexById(ctx *gin.Context, id int) error {
+func (s *SysTableService) DeleteTableIndexById(ctx context.Context, id int) error {
 	index, e := s.sysTableIndexRepo.FindById(id)
 	if e != nil {
 		return e
@@ -1325,7 +1325,7 @@ func (s *SysTableService) DeleteTableIndexById(ctx *gin.Context, id int) error {
 	return nil
 }
 
-func (s *SysTableService) DeleteTableIndexByTableId(ctx *gin.Context, id int) error {
+func (s *SysTableService) DeleteTableIndexByTableId(ctx context.Context, id int) error {
 	table, e := s.GetTableById(id)
 	if e != nil {
 		return e
@@ -1353,7 +1353,7 @@ func (s *SysTableService) DeleteTableIndexByTableId(ctx *gin.Context, id int) er
 	return nil
 }
 
-func (s *SysTableService) InitTable(ctx *gin.Context, tableCode string) error {
+func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error {
 	columns, err := s.sysTableRepo.FetchTableMetadata("public", tableCode)
 	tableIndexes, err := s.sysTableRepo.FetchTableIndexMetadata("public", tableCode)
 	fields := convertColumnsToSysTableFields(tableCode, columns)
@@ -1429,7 +1429,7 @@ func (s *SysTableService) InitTable(ctx *gin.Context, tableCode string) error {
 
 // SyncTableFields 同步已有表结构到 sys_table_field。
 // 已存在的字段只修正敏感字段和系统托管字段的展示开关，不覆盖输入类型、字典、名称等页面配置。
-func (s *SysTableService) SyncTableFields(ctx *gin.Context, tableCode string) error {
+func (s *SysTableService) SyncTableFields(ctx context.Context, tableCode string) error {
 	columns, err := s.sysTableRepo.FetchTableMetadata("public", tableCode)
 	if err != nil {
 		return err
@@ -1531,7 +1531,7 @@ func fieldVisibilityPatch(existing model.SysTableField) (model.SysTableField, bo
 }
 
 // SyncTableIndexes 同步已有表索引到 sys_table_index 与 sys_table_index_field（仅补充缺失索引）
-func (s *SysTableService) SyncTableIndexes(ctx *gin.Context, tableCode string) error {
+func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string) error {
 	indexes, err := s.sysTableRepo.FetchTableIndexMetadata("public", tableCode)
 	if err != nil {
 		return err
@@ -1645,7 +1645,7 @@ func (s *SysTableService) SyncTableIndexes(ctx *gin.Context, tableCode string) e
 // 这个方法只做业务编排：确认开发管理父菜单、创建或恢复低代码菜单、
 // 补齐默认按钮/接口权限，并把权限默认授给 super_admin。具体增删改查
 // 放在 repository 层，避免 service 直接拼数据库语句。
-func (s *SysTableService) PublishTableAsMenu(ctx *gin.Context, tableCode string, parentID int) error {
+func (s *SysTableService) PublishTableAsMenu(ctx context.Context, tableCode string, parentID int) error {
 	table, err := s.GetTableByTableCode(tableCode)
 	if err != nil {
 		return err
@@ -1736,7 +1736,7 @@ func isLowCodePublishParentMenu(menu model.SysMenu) bool {
 // UnpublishTableMenu 取消发布低代码菜单。
 // 取消发布不会物理删除菜单，而是隐藏并停用菜单，同时清理菜单、按钮和数据权限授权，
 // 防止旧页签继续拿这个菜单上下文访问通用页面。
-func (s *SysTableService) UnpublishTableMenu(ctx *gin.Context, tableCode string) error {
+func (s *SysTableService) UnpublishTableMenu(ctx context.Context, tableCode string) error {
 	tableCode = strings.TrimSpace(tableCode)
 	if tableCode == "" {
 		return myerrors.ErrParamInvalid
@@ -2057,7 +2057,7 @@ func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID in
 }
 
 // SyncViewTableFields 视图字段元数据全量对齐（增删改）
-func (s *SysTableService) SyncViewTableFields(ctx *gin.Context, table model.SysTable) error {
+func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.SysTable) error {
 	columns, err := s.sysTableRepo.FetchTableMetadata("public", table.TableCode)
 	if err != nil {
 		return err

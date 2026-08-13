@@ -4,10 +4,10 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
+	"context"
 	"errors"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -50,96 +50,96 @@ type OrgLegalEntityReadScope = OrgReadScope
 
 type OrgLegalEntityRepository interface {
 	BasicRepository[model.OrgLegalEntity]
-	Query(*gin.Context, *request.OrgLegalEntityQueryReq, model.SysTable, OrgLegalEntityReadScope) (response.ListResult[model.OrgLegalEntity], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgLegalEntity, error)
-	ListForTree(*gin.Context, OrgLegalEntityReadScope) ([]model.OrgLegalEntity, error)
-	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgLegalEntity, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgLegalEntity, error)
-	FindByCode(*gin.Context, string, string) (model.OrgLegalEntity, error)
+	Query(context.Context, *request.OrgLegalEntityQueryReq, model.SysTable, OrgLegalEntityReadScope) (response.ListResult[model.OrgLegalEntity], error)
+	FindByIdForRead(context.Context, int) (model.OrgLegalEntity, error)
+	ListForTree(context.Context, OrgLegalEntityReadScope) ([]model.OrgLegalEntity, error)
+	FindByIdsForDisplay(context.Context, []int) ([]model.OrgLegalEntity, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgLegalEntity, error)
+	FindByCode(context.Context, string, string) (model.OrgLegalEntity, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 	UpdatePlatformFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgUnitRepository interface {
 	BasicRepository[model.OrgUnit]
-	Query(*gin.Context, *request.OrgUnitQueryReq, model.SysTable) (response.ListResult[model.OrgUnit], error)
-	QueryForRead(*gin.Context, *request.OrgUnitQueryReq, model.SysTable, OrgReadScope, *int) (response.ListResult[model.OrgUnit], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgUnit, error)
-	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgUnit, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgUnit, error)
-	FindByCode(*gin.Context, string, string) (model.OrgUnit, error)
+	Query(context.Context, *request.OrgUnitQueryReq, model.SysTable) (response.ListResult[model.OrgUnit], error)
+	QueryForRead(context.Context, *request.OrgUnitQueryReq, model.SysTable, OrgReadScope, *int) (response.ListResult[model.OrgUnit], error)
+	FindByIdForRead(context.Context, int) (model.OrgUnit, error)
+	FindByIdsForDisplay(context.Context, []int) ([]model.OrgUnit, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgUnit, error)
+	FindByCode(context.Context, string, string) (model.OrgUnit, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 	UpdatePlatformFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgStructureRepository interface {
 	BasicRepository[model.OrgStructure]
-	Query(*gin.Context, *request.OrgStructureQueryReq, model.SysTable) (response.ListResult[model.OrgStructure], error)
-	QueryForRead(*gin.Context, *request.OrgStructureQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgStructure], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgStructure, error)
-	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgStructure, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgStructure, error)
-	FindByCode(*gin.Context, string) (model.OrgStructure, error)
+	Query(context.Context, *request.OrgStructureQueryReq, model.SysTable) (response.ListResult[model.OrgStructure], error)
+	QueryForRead(context.Context, *request.OrgStructureQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgStructure], error)
+	FindByIdForRead(context.Context, int) (model.OrgStructure, error)
+	FindByIdsForDisplay(context.Context, []int) ([]model.OrgStructure, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgStructure, error)
+	FindByCode(context.Context, string) (model.OrgStructure, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgStructureNodeRepository interface {
 	BasicRepository[model.OrgStructureNode]
-	Query(*gin.Context, *request.OrgStructureNodeQueryReq, model.SysTable) (response.ListResult[model.OrgStructureNode], error)
-	ListByStructureForRead(*gin.Context, int, OrgReadScope, int) ([]model.OrgStructureNode, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgStructureNode, error)
+	Query(context.Context, *request.OrgStructureNodeQueryReq, model.SysTable) (response.ListResult[model.OrgStructureNode], error)
+	ListByStructureForRead(context.Context, int, OrgReadScope, int) ([]model.OrgStructureNode, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgStructureNode, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgPositionRepository interface {
 	BasicRepository[model.OrgPosition]
-	Query(*gin.Context, *request.OrgPositionQueryReq, model.SysTable) (response.ListResult[model.OrgPosition], error)
-	QueryForRead(*gin.Context, *request.OrgPositionQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgPosition], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgPosition, error)
-	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgPosition, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgPosition, error)
-	FindByCode(*gin.Context, string, string) (model.OrgPosition, error)
+	Query(context.Context, *request.OrgPositionQueryReq, model.SysTable) (response.ListResult[model.OrgPosition], error)
+	QueryForRead(context.Context, *request.OrgPositionQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgPosition], error)
+	FindByIdForRead(context.Context, int) (model.OrgPosition, error)
+	FindByIdsForDisplay(context.Context, []int) ([]model.OrgPosition, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgPosition, error)
+	FindByCode(context.Context, string, string) (model.OrgPosition, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 	UpdatePlatformFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgEmployeeRepository interface {
 	BasicRepository[model.OrgEmployee]
-	Query(*gin.Context, *request.OrgEmployeeQueryReq, model.SysTable) (response.ListResult[model.OrgEmployee], error)
-	QueryForRead(*gin.Context, *request.OrgEmployeeQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgEmployee], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgEmployee, error)
-	FindByIdsForDisplay(*gin.Context, []int) ([]model.OrgEmployee, error)
-	FindBoundUserSummaries(*gin.Context, []int) ([]OrgBoundUserSummary, error)
-	QueryUsersForBinding(*gin.Context, string, int, int) (response.ListResult[OrgBindingUserOption], error)
+	Query(context.Context, *request.OrgEmployeeQueryReq, model.SysTable) (response.ListResult[model.OrgEmployee], error)
+	QueryForRead(context.Context, *request.OrgEmployeeQueryReq, model.SysTable, OrgReadScope) (response.ListResult[model.OrgEmployee], error)
+	FindByIdForRead(context.Context, int) (model.OrgEmployee, error)
+	FindByIdsForDisplay(context.Context, []int) ([]model.OrgEmployee, error)
+	FindBoundUserSummaries(context.Context, []int) ([]OrgBoundUserSummary, error)
+	QueryUsersForBinding(context.Context, string, int, int) (response.ListResult[OrgBindingUserOption], error)
 	FindByIdForBinding(*gorm.DB, int) (model.OrgEmployee, error)
 	FindUserForBinding(*gorm.DB, int) (OrgBoundUserSummary, error)
 	FindByBoundUserIdForBinding(*gorm.DB, int) (model.OrgEmployee, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgEmployee, error)
-	FindByEmployeeNo(*gin.Context, string, string) (model.OrgEmployee, error)
-	FindByBoundUserId(*gin.Context, int) (model.OrgEmployee, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgEmployee, error)
+	FindByEmployeeNo(context.Context, string, string) (model.OrgEmployee, error)
+	FindByBoundUserId(context.Context, int) (model.OrgEmployee, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 	UpdatePlatformFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgAssignmentRepository interface {
 	BasicRepository[model.OrgAssignment]
-	Query(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable) (response.ListResult[model.OrgAssignment], error)
-	QueryForRead(*gin.Context, *request.OrgAssignmentQueryReq, model.SysTable, OrgAssignmentReadScope) (response.ListResult[model.OrgAssignment], error)
-	ListEffectiveByEmployee(*gin.Context, int, time.Time, int) ([]model.OrgAssignment, error)
-	FindByIdForRead(*gin.Context, int) (model.OrgAssignment, error)
-	FindBySourceIdentity(*gin.Context, string, string) (model.OrgAssignment, error)
+	Query(context.Context, *request.OrgAssignmentQueryReq, model.SysTable) (response.ListResult[model.OrgAssignment], error)
+	QueryForRead(context.Context, *request.OrgAssignmentQueryReq, model.SysTable, OrgAssignmentReadScope) (response.ListResult[model.OrgAssignment], error)
+	ListEffectiveByEmployee(context.Context, int, time.Time, int) ([]model.OrgAssignment, error)
+	FindByIdForRead(context.Context, int) (model.OrgAssignment, error)
+	FindBySourceIdentity(context.Context, string, string) (model.OrgAssignment, error)
 	UpdateSourceFields(*gorm.DB, int, map[string]any) error
 }
 
 type OrgSyncBatchRepository interface {
 	BasicRepository[model.OrgSyncBatch]
-	Query(*gin.Context, *request.OrgSyncBatchQueryReq, model.SysTable) (response.ListResult[model.OrgSyncBatch], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgSyncBatch, error)
-	FindByBatchNo(*gin.Context, string) (model.OrgSyncBatch, error)
+	Query(context.Context, *request.OrgSyncBatchQueryReq, model.SysTable) (response.ListResult[model.OrgSyncBatch], error)
+	FindByIdForRead(context.Context, int) (model.OrgSyncBatch, error)
+	FindByBatchNo(context.Context, string) (model.OrgSyncBatch, error)
 }
 
 type OrgSyncRecordRepository interface {
 	BasicRepository[model.OrgSyncRecord]
-	Query(*gin.Context, *request.OrgSyncRecordQueryReq, model.SysTable) (response.ListResult[model.OrgSyncRecord], error)
-	FindByIdForRead(*gin.Context, int) (model.OrgSyncRecord, error)
+	Query(context.Context, *request.OrgSyncRecordQueryReq, model.SysTable) (response.ListResult[model.OrgSyncRecord], error)
+	FindByIdForRead(context.Context, int) (model.OrgSyncRecord, error)
 }

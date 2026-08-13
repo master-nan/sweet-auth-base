@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -57,8 +58,20 @@ func NewDimensionProviderRuntime(
 		func(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
 			return dimensionRepo.WithContext(ctx).FindByField("code", code)
 		},
-		organizationProvider.GetEmployeeEffectiveOrganizationScope,
-		organizationProvider.GetOrgDescendants,
+		func(ctx *gin.Context, employeeId int, asOfDate string) (response.OrgEffectiveOrganizationScopeRes, error) {
+			requestContext := context.Background()
+			if ctx != nil && ctx.Request != nil {
+				requestContext = ctx.Request.Context()
+			}
+			return organizationProvider.GetEmployeeEffectiveOrganizationScope(requestContext, employeeId, asOfDate)
+		},
+		func(ctx *gin.Context, structureCode string, orgUnitId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
+			requestContext := context.Background()
+			if ctx != nil && ctx.Request != nil {
+				requestContext = ctx.Request.Context()
+			}
+			return organizationProvider.GetOrgDescendants(requestContext, structureCode, orgUnitId, asOfDate, includeSelf)
+		},
 	)
 }
 

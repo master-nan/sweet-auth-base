@@ -8,12 +8,12 @@ import (
 	"backend/model"
 	"backend/repository"
 	queryutil "backend/repository/util"
+	"context"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -121,7 +121,7 @@ func NewOrgSyncRecordRepositoryImpl(primaryDB *database.PrimaryDB) *OrgSyncRecor
 }
 
 func (r *OrgLegalEntityRepositoryImpl) Query(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgLegalEntityQueryReq,
 	table model.SysTable,
 	scope repository.OrgLegalEntityReadScope,
@@ -145,7 +145,7 @@ func (r *OrgLegalEntityRepositoryImpl) Query(
 	)
 }
 
-func (r *OrgLegalEntityRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgLegalEntity, error) {
+func (r *OrgLegalEntityRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgLegalEntity, error) {
 	var entity model.OrgLegalEntity
 	err := organizationDB(r.db, ctx).
 		Select(orgLegalEntityDetailColumns()).
@@ -154,7 +154,7 @@ func (r *OrgLegalEntityRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int)
 }
 
 func (r *OrgLegalEntityRepositoryImpl) ListForTree(
-	ctx *gin.Context,
+	ctx context.Context,
 	scope repository.OrgLegalEntityReadScope,
 ) ([]model.OrgLegalEntity, error) {
 	var entities []model.OrgLegalEntity
@@ -166,7 +166,7 @@ func (r *OrgLegalEntityRepositoryImpl) ListForTree(
 	return entities, err
 }
 
-func (r *OrgLegalEntityRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgLegalEntity, error) {
+func (r *OrgLegalEntityRepositoryImpl) FindByIdsForDisplay(ctx context.Context, ids []int) ([]model.OrgLegalEntity, error) {
 	if len(ids) == 0 {
 		return []model.OrgLegalEntity{}, nil
 	}
@@ -178,7 +178,7 @@ func (r *OrgLegalEntityRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids
 	return entities, err
 }
 
-func (r *OrgLegalEntityRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgLegalEntity, error) {
+func (r *OrgLegalEntityRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgLegalEntity, error) {
 	var entity model.OrgLegalEntity
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -186,7 +186,7 @@ func (r *OrgLegalEntityRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, so
 	return entity, err
 }
 
-func (r *OrgLegalEntityRepositoryImpl) FindByCode(ctx *gin.Context, sourceSystemCode, code string) (model.OrgLegalEntity, error) {
+func (r *OrgLegalEntityRepositoryImpl) FindByCode(ctx context.Context, sourceSystemCode, code string) (model.OrgLegalEntity, error) {
 	var entity model.OrgLegalEntity
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND code = ?", sourceSystemCode, code).
@@ -202,7 +202,7 @@ func (r *OrgLegalEntityRepositoryImpl) UpdatePlatformFields(tx *gorm.DB, id int,
 	return updateOrganizationFields(tx, &model.OrgLegalEntity{}, id, values, orgLegalEntityPlatformFields)
 }
 
-func (r *OrgUnitRepositoryImpl) Query(ctx *gin.Context, req *request.OrgUnitQueryReq, table model.SysTable) (response.ListResult[model.OrgUnit], error) {
+func (r *OrgUnitRepositoryImpl) Query(ctx context.Context, req *request.OrgUnitQueryReq, table model.SysTable) (response.ListResult[model.OrgUnit], error) {
 	if req == nil {
 		req = &request.OrgUnitQueryReq{}
 	}
@@ -222,7 +222,7 @@ func (r *OrgUnitRepositoryImpl) Query(ctx *gin.Context, req *request.OrgUnitQuer
 }
 
 func (r *OrgUnitRepositoryImpl) QueryForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgUnitQueryReq,
 	table model.SysTable,
 	scope repository.OrgReadScope,
@@ -265,7 +265,7 @@ func (r *OrgUnitRepositoryImpl) QueryForRead(
 	)
 }
 
-func (r *OrgUnitRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgUnit, error) {
+func (r *OrgUnitRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgUnit, error) {
 	var unit model.OrgUnit
 	err := organizationDB(r.db, ctx).
 		Select(orgUnitReadColumns()).
@@ -273,7 +273,7 @@ func (r *OrgUnitRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model
 	return unit, err
 }
 
-func (r *OrgUnitRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgUnit, error) {
+func (r *OrgUnitRepositoryImpl) FindByIdsForDisplay(ctx context.Context, ids []int) ([]model.OrgUnit, error) {
 	if len(ids) == 0 {
 		return []model.OrgUnit{}, nil
 	}
@@ -285,7 +285,7 @@ func (r *OrgUnitRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int)
 	return units, err
 }
 
-func (r *OrgUnitRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgUnit, error) {
+func (r *OrgUnitRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgUnit, error) {
 	var unit model.OrgUnit
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -293,7 +293,7 @@ func (r *OrgUnitRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSys
 	return unit, err
 }
 
-func (r *OrgUnitRepositoryImpl) FindByCode(ctx *gin.Context, sourceSystemCode, code string) (model.OrgUnit, error) {
+func (r *OrgUnitRepositoryImpl) FindByCode(ctx context.Context, sourceSystemCode, code string) (model.OrgUnit, error) {
 	var unit model.OrgUnit
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND code = ?", sourceSystemCode, code).
@@ -309,7 +309,7 @@ func (r *OrgUnitRepositoryImpl) UpdatePlatformFields(tx *gorm.DB, id int, values
 	return updateOrganizationFields(tx, &model.OrgUnit{}, id, values, orgUnitPlatformFields)
 }
 
-func (r *OrgStructureRepositoryImpl) Query(ctx *gin.Context, req *request.OrgStructureQueryReq, table model.SysTable) (response.ListResult[model.OrgStructure], error) {
+func (r *OrgStructureRepositoryImpl) Query(ctx context.Context, req *request.OrgStructureQueryReq, table model.SysTable) (response.ListResult[model.OrgStructure], error) {
 	if req == nil {
 		req = &request.OrgStructureQueryReq{}
 	}
@@ -329,7 +329,7 @@ func (r *OrgStructureRepositoryImpl) Query(ctx *gin.Context, req *request.OrgStr
 }
 
 func (r *OrgStructureRepositoryImpl) QueryForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgStructureQueryReq,
 	table model.SysTable,
 	scope repository.OrgReadScope,
@@ -380,7 +380,7 @@ func (r *OrgStructureRepositoryImpl) QueryForRead(
 	)
 }
 
-func (r *OrgStructureRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgStructure, error) {
+func (r *OrgStructureRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgStructure, error) {
 	var structure model.OrgStructure
 	err := organizationDB(r.db, ctx).
 		Select(orgStructureReadColumns()).
@@ -388,7 +388,7 @@ func (r *OrgStructureRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (
 	return structure, err
 }
 
-func (r *OrgStructureRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgStructure, error) {
+func (r *OrgStructureRepositoryImpl) FindByIdsForDisplay(ctx context.Context, ids []int) ([]model.OrgStructure, error) {
 	if len(ids) == 0 {
 		return []model.OrgStructure{}, nil
 	}
@@ -400,7 +400,7 @@ func (r *OrgStructureRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids [
 	return structures, err
 }
 
-func (r *OrgStructureRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgStructure, error) {
+func (r *OrgStructureRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgStructure, error) {
 	var structure model.OrgStructure
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -408,7 +408,7 @@ func (r *OrgStructureRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sour
 	return structure, err
 }
 
-func (r *OrgStructureRepositoryImpl) FindByCode(ctx *gin.Context, code string) (model.OrgStructure, error) {
+func (r *OrgStructureRepositoryImpl) FindByCode(ctx context.Context, code string) (model.OrgStructure, error) {
 	var structure model.OrgStructure
 	err := organizationDB(r.db, ctx).Where("code = ?", code).First(&structure).Error
 	return structure, err
@@ -418,7 +418,7 @@ func (r *OrgStructureRepositoryImpl) UpdateSourceFields(tx *gorm.DB, id int, val
 	return updateOrganizationFields(tx, &model.OrgStructure{}, id, values, orgStructureSourceFields)
 }
 
-func (r *OrgStructureNodeRepositoryImpl) Query(ctx *gin.Context, req *request.OrgStructureNodeQueryReq, table model.SysTable) (response.ListResult[model.OrgStructureNode], error) {
+func (r *OrgStructureNodeRepositoryImpl) Query(ctx context.Context, req *request.OrgStructureNodeQueryReq, table model.SysTable) (response.ListResult[model.OrgStructureNode], error) {
 	if req == nil {
 		req = &request.OrgStructureNodeQueryReq{}
 	}
@@ -438,7 +438,7 @@ func (r *OrgStructureNodeRepositoryImpl) Query(ctx *gin.Context, req *request.Or
 }
 
 func (r *OrgStructureNodeRepositoryImpl) ListByStructureForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureId int,
 	scope repository.OrgReadScope,
 	limit int,
@@ -463,7 +463,7 @@ func (r *OrgStructureNodeRepositoryImpl) ListByStructureForRead(
 	return nodes, err
 }
 
-func (r *OrgStructureNodeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgStructureNode, error) {
+func (r *OrgStructureNodeRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgStructureNode, error) {
 	var node model.OrgStructureNode
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -475,7 +475,7 @@ func (r *OrgStructureNodeRepositoryImpl) UpdateSourceFields(tx *gorm.DB, id int,
 	return updateOrganizationFields(tx, &model.OrgStructureNode{}, id, values, orgStructureNodeSourceFields)
 }
 
-func (r *OrgPositionRepositoryImpl) Query(ctx *gin.Context, req *request.OrgPositionQueryReq, table model.SysTable) (response.ListResult[model.OrgPosition], error) {
+func (r *OrgPositionRepositoryImpl) Query(ctx context.Context, req *request.OrgPositionQueryReq, table model.SysTable) (response.ListResult[model.OrgPosition], error) {
 	if req == nil {
 		req = &request.OrgPositionQueryReq{}
 	}
@@ -496,7 +496,7 @@ func (r *OrgPositionRepositoryImpl) Query(ctx *gin.Context, req *request.OrgPosi
 }
 
 func (r *OrgPositionRepositoryImpl) QueryForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgPositionQueryReq,
 	table model.SysTable,
 	scope repository.OrgReadScope,
@@ -540,7 +540,7 @@ func (r *OrgPositionRepositoryImpl) QueryForRead(
 	)
 }
 
-func (r *OrgPositionRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgPosition, error) {
+func (r *OrgPositionRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgPosition, error) {
 	var position model.OrgPosition
 	err := organizationDB(r.db, ctx).
 		Select(orgPositionDetailColumns()).
@@ -548,7 +548,7 @@ func (r *OrgPositionRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (m
 	return position, err
 }
 
-func (r *OrgPositionRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgPosition, error) {
+func (r *OrgPositionRepositoryImpl) FindByIdsForDisplay(ctx context.Context, ids []int) ([]model.OrgPosition, error) {
 	if len(ids) == 0 {
 		return []model.OrgPosition{}, nil
 	}
@@ -560,7 +560,7 @@ func (r *OrgPositionRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []
 	return positions, err
 }
 
-func (r *OrgPositionRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgPosition, error) {
+func (r *OrgPositionRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgPosition, error) {
 	var position model.OrgPosition
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -568,7 +568,7 @@ func (r *OrgPositionRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourc
 	return position, err
 }
 
-func (r *OrgPositionRepositoryImpl) FindByCode(ctx *gin.Context, sourceSystemCode, code string) (model.OrgPosition, error) {
+func (r *OrgPositionRepositoryImpl) FindByCode(ctx context.Context, sourceSystemCode, code string) (model.OrgPosition, error) {
 	var position model.OrgPosition
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND code = ?", sourceSystemCode, code).
@@ -584,7 +584,7 @@ func (r *OrgPositionRepositoryImpl) UpdatePlatformFields(tx *gorm.DB, id int, va
 	return updateOrganizationFields(tx, &model.OrgPosition{}, id, values, orgPositionPlatformFields)
 }
 
-func (r *OrgEmployeeRepositoryImpl) Query(ctx *gin.Context, req *request.OrgEmployeeQueryReq, table model.SysTable) (response.ListResult[model.OrgEmployee], error) {
+func (r *OrgEmployeeRepositoryImpl) Query(ctx context.Context, req *request.OrgEmployeeQueryReq, table model.SysTable) (response.ListResult[model.OrgEmployee], error) {
 	if req == nil {
 		req = &request.OrgEmployeeQueryReq{}
 	}
@@ -604,7 +604,7 @@ func (r *OrgEmployeeRepositoryImpl) Query(ctx *gin.Context, req *request.OrgEmpl
 }
 
 func (r *OrgEmployeeRepositoryImpl) QueryForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgEmployeeQueryReq,
 	table model.SysTable,
 	scope repository.OrgReadScope,
@@ -658,7 +658,7 @@ func (r *OrgEmployeeRepositoryImpl) QueryForRead(
 	)
 }
 
-func (r *OrgEmployeeRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgEmployee, error) {
+func (r *OrgEmployeeRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgEmployee, error) {
 	var employee model.OrgEmployee
 	err := organizationDB(r.db, ctx).
 		Select(orgEmployeeDetailColumns()).
@@ -666,7 +666,7 @@ func (r *OrgEmployeeRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (m
 	return employee, err
 }
 
-func (r *OrgEmployeeRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []int) ([]model.OrgEmployee, error) {
+func (r *OrgEmployeeRepositoryImpl) FindByIdsForDisplay(ctx context.Context, ids []int) ([]model.OrgEmployee, error) {
 	if len(ids) == 0 {
 		return []model.OrgEmployee{}, nil
 	}
@@ -679,7 +679,7 @@ func (r *OrgEmployeeRepositoryImpl) FindByIdsForDisplay(ctx *gin.Context, ids []
 }
 
 func (r *OrgEmployeeRepositoryImpl) FindBoundUserSummaries(
-	ctx *gin.Context,
+	ctx context.Context,
 	ids []int,
 ) ([]repository.OrgBoundUserSummary, error) {
 	if len(ids) == 0 {
@@ -695,7 +695,7 @@ func (r *OrgEmployeeRepositoryImpl) FindBoundUserSummaries(
 }
 
 func (r *OrgEmployeeRepositoryImpl) QueryUsersForBinding(
-	ctx *gin.Context,
+	ctx context.Context,
 	keyword string,
 	page int,
 	num int,
@@ -777,7 +777,7 @@ func (r *OrgEmployeeRepositoryImpl) FindByBoundUserIdForBinding(
 	return employee, err
 }
 
-func (r *OrgEmployeeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgEmployee, error) {
+func (r *OrgEmployeeRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgEmployee, error) {
 	var employee model.OrgEmployee
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -785,7 +785,7 @@ func (r *OrgEmployeeRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourc
 	return employee, err
 }
 
-func (r *OrgEmployeeRepositoryImpl) FindByEmployeeNo(ctx *gin.Context, sourceSystemCode, employeeNo string) (model.OrgEmployee, error) {
+func (r *OrgEmployeeRepositoryImpl) FindByEmployeeNo(ctx context.Context, sourceSystemCode, employeeNo string) (model.OrgEmployee, error) {
 	var employee model.OrgEmployee
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND employee_no = ?", sourceSystemCode, employeeNo).
@@ -793,7 +793,7 @@ func (r *OrgEmployeeRepositoryImpl) FindByEmployeeNo(ctx *gin.Context, sourceSys
 	return employee, err
 }
 
-func (r *OrgEmployeeRepositoryImpl) FindByBoundUserId(ctx *gin.Context, userId int) (model.OrgEmployee, error) {
+func (r *OrgEmployeeRepositoryImpl) FindByBoundUserId(ctx context.Context, userId int) (model.OrgEmployee, error) {
 	var employee model.OrgEmployee
 	err := organizationDB(r.db, ctx).Where("user_id = ?", userId).First(&employee).Error
 	return employee, err
@@ -807,7 +807,7 @@ func (r *OrgEmployeeRepositoryImpl) UpdatePlatformFields(tx *gorm.DB, id int, va
 	return updateOrganizationFields(tx, &model.OrgEmployee{}, id, values, orgEmployeePlatformFields)
 }
 
-func (r *OrgAssignmentRepositoryImpl) Query(ctx *gin.Context, req *request.OrgAssignmentQueryReq, table model.SysTable) (response.ListResult[model.OrgAssignment], error) {
+func (r *OrgAssignmentRepositoryImpl) Query(ctx context.Context, req *request.OrgAssignmentQueryReq, table model.SysTable) (response.ListResult[model.OrgAssignment], error) {
 	if req == nil {
 		req = &request.OrgAssignmentQueryReq{}
 	}
@@ -831,7 +831,7 @@ func (r *OrgAssignmentRepositoryImpl) Query(ctx *gin.Context, req *request.OrgAs
 }
 
 func (r *OrgAssignmentRepositoryImpl) QueryForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req *request.OrgAssignmentQueryReq,
 	table model.SysTable,
 	scope repository.OrgAssignmentReadScope,
@@ -864,7 +864,7 @@ func (r *OrgAssignmentRepositoryImpl) QueryForRead(
 }
 
 func (r *OrgAssignmentRepositoryImpl) ListEffectiveByEmployee(
-	ctx *gin.Context,
+	ctx context.Context,
 	employeeId int,
 	asOf time.Time,
 	limit int,
@@ -894,7 +894,7 @@ func (r *OrgAssignmentRepositoryImpl) ListEffectiveByEmployee(
 	return assignments, err
 }
 
-func (r *OrgAssignmentRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgAssignment, error) {
+func (r *OrgAssignmentRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgAssignment, error) {
 	var assignment model.OrgAssignment
 	err := organizationDB(r.db, ctx).
 		Select(orgAssignmentReadColumns()).
@@ -902,7 +902,7 @@ func (r *OrgAssignmentRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) 
 	return assignment, err
 }
 
-func (r *OrgAssignmentRepositoryImpl) FindBySourceIdentity(ctx *gin.Context, sourceSystemCode, sourceId string) (model.OrgAssignment, error) {
+func (r *OrgAssignmentRepositoryImpl) FindBySourceIdentity(ctx context.Context, sourceSystemCode, sourceId string) (model.OrgAssignment, error) {
 	var assignment model.OrgAssignment
 	err := organizationDB(r.db, ctx).
 		Where("source_system_code = ? AND source_id = ?", sourceSystemCode, sourceId).
@@ -914,7 +914,7 @@ func (r *OrgAssignmentRepositoryImpl) UpdateSourceFields(tx *gorm.DB, id int, va
 	return updateOrganizationFields(tx, &model.OrgAssignment{}, id, values, orgAssignmentSourceFields)
 }
 
-func (r *OrgSyncBatchRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSyncBatchQueryReq, table model.SysTable) (response.ListResult[model.OrgSyncBatch], error) {
+func (r *OrgSyncBatchRepositoryImpl) Query(ctx context.Context, req *request.OrgSyncBatchQueryReq, table model.SysTable) (response.ListResult[model.OrgSyncBatch], error) {
 	if req == nil {
 		req = &request.OrgSyncBatchQueryReq{}
 	}
@@ -933,13 +933,13 @@ func (r *OrgSyncBatchRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSyn
 	)
 }
 
-func (r *OrgSyncBatchRepositoryImpl) FindByBatchNo(ctx *gin.Context, batchNo string) (model.OrgSyncBatch, error) {
+func (r *OrgSyncBatchRepositoryImpl) FindByBatchNo(ctx context.Context, batchNo string) (model.OrgSyncBatch, error) {
 	var batch model.OrgSyncBatch
 	err := organizationDB(r.db, ctx).Where("batch_no = ?", batchNo).First(&batch).Error
 	return batch, err
 }
 
-func (r *OrgSyncBatchRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgSyncBatch, error) {
+func (r *OrgSyncBatchRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgSyncBatch, error) {
 	var batch model.OrgSyncBatch
 	err := organizationDB(r.db, ctx).
 		Select(orgSyncBatchListColumns()).
@@ -948,7 +948,7 @@ func (r *OrgSyncBatchRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (
 	return batch, err
 }
 
-func (r *OrgSyncRecordRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSyncRecordQueryReq, table model.SysTable) (response.ListResult[model.OrgSyncRecord], error) {
+func (r *OrgSyncRecordRepositoryImpl) Query(ctx context.Context, req *request.OrgSyncRecordQueryReq, table model.SysTable) (response.ListResult[model.OrgSyncRecord], error) {
 	if req == nil {
 		req = &request.OrgSyncRecordQueryReq{}
 	}
@@ -971,7 +971,7 @@ func (r *OrgSyncRecordRepositoryImpl) Query(ctx *gin.Context, req *request.OrgSy
 	)
 }
 
-func (r *OrgSyncRecordRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) (model.OrgSyncRecord, error) {
+func (r *OrgSyncRecordRepositoryImpl) FindByIdForRead(ctx context.Context, id int) (model.OrgSyncRecord, error) {
 	var record model.OrgSyncRecord
 	err := organizationDB(r.db, ctx).
 		Select(append(orgSyncRecordListColumns(), "dependency_key")).
@@ -982,7 +982,7 @@ func (r *OrgSyncRecordRepositoryImpl) FindByIdForRead(ctx *gin.Context, id int) 
 
 func queryOrganization[T any](
 	repo repository.BasicRepository[T],
-	ctx *gin.Context,
+	ctx context.Context,
 	basic request.Basic,
 	typedFilters map[string]any,
 	table model.SysTable,
@@ -1345,7 +1345,7 @@ func optionalBool(value *bool) any {
 	return *value
 }
 
-func organizationDB(db *gorm.DB, ctx *gin.Context) *gorm.DB {
+func organizationDB(db *gorm.DB, ctx context.Context) *gorm.DB {
 	if ctx == nil {
 		return db
 	}

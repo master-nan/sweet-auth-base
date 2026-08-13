@@ -9,11 +9,10 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
-
-	"github.com/gin-gonic/gin"
+	"context"
 )
 
 type AccessLogRepository interface {
 	BasicRepository[model.AccessLog]
-	GetAccessLogList(*gin.Context, *request.Basic) (response.ListResult[model.AccessLog], error)
+	GetAccessLogList(context.Context, *request.Basic) (response.ListResult[model.AccessLog], error)
 }

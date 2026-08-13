@@ -145,7 +145,7 @@ func (t *ApplicationController) CreateApplication(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	application, err := t.applicationService.CreateApplication(ctx, data)
+	application, err := t.applicationService.CreateApplication(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -179,7 +179,7 @@ func (t *ApplicationController) UpdateApplication(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = t.applicationService.UpdateApplication(ctx, data)
+	err = t.applicationService.UpdateApplication(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -203,7 +203,7 @@ func (t *ApplicationController) RotateApplicationSecret(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	application, err := t.applicationService.RotateApplicationSecret(ctx, id)
+	application, err := t.applicationService.RotateApplicationSecret(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -228,7 +228,7 @@ func (t *ApplicationController) DeleteApplicationById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = t.applicationService.DeleteApplicationById(ctx, id)
+	err = t.applicationService.DeleteApplicationById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

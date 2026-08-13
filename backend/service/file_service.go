@@ -13,6 +13,7 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -37,6 +37,12 @@ type FileService struct {
 	sf            *utils.Snowflake
 	config        *config.Server
 	storage       storage.Storage
+}
+
+// FileAccessActor is the minimum caller snapshot needed for file reuse access.
+type FileAccessActor struct {
+	UserID       int
+	IsSuperAdmin bool
 }
 
 // NewFileService 创建文件服务实例。
@@ -57,7 +63,7 @@ func NewFileService(
 }
 
 // Upload 上传文件（小文件直传）
-func (f *FileService) Upload(ctx *gin.Context, fileHeader *multipart.FileHeader) (model.File, error) {
+func (f *FileService) Upload(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (model.File, error) {
 	if err := validateUploadSize(fileHeader.Size, f.config.Upload); err != nil {
 		return model.File{}, err
 	}
@@ -89,7 +95,7 @@ func (f *FileService) Upload(ctx *gin.Context, fileHeader *multipart.FileHeader)
 	// 秒传：检查是否已有相同 MD5 的文件
 	existing, err := f.fileRepo.FindByFileMd5(fileMd5)
 	if err == nil && existing.Id != 0 {
-		if err := ensureFileReuseAccess(ctx, existing); err != nil {
+		if err := ensureFileReuseAccess(actor, existing); err != nil {
 			return model.File{}, err
 		}
 		return existing, nil
@@ -148,7 +154,7 @@ func (f *FileService) Upload(ctx *gin.Context, fileHeader *multipart.FileHeader)
 // ─── 分片上传 ───────────────────────────────────
 
 // InitChunkUpload 初始化分片上传
-func (f *FileService) InitChunkUpload(ctx *gin.Context, req request.ChunkUploadInitReq) (request.ChunkUploadInitRes, error) {
+func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor, req request.ChunkUploadInitReq) (request.ChunkUploadInitRes, error) {
 	if err := validateUploadSize(req.FileSize, f.config.Upload); err != nil {
 		return request.ChunkUploadInitRes{}, err
 	}
@@ -165,7 +171,7 @@ func (f *FileService) InitChunkUpload(ctx *gin.Context, req request.ChunkUploadI
 	if req.FileMd5 != "" {
 		existing, err := f.fileRepo.FindByFileMd5(req.FileMd5)
 		if err == nil && existing.Id != 0 {
-			if err := ensureFileReuseAccess(ctx, existing); err != nil {
+			if err := ensureFileReuseAccess(actor, existing); err != nil {
 				return request.ChunkUploadInitRes{}, err
 			}
 			return request.ChunkUploadInitRes{
@@ -317,7 +323,7 @@ func normalizedContentType(contentType string) string {
 }
 
 // UploadChunk 上传单个分片
-func (f *FileService) UploadChunk(ctx *gin.Context, uploadId string, chunkIndex int, fileHeader *multipart.FileHeader) error {
+func (f *FileService) UploadChunk(ctx context.Context, uploadId string, chunkIndex int, fileHeader *multipart.FileHeader) error {
 	chunk, err := f.fileChunkRepo.FindByUploadIdAndIndex(uploadId, chunkIndex)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -378,7 +384,7 @@ func (f *FileService) UploadChunk(ctx *gin.Context, uploadId string, chunkIndex 
 }
 
 // MergeChunks 合并分片
-func (f *FileService) MergeChunks(ctx *gin.Context, uploadId string) (model.File, error) {
+func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, uploadId string) (model.File, error) {
 	firstChunk, err := f.fileChunkRepo.GetFirstChunk(uploadId)
 	if err != nil {
 		return model.File{}, myerrors.ErrUploadNotFound
@@ -473,7 +479,7 @@ func (f *FileService) MergeChunks(ctx *gin.Context, uploadId string) (model.File
 	// 秒传检查（合并后再次检查）
 	existing, err := f.fileRepo.FindByFileMd5(fileMd5)
 	if err == nil && existing.Id != 0 {
-		if err := ensureFileReuseAccess(ctx, existing); err != nil {
+		if err := ensureFileReuseAccess(actor, existing); err != nil {
 			return model.File{}, err
 		}
 		_ = f.fileChunkRepo.MarkUploadMerged(uploadId)
@@ -529,7 +535,7 @@ func (f *FileService) MergeChunks(ctx *gin.Context, uploadId string) (model.File
 }
 
 // GetUploadProgressForUser 获取当前用户可访问的分片上传进度。
-func (f *FileService) GetUploadProgressForUser(ctx *gin.Context, uploadId string) (request.ChunkUploadProgressRes, error) {
+func (f *FileService) GetUploadProgressForUser(ctx context.Context, uploadId string) (request.ChunkUploadProgressRes, error) {
 	firstChunk, err := f.fileChunkRepo.GetFirstChunk(uploadId)
 	if err != nil {
 		return request.ChunkUploadProgressRes{}, myerrors.ErrUploadNotFound
@@ -555,12 +561,11 @@ func (f *FileService) GetUploadProgressForUser(ctx *gin.Context, uploadId string
 }
 
 // ensureFileReuseAccess 校验秒传复用已有文件时是否为本人文件或超管。
-func ensureFileReuseAccess(ctx *gin.Context, file model.File) error {
-	user := ctx.MustGet("user").(model.SysUser)
-	if utils.IsSuperAdmin(user) {
+func ensureFileReuseAccess(actor FileAccessActor, file model.File) error {
+	if actor.IsSuperAdmin {
 		return nil
 	}
-	if file.CreateUser != nil && *file.CreateUser == user.Id {
+	if actor.UserID > 0 && file.CreateUser != nil && *file.CreateUser == actor.UserID {
 		return nil
 	}
 	return myerrors.ErrPermissionDenied
@@ -623,7 +628,7 @@ func (f *FileService) GetFileByUuid(uuid string) (model.File, error) {
 }
 
 // DeleteFileById 根据 ID 删除文件
-func (f *FileService) DeleteFileById(ctx *gin.Context, id int) error {
+func (f *FileService) DeleteFileById(ctx context.Context, id int) error {
 	file, err := f.fileRepo.FindById(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

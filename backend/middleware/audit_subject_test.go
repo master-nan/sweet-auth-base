@@ -22,6 +22,10 @@ func TestInjectAuditSubjectWritesStandardRequestContext(t *testing.T) {
 	if subject.UserID != 27 || subject.UserName != "middleware-user" {
 		t.Fatalf("unexpected audit subject: %+v", subject)
 	}
+	legacySubject, ok := audit.GetAuditSubject(ctx)
+	if !ok || legacySubject != subject {
+		t.Fatalf("HTTP adapter context lost audit subject: %+v, ok=%v", legacySubject, ok)
+	}
 }
 
 func TestInjectAuditSubjectHandlesMissingRequest(t *testing.T) {

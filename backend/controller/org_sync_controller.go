@@ -33,7 +33,7 @@ func (o *OrgController) QuerySyncBatches(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QuerySyncBatches(ctx, data, table)
+	result, err := o.orgService.QuerySyncBatches(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -50,7 +50,7 @@ func (o *OrgController) GetSyncBatchDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetSyncBatchDetail(ctx, id)
+	result, err := o.orgService.GetSyncBatchDetail(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -67,7 +67,7 @@ func (o *OrgController) GetSyncBatchError(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetSyncBatchError(ctx, id)
+	result, err := o.orgService.GetSyncBatchError(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -93,7 +93,7 @@ func (o *OrgController) QuerySyncRecords(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QuerySyncRecords(ctx, data, table)
+	result, err := o.orgService.QuerySyncRecords(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -110,7 +110,7 @@ func (o *OrgController) GetSyncRecordDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetSyncRecordDetail(ctx, id)
+	result, err := o.orgService.GetSyncRecordDetail(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -127,7 +127,7 @@ func (o *OrgController) GetSyncRecordError(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetSyncRecordError(ctx, id)
+	result, err := o.orgService.GetSyncRecordError(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

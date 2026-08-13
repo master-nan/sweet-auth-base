@@ -6,6 +6,7 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"time"
 
@@ -34,7 +35,13 @@ func NewSubjectContextBuilder(
 	return newSubjectContextBuilder(
 		userRepo.FindById,
 		userRoleRepo.GetUserRoles,
-		orgProvider.GetEmployeeByUser,
+		func(ctx *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+			requestContext := context.Background()
+			if ctx != nil && ctx.Request != nil {
+				requestContext = ctx.Request.Context()
+			}
+			return orgProvider.GetEmployeeByUser(requestContext, userId)
+		},
 		model.Now,
 	)
 }

@@ -13,8 +13,8 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -84,7 +84,7 @@ func (s *SysDictService) GetSysDictByCode(code string) (model.SysDict, error) {
 	return dict, nil
 }
 
-func (s *SysDictService) CreateSysDict(ctx *gin.Context, req request.DictCreateReq) (int64, error) {
+func (s *SysDictService) CreateSysDict(ctx context.Context, req request.DictCreateReq) (int64, error) {
 	var data model.SysDict
 	dict, e := s.GetSysDictByCode(req.DictCode)
 	if e != nil {
@@ -107,7 +107,7 @@ func (s *SysDictService) CreateSysDict(ctx *gin.Context, req request.DictCreateR
 	return id, s.sysDictRepo.Create(tx, &data)
 }
 
-func (s *SysDictService) UpdateSysDict(ctx *gin.Context, req request.DictUpdateReq) error {
+func (s *SysDictService) UpdateSysDict(ctx context.Context, req request.DictUpdateReq) error {
 	tx := s.sysDictRepo.DBWithContext(ctx)
 	err := s.sysDictRepo.Update(tx, req, req.Id)
 	if err != nil {
@@ -124,7 +124,7 @@ func (s *SysDictService) UpdateSysDict(ctx *gin.Context, req request.DictUpdateR
 	return nil
 }
 
-func (s *SysDictService) DeleteSysDictById(ctx *gin.Context, id int) error {
+func (s *SysDictService) DeleteSysDictById(ctx context.Context, id int) error {
 	tx := s.sysDictRepo.DBWithContext(ctx)
 	err := s.sysDictRepo.DeleteById(tx, id)
 	data, err := s.GetSysDictById(id)
@@ -151,7 +151,7 @@ func (s *SysDictService) GetSysDictItemsByDictId(id int) ([]model.SysDictItem, e
 	return result, err
 }
 
-func (s *SysDictService) CreateSysDictItem(ctx *gin.Context, req request.DictItemCreateReq) error {
+func (s *SysDictService) CreateSysDictItem(ctx context.Context, req request.DictItemCreateReq) error {
 	var data model.SysDictItem
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -181,7 +181,7 @@ func (s *SysDictService) CreateSysDictItem(ctx *gin.Context, req request.DictIte
 	return nil
 }
 
-func (s *SysDictService) UpdateSysDictItem(ctx *gin.Context, req request.DictItemUpdateReq) error {
+func (s *SysDictService) UpdateSysDictItem(ctx context.Context, req request.DictItemUpdateReq) error {
 	tx := s.sysDictRepo.DBWithContext(ctx)
 	err := s.sysDictItemRepo.Update(tx, &req, req.Id)
 	if err != nil {
@@ -205,7 +205,7 @@ func (s *SysDictService) UpdateSysDictItem(ctx *gin.Context, req request.DictIte
 	return nil
 }
 
-func (s *SysDictService) DeleteSysDictItemById(ctx *gin.Context, id int) error {
+func (s *SysDictService) DeleteSysDictItemById(ctx context.Context, id int) error {
 	tx := s.sysDictRepo.DBWithContext(ctx)
 	err := s.sysDictItemRepo.DeleteById(tx, id)
 	if err != nil {

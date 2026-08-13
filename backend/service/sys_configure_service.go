@@ -11,6 +11,7 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -20,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
@@ -55,7 +55,7 @@ func (cs *SysConfigureService) Query() (model.SysConfigure, error) {
 	return data, err
 }
 
-func (cs *SysConfigureService) Update(ctx *gin.Context, req request.ConfigureUpdateReq) error {
+func (cs *SysConfigureService) Update(ctx context.Context, req request.ConfigureUpdateReq) error {
 	tx := cs.sysConfigureRepo.DBWithContext(ctx)
 	if strings.TrimSpace(req.SenderPassword) == "" {
 		var existing model.SysConfigure

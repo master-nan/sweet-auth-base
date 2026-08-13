@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -180,26 +179,10 @@ func (b *Basic) BeforeDelete(tx *gorm.DB) error {
 	return nil
 }
 
-// auditSubjectFromTransaction 优先读取标准 Context，并保留 Gin 上下文兼容读取。
+// auditSubjectFromTransaction 只读取标准 Context 中的受控审计主体。
 func auditSubjectFromTransaction(tx *gorm.DB) (audit.AuditSubject, bool) {
 	if tx == nil || tx.Statement == nil {
 		return audit.AuditSubject{}, false
 	}
-	if subject, ok := audit.GetAuditSubject(tx.Statement.Context); ok {
-		return subject, true
-	}
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if !ok {
-		return audit.AuditSubject{}, false
-	}
-	userValue, exists := ctx.Get("user")
-	if !exists {
-		return audit.AuditSubject{}, false
-	}
-	user, ok := userValue.(SysUser)
-	if !ok {
-		return audit.AuditSubject{}, false
-	}
-	subject := audit.NewAuditSubject(user.Id, user.UserName)
-	return subject, subject.Valid()
+	return audit.GetAuditSubject(tx.Statement.Context)
 }

@@ -9,10 +9,8 @@ import (
 	"backend/repository"
 	"context"
 	"errors"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -431,13 +429,9 @@ func TestOrgRepositoryPropagatesCancelledContext(t *testing.T) {
 
 	requestContext, cancel := context.WithCancel(context.Background())
 	cancel()
-	ginContext, engine := gin.CreateTestContext(httptest.NewRecorder())
-	engine.ContextWithFallback = true
-	ginContext.Request = httptest.NewRequest("POST", "/admin/org/legal-entity/query", nil).
-		WithContext(requestContext)
 
 	_, err := repo.Query(
-		ginContext,
+		requestContext,
 		&request.OrgLegalEntityQueryReq{},
 		model.SysTable{TableCode: "org_legal_entity"},
 		repository.OrgLegalEntityReadScope{AsOf: model.Now()},

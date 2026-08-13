@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -172,7 +171,7 @@ func redactSmsTemplateParamsForLog(params map[string]interface{}) map[string]int
 }
 
 // CheckSmsStatus 检查短信发送状态
-func (s *SmsService) CheckSmsStatus(ctx *gin.Context, bizId, mobile string) (interface{}, error) {
+func (s *SmsService) CheckSmsStatus(ctx context.Context, bizId, mobile string) (interface{}, error) {
 	client, err := sms.GetSmsClient(s.serverConfig.ALiYun.SMS.AccessKeyId, s.serverConfig.ALiYun.SMS.AccessKeySecret)
 	if err != nil {
 		zap.L().Error("获取短信客户端失败", zap.Error(err))
@@ -214,7 +213,7 @@ func (s *SmsService) GetSmsTemplateList(basic *request.Basic, table model.SysTab
 }
 
 // CreateSmsTemplate 创建短信模板
-func (s *SmsService) CreateSmsTemplate(ctx *gin.Context, data request.SmsTemplateCreateReq) (int, error) {
+func (s *SmsService) CreateSmsTemplate(ctx context.Context, data request.SmsTemplateCreateReq) (int, error) {
 	var template model.SmsTemplate
 	// 查询模板编号是否存在
 	smsTemp, err := s.smsTemplateRepo.FindByField("template_code", data.TemplateCode)
@@ -238,7 +237,7 @@ func (s *SmsService) CreateSmsTemplate(ctx *gin.Context, data request.SmsTemplat
 }
 
 // UpdateSmsTemplate 更新短信模板
-func (s *SmsService) UpdateSmsTemplate(ctx *gin.Context, req request.SmsTemplateUpdateReq) error {
+func (s *SmsService) UpdateSmsTemplate(ctx context.Context, req request.SmsTemplateUpdateReq) error {
 	tx := s.smsTemplateRepo.DBWithContext(ctx)
 	err := s.smsTemplateRepo.Update(tx, &req, req.Id)
 	if err != nil {
@@ -260,7 +259,7 @@ func (s *SmsService) GetSmsTemplateById(id int) (model.SmsTemplate, error) {
 }
 
 // DeleteSmsTemplateById 根据ID删除短信模板
-func (s *SmsService) DeleteSmsTemplateById(ctx *gin.Context, id int) error {
+func (s *SmsService) DeleteSmsTemplateById(ctx context.Context, id int) error {
 	tx := s.smsTemplateRepo.DBWithContext(ctx)
 	err := s.smsTemplateRepo.DeleteById(tx, id)
 	if err != nil {

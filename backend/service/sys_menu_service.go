@@ -12,12 +12,12 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -66,7 +66,7 @@ func (s *SysMenuService) GetMenuById(id int) (model.SysMenu, error) {
 }
 
 // CreateMenu 新增菜单
-func (s *SysMenuService) CreateMenu(ctx *gin.Context, req request.MenuCreateReq) error {
+func (s *SysMenuService) CreateMenu(ctx context.Context, req request.MenuCreateReq) error {
 	var data model.SysMenu
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *SysMenuService) CreateMenu(ctx *gin.Context, req request.MenuCreateReq)
 }
 
 // UpdateMenu 更新菜单
-func (s *SysMenuService) UpdateMenu(ctx *gin.Context, data request.MenuUpdateReq) error {
+func (s *SysMenuService) UpdateMenu(ctx context.Context, data request.MenuUpdateReq) error {
 	if data.PageType == "" {
 		existing, err := s.sysMenuRepo.WithContext(ctx).FindById(data.Id)
 		if err == nil {
@@ -105,7 +105,7 @@ func normalizeMenuPageBinding(menu *model.SysMenu) {
 	}
 }
 
-func (s *SysMenuService) UpdateMenuOrder(ctx *gin.Context, data request.MenuOrderUpdateReq) error {
+func (s *SysMenuService) UpdateMenuOrder(ctx context.Context, data request.MenuOrderUpdateReq) error {
 	seen := make(map[int]struct{}, len(data.Menus))
 	return s.sysMenuRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		for _, item := range data.Menus {
@@ -125,12 +125,12 @@ func (s *SysMenuService) UpdateMenuOrder(ctx *gin.Context, data request.MenuOrde
 	})
 }
 
-func (s *SysMenuService) RefreshMenuCache(ctx *gin.Context) error {
+func (s *SysMenuService) RefreshMenuCache(ctx context.Context) error {
 	return nil
 }
 
 // DeleteMenuById 删除菜单
-func (s *SysMenuService) DeleteMenuById(ctx *gin.Context, id int) error {
+func (s *SysMenuService) DeleteMenuById(ctx context.Context, id int) error {
 	var cleanups []rolePolicyCleanup
 	err := s.sysMenuRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		childCount, err := s.sysMenuRepo.CountByField(tx, "pid", id)
@@ -525,7 +525,7 @@ func (s *SysMenuService) GetMenuButtonsByMenuId(menuId int) ([]model.SysMenuButt
 }
 
 // CreateMenuButton 创建菜单按钮
-func (s *SysMenuService) CreateMenuButton(ctx *gin.Context, req request.MenuButtonCreateReq) error {
+func (s *SysMenuService) CreateMenuButton(ctx context.Context, req request.MenuButtonCreateReq) error {
 	var data model.SysMenuButton
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -555,7 +555,7 @@ func (s *SysMenuService) CreateMenuButton(ctx *gin.Context, req request.MenuButt
 }
 
 // UpdateMenuButton 更新菜单按钮
-func (s *SysMenuService) UpdateMenuButton(ctx *gin.Context, req request.MenuButtonUpdateReq) error {
+func (s *SysMenuService) UpdateMenuButton(ctx context.Context, req request.MenuButtonUpdateReq) error {
 	data := model.SysMenuButton{}
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -944,7 +944,7 @@ func requireLowCodeButtonAPI(button *model.SysMenuButton, method, path string) e
 }
 
 // DeleteMenuButton 删除菜单按钮
-func (s *SysMenuService) DeleteMenuButton(ctx *gin.Context, id int) error {
+func (s *SysMenuService) DeleteMenuButton(ctx context.Context, id int) error {
 	var cleanups []rolePolicyCleanup
 	err := s.sysMenuButtonRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		button, err := s.sysMenuButtonRepo.FindById(id)

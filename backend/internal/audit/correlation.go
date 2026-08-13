@@ -7,6 +7,11 @@ import (
 
 type correlationContextKey struct{}
 
+const (
+	RequestIDValueKey = "sweet_platform_request_id"
+	TraceIDValueKey   = "sweet_platform_trace_id"
+)
+
 // CorrelationIDs 保存跨 HTTP 与事务审计复用的请求关联标识。
 type CorrelationIDs struct {
 	RequestID string
@@ -28,6 +33,12 @@ func GetCorrelationIDs(ctx context.Context) CorrelationIDs {
 	if ctx == nil {
 		return CorrelationIDs{}
 	}
-	ids, _ := ctx.Value(correlationContextKey{}).(CorrelationIDs)
+	ids, ok := ctx.Value(correlationContextKey{}).(CorrelationIDs)
+	if !ok {
+		ids.RequestID, _ = ctx.Value(RequestIDValueKey).(string)
+		ids.TraceID, _ = ctx.Value(TraceIDValueKey).(string)
+	}
+	ids.RequestID = strings.TrimSpace(ids.RequestID)
+	ids.TraceID = strings.TrimSpace(ids.TraceID)
 	return ids
 }

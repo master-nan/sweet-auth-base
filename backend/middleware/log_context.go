@@ -15,8 +15,8 @@ const (
 	RequestIDHeader = "X-Request-ID"
 	TraceIDHeader   = "X-Trace-ID"
 
-	requestIDContextKey     = "sweet_platform_request_id"
-	traceIDContextKey       = "sweet_platform_trace_id"
+	requestIDContextKey     = audit.RequestIDValueKey
+	traceIDContextKey       = audit.TraceIDValueKey
 	accessAuditContextKey   = "sweet_platform_access_audit"
 	accessAuditPersistedKey = "sweet_platform_access_audit_persisted"
 	maxCorrelationIDLength  = 128
@@ -60,10 +60,21 @@ func EnsureLogContext(ctx *gin.Context) {
 	ctx.Set(requestIDContextKey, requestID)
 	ctx.Set(traceIDContextKey, traceID)
 	if ctx.Request != nil {
+		path := ctx.FullPath()
+		if path == "" && ctx.Request.URL != nil {
+			path = ctx.Request.URL.Path
+		}
+		requestMetadata := audit.RequestMetadata{
+			Method:   ctx.Request.Method,
+			Path:     path,
+			ClientIP: ctx.ClientIP(),
+		}
+		ctx.Set(audit.RequestMetadataValueKey, requestMetadata)
 		requestContext := audit.WithCorrelationIDs(ctx.Request.Context(), audit.CorrelationIDs{
 			RequestID: requestID,
 			TraceID:   traceID,
 		})
+		requestContext = audit.WithRequestMetadata(requestContext, requestMetadata)
 		ctx.Request = ctx.Request.WithContext(requestContext)
 	}
 	ctx.Header(RequestIDHeader, requestID)

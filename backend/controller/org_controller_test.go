@@ -11,6 +11,7 @@ import (
 	"backend/repository/impl"
 	"backend/service"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -37,7 +38,7 @@ type orgControllerTableProviderStub struct {
 type orgControllerAuditWriterStub struct{}
 
 func (orgControllerAuditWriterStub) RecordTransactionalAudit(
-	*gin.Context,
+	context.Context,
 	*gorm.DB,
 	service.TransactionalAuditRecord,
 ) error {

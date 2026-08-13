@@ -72,7 +72,7 @@ func (o *OrgController) QueryLegalEntities(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryLegalEntities(ctx, data, table)
+	result, err := o.orgService.QueryLegalEntities(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -103,7 +103,7 @@ func (o *OrgController) GetLegalEntityDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetLegalEntityDetail(ctx, id, data)
+	result, err := o.orgService.GetLegalEntityDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -129,7 +129,7 @@ func (o *OrgController) GetLegalEntityTree(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetLegalEntityTree(ctx, data)
+	result, err := o.orgService.GetLegalEntityTree(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -164,7 +164,7 @@ func (o *OrgController) QueryLegalEntityOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryLegalEntityOptions(ctx, data, table)
+	result, err := o.orgService.QueryLegalEntityOptions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -199,7 +199,7 @@ func (o *OrgController) QueryStructures(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryStructures(ctx, data, table)
+	result, err := o.orgService.QueryStructures(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -230,7 +230,7 @@ func (o *OrgController) GetStructureDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetStructureDetail(ctx, id, data)
+	result, err := o.orgService.GetStructureDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -265,7 +265,7 @@ func (o *OrgController) QueryStructureOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryStructureOptions(ctx, data, table)
+	result, err := o.orgService.QueryStructureOptions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -300,7 +300,7 @@ func (o *OrgController) QueryOrgUnits(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryOrgUnits(ctx, data, table)
+	result, err := o.orgService.QueryOrgUnits(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -331,7 +331,7 @@ func (o *OrgController) GetOrgUnitDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetOrgUnitDetail(ctx, id, data)
+	result, err := o.orgService.GetOrgUnitDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -366,7 +366,7 @@ func (o *OrgController) QueryOrgUnitOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryOrgUnitOptions(ctx, data, table)
+	result, err := o.orgService.QueryOrgUnitOptions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -392,7 +392,7 @@ func (o *OrgController) GetStructureOrgTree(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetStructureOrgTree(ctx, data)
+	result, err := o.orgService.GetStructureOrgTree(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -427,7 +427,7 @@ func (o *OrgController) QueryEmployees(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryEmployees(ctx, data, table)
+	result, err := o.orgService.QueryEmployees(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -458,7 +458,7 @@ func (o *OrgController) GetEmployeeDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetEmployeeDetail(ctx, id, data)
+	result, err := o.orgService.GetEmployeeDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -493,7 +493,7 @@ func (o *OrgController) QueryEmployeeOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryEmployeeOptions(ctx, data, table)
+	result, err := o.orgService.QueryEmployeeOptions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -519,7 +519,7 @@ func (o *OrgController) QueryEmployeeUserOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryEmployeeUserOptions(ctx, data)
+	result, err := o.orgService.QueryEmployeeUserOptions(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -557,7 +557,7 @@ func (o *OrgController) BindEmployeeUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.BindEmployeeUser(ctx, data)
+	result, err := o.orgService.BindEmployeeUser(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -595,7 +595,7 @@ func (o *OrgController) UnbindEmployeeUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.UnbindEmployeeUser(ctx, data)
+	result, err := o.orgService.UnbindEmployeeUser(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -631,7 +631,7 @@ func (o *OrgController) QueryPositions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryPositions(ctx, data, table)
+	result, err := o.orgService.QueryPositions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -662,7 +662,7 @@ func (o *OrgController) GetPositionDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetPositionDetail(ctx, id, data)
+	result, err := o.orgService.GetPositionDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -697,7 +697,7 @@ func (o *OrgController) QueryPositionOptions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryPositionOptions(ctx, data, table)
+	result, err := o.orgService.QueryPositionOptions(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -732,7 +732,7 @@ func (o *OrgController) QueryAssignments(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.QueryAssignments(ctx, data, table)
+	result, err := o.orgService.QueryAssignments(ctx.Request.Context(), data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -763,7 +763,7 @@ func (o *OrgController) GetAssignmentDetail(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetAssignmentDetail(ctx, id, data)
+	result, err := o.orgService.GetAssignmentDetail(ctx.Request.Context(), id, data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -799,7 +799,7 @@ func (o *OrgController) GetEmployeeCurrentAssignmentSummary(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := o.orgService.GetEmployeeCurrentAssignmentSummary(ctx, id, data, table)
+	result, err := o.orgService.GetEmployeeCurrentAssignmentSummary(ctx.Request.Context(), id, data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

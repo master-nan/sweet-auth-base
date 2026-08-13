@@ -7,13 +7,13 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -71,7 +71,7 @@ func NewOrgService(
 }
 
 func (s *OrgService) QueryLegalEntities(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgLegalEntityQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgLegalEntityListRes], error) {
@@ -97,7 +97,7 @@ func (s *OrgService) QueryLegalEntities(
 }
 
 func (s *OrgService) GetLegalEntityDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	legalEntityId int,
 	req request.OrgLegalEntityDetailReq,
 ) (response.OrgLegalEntityDetailRes, error) {
@@ -122,7 +122,7 @@ func (s *OrgService) GetLegalEntityDetail(
 }
 
 func (s *OrgService) GetLegalEntityTree(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgLegalEntityTreeReq,
 ) ([]response.OrgLegalEntityTreeNodeRes, error) {
 	if req.RootId != nil && *req.RootId <= 0 {
@@ -140,7 +140,7 @@ func (s *OrgService) GetLegalEntityTree(
 }
 
 func (s *OrgService) QueryLegalEntityOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgLegalEntityOptionsReq,
 	table model.SysTable,
 ) (response.OrgSelectorOptionsRes, error) {
@@ -210,7 +210,7 @@ func (s *OrgService) QueryLegalEntityOptions(
 }
 
 func (s *OrgService) QueryStructures(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgStructureQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgStructureListRes], error) {
@@ -236,7 +236,7 @@ func (s *OrgService) QueryStructures(
 }
 
 func (s *OrgService) GetStructureDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	structureId int,
 	req request.OrgStructureDetailReq,
 ) (response.OrgStructureDetailRes, error) {
@@ -261,7 +261,7 @@ func (s *OrgService) GetStructureDetail(
 }
 
 func (s *OrgService) QueryStructureOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgStructureOptionsReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgSelectorOptionRes], error) {
@@ -335,7 +335,7 @@ func (s *OrgService) QueryStructureOptions(
 }
 
 func (s *OrgService) QueryOrgUnits(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgUnitQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgUnitListRes], error) {
@@ -364,7 +364,7 @@ func (s *OrgService) QueryOrgUnits(
 }
 
 func (s *OrgService) GetOrgUnitDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	orgUnitId int,
 	req request.OrgUnitDetailReq,
 ) (response.OrgUnitDetailRes, error) {
@@ -407,7 +407,7 @@ func (s *OrgService) GetOrgUnitDetail(
 }
 
 func (s *OrgService) QueryOrgUnitOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgUnitOptionsReq,
 	table model.SysTable,
 ) (response.OrgSelectorOptionsRes, error) {
@@ -490,7 +490,7 @@ func (s *OrgService) QueryOrgUnitOptions(
 }
 
 func (s *OrgService) QueryEmployees(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgEmployeeQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgEmployeeListRes], error) {
@@ -523,7 +523,7 @@ func (s *OrgService) QueryEmployees(
 }
 
 func (s *OrgService) GetEmployeeDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	employeeId int,
 	req request.OrgEmployeeDetailReq,
 ) (response.OrgEmployeeDetailRes, error) {
@@ -555,7 +555,7 @@ func (s *OrgService) GetEmployeeDetail(
 }
 
 func (s *OrgService) QueryEmployeeOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgEmployeeOptionsReq,
 	table model.SysTable,
 ) (response.OrgSelectorOptionsRes, error) {
@@ -626,7 +626,7 @@ func (s *OrgService) QueryEmployeeOptions(
 }
 
 func (s *OrgService) QueryEmployeeUserOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgEmployeeUserOptionsReq,
 ) (response.ListResult[response.OrgEmployeeUserOptionRes], error) {
 	var result response.ListResult[response.OrgEmployeeUserOptionRes]
@@ -649,7 +649,7 @@ func (s *OrgService) QueryEmployeeUserOptions(
 }
 
 func (s *OrgService) BindEmployeeUser(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgEmployeeBindUserReq,
 ) (response.OrgEmployeeUserBindingRes, error) {
 	if req.EmployeeId <= 0 {
@@ -719,7 +719,7 @@ func (s *OrgService) BindEmployeeUser(
 }
 
 func (s *OrgService) UnbindEmployeeUser(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgEmployeeUnbindUserReq,
 ) (response.OrgEmployeeUserBindingRes, error) {
 	if req.EmployeeId <= 0 {
@@ -766,7 +766,7 @@ func (s *OrgService) UnbindEmployeeUser(
 }
 
 func (s *OrgService) QueryPositions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgPositionQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgPositionListRes], error) {
@@ -792,7 +792,7 @@ func (s *OrgService) QueryPositions(
 }
 
 func (s *OrgService) GetPositionDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	positionId int,
 	req request.OrgPositionDetailReq,
 ) (response.OrgPositionDetailRes, error) {
@@ -846,7 +846,7 @@ func (s *OrgService) GetPositionDetail(
 }
 
 func (s *OrgService) QueryPositionOptions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgPositionOptionsReq,
 	table model.SysTable,
 ) (response.OrgSelectorOptionsRes, error) {
@@ -916,7 +916,7 @@ func (s *OrgService) QueryPositionOptions(
 }
 
 func (s *OrgService) QueryAssignments(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgAssignmentQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgAssignmentListRes], error) {
@@ -959,7 +959,7 @@ func (s *OrgService) QueryAssignments(
 }
 
 func (s *OrgService) GetAssignmentDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	assignmentId int,
 	_ request.OrgAssignmentDetailReq,
 ) (response.OrgAssignmentDetailRes, error) {
@@ -989,7 +989,7 @@ func (s *OrgService) GetAssignmentDetail(
 }
 
 func (s *OrgService) GetEmployeeCurrentAssignmentSummary(
-	ctx *gin.Context,
+	ctx context.Context,
 	employeeId int,
 	req request.OrgEmployeeCurrentAssignmentSummaryReq,
 	table model.SysTable,
@@ -1053,7 +1053,7 @@ func (s *OrgService) GetEmployeeCurrentAssignmentSummary(
 }
 
 func (s *OrgService) QuerySyncBatches(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgSyncBatchQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgSyncBatchListRes], error) {
@@ -1075,7 +1075,7 @@ func (s *OrgService) QuerySyncBatches(
 }
 
 func (s *OrgService) GetSyncBatchDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	batchId int,
 ) (response.OrgSyncBatchDetailRes, error) {
 	if batchId <= 0 {
@@ -1093,7 +1093,7 @@ func (s *OrgService) GetSyncBatchDetail(
 }
 
 func (s *OrgService) GetSyncBatchError(
-	ctx *gin.Context,
+	ctx context.Context,
 	batchId int,
 ) (response.OrgSyncBatchErrorRes, error) {
 	if batchId <= 0 {
@@ -1111,7 +1111,7 @@ func (s *OrgService) GetSyncBatchError(
 }
 
 func (s *OrgService) QuerySyncRecords(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgSyncRecordQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.OrgSyncRecordListRes], error) {
@@ -1133,7 +1133,7 @@ func (s *OrgService) QuerySyncRecords(
 }
 
 func (s *OrgService) GetSyncRecordDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	recordId int,
 ) (response.OrgSyncRecordDetailRes, error) {
 	if recordId <= 0 {
@@ -1151,7 +1151,7 @@ func (s *OrgService) GetSyncRecordDetail(
 }
 
 func (s *OrgService) GetSyncRecordError(
-	ctx *gin.Context,
+	ctx context.Context,
 	recordId int,
 ) (response.OrgSyncRecordErrorRes, error) {
 	if recordId <= 0 {
@@ -1169,7 +1169,7 @@ func (s *OrgService) GetSyncRecordError(
 }
 
 func (s *OrgService) GetStructureOrgTree(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgStructureOrgTreeReq,
 ) ([]response.OrgStructureOrgTreeNodeRes, error) {
 	if req.StructureId <= 0 {
@@ -1188,7 +1188,7 @@ func (s *OrgService) GetStructureOrgTree(
 }
 
 func (s *OrgService) getStructureOrgTreeForRead(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.OrgStructureOrgTreeReq,
 	scope repository.OrgReadScope,
 ) ([]response.OrgStructureOrgTreeNodeRes, error) {
@@ -1341,7 +1341,7 @@ func classifyAssignmentTimeScope(
 	return request.OrgAssignmentScopeHistory
 }
 
-func (s *OrgService) ensureEmployeeExists(ctx *gin.Context, employeeId int) error {
+func (s *OrgService) ensureEmployeeExists(ctx context.Context, employeeId int) error {
 	_, err := s.employeeRepo.FindByIdForRead(ctx, employeeId)
 	if err == nil {
 		return nil
@@ -1353,7 +1353,7 @@ func (s *OrgService) ensureEmployeeExists(ctx *gin.Context, employeeId int) erro
 }
 
 func (s *OrgService) attachAssignmentReferences(
-	ctx *gin.Context,
+	ctx context.Context,
 	assignments []response.OrgAssignmentListRes,
 ) error {
 	legalEntityIds := make([]int, 0, len(assignments))
@@ -1627,7 +1627,7 @@ func normalizeEmployeeBoundStatus(req *request.OrgEmployeeQueryReq) error {
 }
 
 func (s *OrgService) attachEmployeeAccountSummaries(
-	ctx *gin.Context,
+	ctx context.Context,
 	employees []response.OrgEmployeeListRes,
 ) error {
 	userIds := make([]int, 0, len(employees))
@@ -2055,7 +2055,7 @@ func normalizeOrganizationSelectedIds(ids []int) ([]int, error) {
 }
 
 func (s *OrgService) recordEmployeeUserBindingAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	employeeId int,

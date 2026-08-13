@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/gin-gonic/gin"
 )
 
 type testMultipartFile struct {
@@ -123,24 +121,18 @@ func TestEnsureFileReuseAccessRequiresOwnerOrSuperAdmin(t *testing.T) {
 	file := model.File{}
 	file.CreateUser = &ownerID
 
-	ownerCtx := &gin.Context{}
-	ownerCtx.Set("user", model.SysUser{Basic: model.Basic{Id: ownerID}})
-	if err := ensureFileReuseAccess(ownerCtx, file); err != nil {
+	owner := FileAccessActor{UserID: ownerID}
+	if err := ensureFileReuseAccess(owner, file); err != nil {
 		t.Fatalf("owner should reuse file: %v", err)
 	}
 
-	adminCtx := &gin.Context{}
-	adminCtx.Set("user", model.SysUser{
-		Basic: model.Basic{Id: 202},
-		Roles: []model.SysRole{{Name: "super_admin"}},
-	})
-	if err := ensureFileReuseAccess(adminCtx, file); err != nil {
+	admin := FileAccessActor{UserID: 202, IsSuperAdmin: true}
+	if err := ensureFileReuseAccess(admin, file); err != nil {
 		t.Fatalf("super admin should reuse file: %v", err)
 	}
 
-	otherCtx := &gin.Context{}
-	otherCtx.Set("user", model.SysUser{Basic: model.Basic{Id: 303}})
-	if err := ensureFileReuseAccess(otherCtx, file); err != appErrors.ErrPermissionDenied {
+	other := FileAccessActor{UserID: 303}
+	if err := ensureFileReuseAccess(other, file); err != appErrors.ErrPermissionDenied {
 		t.Fatalf("expected other user to be denied file reuse, got %v", err)
 	}
 }

@@ -136,7 +136,7 @@ func (t *TableController) CreateTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.CreateTable(ctx, data)
+	err = t.sysTableService.CreateTable(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -179,7 +179,7 @@ func (t *TableController) UpdateTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UpdateTable(ctx, data)
+	err = t.sysTableService.UpdateTable(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -213,7 +213,7 @@ func (t *TableController) DeleteTableById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.DeleteTableById(ctx, id)
+	err = t.sysTableService.DeleteTableById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -300,7 +300,7 @@ func (t *TableController) CreateTableField(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.CreateTableField(ctx, data)
+	err = t.sysTableService.CreateTableField(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -343,7 +343,7 @@ func (t *TableController) UpdateTableField(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UpdateTableField(ctx, data)
+	err = t.sysTableService.UpdateTableField(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -377,7 +377,7 @@ func (t *TableController) DeleteTableFieldById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.DeleteTableFieldById(ctx, id)
+	err = t.sysTableService.DeleteTableFieldById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -464,7 +464,7 @@ func (t *TableController) CreateTableRelation(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.CreateTableRelation(ctx, data)
+	err = t.sysTableService.CreateTableRelation(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -507,7 +507,7 @@ func (t *TableController) UpdateTableRelation(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UpdateTableRelation(ctx, data)
+	err = t.sysTableService.UpdateTableRelation(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -541,7 +541,7 @@ func (t *TableController) DeleteTableRelationById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.DeleteTableRelationById(ctx, id)
+	err = t.sysTableService.DeleteTableRelationById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -627,7 +627,7 @@ func (t *TableController) CreateTableIndex(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.CreateTableIndex(ctx, data)
+	err = t.sysTableService.CreateTableIndex(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -670,7 +670,7 @@ func (t *TableController) UpdateTableIndex(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UpdateTableIndex(ctx, data)
+	err = t.sysTableService.UpdateTableIndex(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -704,7 +704,7 @@ func (t *TableController) DeleteTableIndexById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.DeleteTableIndexById(ctx, id)
+	err = t.sysTableService.DeleteTableIndexById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -738,7 +738,7 @@ func (t *TableController) DeleteTableIndexByTableId(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.DeleteTableIndexByTableId(ctx, id)
+	err = t.sysTableService.DeleteTableIndexByTableId(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -768,7 +768,7 @@ func (t *TableController) InitTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.InitTable(ctx, code)
+	err = t.sysTableService.InitTable(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -798,7 +798,7 @@ func (t *TableController) SyncTableFields(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.SyncTableFields(ctx, code)
+	err = t.sysTableService.SyncTableFields(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -828,7 +828,7 @@ func (t *TableController) SyncTableIndexes(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.SyncTableIndexes(ctx, code)
+	err = t.sysTableService.SyncTableIndexes(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -868,7 +868,7 @@ func (t *TableController) PublishTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.PublishTableAsMenu(ctx, code, data.ParentId)
+	err = t.sysTableService.PublishTableAsMenu(ctx.Request.Context(), code, data.ParentId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -898,7 +898,7 @@ func (t *TableController) UnpublishTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UnpublishTableMenu(ctx, code)
+	err = t.sysTableService.UnpublishTableMenu(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

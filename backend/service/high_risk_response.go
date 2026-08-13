@@ -4,10 +4,9 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
+	"context"
 	"encoding/json"
 	"mime/multipart"
-
-	"github.com/gin-gonic/gin"
 )
 
 func basicResponse(data model.Basic) response.BasicRes {
@@ -40,16 +39,16 @@ func fileDetailResponse(data model.File) response.FileDetailRes {
 	}
 }
 
-func (f *FileService) UploadResponse(ctx *gin.Context, fileHeader *multipart.FileHeader) (response.FileDetailRes, error) {
-	data, err := f.Upload(ctx, fileHeader)
+func (f *FileService) UploadResponse(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (response.FileDetailRes, error) {
+	data, err := f.Upload(ctx, actor, fileHeader)
 	if err != nil {
 		return response.FileDetailRes{}, err
 	}
 	return fileDetailResponse(data), nil
 }
 
-func (f *FileService) MergeChunksResponse(ctx *gin.Context, uploadId string) (response.FileDetailRes, error) {
-	data, err := f.MergeChunks(ctx, uploadId)
+func (f *FileService) MergeChunksResponse(ctx context.Context, actor FileAccessActor, uploadId string) (response.FileDetailRes, error) {
+	data, err := f.MergeChunks(ctx, actor, uploadId)
 	if err != nil {
 		return response.FileDetailRes{}, err
 	}

@@ -74,7 +74,7 @@ func (m *MenuController) CreateMenu(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.CreateMenu(ctx, data)
+	err = m.sysMenuService.CreateMenu(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -107,7 +107,7 @@ func (m *MenuController) UpdateMenu(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.UpdateMenu(ctx, data)
+	err = m.sysMenuService.UpdateMenu(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -132,7 +132,7 @@ func (m *MenuController) UpdateMenuOrder(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if err := m.sysMenuService.UpdateMenuOrder(ctx, data); err != nil {
+	if err := m.sysMenuService.UpdateMenuOrder(ctx.Request.Context(), data); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -150,7 +150,7 @@ func (m *MenuController) UpdateMenuOrder(ctx *gin.Context) {
 func (m *MenuController) RefreshMenuCache(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	if err := m.sysMenuService.RefreshMenuCache(ctx); err != nil {
+	if err := m.sysMenuService.RefreshMenuCache(ctx.Request.Context()); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -174,7 +174,7 @@ func (m *MenuController) DeleteMenuById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.DeleteMenuById(ctx, id)
+	err = m.sysMenuService.DeleteMenuById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -290,7 +290,7 @@ func (m *MenuController) CreateMenuButton(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.CreateMenuButton(ctx, data)
+	err = m.sysMenuService.CreateMenuButton(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -323,7 +323,7 @@ func (m *MenuController) UpdateMenuButton(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.UpdateMenuButton(ctx, data)
+	err = m.sysMenuService.UpdateMenuButton(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -347,7 +347,7 @@ func (m *MenuController) DeleteMenuButton(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = m.sysMenuService.DeleteMenuButton(ctx, id)
+	err = m.sysMenuService.DeleteMenuButton(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

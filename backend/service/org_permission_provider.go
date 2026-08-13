@@ -4,30 +4,30 @@ import (
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
 	"backend/model"
+	"context"
 	"errors"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // OrgPermissionProvider 是数据权限运行时使用的 Organization 事实边界。
 // 它不开放 Policy 或 SQL 行为。
 type OrgPermissionProvider interface {
-	GetEmployeeByUser(*gin.Context, int) (response.OrgEmployeeContextRes, error)
-	GetEffectiveAssignments(*gin.Context, int, string) ([]response.OrgEffectiveAssignmentRes, error)
-	GetEmployeeEffectiveOrganizationScope(*gin.Context, int, string) (response.OrgEffectiveOrganizationScopeRes, error)
-	GetOrgAncestors(*gin.Context, string, int, string, bool) (response.OrgAncestorsRes, error)
-	GetOrgDescendants(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
-	IsOrgDescendant(*gin.Context, string, int, int, string, bool) (response.OrgDescendantCheckRes, error)
+	GetEmployeeByUser(context.Context, int) (response.OrgEmployeeContextRes, error)
+	GetEffectiveAssignments(context.Context, int, string) ([]response.OrgEffectiveAssignmentRes, error)
+	GetEmployeeEffectiveOrganizationScope(context.Context, int, string) (response.OrgEffectiveOrganizationScopeRes, error)
+	GetOrgAncestors(context.Context, string, int, string, bool) (response.OrgAncestorsRes, error)
+	GetOrgDescendants(context.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
+	IsOrgDescendant(context.Context, string, int, int, string, bool) (response.OrgDescendantCheckRes, error)
 }
 
 var _ OrgPermissionProvider = (*OrgService)(nil)
 
 func (s *OrgService) GetEmployeeByUser(
-	ctx *gin.Context,
+	ctx context.Context,
 	userId int,
 ) (response.OrgEmployeeContextRes, error) {
 	if userId <= 0 {
@@ -54,7 +54,7 @@ func (s *OrgService) GetEmployeeByUser(
 }
 
 func (s *OrgService) GetEffectiveAssignments(
-	ctx *gin.Context,
+	ctx context.Context,
 	employeeId int,
 	asOfDate string,
 ) ([]response.OrgEffectiveAssignmentRes, error) {
@@ -113,7 +113,7 @@ func (s *OrgService) GetEffectiveAssignments(
 }
 
 func (s *OrgService) GetEmployeeEffectiveOrganizationScope(
-	ctx *gin.Context,
+	ctx context.Context,
 	employeeId int,
 	asOfDate string,
 ) (response.OrgEffectiveOrganizationScopeRes, error) {
@@ -170,7 +170,7 @@ func normalizeRequiredOrganizationDate(raw string) (time.Time, error) {
 }
 
 func (s *OrgService) validateEffectiveAssignmentReferences(
-	ctx *gin.Context,
+	ctx context.Context,
 	assignments []model.OrgAssignment,
 	asOf time.Time,
 ) error {

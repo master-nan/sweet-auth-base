@@ -27,6 +27,10 @@ func TestDetachedTaskContextCopiesRequestAndActorFields(t *testing.T) {
 	if correlation.RequestID != "request-copy-1" || correlation.TraceID != "trace-copy-1" {
 		t.Fatalf("标准 Context 未收到请求关联标识: %+v", correlation)
 	}
+	requestMetadata := audit.GetRequestMetadata(ctx.Request.Context())
+	if requestMetadata.Method != http.MethodGet || requestMetadata.Path != "/async-audit" || requestMetadata.ClientIP == "" {
+		t.Fatalf("标准 Context 未收到安全请求元数据: %+v", requestMetadata)
+	}
 	ctx.Set("user", model.SysUser{
 		Basic:    model.Basic{Id: 81},
 		UserName: "audit-user",

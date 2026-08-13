@@ -130,7 +130,7 @@ func (u *UserController) UpdatePassword(ctx *gin.Context) {
 			_ = ctx.Error(err)
 			return
 		}
-		err = u.sysUserService.UpdatePassword(ctx, req)
+		err = u.sysUserService.UpdatePassword(ctx.Request.Context(), req)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -218,7 +218,7 @@ func (u *UserController) CreateUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = u.sysUserService.Create(ctx, data)
+	err = u.sysUserService.Create(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -251,7 +251,7 @@ func (u *UserController) UpdateUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = u.sysUserService.Update(ctx, data)
+	err = u.sysUserService.Update(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -274,7 +274,7 @@ func (u *UserController) AssignRoles(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = u.sysUserService.AssignRoles(ctx, id, data.RoleIds)
+	err = u.sysUserService.AssignRoles(ctx.Request.Context(), id, data.RoleIds)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -299,7 +299,7 @@ func (u *UserController) DeleteUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = u.sysUserService.Delete(ctx, id)
+	err = u.sysUserService.Delete(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -343,7 +343,7 @@ func (u *UserController) ResetPassword(ctx *gin.Context) {
 		return
 	}
 
-	err = u.sysUserService.ResetPassword(ctx, id, password)
+	err = u.sysUserService.ResetPassword(ctx.Request.Context(), id, password)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

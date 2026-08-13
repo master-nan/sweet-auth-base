@@ -107,7 +107,7 @@ func (r *RoleController) CreateRole(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = r.sysRoleService.CreateRole(ctx, data)
+	err = r.sysRoleService.CreateRole(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -140,7 +140,7 @@ func (r *RoleController) UpdateRole(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = r.sysRoleService.UpdateRole(ctx, data)
+	err = r.sysRoleService.UpdateRole(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -164,7 +164,7 @@ func (r *RoleController) DeleteRoleById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = r.sysRoleService.DeleteRole(ctx, id)
+	err = r.sysRoleService.DeleteRole(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -215,7 +215,7 @@ func (r *RoleController) AssignPermissions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = r.sysRoleService.AssignPermissions(ctx, data)
+	err = r.sysRoleService.AssignPermissions(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

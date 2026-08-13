@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -108,7 +107,7 @@ func (s *SysUserService) GetUserList(basic *request.Basic, table model.SysTable)
 	return result, err
 }
 
-func (s *SysUserService) Create(ctx *gin.Context, req request.SysUserCreateReq) error {
+func (s *SysUserService) Create(ctx context.Context, req request.SysUserCreateReq) error {
 	var data model.SysUser
 	user, e := s.GetByUserName(req.UserName)
 	if e != nil {
@@ -140,7 +139,7 @@ func (s *SysUserService) Create(ctx *gin.Context, req request.SysUserCreateReq) 
 	return s.sysUserRepo.Create(tx, &data)
 }
 
-func (s *SysUserService) Update(ctx *gin.Context, req request.SysUserUpdateReq, selects ...string) error {
+func (s *SysUserService) Update(ctx context.Context, req request.SysUserUpdateReq, selects ...string) error {
 	tx := s.sysUserRepo.DBWithContext(ctx)
 	err := s.sysUserRepo.WithSelect(selects...).Update(tx, &req, req.Id)
 	if err != nil {
@@ -183,7 +182,7 @@ func logAsyncUserStateError(ctx context.Context, err error) {
 }
 
 // UpdatePassword 更新密码
-func (s *SysUserService) UpdatePassword(ctx *gin.Context, req request.SysUserUpdatePasswordReq) error {
+func (s *SysUserService) UpdatePassword(ctx context.Context, req request.SysUserUpdatePasswordReq) error {
 	user, err := s.GetById(req.Id)
 	if err != nil {
 		return err
@@ -213,7 +212,7 @@ func (s *SysUserService) UpdatePassword(ctx *gin.Context, req request.SysUserUpd
 	return nil
 }
 
-func (s *SysUserService) ResetPassword(ctx *gin.Context, id int, password string) error {
+func (s *SysUserService) ResetPassword(ctx context.Context, id int, password string) error {
 	user, err := s.GetById(id)
 	if err != nil {
 		return err
@@ -251,7 +250,7 @@ func (s *SysUserService) ResetPassword(ctx *gin.Context, id int, password string
 	return nil
 }
 
-func (s *SysUserService) Delete(ctx *gin.Context, id int) error {
+func (s *SysUserService) Delete(ctx context.Context, id int) error {
 	tx := s.sysUserRepo.DBWithContext(ctx)
 	err := s.sysUserRepo.DeleteById(tx, id)
 	if err != nil {
@@ -262,7 +261,7 @@ func (s *SysUserService) Delete(ctx *gin.Context, id int) error {
 	return nil
 }
 
-func (s *SysUserService) AssignRoles(ctx *gin.Context, userId int, roleIds []int) error {
+func (s *SysUserService) AssignRoles(ctx context.Context, userId int, roleIds []int) error {
 	if userId <= 0 {
 		return error2.ErrParamInvalid
 	}
@@ -372,7 +371,7 @@ func boolPtr(value bool) *bool {
 
 // 获取所有用户
 
-func (s *SysUserService) GetAll(ctx *gin.Context) ([]model.SysUser, error) {
+func (s *SysUserService) GetAll(ctx context.Context) ([]model.SysUser, error) {
 	var userList []model.SysUser
 	err := s.sysUserRepo.DBWithContext(ctx).Find(&userList).Error
 	if err != nil {

@@ -3,17 +3,16 @@ package service
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/internal/audit"
 	apperrors "backend/internal/errors"
 	"backend/internal/test"
 	"backend/model"
+	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -24,7 +23,7 @@ type testTransactionalAuditWriter struct {
 }
 
 func (writer *testTransactionalAuditWriter) RecordTransactionalAudit(
-	_ *gin.Context,
+	_ context.Context,
 	tx *gorm.DB,
 	record TransactionalAuditRecord,
 ) error {
@@ -319,20 +318,13 @@ func TestOrgServiceEmployeeUserBindingRollsBackWhenAuditFails(t *testing.T) {
 	})
 }
 
-func employeeBindingContext(employeeId int) *gin.Context {
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = httptest.NewRequest(
-		http.MethodPost,
-		"/admin/org/employee/"+strconv.Itoa(employeeId)+"/bind-user",
-		nil,
-	)
-	ctx.Set("user", model.SysUser{
-		Basic:    model.Basic{Id: 9001},
-		UserName: "binding_operator",
+func employeeBindingContext(employeeId int) context.Context {
+	ctx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(9001, "binding_operator"))
+	ctx = audit.WithCorrelationIDs(ctx, audit.CorrelationIDs{RequestID: "request-binding-test", TraceID: "trace-binding-test"})
+	return audit.WithRequestMetadata(ctx, audit.RequestMetadata{
+		Method: "POST",
+		Path:   "/admin/org/employee/" + strconv.Itoa(employeeId) + "/bind-user",
 	})
-	ctx.Set(transactionalAuditRequestIDContextKey, "request-binding-test")
-	ctx.Set(transactionalAuditTraceIDContextKey, "trace-binding-test")
-	return ctx
 }
 
 func employeeBindingUserFixture(id int, userName string) model.SysUser {

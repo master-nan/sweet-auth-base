@@ -102,7 +102,7 @@ func (f *FileController) Upload(ctx *gin.Context) {
 		return
 	}
 
-	file, err := f.fileService.UploadResponse(ctx, fileHeader)
+	file, err := f.fileService.UploadResponse(ctx.Request.Context(), fileAccessActor(ctx.MustGet("user").(model.SysUser)), fileHeader)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -132,7 +132,7 @@ func (f *FileController) InitChunkUpload(ctx *gin.Context) {
 		return
 	}
 
-	result, err := f.fileService.InitChunkUpload(ctx, req)
+	result, err := f.fileService.InitChunkUpload(ctx.Request.Context(), fileAccessActor(ctx.MustGet("user").(model.SysUser)), req)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -175,7 +175,7 @@ func (f *FileController) UploadChunk(ctx *gin.Context) {
 		return
 	}
 
-	err = f.fileService.UploadChunk(ctx, uploadId, chunkIndex, fileHeader)
+	err = f.fileService.UploadChunk(ctx.Request.Context(), uploadId, chunkIndex, fileHeader)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -201,7 +201,7 @@ func (f *FileController) MergeChunks(ctx *gin.Context) {
 		return
 	}
 
-	file, err := f.fileService.MergeChunksResponse(ctx, uploadId)
+	file, err := f.fileService.MergeChunksResponse(ctx.Request.Context(), fileAccessActor(ctx.MustGet("user").(model.SysUser)), uploadId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -228,7 +228,7 @@ func (f *FileController) GetUploadProgress(ctx *gin.Context) {
 		return
 	}
 
-	progress, err := f.fileService.GetUploadProgressForUser(ctx, uploadId)
+	progress, err := f.fileService.GetUploadProgressForUser(ctx.Request.Context(), uploadId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -291,7 +291,7 @@ func (f *FileController) DeleteFileById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	err = f.fileService.DeleteFileById(ctx, id)
+	err = f.fileService.DeleteFileById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -503,6 +503,13 @@ func (f *FileController) ensureFileAccess(ctx *gin.Context, file model.File, fal
 		return nil
 	}
 	return myerrors.ErrPermissionDenied
+}
+
+func fileAccessActor(user model.SysUser) service.FileAccessActor {
+	return service.FileAccessActor{
+		UserID:       user.Id,
+		IsSuperAdmin: utils.IsSuperAdmin(user),
+	}
 }
 
 func (f *FileController) ensureBusinessFileAccess(ctx *gin.Context, file model.File, bizCtx fileBusinessContext) error {

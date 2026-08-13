@@ -7,10 +7,10 @@ package impl
 
 import (
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/database"
 	"backend/model"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -107,13 +107,8 @@ func sysMenuButtonCreateMap(tx *gorm.DB, button *model.SysMenuButton) map[string
 	if button.ModifyUser != nil {
 		row["modify_user"] = button.ModifyUser
 	}
-	ctx, ok := tx.Statement.Context.(*gin.Context)
-	if ok {
-		if userValue, exists := ctx.Get("user"); exists {
-			if user, ok := userValue.(model.SysUser); ok {
-				row["create_user"] = user.Id
-			}
-		}
+	if subject, ok := audit.GetAuditSubject(tx.Statement.Context); ok {
+		row["create_user"] = subject.UserID
 	}
 	return row
 }

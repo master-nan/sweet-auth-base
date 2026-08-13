@@ -7,15 +7,14 @@ package repository
 
 import (
 	"backend/model"
-
-	"github.com/gin-gonic/gin"
+	"context"
 )
 
 type FileRepository interface {
 	BasicRepository[model.File]
 	FindByFileUuid(uuid string) (model.File, error)
 	FindByFileMd5(md5 string) (model.File, error)
-	DeleteFile(ctx *gin.Context, file model.File) error
+	DeleteFile(ctx context.Context, file model.File) error
 }
 
 type FileChunkRepository interface {

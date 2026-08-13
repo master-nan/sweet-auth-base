@@ -266,7 +266,7 @@ func (b *BasicController) UpdateConfigure(ctx *gin.Context) {
 		return
 	}
 	data.Id = id
-	err = b.sysConfigureService.Update(ctx, data)
+	err = b.sysConfigureService.Update(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -318,7 +318,7 @@ func (b *BasicController) QueryAccessLogs(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := b.logService.QueryAccessLogs(ctx, data)
+	result, err := b.logService.QueryAccessLogs(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -343,7 +343,7 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	logData, err := b.logService.GetAccessLogById(ctx, id)
+	logData, err := b.logService.GetAccessLogById(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

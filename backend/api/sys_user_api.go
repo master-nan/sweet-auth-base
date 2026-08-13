@@ -67,7 +67,7 @@ func (u *SysUserApi) UpdatePassword(ctx *gin.Context) {
 			return
 		}
 
-		err = u.sysUserService.UpdatePassword(ctx, data)
+		err = u.sysUserService.UpdatePassword(ctx.Request.Context(), data)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

@@ -8,13 +8,13 @@ import (
 	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -466,7 +466,7 @@ type oversizedStructureNodeRepository struct {
 }
 
 func (oversizedStructureNodeRepository) ListByStructureForRead(
-	*gin.Context,
+	context.Context,
 	int,
 	repository.OrgReadScope,
 	int,

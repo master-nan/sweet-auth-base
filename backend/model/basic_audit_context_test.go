@@ -3,10 +3,8 @@ package model
 import (
 	"backend/internal/audit"
 	"context"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -46,7 +44,7 @@ func TestBasicHooksReadAuditSubjectFromStandardContext(t *testing.T) {
 	}
 }
 
-func TestBasicHooksKeepGinContextCompatibility(t *testing.T) {
+func TestBasicHooksDoNotInventAuditSubject(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -55,13 +53,11 @@ func TestBasicHooksKeepGinContextCompatibility(t *testing.T) {
 		t.Fatalf("migrate fixture: %v", err)
 	}
 
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Set("user", SysUser{Basic: Basic{Id: 52}, UserName: "legacy-user"})
-	row := basicAuditContextFixture{Name: "legacy"}
-	if err := db.WithContext(ctx).Create(&row).Error; err != nil {
+	row := basicAuditContextFixture{Name: "without-subject"}
+	if err := db.WithContext(context.Background()).Create(&row).Error; err != nil {
 		t.Fatalf("create fixture: %v", err)
 	}
-	if row.CreateUser == nil || *row.CreateUser != 52 {
-		t.Fatalf("create user = %v, want 52", row.CreateUser)
+	if row.CreateUser != nil || row.CreateName != nil {
+		t.Fatalf("unexpected audit subject: user=%v name=%v", row.CreateUser, row.CreateName)
 	}
 }
