@@ -5,9 +5,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | Task | INT-006A |
-| 状态 | 详细设计完成；INT-006F-A 已完成任职/离职源契约评审，未关闭 Gate 继续门控生产 Consumer |
+| 状态 | 详细设计完成；INT-006F-B 已实现离职安全子集，未关闭 Gate 继续门控生产 Consumer |
 | 日期 | 2026-08-12 |
-| 最近更新 | 2026-08-13（INT-006F-A） |
+| 最近更新 | 2026-08-13（INT-006F-B） |
 | 范围 | Organization HR 源映射与服务端 `SyncResultConsumer` 设计 |
 | Runtime 基线 | `IntegrationRuntimeFreezeReview.md` |
 | Retry 基线 | `IntegrationRetryFreezeReview.md` |
@@ -681,3 +681,21 @@ INT-006E 不关闭 BIP ID 永久稳定/不可复用、changeTime 权威性/时�
 仍未关闭：顶层主任职语义和稳定身份、`sendpost` 永久权威性、兼职关系 ID 生命周期、NCID -> BIP Crosswalk、历史空结束时间语义、离职权威 `userType`、changeTime 时区/精度/同秒完整性、跨接口冲突排序和再入职雇佣段。
 
 INT-006F-B 只能实现离职安全子集和任职 Parser/Test Harness。生产任职落库继续禁止；离职生产启用也必须等待权威视图、BIP 生命周期与 changeTime Gate 关闭。当前 BIP 字段、字符串容器、`userType` 和 `ifreentry` 均属于 Source Adapter 规则，不得进入 Organization Domain 通用服务。
+
+## 32. INT-006F-B 离职安全子集实现
+
+INT-006F-B 增加静态 `org.hr.resigned_employee` v1 Consumer，保持 `HRResignedEmployeeSourceDTO -> NormalizeResignedEmployeeSource -> ResignationSyncInput -> OrganizationHRSyncService` 边界。源 DTO 只接收 `psnidzjkid_ignore`、`changeTime` 和 `lzdate`；姓名、员工编号、联系方式和其他人员字段不进入离职 canonical input。员工身份只使用 `SourceKey(hr_source, employee, psnidzjkid_ignore)`，员工不存在时写 `deferred + org_sync_reference_missing`，不会从离职事件创建残缺 Employee。
+
+`lzdate` 按严格 `YYYY-MM-DD` LocalDate 解析，空值、非法日期、日期时间和明显越界年份均拒绝。现有 Organization 字段为 timestamp，因此持久化使用 UTC 午夜作为 LocalDate 的无时区载体；该值不是离职事件 instant，不参与跨接口排序。事件排序只使用显式 SourceContract 解析出的 `changeTime`：较旧离职事实为 noop；较新的明确离职事实把 Employee 收敛为 `employment_status=resigned` 并写 `valid_to=lzdate`；同一事件时间但离职事实冲突返回 `org_sync_employment_state_conflict`。离职后的较新普通 active 事件同样返回该冲突，不能自动解释为再入职；普通 suspended 事件不得反转已确认 resigned 状态。
+
+每条离职记录在一个短事务中锁定 Employee，先读取并校验该员工全部未删除 Assignment，再更新 Employee、关闭当前 enabled Assignment 并写 Employee/Assignment 业务记录。合法关闭只修改既有 Assignment 的 `valid_to=lzdate`、`status=disabled`、`sync_status=synced`，不创建任职、不推断主任职、不删除历史；`lzdate < valid_from` 返回 `org_sync_assignment_period_invalid`，Employee 与 Assignment 均不提交。已有 `user_id`、本地备注和标签保持不变，Consumer 不创建、停用或解绑 SysUser。每个 Chunk 最多 500 条离职记录。
+
+每个离职 Slice Execution 仍只对应一个 `OrgSyncBatch`。Employee 记录使用 `object_type=employee`；实际关闭的任职使用 `object_type=assignment` 和 `action=close`，Source ID 只保存不可逆摘要。同一 Execution、同一事件和 Lookback 重放依靠 Employee 源版本、Assignment 当前状态以及 `(batch, object_type, source_id)` 唯一约束收敛为 noop，不重复关闭或创建记录。任一员工缺失、日期非法、事件冲突、任职周期冲突或持久化失败都会使 Consumer 整体失败，Runtime 收敛为 confirmed `business_processing_failed`，不进入 Integration Retry，Checkpoint 不推进。future-of-logical-window 离职事实不落库、不写当前 Slice 成功记录。
+
+任职侧只新增 Source Adapter/Test Harness。`AssignmentSourceParser` 解析 JSON 字符串数组，限制 256 KiB、最多 100 项、每项必须为对象；关系 ID 必须非空且 Slice 内唯一，组织引用按 NCID 候选保留，岗位引用允许为空，未知字段忽略且字符串从不执行。`NormalizeAssignmentPeriod` 只接受已确认组合：当前任职允许空结束时间；合法起止区间要求 `end >= start`；历史任职必须有结束时间；状态与日期冲突稳定拒绝；不识别任何魔法日期。输出 `AssignmentSourceCandidate` 不是可持久化的 `AssignmentSyncInput`，生产 Employee/Resigned Consumer 都不会据此创建 Assignment。
+
+`OrganizationSourceCrosswalkResolver` 只作为当前 HR Source Adapter 的显式端口。V1 没有新增 Crosswalk 表，默认实现稳定返回不可用；NCID 不得作为 BIP ID 使用，也不得通过名称、业务 code 或临时拼接解析。生产兼职落库在 `sendpost` 权威性、关系 ID 生命周期和 NCID -> BIP Crosswalk Gate 关闭前继续禁止。
+
+生产装配登记固定 `org.hr.resigned_employee` code/version，但和其他 HR Consumer 一样保持 `disabled`，不会出现在 SyncTask 可选列表，也不能被 Runtime Resolve。PostgreSQL 16 的 SyncRunner + WorkerRunner + TLS E2E 通过显式 Test SourceContract 启用同一实现，覆盖首次 HTTP 503 后由 Integration Retry、离职 Employee 收敛、Assignment 关闭、重复事实 noop、future 过滤与 Checkpoint 推进；独立场景还覆盖 Employee 缺失 deferred、任职周期冲突整条回滚、旧离职事件 noop，以及离职后较新 active 产生业务冲突。三类业务失败均保持 Checkpoint 且只产生一个 Attempt，未进入 Integration Retry。测试没有引入 userType 权威选择或环境变量 Gate。
+
+INT-006F-B 不关闭以下 Gate：BIP ID 永久稳定/不可复用；changeTime 权威性、时区、精度、同秒完整性与跨接口排序；离职权威 `userType`；主任职语义和稳定 Assignment ID；`sendpost` 永久权威性；兼职关系 ID 生命周期；NCID -> BIP Crosswalk；历史空结束日期完整语义；自动再入职和雇佣段；人员大响应生产策略；物理删除表达。V1 仍不支持主任职创建、顶层组织/岗位转任职、生产兼职落库、自动再入职、魔法日期、Employee/Assignment 删除或 SysUser 生命周期变更。

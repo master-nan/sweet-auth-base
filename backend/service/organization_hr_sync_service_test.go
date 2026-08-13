@@ -428,6 +428,114 @@ func TestOrganizationHREmployeeConsumerRejectsMissingIdentitySendpostAndOversize
 	}
 }
 
+func TestOrganizationHRResignedEmployeeConsumerClosesAssignmentsAndProtectsEventOrder(t *testing.T) {
+	service, db := newOrganizationHRSyncTestService(t)
+	contract, _ := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+	consumer := hrsync.NewResignedEmployeeConsumer(service, contract)
+	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+	userID := nextSyncTestID()
+	employee := seedOrganizationHRResignationEmployee(t, db, "employee-resigned", "EMP-R-1", userID, start)
+	assignment := seedOrganizationHRCurrentAssignment(t, db, employee.Id, time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC))
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED", "SYNC-RESIGNED", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	body := `{"success":true,"data":[{"psnidzjkid_ignore":"employee-resigned","changeTime":"2026-08-12T10:30:00","lzdate":"2026-08-10","name":"must-not-persist"}]}`
+	result := consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED", "SYNC-RESIGNED", "task_resigned", start, end, body)
+	if !result.Success() || result.BusinessSuccessCount() != 2 {
+		t.Fatalf("resignation result=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.EmploymentStatus != "resigned" ||
+		!organizationDatesEqual(employee.ValidTo, time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC)) ||
+		employee.UserId == nil || *employee.UserId != userID || employee.LocalNote != "keep-local" || employee.SourceDeleted {
+		t.Fatalf("resigned employee=%+v err=%v", employee, err)
+	}
+	if err := db.First(&assignment, assignment.Id).Error; err != nil || assignment.Status != "disabled" ||
+		!organizationDatesEqual(assignment.ValidTo, time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC)) || assignment.SourceDeleted {
+		t.Fatalf("closed assignment=%+v err=%v", assignment, err)
+	}
+	assertOrganizationResignationRecord(t, db, "EXEC-RESIGNED", hrsync.ObjectKindEmployee, model.OrgSyncRecordActionUpdate, "success")
+	assertOrganizationResignationRecord(t, db, "EXEC-RESIGNED", hrsync.ObjectKindAssignment, model.OrgSyncRecordActionClose, "success")
+
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED", "SYNC-RESIGNED", "task_resigned", start, end, body)
+	if !result.Success() || result.BusinessSuccessCount() != 2 {
+		t.Fatalf("repeat resignation=%+v", result)
+	}
+	var recordCount int64
+	if err := db.Model(&model.OrgSyncRecord{}).Joins("JOIN org_sync_batches ON org_sync_batches.id = org_sync_records.batch_id").
+		Where("org_sync_batches.execution_id = ?", organizationExecutionID(t, db, "EXEC-RESIGNED")).Count(&recordCount).Error; err != nil || recordCount != 2 {
+		t.Fatalf("repeat records=%d err=%v", recordCount, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED-STALE", "SYNC-RESIGNED-STALE", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED-STALE", "SYNC-RESIGNED-STALE", "task_resigned", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-resigned","changeTime":"2026-08-12T10:20:00","lzdate":"2026-08-09"}]}`)
+	if !result.Success() {
+		t.Fatalf("stale resignation=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || !organizationDatesEqual(employee.ValidTo, time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("stale resignation overwrote employee=%+v err=%v", employee, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-ACTIVE-AFTER-LEAVE", "SYNC-ACTIVE-AFTER-LEAVE", "task_employee", hrsync.ConsumerCodeEmployee, 1)
+	active := hrsync.NewEmployeeConsumer(service, contract)
+	result = consumeOrganizationHRBody(t, active, "EXEC-ACTIVE-AFTER-LEAVE", "SYNC-ACTIVE-AFTER-LEAVE", "task_employee", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-resigned","jhcode":"EMP-R-1","name":"不得再入职","isenable":1,"changeTime":"2026-08-12T10:40:00","sendpost":"[]"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonEmploymentStateConflict) {
+		t.Fatalf("active after resignation=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.EmploymentStatus != "resigned" || employee.Name != "existing" {
+		t.Fatalf("employee reactivated=%+v err=%v", employee, err)
+	}
+}
+
+func TestOrganizationHRResignationMissingEmployeeFutureAndAssignmentRollback(t *testing.T) {
+	service, db := newOrganizationHRSyncTestService(t)
+	contract, _ := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+	consumer := hrsync.NewResignedEmployeeConsumer(service, contract)
+	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED-MISSING", "SYNC-RESIGNED-MISSING", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	result := consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED-MISSING", "SYNC-RESIGNED-MISSING", "task_resigned", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"missing","changeTime":"2026-08-12T10:10:00","lzdate":"2026-08-10"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonReferenceMissing) {
+		t.Fatalf("missing employee=%+v", result)
+	}
+	assertOrganizationResignationRecord(t, db, "EXEC-RESIGNED-MISSING", hrsync.ObjectKindEmployee, model.OrgSyncRecordActionDeferred, "dependency_waiting")
+
+	employee := seedOrganizationHRResignationEmployee(t, db, "employee-period", "EMP-R-2", 0, start)
+	assignment := seedOrganizationHRCurrentAssignment(t, db, employee.Id, time.Date(2026, 8, 11, 0, 0, 0, 0, time.UTC))
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED-PERIOD", "SYNC-RESIGNED-PERIOD", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED-PERIOD", "SYNC-RESIGNED-PERIOD", "task_resigned", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-period","changeTime":"2026-08-12T10:30:00","lzdate":"2026-08-10"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonAssignmentPeriodInvalid) {
+		t.Fatalf("invalid assignment period=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.EmploymentStatus != "active" || employee.ValidTo != nil {
+		t.Fatalf("employee partially resigned=%+v err=%v", employee, err)
+	}
+	if err := db.First(&assignment, assignment.Id).Error; err != nil || assignment.Status != "enabled" || assignment.ValidTo != nil {
+		t.Fatalf("assignment partially closed=%+v err=%v", assignment, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED-FUTURE", "SYNC-RESIGNED-FUTURE", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED-FUTURE", "SYNC-RESIGNED-FUTURE", "task_resigned", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-period","changeTime":"2026-08-12T11:00:00","lzdate":"2026-08-10"}]}`)
+	if !result.Success() || result.BusinessSuccessCount() != 0 {
+		t.Fatalf("future resignation=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.EmploymentStatus != "active" {
+		t.Fatalf("future resignation persisted=%+v err=%v", employee, err)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-RESIGNED-DATE", "SYNC-RESIGNED-DATE", "task_resigned", hrsync.ConsumerCodeResignedEmployee, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-RESIGNED-DATE", "SYNC-RESIGNED-DATE", "task_resigned", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-period","changeTime":"2026-08-12T10:30:00","lzdate":"2026-02-30"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonEnvelopeInvalid) {
+		t.Fatalf("invalid resignation date=%+v", result)
+	}
+}
+
 func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:org-hr-%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "-"))), &gorm.Config{})
@@ -443,6 +551,73 @@ func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService,
 	}
 	repository := impl.NewOrganizationHRSyncRepositoryImpl(&database.PrimaryDB{DB: db})
 	return NewOrganizationHRSyncService(repository, sf), db
+}
+
+func seedOrganizationHRResignationEmployee(t *testing.T, db *gorm.DB, rawSourceID, employeeNo string, userID int, changedAt time.Time) model.OrgEmployee {
+	t.Helper()
+	var user *int
+	if userID != 0 {
+		user = &userID
+	}
+	employee := model.OrgEmployee{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: rawSourceID, EmployeeNo: employeeNo, Name: "existing", EmploymentStatus: "active",
+		SourceVersion: changedAt.Format(time.RFC3339Nano), SourceUpdatedAt: &changedAt, LastSyncAt: &changedAt,
+		SourceDeleted: false, SyncStatus: "synced", UserId: user, LocalNote: "keep-local",
+	}
+	if err := db.Create(&employee).Error; err != nil {
+		t.Fatal(err)
+	}
+	return employee
+}
+
+func seedOrganizationHRCurrentAssignment(t *testing.T, db *gorm.DB, employeeID int, validFrom time.Time) model.OrgAssignment {
+	t.Helper()
+	legal := model.OrgLegalEntity{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: fmt.Sprintf("legal-%d", employeeID), Code: fmt.Sprintf("LEGAL-%d", employeeID), Name: "legal",
+		EntityType: "legal_company", Status: "enabled", SyncStatus: "synced",
+	}
+	if err := db.Create(&legal).Error; err != nil {
+		t.Fatal(err)
+	}
+	unit := model.OrgUnit{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: fmt.Sprintf("management_unit:unit-%d", employeeID), Code: fmt.Sprintf("UNIT-%d", employeeID), Name: "unit",
+		UnitType: "department", Status: "enabled", SyncStatus: "synced",
+	}
+	if err := db.Create(&unit).Error; err != nil {
+		t.Fatal(err)
+	}
+	assignment := model.OrgAssignment{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: fmt.Sprintf("assignment-%d", employeeID), EmployeeId: employeeID, LegalEntityId: legal.Id, OrgUnitId: unit.Id,
+		AssignmentType: "secondary", ValidFrom: &validFrom, Status: "enabled", SourceDeleted: false, SyncStatus: "synced",
+	}
+	if err := db.Create(&assignment).Error; err != nil {
+		t.Fatal(err)
+	}
+	return assignment
+}
+
+func organizationExecutionID(t *testing.T, db *gorm.DB, executionNo string) int {
+	t.Helper()
+	var execution model.IntegrationExecution
+	if err := db.Where("execution_no = ?", executionNo).First(&execution).Error; err != nil {
+		t.Fatal(err)
+	}
+	return execution.Id
+}
+
+func assertOrganizationResignationRecord(t *testing.T, db *gorm.DB, executionNo string, kind hrsync.ObjectKind, action, status string) {
+	t.Helper()
+	var record model.OrgSyncRecord
+	err := db.Joins("JOIN org_sync_batches ON org_sync_batches.id = org_sync_records.batch_id").
+		Where("org_sync_batches.execution_id = ? AND org_sync_records.object_type = ?", organizationExecutionID(t, db, executionNo), kind).
+		First(&record).Error
+	if err != nil || record.Action != action || record.Status != status || record.ErrorMessage != "" || record.SourceCode != "" {
+		t.Fatalf("resignation record=%+v action=%s status=%s err=%v", record, action, status, err)
+	}
 }
 
 func assertOrganizationEmployeeRecordAction(t *testing.T, db *gorm.DB, rawSourceID, action string) {

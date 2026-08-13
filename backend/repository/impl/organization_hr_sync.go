@@ -161,6 +161,18 @@ func (r *OrganizationHRSyncRepositoryImpl) UpdateEmployee(tx *gorm.DB, id int, v
 	return updateOrganizationFields(tx, &model.OrgEmployee{}, id, values, orgEmployeeSourceFields)
 }
 
+func (r *OrganizationHRSyncRepositoryImpl) ListAssignmentsByEmployeeForUpdate(tx *gorm.DB, employeeID int) ([]model.OrgAssignment, error) {
+	var values []model.OrgAssignment
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("employee_id = ? AND source_deleted = ?", employeeID, false).
+		Order("id ASC").Find(&values).Error
+	return values, err
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) UpdateAssignment(tx *gorm.DB, id int, values map[string]any) error {
+	return updateOrganizationFields(tx, &model.OrgAssignment{}, id, values, orgAssignmentSourceFields)
+}
+
 func (r *OrganizationHRSyncRepositoryImpl) FindStructureByCode(tx *gorm.DB, code string) (model.OrgStructure, error) {
 	var value model.OrgStructure
 	err := tx.Where("code = ?", code).First(&value).Error

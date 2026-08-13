@@ -131,6 +131,9 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if _, err := disabled.Resolve(ConsumerCodeEmployee, ConsumerVersionV1); err == nil {
 		t.Fatal("disabled employee consumer resolved")
 	}
+	if _, err := disabled.Resolve(ConsumerCodeResignedEmployee, ConsumerVersionV1); err == nil {
+		t.Fatal("disabled resigned employee consumer resolved")
+	}
 	contract, err := NewExplicitSourceContract(OrganizationHRSourceSystemCode, time.UTC)
 	if err != nil {
 		t.Fatal(err)
@@ -146,8 +149,8 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := enabled.ListMetadata(); len(got) != 6 {
-		t.Fatalf("enabled registrations=%d, want 6", len(got))
+	if got := enabled.ListMetadata(); len(got) != 7 {
+		t.Fatalf("enabled registrations=%d, want 7", len(got))
 	}
 	metadata, err := enabled.ValidateReference(integration.SyncConsumerReference{
 		Code: ConsumerCodeEmployee, Version: ConsumerVersionV1, ContentType: "application/json",
@@ -221,6 +224,10 @@ func (*organizationSyncDomainStub) SynchronizePositions(context.Context, Busines
 }
 
 func (*organizationSyncDomainStub) SynchronizeEmployees(context.Context, BusinessSyncContext, []EmployeeSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
+	return BusinessSyncSummary{}, nil
+}
+
+func (*organizationSyncDomainStub) SynchronizeResignations(context.Context, BusinessSyncContext, []ResignationSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
 	return BusinessSyncSummary{}, nil
 }
 

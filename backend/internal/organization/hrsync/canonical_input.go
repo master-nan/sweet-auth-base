@@ -53,6 +53,13 @@ type EmployeeSyncInput struct {
 	SourceChangedAt  time.Time
 }
 
+// ResignationSyncInput 只表达已确认的离职事实，不携带人员档案或任职推断。
+type ResignationSyncInput struct {
+	Key             SourceKey
+	ResignedOn      time.Time
+	SourceChangedAt time.Time
+}
+
 type AssignmentSyncInput struct {
 	Key SourceKey
 }

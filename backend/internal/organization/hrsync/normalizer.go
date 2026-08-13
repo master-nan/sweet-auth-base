@@ -8,6 +8,7 @@ import (
 )
 
 var ErrSourceContractUnconfirmed = errors.New("org_sync_source_contract_unconfirmed")
+var ErrSourceDateInvalid = errors.New("org_sync_source_date_invalid")
 
 type Normalizer struct {
 	SourceSystemCode string
@@ -86,27 +87,67 @@ func (n Normalizer) NormalizeEmployeeSource(source HREmployeeSourceDTO) (Employe
 	}, nil
 }
 
+func (n Normalizer) NormalizeResignedEmployeeSource(source HRResignedEmployeeSourceDTO) (ResignationSyncInput, error) {
+	key, changedAt, err := n.sourceFact(ObjectKindEmployee, source.SourceID, source.ChangeTime)
+	if err != nil {
+		return ResignationSyncInput{}, err
+	}
+	resignedOn, err := parseSourceLocalDate(source.ResignedAt, n.SourceLocation)
+	if err != nil {
+		return ResignationSyncInput{}, err
+	}
+	return ResignationSyncInput{Key: key, ResignedOn: resignedOn, SourceChangedAt: changedAt}, nil
+}
+
 func (n Normalizer) NormalizeAssignmentSource(HRAssignmentSourceDTO) (AssignmentSyncInput, error) {
 	return AssignmentSyncInput{}, ErrSourceContractUnconfirmed
 }
 
 func (n Normalizer) common(kind ObjectKind, sourceID, changedAt string, enabled SourceEnableStatus) (SourceKey, time.Time, CanonicalStatus, error) {
-	key, err := NewSourceKey(n.SourceSystemCode, kind, sourceID)
+	key, parsed, err := n.sourceFact(kind, sourceID, changedAt)
 	if err != nil {
 		return SourceKey{}, time.Time{}, "", err
 	}
-	if n.SourceLocation == nil || enabled == SourceEnableUnknown {
+	if enabled == SourceEnableUnknown {
 		return SourceKey{}, time.Time{}, "", ErrSourceContractUnconfirmed
-	}
-	parsed, err := time.ParseInLocation("2006-01-02T15:04:05", strings.TrimSpace(changedAt), n.SourceLocation)
-	if err != nil {
-		return SourceKey{}, time.Time{}, "", err
 	}
 	status := CanonicalStatusDisabled
 	if enabled == SourceEnableEnabled {
 		status = CanonicalStatusEnabled
 	}
 	return key, parsed.UTC(), status, nil
+}
+
+func (n Normalizer) sourceFact(kind ObjectKind, sourceID, changedAt string) (SourceKey, time.Time, error) {
+	key, err := NewSourceKey(n.SourceSystemCode, kind, sourceID)
+	if err != nil {
+		return SourceKey{}, time.Time{}, err
+	}
+	if n.SourceLocation == nil {
+		return SourceKey{}, time.Time{}, ErrSourceContractUnconfirmed
+	}
+	parsed, err := time.ParseInLocation("2006-01-02T15:04:05", strings.TrimSpace(changedAt), n.SourceLocation)
+	if err != nil {
+		return SourceKey{}, time.Time{}, err
+	}
+	return key, parsed.UTC(), nil
+}
+
+func parseSourceLocalDate(value string, location *time.Location) (time.Time, error) {
+	if location == nil {
+		return time.Time{}, ErrSourceContractUnconfirmed
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, ErrSourceDateInvalid
+	}
+	// The source field is a LocalDate, not an instant. UTC midnight is the
+	// canonical storage carrier and must not be shifted through source timezone.
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil || parsed.Year() < 1900 || parsed.Year() > 9998 {
+		return time.Time{}, ErrSourceDateInvalid
+	}
+	return parsed.UTC(), nil
 }
 
 func normalizeRequiredError(err error) error {

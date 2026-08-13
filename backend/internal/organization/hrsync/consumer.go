@@ -52,6 +52,11 @@ type EmployeeConsumer struct {
 	normalizer Normalizer
 }
 
+type ResignedEmployeeConsumer struct {
+	domain     OrganizationSyncDomain
+	normalizer Normalizer
+}
+
 var (
 	_ integration.SyncResultConsumer = (*LegalEntityConsumer)(nil)
 	_ integration.SyncResultConsumer = (*ManagementCompanyConsumer)(nil)
@@ -59,6 +64,7 @@ var (
 	_ integration.SyncResultConsumer = (*LegalDepartmentConsumer)(nil)
 	_ integration.SyncResultConsumer = (*PositionConsumer)(nil)
 	_ integration.SyncResultConsumer = (*EmployeeConsumer)(nil)
+	_ integration.SyncResultConsumer = (*ResignedEmployeeConsumer)(nil)
 )
 
 func NewLegalEntityConsumer(domain OrganizationSyncDomain, contract SourceContract) *LegalEntityConsumer {
@@ -83,6 +89,10 @@ func NewPositionConsumer(domain OrganizationSyncDomain, contract SourceContract)
 
 func NewEmployeeConsumer(domain OrganizationSyncDomain, contract SourceContract) *EmployeeConsumer {
 	return &EmployeeConsumer{domain: domain, normalizer: contract.normalizer()}
+}
+
+func NewResignedEmployeeConsumer(domain OrganizationSyncDomain, contract SourceContract) *ResignedEmployeeConsumer {
+	return &ResignedEmployeeConsumer{domain: domain, normalizer: contract.normalizer()}
 }
 
 func (c *LegalEntityConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
@@ -131,6 +141,12 @@ func (c *EmployeeConsumer) Consume(ctx context.Context, request integration.Sync
 	return consumptionResult(summary, err)
 }
 
+func (c *ResignedEmployeeConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+	inputs, issues := normalizeWindowedSources(request, ObjectKindEmployee, c.normalizer.NormalizeResignedEmployeeSource)
+	summary, err := c.domain.SynchronizeResignations(ctx, NewBusinessSyncContext(request), inputs, issues)
+	return consumptionResult(summary, err)
+}
+
 func EnabledConsumerRegistrations(domain OrganizationSyncDomain, contract SourceContract) ([]integration.SyncConsumerRegistration, error) {
 	if domain == nil || !contract.valid() {
 		return nil, ErrSourceContractInvalid
@@ -151,6 +167,7 @@ func consumerRegistrations(domain OrganizationSyncDomain, contract SourceContrac
 		consumerRegistration(ConsumerCodeLegalDepartment, "HR 法人部门", 8<<20, status, NewLegalDepartmentConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodePosition, "HR 岗位", 8<<20, status, NewPositionConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodeEmployee, "HR 员工", maxEmployeeResponseBytes, status, NewEmployeeConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeResignedEmployee, "HR 离职员工", 8<<20, status, NewResignedEmployeeConsumer(domain, contract)),
 	}
 }
 
@@ -181,10 +198,10 @@ func consumptionResult(summary BusinessSyncSummary, err error) (integration.Sync
 }
 
 type changedSource interface {
-	LegalEntitySyncInput | OrgUnitSyncInput | PositionSyncInput | EmployeeSyncInput
+	LegalEntitySyncInput | OrgUnitSyncInput | PositionSyncInput | EmployeeSyncInput | ResignationSyncInput
 }
 
-func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO, T changedSource](
+func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO | HRResignedEmployeeSourceDTO, T changedSource](
 	request integration.SyncConsumptionRequest,
 	kind ObjectKind,
 	normalize func(S) (T, error),
@@ -301,12 +318,14 @@ func sourceChangedAt[T changedSource](value T) time.Time {
 		return typed.SourceChangedAt
 	case EmployeeSyncInput:
 		return typed.SourceChangedAt
+	case ResignationSyncInput:
+		return typed.SourceChangedAt
 	default:
 		return time.Time{}
 	}
 }
 
-func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO | HREmployeeSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
+func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO | HREmployeeSourceDTO | HRResignedEmployeeSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
 	var sourceID string
 	switch value := any(source).(type) {
 	case HRCompanySourceDTO:
@@ -316,6 +335,8 @@ func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSource
 	case HRPositionSourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	case HREmployeeSourceDTO:
+		sourceID = strings.TrimSpace(value.SourceID)
+	case HRResignedEmployeeSourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	}
 	reason := ReasonEnvelopeInvalid

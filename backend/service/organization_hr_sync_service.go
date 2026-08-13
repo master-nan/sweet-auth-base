@@ -175,6 +175,30 @@ func (s *OrganizationHRSyncService) SynchronizeEmployees(
 	return s.finishBusinessBatch(ctx, batch, outcomes)
 }
 
+func (s *OrganizationHRSyncService) SynchronizeResignations(
+	ctx context.Context,
+	business hrsync.BusinessSyncContext,
+	inputs []hrsync.ResignationSyncInput,
+	issues []hrsync.SourceIssue,
+) (hrsync.BusinessSyncSummary, error) {
+	inputs, issues = dedupeResignationInputs(inputs, issues)
+	batch, err := s.beginBusinessBatch(ctx, business, "resigned_employee", hrsync.ConsumerCodeResignedEmployee)
+	if err != nil {
+		return hrsync.BusinessSyncSummary{}, err
+	}
+	outcomes := sourceIssueOutcomes(issues, hrsync.ObjectKindEmployee)
+	for start := 0; start < len(inputs); start += hrsync.OrganizationHRResignationChunkSize {
+		end := min(start+hrsync.OrganizationHRResignationChunkSize, len(inputs))
+		chunkOutcomes, chunkErr := s.upsertResignationChunk(ctx, batch, inputs[start:end])
+		if chunkErr != nil {
+			outcomes = append(outcomes, persistenceFailureOutcomes(inputs[start:end], hrsync.ObjectKindEmployee)...)
+			continue
+		}
+		outcomes = append(outcomes, chunkOutcomes...)
+	}
+	return s.finishBusinessBatch(ctx, batch, outcomes)
+}
+
 func organizationConsumerContract(kind hrsync.ObjectKind, structureType string) (string, string, error) {
 	switch {
 	case kind == hrsync.ObjectKindManagementCompany && structureType == model.OrgStructureTypeManagement:
@@ -569,6 +593,14 @@ func (s *OrganizationHRSyncService) upsertEmployee(tx *gorm.DB, batch organizati
 			outcome.localID, outcome.action = &existing.Id, model.OrgSyncRecordActionNoop
 			return outcome, nil
 		}
+		if existing.EmploymentStatus == "resigned" {
+			if input.EmploymentStatus == "active" {
+				return failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonEmploymentStateConflict), nil
+			}
+			// A non-active employee event may refresh source-owned profile fields,
+			// but it cannot reverse an explicit resignation fact.
+			input.EmploymentStatus = "resigned"
+		}
 		equal := employeeFactsEqual(existing, input)
 		if order == 0 {
 			if !equal {
@@ -624,6 +656,130 @@ func (s *OrganizationHRSyncService) upsertEmployee(tx *gorm.DB, batch organizati
 		outcome.action = model.OrgSyncRecordActionUpdate
 	}
 	return outcome, nil
+}
+
+func (s *OrganizationHRSyncService) upsertResignationChunk(
+	ctx context.Context,
+	batch organizationBusinessBatch,
+	inputs []hrsync.ResignationSyncInput,
+) ([]organizationSyncOutcome, error) {
+	outcomes := make([]organizationSyncOutcome, 0, len(inputs))
+	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		for _, input := range inputs {
+			inputOutcomes, err := s.applyResignation(tx, batch, input)
+			if err != nil {
+				return err
+			}
+			for _, outcome := range inputOutcomes {
+				if err := s.upsertSyncRecord(tx, batch.value, outcome); err != nil {
+					return err
+				}
+			}
+			outcomes = append(outcomes, inputOutcomes...)
+		}
+		return nil
+	})
+	return outcomes, err
+}
+
+func (s *OrganizationHRSyncService) applyResignation(
+	tx *gorm.DB,
+	batch organizationBusinessBatch,
+	input hrsync.ResignationSyncInput,
+) ([]organizationSyncOutcome, error) {
+	employeeOutcome := successOutcome(input.Key, hrsync.ObjectKindEmployee)
+	identity := input.Key.PersistenceID()
+	if err := s.repository.LockSourceIdentity(tx, input.Key.SourceSystemCode()+"|employee|"+identity); err != nil {
+		return nil, err
+	}
+	employee, err := s.repository.FindEmployeeBySource(tx, input.Key.SourceSystemCode(), identity)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		outcome := dependencyOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonReferenceMissing, "employee", input.Key.RawSourceID())
+		return []organizationSyncOutcome{outcome}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	employeeOutcome.localID = &employee.Id
+	order, err := compareOrganizationSourceVersion(employee.SourceVersion, input.SourceChangedAt)
+	if err != nil {
+		return []organizationSyncOutcome{failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonBusinessConflict)}, nil
+	}
+	if order < 0 {
+		employeeOutcome.action = model.OrgSyncRecordActionNoop
+		return []organizationSyncOutcome{employeeOutcome}, nil
+	}
+	if order == 0 && (employee.EmploymentStatus != "resigned" || !organizationDatesEqual(employee.ValidTo, input.ResignedOn)) {
+		return []organizationSyncOutcome{failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonEmploymentStateConflict)}, nil
+	}
+	if employee.EmploymentStatus == "resigned" && employee.ValidTo != nil && !organizationDatesEqual(employee.ValidTo, input.ResignedOn) {
+		return []organizationSyncOutcome{failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonEmploymentStateConflict)}, nil
+	}
+	if employee.ValidFrom != nil && input.ResignedOn.Before(normalizeOrganizationDate(*employee.ValidFrom)) {
+		return []organizationSyncOutcome{failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonEmploymentStateConflict)}, nil
+	}
+
+	assignments, err := s.repository.ListAssignmentsByEmployeeForUpdate(tx, employee.Id)
+	if err != nil {
+		return nil, err
+	}
+	assignmentOutcomes := make([]organizationSyncOutcome, 0, len(assignments))
+	for _, assignment := range assignments {
+		if assignment.Status == "disabled" && organizationDatesEqual(assignment.ValidTo, input.ResignedOn) {
+			assignmentOutcomes = append(assignmentOutcomes, assignmentSyncOutcome(assignment))
+			continue
+		}
+		if assignment.Status != "enabled" {
+			continue
+		}
+		outcome := assignmentSyncOutcome(assignment)
+		if assignment.ValidFrom != nil && input.ResignedOn.Before(normalizeOrganizationDate(*assignment.ValidFrom)) {
+			outcome.action, outcome.status, outcome.reason = model.OrgSyncRecordActionError, "failed", hrsync.ReasonAssignmentPeriodInvalid
+			return []organizationSyncOutcome{employeeOutcome, outcome}, nil
+		}
+		if assignment.ValidTo != nil && normalizeOrganizationDate(*assignment.ValidTo).Before(input.ResignedOn) {
+			outcome.action, outcome.status, outcome.reason = model.OrgSyncRecordActionError, "failed", hrsync.ReasonAssignmentStatusConflict
+			return []organizationSyncOutcome{employeeOutcome, outcome}, nil
+		}
+		outcome.action = model.OrgSyncRecordActionClose
+		assignmentOutcomes = append(assignmentOutcomes, outcome)
+	}
+
+	if order > 0 {
+		if err := s.repository.UpdateEmployee(tx, employee.Id, map[string]any{
+			"employment_status": "resigned", "valid_to": input.ResignedOn,
+			"source_version": input.SourceChangedAt.Format(time.RFC3339Nano), "source_updated_at": input.SourceChangedAt,
+			"last_sync_at": batch.now, "source_deleted": false, "sync_status": "synced",
+		}); err != nil {
+			return nil, err
+		}
+		employeeOutcome.action = model.OrgSyncRecordActionUpdate
+	} else {
+		employeeOutcome.action = model.OrgSyncRecordActionNoop
+	}
+	for index := range assignmentOutcomes {
+		outcome := &assignmentOutcomes[index]
+		if outcome.localID == nil {
+			return nil, ErrOrganizationHRSyncInvalid
+		}
+		if err := s.repository.UpdateAssignment(tx, *outcome.localID, map[string]any{
+			"valid_to": input.ResignedOn, "status": "disabled", "source_deleted": false, "sync_status": "synced",
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return append([]organizationSyncOutcome{employeeOutcome}, assignmentOutcomes...), nil
+}
+
+func assignmentSyncOutcome(assignment model.OrgAssignment) organizationSyncOutcome {
+	summary := "assignment-local-" + safeIntegerDigest(assignment.Id)
+	if key, err := hrsync.NewSourceKey(assignment.SourceSystemCode, hrsync.ObjectKindAssignment, assignment.SourceId); err == nil {
+		summary = key.Digest()
+	}
+	return organizationSyncOutcome{
+		kind: hrsync.ObjectKindAssignment, sourceSummary: summary, localID: &assignment.Id,
+		action: model.OrgSyncRecordActionNoop, status: "success",
+	}
 }
 
 func (s *OrganizationHRSyncService) ensureStructureNodePlaceholder(tx *gorm.DB, structure model.OrgStructure, input hrsync.OrgUnitSyncInput, unit model.OrgUnit) error {
@@ -1296,6 +1452,41 @@ func dedupeEmployeeInputs(inputs []hrsync.EmployeeSyncInput, issues []hrsync.Sou
 	return result, issues
 }
 
+func dedupeResignationInputs(inputs []hrsync.ResignationSyncInput, issues []hrsync.SourceIssue) ([]hrsync.ResignationSyncInput, []hrsync.SourceIssue) {
+	seen := make(map[string]hrsync.ResignationSyncInput, len(inputs))
+	blocked := make(map[string]bool)
+	order := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		identity := input.Key.PersistenceID()
+		if blocked[identity] {
+			continue
+		}
+		existing, ok := seen[identity]
+		if !ok {
+			seen[identity] = input
+			order = append(order, identity)
+			continue
+		}
+		switch {
+		case input.SourceChangedAt.After(existing.SourceChangedAt):
+			seen[identity] = input
+		case input.SourceChangedAt.Before(existing.SourceChangedAt):
+			continue
+		case !reflect.DeepEqual(existing, input):
+			issues = append(issues, sourceConflictIssue(input.Key, hrsync.ObjectKindEmployee))
+			delete(seen, identity)
+			blocked[identity] = true
+		}
+	}
+	result := make([]hrsync.ResignationSyncInput, 0, len(seen))
+	for _, identity := range order {
+		if input, ok := seen[identity]; ok {
+			result = append(result, input)
+		}
+	}
+	return result, issues
+}
+
 func sourceConflictIssue(key hrsync.SourceKey, kind hrsync.ObjectKind) hrsync.SourceIssue {
 	return hrsync.SourceIssue{ObjectKind: kind, SourceIDSummary: key.Digest(), ReasonCode: hrsync.ReasonSourceIDConflict, Action: model.OrgSyncRecordActionError}
 }
@@ -1324,7 +1515,7 @@ func sourceIssueOutcomes(issues []hrsync.SourceIssue, defaultKind hrsync.ObjectK
 	return result
 }
 
-func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSyncInput | hrsync.PositionSyncInput | hrsync.EmployeeSyncInput](inputs []T, kind hrsync.ObjectKind) []organizationSyncOutcome {
+func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSyncInput | hrsync.PositionSyncInput | hrsync.EmployeeSyncInput | hrsync.ResignationSyncInput](inputs []T, kind hrsync.ObjectKind) []organizationSyncOutcome {
 	result := make([]organizationSyncOutcome, 0, len(inputs))
 	for _, input := range inputs {
 		var key hrsync.SourceKey
@@ -1336,6 +1527,8 @@ func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSy
 		case hrsync.PositionSyncInput:
 			key = typed.Key
 		case hrsync.EmployeeSyncInput:
+			key = typed.Key
+		case hrsync.ResignationSyncInput:
 			key = typed.Key
 		}
 		result = append(result, failedOutcome(key, kind, hrsync.ReasonPersistenceFailed))
@@ -1406,6 +1599,20 @@ func safeDependencyDigest(sourceSystem string, kind hrsync.ObjectKind, raw strin
 		return "invalid"
 	}
 	return key.Digest()
+}
+
+func safeIntegerDigest(value int) string {
+	digest := sha256.Sum256([]byte(fmt.Sprintf("organization-local:%d", value)))
+	return hex.EncodeToString(digest[:12])
+}
+
+func normalizeOrganizationDate(value time.Time) time.Time {
+	year, month, day := value.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+}
+
+func organizationDatesEqual(value *time.Time, expected time.Time) bool {
+	return value != nil && normalizeOrganizationDate(*value).Equal(normalizeOrganizationDate(expected))
 }
 
 func structureNodeSourceID(sourceSystem, structureType, unitPersistenceID string) (string, error) {

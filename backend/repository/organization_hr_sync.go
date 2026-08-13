@@ -40,6 +40,8 @@ type OrganizationHRSyncRepository interface {
 	FindEmployeeByNumber(*gorm.DB, string, string) (model.OrgEmployee, error)
 	CreateEmployee(*gorm.DB, *model.OrgEmployee) error
 	UpdateEmployee(*gorm.DB, int, map[string]any) error
+	ListAssignmentsByEmployeeForUpdate(*gorm.DB, int) ([]model.OrgAssignment, error)
+	UpdateAssignment(*gorm.DB, int, map[string]any) error
 
 	FindStructureByCode(*gorm.DB, string) (model.OrgStructure, error)
 	CreateStructure(*gorm.DB, *model.OrgStructure) error

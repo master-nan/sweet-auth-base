@@ -297,6 +297,26 @@ func TestIntegrationSyncPostgreSQLEmployeeBusinessFailureDoesNotRetryE2E(t *test
 	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "employee_conflict")
 }
 
+func TestIntegrationSyncPostgreSQLResignedEmployeeRetryAssignmentCheckpointE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "resigned_success")
+}
+
+func TestIntegrationSyncPostgreSQLResignedEmployeeDoesNotAllowImplicitRehireE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "employee_rehire_conflict")
+}
+
+func TestIntegrationSyncPostgreSQLResignedEmployeeMissingDependencyE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "resigned_missing")
+}
+
+func TestIntegrationSyncPostgreSQLResignedEmployeeAssignmentPeriodRollbackE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "resigned_period_conflict")
+}
+
+func TestIntegrationSyncPostgreSQLStaleResignationNoopE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "resigned_stale")
+}
+
 func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool, organizationScenario string) {
 	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
@@ -305,6 +325,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	lowerBoundOnly := organizationScenario != ""
 	positionScenario := strings.HasPrefix(organizationScenario, "position_")
 	employeeScenario := strings.HasPrefix(organizationScenario, "employee_")
+	resignedScenario := strings.HasPrefix(organizationScenario, "resigned_")
+	resignedBusinessFailure := organizationScenario == "resigned_missing" || organizationScenario == "resigned_period_conflict"
+	var resignationEventTime atomic.Value
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		call := httpCalls.Add(1)
 		if lowerBoundOnly {
@@ -323,7 +346,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			t.Errorf("credential was not injected")
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		if call == 1 {
+		if call == 1 && organizationScenario != "employee_rehire_conflict" && !resignedBusinessFailure {
 			writer.WriteHeader(http.StatusServiceUnavailable)
 		}
 		if lowerBoundOnly {
@@ -333,6 +356,24 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			}
 			if organizationScenario == "deferred_replay" && !organizationRepaired.Load() {
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}})
+				_, _ = writer.Write(body)
+				return
+			}
+			if resignedScenario {
+				eventTime := lower.Add(20 * time.Minute).UTC()
+				if existing := resignationEventTime.Load(); existing != nil {
+					eventTime = existing.(time.Time)
+				} else if call > 1 {
+					resignationEventTime.Store(eventTime)
+				}
+				sourceID := "employee-resigned-e2e"
+				if organizationScenario == "resigned_missing" {
+					sourceID = "employee-resigned-missing"
+				}
+				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
+					{"psnidzjkid_ignore": sourceID, "changeTime": eventTime.Format("2006-01-02T15:04:05"), "lzdate": checkpointSafeResignationDate(eventTime)},
+					{"psnidzjkid_ignore": "employee-resigned-future", "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05"), "lzdate": checkpointSafeResignationDate(eventTime)},
+				}})
 				_, _ = writer.Write(body)
 				return
 			}
@@ -451,6 +492,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		} else if employeeScenario {
 			formalConsumer = hrsync.NewEmployeeConsumer(domain, contract)
 			consumerCode = hrsync.ConsumerCodeEmployee
+		} else if resignedScenario {
+			formalConsumer = hrsync.NewResignedEmployeeConsumer(domain, contract)
+			consumerCode = hrsync.ConsumerCodeResignedEmployee
 		}
 		consumer = integration.SyncResultConsumerFunc(func(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
 			consumerCalled <- request
@@ -539,6 +583,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			}
 		}
 	}
+	if resignedScenario || organizationScenario == "employee_rehire_conflict" {
+		seedPostgreSQLResignationFixture(t, db, organizationScenario)
+	}
 	if err := db.Model(&model.RetryPolicy{}).Where("id = ?", retryPolicy.Id).Update("jitter_ratio", 0).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +635,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	t.Cleanup(func() { _ = syncRunner.Stop(context.Background()); _ = worker.Stop(context.Background()) })
 	expectedBatchStatus := model.IntegrationSyncBatchStatusSucceeded
-	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" || organizationScenario == "position_deferred_replay" || organizationScenario == "employee_conflict" {
+	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" || organizationScenario == "position_deferred_replay" || organizationScenario == "employee_conflict" || organizationScenario == "employee_rehire_conflict" || resignedBusinessFailure {
 		expectedBatchStatus = model.IntegrationSyncBatchStatusFailed
 	}
 	waitForPostgreSQLSyncBatchStatus(t, db, expectedBatchStatus, 20*time.Second)
@@ -668,8 +715,12 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		}
 		return
 	}
-	if organizationScenario == "employee_conflict" {
-		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonSourceIDConflict)
+	if organizationScenario == "employee_conflict" || organizationScenario == "employee_rehire_conflict" {
+		reason := hrsync.ReasonSourceIDConflict
+		if organizationScenario == "employee_rehire_conflict" {
+			reason = hrsync.ReasonEmploymentStateConflict
+		}
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, reason)
 		if err := syncRunner.Stop(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -677,15 +728,42 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			t.Fatal(err)
 		}
 		var failedExecution model.IntegrationExecution
-		if err := db.Order("id ASC").First(&failedExecution).Error; err != nil || failedExecution.Status != model.IntegrationExecutionStatusFailed || failedExecution.CurrentAttempt != 2 {
+		expectedAttempts := 2
+		if organizationScenario == "employee_rehire_conflict" {
+			expectedAttempts = 1
+		}
+		if err := db.Order("id ASC").First(&failedExecution).Error; err != nil || failedExecution.Status != model.IntegrationExecutionStatusFailed || failedExecution.CurrentAttempt != expectedAttempts {
 			t.Fatalf("employee business failure execution=%+v err=%v", failedExecution, err)
 		}
 		var attempts, employees int64
-		if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", failedExecution.Id).Count(&attempts).Error; err != nil || attempts != 2 {
+		if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", failedExecution.Id).Count(&attempts).Error; err != nil || attempts != int64(expectedAttempts) {
 			t.Fatalf("employee business failure attempts=%d err=%v", attempts, err)
 		}
-		if err := db.Model(&model.OrgEmployee{}).Count(&employees).Error; err != nil || employees != 0 || httpCalls.Load() != 2 {
-			t.Fatalf("employee business failure employees=%d http=%d err=%v", employees, httpCalls.Load(), err)
+		if err := db.Model(&model.OrgEmployee{}).Count(&employees).Error; err != nil || employees != 0 || httpCalls.Load() != int32(expectedAttempts) {
+			if organizationScenario != "employee_rehire_conflict" || err != nil || employees != 1 || httpCalls.Load() != int32(expectedAttempts) {
+				t.Fatalf("employee business failure employees=%d http=%d err=%v", employees, httpCalls.Load(), err)
+			}
+		}
+		return
+	}
+	if resignedBusinessFailure {
+		reason := hrsync.ReasonReferenceMissing
+		if organizationScenario == "resigned_period_conflict" {
+			reason = hrsync.ReasonAssignmentPeriodInvalid
+		}
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, reason)
+		if err := syncRunner.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := worker.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		var failedExecution model.IntegrationExecution
+		if err := db.Order("id ASC").First(&failedExecution).Error; err != nil || failedExecution.Status != model.IntegrationExecutionStatusFailed || failedExecution.CurrentAttempt != 1 || httpCalls.Load() != 1 {
+			t.Fatalf("resignation business failure execution=%+v http=%d err=%v", failedExecution, httpCalls.Load(), err)
+		}
+		if organizationScenario == "resigned_period_conflict" {
+			assertPostgreSQLResignationFixtureUnchanged(t, db)
 		}
 		return
 	}
@@ -771,6 +849,39 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		if futureCount != 0 || recordCount != 2 || batchCount != 2 || assignmentCount != 0 {
 			t.Fatalf("employee e2e filter: future=%d records=%d batches=%d assignments=%d", futureCount, recordCount, batchCount, assignmentCount)
 		}
+	} else if resignedScenario {
+		var employee model.OrgEmployee
+		if err := db.Where("source_id = ?", "employee-resigned-e2e").First(&employee).Error; err != nil || employee.UserId != nil || employee.SourceDeleted {
+			t.Fatalf("resigned employee e2e=%+v err=%v", employee, err)
+		}
+		var assignment model.OrgAssignment
+		if organizationScenario != "resigned_stale" {
+			if employee.EmploymentStatus != "resigned" || employee.ValidTo == nil {
+				t.Fatalf("resigned employee state=%+v", employee)
+			}
+			if err := db.Where("employee_id = ?", employee.Id).First(&assignment).Error; err != nil || assignment.Status != "disabled" || assignment.ValidTo == nil || assignment.SourceDeleted {
+				t.Fatalf("resigned assignment e2e=%+v err=%v", assignment, err)
+			}
+		} else if employee.EmploymentStatus != "active" || employee.ValidTo != nil {
+			t.Fatalf("stale resignation changed employee=%+v", employee)
+		}
+		var futureCount, recordCount, batchCount int64
+		if err := db.Model(&model.OrgEmployee{}).Where("source_id = ?", "employee-resigned-future").Count(&futureCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncRecord{}).Count(&recordCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncBatch{}).Count(&batchCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		expectedRecords := int64(4)
+		if organizationScenario == "resigned_stale" {
+			expectedRecords = 2
+		}
+		if futureCount != 0 || recordCount != expectedRecords || batchCount != 2 {
+			t.Fatalf("resignation e2e filter: future=%d records=%d batches=%d", futureCount, recordCount, batchCount)
+		}
 	} else if lowerBoundOnly {
 		var futureCount, recordCount, batchCount, unitCount int64
 		if err := db.Model(&model.OrgUnit{}).Where("code LIKE ?", "FUTURE-%").Count(&futureCount).Error; err != nil {
@@ -793,6 +904,89 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 				t.Fatalf("Organization sync persisted forbidden body column: %s", forbiddenColumn)
 			}
 		}
+	}
+}
+
+func checkpointSafeResignationDate(lower time.Time) string {
+	return lower.UTC().Add(-24 * time.Hour).Format("2006-01-02")
+}
+
+func seedPostgreSQLResignationFixture(t *testing.T, db *gorm.DB, scenario string) {
+	t.Helper()
+	var task model.IntegrationSyncTask
+	if err := db.Order("id DESC").First(&task).Error; err != nil || task.CheckpointAt == nil {
+		t.Fatalf("resignation task checkpoint=%v err=%v", task.CheckpointAt, err)
+	}
+	if scenario == "resigned_missing" {
+		return
+	}
+	withAssignment := scenario == "resigned_success" || scenario == "resigned_period_conflict"
+	rawSourceID := "employee-e2e"
+	status := "resigned"
+	validTo := task.CheckpointAt.Add(-24 * time.Hour)
+	if strings.HasPrefix(scenario, "resigned_") {
+		rawSourceID = "employee-resigned-e2e"
+		status = "active"
+	}
+	employee := model.OrgEmployee{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: rawSourceID, EmployeeNo: "EMP-RESIGNED-E2E", Name: "Existing Employee", EmploymentStatus: status,
+		SourceVersion: task.CheckpointAt.UTC().Format(time.RFC3339Nano), SourceUpdatedAt: task.CheckpointAt,
+		LastSyncAt: task.CheckpointAt, SourceDeleted: false, SyncStatus: "synced",
+	}
+	if scenario == "employee_rehire_conflict" {
+		employee.ValidTo = &validTo
+	}
+	if scenario == "resigned_stale" {
+		newer := task.CheckpointAt.Add(4 * time.Hour)
+		employee.SourceVersion = newer.UTC().Format(time.RFC3339Nano)
+		employee.SourceUpdatedAt = &newer
+	}
+	if err := db.Create(&employee).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !withAssignment {
+		return
+	}
+	legal := model.OrgLegalEntity{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: "legal-resigned-e2e", Code: "LEGAL-RESIGNED-E2E", Name: "Legal", EntityType: "legal_company",
+		Status: "enabled", SourceDeleted: false, SyncStatus: "synced",
+	}
+	unit := model.OrgUnit{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: "management_unit:resigned-e2e", Code: "UNIT-RESIGNED-E2E", Name: "Unit", UnitType: "department",
+		Status: "enabled", SourceDeleted: false, SyncStatus: "synced",
+	}
+	if err := db.Create(&legal).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&unit).Error; err != nil {
+		t.Fatal(err)
+	}
+	validFrom := task.CheckpointAt.Add(-30 * 24 * time.Hour)
+	if scenario == "resigned_period_conflict" {
+		validFrom = task.CheckpointAt.Add(24 * time.Hour)
+	}
+	assignment := model.OrgAssignment{
+		Basic: model.Basic{Id: nextSyncTestID(), State: true}, SourceSystemCode: hrsync.OrganizationHRSourceSystemCode,
+		SourceId: "assignment-resigned-e2e", EmployeeId: employee.Id, LegalEntityId: legal.Id, OrgUnitId: unit.Id,
+		AssignmentType: "secondary", ValidFrom: &validFrom, Status: "enabled", SourceDeleted: false, SyncStatus: "synced",
+	}
+	if err := db.Create(&assignment).Error; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertPostgreSQLResignationFixtureUnchanged(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	var employee model.OrgEmployee
+	if err := db.Where("source_id = ?", "employee-resigned-e2e").First(&employee).Error; err != nil || employee.EmploymentStatus != "active" || employee.ValidTo != nil {
+		t.Fatalf("employee changed despite assignment failure=%+v err=%v", employee, err)
+	}
+	var assignment model.OrgAssignment
+	if err := db.Where("employee_id = ?", employee.Id).First(&assignment).Error; err != nil || assignment.Status != "enabled" || assignment.ValidTo != nil {
+		t.Fatalf("assignment changed despite period failure=%+v err=%v", assignment, err)
 	}
 }
 

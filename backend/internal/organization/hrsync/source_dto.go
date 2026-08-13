@@ -85,8 +85,6 @@ type HREmployeeSourceDTO struct {
 
 type HRResignedEmployeeSourceDTO struct {
 	SourceID   string `json:"psnidzjkid_ignore"`
-	EmployeeNo string `json:"jhcode"`
-	Name       string `json:"psnname"`
 	ChangeTime string `json:"changeTime"`
 	ResignedAt string `json:"lzdate"`
 }
