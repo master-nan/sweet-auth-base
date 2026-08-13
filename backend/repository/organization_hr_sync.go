@@ -36,6 +36,10 @@ type OrganizationHRSyncRepository interface {
 	FindPositionByCode(*gorm.DB, string, string) (model.OrgPosition, error)
 	CreatePosition(*gorm.DB, *model.OrgPosition) error
 	UpdatePosition(*gorm.DB, int, map[string]any) error
+	FindEmployeeBySource(*gorm.DB, string, string) (model.OrgEmployee, error)
+	FindEmployeeByNumber(*gorm.DB, string, string) (model.OrgEmployee, error)
+	CreateEmployee(*gorm.DB, *model.OrgEmployee) error
+	UpdateEmployee(*gorm.DB, int, map[string]any) error
 
 	FindStructureByCode(*gorm.DB, string) (model.OrgStructure, error)
 	CreateStructure(*gorm.DB, *model.OrgStructure) error

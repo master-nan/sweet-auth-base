@@ -16,10 +16,12 @@ const (
 	ConsumerCodeManagementDepartment = "org.hr.management_department"
 	ConsumerCodeLegalDepartment      = "org.hr.legal_department"
 	ConsumerCodePosition             = "org.hr.position"
+	ConsumerCodeEmployee             = "org.hr.employee"
 	ConsumerVersionV1                = 1
 )
 
 const OrganizationHRSyncChunkSize = 500
+const OrganizationHREmployeeChunkSize = 200
 
 var ErrSourceContractInvalid = errors.New("org_sync_source_contract_invalid")
 
@@ -85,4 +87,5 @@ type OrganizationSyncDomain interface {
 	SynchronizeLegalEntities(context.Context, BusinessSyncContext, []LegalEntitySyncInput, []SourceIssue) (BusinessSyncSummary, error)
 	SynchronizeOrgUnits(context.Context, BusinessSyncContext, ObjectKind, string, []OrgUnitSyncInput, []SourceIssue) (BusinessSyncSummary, error)
 	SynchronizePositions(context.Context, BusinessSyncContext, []PositionSyncInput, []SourceIssue) (BusinessSyncSummary, error)
+	SynchronizeEmployees(context.Context, BusinessSyncContext, []EmployeeSyncInput, []SourceIssue) (BusinessSyncSummary, error)
 }

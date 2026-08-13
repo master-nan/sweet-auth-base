@@ -73,6 +73,8 @@ type HREmployeeSourceDTO struct {
 	SourceID            string             `json:"psnidzjkid_ignore"`
 	EmployeeNo          string             `json:"jhcode"`
 	Name                string             `json:"name"`
+	Mobile              string             `json:"mobile"`
+	Email               string             `json:"email"`
 	Enabled             SourceEnableStatus `json:"isenable"`
 	ChangeTime          string             `json:"changeTime"`
 	LegalEntitySourceID string             `json:"corporationCompanyId"`

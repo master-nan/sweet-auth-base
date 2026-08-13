@@ -12,7 +12,15 @@ import (
 	"time"
 )
 
-const maxOrganizationSourceRecords = 100000
+const (
+	maxOrganizationSourceRecords       = 100000
+	maxEmployeeSourceRecords           = 20000
+	maxEmployeeResponseBytes     int64 = 16 << 20
+	maxEmbeddedAssignmentsBytes        = 256 << 10
+	maxEmbeddedAssignmentsCount        = 100
+)
+
+var errEmbeddedAssignmentsInvalid = errors.New("org_sync_embedded_assignments_invalid")
 
 type LegalEntityConsumer struct {
 	domain     OrganizationSyncDomain
@@ -39,12 +47,18 @@ type PositionConsumer struct {
 	normalizer Normalizer
 }
 
+type EmployeeConsumer struct {
+	domain     OrganizationSyncDomain
+	normalizer Normalizer
+}
+
 var (
 	_ integration.SyncResultConsumer = (*LegalEntityConsumer)(nil)
 	_ integration.SyncResultConsumer = (*ManagementCompanyConsumer)(nil)
 	_ integration.SyncResultConsumer = (*ManagementDepartmentConsumer)(nil)
 	_ integration.SyncResultConsumer = (*LegalDepartmentConsumer)(nil)
 	_ integration.SyncResultConsumer = (*PositionConsumer)(nil)
+	_ integration.SyncResultConsumer = (*EmployeeConsumer)(nil)
 )
 
 func NewLegalEntityConsumer(domain OrganizationSyncDomain, contract SourceContract) *LegalEntityConsumer {
@@ -65,6 +79,10 @@ func NewLegalDepartmentConsumer(domain OrganizationSyncDomain, contract SourceCo
 
 func NewPositionConsumer(domain OrganizationSyncDomain, contract SourceContract) *PositionConsumer {
 	return &PositionConsumer{domain: domain, normalizer: contract.normalizer()}
+}
+
+func NewEmployeeConsumer(domain OrganizationSyncDomain, contract SourceContract) *EmployeeConsumer {
+	return &EmployeeConsumer{domain: domain, normalizer: contract.normalizer()}
 }
 
 func (c *LegalEntityConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
@@ -101,6 +119,18 @@ func (c *PositionConsumer) Consume(ctx context.Context, request integration.Sync
 	return consumptionResult(summary, err)
 }
 
+func (c *EmployeeConsumer) Consume(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
+	if request.ResponseSize() > maxEmployeeResponseBytes {
+		summary, err := c.domain.SynchronizeEmployees(ctx, NewBusinessSyncContext(request), nil, []SourceIssue{{
+			ObjectKind: ObjectKindEmployee, ReasonCode: ReasonEnvelopeInvalid, Action: model.OrgSyncRecordActionError,
+		}})
+		return consumptionResult(summary, err)
+	}
+	inputs, issues := normalizeWindowedEmployees(request, c.normalizer)
+	summary, err := c.domain.SynchronizeEmployees(ctx, NewBusinessSyncContext(request), inputs, issues)
+	return consumptionResult(summary, err)
+}
+
 func EnabledConsumerRegistrations(domain OrganizationSyncDomain, contract SourceContract) ([]integration.SyncConsumerRegistration, error) {
 	if domain == nil || !contract.valid() {
 		return nil, ErrSourceContractInvalid
@@ -120,6 +150,7 @@ func consumerRegistrations(domain OrganizationSyncDomain, contract SourceContrac
 		consumerRegistration(ConsumerCodeManagementDepartment, "HR 管理部门", 8<<20, status, NewManagementDepartmentConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodeLegalDepartment, "HR 法人部门", 8<<20, status, NewLegalDepartmentConsumer(domain, contract)),
 		consumerRegistration(ConsumerCodePosition, "HR 岗位", 8<<20, status, NewPositionConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeEmployee, "HR 员工", maxEmployeeResponseBytes, status, NewEmployeeConsumer(domain, contract)),
 	}
 }
 
@@ -150,7 +181,7 @@ func consumptionResult(summary BusinessSyncSummary, err error) (integration.Sync
 }
 
 type changedSource interface {
-	LegalEntitySyncInput | OrgUnitSyncInput | PositionSyncInput
+	LegalEntitySyncInput | OrgUnitSyncInput | PositionSyncInput | EmployeeSyncInput
 }
 
 func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO, T changedSource](
@@ -164,7 +195,7 @@ func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRP
 	}
 	inputs := make([]T, 0)
 	issues := make([]SourceIssue, 0)
-	err := decodeSourceEnvelope(request.Body(), func(source S) error {
+	err := decodeSourceEnvelope(request.Body(), maxOrganizationSourceRecords, func(source S) error {
 		input, err := normalize(source)
 		if err != nil {
 			issues = append(issues, sourceIssue(source, kind, err))
@@ -190,6 +221,76 @@ func normalizeWindowedSources[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRP
 	return inputs, issues
 }
 
+func normalizeWindowedEmployees(request integration.SyncConsumptionRequest, normalizer Normalizer) ([]EmployeeSyncInput, []SourceIssue) {
+	start, end := request.WindowStart(), request.WindowEnd()
+	if start == nil || end == nil || !end.After(*start) {
+		return nil, []SourceIssue{{ObjectKind: ObjectKindEmployee, ReasonCode: ReasonEnvelopeInvalid, Action: model.OrgSyncRecordActionError}}
+	}
+	inputs := make([]EmployeeSyncInput, 0)
+	issues := make([]SourceIssue, 0)
+	err := decodeSourceEnvelope(request.Body(), maxEmployeeSourceRecords, func(source HREmployeeSourceDTO) error {
+		if err := validateEmbeddedAssignments(source.EmbeddedAssignments); err != nil {
+			issues = append(issues, sourceIssue(source, ObjectKindEmployee, err))
+			return nil
+		}
+		input, err := normalizer.NormalizeEmployeeSource(source)
+		if err != nil {
+			issues = append(issues, sourceIssue(source, ObjectKindEmployee, err))
+			return nil
+		}
+		classification, err := ClassifySourceChangeTime(input.SourceChangedAt, *start, *end)
+		if err != nil {
+			issues = append(issues, SourceIssue{ObjectKind: ObjectKindEmployee, ReasonCode: ReasonEnvelopeInvalid, Action: model.OrgSyncRecordActionError})
+			return nil
+		}
+		if classification != WindowRecordFuture {
+			inputs = append(inputs, input)
+		}
+		return nil
+	})
+	if err != nil {
+		reason := ReasonEnvelopeInvalid
+		if errors.Is(err, ErrSourceEnumInvalid) {
+			reason = ReasonEnumUnknown
+		}
+		return nil, []SourceIssue{{ObjectKind: ObjectKindEmployee, ReasonCode: reason, Action: model.OrgSyncRecordActionError}}
+	}
+	return inputs, issues
+}
+
+func validateEmbeddedAssignments(raw string) error {
+	if len(raw) > maxEmbeddedAssignmentsBytes {
+		return errEmbeddedAssignmentsInvalid
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	open, err := decoder.Token()
+	if err != nil || open != json.Delim('[') {
+		return errEmbeddedAssignmentsInvalid
+	}
+	count := 0
+	for decoder.More() {
+		count++
+		if count > maxEmbeddedAssignmentsCount {
+			return errEmbeddedAssignmentsInvalid
+		}
+		var value map[string]json.RawMessage
+		if err := decoder.Decode(&value); err != nil || value == nil {
+			return errEmbeddedAssignmentsInvalid
+		}
+	}
+	if closeToken, err := decoder.Token(); err != nil || closeToken != json.Delim(']') {
+		return errEmbeddedAssignmentsInvalid
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return errEmbeddedAssignmentsInvalid
+	}
+	return nil
+}
+
 func sourceChangedAt[T changedSource](value T) time.Time {
 	switch typed := any(value).(type) {
 	case LegalEntitySyncInput:
@@ -198,12 +299,14 @@ func sourceChangedAt[T changedSource](value T) time.Time {
 		return typed.SourceChangedAt
 	case PositionSyncInput:
 		return typed.SourceChangedAt
+	case EmployeeSyncInput:
+		return typed.SourceChangedAt
 	default:
 		return time.Time{}
 	}
 }
 
-func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
+func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSourceDTO | HREmployeeSourceDTO](source S, kind ObjectKind, err error) SourceIssue {
 	var sourceID string
 	switch value := any(source).(type) {
 	case HRCompanySourceDTO:
@@ -211,6 +314,8 @@ func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSource
 	case HRDepartmentSourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	case HRPositionSourceDTO:
+		sourceID = strings.TrimSpace(value.SourceID)
+	case HREmployeeSourceDTO:
 		sourceID = strings.TrimSpace(value.SourceID)
 	}
 	reason := ReasonEnvelopeInvalid
@@ -228,7 +333,7 @@ func sourceIssue[S HRCompanySourceDTO | HRDepartmentSourceDTO | HRPositionSource
 	return issue
 }
 
-func decodeSourceEnvelope[T any](body []byte, consume func(T) error) error {
+func decodeSourceEnvelope[T any](body []byte, maxRecords int, consume func(T) error) error {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	token, err := decoder.Token()
 	if err != nil || token != json.Delim('{') {
@@ -264,7 +369,7 @@ func decodeSourceEnvelope[T any](body []byte, consume func(T) error) error {
 			}
 			for decoder.More() {
 				count++
-				if count > maxOrganizationSourceRecords {
+				if count > maxRecords {
 					return ErrSourceContractUnconfirmed
 				}
 				var value T

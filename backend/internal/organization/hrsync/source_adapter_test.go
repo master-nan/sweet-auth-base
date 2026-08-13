@@ -64,6 +64,33 @@ func TestSourceDTOAndNormalizersKeepSourceFieldsAtAdapterBoundary(t *testing.T) 
 	if err := json.Unmarshal([]byte(`{"postidzjkid_ignore":"position-2","postCode":"POST-002","postname":"岗位","isenable":"unknown"}`), &invalidPosition); !errors.Is(err, ErrSourceEnumInvalid) {
 		t.Fatalf("invalid position enum err=%v", err)
 	}
+	employee, err := normalizer.NormalizeEmployeeSource(HREmployeeSourceDTO{
+		SourceID: "employee-1", EmployeeNo: "EMP-001", Name: "员工", Mobile: "", Email: "",
+		Enabled: SourceEnableDisabled, ChangeTime: "2026-08-12T10:32:00", EmbeddedAssignments: "[]",
+	})
+	if err != nil || employee.Key.ObjectKind() != ObjectKindEmployee || employee.EmployeeNo != "EMP-001" || employee.Mobile != "" || employee.Email != "" || employee.EmploymentStatus != "suspended" {
+		t.Fatalf("employee normalized=%+v err=%v", employee, err)
+	}
+}
+
+func TestEmployeeEmbeddedAssignmentsDefenseBoundaries(t *testing.T) {
+	values := make([]string, maxEmbeddedAssignmentsCount)
+	for index := range values {
+		values[index] = `{}`
+	}
+	if err := validateEmbeddedAssignments("[" + strings.Join(values, ",") + "]"); err != nil {
+		t.Fatalf("maximum assignment count rejected: %v", err)
+	}
+	values = append(values, `{}`)
+	if err := validateEmbeddedAssignments("[" + strings.Join(values, ",") + "]"); !errors.Is(err, errEmbeddedAssignmentsInvalid) {
+		t.Fatalf("assignment count overflow err=%v", err)
+	}
+	if err := validateEmbeddedAssignments(strings.Repeat(" ", maxEmbeddedAssignmentsBytes+1)); !errors.Is(err, errEmbeddedAssignmentsInvalid) {
+		t.Fatalf("assignment bytes overflow err=%v", err)
+	}
+	if err := validateEmbeddedAssignments(`{"ID":"not-an-array"}`); !errors.Is(err, errEmbeddedAssignmentsInvalid) {
+		t.Fatalf("assignment shape err=%v", err)
+	}
 }
 
 func TestLogicalWindowClassifiesLookbackCurrentAndFuture(t *testing.T) {
@@ -101,6 +128,9 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if _, err := disabled.Resolve(ConsumerCodePosition, ConsumerVersionV1); err == nil {
 		t.Fatal("disabled position consumer resolved")
 	}
+	if _, err := disabled.Resolve(ConsumerCodeEmployee, ConsumerVersionV1); err == nil {
+		t.Fatal("disabled employee consumer resolved")
+	}
 	contract, err := NewExplicitSourceContract(OrganizationHRSourceSystemCode, time.UTC)
 	if err != nil {
 		t.Fatal(err)
@@ -116,8 +146,16 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := enabled.ListMetadata(); len(got) != 5 {
-		t.Fatalf("enabled registrations=%d, want 5", len(got))
+	if got := enabled.ListMetadata(); len(got) != 6 {
+		t.Fatalf("enabled registrations=%d, want 6", len(got))
+	}
+	metadata, err := enabled.ValidateReference(integration.SyncConsumerReference{
+		Code: ConsumerCodeEmployee, Version: ConsumerVersionV1, ContentType: "application/json",
+		ResponseLimit: maxEmployeeResponseBytes, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
+		RequestTimeout: time.Second, LeaseDuration: 180 * time.Second,
+	})
+	if err != nil || metadata.MaxResponseBytes != maxEmployeeResponseBytes {
+		t.Fatalf("employee metadata=%+v err=%v", metadata, err)
 	}
 }
 
@@ -179,6 +217,10 @@ func (*organizationSyncDomainStub) SynchronizeOrgUnits(context.Context, Business
 }
 
 func (*organizationSyncDomainStub) SynchronizePositions(context.Context, BusinessSyncContext, []PositionSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
+	return BusinessSyncSummary{}, nil
+}
+
+func (*organizationSyncDomainStub) SynchronizeEmployees(context.Context, BusinessSyncContext, []EmployeeSyncInput, []SourceIssue) (BusinessSyncSummary, error) {
 	return BusinessSyncSummary{}, nil
 }
 

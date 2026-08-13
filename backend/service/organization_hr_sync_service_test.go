@@ -308,13 +308,133 @@ func TestOrganizationHRPositionConsumerIdentityReferenceStateAndIdempotency(t *t
 	}
 }
 
+func TestOrganizationHREmployeeConsumerIdentityStateStaleAndBoundaries(t *testing.T) {
+	service, db := newOrganizationHRSyncTestService(t)
+	contract, _ := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+	consumer := hrsync.NewEmployeeConsumer(service, contract)
+	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", hrsync.ConsumerCodeEmployee, 1)
+	body := `{"success":true,"data":[` +
+		`{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"员工甲","mobile":null,"email":"","isenable":1,"changeTime":"2026-08-12T10:10:00","sendpost":"[]","deptidzjkid_ignore":"ignored-dept","postidzjkid_ignore":"ignored-position"},` +
+		`{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"员工甲","mobile":null,"email":"","isenable":1,"changeTime":"2026-08-12T10:10:00","sendpost":"[]"},` +
+		`{"psnidzjkid_ignore":"employee-future","jhcode":"EMP-FUTURE","name":"未来员工","isenable":1,"changeTime":"2026-08-12T11:00:00","sendpost":"[]"}]}`
+	result := consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", start, end, body)
+	if !result.Success() || result.BusinessSuccessCount() != 1 {
+		t.Fatalf("employee create=%+v", result)
+	}
+	var employee model.OrgEmployee
+	if err := db.Where("source_id = ?", "employee-a").First(&employee).Error; err != nil || employee.EmployeeNo != "EMP-001" || employee.Name != "员工甲" || employee.Mobile != "" || employee.Email != "" || employee.EmploymentStatus != "active" || employee.SourceDeleted || employee.PrimaryLegalEntityId != nil || employee.UserId != nil {
+		t.Fatalf("employee=%+v err=%v", employee, err)
+	}
+	var future, assignments int64
+	if err := db.Model(&model.OrgEmployee{}).Where("source_id = ?", "employee-future").Count(&future).Error; err != nil || future != 0 {
+		t.Fatalf("future employee=%d err=%v", future, err)
+	}
+	if err := db.Model(&model.OrgAssignment{}).Count(&assignments).Error; err != nil || assignments != 0 {
+		t.Fatalf("assignments=%d err=%v", assignments, err)
+	}
+
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", start, end, body)
+	if !result.Success() {
+		t.Fatalf("employee repeat=%+v", result)
+	}
+	assertOrganizationEmployeeRecordAction(t, db, "employee-a", model.OrgSyncRecordActionNoop)
+	boundUserID := nextSyncTestID()
+	if err := db.Model(&model.OrgEmployee{}).Where("id = ?", employee.Id).Update("user_id", boundUserID).Error; err != nil {
+		t.Fatal(err)
+	}
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"员工甲更新","mobile":"","email":"employee@example.invalid","isenable":2,"changeTime":"2026-08-12T10:30:00","sendpost":"[]"}]}`)
+	if !result.Success() {
+		t.Fatalf("employee update=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.Name != "员工甲更新" || employee.Email != "employee@example.invalid" || employee.EmploymentStatus != "suspended" || employee.EmploymentStatus == "resigned" || employee.UserId == nil || *employee.UserId != boundUserID {
+		t.Fatalf("updated employee=%+v err=%v", employee, err)
+	}
+	assertOrganizationEmployeeRecordAction(t, db, "employee-a", model.OrgSyncRecordActionUpdate)
+
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"陈旧员工","mobile":"secret","email":"stale@example.invalid","isenable":1,"changeTime":"2026-08-12T10:20:00","sendpost":"[]"}]}`)
+	if !result.Success() {
+		t.Fatalf("stale employee=%+v", result)
+	}
+	if err := db.First(&employee, employee.Id).Error; err != nil || employee.Name != "员工甲更新" || employee.EmploymentStatus != "suspended" {
+		t.Fatalf("stale overwrite=%+v err=%v", employee, err)
+	}
+
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE", "SYNC-EMPLOYEE", "task_employee", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"同版本冲突","isenable":2,"changeTime":"2026-08-12T10:30:00","sendpost":"[]"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonSourceIDConflict) {
+		t.Fatalf("same-version conflict=%+v", result)
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-EMPLOYEE-NO", "SYNC-EMPLOYEE-NO", "task_employee", hrsync.ConsumerCodeEmployee, 1)
+	result = consumeOrganizationHRBody(t, consumer, "EXEC-EMPLOYEE-NO", "SYNC-EMPLOYEE-NO", "task_employee", start, end,
+		`{"success":true,"data":[{"psnidzjkid_ignore":"employee-b","jhcode":"EMP-001","name":"员工乙","isenable":1,"changeTime":"2026-08-12T10:40:00","sendpost":"[]"}]}`)
+	if result.Success() || result.ReasonCode() != string(hrsync.ReasonBusinessConflict) {
+		t.Fatalf("employee number conflict=%+v", result)
+	}
+	var employees int64
+	if err := db.Model(&model.OrgEmployee{}).Count(&employees).Error; err != nil || employees != 1 {
+		t.Fatalf("employee count=%d err=%v", employees, err)
+	}
+	assertOrganizationEmployeeDataNotLeaked(t, db)
+}
+
+func TestOrganizationHREmployeeConsumerRejectsMissingIdentitySendpostAndOversize(t *testing.T) {
+	service, db := newOrganizationHRSyncTestService(t)
+	contract, _ := hrsync.NewExplicitSourceContract(hrsync.OrganizationHRSourceSystemCode, time.UTC)
+	consumer := hrsync.NewEmployeeConsumer(service, contract)
+	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+
+	tests := []struct {
+		execution string
+		body      string
+		reason    hrsync.ReasonCode
+	}{
+		{"EXEC-EMPLOYEE-MISSING-ID", `{"success":true,"data":[{"jhcode":"EMP-001","name":"员工","isenable":1,"changeTime":"2026-08-12T10:10:00"}]}`, hrsync.ReasonSourceIDMissing},
+		{"EXEC-EMPLOYEE-MISSING-NO", `{"success":true,"data":[{"psnidzjkid_ignore":"employee-a","name":"员工","isenable":1,"changeTime":"2026-08-12T10:10:00"}]}`, hrsync.ReasonEnvelopeInvalid},
+		{"EXEC-EMPLOYEE-SENDPOST", `{"success":true,"data":[{"psnidzjkid_ignore":"employee-a","jhcode":"EMP-001","name":"员工","isenable":1,"changeTime":"2026-08-12T10:10:00","sendpost":"not-json"}]}`, hrsync.ReasonEnvelopeInvalid},
+	}
+	for _, test := range tests {
+		seedOrganizationHRSyncContext(t, db, test.execution, "SYNC-"+test.execution, "task_employee", hrsync.ConsumerCodeEmployee, 1)
+		result := consumeOrganizationHRBody(t, consumer, test.execution, "SYNC-"+test.execution, "task_employee", start, end, test.body)
+		if result.Success() || result.ReasonCode() != string(test.reason) {
+			t.Fatalf("execution=%s result=%+v", test.execution, result)
+		}
+	}
+
+	seedOrganizationHRSyncContext(t, db, "EXEC-EMPLOYEE-OVERSIZE", "SYNC-EMPLOYEE-OVERSIZE", "task_employee", hrsync.ConsumerCodeEmployee, 1)
+	body := []byte(strings.Repeat(" ", (16<<20)+1))
+	digest := sha256.Sum256(body)
+	request, err := integration.NewSyncConsumptionRequest(integration.SyncConsumptionRequestInput{
+		ExecutionNo: "EXEC-EMPLOYEE-OVERSIZE", SyncBatchNo: "SYNC-EMPLOYEE-OVERSIZE", TaskCode: "task_employee", TaskVersion: 1,
+		SliceNo: 1, WindowStart: &start, WindowEnd: &end, ContentType: "application/json", ResponseSize: int64(len(body)),
+		ResponseHash: hex.EncodeToString(digest[:]), Body: body,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := consumer.Consume(context.Background(), request)
+	if err != nil || result.Success() || result.ReasonCode() != string(hrsync.ReasonEnvelopeInvalid) {
+		t.Fatalf("oversize result=%+v err=%v", result, err)
+	}
+	var employees int64
+	if err := db.Model(&model.OrgEmployee{}).Count(&employees).Error; err != nil || employees != 0 {
+		t.Fatalf("invalid employees=%d err=%v", employees, err)
+	}
+}
+
 func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:org-hr-%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "-"))), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
+	if err := db.AutoMigrate(&model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgEmployee{}, &model.OrgAssignment{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	sf, err := utils.NewSnowflake(11)
@@ -323,6 +443,34 @@ func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService,
 	}
 	repository := impl.NewOrganizationHRSyncRepositoryImpl(&database.PrimaryDB{DB: db})
 	return NewOrganizationHRSyncService(repository, sf), db
+}
+
+func assertOrganizationEmployeeRecordAction(t *testing.T, db *gorm.DB, rawSourceID, action string) {
+	t.Helper()
+	key, err := hrsync.NewSourceKey(hrsync.OrganizationHRSourceSystemCode, hrsync.ObjectKindEmployee, rawSourceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var record model.OrgSyncRecord
+	if err := db.Where("object_type = ? AND source_id = ?", hrsync.ObjectKindEmployee, key.Digest()).First(&record).Error; err != nil || record.Action != action {
+		t.Fatalf("employee record=%+v action=%s err=%v", record, action, err)
+	}
+}
+
+func assertOrganizationEmployeeDataNotLeaked(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	var records []model.OrgSyncRecord
+	if err := db.Find(&records).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		serialized := fmt.Sprintf("%+v", record)
+		for _, forbidden := range []string{"员工甲", "employee@example.invalid", "secret"} {
+			if strings.Contains(serialized, forbidden) {
+				t.Fatalf("employee source fact leaked into record: %+v", record)
+			}
+		}
+	}
 }
 
 func organizationHRPositionUnit(id int, rawSourceID, code string) model.OrgUnit {

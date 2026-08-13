@@ -44,11 +44,13 @@ type PositionSyncInput struct {
 }
 
 type EmployeeSyncInput struct {
-	Key             SourceKey
-	EmployeeNo      string
-	Name            string
-	Status          CanonicalStatus
-	SourceChangedAt time.Time
+	Key              SourceKey
+	EmployeeNo       string
+	Name             string
+	Mobile           string
+	Email            string
+	EmploymentStatus string
+	SourceChangedAt  time.Time
 }
 
 type AssignmentSyncInput struct {

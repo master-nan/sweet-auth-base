@@ -289,6 +289,14 @@ func TestIntegrationSyncPostgreSQLPositionDeferredReplayE2E(t *testing.T) {
 	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "position_deferred_replay")
 }
 
+func TestIntegrationSyncPostgreSQLEmployeeConsumerRetryPartitionAndCheckpointE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "employee_success")
+}
+
+func TestIntegrationSyncPostgreSQLEmployeeBusinessFailureDoesNotRetryE2E(t *testing.T) {
+	runIntegrationSyncPostgreSQLTransportConsumerE2E(t, false, "employee_conflict")
+}
+
 func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondConsumer bool, organizationScenario string) {
 	t.Helper()
 	db := openSyncCoordinatorPostgreSQL(t)
@@ -296,10 +304,16 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	var organizationRepaired atomic.Bool
 	lowerBoundOnly := organizationScenario != ""
 	positionScenario := strings.HasPrefix(organizationScenario, "position_")
+	employeeScenario := strings.HasPrefix(organizationScenario, "employee_")
 	tlsServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		call := httpCalls.Add(1)
 		if lowerBoundOnly {
-			if request.URL.Path != "/employees" || request.URL.Query().Get("changed_since") == "" || request.URL.Query().Get("updated_from") != "" || request.URL.Query().Get("updated_to") != "" || len(request.URL.Query()) != 1 {
+			expectedParameters := 1
+			if employeeScenario {
+				expectedParameters = 2
+			}
+			if request.URL.Path != "/employees" || request.URL.Query().Get("changed_since") == "" || request.URL.Query().Get("updated_from") != "" || request.URL.Query().Get("updated_to") != "" || len(request.URL.Query()) != expectedParameters ||
+				(employeeScenario && request.URL.Query().Get("company_partition") != "approved-company-test") {
 				t.Errorf("unexpected lower-bound request: %s", request.URL.String())
 			}
 		} else if request.URL.Path != "/employees" || request.URL.Query().Get("updated_from") == "" || request.URL.Query().Get("updated_to") == "" {
@@ -343,6 +357,35 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 					data[0]["isenable"] = 0
 				}
 				body, _ := json.Marshal(map[string]any{"success": true, "data": data})
+				_, _ = writer.Write(body)
+				return
+			}
+			if employeeScenario {
+				status := 1
+				name := "员工测试"
+				email := any(nil)
+				if call > 2 {
+					status = 2
+					name = "员工测试更新"
+					email = "employee-e2e@example.invalid"
+				}
+				current := map[string]any{
+					"psnidzjkid_ignore": "employee-e2e", "jhcode": "EMP-E2E-001", "name": name,
+					"mobile": nil, "email": email, "isenable": status, "sendpost": "[]",
+					"changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05"),
+				}
+				duplicate := current
+				if organizationScenario == "employee_conflict" {
+					duplicate = make(map[string]any, len(current))
+					for key, value := range current {
+						duplicate[key] = value
+					}
+					duplicate["name"] = "同版本冲突"
+				}
+				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
+					current, duplicate,
+					{"psnidzjkid_ignore": fmt.Sprintf("employee-future-%d", lower.Unix()), "jhcode": fmt.Sprintf("EMP-FUTURE-%d", lower.Unix()), "name": "未来员工", "isenable": 1, "sendpost": "[]", "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				}})
 				_, _ = writer.Write(body)
 				return
 			}
@@ -405,6 +448,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		if positionScenario {
 			formalConsumer = hrsync.NewPositionConsumer(domain, contract)
 			consumerCode = hrsync.ConsumerCodePosition
+		} else if employeeScenario {
+			formalConsumer = hrsync.NewEmployeeConsumer(domain, contract)
+			consumerCode = hrsync.ConsumerCodeEmployee
 		}
 		consumer = integration.SyncResultConsumerFunc(func(ctx context.Context, request integration.SyncConsumptionRequest) (integration.SyncConsumptionResult, error) {
 			consumerCalled <- request
@@ -440,6 +486,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	parameters := []integration.InputParameterDefinition{{Code: "updated_from", Location: "query", DataType: "string", Required: true, MaxLength: 64}, {Code: "updated_to", Location: "query", DataType: "string", Required: true, MaxLength: 64}}
 	if lowerBoundOnly {
 		parameters = []integration.InputParameterDefinition{{Code: "changed_since", Location: "query", DataType: "string", Required: true, MaxLength: 64}}
+		if employeeScenario {
+			parameters = append(parameters, integration.InputParameterDefinition{Code: "company_partition", Location: "query", DataType: "string", Required: true, MaxLength: 64})
+		}
 	}
 	contract, _ := json.Marshal(integration.InterfaceInputContract{Version: 1, Parameters: parameters})
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: nextSyncTestID(), State: true}, ExternalSystemID: system.Id,
@@ -462,7 +511,11 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	inputPlan := integration.SyncExecutionInputPlan{Version: 1, StaticInput: integration.ExecutionInputValues{}, WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_from", Format: "rfc3339"}, WindowEndBinding: &integration.SyncWindowBinding{Location: "query", Code: "updated_to", Format: "rfc3339"}}
 	lookback := 0
 	if lowerBoundOnly {
-		inputPlan = integration.SyncExecutionInputPlan{Version: integration.SyncExecutionInputPlanVersionV2, WindowMode: integration.SyncWindowModeLowerBoundOnly, StaticInput: integration.ExecutionInputValues{}, WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "changed_since", Format: "rfc3339"}}
+		staticInput := integration.ExecutionInputValues{}
+		if employeeScenario {
+			staticInput.QueryParams = map[string][]string{"company_partition": {"approved-company-test"}}
+		}
+		inputPlan = integration.SyncExecutionInputPlan{Version: integration.SyncExecutionInputPlanVersionV2, WindowMode: integration.SyncWindowModeLowerBoundOnly, StaticInput: staticInput, WindowStartBinding: &integration.SyncWindowBinding{Location: "query", Code: "changed_since", Format: "rfc3339"}}
 		lookback = 600
 	}
 	plan, _ := json.Marshal(inputPlan)
@@ -535,7 +588,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	t.Cleanup(func() { _ = syncRunner.Stop(context.Background()); _ = worker.Stop(context.Background()) })
 	expectedBatchStatus := model.IntegrationSyncBatchStatusSucceeded
-	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" || organizationScenario == "position_deferred_replay" {
+	if failSecondConsumer || organizationScenario == "deferred_replay" || organizationScenario == "cycle" || organizationScenario == "position_deferred_replay" || organizationScenario == "employee_conflict" {
 		expectedBatchStatus = model.IntegrationSyncBatchStatusFailed
 	}
 	waitForPostgreSQLSyncBatchStatus(t, db, expectedBatchStatus, 20*time.Second)
@@ -615,6 +668,27 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		}
 		return
 	}
+	if organizationScenario == "employee_conflict" {
+		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonSourceIDConflict)
+		if err := syncRunner.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := worker.Stop(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		var failedExecution model.IntegrationExecution
+		if err := db.Order("id ASC").First(&failedExecution).Error; err != nil || failedExecution.Status != model.IntegrationExecutionStatusFailed || failedExecution.CurrentAttempt != 2 {
+			t.Fatalf("employee business failure execution=%+v err=%v", failedExecution, err)
+		}
+		var attempts, employees int64
+		if err := db.Model(&model.IntegrationLog{}).Where("execution_id = ?", failedExecution.Id).Count(&attempts).Error; err != nil || attempts != 2 {
+			t.Fatalf("employee business failure attempts=%d err=%v", attempts, err)
+		}
+		if err := db.Model(&model.OrgEmployee{}).Count(&employees).Error; err != nil || employees != 0 || httpCalls.Load() != 2 {
+			t.Fatalf("employee business failure employees=%d http=%d err=%v", employees, httpCalls.Load(), err)
+		}
+		return
+	}
 	if err := syncRunner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -672,6 +746,31 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		if futureCount != 0 || recordCount != 4 || batchCount != 2 {
 			t.Fatalf("position e2e filter: future=%d records=%d batches=%d", futureCount, recordCount, batchCount)
 		}
+	} else if employeeScenario {
+		var employees []model.OrgEmployee
+		if err := db.Find(&employees).Error; err != nil || len(employees) != 1 {
+			t.Fatalf("employee e2e rows=%+v err=%v", employees, err)
+		}
+		employee := employees[0]
+		if employee.EmployeeNo != "EMP-E2E-001" || employee.Name != "员工测试更新" || employee.Mobile != "" || employee.Email != "employee-e2e@example.invalid" || employee.EmploymentStatus != "suspended" || employee.UserId != nil || employee.PrimaryLegalEntityId != nil || employee.SourceDeleted {
+			t.Fatalf("employee e2e semantics=%+v", employee)
+		}
+		var futureCount, recordCount, batchCount, assignmentCount int64
+		if err := db.Model(&model.OrgEmployee{}).Where("source_id LIKE ?", "employee-future-%").Count(&futureCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncRecord{}).Count(&recordCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgSyncBatch{}).Count(&batchCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Model(&model.OrgAssignment{}).Count(&assignmentCount).Error; err != nil {
+			t.Fatal(err)
+		}
+		if futureCount != 0 || recordCount != 2 || batchCount != 2 || assignmentCount != 0 {
+			t.Fatalf("employee e2e filter: future=%d records=%d batches=%d assignments=%d", futureCount, recordCount, batchCount, assignmentCount)
+		}
 	} else if lowerBoundOnly {
 		var futureCount, recordCount, batchCount, unitCount int64
 		if err := db.Model(&model.OrgUnit{}).Where("code LIKE ?", "FUTURE-%").Count(&futureCount).Error; err != nil {
@@ -721,7 +820,7 @@ func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
+	if err := db.AutoMigrate(&model.ExternalSystem{}, &model.Credential{}, &model.RetryPolicy{}, &model.InterfaceDefinition{}, &model.IntegrationSyncTask{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.IntegrationLog{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgEmployee{}, &model.OrgAssignment{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, statement := range []string{

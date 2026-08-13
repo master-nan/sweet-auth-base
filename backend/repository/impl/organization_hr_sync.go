@@ -141,6 +141,26 @@ func (r *OrganizationHRSyncRepositoryImpl) UpdatePosition(tx *gorm.DB, id int, v
 	return updateOrganizationFields(tx, &model.OrgPosition{}, id, values, orgPositionSourceFields)
 }
 
+func (r *OrganizationHRSyncRepositoryImpl) FindEmployeeBySource(tx *gorm.DB, sourceSystem, sourceID string) (model.OrgEmployee, error) {
+	var value model.OrgEmployee
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("source_system_code = ? AND source_id = ?", sourceSystem, sourceID).First(&value).Error
+	return value, err
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) FindEmployeeByNumber(tx *gorm.DB, sourceSystem, employeeNo string) (model.OrgEmployee, error) {
+	var value model.OrgEmployee
+	err := tx.Where("source_system_code = ? AND employee_no = ?", sourceSystem, employeeNo).First(&value).Error
+	return value, err
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) CreateEmployee(tx *gorm.DB, value *model.OrgEmployee) error {
+	return tx.Create(value).Error
+}
+
+func (r *OrganizationHRSyncRepositoryImpl) UpdateEmployee(tx *gorm.DB, id int, values map[string]any) error {
+	return updateOrganizationFields(tx, &model.OrgEmployee{}, id, values, orgEmployeeSourceFields)
+}
+
 func (r *OrganizationHRSyncRepositoryImpl) FindStructureByCode(tx *gorm.DB, code string) (model.OrgStructure, error) {
 	var value model.OrgStructure
 	err := tx.Where("code = ?", code).First(&value).Error

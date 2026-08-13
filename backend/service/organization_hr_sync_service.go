@@ -151,6 +151,30 @@ func (s *OrganizationHRSyncService) SynchronizePositions(
 	return s.finishBusinessBatch(ctx, batch, outcomes)
 }
 
+func (s *OrganizationHRSyncService) SynchronizeEmployees(
+	ctx context.Context,
+	business hrsync.BusinessSyncContext,
+	inputs []hrsync.EmployeeSyncInput,
+	issues []hrsync.SourceIssue,
+) (hrsync.BusinessSyncSummary, error) {
+	inputs, issues = dedupeEmployeeInputs(inputs, issues)
+	batch, err := s.beginBusinessBatch(ctx, business, string(hrsync.ObjectKindEmployee), hrsync.ConsumerCodeEmployee)
+	if err != nil {
+		return hrsync.BusinessSyncSummary{}, err
+	}
+	outcomes := sourceIssueOutcomes(issues, hrsync.ObjectKindEmployee)
+	for start := 0; start < len(inputs); start += hrsync.OrganizationHREmployeeChunkSize {
+		end := min(start+hrsync.OrganizationHREmployeeChunkSize, len(inputs))
+		chunkOutcomes, chunkErr := s.upsertEmployeeChunk(ctx, batch, inputs[start:end])
+		if chunkErr != nil {
+			outcomes = append(outcomes, persistenceFailureOutcomes(inputs[start:end], hrsync.ObjectKindEmployee)...)
+			continue
+		}
+		outcomes = append(outcomes, chunkOutcomes...)
+	}
+	return s.finishBusinessBatch(ctx, batch, outcomes)
+}
+
 func organizationConsumerContract(kind hrsync.ObjectKind, structureType string) (string, string, error) {
 	switch {
 	case kind == hrsync.ObjectKindManagementCompany && structureType == model.OrgStructureTypeManagement:
@@ -423,7 +447,7 @@ func (s *OrganizationHRSyncService) upsertPosition(tx *gorm.DB, batch organizati
 		return outcome, findErr
 	}
 	if findErr == nil {
-		order, err := comparePositionSourceVersion(existing.SourceVersion, input.SourceChangedAt)
+		order, err := compareOrganizationSourceVersion(existing.SourceVersion, input.SourceChangedAt)
 		if err != nil {
 			return failedOutcome(input.Key, hrsync.ObjectKindPosition, hrsync.ReasonBusinessConflict), nil
 		}
@@ -469,7 +493,7 @@ func (s *OrganizationHRSyncService) upsertPosition(tx *gorm.DB, batch organizati
 	if existing.PositionType != "professional" || existing.IsManagerPosition {
 		return failedOutcome(input.Key, hrsync.ObjectKindPosition, hrsync.ReasonSourceIDConflict), nil
 	}
-	order, _ := comparePositionSourceVersion(existing.SourceVersion, input.SourceChangedAt)
+	order, _ := compareOrganizationSourceVersion(existing.SourceVersion, input.SourceChangedAt)
 	equal := positionFactsEqual(existing, input, unit.Id)
 	if order == 0 && !equal {
 		return failedOutcome(input.Key, hrsync.ObjectKindPosition, hrsync.ReasonSourceIDConflict), nil
@@ -502,6 +526,104 @@ func (s *OrganizationHRSyncService) resolvePositionOrgUnit(tx *gorm.DB, input hr
 		return model.OrgUnit{}, &missing
 	}
 	return unit, nil
+}
+
+func (s *OrganizationHRSyncService) upsertEmployeeChunk(
+	ctx context.Context,
+	batch organizationBusinessBatch,
+	inputs []hrsync.EmployeeSyncInput,
+) ([]organizationSyncOutcome, error) {
+	outcomes := make([]organizationSyncOutcome, 0, len(inputs))
+	err := RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		for _, input := range inputs {
+			outcome, err := s.upsertEmployee(tx, batch, input)
+			if err != nil {
+				return err
+			}
+			outcomes = append(outcomes, outcome)
+			if err := s.upsertSyncRecord(tx, batch.value, outcome); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return outcomes, err
+}
+
+func (s *OrganizationHRSyncService) upsertEmployee(tx *gorm.DB, batch organizationBusinessBatch, input hrsync.EmployeeSyncInput) (organizationSyncOutcome, error) {
+	outcome := successOutcome(input.Key, hrsync.ObjectKindEmployee)
+	identity := input.Key.PersistenceID()
+	if err := s.repository.LockSourceIdentity(tx, input.Key.SourceSystemCode()+"|employee|"+identity); err != nil {
+		return outcome, err
+	}
+	existing, findErr := s.repository.FindEmployeeBySource(tx, input.Key.SourceSystemCode(), identity)
+	if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return outcome, findErr
+	}
+	if findErr == nil {
+		order, err := compareOrganizationSourceVersion(existing.SourceVersion, input.SourceChangedAt)
+		if err != nil {
+			return failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonBusinessConflict), nil
+		}
+		if order < 0 {
+			outcome.localID, outcome.action = &existing.Id, model.OrgSyncRecordActionNoop
+			return outcome, nil
+		}
+		equal := employeeFactsEqual(existing, input)
+		if order == 0 {
+			if !equal {
+				return failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonSourceIDConflict), nil
+			}
+			outcome.localID, outcome.action = &existing.Id, model.OrgSyncRecordActionNoop
+			return outcome, nil
+		}
+	}
+
+	if err := s.repository.LockSourceIdentity(tx, input.Key.SourceSystemCode()+"|employee_no|"+input.EmployeeNo); err != nil {
+		return outcome, err
+	}
+	byNumber, numberErr := s.repository.FindEmployeeByNumber(tx, input.Key.SourceSystemCode(), input.EmployeeNo)
+	if numberErr == nil && (findErr != nil || byNumber.Id != existing.Id) {
+		return failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonBusinessConflict), nil
+	}
+	if numberErr != nil && !errors.Is(numberErr, gorm.ErrRecordNotFound) {
+		return outcome, numberErr
+	}
+
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		id, err := s.nextID()
+		if err != nil {
+			return outcome, err
+		}
+		value := model.OrgEmployee{
+			Basic: model.Basic{Id: id, State: true}, SourceSystemCode: input.Key.SourceSystemCode(), SourceId: identity,
+			EmployeeNo: input.EmployeeNo, Name: input.Name, Mobile: input.Mobile, Email: input.Email,
+			EmploymentStatus: input.EmploymentStatus, SourceVersion: input.SourceChangedAt.Format(time.RFC3339Nano),
+			SourceUpdatedAt: organizationHRTimePointer(input.SourceChangedAt), LastSyncAt: &batch.now,
+			SourceDeleted: false, SyncStatus: "synced",
+		}
+		if err := s.repository.CreateEmployee(tx, &value); err != nil {
+			return outcome, err
+		}
+		outcome.localID, outcome.action = &value.Id, model.OrgSyncRecordActionCreate
+		return outcome, nil
+	}
+
+	equal := employeeFactsEqual(existing, input)
+	if err := s.repository.UpdateEmployee(tx, existing.Id, map[string]any{
+		"source_code": "", "employee_no": input.EmployeeNo, "name": input.Name, "mobile": input.Mobile, "email": input.Email,
+		"employment_status": input.EmploymentStatus, "source_version": input.SourceChangedAt.Format(time.RFC3339Nano),
+		"source_updated_at": input.SourceChangedAt, "last_sync_at": batch.now, "source_deleted": false, "sync_status": "synced",
+	}); err != nil {
+		return outcome, err
+	}
+	outcome.localID = &existing.Id
+	if equal {
+		outcome.action = model.OrgSyncRecordActionNoop
+	} else {
+		outcome.action = model.OrgSyncRecordActionUpdate
+	}
+	return outcome, nil
 }
 
 func (s *OrganizationHRSyncService) ensureStructureNodePlaceholder(tx *gorm.DB, structure model.OrgStructure, input hrsync.OrgUnitSyncInput, unit model.OrgUnit) error {
@@ -1139,6 +1261,41 @@ func dedupePositionInputs(inputs []hrsync.PositionSyncInput, issues []hrsync.Sou
 	return result, issues
 }
 
+func dedupeEmployeeInputs(inputs []hrsync.EmployeeSyncInput, issues []hrsync.SourceIssue) ([]hrsync.EmployeeSyncInput, []hrsync.SourceIssue) {
+	seen := make(map[string]hrsync.EmployeeSyncInput, len(inputs))
+	blocked := make(map[string]bool)
+	order := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		identity := input.Key.PersistenceID()
+		if blocked[identity] {
+			continue
+		}
+		existing, ok := seen[identity]
+		if !ok {
+			seen[identity] = input
+			order = append(order, identity)
+			continue
+		}
+		switch {
+		case input.SourceChangedAt.After(existing.SourceChangedAt):
+			seen[identity] = input
+		case input.SourceChangedAt.Before(existing.SourceChangedAt):
+			continue
+		case !reflect.DeepEqual(existing, input):
+			issues = append(issues, sourceConflictIssue(input.Key, hrsync.ObjectKindEmployee))
+			delete(seen, identity)
+			blocked[identity] = true
+		}
+	}
+	result := make([]hrsync.EmployeeSyncInput, 0, len(seen))
+	for _, identity := range order {
+		if input, ok := seen[identity]; ok {
+			result = append(result, input)
+		}
+	}
+	return result, issues
+}
+
 func sourceConflictIssue(key hrsync.SourceKey, kind hrsync.ObjectKind) hrsync.SourceIssue {
 	return hrsync.SourceIssue{ObjectKind: kind, SourceIDSummary: key.Digest(), ReasonCode: hrsync.ReasonSourceIDConflict, Action: model.OrgSyncRecordActionError}
 }
@@ -1167,7 +1324,7 @@ func sourceIssueOutcomes(issues []hrsync.SourceIssue, defaultKind hrsync.ObjectK
 	return result
 }
 
-func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSyncInput | hrsync.PositionSyncInput](inputs []T, kind hrsync.ObjectKind) []organizationSyncOutcome {
+func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSyncInput | hrsync.PositionSyncInput | hrsync.EmployeeSyncInput](inputs []T, kind hrsync.ObjectKind) []organizationSyncOutcome {
 	result := make([]organizationSyncOutcome, 0, len(inputs))
 	for _, input := range inputs {
 		var key hrsync.SourceKey
@@ -1177,6 +1334,8 @@ func persistenceFailureOutcomes[T hrsync.LegalEntitySyncInput | hrsync.OrgUnitSy
 		case hrsync.OrgUnitSyncInput:
 			key = typed.Key
 		case hrsync.PositionSyncInput:
+			key = typed.Key
+		case hrsync.EmployeeSyncInput:
 			key = typed.Key
 		}
 		result = append(result, failedOutcome(key, kind, hrsync.ReasonPersistenceFailed))
@@ -1279,9 +1438,14 @@ func positionFactsEqual(existing model.OrgPosition, input hrsync.PositionSyncInp
 		existing.Status == string(input.Status) && !existing.SourceDeleted
 }
 
-// comparePositionSourceVersion compares the incoming source fact with the persisted RFC3339Nano version.
+func employeeFactsEqual(existing model.OrgEmployee, input hrsync.EmployeeSyncInput) bool {
+	return existing.EmployeeNo == input.EmployeeNo && existing.Name == input.Name && existing.Mobile == input.Mobile &&
+		existing.Email == input.Email && existing.EmploymentStatus == input.EmploymentStatus && !existing.SourceDeleted
+}
+
+// compareOrganizationSourceVersion compares the incoming source fact with the persisted RFC3339Nano version.
 // It returns -1 for stale input, 0 for the same source instant, and 1 for a newer input.
-func comparePositionSourceVersion(existing string, incoming time.Time) (int, error) {
+func compareOrganizationSourceVersion(existing string, incoming time.Time) (int, error) {
 	existing = strings.TrimSpace(existing)
 	if existing == "" {
 		return 1, nil

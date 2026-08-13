@@ -66,10 +66,24 @@ func (n Normalizer) NormalizePositionSource(source HRPositionSourceDTO) (Positio
 
 func (n Normalizer) NormalizeEmployeeSource(source HREmployeeSourceDTO) (EmployeeSyncInput, error) {
 	key, changedAt, status, err := n.common(ObjectKindEmployee, source.SourceID, source.ChangeTime, source.Enabled)
-	if err != nil || strings.TrimSpace(source.EmployeeNo) == "" || strings.TrimSpace(source.Name) == "" {
+	employeeNo := strings.TrimSpace(source.EmployeeNo)
+	name := strings.TrimSpace(source.Name)
+	mobile := strings.TrimSpace(source.Mobile)
+	email := strings.TrimSpace(source.Email)
+	if err != nil || employeeNo == "" || name == "" {
 		return EmployeeSyncInput{}, normalizeRequiredError(err)
 	}
-	return EmployeeSyncInput{Key: key, EmployeeNo: strings.TrimSpace(source.EmployeeNo), Name: strings.TrimSpace(source.Name), Status: status, SourceChangedAt: changedAt}, nil
+	if len(employeeNo) > 128 || len(name) > 128 || len(mobile) > 64 || len(email) > 128 {
+		return EmployeeSyncInput{}, ErrSourceKeyInvalid
+	}
+	employmentStatus := "suspended"
+	if status == CanonicalStatusEnabled {
+		employmentStatus = "active"
+	}
+	return EmployeeSyncInput{
+		Key: key, EmployeeNo: employeeNo, Name: name, Mobile: mobile, Email: email,
+		EmploymentStatus: employmentStatus, SourceChangedAt: changedAt,
+	}, nil
 }
 
 func (n Normalizer) NormalizeAssignmentSource(HRAssignmentSourceDTO) (AssignmentSyncInput, error) {

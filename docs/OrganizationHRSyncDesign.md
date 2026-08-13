@@ -640,3 +640,21 @@ INT-006D 增加静态 `org.hr.position` v1 Consumer，保持 `HRPositionSourceDT
 每个 Position Slice Execution 仍只对应一个 OrgSyncBatch。Record 只保存 `object_type=position`、Source ID 摘要、目标岗位 ID、`create|update|disable|noop|error|deferred`、状态、Reason Code 和脱敏依赖摘要；不保存岗位 DTO、Body、Header、Credential、Attempt 或 Retry。future-of-logical-window 岗位不落库、不写当前 Slice 成功记录；任何关键记录失败都由 Runtime 收敛为 confirmed `business_processing_failed`，不会进入自动 Retry。
 
 PostgreSQL 16 的 Runner/TLS E2E 覆盖：首次 503 后技术 Retry 成功、同名岗位跨组织独立创建、Lookback 重放不重复、后一 Slice 停用、future 过滤和 Checkpoint 推进；另一路覆盖缺组织导致业务失败、Checkpoint 保持、无额外 Retry，以及补齐组织后自动重放成功。INT-006D 不关闭 BIP ID 永久稳定/不可复用、changeTime 权威性/时区/精度/同秒完整性、岗位编码命名空间、员工编号、主任职、`sendpost`、兼职 ID、开放任职日期、人员大响应或物理删除表达 Gate。
+
+## 30. INT-006E 员工实体 Consumer 实现
+
+INT-006E 增加静态 `org.hr.employee` v1 Consumer，保持 `HREmployeeSourceDTO -> NormalizeEmployeeSource -> EmployeeSyncInput -> OrganizationHRSyncService` 边界。员工身份只使用 `SourceKey(hr_source, employee, psnidzjkid_ignore)`；`jhcode`、姓名、手机、邮箱、`esncode`、NCID、`psnid` 和数组位置都不参与身份回退。生产装配登记固定 code/version，但在 BIP ID、changeTime、员工编号和响应量 Gate 关闭前保持 `disabled`，不能被 SyncTask 选择或 Runtime Resolve。
+
+`jhcode` 仅作为最长 128 字符且非空的 `employee_no` 候选。现有模型要求 `(source_system_code, employee_no)` 唯一；不同 SourceKey 使用同一编号时返回 `org_sync_business_conflict`，不查找后覆盖、不使用联系方式补值，也不拼公司、部门或随机后缀。员工编号生命周期仍未获得权威证据，因此该实现不能据此启用生产 Task。
+
+V1 只保存姓名、可空手机、可空邮箱、雇佣状态和源时间。普通人员 `isenable=1` 映射 `active`，`0/2` 映射 `suspended`；不会映射 `resigned`，不会写员工或任职有效期。人员顶层公司、部门、岗位和 `sendpost` 不进入 canonical input，不创建 `org_assignment`、不设置 `primary_legal_entity_id`、不推断主任职。更新只使用 Organization 来源字段白名单，已有 `user_id`、本地备注和标签保持不变；Consumer 不创建、绑定或停用 `SysUser`。
+
+陈旧写保护持久化 `source_version=SourceChangedAt.UTC().Format(RFC3339Nano)` 和 `source_updated_at`。旧版本返回 `noop`；同一源时间且受保护事实相同返回 `noop`；同一源时间但员工编号、姓名、联系方式或雇佣状态不同返回 `org_sync_source_id_conflict`。同一 Body 的重复 SourceKey 先按源时间收敛，时间相同但事实不同则整片失败，不依赖到达顺序、数据库时间或 Batch 顺序。
+
+员工 Consumer 的业务响应上限为 16 MiB，低于 Runtime 64 MiB 绝对上限；InterfaceDefinition 仍可配置更低限制。源 Envelope 使用流式 Decoder 逐条转成精简 canonical input，不把完整源 DTO 数组持久化；领域写入每个短事务最多 200 人。`sendpost` 本阶段只做边界防御：原始字符串最多 256 KiB、JSON 数组最多 100 项且每项必须是对象；不会解析任职 ID、日期、部门或岗位，也不会改变员工成功语义。超限或结构非法以 `org_sync_envelope_invalid` 使 Consumer 失败，不写 Payload、Response Artifact 或临时文件，也不提高 Transport 上限。
+
+每个 Employee Slice Execution 对应一个 `OrgSyncBatch`。`OrgSyncRecord` 只保存 `object_type=employee`、不可逆 Source 摘要、目标员工 ID、动作、状态和稳定 Reason Code；不保存姓名、手机、邮箱、`sendpost`、Body、Header、Credential、Attempt 或 Retry。future-of-logical-window 人员不落库、不写当前 Slice 成功 Record；Lookback 和重复 Consume 依靠 SourceKey、源版本、业务 Batch/Record 唯一约束收敛。任何关键员工失败都由 Runtime 收敛为 confirmed `business_processing_failed`，不得进入自动 Retry，Checkpoint 仅在整片业务成功后推进到 `logical_window_end`。
+
+PostgreSQL 16 的 SyncRunner + WorkerRunner + TLS E2E 覆盖：首轮 HTTP 503 由 Integration Retry 后成功、固定测试公司分区 static input 注入、两片连续消费、空联系方式、重复人员幂等、后片更新为 suspended、future 过滤和 Checkpoint 推进；另一路覆盖同源同时间事实冲突导致业务失败、Checkpoint 保持且 Consumer 失败不产生额外 Retry。测试分区值只属于显式 Test SourceContract。生产公司分区 ID 完整清单和命名空间尚未确认，因此没有建立可供生产选择的任意值入口或动态 Fan-out；生产 Consumer 继续 disabled。
+
+INT-006E 不关闭 BIP ID 永久稳定/不可复用、changeTime 权威性/时区/精度/同秒完整性、员工编号生命周期、公司分区清单、主任职及其稳定 assignment ID、`sendpost` 权威性、兼职 ID 体系、开放任职日期、人员大响应生产策略、物理删除表达或离职/再入职完整规则。进入 INT-006F 只能实现经权威材料确认的任职和离职范围，不能依据本次员工实体同步推断这些语义。
