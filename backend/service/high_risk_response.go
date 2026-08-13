@@ -4,9 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
-	"context"
 	"encoding/json"
-	"mime/multipart"
 )
 
 func basicResponse(data model.Basic) response.BasicRes {
@@ -25,39 +23,6 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func fileDetailResponse(data model.File) response.FileDetailRes {
-	return response.FileDetailRes{
-		BasicRes: basicResponse(data.Basic),
-		FileName: data.FileName,
-		FileType: data.FileType,
-		FileUrl:  data.FileUrl,
-		FileSize: data.FileSize,
-		FileExt:  data.FileExt,
-		FileUuid: data.FileUuid,
-	}
-}
-
-func (f *FileService) UploadResponse(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (response.FileDetailRes, error) {
-	data, err := f.Upload(ctx, actor, fileHeader)
-	if err != nil {
-		return response.FileDetailRes{}, err
-	}
-	return fileDetailResponse(data), nil
-}
-
-func (f *FileService) MergeChunksResponse(ctx context.Context, actor FileAccessActor, uploadId string) (response.FileDetailRes, error) {
-	data, err := f.MergeChunks(ctx, actor, uploadId)
-	if err != nil {
-		return response.FileDetailRes{}, err
-	}
-	return fileDetailResponse(data), nil
-}
-
-// FileDetailResponse 用于 Controller 完成访问校验后组装文件白名单响应。
-func (f *FileService) FileDetailResponse(data model.File) response.FileDetailRes {
-	return fileDetailResponse(data)
 }
 
 func reportDefinitionListResponse(data model.ReportDefinition) response.ReportDefinitionListRes {

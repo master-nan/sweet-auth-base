@@ -10,3 +10,8 @@ type FileDetailRes struct {
 	FileExt  string `json:"file_ext"`
 	FileUuid string `json:"file_uuid"`
 }
+
+type FileAccessURLRes struct {
+	URL       string `json:"url"`
+	ExpiresAt int64  `json:"expires_at"`
+}

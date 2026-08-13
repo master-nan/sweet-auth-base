@@ -273,7 +273,7 @@ Content-Type: text/csv; charset=utf-8
 
 ### 3. Content-Disposition
 
-建议复用 `controller/file_controller.go` 中同 package 的 `contentDisposition`：
+建议复用 `controller/content_disposition.go` 中同 package 的 `contentDisposition`：
 
 ```go
 contentDisposition("attachment", fileName)

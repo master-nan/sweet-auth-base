@@ -108,7 +108,7 @@ func TestUploadAllowListCanBeConfigured(t *testing.T) {
 }
 
 func TestFileAccessURLUsesConfiguredPublicBase(t *testing.T) {
-	svc := &FileService{config: &config.Server{}}
+	svc := &FileUploadService{config: &config.Server{}}
 	svc.config.Upload.BaseURL = "/sweet_admin/files/"
 
 	if got := svc.fileAccessURL("file-uuid"); got != "/sweet_admin/files/file-uuid" {

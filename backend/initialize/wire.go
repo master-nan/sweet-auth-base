@@ -55,7 +55,9 @@ type App struct {
 	ReportController               *controller.ReportController
 	OrgController                  *controller.OrgController
 	SmsController                  *controller.SmsController
-	FileController                 *controller.FileController
+	FileUploadController           *controller.FileUploadController
+	FileMetadataController         *controller.FileMetadataController
+	FileAccessController           *controller.FileAccessController
 	AuthApi                        *api.AuthApi
 	AuthService                    *service.AuthApplicationService
 	SysUserApi                     *api.SysUserApi
@@ -274,7 +276,9 @@ var ServiceProvider = wire.NewSet(
 	integration.NewCredentialProvider,
 	service.NewDingTalkService,
 	service.NewSmsService,
-	service.NewFileService,
+	service.NewFileUploadService,
+	service.NewFileAccessService,
+	service.NewFileMetadataService,
 )
 
 // Controller 提供者
@@ -297,7 +301,10 @@ var ControllerProvider = wire.NewSet(
 	controller.NewOrgController,
 	controller.NewApplicationController,
 	controller.NewSmsController,
-	controller.NewFileController,
+	controller.NewFileBusinessAccessAdapter,
+	controller.NewFileUploadController,
+	controller.NewFileMetadataController,
+	controller.NewFileAccessController,
 )
 
 // API 提供者

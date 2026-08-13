@@ -21,12 +21,12 @@ type File struct {
 // FileChunk 分片上传记录
 type FileChunk struct {
 	Basic
-	UploadId   string `gorm:"size:128;index;comment:上传ID" json:"upload_id"`
+	UploadId   string `gorm:"size:128;index;uniqueIndex:uk_file_chunk_upload_index,priority:1;comment:上传ID" json:"upload_id"`
 	FileName   string `gorm:"size:128;comment:原始文件名" json:"file_name"`
 	FileSize   int64  `gorm:"comment:文件总大小" json:"file_size"`
 	ChunkSize  int64  `gorm:"comment:分片大小" json:"chunk_size"`
 	ChunkCount int    `gorm:"comment:总分片数" json:"chunk_count"`
-	ChunkIndex int    `gorm:"comment:当前分片索引(从0开始)" json:"chunk_index"`
+	ChunkIndex int    `gorm:"uniqueIndex:uk_file_chunk_upload_index,priority:2;comment:当前分片索引(从0开始)" json:"chunk_index"`
 	ChunkMd5   string `gorm:"size:128;comment:分片MD5" json:"chunk_md5"`
 	ChunkPath  string `gorm:"size:512;comment:分片存储路径" json:"chunk_path"`
 	FileMd5    string `gorm:"size:128;comment:完整文件MD5" json:"file_md5"`

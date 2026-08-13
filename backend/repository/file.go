@@ -8,21 +8,23 @@ package repository
 import (
 	"backend/model"
 	"context"
+
+	"gorm.io/gorm"
 )
 
 type FileRepository interface {
 	BasicRepository[model.File]
-	FindByFileUuid(uuid string) (model.File, error)
-	FindByFileMd5(md5 string) (model.File, error)
-	DeleteFile(ctx context.Context, file model.File) error
+	FindByFileUuid(ctx context.Context, uuid string) (model.File, error)
+	FindByFileMd5(ctx context.Context, md5 string) (model.File, error)
+	DeleteFile(tx *gorm.DB, file model.File) error
 }
 
 type FileChunkRepository interface {
 	BasicRepository[model.FileChunk]
-	FindByUploadId(uploadId string) ([]model.FileChunk, error)
-	FindByUploadIdAndIndex(uploadId string, index int) (model.FileChunk, error)
-	CountUploadedChunks(uploadId string) (int64, error)
-	GetFirstChunk(uploadId string) (model.FileChunk, error)
-	FindUnfinishedUpload(fileMd5 string, fileSize int64, fileName string) (model.FileChunk, error)
-	MarkUploadMerged(uploadId string) error
+	FindByUploadId(ctx context.Context, uploadId string) ([]model.FileChunk, error)
+	FindByUploadIdAndIndex(ctx context.Context, uploadId string, index int) (model.FileChunk, error)
+	CountUploadedChunks(ctx context.Context, uploadId string) (int64, error)
+	GetFirstChunk(ctx context.Context, uploadId string) (model.FileChunk, error)
+	FindUnfinishedUpload(ctx context.Context, fileMd5 string, fileSize int64, fileName string, actorID int, allowAll bool) (model.FileChunk, error)
+	MarkUploadMerged(ctx context.Context, uploadId, fileMd5 string) error
 }

@@ -130,8 +130,10 @@ export const useFileApi = () => {
 
   // ─── 基础操作 ───
 
-  const getFileById = (id: number) => {
-    return instance.get<ResponseData<FileInfo>>(`/admin/file/${id}`).then((res) => res.data)
+  const getFileById = (id: number, context?: FileBusinessContext) => {
+    return instance
+      .get<ResponseData<FileInfo>>(`/admin/file/${id}`, { params: context || {} })
+      .then((res) => res.data)
   }
 
   const deleteFile = (id: number) => {

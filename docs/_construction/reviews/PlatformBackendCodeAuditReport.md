@@ -67,7 +67,7 @@
 
 1. [basic_controller.go](../../../backend/controller/basic_controller.go#L58) 的后台登录方法直接编排验证码、登录锁定、密码校验、Token、密码修改要求、登录日志和最后登录时间，已超出传输层职责。
 2. [auth_api.go](../../../backend/api/auth_api.go#L240) 另有一套登录与 Token 编排，和后台登录的安全策略不一致。
-3. [file_controller.go](../../../backend/controller/file_controller.go#L35) 同时负责文件业务上下文解析、权限校验、签名 URL、MIME 安全策略、文件引用扫描和流式输出，786 行的 Controller 已形成独立业务子系统。
+3. 历史 `controller/file_controller.go` 同时负责文件业务上下文解析、权限校验、签名 URL、MIME 安全策略、文件引用扫描和流式输出，786 行的 Controller 已形成独立业务子系统；AF-003 后已拆分为 [file_access_controller.go](../../../backend/controller/file_access_controller.go) 等能力 Controller。
 
 建议保留 Controller 的 HTTP 适配职责，将认证策略和文件访问能力下沉为聚焦的应用 Service；不要将这些逻辑转移到 Repository。
 
@@ -201,7 +201,7 @@ flowchart LR
 - `repository/util/query.go` 的 `applyRule`：动态字段、操作符和值类型组合多，是查询安全敏感点。
 - `service/org_service.go` 的 `buildStructureOrgTree`：树装配和异常分支多。
 - `service/sys_table_service.go` 的 `SyncViewTableFields`、`CreateTable`、`UpdateTableField`：元数据和真实 Schema 一致性复杂。
-- `service/file_service.go` 的 `MergeChunks`：文件 I/O、校验和状态组合较多。
+- [file_upload_service.go](../../../backend/service/file_upload_service.go) 的 `MergeChunks`：文件 I/O、校验和状态组合较多。
 - `middleware/log.go` 的 `classifyAccessAudit`：路由分类分支持续增长。
 
 上述复杂度是启发式结果，不等同于正式圈复杂度。整改顺序应是先固定行为测试，再抽取命名步骤；不建议直接重写核心算法。
@@ -346,7 +346,7 @@ Gin Context 与请求生命周期绑定，不保证请求结束后继续安全�
 
 ### 10.3 P0：文件签名能力未绑定访问用途
 
-[signedFileAccessClaims](../../../backend/controller/file_controller.go#L50) 只签名文件 UUID 和过期时间；预览与下载通过不同 URL 路径区分，但 [signedAccess](../../../backend/controller/file_controller.go#L433) 不校验 Token 的用途。因而预览 Token 可以替换路径后用于下载，反之亦然。
+历史 `signedFileAccessClaims` 只签名文件 UUID 和过期时间，且签名访问未校验 Token 用途；该问题现已在 [file_access_service.go](../../../backend/service/file_access_service.go) 中通过 purpose 绑定和严格验证关闭。
 
 若预览与下载是不同权限或审计动作，这会破坏能力边界。建议把 `action/purpose` 纳入签名 Claims，并在端点验证；若产品明确认为二者权限完全相同，应合并为一个已文档化的文件读取能力，避免伪装成两个独立权限。
 
@@ -367,7 +367,7 @@ Gin Context 与请求生命周期绑定，不保证请求结束后继续安全�
 | P1-01 | Model/Repository 依赖 Gin | `model/basic.go`、`repository/basic.go` | 后台任务和测试难复用，层次反向耦合 | 引入标准审计 Context，逐步移除 Gin 类型 |
 | P1-02 | API 直接返回完整 Model | Role、Menu、Dict、Table、Report、File Controller | 数据库字段变化自动扩大外部契约 | 按模块建立列表/详情白名单 DTO |
 | P1-03 | 事务入口并存 | BasicRepository、Service transaction、直接 GORM | 行为、嵌套与 panic 处理不一致 | 新代码统一 Service 基线，按领域渐进迁移 |
-| P1-04 | FileController 职责过重 | `controller/file_controller.go` | 权限、签名、MIME 和流式响应难独立测试 | 抽 FileAccessService，保留 Controller 适配 |
+| P1-04 | FileController 职责过重 | 历史单体 FileController | 权限、签名、MIME 和流式响应难独立测试 | 抽 FileAccessService，保留 Controller 适配 |
 | P1-05 | Report/SysTable Service 过大 | `report_service.go`、`sys_table_service.go` | 修改影响面大，扩展冲突高 | 拆内部协作者，保留稳定领域门面 |
 | P1-06 | 动态查询核心分支复杂 | `repository/util/query.go` | 权限与查询条件回归风险高 | 先补矩阵/属性测试，再拆解析和执行步骤 |
 | P1-07 | 审计分类集中在 Middleware | `middleware/log.go` | 新业务不断增加分支 | 抽声明式分类器和脱敏策略 |

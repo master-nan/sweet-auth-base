@@ -109,7 +109,7 @@ async function loadFiles() {
       ids.map(async (id) => {
         const cached = fileInfoCache.get(id)
         if (cached) return cached
-        const response = await fileApi.getFileById(id)
+        const response = await fileApi.getFileById(id, fileBusinessContext.value)
         if (response.success && response.data) {
           fileInfoCache.set(id, response.data)
         }

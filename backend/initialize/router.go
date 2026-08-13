@@ -69,9 +69,9 @@ func InitRouter(app *App) *gin.Engine {
 		adminBaseGroup.POST("/logout", app.BasicController.Logout)
 
 	}
-	routerGroup.GET("/files/access/preview/:uuid", app.FileController.SignedPreview)
-	routerGroup.GET("/files/access/download/:uuid", app.FileController.SignedDownload)
-	routerGroup.GET("/files/:uuid", app.FileController.PublicPreview)
+	routerGroup.GET("/files/access/preview/:uuid", app.FileAccessController.SignedPreview)
+	routerGroup.GET("/files/access/download/:uuid", app.FileAccessController.SignedDownload)
+	routerGroup.GET("/files/:uuid", app.FileAccessController.PublicPreview)
 	// 后台验证路由
 	adminGroup := routerGroup.Group("/admin")
 	adminGroup.Use(middleware.AuthHandler(app.AuthService))
@@ -373,19 +373,19 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/report/:id/preview", app.ReportController.PreviewReport)
 
 		// 文件
-		adminGroup.POST("/file/upload", app.FileController.Upload)
-		adminGroup.GET("/file/:id", app.FileController.GetFileById)
-		adminGroup.DELETE("/file/:id", app.FileController.DeleteFileById)
-		adminGroup.GET("/file/preview-url/:uuid", app.FileController.GetFilePreviewAccessURL)
-		adminGroup.GET("/file/download-url/:uuid", app.FileController.GetFileDownloadAccessURL)
-		adminGroup.GET("/file/preview/:uuid", app.FileController.Preview)
-		adminGroup.GET("/file/download/:uuid", app.FileController.Download)
+		adminGroup.POST("/file/upload", app.FileUploadController.Upload)
+		adminGroup.GET("/file/:id", app.FileMetadataController.GetFileById)
+		adminGroup.DELETE("/file/:id", app.FileMetadataController.DeleteFileById)
+		adminGroup.GET("/file/preview-url/:uuid", app.FileAccessController.GetFilePreviewAccessURL)
+		adminGroup.GET("/file/download-url/:uuid", app.FileAccessController.GetFileDownloadAccessURL)
+		adminGroup.GET("/file/preview/:uuid", app.FileAccessController.Preview)
+		adminGroup.GET("/file/download/:uuid", app.FileAccessController.Download)
 
 		// 文件分片上传
-		adminGroup.POST("/file/upload/init", app.FileController.InitChunkUpload)
-		adminGroup.POST("/file/upload/chunk", app.FileController.UploadChunk)
-		adminGroup.POST("/file/upload/merge/:upload_id", app.FileController.MergeChunks)
-		adminGroup.GET("/file/upload/progress/:upload_id", app.FileController.GetUploadProgress)
+		adminGroup.POST("/file/upload/init", app.FileUploadController.InitChunkUpload)
+		adminGroup.POST("/file/upload/chunk", app.FileUploadController.UploadChunk)
+		adminGroup.POST("/file/upload/merge/:upload_id", app.FileUploadController.MergeChunks)
+		adminGroup.GET("/file/upload/progress/:upload_id", app.FileUploadController.GetUploadProgress)
 
 	}
 	return router

@@ -27,28 +27,26 @@ func NewFileRepositoryImpl(primaryDB *database.PrimaryDB) *FileRepositoryImpl {
 	}
 }
 
-func (f *FileRepositoryImpl) FindByFileUuid(uuid string) (model.File, error) {
+func (f *FileRepositoryImpl) FindByFileUuid(ctx context.Context, uuid string) (model.File, error) {
 	var file model.File
-	err := f.db.Where("file_uuid = ?", uuid).First(&file).Error
+	err := f.db.WithContext(ctx).Where("file_uuid = ?", uuid).First(&file).Error
 	return file, err
 }
 
-func (f *FileRepositoryImpl) FindByFileMd5(md5 string) (model.File, error) {
+func (f *FileRepositoryImpl) FindByFileMd5(ctx context.Context, md5 string) (model.File, error) {
 	var file model.File
-	err := f.db.Where("file_md5 = ?", md5).First(&file).Error
+	err := f.db.WithContext(ctx).Where("file_md5 = ?", md5).First(&file).Error
 	return file, err
 }
 
-func (f *FileRepositoryImpl) DeleteFile(ctx context.Context, file model.File) error {
-	return f.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		if err := f.Update(tx, map[string]interface{}{
-			"file_md5":  deletedFileUniqueValue(file.FileMd5, file.Id),
-			"file_uuid": deletedFileUniqueValue(file.FileUuid, file.Id),
-		}, file.Id); err != nil {
-			return err
-		}
-		return f.DeleteById(tx, file.Id)
-	})
+func (f *FileRepositoryImpl) DeleteFile(tx *gorm.DB, file model.File) error {
+	if err := f.Update(tx, map[string]interface{}{
+		"file_md5":  deletedFileUniqueValue(file.FileMd5, file.Id),
+		"file_uuid": deletedFileUniqueValue(file.FileUuid, file.Id),
+	}, file.Id); err != nil {
+		return err
+	}
+	return f.DeleteById(tx, file.Id)
 }
 
 func deletedFileUniqueValue(value string, id int) string {

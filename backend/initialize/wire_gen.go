@@ -206,8 +206,13 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileService := service.NewFileService(fileRepositoryImpl, fileChunkRepositoryImpl, snowflake, server, storageStorage)
-	fileController := controller.NewFileController(fileService, sysTableService, generalizationService, server, v2)
+	fileUploadService := service.NewFileUploadService(fileRepositoryImpl, fileChunkRepositoryImpl, snowflake, server, storageStorage)
+	fileUploadController := controller.NewFileUploadController(fileUploadService, v2)
+	fileMetadataService := service.NewFileMetadataService(fileRepositoryImpl, storageStorage)
+	fileAccessService := service.NewFileAccessService(fileRepositoryImpl, storageStorage, server)
+	fileBusinessAccessAdapter := controller.NewFileBusinessAccessAdapter(fileAccessService, sysTableService, generalizationService)
+	fileMetadataController := controller.NewFileMetadataController(fileMetadataService, fileAccessService, fileBusinessAccessAdapter)
+	fileAccessController := controller.NewFileAccessController(fileAccessService, fileBusinessAccessAdapter)
 	hmacToken := ProvideHMACToken()
 	authApi := api.NewAuthApi(authApplicationService, server, applicationService, smsService, applicationCache, sendCodeCache, v2, hmacToken)
 	sysUserApi := api.NewSysUserApi(sysUserService, sysConfigureService, v2)
@@ -270,7 +275,9 @@ func InitializeApp() (*App, error) {
 		ReportController:               reportController,
 		OrgController:                  orgController,
 		SmsController:                  smsController,
-		FileController:                 fileController,
+		FileUploadController:           fileUploadController,
+		FileMetadataController:         fileMetadataController,
+		FileAccessController:           fileAccessController,
 		AuthApi:                        authApi,
 		AuthService:                    authApplicationService,
 		SysUserApi:                     sysUserApi,
@@ -318,7 +325,9 @@ type App struct {
 	ReportController               *controller.ReportController
 	OrgController                  *controller.OrgController
 	SmsController                  *controller.SmsController
-	FileController                 *controller.FileController
+	FileUploadController           *controller.FileUploadController
+	FileMetadataController         *controller.FileMetadataController
+	FileAccessController           *controller.FileAccessController
 	AuthApi                        *api.AuthApi
 	AuthService                    *service.AuthApplicationService
 	SysUserApi                     *api.SysUserApi
@@ -349,11 +358,11 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewAuthAuditServ
 ), wire.Bind(
 	new(datapermission.OwnershipFieldOperationValidator),
 	new(*datapermission.OwnershipFieldRegistry),
-), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, service.NewOrganizationHRSyncService, ProvideOrganizationSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationSyncCoordinator, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileService,
+), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewCasbinRuleService, service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, service.NewOrganizationHRSyncService, ProvideOrganizationSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationSyncCoordinator, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileUploadService, service.NewFileAccessService, service.NewFileMetadataService,
 )
 
 // Controller 提供者
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileBusinessAccessAdapter, controller.NewFileUploadController, controller.NewFileMetadataController, controller.NewFileAccessController)
 
 // API 提供者
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)

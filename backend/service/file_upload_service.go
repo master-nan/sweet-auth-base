@@ -8,6 +8,7 @@ package service
 import (
 	"backend/config"
 	"backend/dto/request"
+	"backend/dto/response"
 	myerrors "backend/internal/errors"
 	"backend/internal/storage"
 	"backend/internal/utils"
@@ -21,7 +22,6 @@ import (
 	"math"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,40 +30,38 @@ import (
 	"gorm.io/gorm"
 )
 
-// FileService 处理文件上传、分片合并、文件元数据和存储访问。
-type FileService struct {
+// FileUploadService 处理普通上传、秒传和分片上传生命周期。
+type FileUploadService struct {
 	fileRepo      repository.FileRepository
 	fileChunkRepo repository.FileChunkRepository
 	sf            *utils.Snowflake
 	config        *config.Server
 	storage       storage.Storage
+	staging       *storage.LocalChunkStaging
+	locks         *keyedLockPool
 }
 
-// FileAccessActor is the minimum caller snapshot needed for file reuse access.
-type FileAccessActor struct {
-	UserID       int
-	IsSuperAdmin bool
-}
-
-// NewFileService 创建文件服务实例。
-func NewFileService(
+// NewFileUploadService 创建上传能力服务。
+func NewFileUploadService(
 	fileRepo repository.FileRepository,
 	fileChunkRepo repository.FileChunkRepository,
 	sf *utils.Snowflake,
 	config *config.Server,
 	store storage.Storage,
-) *FileService {
-	return &FileService{
+) *FileUploadService {
+	return &FileUploadService{
 		fileRepo:      fileRepo,
 		fileChunkRepo: fileChunkRepo,
 		sf:            sf,
 		config:        config,
 		storage:       store,
+		staging:       storage.NewLocalChunkStaging(config.Upload.Dir),
+		locks:         newKeyedLockPool(),
 	}
 }
 
 // Upload 上传文件（小文件直传）
-func (f *FileService) Upload(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (model.File, error) {
+func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (model.File, error) {
 	if err := validateUploadSize(fileHeader.Size, f.config.Upload); err != nil {
 		return model.File{}, err
 	}
@@ -93,12 +91,15 @@ func (f *FileService) Upload(ctx context.Context, actor FileAccessActor, fileHea
 	fileMd5 := fmt.Sprintf("%x", hash.Sum(nil))
 
 	// 秒传：检查是否已有相同 MD5 的文件
-	existing, err := f.fileRepo.FindByFileMd5(fileMd5)
+	existing, err := f.fileRepo.FindByFileMd5(ctx, fileMd5)
 	if err == nil && existing.Id != 0 {
-		if err := ensureFileReuseAccess(actor, existing); err != nil {
+		if err := f.ensureReusableFile(actor, existing); err != nil {
 			return model.File{}, err
 		}
 		return existing, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.File{}, err
 	}
 
 	// 重置文件读取位置
@@ -118,13 +119,12 @@ func (f *FileService) Upload(ctx context.Context, actor FileAccessActor, fileHea
 	if contentType == "" {
 		contentType = normalizedContentType(fileHeader.Header.Get("Content-Type"))
 	}
-	_, err = f.storage.Save(storagePath, src, contentType)
+	id, err := f.sf.GenerateUniqueID()
 	if err != nil {
 		return model.File{}, err
 	}
 
-	id, err := f.sf.GenerateUniqueID()
-	if err != nil {
+	if _, err = f.storage.Save(storagePath, src, contentType); err != nil {
 		return model.File{}, err
 	}
 
@@ -144,17 +144,27 @@ func (f *FileService) Upload(ctx context.Context, actor FileAccessActor, fileHea
 	tx := f.fileRepo.DBWithContext(ctx)
 	err = f.fileRepo.Create(tx, &file)
 	if err != nil {
-		_ = f.storage.Delete(storagePath)
+		if cleanupErr := f.storage.Delete(storagePath); cleanupErr != nil {
+			return model.File{}, myerrors.WrapSystemError(errors.Join(err, cleanupErr))
+		}
 		return model.File{}, err
 	}
 
 	return file, nil
 }
 
+func (f *FileUploadService) UploadResponse(ctx context.Context, actor FileAccessActor, fileHeader *multipart.FileHeader) (response.FileDetailRes, error) {
+	file, err := f.Upload(ctx, actor, fileHeader)
+	if err != nil {
+		return response.FileDetailRes{}, err
+	}
+	return fileDetailResponse(file), nil
+}
+
 // ─── 分片上传 ───────────────────────────────────
 
 // InitChunkUpload 初始化分片上传
-func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor, req request.ChunkUploadInitReq) (request.ChunkUploadInitRes, error) {
+func (f *FileUploadService) InitChunkUpload(ctx context.Context, actor FileAccessActor, req request.ChunkUploadInitReq) (request.ChunkUploadInitRes, error) {
 	if err := validateUploadSize(req.FileSize, f.config.Upload); err != nil {
 		return request.ChunkUploadInitRes{}, err
 	}
@@ -169,9 +179,9 @@ func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor
 
 	// 秒传检查
 	if req.FileMd5 != "" {
-		existing, err := f.fileRepo.FindByFileMd5(req.FileMd5)
+		existing, err := f.fileRepo.FindByFileMd5(ctx, req.FileMd5)
 		if err == nil && existing.Id != 0 {
-			if err := ensureFileReuseAccess(actor, existing); err != nil {
+			if err := f.ensureReusableFile(actor, existing); err != nil {
 				return request.ChunkUploadInitRes{}, err
 			}
 			return request.ChunkUploadInitRes{
@@ -179,6 +189,9 @@ func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor
 				FileId:     existing.Id,
 				FastUpload: true,
 			}, nil
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return request.ChunkUploadInitRes{}, err
 		}
 	}
 
@@ -194,7 +207,7 @@ func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor
 	}
 
 	if strings.TrimSpace(req.FileMd5) != "" {
-		chunk, err := f.fileChunkRepo.FindUnfinishedUpload(req.FileMd5, req.FileSize, req.FileName)
+		chunk, err := f.fileChunkRepo.FindUnfinishedUpload(ctx, req.FileMd5, req.FileSize, req.FileName, actor.UserID, actor.IsSuperAdmin)
 		if err == nil && chunk.UploadId != "" {
 			return request.ChunkUploadInitRes{
 				UploadId:   chunk.UploadId,
@@ -210,7 +223,7 @@ func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor
 
 	uploadId := uuid.New().String()
 
-	// 批量创建分片记录
+	chunks := make([]model.FileChunk, 0, chunkCount)
 	for i := 0; i < chunkCount; i++ {
 		id, err := f.sf.GenerateUniqueID()
 		if err != nil {
@@ -230,10 +243,12 @@ func (f *FileService) InitChunkUpload(ctx context.Context, actor FileAccessActor
 			Merged:     false,
 		}
 		chunk.Id = int(id)
-		tx := f.fileChunkRepo.DBWithContext(ctx)
-		if err := f.fileChunkRepo.Create(tx, &chunk); err != nil {
-			return request.ChunkUploadInitRes{}, err
-		}
+		chunks = append(chunks, chunk)
+	}
+	if err := RunInTransaction(ctx, f.fileChunkRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
+		return f.fileChunkRepo.Create(tx, &chunks)
+	}); err != nil {
+		return request.ChunkUploadInitRes{}, err
 	}
 
 	return request.ChunkUploadInitRes{
@@ -323,12 +338,18 @@ func normalizedContentType(contentType string) string {
 }
 
 // UploadChunk 上传单个分片
-func (f *FileService) UploadChunk(ctx context.Context, uploadId string, chunkIndex int, fileHeader *multipart.FileHeader) error {
-	chunk, err := f.fileChunkRepo.FindByUploadIdAndIndex(uploadId, chunkIndex)
+func (f *FileUploadService) UploadChunk(ctx context.Context, actor FileAccessActor, uploadId string, chunkIndex int, fileHeader *multipart.FileHeader) error {
+	unlock := f.locks.Lock("chunk:" + uploadId + ":" + fmt.Sprint(chunkIndex))
+	defer unlock()
+
+	chunk, err := f.fileChunkRepo.FindByUploadIdAndIndex(ctx, uploadId, chunkIndex)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrChunkNotFound
 		}
+		return err
+	}
+	if err := ensureChunkUploadAccess(actor, chunk); err != nil {
 		return err
 	}
 
@@ -345,34 +366,10 @@ func (f *FileService) UploadChunk(ctx context.Context, uploadId string, chunkInd
 	}
 	defer src.Close()
 
-	// 计算分片 MD5
-	hash := md5.New()
-	tee := io.TeeReader(src, hash)
-
-	// 分片暂存到本地临时目录
-	chunkDir := fmt.Sprintf("chunks/%s", uploadId)
-	chunkPath := fmt.Sprintf("%s/%d", chunkDir, chunkIndex)
-	localDir := f.config.Upload.Dir
-	if localDir == "" {
-		return myerrors.NewBadRequestError("上传目录配置错误")
-	}
-	fullChunkDir := filepath.Join(localDir, chunkDir)
-	if err := os.MkdirAll(fullChunkDir, os.ModePerm); err != nil {
-		return err
-	}
-	fullChunkPath := filepath.Join(localDir, chunkPath)
-	dst, err := os.Create(fullChunkPath)
+	chunkPath, chunkMd5, err := f.staging.Write(uploadId, chunkIndex, src)
 	if err != nil {
-		return err
+		return myerrors.WrapSystemError(err)
 	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, tee); err != nil {
-		_ = os.Remove(fullChunkPath)
-		return err
-	}
-
-	chunkMd5 := fmt.Sprintf("%x", hash.Sum(nil))
 
 	// 更新分片记录
 	updateReq := map[string]interface{}{
@@ -384,14 +381,33 @@ func (f *FileService) UploadChunk(ctx context.Context, uploadId string, chunkInd
 }
 
 // MergeChunks 合并分片
-func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, uploadId string) (model.File, error) {
-	firstChunk, err := f.fileChunkRepo.GetFirstChunk(uploadId)
+func (f *FileUploadService) MergeChunks(ctx context.Context, actor FileAccessActor, uploadId string) (model.File, error) {
+	unlock := f.locks.Lock("merge:" + uploadId)
+	defer unlock()
+
+	firstChunk, err := f.fileChunkRepo.GetFirstChunk(ctx, uploadId)
 	if err != nil {
 		return model.File{}, myerrors.ErrUploadNotFound
 	}
+	if err := ensureChunkUploadAccess(actor, firstChunk); err != nil {
+		return model.File{}, err
+	}
+	if firstChunk.Merged {
+		existing, findErr := f.fileRepo.FindByFileMd5(ctx, firstChunk.FileMd5)
+		if findErr != nil {
+			return model.File{}, myerrors.ErrUploadNotFound
+		}
+		if err := f.ensureReusableFile(actor, existing); err != nil {
+			return model.File{}, err
+		}
+		if err := f.cleanupChunks(uploadId); err != nil {
+			return model.File{}, err
+		}
+		return existing, nil
+	}
 
 	// 检查所有分片是否已上传
-	uploadedCount, err := f.fileChunkRepo.CountUploadedChunks(uploadId)
+	uploadedCount, err := f.fileChunkRepo.CountUploadedChunks(ctx, uploadId)
 	if err != nil {
 		return model.File{}, err
 	}
@@ -401,14 +417,9 @@ func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, up
 		)
 	}
 
-	chunks, err := f.fileChunkRepo.FindByUploadId(uploadId)
+	chunks, err := f.fileChunkRepo.FindByUploadId(ctx, uploadId)
 	if err != nil {
 		return model.File{}, err
-	}
-
-	localDir := f.config.Upload.Dir
-	if localDir == "" {
-		return model.File{}, myerrors.NewBadRequestError("上传目录配置错误")
 	}
 
 	fileUuid := uuid.New().String()
@@ -417,58 +428,30 @@ func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, up
 	storedName := fileUuid + fileExt
 	storagePath := fmt.Sprintf("%s-%s", datePath, storedName)
 
-	// 合并分片到临时文件，同时计算完整文件 MD5
-	tmpPath := filepath.Join(localDir, "chunks", uploadId, "merged"+fileExt)
-	tmpFile, err := os.Create(tmpPath)
-	if err != nil {
-		return model.File{}, fmt.Errorf("创建合并文件失败: %w", err)
-	}
-
-	hash := md5.New()
-	multiWriter := io.MultiWriter(tmpFile, hash)
-
+	chunkPaths := make([]string, 0, len(chunks))
 	for _, chunk := range chunks {
-		chunkFullPath := filepath.Join(localDir, chunk.ChunkPath)
-		chunkFile, err := os.Open(chunkFullPath)
-		if err != nil {
-			tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return model.File{}, fmt.Errorf("打开分片文件失败: %w", err)
-		}
-		if _, err := io.Copy(multiWriter, chunkFile); err != nil {
-			chunkFile.Close()
-			tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return model.File{}, fmt.Errorf("合并分片失败: %w", err)
-		}
-		chunkFile.Close()
+		chunkPaths = append(chunkPaths, chunk.ChunkPath)
 	}
-	tmpFile.Close()
-
-	fileMd5 := fmt.Sprintf("%x", hash.Sum(nil))
-	stat, err := os.Stat(tmpPath)
+	merged, err := f.staging.Merge(uploadId, fileUuid+fileExt, chunkPaths)
 	if err != nil {
-		_ = os.Remove(tmpPath)
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
-	if err := validateMergedChunkFile(firstChunk, stat.Size(), fileMd5); err != nil {
-		_ = os.Remove(tmpPath)
+	defer f.staging.Remove(merged.Path)
+	fileMd5 := merged.MD5
+	if err := validateMergedChunkFile(firstChunk, merged.Size, fileMd5); err != nil {
 		return model.File{}, err
 	}
 
-	mergedForDetection, err := os.Open(tmpPath)
+	mergedForDetection, err := f.staging.Open(merged.Path)
 	if err != nil {
-		_ = os.Remove(tmpPath)
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 	detectedType, detectErr := detectUploadContentType(mergedForDetection)
 	_ = mergedForDetection.Close()
 	if detectErr != nil {
-		_ = os.Remove(tmpPath)
 		return model.File{}, detectErr
 	}
 	if err := validateUploadMimeType(detectedType, f.config.Upload); err != nil {
-		_ = os.Remove(tmpPath)
 		return model.File{}, err
 	}
 	contentType := normalizedContentType(detectedType)
@@ -477,18 +460,25 @@ func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, up
 	}
 
 	// 秒传检查（合并后再次检查）
-	existing, err := f.fileRepo.FindByFileMd5(fileMd5)
+	existing, err := f.fileRepo.FindByFileMd5(ctx, fileMd5)
 	if err == nil && existing.Id != 0 {
-		if err := ensureFileReuseAccess(actor, existing); err != nil {
+		if err := f.ensureReusableFile(actor, existing); err != nil {
 			return model.File{}, err
 		}
-		_ = f.fileChunkRepo.MarkUploadMerged(uploadId)
-		f.cleanupChunks(localDir, uploadId)
+		if err := f.fileChunkRepo.MarkUploadMerged(ctx, uploadId, fileMd5); err != nil {
+			return model.File{}, err
+		}
+		if err := f.cleanupChunks(uploadId); err != nil {
+			return model.File{}, err
+		}
 		return existing, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.File{}, err
 	}
 
 	// 通过 Storage 接口保存合并后的文件
-	mergedFile, err := os.Open(tmpPath)
+	mergedFile, err := f.staging.Open(merged.Path)
 	if err != nil {
 		return model.File{}, err
 	}
@@ -499,7 +489,7 @@ func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, up
 		return model.File{}, err
 	}
 
-	fileSize := stat.Size()
+	fileSize := merged.Size
 
 	id, err := f.sf.GenerateUniqueID()
 	if err != nil {
@@ -522,25 +512,41 @@ func (f *FileService) MergeChunks(ctx context.Context, actor FileAccessActor, up
 	tx := f.fileRepo.DBWithContext(ctx)
 	err = f.fileRepo.Create(tx, &file)
 	if err != nil {
-		_ = f.storage.Delete(storagePath)
+		if cleanupErr := f.storage.Delete(storagePath); cleanupErr != nil {
+			return model.File{}, myerrors.WrapSystemError(errors.Join(err, cleanupErr))
+		}
 		return model.File{}, err
 	}
 
-	_ = f.fileChunkRepo.MarkUploadMerged(uploadId)
+	if err := f.fileChunkRepo.MarkUploadMerged(ctx, uploadId, fileMd5); err != nil {
+		return model.File{}, err
+	}
 
-	// 异步清理分片临时文件
-	go f.cleanupChunks(localDir, uploadId)
+	if err := f.cleanupChunks(uploadId); err != nil {
+		return model.File{}, err
+	}
 
 	return file, nil
 }
 
+func (f *FileUploadService) MergeChunksResponse(ctx context.Context, actor FileAccessActor, uploadId string) (response.FileDetailRes, error) {
+	file, err := f.MergeChunks(ctx, actor, uploadId)
+	if err != nil {
+		return response.FileDetailRes{}, err
+	}
+	return fileDetailResponse(file), nil
+}
+
 // GetUploadProgressForUser 获取当前用户可访问的分片上传进度。
-func (f *FileService) GetUploadProgressForUser(ctx context.Context, uploadId string) (request.ChunkUploadProgressRes, error) {
-	firstChunk, err := f.fileChunkRepo.GetFirstChunk(uploadId)
+func (f *FileUploadService) GetUploadProgressForUser(ctx context.Context, actor FileAccessActor, uploadId string) (request.ChunkUploadProgressRes, error) {
+	firstChunk, err := f.fileChunkRepo.GetFirstChunk(ctx, uploadId)
 	if err != nil {
 		return request.ChunkUploadProgressRes{}, myerrors.ErrUploadNotFound
 	}
-	chunks, err := f.fileChunkRepo.FindByUploadId(firstChunk.UploadId)
+	if err := ensureChunkUploadAccess(actor, firstChunk); err != nil {
+		return request.ChunkUploadProgressRes{}, err
+	}
+	chunks, err := f.fileChunkRepo.FindByUploadId(ctx, firstChunk.UploadId)
 	if err != nil {
 		return request.ChunkUploadProgressRes{}, err
 	}
@@ -566,6 +572,36 @@ func ensureFileReuseAccess(actor FileAccessActor, file model.File) error {
 		return nil
 	}
 	if actor.UserID > 0 && file.CreateUser != nil && *file.CreateUser == actor.UserID {
+		return nil
+	}
+	return myerrors.ErrPermissionDenied
+}
+
+func (f *FileUploadService) ensureReusableFile(actor FileAccessActor, file model.File) error {
+	if err := ensureFileReuseAccess(actor, file); err != nil {
+		return err
+	}
+	reader, err := f.storage.Get(file.FilePath)
+	if err != nil {
+		return myerrors.ErrFileNotFound
+	}
+	defer reader.Close()
+	hash := md5.New()
+	size, err := io.Copy(hash, reader)
+	if err != nil {
+		return myerrors.WrapSystemError(err)
+	}
+	if size != file.FileSize || !strings.EqualFold(fmt.Sprintf("%x", hash.Sum(nil)), file.FileMd5) {
+		return myerrors.ErrMergedFileMD5Invalid
+	}
+	return nil
+}
+
+func ensureChunkUploadAccess(actor FileAccessActor, chunk model.FileChunk) error {
+	if actor.IsSuperAdmin {
+		return nil
+	}
+	if actor.UserID > 0 && chunk.CreateUser != nil && *chunk.CreateUser == actor.UserID {
 		return nil
 	}
 	return myerrors.ErrPermissionDenied
@@ -598,64 +634,15 @@ func validateMergedChunkFile(firstChunk model.FileChunk, size int64, fileMd5 str
 }
 
 // cleanupChunks 清理分片临时目录。
-func (f *FileService) cleanupChunks(localDir string, uploadId string) {
-	chunkDir := filepath.Join(localDir, "chunks", uploadId)
-	_ = os.RemoveAll(chunkDir)
-}
-
-// GetFileById 根据 ID 获取文件信息
-func (f *FileService) GetFileById(id int) (model.File, error) {
-	file, err := f.fileRepo.FindById(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.File{}, myerrors.ErrDataNotFound
-		}
-		return model.File{}, err
+func (f *FileUploadService) cleanupChunks(uploadId string) error {
+	if err := f.staging.Cleanup(uploadId); err != nil {
+		return myerrors.WrapSystemError(err)
 	}
-	return file, nil
-}
-
-// GetFileByUuid 根据 UUID 获取文件信息
-func (f *FileService) GetFileByUuid(uuid string) (model.File, error) {
-	file, err := f.fileRepo.FindByFileUuid(uuid)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.File{}, myerrors.ErrDataNotFound
-		}
-		return model.File{}, err
-	}
-	return file, nil
-}
-
-// DeleteFileById 根据 ID 删除文件
-func (f *FileService) DeleteFileById(ctx context.Context, id int) error {
-	file, err := f.fileRepo.FindById(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return myerrors.ErrDataNotFound
-		}
-		return err
-	}
-
-	if err := f.fileRepo.DeleteFile(ctx, file); err != nil {
-		return err
-	}
-
-	// 通过 Storage 接口删除文件
-	if file.FilePath != "" {
-		_ = f.storage.Delete(file.FilePath)
-	}
-
 	return nil
 }
 
 // fileAccessURL 生成文件公开访问 URL。
-func (f *FileService) fileAccessURL(fileUuid string) string {
+func (f *FileUploadService) fileAccessURL(fileUuid string) string {
 	baseURL := strings.TrimRight(strings.TrimSpace(f.config.Upload.BaseURL), "/")
 	return fmt.Sprintf("%s/%s", baseURL, fileUuid)
-}
-
-// GetFileContent 获取文件内容（用于 Download/Preview）
-func (f *FileService) GetFileContent(file model.File) (io.ReadCloser, error) {
-	return f.storage.Get(file.FilePath)
 }

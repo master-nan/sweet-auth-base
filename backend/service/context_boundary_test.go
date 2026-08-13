@@ -23,7 +23,9 @@ func TestGinContextBoundary(t *testing.T) {
 		"org_service.go",
 		"org_permission_provider.go",
 		"org_permission_tree_provider.go",
-		"file_service.go",
+		"file_upload_service.go",
+		"file_access_service.go",
+		"file_metadata_service.go",
 		"high_risk_response.go",
 		"log_service.go",
 	} {
