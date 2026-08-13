@@ -13,6 +13,8 @@ frontend/.quasar/
 node_modules/
 .DS_Store
 AGENTS.md
-docs/*/
-design/
-work/
+# Local construction records and source material that must never enter Git.
+docs/development/
+docs/_construction/analysis/organization-source/
+/design/
+/work/

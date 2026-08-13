@@ -1,4 +1,4 @@
-.PHONY: help verify backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify docs-check backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
@@ -12,6 +12,7 @@ help:
 	@printf '%s\n' '  cd frontend && yarn && quasar dev         启动前端开发服务'
 	@printf '%s\n' ''
 	@printf '%s\n' '测试验证：'
+	@printf '%s\n' '  make docs-check                           检查文档目录、旧路径和相对链接'
 	@printf '%s\n' '  make backend-test                         只跑 Go 测试'
 	@printf '%s\n' '  make frontend-ci                          只跑前端 lint/typecheck/build'
 	@printf '%s\n' '  make verify                               后端测试 + 前端 CI'
@@ -33,9 +34,12 @@ help:
 	@printf '%s\n' '  cp .env.external.example .env.external    首次复制外部环境配置'
 	@printf '%s\n' '  make docker-up-external                   只启动 backend、frontend'
 	@printf '%s\n' ''
-	@printf '%s\n' '详细说明见 docs/Runbook.md'
+	@printf '%s\n' '详细说明见 docs/operations/Runbook.md'
 
-verify: backend-test frontend-ci
+verify: docs-check backend-test frontend-ci
+
+docs-check:
+	python3 scripts/check_docs.py
 
 backend-test:
 	cd backend && go test ./...
