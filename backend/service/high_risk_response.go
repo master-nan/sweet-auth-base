@@ -3,7 +3,9 @@ package service
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	platformmetadata "backend/internal/metadata"
 	"backend/model"
+	"context"
 	"encoding/json"
 )
 
@@ -174,12 +176,49 @@ func (s *SysTableService) GetTableByIdResponse(id int) (response.SysTableDetailR
 	return tableDetailResponse(data), nil
 }
 
-func (s *SysTableService) GetTableByTableCodeResponse(code string) (response.SysTableDetailRes, error) {
-	data, err := s.GetTableByTableCode(code)
+func (s *MetadataRuntimeService) GetTableResponse(
+	ctx context.Context,
+	code string,
+) (response.RuntimeTableMetadataRes, error) {
+	data, err := s.GetTable(ctx, code)
 	if err != nil {
-		return response.SysTableDetailRes{}, err
+		return response.RuntimeTableMetadataRes{}, err
 	}
-	return tableDetailResponse(data), nil
+	return runtimeTableMetadataResponse(data), nil
+}
+
+func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.RuntimeTableMetadataRes {
+	fields := make([]response.RuntimeFieldMetadataRes, 0, len(data.Fields))
+	for _, field := range data.Fields {
+		fields = append(fields, response.RuntimeFieldMetadataRes{
+			Id: field.ID, TableId: field.TableID, FieldName: field.DisplayName, FieldCode: field.Code,
+			FieldType: field.StorageType, LogicalType: string(field.LogicalType), InputType: field.UIComponent,
+			FieldLength: field.Length, FieldDecimalLength: field.DecimalLength,
+			FormSpan: field.FormSpan, DetailSpan: field.DetailSpan,
+			DefaultValue: field.DefaultValue, DictCode: field.DictionaryCode,
+			IsPrimaryKey: field.PrimaryKey, IsIndex: field.Indexed,
+			IsQuickSearch: field.QuickQuery, IsAdvancedSearch: field.AdvancedQuery, IsSort: field.Sortable,
+			IsNull: field.Nullable, IsListShow: field.ListVisible,
+			IsInsertShow: field.InsertVisible, IsUpdateShow: field.UpdateVisible,
+			Sequence: field.Sequence, OriginalFieldId: field.OriginalFieldID,
+			Binding: field.Binding, FieldCategory: field.Category,
+			Expression: field.RelationExpression, LinkageConfig: field.LinkageConfig,
+			SystemManaged: field.SystemManaged,
+		})
+	}
+	relations := make([]response.RuntimeRelationRes, 0, len(data.Relations))
+	for _, relation := range data.Relations {
+		relations = append(relations, response.RuntimeRelationRes{
+			Id: relation.ID, TableId: relation.TableID, RelatedTableId: relation.RelatedTableID,
+			ReferenceKey: relation.ReferenceKey, ForeignKey: relation.ForeignKey,
+			RelationType: relation.RelationType, ManyTableCode: relation.ManyTableCode,
+		})
+	}
+	return response.RuntimeTableMetadataRes{
+		Id: data.ID, TableName: data.Name, TableCode: data.Code, TableType: data.TableType,
+		MasterDetailMode: data.MasterDetailMode, FormOpenMode: data.FormOpenMode,
+		DetailOpenMode: data.DetailOpenMode, TableFields: fields, TableRelations: relations,
+	}
 }
 
 func (s *SysTableService) GetTableListResponse(basic *request.Basic) (response.ListResult[response.SysTableListRes], error) {

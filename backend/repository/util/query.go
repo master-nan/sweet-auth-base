@@ -833,7 +833,6 @@ func dynamicQuery(
 						continue
 					}
 				}
-				selectParts = append(selectParts, fmt.Sprintf("%s AS %s", *field.Expression, QuoteIdentifier(fieldCode)))
 			}
 			continue
 		}
@@ -920,9 +919,18 @@ func findFieldById(table model.SysTable, fieldId int) (model.SysTableField, bool
 func listResultFields(fields []model.SysTableField) []model.SysTableField {
 	result := make([]model.SysTableField, 0, len(fields))
 	for _, field := range fields {
-		if field.IsListShow && !security.IsSensitiveFieldName(field.FieldCode) {
-			result = append(result, field)
+		if !field.IsListShow || security.IsSensitiveFieldName(field.FieldCode) {
+			continue
 		}
+		if field.FieldCategory == enum.CalculatedField || field.FieldCategory == enum.VirtualField {
+			if field.Expression == nil {
+				continue
+			}
+			if _, _, ok := parseRelationExpression(*field.Expression); !ok {
+				continue
+			}
+		}
+		result = append(result, field)
 	}
 	result = prependPrimaryKeyField(result, fields)
 	if len(result) > 0 {

@@ -8,6 +8,7 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
+	"context"
 
 	"gorm.io/gorm"
 )
@@ -24,8 +25,8 @@ func NewSysTableRelationRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysTableR
 	}
 }
 
-func (s *SysTableRelationRepositoryImpl) GetTableRelationsByTableId(i int) ([]model.SysTableRelation, error) {
+func (s *SysTableRelationRepositoryImpl) GetTableRelationsByTableId(ctx context.Context, i int) ([]model.SysTableRelation, error) {
 	var relations []model.SysTableRelation
-	err := s.db.Where("table_id = ?", i).Find(&relations).Error
+	err := s.db.WithContext(ctx).Where("table_id = ?", i).Find(&relations).Error
 	return relations, err
 }

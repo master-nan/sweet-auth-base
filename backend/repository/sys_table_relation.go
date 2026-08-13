@@ -7,9 +7,10 @@ package repository
 
 import (
 	"backend/model"
+	"context"
 )
 
 type SysTableRelationRepository interface {
 	BasicRepository[model.SysTableRelation]
-	GetTableRelationsByTableId(int) ([]model.SysTableRelation, error)
+	GetTableRelationsByTableId(context.Context, int) ([]model.SysTableRelation, error)
 }

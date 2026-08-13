@@ -22,13 +22,15 @@ import (
 
 type TableController struct {
 	sysTableService *service.SysTableService
+	metadataRuntime *service.MetadataRuntimeService
 	sysMenuService  *service.SysMenuService
 	translators     map[string]ut.Translator
 }
 
-func NewTableController(sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
+func NewTableController(sysTableService *service.SysTableService, metadataRuntime *service.MetadataRuntimeService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
 	return &TableController{
 		sysTableService,
+		metadataRuntime,
 		sysMenuService,
 		translators,
 	}
@@ -72,7 +74,7 @@ func (t *TableController) GetTableByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	code := utils.SanitizeInput(ctx.Param("code"))
-	data, err := t.sysTableService.GetTableByTableCodeResponse(code)
+	data, err := t.metadataRuntime.GetTableResponse(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

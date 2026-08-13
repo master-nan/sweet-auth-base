@@ -399,12 +399,14 @@ func newReportServiceForConfigTest(t *testing.T) *ReportService {
 	}
 	primaryDB := &database.PrimaryDB{DB: db}
 	store := newJSONMemoryCacher()
+	metadataRuntime := NewMetadataRuntimeService(
+		impl.NewSysTableRepositoryImpl(primaryDB),
+		impl.NewSysTableFieldRepositoryImpl(primaryDB),
+		cache.NewSysTableCache(store),
+		cache.NewSysTableFieldCache(store),
+	)
 	return &ReportService{
-		reportRepo: impl.NewReportDefinitionRepositoryImpl(primaryDB),
-		sysTableService: &SysTableService{
-			sysTableRepo:       impl.NewSysTableRepositoryImpl(primaryDB),
-			sysTableCache:      cache.NewSysTableCache(store),
-			sysTableFieldCache: cache.NewSysTableFieldCache(store),
-		},
+		reportRepo:      impl.NewReportDefinitionRepositoryImpl(primaryDB),
+		metadataRuntime: metadataRuntime,
 	}
 }

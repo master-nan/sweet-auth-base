@@ -6,6 +6,7 @@ import (
 	"backend/enum"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
+	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -34,7 +35,7 @@ type DataOwnershipConfigService struct {
 	resourceRepo             repository.DataResourceRepository
 	dimensionRepo            repository.DataDimensionDefinitionRepository
 	ownershipRepo            repository.DataOwnershipFieldRepository
-	tableFieldRepo           repository.SysTableFieldRepository
+	metadataFieldReader      MetadataSecurityReader
 	registeredFieldValidator datapermission.OwnershipFieldBindingValidator
 	sf                       *utils.Snowflake
 	auditWriter              TransactionalAuditWriter
@@ -44,7 +45,7 @@ func NewDataOwnershipConfigService(
 	resourceRepo repository.DataResourceRepository,
 	dimensionRepo repository.DataDimensionDefinitionRepository,
 	ownershipRepo repository.DataOwnershipFieldRepository,
-	tableFieldRepo repository.SysTableFieldRepository,
+	metadataFieldReader MetadataSecurityReader,
 	registeredFieldValidator datapermission.OwnershipFieldBindingValidator,
 	sf *utils.Snowflake,
 	auditWriter TransactionalAuditWriter,
@@ -53,7 +54,7 @@ func NewDataOwnershipConfigService(
 		resourceRepo:             resourceRepo,
 		dimensionRepo:            dimensionRepo,
 		ownershipRepo:            ownershipRepo,
-		tableFieldRepo:           tableFieldRepo,
+		metadataFieldReader:      metadataFieldReader,
 		registeredFieldValidator: registeredFieldValidator,
 		sf:                       sf,
 		auditWriter:              auditWriter,
@@ -435,14 +436,17 @@ func (s *DataOwnershipConfigService) validateOwnershipBinding(
 			ownership.TableFieldId == nil {
 			return myerrors.ErrDataOwnershipBindingInvalid
 		}
-		field, err := s.tableFieldRepo.FindByIdForConfigDB(tx, *ownership.TableFieldId)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if s.metadataFieldReader == nil {
+			return myerrors.ErrDataOwnershipMetadataFieldNotFound
+		}
+		field, err := s.metadataFieldReader.FindMetadataSecurityField(tx.Statement.Context, tx, *ownership.TableFieldId)
+		if errors.Is(err, datapermission.ErrMetadataFieldRecordNotFound) {
 			return myerrors.ErrDataOwnershipMetadataFieldNotFound
 		}
 		if err != nil {
 			return myerrors.WrapDatabaseError(err)
 		}
-		if !field.State {
+		if !field.State || field.Deleted {
 			return myerrors.ErrDataOwnershipMetadataFieldNotFound
 		}
 		if field.TableId != *resource.TableId {
@@ -456,6 +460,18 @@ func (s *DataOwnershipConfigService) validateOwnershipBinding(
 		}
 		if !metadataFieldMatchesDimension(field.FieldCode, dimension.Code) {
 			return myerrors.ErrDataOwnershipMetadataDimension
+		}
+		columnExists, err := s.metadataFieldReader.HasPhysicalColumn(
+			tx.Statement.Context,
+			tx,
+			*resource.TableId,
+			field.FieldCode,
+		)
+		if err != nil {
+			return myerrors.WrapDatabaseError(err)
+		}
+		if !columnExists {
+			return myerrors.ErrDataOwnershipMetadataFieldNotFound
 		}
 	case model.DataOwnershipBindingTypeRegisteredField:
 		if ownership.AdapterFieldCode == nil ||
@@ -486,8 +502,8 @@ func (s *DataOwnershipConfigService) validateOwnershipBinding(
 	return nil
 }
 
-func isMetadataOwnershipField(field model.SysTableField) bool {
-	if field.Expression != nil && strings.TrimSpace(*field.Expression) != "" {
+func isMetadataOwnershipField(field datapermission.MetadataFieldRecord) bool {
+	if strings.TrimSpace(field.Expression) != "" {
 		return false
 	}
 	if field.IsPrimaryKey {
@@ -517,7 +533,7 @@ func metadataFieldMatchesOwnershipValueType(
 
 func isForbiddenMetadataOwnershipFieldCode(fieldCode string) bool {
 	fieldCode = strings.ToLower(strings.TrimSpace(fieldCode))
-	if fieldCode == "" {
+	if fieldCode == "" || security.IsSensitiveFieldName(fieldCode) || security.IsManagedMetadataField(fieldCode) {
 		return true
 	}
 	for _, prefix := range []string{

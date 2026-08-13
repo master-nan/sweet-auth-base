@@ -15,6 +15,7 @@ import (
 	"backend/internal/database"
 	"backend/internal/datapermission"
 	"backend/internal/integration"
+	"backend/internal/metadata"
 	"backend/internal/security"
 	"backend/internal/storage"
 	"backend/internal/token"
@@ -117,7 +118,6 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewDataPolicyRepositoryImpl,
 	impl.NewDataPolicyRuleRepositoryImpl,
 	impl.NewDataGrantRepositoryImpl,
-	impl.NewDataPermissionMetadataReaderImpl,
 	impl.NewOrgLegalEntityRepositoryImpl,
 	impl.NewOrgUnitRepositoryImpl,
 	impl.NewOrgStructureRepositoryImpl,
@@ -172,7 +172,6 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.DataPolicyRepository), new(*impl.DataPolicyRepositoryImpl)),
 	wire.Bind(new(repository.DataPolicyRuleRepository), new(*impl.DataPolicyRuleRepositoryImpl)),
 	wire.Bind(new(repository.DataGrantRepository), new(*impl.DataGrantRepositoryImpl)),
-	wire.Bind(new(datapermission.MetadataFieldReader), new(*impl.DataPermissionMetadataReaderImpl)),
 	wire.Bind(new(repository.OrgLegalEntityRepository), new(*impl.OrgLegalEntityRepositoryImpl)),
 	wire.Bind(new(repository.OrgUnitRepository), new(*impl.OrgUnitRepositoryImpl)),
 	wire.Bind(new(repository.OrgStructureRepository), new(*impl.OrgStructureRepositoryImpl)),
@@ -232,9 +231,13 @@ var ServiceProvider = wire.NewSet(
 	service.NewSysDictService,
 	service.NewSysRoleService,
 	service.NewSysMenuService,
+	service.NewMetadataRuntimeService,
+	wire.Bind(new(datapermission.MetadataFieldReader), new(*service.MetadataRuntimeService)),
+	wire.Bind(new(service.MetadataSecurityReader), new(*service.MetadataRuntimeService)),
+	wire.Bind(new(metadata.RuntimeReader), new(*service.MetadataRuntimeService)),
 	service.NewSysTableService,
 	service.NewSysUserService,
-	service.NewGeneralizationServiceWithDataPermission,
+	service.NewGeneralizationServiceWithRuntimeAndDataPermission,
 	service.NewDataResourceConfigService,
 	service.NewDataOwnershipConfigService,
 	service.NewDataPolicyConfigService,

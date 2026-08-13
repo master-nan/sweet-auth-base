@@ -7,6 +7,7 @@ import (
 
 	"backend/enum"
 	myerrors "backend/internal/errors"
+	"backend/internal/security"
 )
 
 var (
@@ -285,7 +286,7 @@ func isMetadataFilterField(field MetadataFieldRecord) bool {
 
 func isForbiddenMetadataFilterFieldCode(fieldCode string) bool {
 	fieldCode = strings.ToLower(strings.TrimSpace(fieldCode))
-	if fieldCode == "" {
+	if fieldCode == "" || security.IsSensitiveFieldName(fieldCode) || security.IsManagedMetadataField(fieldCode) {
 		return true
 	}
 	for _, prefix := range []string{"gmt_", "source_", "create_", "modify_", "delete_"} {

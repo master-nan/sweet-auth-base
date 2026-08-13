@@ -24,12 +24,11 @@ type fileBusinessContext struct {
 // data-permission API. Gin does not cross into File services or repositories.
 type FileBusinessAccessAdapter struct {
 	files          *service.FileAccessService
-	tables         *service.SysTableService
 	generalization *service.GeneralizationService
 }
 
-func NewFileBusinessAccessAdapter(files *service.FileAccessService, tables *service.SysTableService, generalization *service.GeneralizationService) *FileBusinessAccessAdapter {
-	return &FileBusinessAccessAdapter{files: files, tables: tables, generalization: generalization}
+func NewFileBusinessAccessAdapter(files *service.FileAccessService, generalization *service.GeneralizationService) *FileBusinessAccessAdapter {
+	return &FileBusinessAccessAdapter{files: files, generalization: generalization}
 }
 
 func (a *FileBusinessAccessAdapter) Authorize(ctx *gin.Context, resource service.FileAccessResource, fallback enum.SysMenuButtonEventAction, allowOverride bool) error {
@@ -40,10 +39,10 @@ func (a *FileBusinessAccessAdapter) Authorize(ctx *gin.Context, resource service
 	if !found {
 		return a.files.AuthorizeActor(fileAccessActor(ctx), resource)
 	}
-	if a.tables == nil || a.generalization == nil {
+	if a.generalization == nil {
 		return myerrors.ErrPermissionDenied
 	}
-	table, err := a.tables.GetTableByTableCode(business.TableCode)
+	table, err := a.generalization.ResolveRuntimeTable(ctx.Request.Context(), business.TableCode)
 	if err != nil {
 		return err
 	}

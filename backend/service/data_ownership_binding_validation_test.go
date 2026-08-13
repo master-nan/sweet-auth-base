@@ -33,6 +33,28 @@ func TestDataOwnershipMetadataFieldValidationAdapter(t *testing.T) {
 		)
 	})
 
+	t.Run("metadata field must exist physically", func(t *testing.T) {
+		service, db := newDataOwnershipConfigTestSubject(
+			t,
+			&testTransactionalAuditWriter{},
+			nil,
+		)
+		resource, dimension, field := createMetadataOwnershipFixtures(t, db)
+		if err := db.Exec(`DROP TABLE tms_order`).Error; err != nil {
+			t.Fatalf("drop physical ownership table: %v", err)
+		}
+
+		_, err := service.CreateOwnership(
+			dataResourceConfigContext(),
+			metadataOwnershipCreateRequest(resource.Id, dimension.Id, field.Id),
+		)
+		assertDataOwnershipConfigError(
+			t,
+			err,
+			apperrors.ErrorCodeDataOwnershipMetadataFieldNotFound,
+		)
+	})
+
 	t.Run("forbidden technical and display fields are rejected", func(t *testing.T) {
 		tests := []struct {
 			name       string

@@ -9,10 +9,13 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	error2 "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -29,6 +32,38 @@ type GeneralizationService struct {
 	permissionRepo     repository.GeneralizationPermissionRepository
 	sf                 *utils.Snowflake
 	permissionRuntime  *LowCodeDataPermissionRuntime
+	metadataRuntime    platformmetadata.RuntimeReader
+}
+
+func NewGeneralizationServiceWithRuntimeAndDataPermission(
+	generalizationRepo repository.GeneralizationRepository,
+	sf *utils.Snowflake,
+	metadataRuntime platformmetadata.RuntimeReader,
+	permissionRuntime *LowCodeDataPermissionRuntime,
+) *GeneralizationService {
+	service := NewGeneralizationServiceWithDataPermission(generalizationRepo, sf, permissionRuntime)
+	service.metadataRuntime = metadataRuntime
+	return service
+}
+
+// ResolveRuntimeTable is the compatibility edge between stable platform
+// metadata and the existing dynamic query engine. Controllers and runtime
+// consumers do not load SysTable persistence models themselves.
+func (gs *GeneralizationService) ResolveRuntimeTable(
+	ctx context.Context,
+	tableCode string,
+) (model.SysTable, error) {
+	if gs == nil || gs.metadataRuntime == nil {
+		return model.SysTable{}, error2.WrapSystemError(fmt.Errorf("metadata runtime is not initialized"))
+	}
+	metadata, err := gs.metadataRuntime.GetTable(ctx, tableCode)
+	if errors.Is(err, error2.ErrDataNotFound) {
+		return model.SysTable{}, nil
+	}
+	if err != nil {
+		return model.SysTable{}, err
+	}
+	return metadata.QueryModel(), nil
 }
 
 func NewGeneralizationService(generalizationRepo repository.GeneralizationRepository, sf *utils.Snowflake) *GeneralizationService {

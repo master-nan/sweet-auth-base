@@ -7,9 +7,10 @@ package repository
 
 import (
 	"backend/model"
+	"context"
 )
 
 type SysTableIndexRepository interface {
 	BasicRepository[model.SysTableIndex]
-	GetTableIndexesByTableId(int) ([]model.SysTableIndex, error)
+	GetTableIndexesByTableId(context.Context, int) ([]model.SysTableIndex, error)
 }

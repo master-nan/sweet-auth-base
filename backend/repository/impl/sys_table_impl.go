@@ -10,8 +10,11 @@ import (
 	"backend/dto/response"
 	"backend/internal/database"
 	error2 "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/model"
 	"backend/repository/util"
+	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -32,30 +35,67 @@ func NewSysTableRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysTableRepositor
 	}
 }
 
-func (s *SysTableRepositoryImpl) GetTableById(i int) (model.SysTable, error) {
+func (s *SysTableRepositoryImpl) GetTableById(ctx context.Context, i int) (model.SysTable, error) {
 	var table model.SysTable
-	err := s.db.Preload("TableFields", func(db *gorm.DB) *gorm.DB {
+	err := s.db.WithContext(ctx).Preload("TableFields", func(db *gorm.DB) *gorm.DB {
 		return db.Order("sequence")
 	}).Preload("TableRelations").Preload("TableIndexes.IndexFields").Where("id = ?", i).First(&table).Error
 	return table, err
 }
 
-func (s *SysTableRepositoryImpl) GetTableByTableCode(code string) (model.SysTable, error) {
+func (s *SysTableRepositoryImpl) GetTableByTableCode(ctx context.Context, code string) (model.SysTable, error) {
 	var table model.SysTable
-	err := s.db.Preload("TableFields", func(db *gorm.DB) *gorm.DB {
+	err := s.db.WithContext(ctx).Preload("TableFields", func(db *gorm.DB) *gorm.DB {
 		return db.Order("sequence")
 	}).Preload("TableRelations").Preload("TableIndexes.IndexFields").Where("table_code = ? ", code).First(&table).Error
 	return table, err
 }
 
-func (s *SysTableRepositoryImpl) GetTableList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SysTable], error) {
+func (s *SysTableRepositoryImpl) FindMetadataIdentity(db *gorm.DB, id int) (model.SysTable, error) {
+	if db == nil {
+		db = s.db
+	}
+	var table model.SysTable
+	err := db.Select("id", "table_code", "state", "gmt_delete").Unscoped().Where("id = ?", id).First(&table).Error
+	return table, err
+}
+
+func (s *SysTableRepositoryImpl) GetTableList(ctx context.Context, basic *request.Basic, table model.SysTable) (response.ListResult[model.SysTable], error) {
 	var repo response.ListResult[model.SysTable]
 	var sysTableList []model.SysTable
-	total, err := s.PaginateAndCountAsync(basic, &sysTableList, table)
+	total, err := s.WithContext(ctx).PaginateAndCountAsync(basic, &sysTableList, table)
 	zap.L().Debug("sysTableList", zap.Any("sysTableList", sysTableList))
 	repo.Data = sysTableList
 	repo.Total = int(total)
 	return repo, err
+}
+
+func (s *SysTableRepositoryImpl) ListRuntimeTables(ctx context.Context) ([]model.SysTable, error) {
+	var tables []model.SysTable
+	err := s.db.WithContext(ctx).
+		Preload("TableFields", func(db *gorm.DB) *gorm.DB {
+			return db.Where("state = ?", true).Order("sequence, field_code")
+		}).
+		Preload("TableRelations", "state = ?", true).
+		Where("state = ?", true).
+		Order("table_code").
+		Find(&tables).Error
+	return tables, err
+}
+
+func (s *SysTableRepositoryImpl) HasTableColumn(db *gorm.DB, tableCode, fieldCode string) bool {
+	if db == nil {
+		db = s.db
+	}
+	tableName := util.GetTableName(db, tableCode)
+	return db.Migrator().HasColumn(tableName, fieldCode)
+}
+
+func (s *SysTableRepositoryImpl) HasPhysicalTable(db *gorm.DB, tableCode string) bool {
+	if db == nil {
+		db = s.db
+	}
+	return db.Migrator().HasTable(util.GetTableName(db, tableCode))
 }
 
 // CreateTableIndex 创建实体表索引
@@ -94,28 +134,22 @@ func quoteSQLIdentifierList(fields string) string {
 
 func (s *SysTableRepositoryImpl) CreateTable(tx *gorm.DB, tableCode string, model any) error {
 	tableName := util.GetTableName(tx, tableCode)
-	// 检查表是否存在
-	if !tx.Migrator().HasTable(tableName) {
-		// 不存在则创建表
-		err := tx.Table(tableName).AutoMigrate(model)
-		if err != nil {
-			return err
-		}
+	if tx.Migrator().HasTable(tableName) {
+		return error2.ErrTableExist
 	}
-	return nil
+	return tx.Table(tableName).AutoMigrate(model)
 }
 
 func (s *SysTableRepositoryImpl) CreateView(tx *gorm.DB, viewCode string, sql string) error {
 	viewName := util.GetTableName(tx, viewCode)
-	trimmed := strings.TrimSpace(sql)
-	if trimmed == "" {
+	query, err := platformmetadata.ValidateReadOnlyQuery(sql)
+	if errors.Is(err, platformmetadata.ErrReadOnlyQueryEmpty) {
 		return error2.ErrTableViewSQLEmpty
 	}
-	lower := strings.ToLower(trimmed)
-	if strings.HasPrefix(lower, "create view") || strings.HasPrefix(lower, "create or replace view") {
-		return tx.Exec(trimmed).Error
+	if err != nil {
+		return err
 	}
-	createSQL := fmt.Sprintf("CREATE OR REPLACE VIEW %s AS %s", quoteSQLIdentifier(viewName), trimmed)
+	createSQL := fmt.Sprintf("CREATE OR REPLACE VIEW %s AS %s", quoteSQLIdentifier(viewName), query)
 	return tx.Exec(createSQL).Error
 }
 
@@ -163,9 +197,12 @@ func (s *SysTableRepositoryImpl) ChangeTableColumn(tx *gorm.DB, tableCode string
 	return alterPostgresColumn(tx, tableName, fieldCode, sqlType)
 }
 
-func (s *SysTableRepositoryImpl) FetchTableMetadata(tableSchema string, tableCode string) ([]model.TableColumnMate, error) {
+func (s *SysTableRepositoryImpl) FetchTableMetadata(ctx context.Context, db *gorm.DB, tableSchema string, tableCode string) ([]model.TableColumnMate, error) {
 	var columns []model.TableColumnMate
-	tableName := util.GetTableName(s.db, tableCode)
+	if db == nil {
+		db = s.db
+	}
+	tableName := util.GetTableName(db, tableCode)
 	query := `
 SELECT
 	c.column_name AS "COLUMN_NAME",
@@ -197,16 +234,19 @@ LEFT JOIN (
 	AND pk.column_name = c.column_name
 WHERE c.table_schema = ? AND c.table_name = ?
 ORDER BY c.ordinal_position;`
-	err := s.db.Raw(query, normalizePostgresSchema(tableSchema), tableName).Scan(&columns).Error
+	err := db.WithContext(ctx).Raw(query, normalizePostgresSchema(tableSchema), tableName).Scan(&columns).Error
 	if err != nil {
 		return []model.TableColumnMate{}, err
 	}
 	return columns, nil
 }
 
-func (s *SysTableRepositoryImpl) FetchTableIndexMetadata(tableSchema string, tableCode string) ([]model.TableIndexMate, error) {
+func (s *SysTableRepositoryImpl) FetchTableIndexMetadata(ctx context.Context, db *gorm.DB, tableSchema string, tableCode string) ([]model.TableIndexMate, error) {
 	var indexes []model.TableIndexMate
-	tableName := util.GetTableName(s.db, tableCode)
+	if db == nil {
+		db = s.db
+	}
+	tableName := util.GetTableName(db, tableCode)
 	query := `
 SELECT
 	a.attname AS "COLUMN_NAME",
@@ -219,7 +259,7 @@ JOIN pg_class i ON i.oid = ix.indexrelid
 JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
 WHERE n.nspname = ? AND t.relname = ? AND ix.indisprimary = false
 ORDER BY i.relname, a.attnum;`
-	err := s.db.Raw(query, normalizePostgresSchema(tableSchema), tableName).Scan(&indexes).Error
+	err := db.WithContext(ctx).Raw(query, normalizePostgresSchema(tableSchema), tableName).Scan(&indexes).Error
 	if err != nil {
 		return []model.TableIndexMate{}, err
 	}

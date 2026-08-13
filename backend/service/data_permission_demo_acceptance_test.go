@@ -216,7 +216,12 @@ func newDataPermissionDemoAcceptanceService(
 		},
 	)
 	metadataAdapter, err := datapermission.NewMetadataFieldAdapter(
-		impl.NewDataPermissionMetadataReaderImpl(primaryDB),
+		NewMetadataRuntimeService(
+			impl.NewSysTableRepositoryImpl(primaryDB),
+			impl.NewSysTableFieldRepositoryImpl(primaryDB),
+			nil,
+			nil,
+		),
 	)
 	if err != nil {
 		t.Fatalf("create Metadata Adapter: %v", err)

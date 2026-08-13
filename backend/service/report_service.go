@@ -5,12 +5,14 @@ import (
 	"backend/dto/response"
 	"backend/enum"
 	myerrors "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/internal/reportconfig"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
 	queryutil "backend/repository/util"
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
@@ -49,9 +51,6 @@ const (
 	maxReportExportRows        = 10000
 )
 
-var reportSQLForbiddenPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|merge|truncate|drop|alter|create|grant|revoke|replace|call|execute|exec|copy|vacuum|reindex|attach|detach|pragma|pg_sleep|benchmark|sleep)\b`)
-var reportSQLForbiddenPhrasePattern = regexp.MustCompile(`(?i)\bexplain\s+analyze\b`)
-
 type ReportExecutionSnapshot struct {
 	ReportId            int
 	VersionId           int
@@ -87,7 +86,7 @@ type ReportService struct {
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository
 	casbinRuleRepo        repository.CasbinRuleRepository
 	generalizationService *GeneralizationService
-	sysTableService       *SysTableService
+	metadataRuntime       platformmetadata.RuntimeReader
 	sf                    *utils.Snowflake
 }
 
@@ -102,7 +101,7 @@ func NewReportService(
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
 	casbinRuleRepo repository.CasbinRuleRepository,
 	generalizationService *GeneralizationService,
-	sysTableService *SysTableService,
+	metadataRuntime platformmetadata.RuntimeReader,
 	sf *utils.Snowflake,
 ) *ReportService {
 	return &ReportService{
@@ -116,7 +115,7 @@ func NewReportService(
 		sysRoleMenuButtonRepo: sysRoleMenuButtonRepo,
 		casbinRuleRepo:        casbinRuleRepo,
 		generalizationService: generalizationService,
-		sysTableService:       sysTableService,
+		metadataRuntime:       metadataRuntime,
 		sf:                    sf,
 	}
 }
@@ -137,28 +136,13 @@ func (s *ReportService) GetReportDefinitionById(id int) (model.ReportDefinition,
 }
 
 func (s *ReportService) GetDataSources() ([]response.ReportDataSourceRes, error) {
-	query := &request.Basic{
-		Page:      1,
-		Num:       500,
-		TableCode: "sys_table",
-		Order: request.Order{
-			Field: "gmt_modify",
-			IsAsc: false,
-		},
-	}
-	result, err := s.sysTableService.GetTableList(query)
+	result, err := s.metadataRuntime.ListTables(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	items := make([]response.ReportDataSourceRes, 0, len(result.Data))
-	for _, table := range result.Data {
-		fullTable, err := s.sysTableService.GetTableByTableCode(table.TableCode)
-		if err != nil {
-			return nil, err
-		}
-		if fullTable.Id == 0 {
-			continue
-		}
+	items := make([]response.ReportDataSourceRes, 0, len(result))
+	for _, tableMetadata := range result {
+		fullTable := tableMetadata.QueryModel()
 		items = append(items, response.ReportDataSourceRes{
 			Id:          fullTable.Id,
 			Name:        fullTable.TableName,
@@ -169,6 +153,20 @@ func (s *ReportService) GetDataSources() ([]response.ReportDataSourceRes, error)
 		})
 	}
 	return items, nil
+}
+
+func (s *ReportService) ResolveRuntimeTable(ctx context.Context, tableCode string) (model.SysTable, error) {
+	if s == nil || s.metadataRuntime == nil {
+		return model.SysTable{}, myerrors.NewBadRequestError("报表元数据服务未初始化")
+	}
+	table, err := s.metadataRuntime.GetTable(ctx, tableCode)
+	if errors.Is(err, myerrors.ErrDataNotFound) {
+		return model.SysTable{}, nil
+	}
+	if err != nil {
+		return model.SysTable{}, err
+	}
+	return table.QueryModel(), nil
 }
 
 func (s *ReportService) InferSQLFields(ctx *gin.Context, req request.ReportSQLFieldsReq) ([]response.ReportPreviewColumn, error) {
@@ -933,7 +931,7 @@ func (s *ReportService) resolveReportTables(report model.ReportDefinition) (mode
 	if normalizeReportSourceType(report.SourceType) == "" {
 		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表数据源类型不合法")
 	}
-	sourceTable, err := s.sysTableService.GetTableByTableCode(strings.TrimSpace(report.SourceCode))
+	sourceTable, err := s.ResolveRuntimeTable(context.Background(), strings.TrimSpace(report.SourceCode))
 	if err != nil {
 		return model.SysTable{}, model.SysTable{}, err
 	}
@@ -951,7 +949,7 @@ func (s *ReportService) resolveReportPreviewTable(snapshot ReportExecutionSnapsh
 	if selectedDataset.Id == "" {
 		return s.resolveReportTables(reportDefinitionFromSnapshot(snapshot))
 	}
-	sourceTable, err := s.sysTableService.GetTableByTableCode(strings.TrimSpace(selectedDataset.SourceCode))
+	sourceTable, err := s.ResolveRuntimeTable(context.Background(), strings.TrimSpace(selectedDataset.SourceCode))
 	if err != nil {
 		return model.SysTable{}, model.SysTable{}, err
 	}
@@ -962,7 +960,7 @@ func (s *ReportService) resolveReportPreviewTable(snapshot ReportExecutionSnapsh
 }
 
 func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) error {
-	if s.sysTableService == nil {
+	if s.metadataRuntime == nil {
 		return myerrors.NewBadRequestError("报表表结构服务未初始化")
 	}
 	datasetByID := make(map[string]reportconfig.Dataset, len(config.Datasets()))
@@ -974,7 +972,7 @@ func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) 
 		if dataset.Type != reportconfig.SourceTypeTable {
 			continue
 		}
-		table, err := s.sysTableService.GetTableByTableCode(dataset.SourceCode)
+		table, err := s.ResolveRuntimeTable(context.Background(), dataset.SourceCode)
 		if err != nil {
 			return err
 		}
@@ -1047,7 +1045,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 		if dataset.Type != reportconfig.SourceTypeTable {
 			continue
 		}
-		table, err := s.sysTableService.GetTableByTableCode(dataset.SourceCode)
+		table, err := s.ResolveRuntimeTable(reportRequestContext(ctx), dataset.SourceCode)
 		if err != nil {
 			return response.ReportPreviewRes{}, err
 		}
@@ -1146,6 +1144,13 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	}, nil
 }
 
+func reportRequestContext(ctx *gin.Context) context.Context {
+	if ctx != nil && ctx.Request != nil {
+		return ctx.Request.Context()
+	}
+	return context.Background()
+}
+
 func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
 	permission, err := s.generalizationService.ResolveDataPermission(ctx, primaryTable, reportDataPermissionOperation(action))
 	if err != nil {
@@ -1159,22 +1164,9 @@ func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gor
 }
 
 func safeReportPreviewSQL(raw string) (string, error) {
-	sqlText := strings.TrimSpace(raw)
-	if sqlText == "" {
-		return "", myerrors.NewBadRequestError("SQL 数据集未配置 SQL")
-	}
-	if strings.Contains(sqlText, ";") {
-		return "", myerrors.NewBadRequestError("SQL 数据集预览仅允许单条 SELECT/WITH 查询，禁止使用分号")
-	}
-	lower := strings.ToLower(sqlText)
-	if !strings.HasPrefix(lower, "select") && !strings.HasPrefix(lower, "with") {
-		return "", myerrors.NewBadRequestError("SQL 数据集预览仅允许 SELECT/WITH 只读查询")
-	}
-	if reportSQLForbiddenPattern.MatchString(sqlText) {
-		return "", myerrors.NewBadRequestError("SQL 数据集预览禁止写操作或 DDL 关键字")
-	}
-	if reportSQLForbiddenPhrasePattern.MatchString(sqlText) {
-		return "", myerrors.NewBadRequestError("SQL 数据集预览禁止高风险分析语句")
+	sqlText, err := platformmetadata.ValidateReadOnlyQuery(raw)
+	if err != nil {
+		return "", myerrors.NewBadRequestError("SQL 数据集仅允许单条 SELECT/WITH 只读查询")
 	}
 	return sqlText, nil
 }

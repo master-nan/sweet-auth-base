@@ -12,16 +12,14 @@ import (
 )
 
 type ReportController struct {
-	reportService   *service.ReportService
-	sysTableService *service.SysTableService
-	translators     map[string]ut.Translator
+	reportService *service.ReportService
+	translators   map[string]ut.Translator
 }
 
-func NewReportController(reportService *service.ReportService, sysTableService *service.SysTableService, translators map[string]ut.Translator) *ReportController {
+func NewReportController(reportService *service.ReportService, translators map[string]ut.Translator) *ReportController {
 	return &ReportController{
-		reportService:   reportService,
-		sysTableService: sysTableService,
-		translators:     translators,
+		reportService: reportService,
+		translators:   translators,
 	}
 }
 
@@ -37,7 +35,7 @@ func (r *ReportController) QueryReportDefinitions(ctx *gin.Context) {
 	if data.TableCode == "" {
 		data.TableCode = "report_definition"
 	}
-	table, err := r.sysTableService.GetTableByTableCode(data.TableCode)
+	table, err := r.reportService.ResolveRuntimeTable(ctx.Request.Context(), data.TableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

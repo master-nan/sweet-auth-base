@@ -232,12 +232,12 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 		sf,
 		permissionRuntime,
 	)
-	sysTableService := &SysTableService{
-		sysTableRepo:       impl.NewSysTableRepositoryImpl(primaryDB),
-		sysTableFieldRepo:  impl.NewSysTableFieldRepositoryImpl(primaryDB),
-		sysTableCache:      cache.NewSysTableCache(store),
-		sysTableFieldCache: cache.NewSysTableFieldCache(store),
-	}
+	metadataRuntime := NewMetadataRuntimeService(
+		impl.NewSysTableRepositoryImpl(primaryDB),
+		impl.NewSysTableFieldRepositoryImpl(primaryDB),
+		cache.NewSysTableCache(store),
+		cache.NewSysTableFieldCache(store),
+	)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Set("user", user)
 	return &reportV1ATestEnv{
@@ -248,7 +248,7 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 			reportVersionRepo:     impl.NewReportDefinitionVersionRepositoryImpl(primaryDB),
 			reportLogRepo:         impl.NewReportExecutionLogRepositoryImpl(primaryDB),
 			generalizationService: generalizationService,
-			sysTableService:       sysTableService,
+			metadataRuntime:       metadataRuntime,
 			sf:                    sf,
 		},
 		ctx: ctx,

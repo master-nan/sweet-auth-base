@@ -9,6 +9,7 @@ import (
 	"backend/internal/audit"
 	"backend/internal/database"
 	"backend/model"
+	"context"
 
 	"gorm.io/gorm"
 )
@@ -47,18 +48,21 @@ func (s *SysTableFieldRepositoryImpl) Create(tx *gorm.DB, entity interface{}) er
 	}
 }
 
-func (s *SysTableFieldRepositoryImpl) GetTableFieldsByTableId(id int) ([]model.SysTableField, error) {
+func (s *SysTableFieldRepositoryImpl) GetTableFieldsByTableId(ctx context.Context, id int) ([]model.SysTableField, error) {
 	var items []model.SysTableField
-	err := s.db.Where("table_id = ?", id).Order("sequence").Find(&items).Error
+	err := s.db.WithContext(ctx).Where("table_id = ?", id).Order("sequence, field_code").Find(&items).Error
 	return items, err
 }
 
-func (s *SysTableFieldRepositoryImpl) FindByIdForConfigDB(db *gorm.DB, id int) (model.SysTableField, error) {
+func (s *SysTableFieldRepositoryImpl) FindMetadataSecurityField(db *gorm.DB, id int) (model.SysTableField, error) {
+	if db == nil {
+		db = s.db
+	}
 	var field model.SysTableField
 	err := db.Select(
-		"id", "state", "table_id", "field_code", "field_type", "field_category",
-		"expression", "is_primary_key",
-	).Where("id = ?", id).First(&field).Error
+		"id", "state", "gmt_delete", "table_id", "field_code", "field_type", "input_type",
+		"field_category", "expression", "is_primary_key", "is_advanced_search",
+	).Unscoped().Where("id = ?", id).First(&field).Error
 	return field, err
 }
 

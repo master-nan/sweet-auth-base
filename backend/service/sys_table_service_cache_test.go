@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestUpdateTableInvalidatesPreviousTableCodeCache(t *testing.T) {
+func TestUpdateTableRejectsStableCodeMutationAndRefreshesCache(t *testing.T) {
 	db := sysTableCacheTestDB(t)
 	table := model.SysTable{
 		Basic:     model.Basic{Id: 10, State: true},
@@ -53,18 +53,29 @@ func TestUpdateTableInvalidatesPreviousTableCodeCache(t *testing.T) {
 		Id:        table.Id,
 		TableName: "Orders V2",
 		TableCode: "orders_v2",
-	}); err != nil {
-		t.Fatalf("update table: %v", err)
+	}); err == nil {
+		t.Fatal("expected stable table_code mutation to be rejected")
 	}
 
-	if tableCache.Exists("orders") {
-		t.Fatal("expected previous table_code cache to be invalidated")
+	if !tableCache.Exists("orders") {
+		t.Fatal("expected stable table_code cache to remain available")
 	}
-	updated, err := tableCache.Get("orders_v2")
+	if tableCache.Exists("orders_v2") {
+		t.Fatal("unexpected cache entry for rejected table_code")
+	}
+
+	if err := svc.UpdateTable(ginTestContext(), request.TableUpdateReq{
+		Id:        table.Id,
+		TableName: "Orders V2",
+		TableCode: "orders",
+	}); err != nil {
+		t.Fatalf("update table name: %v", err)
+	}
+	updated, err := tableCache.Get("orders")
 	if err != nil {
-		t.Fatalf("expected new table_code cache to be set: %v", err)
+		t.Fatalf("expected stable table_code cache to be refreshed: %v", err)
 	}
-	if updated.TableCode != "orders_v2" || updated.TableName != "Orders V2" {
+	if updated.TableCode != "orders" || updated.TableName != "Orders V2" {
 		t.Fatalf("unexpected refreshed table cache: %+v", updated)
 	}
 }
@@ -145,7 +156,14 @@ func newSysTableCacheTestService(db *gorm.DB) (*SysTableService, *cache.SysTable
 	store := newJSONMemoryCacher()
 	tableCache := cache.NewSysTableCache(store)
 	fieldCache := cache.NewSysTableFieldCache(store)
-	tableRepo := impl.NewSysTableRepositoryImpl(&database.PrimaryDB{DB: db})
+	primaryDB := &database.PrimaryDB{DB: db}
+	tableRepo := impl.NewSysTableRepositoryImpl(primaryDB)
+	metadataRuntime := NewMetadataRuntimeService(
+		tableRepo,
+		impl.NewSysTableFieldRepositoryImpl(primaryDB),
+		tableCache,
+		fieldCache,
+	)
 	return NewSysTableService(
 		tableRepo,
 		nil,
@@ -159,8 +177,7 @@ func newSysTableCacheTestService(db *gorm.DB) (*SysTableService, *cache.SysTable
 		nil,
 		nil,
 		nil,
-		tableCache,
-		fieldCache,
+		metadataRuntime,
 		&config.Server{},
 	), tableCache, fieldCache
 }

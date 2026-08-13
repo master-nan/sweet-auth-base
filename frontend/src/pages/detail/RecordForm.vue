@@ -35,7 +35,11 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import { useGeneralizationApi } from 'src/api/services/generalization'
-import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
+import {
+  useTableApi,
+  type RuntimeTableMetadata,
+  type TableField,
+} from 'src/api/services/sys-table'
 import type { RouteData } from 'src/types'
 import { useUserStore } from 'src/stores/user'
 import { useTagViewStore } from 'src/stores/tagView'
@@ -61,7 +65,7 @@ const generalizationApi = useGeneralizationApi()
 
 const loadError = ref('')
 const formVisible = ref(true)
-const table = ref<Table | null>(null)
+const table = ref<RuntimeTableMetadata | null>(null)
 const tableFields = ref<TableField[]>([])
 const editData = ref<Record<string, any> | null>(null)
 

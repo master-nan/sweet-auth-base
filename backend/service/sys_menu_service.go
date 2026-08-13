@@ -9,6 +9,7 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	myerrors "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -31,7 +32,7 @@ type SysMenuService struct {
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository
 	sysUserRoleRepo       repository.SysUserRoleRepository
 	sysMenuButtonRepo     repository.SysMenuButtonRepository
-	sysTableRepo          repository.SysTableRepository
+	metadataRuntime       platformmetadata.RuntimeReader
 	casbinRuleRepo        repository.CasbinRuleRepository
 	sf                    *utils.Snowflake
 }
@@ -39,7 +40,7 @@ type SysMenuService struct {
 func NewSysMenuService(sysMenuRepo repository.SysMenuRepository, sysRoleMenuRepo repository.SysRoleMenuRepository, sysRoleRepo repository.SysRoleRepository,
 	sysRoleMenuButtons repository.SysRoleMenuButtonRepository,
 	sysUserRoleRepo repository.SysUserRoleRepository, sysMenuButtonRepo repository.SysMenuButtonRepository,
-	sysTableRepo repository.SysTableRepository, casbinRuleRepo repository.CasbinRuleRepository,
+	metadataRuntime platformmetadata.RuntimeReader, casbinRuleRepo repository.CasbinRuleRepository,
 	sf *utils.Snowflake) *SysMenuService {
 	return &SysMenuService{
 		sysMenuRepo,
@@ -48,7 +49,7 @@ func NewSysMenuService(sysMenuRepo repository.SysMenuRepository, sysRoleMenuRepo
 		sysRoleMenuButtons,
 		sysUserRoleRepo,
 		sysMenuButtonRepo,
-		sysTableRepo,
+		metadataRuntime,
 		casbinRuleRepo,
 		sf,
 	}
@@ -295,25 +296,31 @@ func (s *SysMenuService) attachMenuDetailOpenModes(menus []model.SysMenu) error 
 	if len(tableCodes) == 0 {
 		return nil
 	}
-	tables, err := s.sysTableRepo.FindListByFieldIn("table_code", tableCodes)
+	tables, err := s.metadataRuntime.ListTables(context.Background())
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
 		return err
 	}
-	applyMenuDetailOpenModes(menus, tables)
+	applyMenuDetailOpenModes(menus, tables, seen)
 	return nil
 }
 
-func applyMenuDetailOpenModes(menus []model.SysMenu, tables []model.SysTable) {
+func applyMenuDetailOpenModes(
+	menus []model.SysMenu,
+	tables []platformmetadata.TableMetadata,
+	wanted map[string]struct{},
+) {
 	modeByTableCode := make(map[string]enum.SysDetailOpenMode, len(tables))
 	for _, table := range tables {
+		if len(wanted) > 0 {
+			if _, ok := wanted[table.Code]; !ok {
+				continue
+			}
+		}
 		mode, ok := enum.NormalizeSysDetailOpenMode(string(table.DetailOpenMode))
 		if !ok {
 			mode = enum.DetailOpenAuto
 		}
-		modeByTableCode[table.TableCode] = mode
+		modeByTableCode[table.Code] = mode
 	}
 	for index := range menus {
 		if mode, exists := modeByTableCode[menus[index].TableCode]; exists {

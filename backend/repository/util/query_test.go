@@ -581,6 +581,24 @@ func TestListResultFieldsKeepsHiddenPrimaryKeyForRowActions(t *testing.T) {
 	}
 }
 
+func TestListResultFieldsRejectsArbitraryCalculatedExpressions(t *testing.T) {
+	unsafe := "(select password from sys_user limit 1)"
+	safe := "rel:org_unit.name"
+	table := model.SysTable{
+		TableCode: "demo_table",
+		TableFields: []model.SysTableField{
+			{FieldCode: "id", FieldType: enum.BigIntFieldType, IsPrimaryKey: true},
+			{FieldCode: "unsafe", FieldType: enum.VarcharFieldType, IsListShow: true, FieldCategory: enum.CalculatedField, Expression: &unsafe},
+			{FieldCode: "org_name", FieldType: enum.VarcharFieldType, IsListShow: true, FieldCategory: enum.VirtualField, Expression: &safe},
+		},
+	}
+
+	fields := listResultFields(table.TableFields)
+	if len(fields) != 2 || fields[0].FieldCode != "id" || fields[1].FieldCode != "org_name" {
+		t.Fatalf("unsafe calculated field reached runtime selection: %+v", fields)
+	}
+}
+
 func TestDynamicQueryDoesNotDuplicateRowsForOneToManyRelations(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {

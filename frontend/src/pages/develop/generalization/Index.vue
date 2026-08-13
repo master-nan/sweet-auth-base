@@ -594,8 +594,9 @@ import Ajv from 'ajv'
 
 import type { Query } from 'src/types/global'
 import {
-  useTableApi,
-  type Table,
+	useTableApi,
+	type RuntimeTableMetadata,
+	type Table,
   type TableField,
   type TableRelation,
 } from 'src/api/services/sys-table'
@@ -671,7 +672,7 @@ const columns = ref<QTableProps['columns']>([])
 const table_fields_advanced = ref<TableField[]>([])
 const visibleColumns = ref<string[]>([])
 const tableFields = ref<TableField[]>([])
-const currentTable = ref<Table | null>(null)
+const currentTable = ref<RuntimeTableMetadata | null>(null)
 const menuButtons = ref<MenuButton[]>([])
 const relationLookups = ref<Record<string, LookupMap>>({})
 
@@ -1777,7 +1778,7 @@ const handleFormButtonClick = (button: MenuButton, formData: Record<string, any>
 const fetchTableMeta = async (tableCode: string) => {
   const res = await tableApi.queryTableByCode(tableCode)
   if (res.data && res.data.table_fields) {
-    currentTable.value = res.data as Table
+		currentTable.value = res.data
     tableFields.value = res.data.table_fields
     const dictCodes = res.data.table_fields
       .map((field) => field.dict_code)

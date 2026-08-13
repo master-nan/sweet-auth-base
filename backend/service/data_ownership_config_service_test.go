@@ -399,7 +399,12 @@ func newDataOwnershipConfigTestSubject(
 		impl.NewDataResourceRepositoryImpl(primaryDB),
 		impl.NewDataDimensionDefinitionRepositoryImpl(primaryDB),
 		impl.NewDataOwnershipFieldRepositoryImpl(primaryDB),
-		impl.NewSysTableFieldRepositoryImpl(primaryDB),
+		NewMetadataRuntimeService(
+			impl.NewSysTableRepositoryImpl(primaryDB),
+			impl.NewSysTableFieldRepositoryImpl(primaryDB),
+			nil,
+			nil,
+		),
 		validator,
 		sf,
 		auditWriter,
@@ -434,6 +439,9 @@ func createMetadataOwnershipFixtures(
 	testutil.MustCreate(t, db, &field)
 	testutil.MustCreate(t, db, &resource)
 	testutil.MustCreate(t, db, &dimension)
+	if err := db.Exec(`CREATE TABLE tms_order (owner_org_id integer)`).Error; err != nil {
+		t.Fatalf("create physical ownership table: %v", err)
+	}
 	return resource, dimension, field
 }
 

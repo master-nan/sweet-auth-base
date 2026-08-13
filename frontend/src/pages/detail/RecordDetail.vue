@@ -184,7 +184,11 @@ import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import { useFileApi } from 'src/api/services/file'
 import { useGeneralizationApi } from 'src/api/services/generalization'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
+import {
+  useTableApi,
+  type RuntimeTableMetadata,
+  type TableField,
+} from 'src/api/services/sys-table'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useDictStore } from 'src/stores/dict'
 import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
@@ -258,7 +262,7 @@ const { loading } = storeToRefs(loadingStore)
 
 const loadError = ref('')
 const record = ref<Record<string, any> | null>(null)
-const table = ref<Table | null>(null)
+const table = ref<RuntimeTableMetadata | null>(null)
 const tableFields = ref<TableField[]>([])
 const relationLookups = ref<Record<string, LookupMap>>({})
 const richTextHtmlMap = ref<Record<string, string>>({})
@@ -566,10 +570,7 @@ async function loadAuditDetail() {
     master_detail_mode: 'auto' as any,
     form_open_mode: 'auto' as any,
     detail_open_mode: 'auto' as any,
-    parent_id: 0,
     table_fields: [],
-    sql: '',
-    table_indexes: [],
     table_relations: [],
   }
   tableFields.value = buildAuditFields()

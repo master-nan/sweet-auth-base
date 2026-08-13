@@ -101,6 +101,17 @@ export interface Table extends Basic {
   table_relations: Array<TableRelation>
 }
 
+export interface RuntimeTableMetadata extends Basic {
+  table_name: string
+  table_code: string
+  table_type: SysTableType
+  master_detail_mode: SysMasterDetailMode
+  form_open_mode: SysFormOpenMode
+  detail_open_mode: SysDetailOpenMode
+  table_fields: Array<TableField>
+  table_relations: Array<TableRelation>
+}
+
 export interface TablePublishReq {
   parent_id?: number
 }
@@ -201,7 +212,7 @@ export const useTableApi = () => {
   }
 
   const queryTableByCode = async (code: string) => {
-    return instance.get<ResponseData<Table>>(`/admin/table/code/${code}`).then((res) => {
+    return instance.get<ResponseData<RuntimeTableMetadata>>(`/admin/table/code/${code}`).then((res) => {
       return res.data
     })
   }

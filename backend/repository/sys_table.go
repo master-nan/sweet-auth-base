@@ -9,17 +9,22 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/model"
+	"context"
 	"gorm.io/gorm"
 )
 
 type SysTableRepository interface {
 	BasicRepository[model.SysTable]
-	GetTableById(int) (model.SysTable, error)
-	GetTableByTableCode(string) (model.SysTable, error)
-	GetTableList(*request.Basic, model.SysTable) (response.ListResult[model.SysTable], error)
+	GetTableById(context.Context, int) (model.SysTable, error)
+	GetTableByTableCode(context.Context, string) (model.SysTable, error)
+	FindMetadataIdentity(*gorm.DB, int) (model.SysTable, error)
+	GetTableList(context.Context, *request.Basic, model.SysTable) (response.ListResult[model.SysTable], error)
+	ListRuntimeTables(context.Context) ([]model.SysTable, error)
+	HasPhysicalTable(*gorm.DB, string) bool
+	HasTableColumn(*gorm.DB, string, string) bool
 
-	FetchTableMetadata(string, string) ([]model.TableColumnMate, error)
-	FetchTableIndexMetadata(string, string) ([]model.TableIndexMate, error)
+	FetchTableMetadata(context.Context, *gorm.DB, string, string) ([]model.TableColumnMate, error)
+	FetchTableIndexMetadata(context.Context, *gorm.DB, string, string) ([]model.TableIndexMate, error)
 
 	Model([]model.SysTableField) interface{}
 

@@ -10,8 +10,8 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
-	"backend/internal/cache"
 	myerrors "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"strconv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
@@ -43,8 +42,7 @@ type SysTableService struct {
 	sysRoleMenuRepo        repository.SysRoleMenuRepository
 	sysRoleMenuButtonRepo  repository.SysRoleMenuButtonRepository
 	sf                     *utils.Snowflake
-	sysTableCache          *cache.SysTableCache
-	sysTableFieldCache     *cache.SysTableFieldCache
+	metadataRuntime        *MetadataRuntimeService
 	serverConfig           *config.Server
 }
 
@@ -63,8 +61,7 @@ func NewSysTableService(
 	sysRoleMenuRepo repository.SysRoleMenuRepository,
 	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
 	sf *utils.Snowflake,
-	sysTableCache *cache.SysTableCache,
-	sysTableFieldCache *cache.SysTableFieldCache,
+	metadataRuntime *MetadataRuntimeService,
 	serverConfig *config.Server,
 ) *SysTableService {
 	return &SysTableService{
@@ -80,68 +77,21 @@ func NewSysTableService(
 		sysRoleMenuRepo,
 		sysRoleMenuButtonRepo,
 		sf,
-		sysTableCache,
-		sysTableFieldCache,
+		metadataRuntime,
 		serverConfig,
 	}
 }
 
 func (s *SysTableService) GetTableById(id int) (model.SysTable, error) {
-	data, err := s.sysTableCache.Get(strconv.Itoa(id))
-	if err == nil {
-		return data, nil
-	}
-	if !errors.Is(err, cache.ErrCacheMiss) {
-		return model.SysTable{}, err
-	}
-	data, err = s.sysTableRepo.GetTableById(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.SysTable{}, nil
-		}
-		return model.SysTable{}, err
-	}
-	err = s.sysTableCache.Set(strconv.Itoa(id), data)
-	if err != nil {
-		return model.SysTable{}, err
-	}
-	err = s.sysTableCache.Set(data.TableCode, data)
-	if err != nil {
-		return model.SysTable{}, err
-	}
-	for _, field := range data.TableFields {
-		s.sysTableFieldCache.Set(strconv.Itoa(field.Id), field)
-	}
-	return data, nil
+	return s.metadataRuntime.configTableByID(context.Background(), id)
 }
 
 func (s *SysTableService) GetTableList(basic *request.Basic) (response.ListResult[model.SysTable], error) {
-	var result response.ListResult[model.SysTable]
-	table, err := s.GetTableByTableCode(basic.TableCode)
-	if err != nil {
-		return result, err
-	}
-	result, err = s.sysTableRepo.GetTableList(basic, table)
-	return result, err
+	return s.metadataRuntime.listConfigTables(context.Background(), basic)
 }
 
 func (s *SysTableService) GetTableByTableCode(code string) (model.SysTable, error) {
-	data, err := s.sysTableCache.Get(code)
-	if err == nil {
-		return data, nil
-	}
-	if !errors.Is(err, cache.ErrCacheMiss) {
-		return model.SysTable{}, err
-	}
-	data, err = s.sysTableRepo.GetTableByTableCode(code)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.SysTable{}, nil
-		}
-		return model.SysTable{}, err
-	}
-	s.sysTableCache.Set(code, data)
-	return data, nil
+	return s.metadataRuntime.configTableByCode(context.Background(), code)
 }
 
 func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCreateReq) error {
@@ -150,6 +100,9 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		return err
 	}
 	req.TableCode = tableCode
+	if err = validateMetadataTableType(req.TableType); err != nil {
+		return err
+	}
 	masterDetailMode, ok := enum.NormalizeSysMasterDetailMode(string(req.MasterDetailMode))
 	if !ok {
 		return fmt.Errorf("主子表展示模式不合法: %s", req.MasterDetailMode)
@@ -173,8 +126,13 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 	if table.Id != 0 {
 		return myerrors.ErrTableExist
 	}
-	if req.TableType == enum.View && strings.TrimSpace(req.SQL) == "" {
-		return myerrors.ErrTableViewSQLEmpty
+	if req.TableType == enum.View {
+		req.SQL, err = validateMetadataViewSQL(req.SQL)
+		if err != nil {
+			return err
+		}
+	} else if strings.TrimSpace(req.SQL) != "" {
+		return myerrors.NewBadRequestError("普通表不允许配置视图SQL")
 	}
 	err = copier.Copy(&data, &req)
 	if err != nil {
@@ -192,10 +150,13 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		data.SQL = req.SQL
 		data.ParentId = req.ParentId
 		if err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+			if s.sysTableRepo.HasPhysicalTable(tx, req.TableCode) {
+				return myerrors.ErrTableExist
+			}
 			if e := s.sysTableRepo.CreateView(tx, req.TableCode, req.SQL); e != nil {
 				return e
 			}
-			columns, e := s.sysTableRepo.FetchTableMetadata("public", req.TableCode)
+			columns, e := s.sysTableRepo.FetchTableMetadata(ctx, tx, "public", req.TableCode)
 			if e != nil {
 				return e
 			}
@@ -233,6 +194,9 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		fields[i].Id = int(fieldId)
 	}
 	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		if s.sysTableRepo.HasPhysicalTable(tx, data.TableCode) {
+			return myerrors.ErrTableExist
+		}
 		tableRecord := data
 		tableRecord.TableFields = nil
 		if e := s.sysTableRepo.Create(tx, &tableRecord); e != nil {
@@ -243,10 +207,6 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		}
 		// 创建实例
 		dynamicModel := s.sysTableRepo.Model(fields)
-		// 先删除再创建
-		if e := s.sysTableRepo.DropTable(tx, data.TableCode); e != nil {
-			return e
-		}
 		if e := s.sysTableRepo.CreateTable(tx, data.TableCode, dynamicModel); e != nil {
 			return e
 		}
@@ -291,8 +251,14 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 	if updateReq.TableCode == "" {
 		updateReq.TableCode = current.TableCode
 	}
+	if updateReq.TableCode != current.TableCode {
+		return myerrors.NewBadRequestError("表编码是跨模块稳定标识，创建后不可修改")
+	}
 	if updateReq.TableType == 0 {
 		updateReq.TableType = current.TableType
+	}
+	if err = validateMetadataTableType(updateReq.TableType); err != nil {
+		return err
 	}
 	if strings.TrimSpace(string(updateReq.MasterDetailMode)) == "" {
 		masterDetailMode, _ := enum.NormalizeSysMasterDetailMode(string(current.MasterDetailMode))
@@ -332,11 +298,12 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 	}
 
 	if updateReq.TableType == enum.View {
-		trimmedSQL := strings.TrimSpace(updateReq.SQL)
-		if trimmedSQL == "" {
-			return myerrors.ErrTableViewSQLEmpty
+		validatedSQL, validationErr := validateMetadataViewSQL(updateReq.SQL)
+		if validationErr != nil {
+			return validationErr
 		}
-		sqlChanged := strings.TrimSpace(current.SQL) != trimmedSQL
+		updateReq.SQL = validatedSQL
+		sqlChanged := strings.TrimSpace(current.SQL) != validatedSQL
 		err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 			if sqlChanged {
 				if e := s.sysTableRepo.CreateView(tx, updateReq.TableCode, updateReq.SQL); e != nil {
@@ -356,9 +323,12 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 				return err
 			}
 		}
-		s.deleteCachedTable(current)
+		s.metadataRuntime.deleteCachedTable(current)
 		s.RefreshCache(req.Id)
 		return nil
+	}
+	if strings.TrimSpace(updateReq.SQL) != "" {
+		return myerrors.NewBadRequestError("普通表不允许配置视图SQL")
 	}
 
 	tx := s.sysTableRepo.DBWithContext(ctx)
@@ -367,7 +337,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 		return err
 	}
 	// 刷新缓存
-	s.deleteCachedTable(current)
+	s.metadataRuntime.deleteCachedTable(current)
 	s.RefreshCache(req.Id)
 	return nil
 }
@@ -382,7 +352,7 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 			return e
 		}
 		// 查询表所有索引
-		tableIndexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(id)
+		tableIndexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, id)
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
@@ -402,7 +372,7 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 			}
 		}
 		// 查询关联表数据
-		relations, e := s.sysTableRelationRepo.GetTableRelationsByTableId(id)
+		relations, e := s.sysTableRelationRepo.GetTableRelationsByTableId(ctx, id)
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
@@ -428,40 +398,15 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 }
 
 func (s *SysTableService) GetTableFieldById(id int) (model.SysTableField, error) {
-	data, err := s.sysTableFieldCache.Get(strconv.Itoa(id))
-	if err == nil {
-		return data, nil
-	}
-	if !errors.Is(err, cache.ErrCacheMiss) {
-		return model.SysTableField{}, err
-	}
-	data, err = s.sysTableFieldRepo.FindById(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.SysTableField{}, nil
-		}
-		return model.SysTableField{}, err
-	}
-	s.sysTableFieldCache.Set(strconv.Itoa(id), data)
-	return data, nil
+	return s.metadataRuntime.configFieldByID(context.Background(), id)
 }
 
 func (s *SysTableService) GetTableFieldsByTableId(tableId int) ([]model.SysTableField, error) {
-	data, err := s.sysTableCache.Get(strconv.Itoa(tableId))
-	if err == nil {
-		return data.TableFields, nil
-	}
-	if !errors.Is(err, cache.ErrCacheMiss) {
-		return nil, err
-	}
-	fields, err := s.sysTableFieldRepo.GetTableFieldsByTableId(tableId)
+	table, err := s.metadataRuntime.configTableByID(context.Background(), tableId)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return []model.SysTableField{}, nil
-		}
 		return nil, err
 	}
-	return fields, nil
+	return table.TableFields, nil
 }
 
 func (s *SysTableService) CreateTableField(ctx context.Context, req request.TableFieldCreateReq) error {
@@ -501,6 +446,13 @@ func (s *SysTableService) CreateTableField(ctx context.Context, req request.Tabl
 		zap.L().Error("Error during struct mapping:", zap.Error(err))
 		return err
 	}
+	data.Expression = optionalMetadataString(req.Expression)
+	data.LinkageConfig = optionalMetadataString(req.LinkageConfig)
+	data.DefaultValue = optionalMetadataString(req.DefaultValue)
+	data.DictCode = optionalMetadataString(req.DictCode)
+	if err = validateMetadataFieldDefinition(&data, req.Sequence); err != nil {
+		return err
+	}
 	data.Id = int(id)
 	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
 		// 构建SQL类型字符串，包括长度、默认值、是否可为空和备注
@@ -526,6 +478,37 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 		return err
 	}
 	req.FieldCode = fieldCode
+	candidate := model.SysTableField{
+		TableId:            req.TableId,
+		FieldName:          req.FieldName,
+		FieldCode:          req.FieldCode,
+		FieldType:          req.FieldType,
+		FieldLength:        req.FieldLength,
+		FieldDecimalLength: req.FieldDecimalLength,
+		InputType:          req.InputType,
+		FormSpan:           req.FormSpan,
+		DetailSpan:         req.DetailSpan,
+		DefaultValue:       optionalMetadataString(req.DefaultValue),
+		DictCode:           optionalMetadataString(req.DictCode),
+		IsPrimaryKey:       req.IsPrimaryKey,
+		IsIndex:            req.IsIndex,
+		IsQuickSearch:      req.IsQuickSearch,
+		IsAdvancedSearch:   req.IsAdvancedSearch,
+		IsSort:             req.IsSort,
+		IsNull:             req.IsNull,
+		IsListShow:         req.IsListShow,
+		IsInsertShow:       req.IsInsertShow,
+		IsUpdateShow:       req.IsUpdateShow,
+		Sequence:           uint8(req.Sequence),
+		OriginalFieldId:    req.OriginalFieldId,
+		Binding:            req.Binding,
+		FieldCategory:      req.FieldCategory,
+		Expression:         optionalMetadataString(req.Expression),
+		LinkageConfig:      optionalMetadataString(req.LinkageConfig),
+	}
+	if err = validateMetadataFieldDefinition(&candidate, req.Sequence); err != nil {
+		return err
+	}
 	table, err := s.GetTableById(req.TableId)
 	if err != nil {
 		return err
@@ -621,7 +604,33 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 	return myerrors.ErrDataNotFound
 }
 
-const maxDBIdentifierLength = 64
+func optionalMetadataString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+const maxDBIdentifierLength = 63
+
+func validateMetadataTableType(tableType enum.SysTableType) error {
+	if tableType != enum.System && tableType != enum.View {
+		return myerrors.NewBadRequestError("表类型不合法")
+	}
+	return nil
+}
+
+func validateMetadataViewSQL(raw string) (string, error) {
+	query, err := platformmetadata.ValidateReadOnlyQuery(raw)
+	if errors.Is(err, platformmetadata.ErrReadOnlyQueryEmpty) {
+		return "", myerrors.ErrTableViewSQLEmpty
+	}
+	if err != nil {
+		return "", myerrors.NewBadRequestError("视图仅允许单条SELECT/WITH只读查询")
+	}
+	return query, nil
+}
 
 func normalizeDBIdentifier(name, value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
@@ -970,7 +979,7 @@ func (s *SysTableService) DeleteTableFieldById(ctx context.Context, id int) erro
 }
 
 func (s *SysTableService) GetTableRelationsByTableId(tableId int) ([]model.SysTableRelation, error) {
-	return s.sysTableRelationRepo.GetTableRelationsByTableId(tableId)
+	return s.sysTableRelationRepo.GetTableRelationsByTableId(context.Background(), tableId)
 }
 
 func (s *SysTableService) GetTableRelationById(id int) (model.SysTableRelation, error) {
@@ -995,10 +1004,13 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 	if req.ManyTableCode, err = normalizeOptionalDBIdentifier("中间表编码", req.ManyTableCode); err != nil {
 		return err
 	}
-	if req.RelationType == enum.ManyToMany && req.ManyTableCode == "" {
-		return myerrors.NewBadRequestError("多对多关系必须指定中间表编码")
+	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
+		return err
 	}
 	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		if req.RelationType == enum.ManyToMany && s.sysTableRepo.HasPhysicalTable(tx, req.ManyTableCode) {
+			return myerrors.ErrTableExist
+		}
 		var data model.SysTableRelation
 		e := copier.Copy(&data, &req)
 		if e != nil {
@@ -1076,19 +1088,24 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 	if req.ManyTableCode, err = normalizeOptionalDBIdentifier("中间表编码", req.ManyTableCode); err != nil {
 		return err
 	}
-	if req.RelationType == enum.ManyToMany && req.ManyTableCode == "" {
-		return myerrors.NewBadRequestError("多对多关系必须指定中间表编码")
+	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
+		return err
 	}
 
 	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		newJoinTable := req.RelationType == enum.ManyToMany &&
+			(oldRelation.RelationType != enum.ManyToMany || oldRelation.ManyTableCode != req.ManyTableCode)
+		if newJoinTable && s.sysTableRepo.HasPhysicalTable(tx, req.ManyTableCode) {
+			return myerrors.ErrTableExist
+		}
 		if e := s.sysTableRelationRepo.Update(tx, &req, req.Id); e != nil {
 			return e
 		}
 		// 如果旧关系是多对多且中间表存在，而新关系不再是多对多，则删除中间表
 		if oldRelation.RelationType == enum.ManyToMany && oldRelation.ManyTableCode != "" {
-			if req.RelationType != enum.ManyToMany {
+			if req.RelationType != enum.ManyToMany || oldRelation.ManyTableCode != req.ManyTableCode {
 				if e := s.sysTableRepo.DropTable(tx, oldRelation.ManyTableCode); e != nil {
-					zap.L().Warn("删除旧中间表失败", zap.String("table", oldRelation.ManyTableCode), zap.Error(e))
+					return e
 				}
 			}
 		}
@@ -1136,6 +1153,19 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 	return nil
 }
 
+func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableCode string) error {
+	if relationType < enum.OneToOne || relationType > enum.ManyToMany {
+		return myerrors.NewBadRequestError("关系类型不合法")
+	}
+	if relationType == enum.ManyToMany && manyTableCode == "" {
+		return myerrors.NewBadRequestError("多对多关系必须指定中间表编码")
+	}
+	if relationType != enum.ManyToMany && manyTableCode != "" {
+		return myerrors.NewBadRequestError("非多对多关系不允许配置中间表")
+	}
+	return nil
+}
+
 func (s *SysTableService) DeleteTableRelationById(ctx context.Context, id int) error {
 	relation, err := s.sysTableRelationRepo.FindById(id)
 	if err != nil {
@@ -1173,7 +1203,7 @@ func (s *SysTableService) GetTableIndexById(id int) (model.SysTableIndex, error)
 }
 
 func (s *SysTableService) GetTableIndexesByTableId(tableId int) ([]model.SysTableIndex, error) {
-	return s.sysTableIndexRepo.GetTableIndexesByTableId(tableId)
+	return s.sysTableIndexRepo.GetTableIndexesByTableId(context.Background(), tableId)
 }
 
 func (s *SysTableService) CreateTableIndex(ctx context.Context, req request.TableIndexCreateReq) error {
@@ -1330,7 +1360,7 @@ func (s *SysTableService) DeleteTableIndexByTableId(ctx context.Context, id int)
 	if e != nil {
 		return e
 	}
-	indexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(id)
+	indexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, id)
 	if e != nil {
 		return e
 	}
@@ -1354,8 +1384,22 @@ func (s *SysTableService) DeleteTableIndexByTableId(ctx context.Context, id int)
 }
 
 func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error {
-	columns, err := s.sysTableRepo.FetchTableMetadata("public", tableCode)
-	tableIndexes, err := s.sysTableRepo.FetchTableIndexMetadata("public", tableCode)
+	var err error
+	tableCode, err = normalizeDBIdentifier("表编码", tableCode)
+	if err != nil {
+		return err
+	}
+	if !s.sysTableRepo.HasPhysicalTable(s.sysTableRepo.DBWithContext(ctx), tableCode) {
+		return myerrors.ErrTableNotFound
+	}
+	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, nil, "public", tableCode)
+	if err != nil {
+		return err
+	}
+	tableIndexes, err := s.sysTableRepo.FetchTableIndexMetadata(ctx, nil, "public", tableCode)
+	if err != nil {
+		return err
+	}
 	fields := convertColumnsToSysTableFields(tableCode, columns)
 	id, err := s.sf.GenerateUniqueID()
 	if err != nil {
@@ -1430,7 +1474,12 @@ func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error
 // SyncTableFields 同步已有表结构到 sys_table_field。
 // 已存在的字段只修正敏感字段和系统托管字段的展示开关，不覆盖输入类型、字典、名称等页面配置。
 func (s *SysTableService) SyncTableFields(ctx context.Context, tableCode string) error {
-	columns, err := s.sysTableRepo.FetchTableMetadata("public", tableCode)
+	var err error
+	tableCode, err = normalizeDBIdentifier("表编码", tableCode)
+	if err != nil {
+		return err
+	}
+	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, nil, "public", tableCode)
 	if err != nil {
 		return err
 	}
@@ -1532,7 +1581,12 @@ func fieldVisibilityPatch(existing model.SysTableField) (model.SysTableField, bo
 
 // SyncTableIndexes 同步已有表索引到 sys_table_index 与 sys_table_index_field（仅补充缺失索引）
 func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string) error {
-	indexes, err := s.sysTableRepo.FetchTableIndexMetadata("public", tableCode)
+	var err error
+	tableCode, err = normalizeDBIdentifier("表编码", tableCode)
+	if err != nil {
+		return err
+	}
+	indexes, err := s.sysTableRepo.FetchTableIndexMetadata(ctx, nil, "public", tableCode)
 	if err != nil {
 		return err
 	}
@@ -1554,7 +1608,7 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		fieldMap[field.FieldCode] = field.Id
 	}
 
-	existingIndexes, err := s.sysTableIndexRepo.GetTableIndexesByTableId(table.Id)
+	existingIndexes, err := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, table.Id)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
@@ -2058,12 +2112,12 @@ func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID in
 
 // SyncViewTableFields 视图字段元数据全量对齐（增删改）
 func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.SysTable) error {
-	columns, err := s.sysTableRepo.FetchTableMetadata("public", table.TableCode)
+	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, nil, "public", table.TableCode)
 	if err != nil {
 		return err
 	}
 
-	existingFields, err := s.sysTableFieldRepo.GetTableFieldsByTableId(table.Id)
+	existingFields, err := s.sysTableFieldRepo.GetTableFieldsByTableId(ctx, table.Id)
 	if err != nil {
 		return err
 	}
@@ -2200,108 +2254,11 @@ func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.S
 // 表元数据有两种常用读取方式：按 id 读取、按 table_code 读取，所以缓存会同时保存两份 key。
 // 字段缓存按字段 id 保存，刷新表时也会同步刷新字段缓存，避免修改字段后通用页面仍拿旧配置。
 func (s *SysTableService) RefreshCache(originId int) {
-	table, err := s.sysTableRepo.GetTableById(originId)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			zap.L().Error("refresh sys table cache query failed", zap.Int("table_id", originId), zap.Error(err))
-		}
-		return
-	}
-	if table.Id == 0 {
-		return
-	}
-	s.deleteCachedTableById(originId)
-	s.deleteCachedTable(table)
-	s.setCachedTable(table)
+	s.metadataRuntime.Refresh(context.Background(), originId)
 }
 
 func (s *SysTableService) DeleteCache(tableId int) {
-	s.deleteCachedTableById(tableId)
-	table, err := s.sysTableRepo.WithUnscoped().WithPreload("TableFields").FindById(tableId)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			zap.L().Error("delete sys table cache query failed", zap.Int("table_id", tableId), zap.Error(err))
-		}
-		return
-	}
-	if table.Id != 0 {
-		s.deleteCachedTable(table)
-	}
-}
-
-// deleteCachedTableById 根据表 id 删除缓存。
-// 删除前先尝试读取旧缓存，是为了拿到 table_code 和字段 id，一次性删除相关联的缓存 key。
-func (s *SysTableService) deleteCachedTableById(tableId int) {
-	if s.sysTableCache == nil || tableId == 0 {
-		return
-	}
-	cached, err := s.sysTableCache.Get(strconv.Itoa(tableId))
-	if err != nil {
-		if !errors.Is(err, cache.ErrCacheMiss) {
-			zap.L().Error("get cached sys table failed", zap.Int("table_id", tableId), zap.Error(err))
-		}
-		return
-	}
-	s.deleteCachedTable(cached)
-}
-
-// deleteCachedTable 删除表缓存和字段缓存。
-// 这里看起来会删除 id 和 table_code 两个 key，但不是重复操作；
-// id key 服务于后台编辑场景，table_code key 服务于低代码通用页面运行时查询。
-func (s *SysTableService) deleteCachedTable(table model.SysTable) {
-	if table.Id == 0 {
-		return
-	}
-	if s.sysTableCache != nil {
-		if err := s.sysTableCache.Delete(strconv.Itoa(table.Id)); err != nil {
-			zap.L().Error("delete sys table cache by id failed", zap.Int("table_id", table.Id), zap.Error(err))
-		}
-		if strings.TrimSpace(table.TableCode) != "" {
-			if err := s.sysTableCache.Delete(table.TableCode); err != nil {
-				zap.L().Error("delete sys table cache by code failed", zap.String("table_code", table.TableCode), zap.Error(err))
-			}
-		}
-	}
-	if s.sysTableFieldCache == nil {
-		return
-	}
-	for _, field := range table.TableFields {
-		if field.Id == 0 {
-			continue
-		}
-		if err := s.sysTableFieldCache.Delete(strconv.Itoa(field.Id)); err != nil {
-			zap.L().Error("delete sys table field cache failed", zap.Int("field_id", field.Id), zap.Error(err))
-		}
-	}
-}
-
-// setCachedTable 写入表缓存和字段缓存。
-// 缓存粒度保持和删除逻辑一致：表按 id/table_code 双 key 保存，字段按字段 id 保存。
-func (s *SysTableService) setCachedTable(table model.SysTable) {
-	if table.Id == 0 {
-		return
-	}
-	if s.sysTableCache != nil {
-		if err := s.sysTableCache.Set(strconv.Itoa(table.Id), table); err != nil {
-			zap.L().Error("set sys table cache by id failed", zap.Int("table_id", table.Id), zap.Error(err))
-		}
-		if strings.TrimSpace(table.TableCode) != "" {
-			if err := s.sysTableCache.Set(table.TableCode, table); err != nil {
-				zap.L().Error("set sys table cache by code failed", zap.String("table_code", table.TableCode), zap.Error(err))
-			}
-		}
-	}
-	if s.sysTableFieldCache == nil {
-		return
-	}
-	for _, field := range table.TableFields {
-		if field.Id == 0 {
-			continue
-		}
-		if err := s.sysTableFieldCache.Set(strconv.Itoa(field.Id), field); err != nil {
-			zap.L().Error("set sys table field cache failed", zap.Int("field_id", field.Id), zap.Error(err))
-		}
-	}
+	s.metadataRuntime.Invalidate(context.Background(), tableId)
 }
 
 func cleanColumnDisplayName(name string) string {

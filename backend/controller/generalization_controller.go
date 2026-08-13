@@ -25,15 +25,13 @@ import (
 
 type GeneralizationController struct {
 	generalizationService *service.GeneralizationService
-	sysTableService       *service.SysTableService
 	sysMenuService        *service.SysMenuService
 	translators           map[string]ut.Translator
 }
 
-func NewGeneralizationController(generalizationService *service.GeneralizationService, sysTableService *service.SysTableService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *GeneralizationController {
+func NewGeneralizationController(generalizationService *service.GeneralizationService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *GeneralizationController {
 	return &GeneralizationController{
 		generalizationService: generalizationService,
-		sysTableService:       sysTableService,
 		sysMenuService:        sysMenuService,
 		translators:           translators,
 	}
@@ -141,7 +139,7 @@ func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(code)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -184,7 +182,7 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(code)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -232,7 +230,7 @@ func (gc *GeneralizationController) Create(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(data.TableCode)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), data.TableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -263,7 +261,7 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(data.TableCode)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), data.TableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -299,7 +297,7 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(data.TableCode)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), data.TableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -333,7 +331,7 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(data.TableCode)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), data.TableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -373,7 +371,7 @@ func (gc *GeneralizationController) Export(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	table, err := gc.sysTableService.GetTableByTableCode(tableCode)
+	table, err := gc.generalizationService.ResolveRuntimeTable(ctx.Request.Context(), tableCode)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

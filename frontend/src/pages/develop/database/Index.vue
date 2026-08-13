@@ -1556,8 +1556,10 @@ const openAddDialog = () => {
   showFormDialog.value = true
 }
 
-const openEditDialog = (row: Table) => {
-  currentEditData.value = cloneDeep(row)
+const openEditDialog = async (row: Table) => {
+  const result = await tableApi.queryTableById(row.id)
+  if (!result.success) return
+  currentEditData.value = cloneDeep(result.data)
   showFormDialog.value = true
 }
 
