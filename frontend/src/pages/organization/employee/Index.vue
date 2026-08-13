@@ -256,6 +256,7 @@ import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useDictStore } from 'src/stores/dict'
+import { useUserStore } from 'src/stores/user'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
@@ -274,6 +275,7 @@ const $q = useQuasar()
 const router = useRouter()
 const { confirmAction } = useConfirmDialog($q)
 const dictStore = useDictStore()
+const userStore = useUserStore()
 const {
   line_buttons,
   top_buttons,
@@ -283,6 +285,7 @@ const {
 const detailMode = useOrganizationDetailMode('organization_employee', 'dialog')
 
 const rows = ref<EmployeeListItem[]>([])
+const canQueryEmployees = computed(() => userStore.buttons.includes('organization_employee_query'))
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
@@ -473,6 +476,7 @@ const applyAdvancedQuery = () => {
 }
 
 const fetchData = async () => {
+  if (!canQueryEmployees.value) return
   loading.value = true
   loadError.value = ''
   try {

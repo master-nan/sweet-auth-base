@@ -8,7 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   getWorkerStatus: vi.fn(),
   cancelExecution: vi.fn(),
 }))
-const permissionCodes = vi.hoisted(() => ['integration_execution_detail'])
+const permissionCodes = vi.hoisted(() => ['integration_execution_query', 'integration_execution_detail', 'integration_worker_status'])
 const lineButtons = vi.hoisted(() => [
   { id: 1, name: '详情', event_action: 'detail' },
   { id: 2, name: '取消', event_action: 'cancel' },
@@ -55,6 +55,7 @@ const mountPage = () => shallowMount(ExecutionPage, {
 describe('integration execution retry summary', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    permissionCodes.splice(0, permissionCodes.length, 'integration_execution_query', 'integration_execution_detail', 'integration_worker_status')
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     apiMocks.queryExecutions.mockResolvedValue({
       data: [{
@@ -67,6 +68,15 @@ describe('integration execution retry summary', () => {
       total: 1,
     })
     apiMocks.getWorkerStatus.mockResolvedValue({ data: { enabled: false, running: false } })
+  })
+
+  it('does not preload executions or worker status without their query permissions', async () => {
+    permissionCodes.splice(0)
+    mountPage()
+    await flushPromises()
+
+    expect(apiMocks.queryExecutions).not.toHaveBeenCalled()
+    expect(apiMocks.getWorkerStatus).not.toHaveBeenCalled()
   })
 
   it('loads safe retry list summaries and exposes no runtime mutation actions', async () => {

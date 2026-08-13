@@ -218,6 +218,7 @@ const { loading } = storeToRefs(useLoadingStore())
 const detail = ref<IntegrationExecutionDetail | null>(null)
 const attempts = ref<IntegrationLogListItem[]>([])
 const attemptsLoading = ref(false)
+const canViewExecutionDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
 const canQueryLogs = computed(() => userStore.buttons.includes('integration_log_query'))
 const canViewLogDetail = computed(() => userStore.buttons.includes('integration_log_detail'))
 const statusMeta: Record<string, { label: string; color: string }> = {
@@ -251,6 +252,7 @@ const openLog = (logId: number) => {
     })
 }
 onMounted(async () => {
+  if (!canViewExecutionDetail.value) return
   const id = Number(route.params.id)
   if (id > 0) {
     const response = await api.getExecution(id)

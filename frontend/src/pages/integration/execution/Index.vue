@@ -197,6 +197,8 @@ const userStore = useUserStore()
 const { loading } = storeToRefs(useLoadingStore())
 const { confirmAction } = useConfirmDialog($q)
 const { line_buttons, top_buttons } = usePageButtons('integration_execution')
+const canQueryExecutions = computed(() => userStore.buttons.includes('integration_execution_query'))
+const canViewWorkerStatus = computed(() => userStore.buttons.includes('integration_worker_status'))
 const canViewDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
 const rows = ref<IntegrationExecutionListItem[]>([])
 const total = ref(0)
@@ -255,11 +257,13 @@ const columns: QTableProps['columns'] = [
 
 const formatDate = formatRuntimeDateTime
 const fetchData = async () => {
+  if (!canQueryExecutions.value) return
   const response = await api.queryExecutions(query.value)
   rows.value = response.data || []
   total.value = response.total || 0
 }
 const fetchWorker = async () => {
+  if (!canViewWorkerStatus.value) return
   const response = await api.getWorkerStatus()
   if (response.data) workerStatus.value = response.data
 }

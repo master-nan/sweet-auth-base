@@ -184,20 +184,20 @@ func TestOrgSyncResponsesSeparateDefaultAndPrivilegedErrorDetails(t *testing.T) 
 		SyncType:     "full",
 		ObjectScope:  "all",
 		Status:       "failed",
-		ErrorSummary: "upstream payload validation failed",
+		ErrorSummary: "org_sync_business_conflict",
 	}
 	record := model.OrgSyncRecord{
 		Basic:          model.Basic{Id: 2, State: true},
 		BatchId:        1,
 		ObjectType:     "employee",
-		SourceId:       "sensitive-source-id",
+		SourceId:       "0123456789abcdef01234567",
 		SourceCode:     "EMP-1",
 		Action:         "insert",
 		Status:         "failed",
-		ErrorCode:      "org_employee_missing",
+		ErrorCode:      "org_sync_reference_missing",
 		ErrorMessage:   "employee dependency was not found",
 		DependencyType: "employee",
-		DependencyKey:  "sensitive-dependency-key",
+		DependencyKey:  "89abcdef0123456789abcdef",
 		RetryCount:     1,
 	}
 
@@ -212,16 +212,27 @@ func TestOrgSyncResponsesSeparateDefaultAndPrivilegedErrorDetails(t *testing.T) 
 	}
 
 	recordDefault := marshalJSONObject(t, NewOrgSyncRecordDetailRes(record))
-	assertJSONKeysAbsent(t, recordDefault, "source_id", "error_message", "dependency_key")
+	assertJSONKeysAbsent(t, recordDefault, "source_id", "source_code", "error_message", "dependency_key")
+	if recordDefault["source_summary"] != record.SourceId {
+		t.Fatalf("safe source summary missing: %+v", recordDefault)
+	}
 	if recordDefault["has_error"] != true {
 		t.Fatalf("expected record has_error marker, got %v", recordDefault["has_error"])
 	}
 	recordError := marshalJSONObject(t, NewOrgSyncRecordErrorRes(record))
-	if recordError["error_message"] != record.ErrorMessage ||
-		recordError["dependency_key"] != record.DependencyKey {
+	if recordError["error_code"] != record.ErrorCode ||
+		recordError["dependency_summary"] != record.DependencyKey {
 		t.Fatalf("privileged record error response missing detail: %+v", recordError)
 	}
-	assertJSONKeysAbsent(t, recordError, "source_id")
+	assertJSONKeysAbsent(t, recordError, "source_id", "error_message", "dependency_key")
+
+	unsafeBatch := NewOrgSyncBatchErrorRes(model.OrgSyncBatch{ErrorSummary: "employee Zhang San failed"})
+	unsafeRecord := NewOrgSyncRecordErrorRes(model.OrgSyncRecord{
+		ErrorCode: "database error: employee@example.invalid", ErrorMessage: "mobile=13800000000", DependencyKey: "raw-employee-id",
+	})
+	if unsafeBatch.ErrorSummary != "" || unsafeRecord.ErrorCode != "" || unsafeRecord.DependencySummary != "" {
+		t.Fatalf("legacy free-form diagnostics were not redacted: batch=%+v record=%+v", unsafeBatch, unsafeRecord)
+	}
 }
 
 func TestOrganizationDefaultResponsesOmitSourceAndSyncInternals(t *testing.T) {

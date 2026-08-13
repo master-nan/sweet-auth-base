@@ -95,7 +95,7 @@
     <organization-record-detail-dialog
       v-model="showDetailDialog"
       title="同步记录详情"
-      :subtitle="recordDetail?.source_code || ''"
+      :subtitle="recordDetail?.source_summary || ''"
       :sections="detailSections"
       icon="sync_problem"
       :status-label="
@@ -114,7 +114,7 @@
     <organization-record-detail-dialog
       v-model="showErrorDialog"
       title="同步错误详情"
-      :subtitle="currentRecord?.source_code || ''"
+      :subtitle="currentRecord?.source_summary || ''"
       :items="errorItems"
       icon="error_outline"
       status-label="失败"
@@ -159,11 +159,13 @@ import {
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
+import { useUserStore } from 'src/stores/user'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const route = useRoute()
 const dictStore = useDictStore()
+const userStore = useUserStore()
 const {
   line_buttons,
   top_buttons,
@@ -176,6 +178,7 @@ const rows = ref<SyncRecordListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
+const canQueryRecords = computed(() => userStore.buttons.includes('organization_sync_error_query'))
 const query = ref<SyncRecordQueryRequest>({
   ...createOrganizationQuery('org_sync_record'),
   status: 'failed',
@@ -209,7 +212,7 @@ const objectTypeOptions = [
 const columns: QTableProps['columns'] = [
   { name: 'batch_id', field: 'batch_id', label: '批次ID', align: 'right', sortable: true },
   { name: 'object_type', field: 'object_type', label: '对象类型', align: 'left' },
-  { name: 'source_code', field: 'source_code', label: '源对象编码', align: 'left' },
+  { name: 'source_summary', field: 'source_summary', label: '来源摘要', align: 'left' },
   { name: 'action', field: 'action', label: '动作', align: 'center' },
   { name: 'status', field: 'status', label: '处理状态', align: 'center' },
   { name: 'error_code', field: 'error_code', label: '错误码', align: 'left' },
@@ -223,7 +226,6 @@ const advancedFields = [
     inputType: SysTableFieldInputType.INPUT_NUMBER,
   }),
   createOrganizationField('对象类型', 'object_type'),
-  createOrganizationField('源对象编码', 'source_code'),
   createOrganizationField('同步动作', 'action', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_action',
@@ -259,7 +261,7 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
         { label: '批次ID', value: detail.batch_id },
         { label: '集成执行ID', value: detail.execution_id ?? null },
         { label: '对象类型', value: objectTypeLabel(detail.object_type) },
-        { label: '源对象编码', value: detail.source_code },
+        { label: '来源摘要', value: detail.source_summary },
         { label: '本地对象ID', value: detail.local_id ?? null },
         { label: '同步动作', value: dictLabel('org_sync_action', detail.action) },
         {
@@ -289,9 +291,8 @@ const errorItems = computed<OrganizationDetailItem[]>(() => {
   if (!error) return []
   return [
     { label: '错误码', value: error.error_code },
-    { label: '错误信息', value: error.error_message, fullWidth: true },
     { label: '依赖类型', value: dictLabel('org_dependency_type', error.dependency_type) },
-    { label: '依赖对象', value: error.dependency_key },
+    { label: '依赖摘要', value: error.dependency_summary },
   ]
 })
 
@@ -322,6 +323,7 @@ const applyAdvancedQuery = () => {
 }
 
 const fetchData = async () => {
+  if (!canQueryRecords.value) return
   loading.value = true
   loadError.value = ''
   try {

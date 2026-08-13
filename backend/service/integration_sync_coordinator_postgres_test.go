@@ -355,7 +355,10 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 				t.Errorf("parse changed_since: %v", parseErr)
 			}
 			if organizationScenario == "deferred_replay" && !organizationRepaired.Load() {
-				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}})
+				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
+					{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				}})
 				_, _ = writer.Write(body)
 				return
 			}
@@ -446,7 +449,11 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "code": fmt.Sprintf("FUTURE-%d", lower.Unix()), "name": "Future", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
 			}
 			if organizationScenario == "deferred_replay" {
-				data = append(data, map[string]any{"zjkid_ignore": "deferred-parent", "code": "DEFERRED-PARENT", "name": "Repaired Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")}, map[string]any{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")})
+				data = append(data,
+					map[string]any{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					map[string]any{"zjkid_ignore": "deferred-parent", "code": "DEFERRED-PARENT", "name": "Repaired Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					map[string]any{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				)
 			}
 			body, _ := json.Marshal(map[string]any{"success": true, "data": data})
 			_, _ = writer.Write(body)
@@ -651,6 +658,10 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	if organizationScenario == "deferred_replay" {
 		assertOrganizationFailedCheckpoint(t, db, task.Id, checkpoint, hrsync.ReasonParentUnresolved)
+		var stableUnits int64
+		if err := db.Model(&model.OrgUnit{}).Where("source_id = ?", "management_unit:deferred-stable").Count(&stableUnits).Error; err != nil || stableUnits != 1 {
+			t.Fatalf("successful object before replay count=%d err=%v", stableUnits, err)
+		}
 		organizationRepaired.Store(true)
 		replayScheduledFor := checkpoint.Add(30 * time.Minute)
 		if err := db.Model(&model.IntegrationSyncTask{}).Where("id = ?", task.Id).Update("next_scheduled_at", replayScheduledFor).Error; err != nil {
@@ -673,6 +684,9 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		}
 		if err := db.Model(&model.OrgUnit{}).Where("source_id = ?", "management_unit:deferred-child").Count(&deferredChildren).Error; err != nil || deferredChildren != 1 {
 			t.Fatalf("replayed child count=%d err=%v", deferredChildren, err)
+		}
+		if err := db.Model(&model.OrgUnit{}).Where("source_id = ?", "management_unit:deferred-stable").Count(&stableUnits).Error; err != nil || stableUnits != 1 {
+			t.Fatalf("successful replay idempotency count=%d err=%v", stableUnits, err)
 		}
 		if units < 2 {
 			t.Fatalf("repaired units=%d", units)

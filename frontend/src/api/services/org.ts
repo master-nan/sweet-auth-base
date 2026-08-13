@@ -320,7 +320,7 @@ export interface SyncRecordListItem extends OrganizationBaseRecord {
   batch_id: number
   execution_id?: number | null
   object_type: string
-  source_code: string
+  source_summary: string
   local_id?: number | null
   action: string
   status: string
@@ -337,9 +337,8 @@ export type SyncRecordDetail = SyncRecordListItem
 export interface SyncRecordError {
   id: number
   error_code: string
-  error_message: string
   dependency_type: string
-  dependency_key: string
+  dependency_summary: string
 }
 
 export const organizationOptionsEndpoints: Record<OrganizationSelectorType, string> = {

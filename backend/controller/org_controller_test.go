@@ -192,20 +192,20 @@ func TestOrgControllerSyncReadRoutesKeepErrorDetailsBehindDedicatedPermission(t 
 		TotalCount:   1,
 		FailedCount:  1,
 		Status:       "failed",
-		ErrorSummary: "batch error detail",
+		ErrorSummary: "org_sync_business_conflict",
 	}
 	record := model.OrgSyncRecord{
 		Basic:          model.Basic{Id: 72, State: true},
 		BatchId:        batch.Id,
 		ObjectType:     "employee",
-		SourceId:       "source-employee-72",
+		SourceId:       "0123456789abcdef01234567",
 		SourceCode:     "EMP-072",
 		Action:         "update",
 		Status:         "failed",
-		ErrorCode:      "org_employee_missing",
+		ErrorCode:      "org_sync_reference_missing",
 		ErrorMessage:   "record error detail",
 		DependencyType: "employee",
-		DependencyKey:  "EMP-072",
+		DependencyKey:  "89abcdef0123456789abcdef",
 	}
 	testutil.MustCreate(t, db, &batch)
 	testutil.MustCreate(t, db, &record)
@@ -222,36 +222,36 @@ func TestOrgControllerSyncReadRoutesKeepErrorDetailsBehindDedicatedPermission(t 
 			target:         "/admin/org/sync/batch/query",
 			body:           `{"page":1,"num":10}`,
 			contains:       `"batch_no":"ORG-SYNC-071"`,
-			mustNotContain: "batch error detail",
+			mustNotContain: "org_sync_business_conflict",
 		},
 		{
 			method:         http.MethodGet,
 			target:         "/admin/org/sync/batch/71",
 			contains:       `"batch_no":"ORG-SYNC-071"`,
-			mustNotContain: "batch error detail",
+			mustNotContain: "org_sync_business_conflict",
 		},
 		{
 			method:   http.MethodGet,
 			target:   "/admin/org/sync/batch/71/error",
-			contains: "batch error detail",
+			contains: "org_sync_business_conflict",
 		},
 		{
 			method:         http.MethodPost,
 			target:         "/admin/org/sync/record/query",
 			body:           `{"page":1,"num":10}`,
-			contains:       `"source_code":"EMP-072"`,
+			contains:       `"source_summary":"0123456789abcdef01234567"`,
 			mustNotContain: "record error detail",
 		},
 		{
 			method:         http.MethodGet,
 			target:         "/admin/org/sync/record/72",
-			contains:       `"source_code":"EMP-072"`,
+			contains:       `"source_summary":"0123456789abcdef01234567"`,
 			mustNotContain: "record error detail",
 		},
 		{
 			method:   http.MethodGet,
 			target:   "/admin/org/sync/record/72/error",
-			contains: "record error detail",
+			contains: `"dependency_summary":"89abcdef0123456789abcdef"`,
 		},
 	} {
 		recorder := testutil.PerformRequest(t, router, testutil.HTTPRequest{

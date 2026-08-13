@@ -22,7 +22,7 @@ func TestOrgServiceSyncBatchReadBoundary(t *testing.T) {
 			SuccessCount: 1,
 			FailedCount:  1,
 			Status:       "failed",
-			ErrorSummary: "one employee failed",
+			ErrorSummary: "org_sync_business_conflict",
 		},
 		{
 			Basic:        model.Basic{Id: 2, State: true},
@@ -58,7 +58,7 @@ func TestOrgServiceSyncBatchReadBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal sync batch detail: %v", err)
 	}
-	if strings.Contains(string(encodedDetail), "one employee failed") {
+	if strings.Contains(string(encodedDetail), "org_sync_business_conflict") {
 		t.Fatalf("ordinary detail leaked error summary: %s", encodedDetail)
 	}
 
@@ -66,7 +66,7 @@ func TestOrgServiceSyncBatchReadBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get sync batch error: %v", err)
 	}
-	if errorDetail.ErrorSummary != "one employee failed" {
+	if errorDetail.ErrorSummary != "org_sync_business_conflict" {
 		t.Fatalf("unexpected sync batch error detail: %+v", errorDetail)
 	}
 }
@@ -144,9 +144,7 @@ func TestOrgServiceSyncRecordReadBoundaryAndLocalObjectFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get sync record error: %v", err)
 	}
-	if errorDetail.ErrorCode != "org_employee_missing" ||
-		errorDetail.ErrorMessage != "employee dependency is unavailable" ||
-		errorDetail.DependencyKey != "source-employee-201" {
+	if errorDetail.ErrorCode != "" || errorDetail.DependencySummary != "" {
 		t.Fatalf("unexpected sync record error detail: %+v", errorDetail)
 	}
 }

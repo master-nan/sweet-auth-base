@@ -122,17 +122,18 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	if got := disabled.ListMetadata(); len(got) != 0 {
 		t.Fatalf("disabled production registrations leaked into selectable metadata: %+v", got)
 	}
-	if _, err := disabled.Resolve(ConsumerCodeLegalEntity, ConsumerVersionV1); err == nil {
-		t.Fatal("disabled consumer resolved")
-	}
-	if _, err := disabled.Resolve(ConsumerCodePosition, ConsumerVersionV1); err == nil {
-		t.Fatal("disabled position consumer resolved")
-	}
-	if _, err := disabled.Resolve(ConsumerCodeEmployee, ConsumerVersionV1); err == nil {
-		t.Fatal("disabled employee consumer resolved")
-	}
-	if _, err := disabled.Resolve(ConsumerCodeResignedEmployee, ConsumerVersionV1); err == nil {
-		t.Fatal("disabled resigned employee consumer resolved")
+	for _, code := range []string{
+		ConsumerCodeLegalEntity,
+		ConsumerCodeManagementCompany,
+		ConsumerCodeManagementDepartment,
+		ConsumerCodeLegalDepartment,
+		ConsumerCodePosition,
+		ConsumerCodeEmployee,
+		ConsumerCodeResignedEmployee,
+	} {
+		if _, err := disabled.Resolve(code, ConsumerVersionV1); err == nil {
+			t.Fatalf("disabled consumer %s resolved", code)
+		}
 	}
 	contract, err := NewExplicitSourceContract(OrganizationHRSourceSystemCode, time.UTC)
 	if err != nil {

@@ -152,11 +152,13 @@ import {
   referenceLabel,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
+import { useUserStore } from 'src/stores/user'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const router = useRouter()
 const dictStore = useDictStore()
+const userStore = useUserStore()
 const {
   line_buttons,
   top_buttons,
@@ -169,6 +171,7 @@ const rows = ref<PositionListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
+const canQueryPositions = computed(() => userStore.buttons.includes('organization_position_query'))
 const query = ref<PositionQueryRequest>({
   ...createOrganizationQuery('org_position'),
   only_effective: true,
@@ -284,6 +287,7 @@ const applyAdvancedQuery = () => {
 }
 
 const fetchData = async () => {
+  if (!canQueryPositions.value) return
   loading.value = true
   loadError.value = ''
   try {

@@ -7,8 +7,10 @@ const apiMocks = vi.hoisted(() => ({
   getSyncBatchError: vi.fn(),
   querySyncRecords: vi.fn(),
 }))
+const permissions = vi.hoisted(() => ({ values: ['organization_sync_error_query'] }))
 
 vi.mock('src/api/services/org', () => apiMocks)
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
 
 vi.mock('src/composables/page-buttons', () => ({
   usePageButtons: () => ({
@@ -78,6 +80,7 @@ const batch = (id: number) => ({
 
 describe('Organization sync batch detail', () => {
   beforeEach(() => {
+    permissions.values = ['organization_sync_error_query']
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     apiMocks.getSyncBatchDetail.mockImplementation((id: number) => Promise.resolve(batch(id)))
     apiMocks.querySyncRecords.mockResolvedValue({
@@ -85,7 +88,7 @@ describe('Organization sync batch detail', () => {
         {
           id: 1,
           object_type: 'org_unit',
-          source_code: 'OU-001',
+          source_summary: '0123456789abcdef01234567',
           action: 'update',
           status: 'success',
           error_code: '',
@@ -93,6 +96,16 @@ describe('Organization sync batch detail', () => {
       ],
       total: 1,
     })
+  })
+
+  it('loads the batch summary without requesting records when record query is not granted', async () => {
+    permissions.values = []
+    const wrapper = mountDetail(41)
+    await flushPromises()
+
+    expect(apiMocks.getSyncBatchDetail).toHaveBeenCalledWith(41)
+    expect(apiMocks.querySyncRecords).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="detail-title"]').text()).toBe('同步批次详情：BATCH-41')
   })
 
   it('loads detail and records by the route record id', async () => {

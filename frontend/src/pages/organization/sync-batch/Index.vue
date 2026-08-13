@@ -148,10 +148,12 @@ import {
 } from 'src/pages/organization/organization-list-page'
 import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'
 import { useDictStore } from 'src/stores/dict'
+import { useUserStore } from 'src/stores/user'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const dictStore = useDictStore()
+const userStore = useUserStore()
 const router = useRouter()
 const { line_buttons, top_buttons } = usePageButtons('organization_sync_batch')
 
@@ -162,6 +164,7 @@ const loadError = ref('')
 const query = ref<SyncBatchQueryRequest>(createOrganizationQuery('org_sync_batch'))
 const tempAdvancedQuery = ref<SyncBatchQueryRequest>(cloneDeep(query.value))
 const showAdvancedQuery = ref(false)
+const canQueryBatches = computed(() => userStore.buttons.includes('organization_sync_batch_query'))
 
 const currentBatch = ref<SyncBatchListItem | null>(null)
 
@@ -236,6 +239,7 @@ const applyAdvancedQuery = () => {
 }
 
 const fetchData = async () => {
+  if (!canQueryBatches.value) return
   loading.value = true
   loadError.value = ''
   try {

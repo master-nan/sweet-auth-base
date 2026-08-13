@@ -1549,7 +1549,7 @@ func orgSyncBatchListColumns() []string {
 func orgSyncRecordListColumns() []string {
 	return []string{
 		"id", "gmt_create", "gmt_modify", "state", "batch_id", "execution_id",
-		"object_type", "source_code", "local_id", "action", "status", "error_code",
+		"object_type", "source_id", "local_id", "action", "status", "error_code",
 		"error_message", "dependency_type", "retry_count", "last_retry_at",
 		"local_handling_status",
 	}

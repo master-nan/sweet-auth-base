@@ -5,9 +5,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | Task | INT-006A |
-| 状态 | 详细设计完成；INT-006F-B 已实现离职安全子集，未关闭 Gate 继续门控生产 Consumer |
+| 状态 | 详细设计完成；INT-006G 已完成 Adapter V1 能力验收与冻结，真实 HR 源生产启用仍受 Gate 阻断 |
 | 日期 | 2026-08-12 |
-| 最近更新 | 2026-08-13（INT-006F-B） |
+| 最近更新 | 2026-08-13（INT-006G） |
 | 范围 | Organization HR 源映射与服务端 `SyncResultConsumer` 设计 |
 | Runtime 基线 | `IntegrationRuntimeFreezeReview.md` |
 | Retry 基线 | `IntegrationRetryFreezeReview.md` |
@@ -574,7 +574,7 @@ P0 源契约确认是正式 Gate，不属于隐藏开发工作。
 
 - 真实 PostgreSQL、Integration SyncRunner、WorkerRunner、TLS HR Mock、注册的 Organization Consumer、Retry 联动、Checkpoint 和浏览器验收；
 - 覆盖基线/增量顺序、Lookback 幂等、依赖重放、部分失败、内存/租约、DTO/日志脱敏；
-- 只有全部 P0 Gate 和安全不变量通过后，才生成 Organization HR 验收报告和 Freeze Review。
+- 将 Adapter Capability Freeze 与真实 HR Source Production Enablement 分层判断：安全不变量通过即可冻结 Adapter 架构；全部相关源 Gate 关闭后才允许生产启用 Consumer。
 
 若源端无法提供有界窗口契约，INT-006B 必须先形成经评审的兼容决定，INT-006C 才能开始。Organization Consumer 不得以自建 Scheduler、Proxy、Artifact Store 或第二条 HTTP 链路补偿。
 
@@ -699,3 +699,18 @@ INT-006F-B 增加静态 `org.hr.resigned_employee` v1 Consumer，保持 `HRResig
 生产装配登记固定 `org.hr.resigned_employee` code/version，但和其他 HR Consumer 一样保持 `disabled`，不会出现在 SyncTask 可选列表，也不能被 Runtime Resolve。PostgreSQL 16 的 SyncRunner + WorkerRunner + TLS E2E 通过显式 Test SourceContract 启用同一实现，覆盖首次 HTTP 503 后由 Integration Retry、离职 Employee 收敛、Assignment 关闭、重复事实 noop、future 过滤与 Checkpoint 推进；独立场景还覆盖 Employee 缺失 deferred、任职周期冲突整条回滚、旧离职事件 noop，以及离职后较新 active 产生业务冲突。三类业务失败均保持 Checkpoint 且只产生一个 Attempt，未进入 Integration Retry。测试没有引入 userType 权威选择或环境变量 Gate。
 
 INT-006F-B 不关闭以下 Gate：BIP ID 永久稳定/不可复用；changeTime 权威性、时区、精度、同秒完整性与跨接口排序；离职权威 `userType`；主任职语义和稳定 Assignment ID；`sendpost` 永久权威性；兼职关系 ID 生命周期；NCID -> BIP Crosswalk；历史空结束日期完整语义；自动再入职和雇佣段；人员大响应生产策略；物理删除表达。V1 仍不支持主任职创建、顶层组织/岗位转任职、生产兼职落库、自动再入职、魔法日期、Employee/Assignment 删除或 SysUser 生命周期变更。
+
+## 33. INT-006G 验收与两层冻结结论
+
+正式证据见 `docs/OrganizationHRSyncAcceptanceReport.md`，能力冻结见 `docs/OrganizationHRSyncFreezeReview.md`。INT-006G 以 INT-006F-B 实现提交为基线，完成代码、Migration、Registry、七类 Consumer、PostgreSQL 16、Integration SyncRunner + WorkerRunner + TLS、Retry/Checkpoint、页面、权限和脱敏验收。
+
+真实初始化顺序 E2E 按法人、管理公司、管理部门、法人部门、岗位、员工、离职自动运行；首次 HTTP 503 只由 Integration Retry 在同一 Execution 追加 Attempt，业务成功后才推进 Checkpoint。另一个 E2E 在同一 Slice 验证 N-1 成功、1 条父依赖失败、Checkpoint 保持，以及补齐依赖后 Lookback 重放和幂等收敛。生产路径没有第二套 HTTP、Retry、Scheduler、Checkpoint 或 Execution 状态入口。
+
+Organization 业务查询 DTO 已收敛为安全 `source_summary`、`dependency_summary` 和稳定 Reason Code；不安全的遗留原值 fail-closed。前端补充了 Sync/Execution/Organization 列表与详情的 query/detail 权限守卫。真实浏览器确认管理员技术/业务页面、深色模式和动态按钮正常；无权限账号为零菜单，Organization/Integration 相关直达路由为 404，且没有预加载受保护 API。
+
+正式分层结论：
+
+1. **Organization HR Adapter V1 Capability：通过冻结。** 已实现法人、双组织结构、岗位、员工、离职安全子集，以及任职 Parser/Test Harness 和 Crosswalk 边界；Source DTO -> Canonical Input -> Domain、SourceKey、registered Consumer、Business failure 不 Retry、Checkpoint、业务 Batch/Record 与 Payload 不持久化规则被冻结。
+2. **Current HR Source Production Enablement：不允许。** 七类生产 Consumer 继续保持 disabled。BIP ID 生命周期、changeTime 完整契约、对象编码、员工编号、人员响应量、离职权威视图、主任职、任职 ID、sendpost、Crosswalk、再入职和物理删除等 Gate 没有被本次验收伪造关闭。
+
+V1 明确不支持主任职同步、生产兼职同步、自动再入职、物理删除、动态公司 Fan-out、全量对账、视图 99、OA 专用人员源、Response Artifact 和 HR 业务脚本。下一步只允许源契约确认、容量试验和逐 Consumer 生产准入，不允许继续用默认规则扩展业务语义。

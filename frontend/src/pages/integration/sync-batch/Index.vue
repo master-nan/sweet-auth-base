@@ -106,6 +106,7 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detail = ref<SyncBatchDetail | null>(null)
 const executions = ref<IntegrationExecutionListItem[]>([])
+const canQueryBatches = computed(() => userStore.buttons.includes('integration_sync_batch_query'))
 const canDetail = computed(() => userStore.buttons.includes('integration_sync_batch_detail'))
 const canQueryExecutions = computed(() => userStore.buttons.includes('integration_execution_query'))
 const canViewExecutionDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
@@ -129,7 +130,7 @@ const columns: QTableProps['columns'] = [
 ]
 const query = ref<SyncBatchQuery>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ rules: [{ field: '', value: null }], nested: [] }] })
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const fetchData = async () => { const result = await api.querySyncBatches(query.value); rows.value = result.data || []; total.value = result.total || 0 }
+const fetchData = async () => { if (!canQueryBatches.value) return; const result = await api.querySyncBatches(query.value); rows.value = result.data || []; total.value = result.total || 0 }
 const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
 const openDetail = async (id: number) => {
   if (!canDetail.value) return

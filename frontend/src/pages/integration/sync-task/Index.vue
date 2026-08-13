@@ -51,6 +51,7 @@ const $q = useQuasar(); const api = useIntegrationApi(); const tableApi = useTab
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integration_sync_task')
 const rows = ref<SyncTaskListItem[]>([]); const total = ref(0); const initialized = ref(false); const showAdvancedQuery = ref(false); const showForm = ref(false); const showDetail = ref(false); const detailID = ref(0); const editData = ref<SyncTaskEdit | null>(null)
 const systems = ref<ExternalSystemListItem[]>([]); const interfaces = ref<InterfaceDefinitionListItem[]>([]); const consumers = ref<SyncConsumerMetadata[]>([]); const advancedFields = ref<TableField[]>([])
+const canQueryTasks = computed(() => userStore.buttons.includes('integration_sync_task_query'))
 const canUseAdvancedQuery = computed(() => userStore.buttons.includes('integration_sync_task_metadata'))
 const statusMeta = { draft: { label: '草稿', color: 'grey-7' }, enabled: { label: '已启用', color: 'positive' }, disabled: { label: '已停用', color: 'warning' } }
 const statusFor = (row: SyncTaskListItem) => statusMeta[row.status]
@@ -63,7 +64,7 @@ const columns: QTableProps['columns'] = [
 ]
 const visibleColumns = ref(columns.map((item) => item.name)); const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const query = ref<SyncTaskQuery>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() }); const tempAdvancedQuery = ref<Query>(cloneDeep(query.value)); const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const fetchData = async () => { const result = await api.querySyncTasks(query.value); rows.value = result.data || []; total.value = result.total || 0 }
+const fetchData = async () => { if (!canQueryTasks.value) return; const result = await api.querySyncTasks(query.value); rows.value = result.data || []; total.value = result.total || 0 }
 const fetchMetadata = async () => { if (!userStore.buttons.includes('integration_sync_task_metadata')) return; const metadata = await tableApi.queryTableByCode('integration_sync_task'); advancedFields.value = metadata.data?.table_fields || [] }
 const fetchReferences = async () => {
   const requests: Promise<void>[] = []

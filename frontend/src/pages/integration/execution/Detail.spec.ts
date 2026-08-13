@@ -61,7 +61,7 @@ const mountPage = () =>
 describe('integration execution detail permissions', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    permissionCodes.splice(0)
+    permissionCodes.splice(0, permissionCodes.length, 'integration_execution_detail')
     routerPush.mockReset()
     apiMocks.getExecution.mockReset()
     apiMocks.queryLogs.mockReset()
@@ -82,6 +82,15 @@ describe('integration execution detail permissions', () => {
       ],
       total: 1,
     })
+  })
+
+  it('does not request the execution when direct detail permission is absent', async () => {
+    permissionCodes.splice(0)
+    mountPage()
+    await flushPromises()
+
+    expect(apiMocks.getExecution).not.toHaveBeenCalled()
+    expect(apiMocks.queryLogs).not.toHaveBeenCalled()
   })
 
   it('does not request Attempt data without log query permission', async () => {

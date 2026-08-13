@@ -1,10 +1,14 @@
 <template>
   <organization-sync-batch-detail
-    v-if="isOrganizationSyncBatch"
+    v-if="isOrganizationSyncBatch && canLoadRecordDetail"
     :record-id="recordId"
     @close="goBackToList"
     @title-change="syncPageChromeTitle"
   />
+
+  <base-content v-else-if="!canLoadRecordDetail" scrollable class="q-pa-sm">
+    <q-banner rounded class="record-detail-error">无详情查看权限</q-banner>
+  </base-content>
 
   <base-content v-else scrollable class="q-pa-sm record-detail-page">
     <div class="record-detail">
@@ -296,6 +300,10 @@ const detailMenuButtons = computed(() =>
     .filter(isPageButton)
     .slice()
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
+)
+
+const canLoadRecordDetail = computed(() =>
+  detailMenuButtons.value.some((button) => button.event_action === 'detail'),
 )
 
 const detailTopButtons = computed(() =>
@@ -743,6 +751,7 @@ function handleParamsSubmit(formPayload: { data: Record<string, any> }) {
 }
 
 async function loadDetail() {
+  if (!canLoadRecordDetail.value) return
   if (isOrganizationSyncBatch.value) return
   if (!recordId.value || !tableCode.value) {
     loadError.value = '详情路由缺少记录ID或表编码'

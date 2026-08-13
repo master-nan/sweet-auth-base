@@ -42,7 +42,9 @@
             </q-td>
           </template>
           <template #no-data>
-            <div class="full-width text-center text-grey-7 q-pa-lg">暂无对象处理记录</div>
+            <div class="full-width text-center text-grey-7 q-pa-lg">
+              {{ recordsLoadError || (canQueryRecords ? '暂无对象处理记录' : '无业务同步记录查看权限') }}
+            </div>
           </template>
         </q-table>
       </template>
@@ -87,6 +89,7 @@ import {
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
+import { useUserStore } from 'src/stores/user'
 
 const props = defineProps<{
   recordId: number
@@ -98,6 +101,7 @@ const emit = defineEmits<{
 }>()
 
 const dictStore = useDictStore()
+const userStore = useUserStore()
 const { record_detail_top_buttons, record_detail_bottom_buttons } = usePageButtons(
   'organization_sync_batch',
 )
@@ -106,10 +110,12 @@ const loading = ref(false)
 const loadError = ref('')
 const batchDetail = ref<SyncBatchDetail | null>(null)
 const batchRecords = ref<SyncRecordListItem[]>([])
+const recordsLoadError = ref('')
 const showErrorDialog = ref(false)
 const errorLoading = ref(false)
 const errorLoadError = ref('')
 const errorSummary = ref('')
+const canQueryRecords = computed(() => userStore.buttons.includes('organization_sync_error_query'))
 
 const title = computed(() =>
   batchDetail.value
@@ -160,7 +166,7 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
 
 const recordColumns: QTableProps['columns'] = [
   { name: 'object_type', field: 'object_type', label: '对象类型', align: 'left' },
-  { name: 'source_code', field: 'source_code', label: '源对象编码', align: 'left' },
+  { name: 'source_summary', field: 'source_summary', label: '来源摘要', align: 'left' },
   { name: 'action', field: 'action', label: '动作', align: 'center' },
   { name: 'status', field: 'status', label: '状态', align: 'center' },
   { name: 'error_code', field: 'error_code', label: '错误码', align: 'left' },
@@ -177,6 +183,7 @@ const loadDetail = async () => {
 
   loading.value = true
   loadError.value = ''
+  recordsLoadError.value = ''
   batchDetail.value = null
   batchRecords.value = []
   try {
@@ -185,17 +192,20 @@ const loadDetail = async () => {
       'org_sync_action',
       'org_sync_record_status',
     ])
-    const [detail, records] = await Promise.all([
-      getSyncBatchDetail(props.recordId),
-      querySyncRecords({
+    batchDetail.value = await getSyncBatchDetail(props.recordId)
+    if (canQueryRecords.value) {
+      try {
+        const records = await querySyncRecords({
         ...createOrganizationQuery('org_sync_record'),
         batch_id: props.recordId,
         order: { field: 'gmt_create', is_asc: true },
         num: 100,
-      }),
-    ])
-    batchDetail.value = detail
-    batchRecords.value = records.items
+        })
+        batchRecords.value = records.items
+      } catch {
+        recordsLoadError.value = '对象处理记录加载失败'
+      }
+    }
   } catch {
     loadError.value = '同步批次详情加载失败'
   } finally {
