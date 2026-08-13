@@ -5,8 +5,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | Task | INT-006A |
-| 状态 | 详细设计完成；INT-006B 已提供单下界平台兼容契约，其余第 22 章 P0 继续门控生产 Consumer |
+| 状态 | 详细设计完成；INT-006F-A 已完成任职/离职源契约评审，未关闭 Gate 继续门控生产 Consumer |
 | 日期 | 2026-08-12 |
+| 最近更新 | 2026-08-13（INT-006F-A） |
 | 范围 | Organization HR 源映射与服务端 `SyncResultConsumer` 设计 |
 | Runtime 基线 | `IntegrationRuntimeFreezeReview.md` |
 | Retry 基线 | `IntegrationRetryFreezeReview.md` |
@@ -67,7 +68,7 @@ Consumer 业务失败属于 `confirmed`，不进入 Integration Retry。后续�
 - 人员全局九天增量超过本地采集的 2 MiB 防御上限；
 - 按公司查询的人员响应显著更小；
 - `sendPostList` 为空，而 JSON 字符串 `sendpost` 中存在任职；
-- 13 条当前任职出现相同的反转结束日期形态，疑似开放任职占位值，但尚未确认；
+- 25 条兼职中 13 条当前任职结束时间为空；原始响应复核未发现非空结束时间反转，不存在可据此冻结的魔法日期；
 - 源端提供启停状态，但没有可靠物理删除事件；
 - 管理、法人视图彼此独立，视图 `99` 的业务语义未确认。
 
@@ -116,7 +117,7 @@ Consumer 过滤不能减少已经下载的响应。`lower_bound_only` 不限制�
 | 结构节点 | 结构 + 主体身份 | 源端无独立节点 ID | `<structure-code>:<unit-source-id>` | 受控派生 |
 | 岗位 | `postidzjkid_ignore` | Swagger BIP ID；样本非空、唯一 | `(source_system_code, raw ID)` | 样本 high |
 | 员工 | `psnidzjkid_ignore` | Swagger BIP ID；样本非空、唯一 | `(source_system_code, raw ID)` | 样本 high |
-| 兼职任职 | `sendpost[].ID` | 样本非空、唯一 | `(source_system_code, raw ID)` | 样本 high |
+| 兼职任职候选 | `sendpost[].ID` | 25 条样本非空、唯一且不与其他已采集 ID 空间重合；字符串字段生命周期未获承诺 | P0 关闭后才使用 `(source_system_code, raw ID)` | 样本 high，生产阻塞 |
 | 顶层主任职候选 | 尚无可靠 ID | 无 assignment ID、无主职标记 | P0 关闭前不持久化 | 阻塞 |
 
 禁止在 Source ID、NCID、名称、联系方式、编码之间相互回退。若后续证明管理和法人视图中的相同原始组织 ID 表示同一主体，必须通过显式 Crosswalk 和迁移合并；V1 宁可暂时隔离，也不做错误合并。
@@ -216,7 +217,7 @@ V1 不得：
 
 ### 10.2 兼职与 `sendpost`
 
-样本运行事实是 JSON 字符串 `sendpost`；`sendPostList` 为空，`sendposten` 是英文键镜像。P0 权威性确认后按以下规则处理：
+样本运行事实是 JSON 字符串 `sendpost`；`sendPostList` 为空。`sendposten` 与中文容器的关系 ID、时间、状态和空岗位逐项一致，但 25 条公司/部门引用值全部不同，不能视为字段值完全相同的英文镜像。P0 权威性、双源优先级和引用 ID 体系确认后才按以下规则处理：
 
 - `sendpost[].ID` -> assignment Source ID；
 - 父人员 BIP ID -> `employee_id`；
@@ -243,7 +244,7 @@ V1 不得：
 | 反转日期且不属于已确认当前占位 | `org_sync_assignment_period_invalid` |
 | 在岗/结束标记冲突 | `org_sync_assignment_status_conflict` |
 
-P0-9 关闭前不内置魔法日期。未来任职可以用未来 `valid_from` 保存，但不能视为当前。结束任职改为 disabled 并保留，`source_deleted` 仍为 false。
+INT-006F-A 对保存原始响应重新统计：13 条当前任职均为空结束时间；12 条历史任职中 11 条为合法非空区间，1 条结束时间为空；不存在非空结束时间反转。早期“13 条相同反转占位值”的派生结论由本次原始资料复核更正。P0 关闭前仍不内置魔法日期；只允许显式 null/空且当前状态一致时规范为开放结束，历史状态但结束为空属于冲突。未来任职可以用未来 `valid_from` 保存，但不能视为当前。结束任职改为 disabled 并保留，`source_deleted` 仍为 false。
 
 ## 11. 离职与状态规则
 
@@ -255,7 +256,7 @@ P0-9 关闭前不内置魔法日期。未来任职可以用未来 `valid_from` �
 4. 保留员工、历史任职、岗位、组织、法人和 `user_id` 绑定；
 5. 不停用或删除 `SysUser`，账号生命周期属于独立受控流程。
 
-普通人员 `isenable=1` 映射 active；没有已确认离职事件时，`0/2` 保守映射 suspended，而不是 resigned。带有效日期的离职事件优先于更早的普通人员事件。只有源端确认再入职顺序和雇佣段规则后，更晚的再入职事实才可重新激活；否则写 `org_sync_employment_state_conflict`。
+普通人员 `isenable=1` 映射 active；没有已确认离职事件时，`0/2` 保守映射 suspended，而不是 resigned。OpenAPI 明确离职接口和 `lzdate` 字段语义，因此在权威源时间可比较时，带合法日期的离职事实可以优先于更早的普通 active 事实。更晚的普通 active 不能自动解释为再入职；源端确认再入职枚举、顺序和雇佣段规则前写 `org_sync_employment_state_conflict`。普通人员虽有描述为“二次入厂”的 `ifreentry`，但枚举和生命周期未说明，不能据此重新激活。
 
 陈旧写保护使用 P0-7 最终确认的权威源更新时间，不能用到达顺序决定最终状态。
 
@@ -471,9 +472,9 @@ OrgSyncBatch.execution_id
 | 员工编号身份 | `jhcode` 仅是候选 | 目标字段必填且唯一 | 缺失/冲突失败，不使用联系方式/姓名回退 |
 | 顶层任职是否唯一主任职 | 顶层单值，Swagger 未声明 | 决定 `is_primary` 和权限语义 | 仅同步员工，不创建主职 |
 | 主任职稳定 ID 与生命周期 | 顶层无 assignment ID | 无法幂等保存调岗/历史 | 要求源 ID 或正式保证的复合键 |
-| `sendpost` 权威性和双源优先级 | `sendPostList=[]`，`sendpost` 有值 | 可能漏掉或重复全部兼职 | 未批准源非空时失败并保持 Checkpoint |
-| 兼职 ID 体系和结构枚举 | 部分命中 NCID，无字典 | 可能错误关联必需外键 | 不按名称解析，引用不明则失败 |
-| 开放任职结束日期占位 | 重复反转日期疑似占位 | 错误规范化会关闭当前任职 | 不猜魔法日期，受影响任职失败 |
+| `sendpost` 权威性和双源优先级 | `sendPostList=[]`，字符串有值；中英文公司/部门引用不一致 | 可能漏掉、重复或错误关联全部兼职 | 未批准源不落库并保持 Checkpoint |
+| 兼职 ID 体系和结构枚举 | 关系 ID 仅样本唯一；结构化组织/岗位引用契约为 NCID，当前领域身份为 BIP | 缺少生命周期承诺和 NCID Crosswalk | 不按名称解析，不把 NCID 当 BIP，引用不明则失败 |
+| 开放任职结束日期与状态组合 | OpenAPI end nullable；13 条当前 end 为空，另有 1 条历史 end 为空；无非空反转样本 | 历史空 end 与未知占位规则可能误判当前状态 | 只接受显式空且当前标记一致，不猜魔法日期 |
 | 人员响应上限与首次初始化 | 全局九天超过采集上限，无分页/上界 | Transport/内存风险，基线可能不完整 | 受控按公司试运行；无法限流则要求源端改造 |
 
 ### 22.2 P1：生产上线前必须关闭
@@ -555,11 +556,19 @@ P0 源契约确认是正式 Gate，不属于隐藏开发工作。
 - 建立内存/响应防御和公司分片试运行；
 - 不提前宣称任职完整。
 
-### INT-006F：任职与离职 Consumer
+### INT-006F-A：任职与离职源契约评审
 
-- 受主任职、`sendpost`、ID 体系和有效期 P0 门控；
-- 实现主任职/兼职、有效期规范化、离职排序、任职关闭和再入职冲突；
-- 证明无猜测主职、无假引用、无账号删除。
+- 只读复核 OpenAPI、脱敏样本和保存响应；
+- 形成 `OrganizationHRAssignmentContractReview.md` Gate 矩阵；
+- 关闭兼职岗位可空和 `lzdate` 字段语义两个局部结论；
+- 主任职、`sendpost` 权威性、关系 ID 生命周期、NCID Crosswalk、离职视图、跨接口排序和再入职继续门控。
+
+### INT-006F-B：任职与离职安全子集
+
+- 允许实现离职 Source DTO、合法 `lzdate`、Employee resigned 收敛、历史保护和冲突处理；
+- 允许实现受限任职 Parser/Test Harness、空岗位和显式空结束时间校验，但不允许生产兼职持久化；
+- 不实现主任职、自动再入职、魔法日期或 NCID 绕过；
+- 生产 Consumer 在权威视图、BIP 生命周期和 changeTime Gate 关闭前保持 disabled。
 
 ### INT-006G：端到端验收与冻结
 
@@ -658,3 +667,17 @@ V1 只保存姓名、可空手机、可空邮箱、雇佣状态和源时间。�
 PostgreSQL 16 的 SyncRunner + WorkerRunner + TLS E2E 覆盖：首轮 HTTP 503 由 Integration Retry 后成功、固定测试公司分区 static input 注入、两片连续消费、空联系方式、重复人员幂等、后片更新为 suspended、future 过滤和 Checkpoint 推进；另一路覆盖同源同时间事实冲突导致业务失败、Checkpoint 保持且 Consumer 失败不产生额外 Retry。测试分区值只属于显式 Test SourceContract。生产公司分区 ID 完整清单和命名空间尚未确认，因此没有建立可供生产选择的任意值入口或动态 Fan-out；生产 Consumer 继续 disabled。
 
 INT-006E 不关闭 BIP ID 永久稳定/不可复用、changeTime 权威性/时区/精度/同秒完整性、员工编号生命周期、公司分区清单、主任职及其稳定 assignment ID、`sendpost` 权威性、兼职 ID 体系、开放任职日期、人员大响应生产策略、物理删除表达或离职/再入职完整规则。进入 INT-006F 只能实现经权威材料确认的任职和离职范围，不能依据本次员工实体同步推断这些语义。
+
+## 31. INT-006F-A 任职与离职源契约评审结论
+
+正式证据与 Gate 矩阵见 `docs/OrganizationHRAssignmentContractReview.md`。本轮没有修改代码、数据库或生产 Consumer，也没有重新采集真实人员数据。
+
+已确认的局部语义只有：
+
+1. 兼职岗位可以为空，`org_assignment.position_id=NULL` 是合法场景；
+2. 离职接口的 `lzdate` 明确表示离职日期；
+3. 明确离职事实可在权威源时间可比较时使员工收敛为 resigned，但普通 `isenable=2` 仍不能单独等同离职。
+
+仍未关闭：顶层主任职语义和稳定身份、`sendpost` 永久权威性、兼职关系 ID 生命周期、NCID -> BIP Crosswalk、历史空结束时间语义、离职权威 `userType`、changeTime 时区/精度/同秒完整性、跨接口冲突排序和再入职雇佣段。
+
+INT-006F-B 只能实现离职安全子集和任职 Parser/Test Harness。生产任职落库继续禁止；离职生产启用也必须等待权威视图、BIP 生命周期与 changeTime Gate 关闭。当前 BIP 字段、字符串容器、`userType` 和 `ifreentry` 均属于 Source Adapter 规则，不得进入 Organization Domain 通用服务。
