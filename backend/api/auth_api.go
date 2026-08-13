@@ -19,6 +19,7 @@ import (
 	"backend/service"
 	"crypto/sha256"
 	"crypto/subtle"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -144,7 +145,7 @@ func (a *AuthApi) SendSms(ctx *gin.Context) {
 	err := ctx.ShouldBindBodyWith(&data, binding.JSON)
 	if err != nil {
 		// 判断错误是否是空内容导致，如果是则赋值为空 map，允许通过
-		if err == io.EOF || err.Error() == "EOF" {
+		if stderrors.Is(err, io.EOF) {
 			data = map[string]interface{}{}
 		} else {
 			_ = ctx.Error(errors.WrapParameterError(err, "请求参数格式错误"))

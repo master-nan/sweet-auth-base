@@ -33,6 +33,12 @@ type SysUserService struct {
 	serverConfig    *config.Server
 }
 
+type userPasswordStateUpdate struct {
+	Password          string
+	IsReset           *bool
+	PasswordChangedAt *model.CustomTime
+}
+
 func NewSysUserService(
 	sysUserRepo repository.SysUserRepository,
 	sysUserRoleRepo repository.SysUserRoleRepository,
@@ -158,14 +164,14 @@ func (s *SysUserService) UpdatePassword(ctx context.Context, req request.SysUser
 		return error2.ErrPasswordEmpty
 	}
 	now := model.CustomTime(time.Now().UTC())
-	req.PasswordChangedAt = &now
-	req.IsReset = utils.BoolPtr(false)
 	// 存储加密后的密码
 	salt := strconv.Itoa(user.Id) + s.serverConfig.Conf.Salt
-	req.Password = utils.Encryption(pwd, salt)
+	update := userPasswordStateUpdate{
+		Password: utils.Encryption(pwd, salt), IsReset: utils.BoolPtr(false), PasswordChangedAt: &now,
+	}
 
 	tx := s.sysUserRepo.DBWithContext(ctx)
-	err = s.sysUserRepo.Update(tx, &req, req.Id)
+	err = s.sysUserRepo.Update(tx, &update, req.Id)
 	if err != nil {
 		return err
 	}
@@ -188,24 +194,21 @@ func (s *SysUserService) ResetPassword(ctx context.Context, id int, password str
 		return error2.ErrPasswordEmpty
 	}
 	now := model.CustomTime(time.Now().UTC())
-	req := request.SysUserUpdateReq{
-		Id:           id,
-		AccessTokens: "",
-		IsReset:      utils.BoolPtr(true),
-	}
 	salt := strconv.Itoa(user.Id) + s.serverConfig.Conf.Salt
-	updatePasswordReq := request.SysUserUpdatePasswordReq{
-		Id:                id,
+	updatePasswordReq := userPasswordStateUpdate{
 		Password:          utils.Encryption(pwd, salt),
-		IsReset:           req.IsReset,
+		IsReset:           utils.BoolPtr(true),
 		PasswordChangedAt: &now,
 	}
 
 	tx := s.sysUserRepo.DBWithContext(ctx)
-	if err := s.sysUserRepo.Update(tx, &updatePasswordReq, id); err != nil {
+	if err := RunInTransaction(ctx, tx, func(tx *gorm.DB) error {
+		if err := s.sysUserRepo.Update(tx, &updatePasswordReq, id); err != nil {
+			return err
+		}
+		_, err := s.sysUserRepo.UpdateFields(tx, id, map[string]any{"access_tokens": ""})
 		return err
-	}
-	if err := s.sysUserRepo.WithSelect("access_tokens").Update(tx, &req, id); err != nil {
+	}); err != nil {
 		return err
 	}
 	s.RefreshCache(id)
@@ -254,7 +257,7 @@ func (s *SysUserService) AssignRoles(ctx context.Context, userId int, roleIds []
 	if int(count) != len(normalizedRoleIds) {
 		return error2.NewBadRequestError("存在无效角色")
 	}
-	err = tx.Transaction(func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, tx, func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserRole{}).Error; err != nil {
 			return err
 		}

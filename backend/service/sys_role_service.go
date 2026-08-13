@@ -117,6 +117,13 @@ func (s *SysRoleService) CreateRoleMenu(ctx context.Context, req request.RoleMen
 
 // AssignPermissions 分配角色权限
 func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.RoleAssignPermissionsReq) error {
+	role, err := s.sysRoleRepo.FindById(data.RoleId)
+	if err != nil {
+		return err
+	}
+	if role.Id == 0 {
+		return nil
+	}
 	menuIDs := uniquePositiveInts(data.MenuIds)
 	buttonIDs := uniquePositiveInts(data.ButtonIds)
 	menuIDSet := intSet(menuIDs)
@@ -128,8 +135,12 @@ func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.Rol
 		}
 		assignableButtons = filterAssignableRoleButtons(buttons, menuIDSet)
 	}
+	oldPolicies, err := quiesceCasbinSubject(s.casbinRuleRepo, role.Name)
+	if err != nil {
+		return fmt.Errorf("casbin策略暂时撤下失败: %w", err)
+	}
 
-	err := s.sysRoleRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysRoleRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		// 删除旧的角色菜单
 		if err := s.sysRoleMenuRepo.DeleteByField(tx, "role_id", data.RoleId); err != nil {
 			return err
@@ -162,15 +173,10 @@ func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.Rol
 		return nil
 	})
 	if err != nil {
+		if restoreErr := s.casbinRuleRepo.ReplaceSubjectPolicies(role.Name, oldPolicies); restoreErr != nil {
+			return fmt.Errorf("角色权限事务失败且casbin恢复失败: %v: %w", restoreErr, err)
+		}
 		return err
-	}
-
-	role, err := s.sysRoleRepo.FindById(data.RoleId)
-	if err != nil {
-		return err
-	}
-	if role.Id == 0 {
-		return nil
 	}
 
 	// 先构建新策略列表
@@ -189,6 +195,7 @@ func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.Rol
 	}
 
 	if err = s.casbinRuleRepo.ReplaceSubjectPolicies(role.Name, newPolicies); err != nil {
+		_ = s.casbinRuleRepo.ReplaceSubjectPolicies(role.Name, nil)
 		return fmt.Errorf("casbin策略更新失败: %w", err)
 	}
 

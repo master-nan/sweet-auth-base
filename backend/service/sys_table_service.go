@@ -309,6 +309,9 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 				if e := s.sysTableRepo.CreateView(tx, updateReq.TableCode, updateReq.SQL); e != nil {
 					return e
 				}
+				if e := s.syncViewTableFields(ctx, tx, current); e != nil {
+					return e
+				}
 			}
 			if e := s.sysTableRepo.Update(tx, &updateReq, updateReq.Id); e != nil {
 				return e
@@ -317,11 +320,6 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 		})
 		if err != nil {
 			return err
-		}
-		if sqlChanged {
-			if err := s.SyncViewTableFields(ctx, current); err != nil {
-				return err
-			}
 		}
 		s.metadataRuntime.deleteCachedTable(current)
 		s.RefreshCache(req.Id)
@@ -2112,12 +2110,18 @@ func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID in
 
 // SyncViewTableFields 视图字段元数据全量对齐（增删改）
 func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.SysTable) error {
-	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, nil, "public", table.TableCode)
+	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		return s.syncViewTableFields(ctx, tx, table)
+	})
+}
+
+func (s *SysTableService) syncViewTableFields(ctx context.Context, tx *gorm.DB, table model.SysTable) error {
+	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, tx, "public", table.TableCode)
 	if err != nil {
 		return err
 	}
 
-	existingFields, err := s.sysTableFieldRepo.GetTableFieldsByTableId(ctx, table.Id)
+	existingFields, err := s.sysTableFieldRepo.FindListByFieldWithDB(tx, "table_id", table.Id)
 	if err != nil {
 		return err
 	}
@@ -2230,24 +2234,22 @@ func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.S
 		"is_update_show",
 	)
 
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		if len(toCreate) > 0 {
-			if e := s.sysTableFieldRepo.Create(tx, &toCreate); e != nil {
-				return e
-			}
+	if len(toCreate) > 0 {
+		if e := s.sysTableFieldRepo.Create(tx, &toCreate); e != nil {
+			return e
 		}
-		for _, item := range toUpdate {
-			if e := selectRepo.Update(tx, &item.Field, item.Id); e != nil {
-				return e
-			}
+	}
+	for _, item := range toUpdate {
+		if e := selectRepo.Update(tx, &item.Field, item.Id); e != nil {
+			return e
 		}
-		for _, id := range toDelete {
-			if e := s.sysTableFieldRepo.DeleteById(tx, id); e != nil {
-				return e
-			}
+	}
+	for _, id := range toDelete {
+		if e := s.sysTableFieldRepo.DeleteById(tx, id); e != nil {
+			return e
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // RefreshCache 刷新表元数据缓存。

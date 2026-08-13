@@ -110,8 +110,8 @@ func (s *SmsService) SendSms(
 		return nil, err
 	}
 	if *result.Code != "OK" {
-		zap.L().Error("短信发送失败", zap.Any("result", result))
-		return nil, error2.NewBadRequestError(*result.Message)
+		zap.L().Error("短信发送失败", zap.String("provider_code", *result.Code))
+		return nil, error2.ErrSmsSendFailed
 	}
 	// 记录短信发送日志
 	id, err := s.sf.GenerateUniqueID()

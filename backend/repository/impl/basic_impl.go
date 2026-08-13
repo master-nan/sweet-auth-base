@@ -39,20 +39,7 @@ func NewBasicRepositoryImpl[T any](db *gorm.DB, model *T) *BasicRepositoryImpl[T
 }
 
 func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
-	return b.db.WithContext(ctx).Transaction(func(tx *gorm.DB) (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				if e, ok := r.(error); ok {
-					zap.L().Error("Recovered from panic:", zap.Error(e))
-					err = e
-				} else {
-					zap.L().Error("Recovered from panic:", zap.Any("recover:", r))
-					err = fmt.Errorf("panic: %v", r)
-				}
-			}
-		}()
-		return fn(tx) // 执行传入的函数
-	})
+	return b.db.WithContext(ctx).Transaction(fn)
 }
 
 func (b *BasicRepositoryImpl[T]) DBWithContext(ctx context.Context) *gorm.DB {

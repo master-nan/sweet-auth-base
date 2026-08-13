@@ -563,11 +563,6 @@ const handleFormSubmit = async (formPayload: { data: User; isEdit: boolean; id?:
         user_name: formPayload.data.user_name,
         email: formPayload.data.email,
         phone_number: formPayload.data.phone_number,
-        access_tokens: (formPayload.data as any).access_tokens,
-        gmt_last_login: formPayload.data.gmt_last_login || null,
-      }
-      if (formPayload.data.is_reset !== undefined) {
-        req.is_reset = formPayload.data.is_reset
       }
       const result = await sysUserApi.updateUser(req)
       if (result.success) {

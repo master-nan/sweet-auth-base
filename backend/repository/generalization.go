@@ -9,6 +9,9 @@ import (
 	"backend/dto/request"
 	"backend/internal/datapermission"
 	"backend/model"
+	"context"
+
+	"gorm.io/gorm"
 )
 
 type GeneralizationListResult struct {
@@ -34,11 +37,12 @@ type GeneralizationRepository interface {
 }
 
 type GeneralizationPermissionRepository interface {
+	DBWithContext(context.Context) *gorm.DB
 	QueryWithPermission(*request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)
 	GetByIdWithPermission(model.SysTable, int, GeneralizationPermission) (map[string]interface{}, error)
 	UpdateWithPermission(model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
 	SoftDeleteWithPermission(model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
 	HardDeleteWithPermission(model.SysTable, int, GeneralizationPermission) (bool, error)
-	BatchSoftDeleteWithPermission(model.SysTable, []int, map[string]interface{}, GeneralizationPermission) (bool, error)
-	BatchHardDeleteWithPermission(model.SysTable, []int, GeneralizationPermission) (bool, error)
+	BatchSoftDeleteWithPermission(*gorm.DB, model.SysTable, []int, map[string]interface{}, GeneralizationPermission) (bool, error)
+	BatchHardDeleteWithPermission(*gorm.DB, model.SysTable, []int, GeneralizationPermission) (bool, error)
 }

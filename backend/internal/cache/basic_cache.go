@@ -6,11 +6,18 @@
 package cache
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+func cacheKeyDigest(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:6])
+}
 
 type BasicCache[T any] struct {
 	cacher         Cacher
@@ -28,7 +35,7 @@ func (c *BasicCache[T]) Get(key string) (T, error) {
 	err := c.cacher.Get(c.cacheKeyPrefix+key, &data)
 	if err != nil {
 		if !errors.Is(err, ErrCacheMiss) {
-			zap.L().Error(c.cacheKeyPrefix+"Error getting key in cache", zap.String("key", key), zap.Error(err))
+			zap.L().Error(c.cacheKeyPrefix+"Error getting key in cache", zap.String("key_hash", cacheKeyDigest(key)), zap.Error(err))
 		}
 		return data, err
 	}
@@ -38,7 +45,7 @@ func (c *BasicCache[T]) Get(key string) (T, error) {
 func (c *BasicCache[T]) Set(key string, data T) error {
 	err := c.cacher.Set(c.cacheKeyPrefix+key, &data, 7200*time.Second)
 	if err != nil {
-		zap.L().Error(c.cacheKeyPrefix+"Error setting key in cache", zap.String("key", key), zap.Error(err))
+		zap.L().Error(c.cacheKeyPrefix+"Error setting key in cache", zap.String("key_hash", cacheKeyDigest(key)), zap.Error(err))
 		return err
 	}
 	return nil
@@ -47,7 +54,7 @@ func (c *BasicCache[T]) Set(key string, data T) error {
 func (c *BasicCache[T]) SetExpiration(key string, data T, expiration int64) error {
 	err := c.cacher.Set(c.cacheKeyPrefix+key, &data, time.Duration(expiration)*time.Second)
 	if err != nil {
-		zap.L().Error(c.cacheKeyPrefix+"Error setting key in cache", zap.String("key", key), zap.Error(err))
+		zap.L().Error(c.cacheKeyPrefix+"Error setting key in cache", zap.String("key_hash", cacheKeyDigest(key)), zap.Error(err))
 		return err
 	}
 	return nil
@@ -56,7 +63,7 @@ func (c *BasicCache[T]) SetExpiration(key string, data T, expiration int64) erro
 func (c *BasicCache[T]) Delete(key string) error {
 	err := c.cacher.Del(c.cacheKeyPrefix + key)
 	if err != nil {
-		zap.L().Error(c.cacheKeyPrefix+"Error delete key in cache", zap.String("key", key), zap.Error(err))
+		zap.L().Error(c.cacheKeyPrefix+"Error delete key in cache", zap.String("key_hash", cacheKeyDigest(key)), zap.Error(err))
 		return err
 	}
 	return nil

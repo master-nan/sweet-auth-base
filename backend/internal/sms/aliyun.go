@@ -8,7 +8,7 @@ package sms
 import (
 	error2 "backend/internal/errors"
 	"backend/internal/utils"
-	"errors"
+	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dysmsapi20170525 "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 	"github.com/alibabacloud-go/tea/tea"
@@ -42,15 +42,10 @@ func SendSms(client *dysmsapi20170525.Client, signName, templateCode, phoneNumbe
 	// 复制代码运行请自行打印 API 的返回值
 	result, err := client.SendSms(sendSmsRequest)
 	if err != nil {
-		var error = &tea.SDKError{}
-		var _t *tea.SDKError
-		if errors.As(err, &_t) {
-			error = _t
-		}
-		zap.L().Error("发送短信失败", zap.Error(error))
-		return nil, error2.NewError(*error.StatusCode, 60001, *error.Message)
+		zap.L().Error("发送短信失败", zap.String("error_type", fmt.Sprintf("%T", err)))
+		return nil, error2.WrapSmsSendFailed(err)
 	}
-	zap.L().Warn("发送短信返回结果", zap.Any("result", result))
+	zap.L().Debug("发送短信调用完成")
 	return result.Body, nil
 }
 
@@ -66,14 +61,9 @@ func CheckSmsStatus(client *dysmsapi20170525.Client, bizId, phoneNumber string, 
 	// 复制代码运行请自行打印 API 的返回值
 	result, err := client.QuerySendDetails(querySendDetailsRequest)
 	if err != nil {
-		var error = &tea.SDKError{}
-		var _t *tea.SDKError
-		if errors.As(err, &_t) {
-			error = _t
-		}
-		zap.L().Error("查询短信发送状态失败", zap.Error(error))
-		return nil, error2.NewError(*error.StatusCode, 60001, *error.Message)
+		zap.L().Error("查询短信发送状态失败", zap.String("error_type", fmt.Sprintf("%T", err)))
+		return nil, error2.WrapSmsStatusQueryFailed(err)
 	}
-	zap.L().Warn("查询短信发送状态返回结果", zap.Any("result", result))
+	zap.L().Debug("查询短信发送状态调用完成")
 	return result.Body, nil
 }

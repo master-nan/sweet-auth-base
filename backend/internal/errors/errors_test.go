@@ -87,6 +87,31 @@ func TestToClientErrorSanitizesUnknownError(t *testing.T) {
 	}
 }
 
+func TestThirdPartyErrorWrappersKeepStableClientMessages(t *testing.T) {
+	providerErr := stderrors.New("provider token=do-not-expose endpoint=internal")
+	tests := []struct {
+		name    string
+		err     error
+		code    int
+		message string
+	}{
+		{name: "sms send", err: WrapSmsSendFailed(providerErr), code: 50005, message: "短信发送失败"},
+		{name: "sms status", err: WrapSmsStatusQueryFailed(providerErr), code: 50010, message: "短信状态查询失败"},
+		{name: "dingtalk", err: WrapDingTalkRequestFailed(providerErr), code: 60004, message: "钉钉服务请求失败"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientErr, classified := ToClientError(test.err)
+			if !classified || clientErr.StatusCode != http.StatusBadGateway || clientErr.ErrorCode != test.code || clientErr.ErrorMessage != test.message {
+				t.Fatalf("unexpected client error: %#v", clientErr)
+			}
+			if strings.Contains(clientErr.ErrorMessage, "do-not-expose") || !stderrors.Is(test.err, providerErr) {
+				t.Fatalf("provider detail leaked or cause was lost: %#v", clientErr)
+			}
+		})
+	}
+}
+
 func TestToClientErrorRecognizesRawParameterError(t *testing.T) {
 	_, rawErr := strconv.Atoi("not-an-id")
 	if rawErr == nil {

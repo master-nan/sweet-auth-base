@@ -82,6 +82,18 @@ func WrapSystemError(cause error) error {
 	)
 }
 
+func WrapSmsSendFailed(cause error) error {
+	return WrapError(cause, response.ErrorCategorySystem, http.StatusBadGateway, 50005, "短信发送失败")
+}
+
+func WrapSmsStatusQueryFailed(cause error) error {
+	return WrapError(cause, response.ErrorCategorySystem, http.StatusBadGateway, 50010, "短信状态查询失败")
+}
+
+func WrapDingTalkRequestFailed(cause error) error {
+	return WrapError(cause, response.ErrorCategorySystem, http.StatusBadGateway, 60004, "钉钉服务请求失败")
+}
+
 func CategoryOf(err error) response.ErrorCategory {
 	var adminErr *response.AdminError
 	if stderrors.As(err, &adminErr) {
@@ -218,19 +230,21 @@ var (
 	ErrAppTokenInvalid = NewError(http.StatusUnauthorized, 40004, "应用token无效")
 	ErrAppNameExist    = NewBusinessError(http.StatusUnauthorized, 40005, "应用名称已存在")
 
-	ErrClientNotFound      = NewError(http.StatusBadRequest, 50001, "客户端不存在")
-	ErrSmsTemplateNotFound = NewError(http.StatusBadRequest, 50002, "短信模板不存在")
-	ErrSmsMobileNotFound   = NewError(http.StatusBadRequest, 50003, "手机号不存在")
-	ErrSmsFieldInvalid     = NewError(http.StatusBadRequest, 50004, "字段不合法")
-	ErrSmsSendFailed       = NewError(http.StatusBadRequest, 50005, "短信发送失败")
-	ErrMobileInvalid       = NewError(http.StatusBadRequest, 50006, "手机号不合法")
-	ErrCodeInvalid         = NewError(http.StatusBadRequest, 50007, "验证码错误或者已过期")
-	ErrSmsTemplateExist    = NewError(http.StatusBadRequest, 50008, "短信模板已存在")
-	ErrSmsSendTooFrequent  = NewError(http.StatusTooManyRequests, 50009, "短信发送过于频繁，请稍后再试")
+	ErrClientNotFound       = NewError(http.StatusBadRequest, 50001, "客户端不存在")
+	ErrSmsTemplateNotFound  = NewError(http.StatusBadRequest, 50002, "短信模板不存在")
+	ErrSmsMobileNotFound    = NewError(http.StatusBadRequest, 50003, "手机号不存在")
+	ErrSmsFieldInvalid      = NewError(http.StatusBadRequest, 50004, "字段不合法")
+	ErrSmsSendFailed        = NewError(http.StatusBadGateway, 50005, "短信发送失败")
+	ErrMobileInvalid        = NewError(http.StatusBadRequest, 50006, "手机号不合法")
+	ErrCodeInvalid          = NewError(http.StatusBadRequest, 50007, "验证码错误或者已过期")
+	ErrSmsTemplateExist     = NewError(http.StatusBadRequest, 50008, "短信模板已存在")
+	ErrSmsSendTooFrequent   = NewError(http.StatusTooManyRequests, 50009, "短信发送过于频繁，请稍后再试")
+	ErrSmsStatusQueryFailed = NewError(http.StatusBadGateway, 50010, "短信状态查询失败")
 
 	ErrDingTalkSecretNotFound = NewError(http.StatusBadRequest, 60001, "钉钉密钥未配置")
 	ErrDingTalkMsgTypeInvalid = NewError(http.StatusBadRequest, 60002, "钉钉消息类型错误")
 	ErrDingTalkRecipientEmpty = NewError(http.StatusBadRequest, 60003, "userid_list, dept_id_list, to_all_user 不能同时为空")
+	ErrDingTalkRequestFailed  = NewError(http.StatusBadGateway, 60004, "钉钉服务请求失败")
 
 	ErrFileNotFound               = NewError(http.StatusNotFound, 70001, "文件不存在")
 	ErrFileEmpty                  = NewError(http.StatusBadRequest, 70002, "文件不能为空")

@@ -2,8 +2,9 @@ import type { Basic, Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
 
 export interface AccessLog extends Basic {
-  user_id: number
   user_name: string
+  request_id: string
+  trace_id: string
   method: string
   ip: string
   locality: string
@@ -12,13 +13,12 @@ export interface AccessLog extends Basic {
   resource_type: string
   resource_code: string
   resource_id: string
-  menu_id: number
   status_code: number
   success: boolean
   duration_ms: number
-  body?: string
-  query?: string
-  response?: string
+  result: string
+  error_code: string
+  error_message: string
 }
 
 export const useAccessLogApi = () => {

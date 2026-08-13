@@ -46,6 +46,27 @@ func TestRunInTransactionRollsBackAndPropagatesError(t *testing.T) {
 	assertTransactionFixtureNames(t, db)
 }
 
+func TestRunInTransactionRollsBackAndPropagatesPanic(t *testing.T) {
+	db := testutil.OpenSQLite(t, &transactionFixture{})
+	const panicValue = "transaction panic"
+
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != panicValue {
+				t.Fatalf("expected panic %q, got %#v", panicValue, recovered)
+			}
+		}()
+		_ = RunInTransaction(context.Background(), db, func(tx *gorm.DB) error {
+			if err := tx.Create(&transactionFixture{Name: "rolled-back-panic"}).Error; err != nil {
+				return err
+			}
+			panic(panicValue)
+		})
+	}()
+
+	assertTransactionFixtureNames(t, db)
+}
+
 func TestRunInTransactionNestedSavepoint(t *testing.T) {
 	db := testutil.OpenSQLite(t, &transactionFixture{})
 	nestedErr := errors.New("nested write rejected")

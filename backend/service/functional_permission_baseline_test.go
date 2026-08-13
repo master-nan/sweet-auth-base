@@ -6,7 +6,9 @@ import (
 	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
+	"backend/repository"
 	"backend/repository/impl"
+	"errors"
 	"net/http/httptest"
 	"testing"
 
@@ -14,6 +16,19 @@ import (
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/gin-gonic/gin"
 )
+
+type failSecondPolicyReplaceEnforcer struct {
+	repository.CasbinPolicyEnforcer
+	replaceCalls int
+}
+
+func (e *failSecondPolicyReplaceEnforcer) UpdateFilteredPolicies(newPolicies [][]string, fieldIndex int, fieldValues ...string) (bool, error) {
+	e.replaceCalls++
+	if e.replaceCalls == 2 {
+		return false, errors.New("casbin replace failed")
+	}
+	return e.CasbinPolicyEnforcer.UpdateFilteredPolicies(newPolicies, fieldIndex, fieldValues...)
+}
 
 func TestAssignPermissionsPersistsMenuAndButtonGrantsAndBuildsCasbinPolicy(t *testing.T) {
 	db := testutil.OpenSQLite(
@@ -129,6 +144,52 @@ func TestAssignPermissionsPersistsMenuAndButtonGrantsAndBuildsCasbinPolicy(t *te
 			Allowed: false,
 		},
 	)
+}
+
+func TestAssignPermissionsCasbinFailureLeavesRoleFailClosed(t *testing.T) {
+	db := testutil.OpenSQLite(t, &model.SysRole{}, &model.SysMenu{}, &model.SysMenuButton{}, &model.SysRoleMenu{}, &model.SysRoleMenuButton{}, &model.CasbinRule{})
+	role := model.SysRole{Basic: model.Basic{Id: 1, State: true}, Name: "fail_closed_role"}
+	menu := model.SysMenu{Basic: model.Basic{Id: 10, State: true}, Name: "new_menu"}
+	button := model.SysMenuButton{Basic: model.Basic{Id: 100, State: true}, MenuId: menu.Id, Code: "query", Path: "/admin/new", Method: "GET"}
+	testutil.MustCreate(t, db, &role)
+	testutil.MustCreate(t, db, &menu)
+	testutil.MustCreate(t, db, &button)
+
+	adapter, err := gormadapter.NewAdapterByDB(db)
+	if err != nil {
+		t.Fatalf("new casbin adapter: %v", err)
+	}
+	enforcer, err := casbin.NewSyncedEnforcer("../casbin_model.conf", adapter)
+	if err != nil {
+		t.Fatalf("new synced enforcer: %v", err)
+	}
+	if _, err = enforcer.AddPolicy(role.Name, "/admin/old", "GET"); err != nil {
+		t.Fatalf("seed old policy: %v", err)
+	}
+	failingEnforcer := &failSecondPolicyReplaceEnforcer{CasbinPolicyEnforcer: enforcer}
+	primaryDB := &database.PrimaryDB{DB: db}
+	sf, _ := utils.NewSnowflake(1)
+	svc := NewSysRoleService(
+		impl.NewSysMenuButtonRepositoryImpl(primaryDB), impl.NewSysRoleRepositoryImpl(primaryDB),
+		impl.NewSysRoleMenuRepositoryImpl(primaryDB), impl.NewSysRoleMenuButtonRepositoryImpl(primaryDB),
+		impl.NewCasbinRuleRepositoryImpl(primaryDB, failingEnforcer), sf,
+	)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+	err = svc.AssignPermissions(ctx, request.RoleAssignPermissionsReq{RoleId: role.Id, MenuIds: []int{menu.Id}, ButtonIds: []int{button.Id}})
+	if err == nil {
+		t.Fatal("expected casbin replacement failure")
+	}
+	for _, policy := range [][2]string{{"/admin/old", "GET"}, {button.Path, button.Method}} {
+		allowed, enforceErr := enforcer.Enforce(role.Name, policy[0], policy[1])
+		if enforceErr != nil || allowed {
+			t.Fatalf("role must remain fail closed for %v: allowed=%v err=%v", policy, allowed, enforceErr)
+		}
+	}
+	var grants int64
+	if err := db.Model(&model.SysRoleMenuButton{}).Where("role_id = ?", role.Id).Count(&grants).Error; err != nil || grants != 1 {
+		t.Fatalf("database permission assignment should commit before policy install: grants=%d err=%v", grants, err)
+	}
 }
 
 func TestAssignPermissionsPreservesSeededRoutePolicyRepresentedByPermissionButton(t *testing.T) {

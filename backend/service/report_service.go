@@ -283,7 +283,7 @@ func (s *ReportService) PublishReport(ctx *gin.Context, reportId int, req reques
 		return response.ReportPublishRes{}, myerrors.ErrParamInvalid
 	}
 	var published model.ReportDefinitionVersion
-	err := s.reportRepo.DBWithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := RunInTransaction(reportRequestContext(ctx), s.reportRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		var report model.ReportDefinition
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&report, reportId).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -402,7 +402,7 @@ func (s *ReportService) PublishReportAsMenu(ctx *gin.Context, reportId int, req 
 	}
 	var result response.ReportPublishMenuRes
 	var policies []reportMenuPolicy
-	err := s.reportRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := RunInTransaction(reportRequestContext(ctx), s.reportRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		var report model.ReportDefinition
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&report, reportId).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -478,9 +478,36 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 	if reportId <= 0 {
 		return response.ReportPublishMenuRes{}, myerrors.ErrParamInvalid
 	}
+	db := s.reportRepo.DBWithContext(ctx)
+	var preflightReport model.ReportDefinition
+	if err := db.First(&preflightReport, reportId).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.ReportPublishMenuRes{}, myerrors.ErrDataNotFound
+		}
+		return response.ReportPublishMenuRes{}, err
+	}
+	var snapshots []casbinPolicySnapshot
+	if preflightReport.PermissionMenuId > 0 {
+		buttons, err := s.reportMenuButtons(db, preflightReport.PermissionMenuId)
+		if err != nil {
+			return response.ReportPublishMenuRes{}, err
+		}
+		candidates, err := s.reportButtonPolicyCandidates(db, buttons)
+		if err != nil {
+			return response.ReportPublishMenuRes{}, err
+		}
+		identities, err := s.reportPolicyIdentities(candidates)
+		if err != nil {
+			return response.ReportPublishMenuRes{}, err
+		}
+		snapshots, err = quiesceCasbinPolicies(s.casbinRuleRepo, identities)
+		if err != nil {
+			return response.ReportPublishMenuRes{}, err
+		}
+	}
 	var result response.ReportPublishMenuRes
 	var cleanups []reportMenuPolicy
-	err := s.reportRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := RunInTransaction(reportRequestContext(ctx), db, func(tx *gorm.DB) error {
 		var report model.ReportDefinition
 		if err := tx.First(&report, reportId).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -543,9 +570,12 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 		return nil
 	})
 	if err != nil {
+		if restoreErr := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, nil); restoreErr != nil {
+			return response.ReportPublishMenuRes{}, fmt.Errorf("报表菜单撤销失败且casbin恢复失败: %v: %w", restoreErr, err)
+		}
 		return response.ReportPublishMenuRes{}, err
 	}
-	if err := s.removeReportMenuPolicies(cleanups); err != nil {
+	if err := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, reportCleanupPolicySet(cleanups)); err != nil {
 		return response.ReportPublishMenuRes{}, err
 	}
 	return result, nil
@@ -2016,7 +2046,8 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecu
 		ErrorMessage: "",
 	}
 	if runErr != nil {
-		log.ErrorMessage = runErr.Error()
+		clientErr, _ := myerrors.ToClientError(runErr)
+		log.ErrorMessage = clientErr.ErrorMessage
 	}
 	db := s.reportLogRepo.DBWithContext(ctx)
 	if err := db.Create(&log).Error; err != nil {
@@ -2816,15 +2847,6 @@ func (s *ReportService) addReportMenuPolicies(policies []reportMenuPolicy) error
 	return nil
 }
 
-func (s *ReportService) removeReportMenuPolicies(policies []reportMenuPolicy) error {
-	for _, policy := range uniqueReportMenuPolicies(policies) {
-		if _, err := s.casbinRuleRepo.RemovePolicy(policy.RoleName, policy.Path, policy.Method); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *ReportService) reportMenuButtons(tx *gorm.DB, menuID int) ([]model.SysMenuButton, error) {
 	var buttons []model.SysMenuButton
 	if err := tx.Where("menu_id = ?", menuID).Find(&buttons).Error; err != nil {
@@ -2872,6 +2894,29 @@ func (s *ReportService) reportOrphanRolePolicyCleanups(tx *gorm.DB, candidates m
 		cleanups = append(cleanups, reportMenuPolicy{RoleID: role.Id, RoleName: role.Name, Path: candidate.Path, Method: candidate.Method})
 	}
 	return cleanups, nil
+}
+
+func (s *ReportService) reportPolicyIdentities(candidates map[buttonPolicyKey]struct{}) ([]casbinPolicyIdentity, error) {
+	identities := make([]casbinPolicyIdentity, 0, len(candidates))
+	for candidate := range candidates {
+		role, err := s.sysRoleRepo.FindById(candidate.RoleID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		identities = append(identities, casbinPolicyIdentity{Subject: role.Name, Path: candidate.Path, Method: candidate.Method})
+	}
+	return identities, nil
+}
+
+func reportCleanupPolicySet(cleanups []reportMenuPolicy) map[casbinPolicyIdentity]struct{} {
+	result := make(map[casbinPolicyIdentity]struct{}, len(cleanups))
+	for _, cleanup := range cleanups {
+		result[casbinPolicyIdentity{Subject: cleanup.RoleName, Path: cleanup.Path, Method: cleanup.Method}] = struct{}{}
+	}
+	return result
 }
 
 func reportMenuResponse(report model.ReportDefinition, menu model.SysMenu, published bool) response.ReportPublishMenuRes {

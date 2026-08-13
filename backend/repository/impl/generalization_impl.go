@@ -14,6 +14,7 @@ import (
 	"backend/model"
 	"backend/repository"
 	"backend/repository/util"
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -31,6 +32,10 @@ func NewGeneralizationRepositoryImpl(PrimaryDB *database.PrimaryDB) *Generalizat
 	return &GeneralizationRepositoryImpl{
 		db: PrimaryDB.DB,
 	}
+}
+
+func (g *GeneralizationRepositoryImpl) DBWithContext(ctx context.Context) *gorm.DB {
+	return g.db.WithContext(ctx)
 }
 
 func (g *GeneralizationRepositoryImpl) Query(basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
@@ -175,6 +180,7 @@ func (g *GeneralizationRepositoryImpl) HardDeleteWithPermission(
 }
 
 func (g *GeneralizationRepositoryImpl) BatchSoftDeleteWithPermission(
+	tx *gorm.DB,
 	table model.SysTable,
 	ids []int,
 	deleteData map[string]interface{},
@@ -183,31 +189,22 @@ func (g *GeneralizationRepositoryImpl) BatchSoftDeleteWithPermission(
 	if len(ids) == 0 {
 		return false, nil
 	}
-	err := g.db.Transaction(func(tx *gorm.DB) error {
-		query, applyErr := util.ApplyGeneralizationPermission(
-			activeRowQuery(tx.Table(table.TableCode), table),
-			permission,
-			table,
-		)
-		if applyErr != nil {
-			return applyErr
-		}
-		result := query.Where("id IN ?", ids).Updates(deleteData)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != int64(len(ids)) {
-			return errGeneralizationBatchPermissionMismatch
-		}
-		return nil
-	})
-	if errors.Is(err, errGeneralizationBatchPermissionMismatch) {
+	query, err := util.ApplyGeneralizationPermission(activeRowQuery(tx.Table(table.TableCode), table), permission, table)
+	if err != nil {
+		return false, err
+	}
+	result := query.Where("id IN ?", ids).Updates(deleteData)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected != int64(len(ids)) {
 		return false, nil
 	}
-	return err == nil, err
+	return true, nil
 }
 
 func (g *GeneralizationRepositoryImpl) BatchHardDeleteWithPermission(
+	tx *gorm.DB,
 	table model.SysTable,
 	ids []int,
 	permission repository.GeneralizationPermission,
@@ -215,24 +212,18 @@ func (g *GeneralizationRepositoryImpl) BatchHardDeleteWithPermission(
 	if len(ids) == 0 {
 		return false, nil
 	}
-	err := g.db.Transaction(func(tx *gorm.DB) error {
-		query, applyErr := util.ApplyGeneralizationPermission(tx.Table(table.TableCode), permission, table)
-		if applyErr != nil {
-			return applyErr
-		}
-		result := query.Where("id IN ?", ids).Delete(nil)
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected != int64(len(ids)) {
-			return errGeneralizationBatchPermissionMismatch
-		}
-		return nil
-	})
-	if errors.Is(err, errGeneralizationBatchPermissionMismatch) {
+	query, err := util.ApplyGeneralizationPermission(tx.Table(table.TableCode), permission, table)
+	if err != nil {
+		return false, err
+	}
+	result := query.Where("id IN ?", ids).Delete(nil)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected != int64(len(ids)) {
 		return false, nil
 	}
-	return err == nil, err
+	return true, nil
 }
 
 func (g *GeneralizationRepositoryImpl) GetFieldById(tableCode string, id int, fieldName string) (interface{}, error) {

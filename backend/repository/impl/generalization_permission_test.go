@@ -105,19 +105,32 @@ func TestGeneralizationPermissionRepositoryBatchDeleteRollsBackPartialAuthorizat
 	repo := NewGeneralizationRepositoryImpl(&database.PrimaryDB{DB: db})
 	permission := generalizationRepositoryPermission(t, model.DataPermissionOperationDelete, []int64{11})
 
-	deleted, err := repo.BatchSoftDeleteWithPermission(
-		table,
-		[]int{1, 2},
-		map[string]interface{}{"gmt_delete": model.Now()},
-		permission,
-	)
-	if err != nil || deleted {
+	deleted := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var deleteErr error
+		deleted, deleteErr = repo.BatchSoftDeleteWithPermission(
+			tx,
+			table,
+			[]int{1, 2},
+			map[string]interface{}{"gmt_delete": model.Now()},
+			permission,
+		)
+		if deleteErr != nil {
+			return deleteErr
+		}
+		if !deleted {
+			return errGeneralizationBatchPermissionMismatch
+		}
+		return nil
+	})
+	if !errors.Is(err, errGeneralizationBatchPermissionMismatch) || deleted {
 		t.Fatalf("partially authorized batch delete = %v, err=%v", deleted, err)
 	}
 	assertGeneralizationPermissionRow(t, db, 1, "allowed", true)
 	assertGeneralizationPermissionRow(t, db, 2, "denied", true)
 
 	deleted, err = repo.BatchSoftDeleteWithPermission(
+		db,
 		table,
 		[]int{1},
 		map[string]interface{}{"gmt_delete": model.Now()},

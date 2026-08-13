@@ -796,9 +796,11 @@ const auditFieldLabels: Record<string, string> = {
   duration_ms: '耗时',
   ip: 'IP',
   locality: '归属地',
-  body: '请求 Body',
-  query: '请求 Query',
-  response: '响应',
+  request_id: '请求ID',
+  trace_id: '追踪ID',
+  result: '审计结果',
+  error_code: '错误码',
+  error_message: '安全错误信息',
 }
 
 const preferredSystemKeys = [
@@ -868,9 +870,11 @@ function buildAuditFields() {
     auditField('耗时', 'duration_ms', SysTableFieldType.BIGINT),
     auditField('IP', 'ip', SysTableFieldType.VARCHAR),
     auditField('归属地', 'locality', SysTableFieldType.VARCHAR),
-    auditField('请求 Body', 'body', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
-    auditField('请求 Query', 'query', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
-    auditField('响应', 'response', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
+    auditField('请求ID', 'request_id', SysTableFieldType.VARCHAR),
+    auditField('追踪ID', 'trace_id', SysTableFieldType.VARCHAR),
+    auditField('审计结果', 'result', SysTableFieldType.VARCHAR),
+    auditField('错误码', 'error_code', SysTableFieldType.VARCHAR),
+    auditField('安全错误信息', 'error_message', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
   ]
 }
 

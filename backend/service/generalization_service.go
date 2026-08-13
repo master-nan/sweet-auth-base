@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type GeneralizationService struct {
@@ -348,32 +349,32 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 	if gs.permissionRepo == nil {
 		return error2.ErrDataPermissionRuntimeFailed
 	}
+	db := gs.permissionRepo.DBWithContext(ctx.Request.Context())
 	if !utils.HasTableField(table, "gmt_delete") {
-		deleted, deleteErr := gs.permissionRepo.BatchHardDeleteWithPermission(table, ids, resolution.permission)
-		if deleteErr != nil {
-			return deleteErr
+		return RunInTransaction(ctx.Request.Context(), db, func(tx *gorm.DB) error {
+			deleted, deleteErr := gs.permissionRepo.BatchHardDeleteWithPermission(tx, table, ids, resolution.permission)
+			if deleteErr != nil {
+				return deleteErr
+			}
+			if !deleted {
+				return permissionMissError(resolution.permission)
+			}
+			return nil
+		})
+	}
+	deleteData := map[string]interface{}{"gmt_delete": model.Now()}
+	user := ctx.MustGet("user").(model.SysUser)
+	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
+	return RunInTransaction(ctx.Request.Context(), db, func(tx *gorm.DB) error {
+		deleted, err := gs.permissionRepo.BatchSoftDeleteWithPermission(tx, table, ids, deleteData, resolution.permission)
+		if err != nil {
+			return err
 		}
 		if !deleted {
 			return permissionMissError(resolution.permission)
 		}
 		return nil
-	}
-	deleteData := map[string]interface{}{"gmt_delete": model.Now()}
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
-	deleted, err := gs.permissionRepo.BatchSoftDeleteWithPermission(
-		table,
-		ids,
-		deleteData,
-		resolution.permission,
-	)
-	if err != nil {
-		return err
-	}
-	if !deleted {
-		return permissionMissError(resolution.permission)
-	}
-	return nil
+	})
 }
 
 func normalizeGeneralizationIds(ids []int) ([]int, error) {

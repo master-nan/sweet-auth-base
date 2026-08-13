@@ -3,6 +3,7 @@ package cache
 import (
 	"backend/enum"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +58,9 @@ func TestTokenBlackCacheRevokeDoesNotLogTokenValue(t *testing.T) {
 		}
 		if value == tokenValue {
 			t.Fatalf("token value leaked in log context field %s", key)
+		}
+		if text, ok := value.(string); ok && strings.Contains(text, tokenValue) {
+			t.Fatalf("token value leaked in log field %s", key)
 		}
 	}
 }

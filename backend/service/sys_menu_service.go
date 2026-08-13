@@ -108,7 +108,7 @@ func normalizeMenuPageBinding(menu *model.SysMenu) {
 
 func (s *SysMenuService) UpdateMenuOrder(ctx context.Context, data request.MenuOrderUpdateReq) error {
 	seen := make(map[int]struct{}, len(data.Menus))
-	return s.sysMenuRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysMenuRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		for _, item := range data.Menus {
 			if item.Id <= 0 {
 				return fmt.Errorf("菜单ID不能为空")
@@ -132,8 +132,31 @@ func (s *SysMenuService) RefreshMenuCache(ctx context.Context) error {
 
 // DeleteMenuById 删除菜单
 func (s *SysMenuService) DeleteMenuById(ctx context.Context, id int) error {
+	_, err := s.sysMenuRepo.WithContext(ctx).FindById(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	buttons, err := s.sysMenuButtonRepo.FindListByField("menu_id", id)
+	if err != nil {
+		return err
+	}
+	candidates, err := s.collectButtonPolicyCandidates(buttons)
+	if err != nil {
+		return err
+	}
+	identities, err := s.policyIdentities(candidates)
+	if err != nil {
+		return err
+	}
+	snapshots, err := quiesceCasbinPolicies(s.casbinRuleRepo, identities)
+	if err != nil {
+		return err
+	}
 	var cleanups []rolePolicyCleanup
-	err := s.sysMenuRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysMenuRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		childCount, err := s.sysMenuRepo.CountByField(tx, "pid", id)
 		if err != nil {
 			return err
@@ -172,9 +195,12 @@ func (s *SysMenuService) DeleteMenuById(ctx context.Context, id int) error {
 		return err
 	})
 	if err != nil {
+		if restoreErr := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, nil); restoreErr != nil {
+			return fmt.Errorf("菜单删除失败且casbin恢复失败: %v: %w", restoreErr, err)
+		}
 		return err
 	}
-	return s.removeRolePolicies(cleanups)
+	return restoreCasbinPolicies(s.casbinRuleRepo, snapshots, cleanupPolicySet(cleanups))
 }
 
 // GetMenuTree 获取菜单列表并构建树结构
@@ -952,8 +978,27 @@ func requireLowCodeButtonAPI(button *model.SysMenuButton, method, path string) e
 
 // DeleteMenuButton 删除菜单按钮
 func (s *SysMenuService) DeleteMenuButton(ctx context.Context, id int) error {
+	button, err := s.sysMenuButtonRepo.FindById(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	candidates, err := s.collectButtonPolicyCandidates([]model.SysMenuButton{button})
+	if err != nil {
+		return err
+	}
+	identities, err := s.policyIdentities(candidates)
+	if err != nil {
+		return err
+	}
+	snapshots, err := quiesceCasbinPolicies(s.casbinRuleRepo, identities)
+	if err != nil {
+		return err
+	}
 	var cleanups []rolePolicyCleanup
-	err := s.sysMenuButtonRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysMenuButtonRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		button, err := s.sysMenuButtonRepo.FindById(id)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -975,9 +1020,12 @@ func (s *SysMenuService) DeleteMenuButton(ctx context.Context, id int) error {
 		return err
 	})
 	if err != nil {
+		if restoreErr := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, nil); restoreErr != nil {
+			return fmt.Errorf("按钮删除失败且casbin恢复失败: %v: %w", restoreErr, err)
+		}
 		return err
 	}
-	return s.removeRolePolicies(cleanups)
+	return restoreCasbinPolicies(s.casbinRuleRepo, snapshots, cleanupPolicySet(cleanups))
 }
 
 type buttonPolicyKey struct {
@@ -990,6 +1038,29 @@ type rolePolicyCleanup struct {
 	RoleName string
 	Path     string
 	Method   string
+}
+
+func (s *SysMenuService) policyIdentities(candidates map[buttonPolicyKey]struct{}) ([]casbinPolicyIdentity, error) {
+	identities := make([]casbinPolicyIdentity, 0, len(candidates))
+	for candidate := range candidates {
+		role, err := s.sysRoleRepo.FindById(candidate.RoleID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		identities = append(identities, casbinPolicyIdentity{Subject: role.Name, Path: candidate.Path, Method: candidate.Method})
+	}
+	return identities, nil
+}
+
+func cleanupPolicySet(cleanups []rolePolicyCleanup) map[casbinPolicyIdentity]struct{} {
+	result := make(map[casbinPolicyIdentity]struct{}, len(cleanups))
+	for _, cleanup := range cleanups {
+		result[casbinPolicyIdentity{Subject: cleanup.RoleName, Path: cleanup.Path, Method: cleanup.Method}] = struct{}{}
+	}
+	return result
 }
 
 func (s *SysMenuService) collectButtonPolicyCandidates(buttons []model.SysMenuButton) (map[buttonPolicyKey]struct{}, error) {
@@ -1031,16 +1102,4 @@ func (s *SysMenuService) orphanRolePolicyCleanups(tx *gorm.DB, candidates map[bu
 		cleanups = append(cleanups, rolePolicyCleanup{RoleName: role.Name, Path: candidate.Path, Method: candidate.Method})
 	}
 	return cleanups, nil
-}
-
-func (s *SysMenuService) removeRolePolicies(cleanups []rolePolicyCleanup) error {
-	for _, cleanup := range cleanups {
-		if cleanup.RoleName == "" || cleanup.Path == "" || cleanup.Method == "" {
-			continue
-		}
-		if _, err := s.casbinRuleRepo.RemovePolicy(cleanup.RoleName, cleanup.Path, cleanup.Method); err != nil {
-			return err
-		}
-	}
-	return nil
 }

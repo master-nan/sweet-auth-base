@@ -40,21 +40,17 @@ func TestApplicationResDoesNotExposeSecrets(t *testing.T) {
 	}
 }
 
-func TestNewApplicationSecretResExposesOneTimeSecret(t *testing.T) {
-	application := model.Application{
-		Basic:      model.Basic{Id: 1, State: true},
-		Name:       "Default Admin App",
-		AppKey:     "sweet-admin",
-		AppSecret:  "sweet-admin-secret",
-		Expiration: 7200,
+func TestApplicationSecretResExposesOnlyOneTimeSecretFields(t *testing.T) {
+	got := ApplicationSecretRes{Id: 1, Name: "Default Admin App", AppKey: "sweet-admin", AppSecret: "one-time", Expiration: 7200}
+	payload, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal application secret response: %v", err)
 	}
-
-	got := NewApplicationSecretRes(application)
-	if got.AppSecret != application.AppSecret {
-		t.Fatalf("expected one-time app secret to be returned, got %q", got.AppSecret)
+	if got.AppSecret != "one-time" || got.AppKey != "sweet-admin" || got.Id != 1 {
+		t.Fatalf("expected one-time application secret fields, got %+v", got)
 	}
-	if got.AppKey != application.AppKey || got.Id != application.Id {
-		t.Fatalf("expected app identity to be preserved, got %+v", got)
+	if jsonContainsKey(payload, "ding_secret") || jsonContainsKey(payload, "ding_key") {
+		t.Fatalf("unexpected provider secret fields: %s", payload)
 	}
 }
 

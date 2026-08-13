@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/jinzhu/copier"
 )
 
 type SysUserApi struct {
@@ -90,11 +89,5 @@ func (u *SysUserApi) GetMe(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	user := ctx.MustGet("user").(model.SysUser)
-	var userRes response.SysUserRes
-	err := copier.Copy(&userRes, &user)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(userRes)
+	resp.SetData(service.SysUserResponse(user))
 }

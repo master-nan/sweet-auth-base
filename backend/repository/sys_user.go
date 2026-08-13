@@ -33,5 +33,4 @@ type SysUserRepository interface {
 	BasicRepository[model.SysUser]
 	GetByUserName(string) (model.SysUser, error)
 	GetUserList(*request.Basic, model.SysTable) (response.ListResult[model.SysUser], error)
-	UpdateBatch(*gorm.DB, []request.SysUserUpdateReq, []int) error
 }

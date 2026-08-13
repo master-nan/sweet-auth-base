@@ -9,6 +9,7 @@ import (
 	"backend/internal/errors"
 	"backend/internal/http"
 	"encoding/json"
+	"fmt"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	dingtalkoauth "github.com/alibabacloud-go/dingtalk/oauth2_1_0"
 	"github.com/alibabacloud-go/tea/tea"
@@ -119,7 +120,7 @@ func (d *Client) GetUserInfo(accessToken string, code string) (DingUserInfoRespo
 		return res, err
 	}
 	if res.ErrCode != 0 {
-		return res, errors.NewBadRequestError(res.ErrMsg)
+		return res, errors.WrapDingTalkRequestFailed(fmt.Errorf("provider code %d", res.ErrCode))
 	}
 	return res, nil
 }
@@ -143,7 +144,7 @@ func (d *Client) GetUser(accessToken string, code string) (UserInfo, error) {
 		return res, err
 	}
 	if dingTalkUserGetResp.ErrCode != 0 {
-		return res, errors.NewBadRequestError(dingTalkUserGetResp.ErrMsg)
+		return res, errors.WrapDingTalkRequestFailed(fmt.Errorf("provider code %d", dingTalkUserGetResp.ErrCode))
 	}
 	zap.L().Debug("DingTalk GetUser succeeded")
 	res.UserName = dingTalkUserGetResp.Result.Name
@@ -169,7 +170,7 @@ func (d *Client) GetUserByMobile(accessToken, mobile string) (string, error) {
 		return "", err
 	}
 	if res.ErrCode != 0 {
-		return "", errors.NewBadRequestError(res.ErrMsg)
+		return "", errors.WrapDingTalkRequestFailed(fmt.Errorf("provider code %d", res.ErrCode))
 	}
 	zap.L().Debug("DingTalk GetUserByMobile succeeded")
 	return res.Result.UserId, nil
@@ -291,8 +292,8 @@ func (d *Client) AsyncSendMessage(accessToken string, msg SendMessageRequest) er
 		return err
 	}
 	if sendMessageResponse.ErrCode != 0 {
-		zap.L().Error("AsyncSendDingTalkMessage Error", zap.Any("errmsg", sendMessageResponse.ErrMsg))
-		return errors.NewBadRequestError(sendMessageResponse.ErrMsg)
+		zap.L().Error("AsyncSendDingTalkMessage Error", zap.Int("provider_code", sendMessageResponse.ErrCode))
+		return errors.WrapDingTalkRequestFailed(fmt.Errorf("provider code %d", sendMessageResponse.ErrCode))
 	}
 	zap.L().Info("AsyncSendDingTalkMessage", zap.Int64("task_id", sendMessageResponse.TaskId), zap.String("request_id", sendMessageResponse.RequestId))
 	return nil

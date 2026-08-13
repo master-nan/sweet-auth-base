@@ -71,13 +71,13 @@ func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, f
 
 	src, err := fileHeader.Open()
 	if err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 	defer src.Close()
 
 	detectedType, err := detectUploadContentType(src)
 	if err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 	if err := validateUploadMimeType(detectedType, f.config.Upload); err != nil {
 		return model.File{}, err
@@ -86,7 +86,7 @@ func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, f
 	// 计算文件 MD5
 	hash := md5.New()
 	if _, err := io.Copy(hash, src); err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 	fileMd5 := fmt.Sprintf("%x", hash.Sum(nil))
 
@@ -104,7 +104,7 @@ func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, f
 
 	// 重置文件读取位置
 	if _, err := src.Seek(0, io.SeekStart); err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 
 	// 生成文件信息
@@ -125,7 +125,7 @@ func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, f
 	}
 
 	if _, err = f.storage.Save(storagePath, src, contentType); err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 
 	file := model.File{
@@ -486,7 +486,7 @@ func (f *FileUploadService) MergeChunks(ctx context.Context, actor FileAccessAct
 
 	_, err = f.storage.Save(storagePath, mergedFile, contentType)
 	if err != nil {
-		return model.File{}, err
+		return model.File{}, myerrors.WrapSystemError(err)
 	}
 
 	fileSize := merged.Size

@@ -221,6 +221,34 @@ func TestBasicRepositoryTransactionReadAndFieldUpdate(t *testing.T) {
 	}
 }
 
+func TestBasicRepositoryExecuteTxRollsBackAndPropagatesPanic(t *testing.T) {
+	db := testutil.OpenSQLite(t, &basicRepositoryFindByFieldFixture{})
+	repo := NewBasicRepositoryImpl(db, &basicRepositoryFindByFieldFixture{})
+	const panicValue = "repository transaction panic"
+
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != panicValue {
+				t.Fatalf("expected panic %q, got %#v", panicValue, recovered)
+			}
+		}()
+		_ = repo.ExecuteTx(context.Background(), func(tx *gorm.DB) error {
+			if err := tx.Create(&basicRepositoryFindByFieldFixture{Basic: model.Basic{Id: 1}, Name: "rolled-back"}).Error; err != nil {
+				return err
+			}
+			panic(panicValue)
+		})
+	}()
+
+	var count int64
+	if err := db.Model(&basicRepositoryFindByFieldFixture{}).Count(&count).Error; err != nil {
+		t.Fatalf("count fixtures: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected panic rollback, got %d rows", count)
+	}
+}
+
 func TestBasicRepositoryUpdateOmitsEmbeddedBasicField(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:basic_repo_update?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

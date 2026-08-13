@@ -12,7 +12,6 @@ import (
 	"github.com/dchest/captcha"
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/jinzhu/copier"
 )
 
 type BasicController struct {
@@ -101,13 +100,8 @@ func (b *BasicController) Captcha(ctx *gin.Context) {
 func (b *BasicController) Configure(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	configUre, err := b.sysConfigureService.Query()
+	configureRes, err := b.sysConfigureService.QueryPublicResponse()
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	var configureRes response.PublicConfigureRes
-	if err = copier.Copy(&configureRes, &configUre); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -125,13 +119,8 @@ func (b *BasicController) Configure(ctx *gin.Context) {
 func (b *BasicController) ConfigureDetail(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	configUre, err := b.sysConfigureService.Query()
+	configureRes, err := b.sysConfigureService.QueryDetailResponse()
 	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	var configureRes response.ConfigureRes
-	if err = copier.Copy(&configureRes, &configUre); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -215,7 +204,7 @@ func (b *BasicController) QueryAccessLogs(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := b.logService.QueryAccessLogs(ctx.Request.Context(), data)
+	result, err := b.logService.QueryAccessLogsResponse(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -240,7 +229,7 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	logData, err := b.logService.GetAccessLogById(ctx.Request.Context(), id)
+	logData, err := b.logService.GetAccessLogByIdResponse(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

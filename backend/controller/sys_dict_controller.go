@@ -48,7 +48,7 @@ func (t *DictController) GetSysDictById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysDictService.GetSysDictById(id)
+	data, err := t.sysDictService.GetSysDictByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -69,7 +69,7 @@ func (t *DictController) GetSysDictByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	code := utils.SanitizeInput(ctx.Param("code"))
-	data, err := t.sysDictService.GetSysDictByCode(code)
+	data, err := t.sysDictService.GetSysDictByCodeResponse(code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -103,7 +103,7 @@ func (t *DictController) QuerySysDict(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := t.sysDictService.GetSysDictList(&data, table)
+	result, err := t.sysDictService.GetSysDictListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -214,7 +214,7 @@ func (t *DictController) GetSysDictItemsByDictId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := t.sysDictService.GetSysDictItemsByDictId(id)
+	result, err := t.sysDictService.GetSysDictItemsByDictIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -239,7 +239,7 @@ func (t *DictController) GetSysDictItemById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysDictService.GetSysDictItemById(id)
+	data, err := t.sysDictService.GetSysDictItemByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

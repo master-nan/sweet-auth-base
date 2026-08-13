@@ -52,7 +52,7 @@ func (r *RedisUtil) Set(key string, value interface{}, expiration time.Duration)
 		b, err := json.Marshal(v)
 		if err != nil {
 			zap.L().Error("json marshalling failed",
-				zap.String("value", fmt.Sprintf("%s", value)),
+				zap.String("value_type", fmt.Sprintf("%T", value)),
 				zap.Error(err))
 			return err
 		}
@@ -60,8 +60,8 @@ func (r *RedisUtil) Set(key string, value interface{}, expiration time.Duration)
 	}
 	err := r.client.Set(ctx, key, str, expiration).Err()
 	if err != nil {
-		zap.L().Error("failed to set key %s: %v",
-			zap.String("value", fmt.Sprintf("%s", key)),
+		zap.L().Error("failed to set cache key",
+			zap.String("key_hash", cacheKeyDigest(key)),
 			zap.Error(err))
 		return err
 	}
@@ -76,8 +76,8 @@ func (r *RedisUtil) Get(key string, value interface{}) error {
 		if errors.Is(err, redis.Nil) {
 			return ErrCacheMiss
 		}
-		zap.L().Error("failed to set key %s: %v",
-			zap.String("value", fmt.Sprintf("%s", key)),
+		zap.L().Error("failed to get cache key",
+			zap.String("key_hash", cacheKeyDigest(key)),
 			zap.Error(err))
 		return err
 	}
@@ -87,8 +87,8 @@ func (r *RedisUtil) Get(key string, value interface{}) error {
 	case *int:
 		iv, err := strconv.Atoi(string(val))
 		if err != nil {
-			zap.L().Error("failed to convert string to int for key %s: %v",
-				zap.String("value", fmt.Sprintf("%s", key)),
+			zap.L().Error("failed to convert cached string to int",
+				zap.String("key_hash", cacheKeyDigest(key)),
 				zap.Error(err))
 			return err
 		}
@@ -96,8 +96,8 @@ func (r *RedisUtil) Get(key string, value interface{}) error {
 	case *float64:
 		fv, err := strconv.ParseFloat(string(val), 64)
 		if err != nil {
-			zap.L().Error("failed to convert string to float64 for key %s: %v",
-				zap.String("value", fmt.Sprintf("%s", key)),
+			zap.L().Error("failed to convert cached string to float64",
+				zap.String("key_hash", cacheKeyDigest(key)),
 				zap.Error(err))
 			return err
 		}
@@ -105,8 +105,8 @@ func (r *RedisUtil) Get(key string, value interface{}) error {
 	default:
 		err := json.Unmarshal(val, value)
 		if err != nil {
-			zap.L().Error("failed to unmarshal value for key %s: %v",
-				zap.String("value", fmt.Sprintf("%s", key)),
+			zap.L().Error("failed to unmarshal cached value",
+				zap.String("key_hash", cacheKeyDigest(key)),
 				zap.Error(err))
 			return err
 		}
@@ -122,8 +122,8 @@ func (r *RedisUtil) Del(key string) error {
 		if errors.Is(err, redis.Nil) {
 			return ErrCacheMiss
 		}
-		zap.L().Error("failed to delete key %s: %v",
-			zap.String("value", fmt.Sprintf("%s", key)),
+		zap.L().Error("failed to delete cache key",
+			zap.String("key_hash", cacheKeyDigest(key)),
 			zap.Error(err))
 		return err
 	}
@@ -135,7 +135,7 @@ func (r *RedisUtil) Exists(keys ...string) (int64, error) {
 	defer cancel()
 	val, err := r.client.Exists(ctx, keys...).Result()
 	if err != nil {
-		return 0, fmt.Errorf("failed to check if keys exist: %v", err)
+		return 0, fmt.Errorf("failed to check whether cache keys exist: %w", err)
 	}
 	return val, nil
 }
@@ -145,7 +145,7 @@ func (r *RedisUtil) Expire(key string, expiration time.Duration) (bool, error) {
 	defer cancel()
 	val, err := r.client.Expire(ctx, key, expiration).Result()
 	if err != nil {
-		return false, fmt.Errorf("failed to set expiration for key %s: %v", key, err)
+		return false, fmt.Errorf("failed to set cache expiration: %w", err)
 	}
 	return val, nil
 }
@@ -220,7 +220,7 @@ func (r *RedisUtil) HSet(key, field string, value interface{}) error {
 	defer cancel()
 	err := r.client.HSet(ctx, key, field, value).Err()
 	if err != nil {
-		return fmt.Errorf("failed to hset key %s: %v", key, err)
+		return fmt.Errorf("failed to set cache hash: %w", err)
 	}
 	return nil
 }
@@ -230,7 +230,7 @@ func (r *RedisUtil) HGet(key, field string) (string, error) {
 	defer cancel()
 	val, err := r.client.HGet(ctx, key, field).Result()
 	if err != nil {
-		return "", fmt.Errorf("failed to hget key %s: %v", key, err)
+		return "", fmt.Errorf("failed to get cache hash: %w", err)
 	}
 	return val, nil
 }
@@ -240,7 +240,7 @@ func (r *RedisUtil) HDel(key string, fields ...string) (int64, error) {
 	defer cancel()
 	val, err := r.client.HDel(ctx, key, fields...).Result()
 	if err != nil {
-		return 0, fmt.Errorf("failed to hdel key %s: %v", key, err)
+		return 0, fmt.Errorf("failed to delete cache hash: %w", err)
 	}
 	return val, nil
 }

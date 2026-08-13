@@ -54,7 +54,7 @@ func (s *SmsController) QuerySmsTemplate(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := s.smsService.GetSmsTemplateList(&data, table)
+	result, err := s.smsService.GetSmsTemplateListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -79,7 +79,7 @@ func (s *SmsController) GetSmsTemplateById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := s.smsService.GetSmsTemplateById(id)
+	data, err := s.smsService.GetSmsTemplateByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

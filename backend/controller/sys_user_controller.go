@@ -21,7 +21,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/jinzhu/copier"
 )
 
 type UserController struct {
@@ -66,19 +65,13 @@ func (u *UserController) QuerySysUser(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := u.sysUserService.GetUserList(&data, table)
+	result, err := u.sysUserService.GetUserListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
 
-	users := make([]response.SysUserRes, 0, len(result.Data))
-	for _, user := range result.Data {
-		var userRes response.SysUserRes
-		copier.Copy(&userRes, &user)
-		users = append(users, userRes)
-	}
-	resp.SetData(users).SetTotal(result.Total)
+	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
 // GetMe 获取当前用户信息
@@ -93,9 +86,7 @@ func (u *UserController) GetMe(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	user := ctx.MustGet("user").(model.SysUser)
-	var userRes response.SysUserRes
-	copier.Copy(&userRes, &user)
-	resp.SetData(userRes)
+	resp.SetData(service.SysUserResponse(user))
 }
 
 // UpdatePassword 修改密码
@@ -153,14 +144,12 @@ func (u *UserController) GetUserByUserName(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	username := ctx.Param("username")
-	data, err := u.sysUserService.GetByUserName(username)
+	data, err := u.sysUserService.GetByUserNameResponse(username)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	var userRes response.SysUserRes
-	copier.Copy(&userRes, &data)
-	resp.SetData(userRes)
+	resp.SetData(data)
 }
 
 // GetUserById 根据ID获取用户
@@ -180,14 +169,12 @@ func (u *UserController) GetUserById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := u.sysUserService.GetById(id)
+	data, err := u.sysUserService.GetByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	var userRes response.SysUserRes
-	copier.Copy(&userRes, &data)
-	resp.SetData(userRes)
+	resp.SetData(data)
 }
 
 // CreateUser 创建用户

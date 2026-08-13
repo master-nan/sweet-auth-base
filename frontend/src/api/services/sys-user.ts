@@ -6,7 +6,6 @@ export interface User extends Basic {
   email: string
   phone_number: string
   gmt_last_login?: string | null
-  password_changed_at?: string | null
   language: string
   is_reset?: boolean
   roles?: Array<{ id: number; name: string; memo?: string }>
@@ -31,9 +30,6 @@ export interface UserUpdateReq {
   user_name: string
   email: string
   phone_number: string
-  access_tokens?: string
-  gmt_last_login?: string | null
-  is_reset?: boolean
 }
 
 export interface UserAssignRolesReq {

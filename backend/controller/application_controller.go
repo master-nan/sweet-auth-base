@@ -14,7 +14,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/jinzhu/copier"
 )
 
 type ApplicationController struct {
@@ -48,18 +47,12 @@ func (t *ApplicationController) GetApplicationById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.applicationService.GetApplicationById(id)
+	data, err := t.applicationService.GetApplicationByIdResponse(id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	var applicationRes response.ApplicationRes
-	err = copier.Copy(&applicationRes, &data)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(applicationRes)
+	resp.SetData(data)
 }
 
 // QueryApplication 获取应用列表
@@ -85,18 +78,12 @@ func (t *ApplicationController) QueryApplication(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := t.applicationService.GetApplicationList(&data, table)
+	result, err := t.applicationService.GetApplicationListResponse(&data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	var list []response.ApplicationRes
-	err = copier.Copy(&list, &result.Data)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(list).SetTotal(result.Total)
+	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
 // GetApplicationByAppKey 根据appKey获取应用详情
@@ -112,18 +99,12 @@ func (t *ApplicationController) GetApplicationByAppKey(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
 	appKey := ctx.Param("appKey")
-	data, err := t.applicationService.GetApplicationByAppKey(appKey)
+	data, err := t.applicationService.GetApplicationByAppKeyResponse(appKey)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	var applicationRes response.ApplicationRes
-	err = copier.Copy(&applicationRes, &data)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(applicationRes)
+	resp.SetData(data)
 }
 
 // CreateApplication 创建应用
@@ -145,12 +126,12 @@ func (t *ApplicationController) CreateApplication(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	application, err := t.applicationService.CreateApplication(ctx.Request.Context(), data)
+	application, err := t.applicationService.CreateApplicationResponse(ctx.Request.Context(), data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(response.NewApplicationSecretRes(application))
+	resp.SetData(application)
 }
 
 // UpdateApplication 更新应用
@@ -203,12 +184,12 @@ func (t *ApplicationController) RotateApplicationSecret(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	application, err := t.applicationService.RotateApplicationSecret(ctx.Request.Context(), id)
+	application, err := t.applicationService.RotateApplicationSecretResponse(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	resp.SetData(response.NewApplicationSecretRes(application))
+	resp.SetData(application)
 }
 
 // DeleteApplicationById 删除应用

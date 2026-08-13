@@ -29,6 +29,28 @@ func TestHighRiskResponseSensitiveFieldsAreNotSerialized(t *testing.T) {
 		forbidden []string
 	}{
 		{
+			name: "access log payload",
+			value: accessLogResponse(model.AccessLog{
+				Basic: basic, UserId: 42, MenuId: 77,
+				Body: "secret request", Query: "token=secret", Response: "sensitive response",
+			}),
+			forbidden: []string{"user_id", "menu_id", "body", "query", "response", "createUser", "modify_user", "delete_user"},
+		},
+		{
+			name: "application secrets",
+			value: applicationResponse(model.Application{
+				Basic: basic, AppKey: "public-key", AppSecret: "secret", DingSecret: "ding-secret",
+			}),
+			forbidden: []string{"app_secret", "ding_secret", "createUser", "modify_user", "delete_user"},
+		},
+		{
+			name: "user credentials and relations",
+			value: SysUserResponse(model.SysUser{
+				Basic: basic, UserName: "user", Password: "secret", AccessTokens: "token",
+			}),
+			forbidden: []string{"password", "access_tokens", "password_changed_at", "createUser", "modify_user", "delete_user"},
+		},
+		{
 			name: "file storage internals",
 			value: fileDetailResponse(model.File{
 				Basic:       basic,
