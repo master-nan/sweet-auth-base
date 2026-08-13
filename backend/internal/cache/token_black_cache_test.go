@@ -32,7 +32,7 @@ func (f failingCacher) Expire(key string, expiration time.Duration) (bool, error
 	return false, nil
 }
 
-func TestTokenBlackCacheSetDoesNotLogTokenValue(t *testing.T) {
+func TestTokenBlackCacheRevokeDoesNotLogTokenValue(t *testing.T) {
 	core, logs := observer.New(zap.ErrorLevel)
 	restore := zap.ReplaceGlobals(zap.New(core))
 	defer restore()
@@ -40,7 +40,7 @@ func TestTokenBlackCacheSetDoesNotLogTokenValue(t *testing.T) {
 	tokenValue := "secret-token-value"
 	tokenBlackCache := NewTokenBlackCache(failingCacher{})
 
-	if _, err := tokenBlackCache.Set(enum.AccessToken, tokenValue); err == nil {
+	if err := tokenBlackCache.Revoke(enum.AccessToken, tokenValue, time.Now().Add(time.Hour)); err == nil {
 		t.Fatal("expected cache set error")
 	}
 

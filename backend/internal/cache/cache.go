@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	ErrCacheMiss = errors.New("cache miss")
+	ErrCacheMiss           = errors.New("cache miss")
+	ErrAtomicCacheRequired = errors.New("atomic cache capability is required")
 )
 
 type Cacher interface {

@@ -1,48 +1,32 @@
 package controller
 
 import (
-	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
-	"backend/internal/cache"
 	myerrors "backend/internal/errors"
-	"backend/internal/token"
 	"backend/internal/utils"
-	"backend/middleware"
-	"backend/model"
 	"backend/service"
 	"bytes"
 	"strconv"
-	"time"
 
 	"github.com/dchest/captcha"
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/jinzhu/copier"
-	"go.uber.org/zap"
 )
 
 type BasicController struct {
-	tokenGenerator      token.JWTToken
-	serverConfig        *config.Server
+	authService         *service.AuthApplicationService
 	sysConfigureService *service.SysConfigureService
 	logService          *service.LogService
-	sysUserService      *service.SysUserService
-	tokenBlackCache     *cache.TokenBlackCache
-	loginAttemptCache   *cache.LoginAttemptCache
 	translators         map[string]ut.Translator
 }
 
-func NewBasicController(tokenGenerator token.JWTToken, serverConfig *config.Server, sysConfigureService *service.SysConfigureService, logService *service.LogService, sysUserService *service.SysUserService, tokenBlackCache *cache.TokenBlackCache, loginAttemptCache *cache.LoginAttemptCache, translators map[string]ut.Translator) *BasicController {
+func NewBasicController(authService *service.AuthApplicationService, sysConfigureService *service.SysConfigureService, logService *service.LogService, translators map[string]ut.Translator) *BasicController {
 	return &BasicController{
-		tokenGenerator,
-		serverConfig,
+		authService,
 		sysConfigureService,
 		logService,
-		sysUserService,
-		tokenBlackCache,
-		loginAttemptCache,
 		translators,
 	}
 }
@@ -66,104 +50,17 @@ func (b *BasicController) Login(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	configUre, err := b.sysConfigureService.Query()
+	result, err := b.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
+		Channel: service.AuthChannelAdminPassword, CredentialType: service.AuthCredentialPassword,
+		Principal: data.UserName, Secret: data.Password, CaptchaID: data.CaptchaId, Captcha: data.Captcha,
+	})
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	if b.loginAttemptCache != nil {
-		locked, lockErr := b.loginAttemptCache.IsLocked(data.UserName)
-		if lockErr != nil {
-			zap.L().Warn("failed to check login lock", zap.Error(lockErr))
-			_ = ctx.Error(lockErr)
-			return
-		}
-		if locked {
-			_ = ctx.Error(myerrors.ErrLoginLocked)
-			return
-		}
-	}
-	if configUre.EnableCaptcha {
-		boolean := captcha.VerifyString(data.CaptchaId, data.Captcha)
-		if boolean == false {
-			_ = ctx.Error(myerrors.ErrCaptchaInvalid)
-			return
-		}
-	}
-	var loginLog = model.LoginLog{
-		Ip:       ctx.ClientIP(),
-		Locality: "",
-		UserName: data.UserName,
-	}
-	b.logService.CreateLoginLogAsync(middleware.DetachedTaskContext(ctx), loginLog)
-	user, err := b.sysUserService.GetByUserName(data.UserName)
-	if err != nil || user.Id == 0 || utils.Encryption(data.Password, strconv.Itoa(user.Id)+b.serverConfig.Conf.Salt) != user.Password || !user.State {
-		if b.loginAttemptCache != nil {
-			locked, cacheErr := b.loginAttemptCache.RecordFailure(data.UserName, configUre.PasswordErrorCount, time.Duration(configUre.PasswordLockMinutes)*time.Minute)
-			if cacheErr != nil {
-				zap.L().Warn("failed to record login failure", zap.Error(cacheErr))
-				_ = ctx.Error(cacheErr)
-				return
-			}
-			if locked {
-				_ = ctx.Error(myerrors.ErrLoginLocked)
-				return
-			}
-		}
-		_ = ctx.Error(myerrors.ErrUserNotFound)
-		return
-	}
-	if b.loginAttemptCache != nil {
-		if err = b.loginAttemptCache.Clear(data.UserName); err != nil {
-			zap.L().Warn("failed to clear login failure", zap.Error(err))
-			_ = ctx.Error(err)
-			return
-		}
-	}
-	conf := token.Config{
-		Issuer:                 b.serverConfig.Name,
-		SecretKey:              b.serverConfig.Conf.Salt,
-		AccessTokenExpiration:  7200,
-		RefreshTokenExpiration: 60 * 60 * 24 * 30,
-	}
-	claimsAccess := token.Claims{
-		ID:        strconv.Itoa(user.Id),
-		Type:      enum.AccessToken,
-		IssuedAt:  time.Now(),
-		ExpiresAt: time.Now().Add(7200 * time.Second),
-		NotBefore: time.Now(),
-	}
-
-	accessToken, err := b.tokenGenerator.GenerateToken(claimsAccess, conf)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	claimsRefresh := token.Claims{
-		ID:        strconv.Itoa(user.Id),
-		Type:      enum.RefreshToken,
-		IssuedAt:  time.Now(),
-		ExpiresAt: time.Now().Add(60 * 60 * 24 * 30 * time.Second),
-		NotBefore: time.Now(),
-	}
-	refreshToken, err := b.tokenGenerator.GenerateToken(claimsRefresh, conf)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	mustChangePassword, changeReason := service.PasswordChangeRequirement(user, configUre, time.Now())
-	lastLogin := model.CustomTime(time.Now())
-	b.sysUserService.UpdateLoginStateAsync(
-		middleware.DetachedTaskContext(ctx).WithActor(user.Id, user.UserName),
-		user.Id,
-		utils.UpdateAccessTokens(user.AccessTokens, accessToken),
-		lastLogin,
-	)
 	signInRes := response.SignInRes{
-		AccessToken:          accessToken,
-		RefreshToken:         refreshToken,
-		MustChangePassword:   mustChangePassword,
-		PasswordChangeReason: changeReason,
+		AccessToken: result.AccessToken, RefreshToken: result.RefreshToken,
+		MustChangePassword: result.MustChangePassword, PasswordChangeReason: result.PasswordChangeReason,
 	}
 	resp.SetData(signInRes)
 }
@@ -367,8 +264,7 @@ func (b *BasicController) Logout(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrUserNotLogin)
 		return
 	}
-	_, err := b.tokenBlackCache.Set(enum.AccessToken, authorization[len("Bearer "):])
-	if err != nil {
+	if err := b.authService.Logout(ctx.Request.Context(), authorization[len("Bearer "):]); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

@@ -7,13 +7,17 @@ import (
 
 func TestRequestMetadataRoundTrip(t *testing.T) {
 	ctx := WithRequestMetadata(context.Background(), RequestMetadata{
-		Method:   " post ",
-		Path:     " /admin/org/employee/1 ",
-		ClientIP: " 127.0.0.1 ",
+		Method:    " post ",
+		Path:      " /admin/org/employee/1 ",
+		ClientIP:  " 127.0.0.1 ",
+		UserAgent: " test-agent ",
 	})
 	metadata := GetRequestMetadata(ctx)
 	if metadata.Method != "POST" || metadata.Path != "/admin/org/employee/1" || metadata.ClientIP != "127.0.0.1" {
 		t.Fatalf("unexpected request metadata: %+v", metadata)
+	}
+	if metadata.UserAgent != "test-agent" {
+		t.Fatalf("unexpected user agent: %q", metadata.UserAgent)
 	}
 }
 
@@ -33,5 +37,16 @@ func TestAuditHelpersReadHTTPAdapterStringValues(t *testing.T) {
 	}
 	if metadata := GetRequestMetadata(ctx); metadata.Method != "POST" || metadata.Path != "/admin/test" {
 		t.Fatalf("request metadata = %+v", metadata)
+	}
+}
+
+func TestAccessAuditStatePropagatesThroughStandardContext(t *testing.T) {
+	ctx := WithAccessAuditState(context.Background())
+	if AccessAuditPersisted(ctx) {
+		t.Fatal("new request audit state must be unpersisted")
+	}
+	MarkAccessAuditPersisted(ctx)
+	if !AccessAuditPersisted(ctx) {
+		t.Fatal("persisted audit state was not visible to the request adapter")
 	}
 }

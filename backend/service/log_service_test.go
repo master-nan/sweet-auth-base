@@ -3,7 +3,6 @@ package service
 import (
 	"backend/dto/request"
 	"backend/enum"
-	"backend/internal/asynctask"
 	"backend/internal/audit"
 	"backend/internal/database"
 	testutil "backend/internal/test"
@@ -14,20 +13,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"gorm.io/gorm"
 )
-
-var _ func(*LogService, asynctask.Context, model.LoginLog) = (*LogService).CreateLoginLogAsync
-
-var _ func(
-	*SysUserService,
-	asynctask.Context,
-	int,
-	string,
-	model.CustomTime,
-) = (*SysUserService).UpdateLoginStateAsync
 
 func TestParseAccessLogQueryTime(t *testing.T) {
 	parsed, err := parseAccessLogQueryTime("2026-06-04 14:30:00")
@@ -191,41 +179,6 @@ func TestLogServiceRecordTransactionalAuditContextKeepsSubjectAndCorrelation(t *
 	if stored.UserId != 73 || stored.UserName != "integration-admin" || stored.RequestId != "request-integration" || stored.TraceId != "trace-integration" {
 		t.Fatalf("audit context lost: %+v", stored)
 	}
-}
-
-func TestLogServiceCreateLoginLogAsyncAfterRequestEnds(t *testing.T) {
-	db := testutil.OpenSQLite(t, &model.LoginLog{})
-	primaryDB := &database.PrimaryDB{DB: db}
-	sf, err := utils.NewSnowflake(2)
-	if err != nil {
-		t.Fatalf("new snowflake: %v", err)
-	}
-	logService := NewLogServer(impl.NewLoginLogRepositoryImpl(primaryDB), nil, sf)
-	taskContext := asynctask.New(asynctask.Metadata{
-		RequestID: "request-login-log",
-		TraceID:   "trace-login-log",
-		UserID:    42,
-		UserName:  "login-user",
-		ClientIP:  "127.0.0.1",
-	})
-
-	logService.CreateLoginLogAsync(taskContext, model.LoginLog{
-		Ip:       "127.0.0.1",
-		UserName: "login-user",
-	})
-
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		var stored model.LoginLog
-		if err = db.First(&stored).Error; err == nil {
-			if stored.UserName != "login-user" || stored.Ip != "127.0.0.1" {
-				t.Fatalf("unexpected login log: %+v", stored)
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("异步登录日志未在请求结束后写入: %v", err)
 }
 
 func requestAccessLogQueryReqForTest(success bool) request.AccessLogQueryReq {

@@ -5,12 +5,24 @@ import (
 	"backend/internal/cache"
 	error2 "backend/internal/errors"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
 
 type memoryCacher struct {
+	mu     sync.Mutex
 	values map[string]interface{}
+}
+
+func (m *memoryCacher) SetIfAbsent(key string, value interface{}, _ time.Duration) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.values[key]; ok {
+		return false, nil
+	}
+	m.values[key] = value
+	return true, nil
 }
 
 func newMemoryCacher() *memoryCacher {

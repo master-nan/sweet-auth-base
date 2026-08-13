@@ -26,6 +26,10 @@ type Config struct {
 type Claims struct {
 	// ID 用户ID或应用ID
 	ID string
+	// TokenID 服务端生成的令牌唯一标识；旧令牌可以为空
+	TokenID string
+	// SessionID 服务端会话标识；旧令牌可以为空
+	SessionID string
 	// Type token类型
 	Type enum.TokenTypeEnum
 	// IssuedAt 签发时间

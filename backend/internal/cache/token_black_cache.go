@@ -7,7 +7,12 @@ package cache
 
 import (
 	"backend/enum"
+	"crypto/sha256"
+	"errors"
+	"fmt"
 	"go.uber.org/zap"
+	"strconv"
+	"time"
 )
 
 type TokenBlackCache struct {
@@ -18,36 +23,130 @@ const TokenBlackCacheKey = "TOKEN_BLACK_"
 
 const RefreshTokenBlackCacheKey = "REFRESH_TOKEN_BLACK_"
 
+const UserTokenRevokedAtCacheKey = "USER_TOKEN_REVOKED_AT_"
+
+const UserTokenSessionCacheKey = "USER_TOKEN_SESSION_"
+
+type atomicTokenCacher interface {
+	SetIfAbsent(key string, value interface{}, expiration time.Duration) (bool, error)
+}
+
 func NewTokenBlackCache(cacher Cacher) *TokenBlackCache {
 	return &TokenBlackCache{
 		BasicCache: NewBasicCache[string](cacher, ""),
 	}
 }
 
-func (t *TokenBlackCache) Exists(key string) bool {
-	exists, _ := t.cacher.Exists(TokenBlackCacheKey + key)
-	if exists > 0 {
-		return true
+func (t *TokenBlackCache) IsRevoked(tokenType enum.TokenTypeEnum, value string, includeLegacyKey bool) (bool, error) {
+	prefix := TokenBlackCacheKey
+	if tokenType == enum.RefreshToken {
+		prefix = RefreshTokenBlackCacheKey
 	}
-	exists, _ = t.cacher.Exists(RefreshTokenBlackCacheKey + key)
-	return exists > 0
+	keys := []string{tokenCacheKey(tokenType, value)}
+	if includeLegacyKey {
+		keys = append(keys, prefix+value)
+	}
+	exists, err := t.cacher.Exists(keys...)
+	return exists > 0, err
 }
 
-func (t *TokenBlackCache) Set(tokenType enum.TokenTypeEnum, token string) (bool, error) {
-	if tokenType == enum.AccessToken {
-		err := t.cacher.Set(TokenBlackCacheKey+token, true, 7200)
-		if err != nil {
-			zap.L().Error(TokenBlackCacheKey+"Error TokenBlackCache setting token in cache", zap.String("token_type", "access_token"), zap.Error(err))
-			return false, err
-		}
-		return true, nil
+func (t *TokenBlackCache) Revoke(tokenType enum.TokenTypeEnum, value string, expiresAt time.Time) error {
+	ttl := time.Until(expiresAt)
+	if ttl <= 0 {
+		ttl = time.Second
 	}
+	return t.setRevoked(tokenType, value, ttl)
+}
+
+func (t *TokenBlackCache) ConsumeRefresh(value string, expiresAt time.Time) (bool, error) {
+	atomic, ok := t.cacher.(atomicTokenCacher)
+	if !ok {
+		return false, ErrAtomicCacheRequired
+	}
+	ttl := time.Until(expiresAt)
+	if ttl <= 0 {
+		return false, nil
+	}
+	return atomic.SetIfAbsent(tokenCacheKey(enum.RefreshToken, value), true, ttl)
+}
+
+func (t *TokenBlackCache) RevokeUser(userID int, at time.Time, ttl time.Duration) error {
+	return t.cacher.Set(UserTokenRevokedAtCacheKey+strconv.Itoa(userID), at.UnixNano(), ttl)
+}
+
+func (t *TokenBlackCache) UserRevokedAt(userID int) (time.Time, error) {
+	var value string
+	err := t.cacher.Get(UserTokenRevokedAtCacheKey+strconv.Itoa(userID), &value)
+	if errors.Is(err, ErrCacheMiss) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	timestamp, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	// Values written before AF-002 used Unix seconds.
+	if timestamp < 1_000_000_000_000 {
+		return time.Unix(timestamp, 0), nil
+	}
+	return time.Unix(0, timestamp), nil
+}
+
+func (t *TokenBlackCache) ActivateSession(userID int, sessionID string, ttl time.Duration) error {
+	if userID <= 0 || sessionID == "" {
+		return ErrCacheMiss
+	}
+	return t.cacher.Set(userSessionCacheKey(userID, sessionID), true, ttl)
+}
+
+func (t *TokenBlackCache) TouchSession(userID int, sessionID string, ttl time.Duration) (bool, error) {
+	exists, err := t.cacher.Exists(userSessionCacheKey(userID, sessionID))
+	if err != nil || exists == 0 {
+		return false, err
+	}
+	extended, err := t.cacher.Expire(userSessionCacheKey(userID, sessionID), ttl)
+	if err != nil {
+		return false, err
+	}
+	return extended, nil
+}
+
+func (t *TokenBlackCache) IsSessionActive(userID int, sessionID string) (bool, error) {
+	exists, err := t.cacher.Exists(userSessionCacheKey(userID, sessionID))
+	return exists > 0, err
+}
+
+func (t *TokenBlackCache) DeactivateSession(userID int, sessionID string) error {
+	err := t.cacher.Del(userSessionCacheKey(userID, sessionID))
+	if errors.Is(err, ErrCacheMiss) {
+		return nil
+	}
+	return err
+}
+
+func (t *TokenBlackCache) setRevoked(tokenType enum.TokenTypeEnum, value string, ttl time.Duration) error {
+	err := t.cacher.Set(tokenCacheKey(tokenType, value), true, ttl)
+	if err != nil {
+		zap.L().Error("failed to revoke token", zap.String("token_type", string(tokenType)), zap.Error(err))
+	}
+	return err
+}
+
+func tokenCacheKey(tokenType enum.TokenTypeEnum, value string) string {
+	prefix := TokenBlackCacheKey
 	if tokenType == enum.RefreshToken {
-		err := t.cacher.Set(RefreshTokenBlackCacheKey+token, true, 3600*24*7)
-		if err != nil {
-			zap.L().Error(RefreshTokenBlackCacheKey+"Error TokenBlackCache setting token in cache", zap.String("token_type", "refresh_token"), zap.Error(err))
-			return false, err
-		}
+		prefix = RefreshTokenBlackCacheKey
 	}
-	return true, nil
+	return prefix + tokenDigest(value)
+}
+
+func tokenDigest(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("%x", sum)
+}
+
+func userSessionCacheKey(userID int, sessionID string) string {
+	return UserTokenSessionCacheKey + strconv.Itoa(userID) + ":" + tokenDigest(sessionID)
 }

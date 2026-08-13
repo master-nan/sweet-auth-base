@@ -9,6 +9,7 @@ import (
 	"backend/enum"
 	error2 "backend/internal/errors"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -24,20 +25,30 @@ func NewJWTGenerator() *JWTGenerator {
 
 // GenerateToken 生成JWT令牌
 func (g *JWTGenerator) GenerateToken(claims Claims, config Config) (string, error) {
-	tkn := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+	values := jwt.MapClaims{
 		"iss":  config.Issuer,
 		"iat":  jwt.NewNumericDate(claims.IssuedAt),
 		"exp":  jwt.NewNumericDate(claims.ExpiresAt),
 		"nbf":  jwt.NewNumericDate(claims.NotBefore),
 		"sub":  claims.ID,
 		"type": claims.Type,
-	})
+	}
+	if claims.TokenID != "" {
+		values["jti"] = claims.TokenID
+	}
+	if claims.SessionID != "" {
+		values["sid"] = claims.SessionID
+	}
+	tkn := jwt.NewWithClaims(jwt.SigningMethodHS512, values)
 	return tkn.SignedString([]byte(config.SecretKey))
 }
 
 // ParseToken 解析JWT令牌
 func (g *JWTGenerator) ParseToken(token string, config Config) (*Claims, error) {
-	res, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+	res, err := jwt.Parse(token, func(parsed *jwt.Token) (interface{}, error) {
+		if parsed.Method != jwt.SigningMethodHS512 {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
 		return []byte(config.SecretKey), nil
 	})
 	if err != nil {
@@ -54,13 +65,21 @@ func (g *JWTGenerator) ParseToken(token string, config Config) (*Claims, error) 
 			}
 		}
 	}
-	if !res.Valid {
+	if res == nil || !res.Valid {
 		return nil, error2.ErrTokenInvalid
 	}
 	if claims, ok := res.Claims.(jwt.MapClaims); ok {
+		subject, subjectOK := claims["sub"].(string)
+		typeValue, typeOK := claims["type"].(string)
+		issuer, issuerOK := claims["iss"].(string)
+		if !subjectOK || subject == "" || !typeOK || !issuerOK || issuer != config.Issuer {
+			return nil, error2.ErrTokenInvalid
+		}
 		tokenClaims := &Claims{
-			ID:   claims["sub"].(string),
-			Type: enum.TokenTypeEnum(claims["type"].(string)),
+			ID:        subject,
+			TokenID:   stringClaim(claims, "jti"),
+			SessionID: stringClaim(claims, "sid"),
+			Type:      enum.TokenTypeEnum(typeValue),
 		}
 		if iat, ok := claims["iat"].(float64); ok {
 			tokenClaims.IssuedAt = time.Unix(int64(iat), 0)
@@ -71,8 +90,16 @@ func (g *JWTGenerator) ParseToken(token string, config Config) (*Claims, error) 
 		if nbf, ok := claims["nbf"].(float64); ok {
 			tokenClaims.NotBefore = time.Unix(int64(nbf), 0)
 		}
+		if tokenClaims.IssuedAt.IsZero() || tokenClaims.ExpiresAt.IsZero() || tokenClaims.NotBefore.IsZero() {
+			return nil, error2.ErrTokenInvalid
+		}
 		return tokenClaims, nil
 	} else {
 		return nil, error2.ErrTokenInvalid
 	}
+}
+
+func stringClaim(claims jwt.MapClaims, key string) string {
+	value, _ := claims[key].(string)
+	return value
 }

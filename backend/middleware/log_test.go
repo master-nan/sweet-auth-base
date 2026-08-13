@@ -188,8 +188,8 @@ func TestSanitizeAccessLogPayloadRedactsOneTimeCodeOnlyOnAuthPaths(t *testing.T)
 	if strings.Contains(masked, "123456") {
 		t.Fatalf("sms login payload leaked one-time code: %s", masked)
 	}
-	if !strings.Contains(masked, "13800138000") || !strings.Contains(masked, "sys_user") {
-		t.Fatalf("payload did not retain non-sensitive fields: %s", masked)
+	if strings.Contains(masked, "13800138000") || !strings.Contains(masked, "sys_user") {
+		t.Fatalf("payload did not redact the authentication principal safely: %s", masked)
 	}
 
 	ordinary := sanitizeAccessLogPayload("/sweet_admin/admin/menu/button", payload)

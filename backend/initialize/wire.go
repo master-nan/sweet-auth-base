@@ -57,6 +57,7 @@ type App struct {
 	SmsController                  *controller.SmsController
 	FileController                 *controller.FileController
 	AuthApi                        *api.AuthApi
+	AuthService                    *service.AuthApplicationService
 	SysUserApi                     *api.SysUserApi
 	DingTalkApi                    *api.DingTalkApi
 	LogService                     *service.LogService
@@ -140,6 +141,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.SysTableFieldRepository), new(*impl.SysTableFieldRepositoryImpl)),
 	wire.Bind(new(repository.SysTableRepository), new(*impl.SysTableRepositoryImpl)),
 	wire.Bind(new(repository.SysUserRepository), new(*impl.SysUserRepositoryImpl)),
+	wire.Bind(new(repository.AuthenticationUserRepository), new(*impl.SysUserRepositoryImpl)),
 	wire.Bind(new(repository.SysMenuRepository), new(*impl.SysMenuRepositoryImpl)),
 	wire.Bind(new(repository.SysMenuButtonRepository), new(*impl.SysMenuButtonRepositoryImpl)),
 	wire.Bind(new(repository.SysMenuButtonTemplateRepository), new(*impl.SysMenuButtonTemplateRepositoryImpl)),
@@ -213,6 +215,15 @@ var CacheProvider = wire.NewSet(
 // Service 提供者
 var ServiceProvider = wire.NewSet(
 	service.NewLogServer,
+	service.NewAuthAuditService,
+	wire.Bind(new(service.AuthAuditRecorder), new(*service.AuthAuditService)),
+	service.NewAuthTokenService,
+	service.NewAuthLoginStateService,
+	service.NewPasswordCredentialProvider,
+	service.NewSMSCredentialProvider,
+	service.NewDingTalkCredentialProvider,
+	service.NewCaptchaVerifier,
+	service.NewAuthApplicationService,
 	wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)),
 	wire.Bind(new(service.StandardContextAuditWriter), new(*service.LogService)),
 	service.NewSysConfigureService,

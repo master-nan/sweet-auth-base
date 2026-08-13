@@ -38,23 +38,22 @@ func InitRouter(app *App) *gin.Engine {
 		apiBaseGroup.POST("/app_token", app.AuthApi.GetAppToken)
 
 		// 单 Token 验证路由
-		apiBaseGroup.POST("/send_sms/:mobile/:templateCode", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.SendSms)
-		apiBaseGroup.POST("/sms_code_login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.SmsCodeLogin)
-		apiBaseGroup.POST("/login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.Login)
-		apiBaseGroup.GET("/refresh_token", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.RefreshToken)
-		apiBaseGroup.GET("/sso_login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.SSOLogin)
+		apiBaseGroup.POST("/send_sms/:mobile/:templateCode", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.SendSms)
+		apiBaseGroup.POST("/sms_code_login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.SmsCodeLogin)
+		apiBaseGroup.POST("/login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.Login)
+		apiBaseGroup.GET("/refresh_token", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.RefreshToken)
+		apiBaseGroup.GET("/sso_login", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.SSOLogin)
+		apiBaseGroup.POST("/logout", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.Logout)
 		// 检查短信发送状态
-		apiBaseGroup.GET("/check_sms_status/:bizId/:mobile", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.AuthApi.CheckSmsStatus)
+		apiBaseGroup.GET("/check_sms_status/:bizId/:mobile", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.AuthApi.CheckSmsStatus)
 		// 发送钉钉消息
-		apiBaseGroup.POST("/dingtalk/send_message", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache), app.DingTalkApi.SendMessage)
+		apiBaseGroup.POST("/dingtalk/send_message", middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService), app.DingTalkApi.SendMessage)
 	}
 	apiGroup := routerGroup.Group("/api")
-	apiGroup.Use(middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache))
-	apiGroup.Use(middleware.AuthHandler(app.Config, app.JwtGenerator, app.UserService, app.TokenBlackCache))
+	apiGroup.Use(middleware.AuthHMACHandler(app.HmacGenerator, app.ApplicationCache, app.ApplicationService))
+	apiGroup.Use(middleware.AuthHandler(app.AuthService))
 	{
 		// 双 Token 验证路由
-		// 认证
-		apiGroup.POST("/logout", app.AuthApi.Logout)
 		// 系统用户
 		apiGroup.GET("/user/me", app.SysUserApi.GetMe)
 		apiGroup.POST("/user/password", app.SysUserApi.UpdatePassword)
@@ -67,6 +66,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminBaseGroup.POST("/login", app.BasicController.Login)
 		adminBaseGroup.GET("/captcha", app.BasicController.Captcha)
 		adminBaseGroup.GET("/configure", app.BasicController.Configure)
+		adminBaseGroup.POST("/logout", app.BasicController.Logout)
 
 	}
 	routerGroup.GET("/files/access/preview/:uuid", app.FileController.SignedPreview)
@@ -74,13 +74,11 @@ func InitRouter(app *App) *gin.Engine {
 	routerGroup.GET("/files/:uuid", app.FileController.PublicPreview)
 	// 后台验证路由
 	adminGroup := routerGroup.Group("/admin")
-	adminGroup.Use(middleware.AuthHandler(app.Config, app.JwtGenerator, app.UserService, app.TokenBlackCache))
+	adminGroup.Use(middleware.AuthHandler(app.AuthService))
 	adminGroup.Use(middleware.CasbinHandler(app.Enforcer, middleware.CasbinOptions{
 		EnforcePolicyCoverage: app.Config.Security.EnforceCasbinPolicyCoverage,
 	}))
 	{
-		// 退出
-		adminGroup.POST("/logout", app.BasicController.Logout)
 		adminGroup.GET("/configure/detail", app.BasicController.ConfigureDetail)
 		adminGroup.PUT("/configure/:id", app.BasicController.UpdateConfigure)
 		adminGroup.POST("/configure/test-email", app.BasicController.TestConfigureEmail)

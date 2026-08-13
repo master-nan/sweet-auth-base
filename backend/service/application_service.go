@@ -58,6 +58,19 @@ func (a *ApplicationService) GetApplicationById(id int) (model.Application, erro
 	return result, nil
 }
 
+// GetApplicationForAuthentication bypasses cached snapshots so application
+// disablement and secret rotation take effect for already issued AppTokens.
+func (a *ApplicationService) GetApplicationForAuthentication(ctx context.Context, id int) (model.Application, error) {
+	result, err := a.applicationRepo.FindByIdWithDB(a.applicationRepo.DBWithContext(ctx), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.Application{}, nil
+		}
+		return model.Application{}, err
+	}
+	return result, nil
+}
+
 // GetApplicationList 获取应用列表
 func (a *ApplicationService) GetApplicationList(basic *request.Basic, table model.SysTable) (response.ListResult[model.Application], error) {
 	result, err := a.applicationRepo.GetApplicationList(basic, table)

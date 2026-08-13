@@ -10,7 +10,6 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
-	"backend/internal/asynctask"
 	"backend/internal/cache"
 	"backend/internal/errors"
 	"backend/internal/token"
@@ -19,6 +18,7 @@ import (
 	"backend/model"
 	"backend/service"
 	"crypto/sha256"
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"strconv"
@@ -33,33 +33,23 @@ import (
 const defaultSmsSendIntervalSeconds = 60
 
 type AuthApi struct {
-	jwtToken            token.JWTToken
-	serverConfig        *config.Server
-	sysConfigureService *service.SysConfigureService
-	logService          *service.LogService
-	sysUserService      *service.SysUserService
-	applicationService  *service.ApplicationService
-	dingTalkService     *service.DingTalkService
-	smsService          *service.SmsService
-	applicationCache    *cache.ApplicationCache
-	tokenBlackCache     *cache.TokenBlackCache
-	sendCodeCache       *cache.SendCodeCache
-	translators         map[string]ut.Translator
-	hmacToken           token.HMACToken
+	authService        *service.AuthApplicationService
+	serverConfig       *config.Server
+	applicationService *service.ApplicationService
+	smsService         *service.SmsService
+	applicationCache   *cache.ApplicationCache
+	sendCodeCache      *cache.SendCodeCache
+	translators        map[string]ut.Translator
+	hmacToken          token.HMACToken
 }
 
-func NewAuthApi(jwtToken token.JWTToken, serverConfig *config.Server, sysConfigureService *service.SysConfigureService, logService *service.LogService, sysUserService *service.SysUserService, applicationService *service.ApplicationService, dingTalkService *service.DingTalkService, smsService *service.SmsService, applicationCache *cache.ApplicationCache, tokenBlackCache *cache.TokenBlackCache, sendCodeCache *cache.SendCodeCache, translators map[string]ut.Translator, hmacToken token.HMACToken) *AuthApi {
+func NewAuthApi(authService *service.AuthApplicationService, serverConfig *config.Server, applicationService *service.ApplicationService, smsService *service.SmsService, applicationCache *cache.ApplicationCache, sendCodeCache *cache.SendCodeCache, translators map[string]ut.Translator, hmacToken token.HMACToken) *AuthApi {
 	return &AuthApi{
-		jwtToken,
+		authService,
 		serverConfig,
-		sysConfigureService,
-		logService,
-		sysUserService,
 		applicationService,
-		dingTalkService,
 		smsService,
 		applicationCache,
-		tokenBlackCache,
 		sendCodeCache,
 		translators,
 		hmacToken,
@@ -92,8 +82,9 @@ func (a *AuthApi) GetAppToken(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if application.Id == 0 || application.AppSecret != data.AppSecret {
+	if application.Id == 0 || !application.State || subtle.ConstantTimeCompare([]byte(application.AppSecret), []byte(data.AppSecret)) != 1 {
 		_ = ctx.Error(errors.ErrAppNotFound)
+		return
 	}
 	claims := token.Claims{
 		ID:        strconv.Itoa(application.Id),
@@ -190,8 +181,10 @@ func (a *AuthApi) SendSms(ctx *gin.Context) {
 	}
 	// 判断是否为验证码短信
 	if code, ok := smsVerificationCodeFromParams(tempParam); ok {
-		// 缓存验证码
-		_ = a.sendCodeCache.Set(strconv.Itoa(application.Id)+mobile+code, code)
+		if err := a.sendCodeCache.Set(cache.SMSVerificationKey(application.Id, mobile), code); err != nil {
+			_ = ctx.Error(err)
+			return
+		}
 	}
 	resp.SetData(smsSendResponse())
 }
@@ -254,54 +247,15 @@ func (a *AuthApi) Login(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	var loginLog = model.LoginLog{
-		Ip:       ctx.ClientIP(),
-		Locality: "",
-		UserName: data.UserName,
+	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
+		Channel: service.AuthChannelAPIPassword, CredentialType: service.AuthCredentialPassword,
+		Principal: data.UserName, Secret: data.Password,
+	})
+	if err != nil {
+		_ = ctx.Error(err)
+		return
 	}
-	a.logService.CreateLoginLogAsync(middleware.DetachedTaskContext(ctx), loginLog)
-	user, err := a.sysUserService.GetByUserName(data.UserName)
-	if err != nil || utils.Encryption(data.Password, strconv.Itoa(user.Id)+a.serverConfig.Conf.Salt) != user.Password || !user.State {
-		_ = ctx.Error(errors.ErrUserNotFound)
-	} else {
-		claimsAccess := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.AccessToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(7200 * time.Second),
-			NotBefore: time.Now(),
-		}
-		conf := token.Config{
-			Issuer:                 a.serverConfig.Name,
-			SecretKey:              a.serverConfig.Conf.Salt,
-			AccessTokenExpiration:  7200,
-			RefreshTokenExpiration: 60 * 60 * 24 * 30,
-		}
-
-		accessToken, err := a.jwtToken.GenerateToken(claimsAccess, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		claimsRefresh := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.RefreshToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(60 * 60 * 24 * 30 * time.Second),
-			NotBefore: time.Now(),
-		}
-		refreshToken, err := a.jwtToken.GenerateToken(claimsRefresh, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
-		signInRes := response.SignInRes{
-			AccessToken:  accessToken,
-			RefreshToken: refreshToken,
-		}
-		resp.SetData(signInRes)
-	}
+	resp.SetData(authSignInResponse(result))
 }
 
 // RefreshToken 刷新Token
@@ -314,64 +268,22 @@ func (a *AuthApi) Login(ctx *gin.Context) {
 // @Success 200 {object} response.Response "请求成功"
 // @Router /api/refresh_token [get]
 func (a *AuthApi) RefreshToken(ctx *gin.Context) {
-	var data request.RefreshTokenReq
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
-	translator := a.translators["zh"]
-	// 获取url上传递的refreshToken
 	refreshToken := ctx.Query("refreshToken")
-	err := utils.ValidatorBody[request.RefreshTokenReq](ctx, &data, translator)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
+	if refreshToken == "" {
+		refreshToken = ctx.Query("refresh_token")
 	}
-	conf := token.Config{
-		Issuer:                 a.serverConfig.Name,
-		SecretKey:              a.serverConfig.Conf.Salt,
-		AccessTokenExpiration:  7200,
-		RefreshTokenExpiration: 60 * 60 * 24 * 30,
-	}
-
-	claims, err := a.jwtToken.ParseToken(refreshToken, conf)
-	if err != nil || claims.Type != enum.RefreshToken {
+	if refreshToken == "" {
 		_ = ctx.Error(errors.ErrInvalidRefreshToken)
 		return
 	}
-	// 将旧的刷新 Token 添加到黑名单
-	_, err = a.tokenBlackCache.Set(enum.RefreshToken, refreshToken)
+	result, err := a.authService.Refresh(ctx.Request.Context(), refreshToken)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
-	claimsAccess := token.Claims{
-		ID:        claims.ID,
-		Type:      enum.AccessToken,
-		IssuedAt:  time.Now(),
-		ExpiresAt: time.Now().Add(7200 * time.Second),
-		NotBefore: time.Now(),
-	}
-	newAccessToken, err := a.jwtToken.GenerateToken(claimsAccess, conf)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	claimsRefresh := token.Claims{
-		ID:        claims.ID,
-		Type:      enum.RefreshToken,
-		IssuedAt:  time.Now(),
-		ExpiresAt: time.Now().Add(60 * 60 * 24 * 30 * time.Second),
-		NotBefore: time.Now(),
-	}
-	newRefreshToken, err := a.jwtToken.GenerateToken(claimsRefresh, conf)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	signInRes := response.SignInRes{
-		AccessToken:  newAccessToken,
-		RefreshToken: newRefreshToken,
-	}
-	resp.SetData(signInRes)
+	resp.SetData(authSignInResponse(result))
 }
 
 // Logout 退出登录
@@ -391,8 +303,7 @@ func (a *AuthApi) Logout(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrUserNotLogin)
 		return
 	}
-	_, err := a.tokenBlackCache.Set(enum.AccessToken, authorization[len("Bearer "):])
-	if err != nil {
+	if err := a.authService.Logout(ctx.Request.Context(), authorization[len("Bearer "):]); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -416,64 +327,25 @@ func (a *AuthApi) SSOLogin(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrParamInvalid)
 		return
 	}
-	if data, exists := ctx.Get("application"); exists {
-		application := data.(model.Application)
-		dingToken, err := a.dingTalkService.GetAccessToken(application)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		if application.DingKey == "" || application.DingSecret == "" {
-			_ = ctx.Error(errors.ErrDingTalkSecretNotFound)
-			return
-		}
-		user, err := a.dingTalkService.GetUser(dingToken, code)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		conf := token.Config{
-			Issuer:                 a.serverConfig.Name,
-			SecretKey:              a.serverConfig.Conf.Salt,
-			AccessTokenExpiration:  7200,
-			RefreshTokenExpiration: 60 * 60 * 24 * 30,
-		}
-		claimsAccess := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.AccessToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(7200 * time.Second),
-			NotBefore: time.Now(),
-		}
-
-		accessToken, err := a.jwtToken.GenerateToken(claimsAccess, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		claimsRefresh := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.RefreshToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(60 * 60 * 24 * 30 * time.Second),
-			NotBefore: time.Now(),
-		}
-		refreshToken, err := a.jwtToken.GenerateToken(claimsRefresh, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
-		signInRes := response.SignInRes{
-			AccessToken:  accessToken,
-			RefreshToken: refreshToken,
-		}
-		resp.SetData(signInRes)
-		return
-	} else {
+	data, exists := ctx.Get("application")
+	if !exists {
 		_ = ctx.Error(errors.ErrAppUnauthorized)
 		return
 	}
+	application, ok := data.(model.Application)
+	if !ok {
+		_ = ctx.Error(errors.ErrAppUnauthorized)
+		return
+	}
+	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
+		Channel: service.AuthChannelDingTalk, CredentialType: service.AuthCredentialDingTalk,
+		Secret: code, Application: application,
+	})
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(authSignInResponse(result))
 }
 
 // SmsCodeLogin 短信验证码登录
@@ -496,76 +368,32 @@ func (a *AuthApi) SmsCodeLogin(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	if d, exists := ctx.Get("application"); exists {
-		application := d.(model.Application)
-		// 获取缓存中的验证码
-		k := strconv.Itoa(application.Id) + data.Mobile + data.Code
-		b := a.sendCodeCache.Exists(k)
-		if !b {
-			_ = ctx.Error(errors.ErrCodeInvalid)
-			return
-		}
-		// 异步删除验证码
-		go func() {
-			_ = a.sendCodeCache.Delete(k)
-		}()
-		user, err := a.sysUserService.GetByUserName(data.Mobile)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		conf := token.Config{
-			Issuer:                 a.serverConfig.Name,
-			SecretKey:              a.serverConfig.Conf.Salt,
-			AccessTokenExpiration:  7200,
-			RefreshTokenExpiration: 60 * 60 * 24 * 30,
-		}
-		claimsAccess := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.AccessToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(7200 * time.Second),
-			NotBefore: time.Now(),
-		}
-		accessToken, err := a.jwtToken.GenerateToken(claimsAccess, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		claimsRefresh := token.Claims{
-			ID:        strconv.Itoa(user.Id),
-			Type:      enum.RefreshToken,
-			IssuedAt:  time.Now(),
-			ExpiresAt: time.Now().Add(60 * 60 * 24 * 30 * time.Second),
-			NotBefore: time.Now(),
-		}
-		refreshToken, err := a.jwtToken.GenerateToken(claimsRefresh, conf)
-		if err != nil {
-			_ = ctx.Error(err)
-			return
-		}
-		a.updateLoginStateAsync(middleware.DetachedTaskContext(ctx), user, accessToken)
-		signInRes := response.SignInRes{
-			AccessToken:  accessToken,
-			RefreshToken: refreshToken,
-		}
-		resp.SetData(signInRes)
-		return
-	} else {
+	d, exists := ctx.Get("application")
+	if !exists {
 		_ = ctx.Error(errors.ErrAppUnauthorized)
 		return
 	}
+	application, ok := d.(model.Application)
+	if !ok {
+		_ = ctx.Error(errors.ErrAppUnauthorized)
+		return
+	}
+	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
+		Channel: service.AuthChannelSMS, CredentialType: service.AuthCredentialSMS,
+		Principal: data.Mobile, Secret: data.Code, Application: application,
+	})
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(authSignInResponse(result))
 }
 
-func (a *AuthApi) updateLoginStateAsync(taskContext asynctask.Context, user model.SysUser, accessToken string) {
-	taskContext = taskContext.WithActor(user.Id, user.UserName)
-	lastLogin := model.CustomTime(time.Now())
-	a.sysUserService.UpdateLoginStateAsync(
-		taskContext,
-		user.Id,
-		utils.UpdateAccessTokens(user.AccessTokens, accessToken),
-		lastLogin,
-	)
+func authSignInResponse(result service.AuthenticationResult) response.SignInRes {
+	return response.SignInRes{
+		AccessToken: result.AccessToken, RefreshToken: result.RefreshToken,
+		MustChangePassword: result.MustChangePassword, PasswordChangeReason: result.PasswordChangeReason,
+	}
 }
 
 // CheckSmsStatus 检查短信发送状态

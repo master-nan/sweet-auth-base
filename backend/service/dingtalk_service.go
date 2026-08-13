@@ -20,14 +20,12 @@ import (
 type DingTalkService struct {
 	dingTalkCache       *cache.DingTalkCache
 	dingTalkUserIDCache *cache.DingTalkUserIDCache
-	sysUserService      *SysUserService
 }
 
-func NewDingTalkService(dingTalkCache *cache.DingTalkCache, dingTalkUserIDCache *cache.DingTalkUserIDCache, sysUserService *SysUserService) *DingTalkService {
+func NewDingTalkService(dingTalkCache *cache.DingTalkCache, dingTalkUserIDCache *cache.DingTalkUserIDCache) *DingTalkService {
 	return &DingTalkService{
 		dingTalkCache,
 		dingTalkUserIDCache,
-		sysUserService,
 	}
 }
 
@@ -48,25 +46,19 @@ func (d *DingTalkService) GetAccessToken(application model.Application) (string,
 		return "", err
 	}
 	// 缓存
-	_ = d.dingTalkCache.SetExpiration(application.DingKey, dingTalkAccessToken, dingTalkAccessToken.ExpiresIn)
+	_ = d.dingTalkCache.SetExpiration(application.AppKey, dingTalkAccessToken, dingTalkAccessToken.ExpiresIn)
 	return dingTalkAccessToken.AccessToken, nil
 }
 
-func (d *DingTalkService) GetUser(accessToken, code string) (model.SysUser, error) {
+func (d *DingTalkService) GetIdentityPrincipal(accessToken, code string) (string, error) {
 	// 从钉钉处获取用户信息
 	dingTalkClient := dingtalk.NewClient()
 	dingTailUser, err := dingTalkClient.GetUser(accessToken, code)
 	if err != nil {
 		zap.L().Error("DingTalkService GetUser 1=======>", zap.Error(err))
-		return model.SysUser{}, err
+		return "", err
 	}
-	// 从数据库获取用户信息
-	sysUser, err := d.sysUserService.GetByUserName(dingTailUser.Email)
-	if err != nil {
-		zap.L().Error("DingTalkService GetUser 2=======>", zap.Error(err))
-		return model.SysUser{}, err
-	}
-	return sysUser, nil
+	return strings.TrimSpace(dingTailUser.Email), nil
 }
 
 // SendMessage 发送消息

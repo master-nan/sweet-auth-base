@@ -551,7 +551,7 @@ func redactPathSensitiveData(path string, value interface{}) interface{} {
 	case map[string]interface{}:
 		for key, child := range data {
 			normalized := normalizeAuditKey(key)
-			if shouldRedactOneTimeCode(path, normalized) || shouldRedactCaptchaImage(path, normalized) {
+			if shouldRedactOneTimeCode(path, normalized) || shouldRedactCaptchaImage(path, normalized) || shouldRedactAuthenticationPrincipal(path, normalized) {
 				data[key] = "***"
 				continue
 			}
@@ -586,6 +586,14 @@ func shouldRedactOneTimeCode(path, normalizedKey string) bool {
 
 func shouldRedactCaptchaImage(path, normalizedKey string) bool {
 	return isCaptchaPath(path) && (normalizedKey == "image" || normalizedKey == "captchaid")
+}
+
+func shouldRedactAuthenticationPrincipal(path, normalizedKey string) bool {
+	normalizedPath := strings.ToLower(path)
+	isLogin := strings.HasSuffix(normalizedPath, "/login") ||
+		strings.Contains(normalizedPath, "/sms_code_login") ||
+		strings.Contains(normalizedPath, "/sso_login")
+	return isLogin && (normalizedKey == "username" || normalizedKey == "mobile" || normalizedKey == "email")
 }
 
 func normalizeAuditKey(key string) string {

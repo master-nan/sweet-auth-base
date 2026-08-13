@@ -384,9 +384,11 @@ func (u *UserController) UnlockLogin(ctx *gin.Context) {
 		return
 	}
 	if u.loginAttemptCache != nil {
-		if err := u.loginAttemptCache.Clear(user.UserName); err != nil {
-			_ = ctx.Error(err)
-			return
+		for _, principal := range []string{cache.UserLoginPrincipal(user.Id), user.UserName, user.PhoneNumber, user.Email} {
+			if err := u.loginAttemptCache.Clear(principal); err != nil {
+				_ = ctx.Error(err)
+				return
+			}
 		}
 	}
 	resp.SetData(true)

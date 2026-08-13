@@ -2,6 +2,7 @@ package cache
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -15,6 +16,25 @@ const (
 
 type LoginAttemptCache struct {
 	cacher Cacher
+}
+
+type atomicLoginAttemptCacher interface {
+	RecordLoginFailure(attemptKey, lockKey string, maxAttempts int, ttl time.Duration) (bool, error)
+	CompleteLoginSuccess(attemptKey, lockKey string) (bool, error)
+}
+
+// CompleteSuccess atomically refuses a success that raced with account lock
+// creation, otherwise clearing only the failure counter.
+func (c *LoginAttemptCache) CompleteSuccess(principal string) (bool, error) {
+	key := normalizeLoginPrincipal(principal)
+	if key == "" {
+		return false, nil
+	}
+	atomic, ok := c.cacher.(atomicLoginAttemptCacher)
+	if !ok {
+		return false, ErrAtomicCacheRequired
+	}
+	return atomic.CompleteLoginSuccess(LoginAttemptCacheKey+key, LoginLockCacheKey+key)
 }
 
 func NewLoginAttemptCache(cacher Cacher) *LoginAttemptCache {
@@ -38,23 +58,16 @@ func (c *LoginAttemptCache) RecordFailure(principal string, maxAttempts int, loc
 		lockFor = defaultLoginAttemptLockIn
 	}
 
-	attemptKey := LoginAttemptCacheKey + key
-	var attempts int
-	if err := c.cacher.Get(attemptKey, &attempts); err != nil && !errors.Is(err, ErrCacheMiss) {
-		return false, err
+	atomic, ok := c.cacher.(atomicLoginAttemptCacher)
+	if !ok {
+		return false, ErrAtomicCacheRequired
 	}
-	attempts++
-	if attempts >= maxAttempts {
-		if err := c.cacher.Set(LoginLockCacheKey+key, 1, lockFor); err != nil {
-			return false, err
-		}
-		_ = c.cacher.Del(attemptKey)
-		return true, nil
-	}
-	if err := c.cacher.Set(attemptKey, attempts, lockFor); err != nil {
-		return false, err
-	}
-	return false, nil
+	return atomic.RecordLoginFailure(
+		LoginAttemptCacheKey+key,
+		LoginLockCacheKey+key,
+		maxAttempts,
+		lockFor,
+	)
 }
 
 func (c *LoginAttemptCache) Clear(principal string) error {
@@ -73,4 +86,8 @@ func (c *LoginAttemptCache) Clear(principal string) error {
 
 func normalizeLoginPrincipal(principal string) string {
 	return strings.ToLower(strings.TrimSpace(principal))
+}
+
+func UserLoginPrincipal(userID int) string {
+	return fmt.Sprintf("user:%d", userID)
 }

@@ -465,3 +465,19 @@ Sweet Platform 统一认证体系冻结为：
 **多种 Credential Provider + 单一 Auth Service 编排 + 单一账号安全策略 + 单一 Token 生命周期 + 全入口登录审计。**
 
 后台、开放 API、短信和未来 SSO/OAuth 只是不同的凭证入口。任何新入口都必须通过统一 Auth Service 接入，不能自行检查账号、签发 Token 或省略安全策略。后续整改应优先收口 Token 和密码登录，再迁移短信、SSO、刷新和注销，最终删除 Controller/API 中重复的认证编排。
+
+## 16. AF-002 实现收敛
+
+AF-002 已按上述边界完成存量入口迁移，冻结以下实现细节：
+
+- 后台密码、开放 API 密码、短信验证码和现有钉钉 SSO 均由静态 Credential Provider 接入同一 `AuthApplicationService`。
+- `AuthTokenService` 复用现有 JWT 格式，统一签发、校验、Refresh 单次消费和精确有效期撤销；服务端生成的 `jti` 保证轮换唯一，`sid` 关联同一 Access/Refresh 会话并收敛 Logout/Refresh 竞争，旧 JWT 仍兼容解析，未增加新的 Token 协议或客户端可提交 Claims。
+- Refresh 和 Logout 均重新读取权威用户状态。停用、删除、锁定、改密或已撤销账号不能继续使用既有会话。
+- 密码失败计数、成功/锁定收敛、短信验证码消费与失败次数、Refresh 消费使用 Redis 原子原语；短信和 SSO 失败不机械累计密码失败次数。
+- 用户 Login State 在短事务中同步更新，仅保存 Access Token 摘要；不再由 Controller 异步覆盖整个状态。
+- 认证审计使用标准 `context.Context` 中的 request ID、trace ID、客户端 IP 和 User-Agent。未知身份只持久化摘要，不保存原始账号、密码、验证码或 Token。
+- AppToken 继续表示开放 API 应用身份，不进入用户 Token、Login State 或账号锁定链。
+- AppToken 放行前读取数据库权威应用状态；应用停用或密钥轮换会使缓存中的旧 AppToken 快照立即失效。
+- 初始密码或过期密码登录只获得服务端受限会话；认证中间件仅允许该会话访问密码修改接口，注销仍由公开的 Token 撤销入口处理，Refresh 在密码状态恢复前拒绝续期。
+- API 路径和登录响应字段保持兼容；认证失败统一为不可枚举的稳定错误。Refresh 同时兼容既有 `refreshToken` 和规范化的 `refresh_token` 查询参数。
+- 现有客户端仍依赖 `GET /api/refresh_token` 查询参数，AF-002 仅保留为兼容入口并确保应用访问日志脱敏；迁移到受保护请求体或安全 Cookie 仍属于后续兼容整改，不能把当前路径描述为长期安全终态。

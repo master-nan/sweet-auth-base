@@ -65,9 +65,10 @@ func EnsureLogContext(ctx *gin.Context) {
 			path = ctx.Request.URL.Path
 		}
 		requestMetadata := audit.RequestMetadata{
-			Method:   ctx.Request.Method,
-			Path:     path,
-			ClientIP: ctx.ClientIP(),
+			Method:    ctx.Request.Method,
+			Path:      path,
+			ClientIP:  ctx.ClientIP(),
+			UserAgent: ctx.Request.UserAgent(),
 		}
 		ctx.Set(audit.RequestMetadataValueKey, requestMetadata)
 		requestContext := audit.WithCorrelationIDs(ctx.Request.Context(), audit.CorrelationIDs{
@@ -75,6 +76,7 @@ func EnsureLogContext(ctx *gin.Context) {
 			TraceID:   traceID,
 		})
 		requestContext = audit.WithRequestMetadata(requestContext, requestMetadata)
+		requestContext = audit.WithAccessAuditState(requestContext)
 		ctx.Request = ctx.Request.WithContext(requestContext)
 	}
 	ctx.Header(RequestIDHeader, requestID)
@@ -120,6 +122,9 @@ func MarkAccessAuditPersisted(ctx *gin.Context) {
 func AccessAuditPersisted(ctx *gin.Context) bool {
 	if ctx == nil {
 		return false
+	}
+	if ctx.Request != nil && audit.AccessAuditPersisted(ctx.Request.Context()) {
+		return true
 	}
 	value, exists := ctx.Get(accessAuditPersistedKey)
 	persisted, ok := value.(bool)

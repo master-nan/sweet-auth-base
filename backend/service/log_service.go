@@ -9,7 +9,6 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
-	"backend/internal/asynctask"
 	"backend/internal/audit"
 	error2 "backend/internal/errors"
 	"backend/internal/utils"
@@ -22,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -88,22 +86,6 @@ func (ls *LogService) CreateLoginLog(ctx context.Context, log model.LoginLog) er
 	}
 	log.Id = int(id)
 	return writer.CreateLoginLogContext(ctx, &log)
-}
-
-// CreateLoginLogAsync 使用请求字段快照写入登录日志，不保留 Gin Context。
-func (ls *LogService) CreateLoginLogAsync(taskContext asynctask.Context, log model.LoginLog) {
-	asynctask.Run(taskContext, func(ctx context.Context) {
-		if err := ls.CreateLoginLog(ctx, log); err != nil {
-			metadata := asynctask.MetadataFrom(ctx)
-			zap.L().Error("记录登录日志失败",
-				zap.Error(err),
-				zap.String("request_id", metadata.RequestID),
-				zap.String("trace_id", metadata.TraceID),
-				zap.Int("user_id", metadata.UserID),
-				zap.String("client_ip", metadata.ClientIP),
-			)
-		}
-	})
 }
 
 func (ls *LogService) CreateAccessLog(ctx context.Context, log model.AccessLog) error {

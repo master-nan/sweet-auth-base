@@ -150,6 +150,71 @@ func (r *RedisUtil) Expire(key string, expiration time.Duration) (bool, error) {
 	return val, nil
 }
 
+// SetIfAbsent atomically reserves a cache key for one-time security state.
+func (r *RedisUtil) SetIfAbsent(key string, value interface{}, expiration time.Duration) (bool, error) {
+	ctx, cancel := withTimeout(2 * time.Second)
+	defer cancel()
+	return r.client.SetNX(ctx, key, value, expiration).Result()
+}
+
+// ConsumeCode atomically verifies a one-time code and limits guessing.
+func (r *RedisUtil) ConsumeCode(key, attemptKey, expected string, maxAttempts int, ttl time.Duration) (int64, error) {
+	ctx, cancel := withTimeout(2 * time.Second)
+	defer cancel()
+	return r.client.Eval(ctx, `
+		local code = redis.call("GET", KEYS[1])
+		if not code then
+			return 0
+		end
+		if code == ARGV[1] then
+			redis.call("DEL", KEYS[1], KEYS[2])
+			return 1
+		end
+		local attempts = redis.call("INCR", KEYS[2])
+		if attempts == 1 then
+			redis.call("PEXPIRE", KEYS[2], ARGV[3])
+		end
+		if attempts >= tonumber(ARGV[2]) then
+			redis.call("DEL", KEYS[1], KEYS[2])
+		end
+		return -1
+	`, []string{key, attemptKey}, expected, maxAttempts, ttl.Milliseconds()).Int64()
+}
+
+// RecordLoginFailure atomically increments an attempt counter and creates the
+// lock at the configured boundary.
+func (r *RedisUtil) RecordLoginFailure(attemptKey, lockKey string, maxAttempts int, ttl time.Duration) (bool, error) {
+	ctx, cancel := withTimeout(2 * time.Second)
+	defer cancel()
+	result, err := r.client.Eval(ctx, `
+		local attempts = redis.call("INCR", KEYS[1])
+		if attempts == 1 then
+			redis.call("PEXPIRE", KEYS[1], ARGV[2])
+		end
+		if attempts >= tonumber(ARGV[1]) then
+			redis.call("SET", KEYS[2], "1", "PX", ARGV[2])
+			redis.call("DEL", KEYS[1])
+			return 1
+		end
+		return 0
+	`, []string{attemptKey, lockKey}, maxAttempts, ttl.Milliseconds()).Int64()
+	return result == 1, err
+}
+
+// CompleteLoginSuccess closes the password-success/lock-creation race.
+func (r *RedisUtil) CompleteLoginSuccess(attemptKey, lockKey string) (bool, error) {
+	ctx, cancel := withTimeout(2 * time.Second)
+	defer cancel()
+	result, err := r.client.Eval(ctx, `
+		if redis.call("EXISTS", KEYS[2]) == 1 then
+			return 0
+		end
+		redis.call("DEL", KEYS[1])
+		return 1
+	`, []string{attemptKey, lockKey}).Int64()
+	return result == 1, err
+}
+
 func (r *RedisUtil) HSet(key, field string, value interface{}) error {
 	ctx, cancel := withTimeout(2 * time.Second)
 	defer cancel()

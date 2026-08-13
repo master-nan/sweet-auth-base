@@ -202,6 +202,8 @@ var (
 	ErrDictCodeExist            = NewError(http.StatusBadRequest, 20012, "存在重复的dictCode")
 	ErrDataNotFound             = NewError(http.StatusBadRequest, 20013, "操作的数据不存在")
 	ErrLoginLocked              = NewError(http.StatusTooManyRequests, 20014, "登录失败次数过多，请稍后再试")
+	ErrAuthenticationFailed     = NewError(http.StatusUnauthorized, 20015, "认证失败")
+	ErrPasswordChangeRequired   = NewError(http.StatusForbidden, 20016, "请先修改密码")
 
 	ErrInvalidRefreshToken = NewError(http.StatusUnauthorized, 30001, "无效的刷新token")
 	ErrTokenExpired        = NewError(http.StatusUnauthorized, 30002, "token已过期")
