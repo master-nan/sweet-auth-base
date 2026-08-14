@@ -7,7 +7,7 @@
 | 目录 | 读者 | 用途 | 生命周期 |
 | --- | --- | --- | --- |
 | [`user-guide/`](user-guide/README.md) | 用户、业务管理员、平台管理员 | 页面操作、配置方法和产品使用说明 | 长期 |
-| [`engineering/`](engineering/README.md) | 开发、架构、测试人员 | 架构边界、开发规范和扩展方式 | 长期；现有内容仍需后续重写 |
+| [`engineering/`](engineering/README.md) | 开发、架构、测试人员 | 架构边界、目录职责、开发规范和扩展方式 | 长期 |
 | [`operations/`](operations/README.md) | 部署、运维、开发人员 | 环境、配置、部署、运行和排错 | 长期 |
 | [`_construction/`](_construction/README.md) | 建设与评审人员 | Design、Standard、Acceptance、Freeze、Audit 和生产 Gate 证据 | 临时；不是产品文档 |
 | `development/` | 本地开发人员 | Task 记录、原始分析和敏感源资料 | Git 忽略；稳定后整体删除 |
@@ -27,7 +27,7 @@
 
 ### 工程与运行
 
-- [Sweet Platform 工程手册 V1](engineering/sweet-platform-engineering-handbook-v1.md)
+- [平台工程架构与目录手册](engineering/PlatformEngineeringGuide.md)
 - [运行手册](operations/Runbook.md)
 
 ### 建设期参考资料

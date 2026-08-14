@@ -8,7 +8,7 @@
 
 本 Backlog 依据以下已形成的工程和平台文档整理：
 
-- `docs/engineering/sweet-platform-engineering-handbook-v1.md`
+- `docs/engineering/PlatformEngineeringGuide.md`
 - `design/platform/sweet-platform-core-capabilities-overall-architecture.md`
 - `design/platform/sweet-platform-core-capabilities-overall-architecture-review-log.md`
 - `design/platform/integration-center-v1-detailed-design.md`
