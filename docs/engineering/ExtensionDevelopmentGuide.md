@@ -350,7 +350,7 @@ HR Source DTO
 
 测试夹具优先用 `backend/internal/test` 的 `OpenSQLite` 和 HTTP helper。SKIP LOCKED、JSONB、partial unique、`CHECK`、DDL、Migration、Integration 和 Organization HR 不能静默降级到 SQLite。
 
-`make verify` 当前只执行 docs-check、后端测试以及前端 lint/typecheck/build，不包含前端 Vitest、Race 和强制 PostgreSQL 测试，因此不能单独作为发布门禁。
+`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该目标包含强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。
 
 ## 18. 常见反例
 

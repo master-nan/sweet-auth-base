@@ -8,7 +8,7 @@
 | 文档状态 | 正式设计 |
 | 设计日期 | 2026-08-07 |
 | 审计基线 | `1478ce1dbdf8046461cc6f5696c7f0891f04cadf` |
-| 前置设计 | [IntegrationFoundationDesign.md](IntegrationFoundationDesign.md)、[IntegrationConfigurationDesign.md](IntegrationConfigurationDesign.md)、[IntegrationRuntimeDesign.md](IntegrationRuntimeDesign.md) |
+| 前置设计 | [IntegrationRuntimeDesign.md](IntegrationRuntimeDesign.md)、[PlatformEngineeringGuide.md](../../engineering/PlatformEngineeringGuide.md) |
 | 冻结依据 | [IntegrationRuntimeAcceptanceReport.md](../reviews/IntegrationRuntimeAcceptanceReport.md)、[IntegrationRuntimeFreezeReview.md](../reviews/IntegrationRuntimeFreezeReview.md) |
 
 ## 1. 定位与目标

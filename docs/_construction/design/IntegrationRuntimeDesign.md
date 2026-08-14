@@ -5,14 +5,13 @@
 | 项目 | 内容 |
 | --- | --- |
 | 文档目的 | 冻结 Integration Runtime 的执行对象、状态机、Worker、HTTP、凭证、幂等、并发、事务与错误契约 |
-| 上位设计 | [IntegrationFoundationDesign.md](IntegrationFoundationDesign.md) |
-| 配置设计 | [IntegrationConfigurationDesign.md](IntegrationConfigurationDesign.md) |
-| 配置验收 | [IntegrationConfigurationAcceptanceReport.md](../reviews/IntegrationConfigurationAcceptanceReport.md) |
+| 当前工程边界 | [PlatformEngineeringGuide.md](../../engineering/PlatformEngineeringGuide.md) |
+| 当前扩展规则 | [ExtensionDevelopmentGuide.md](../../engineering/ExtensionDevelopmentGuide.md) |
 | 设计日期 | 2026-08-05 |
 | 当前范围 | `IntegrationExecution` 运行时详细设计 |
 | 文档性质 | 正式设计，不创建数据库、Migration、Service、Worker 或页面 |
 
-本文继续遵守 [TransactionUsageStandard.md](../standards/TransactionUsageStandard.md)、[ErrorHandlingStandard.md](../standards/ErrorHandlingStandard.md) 和 [TestInfrastructureStandard.md](../standards/TestInfrastructureStandard.md)。文中的字段是领域契约，不等同于已经冻结的数据库列；物理类型、索引名和表名在实施任务中确认。
+本文的长期工程、错误、事务和测试规则已吸收进工程手册与扩展指南。文中的字段是领域契约，不等同于已经冻结的数据库列；物理类型、索引名和表名在实施任务中确认。
 
 ## 1. Runtime 定位与原则
 

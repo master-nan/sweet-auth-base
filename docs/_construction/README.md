@@ -1,15 +1,13 @@
 # 建设期资料
 
-> 本目录不是最终产品文档。内容用于保存设计、验收、冻结、审计、实施证据和生产准入 Gate，待核心结论吸收后由 DOC-FINAL 清理。
+> 本目录不是最终产品文档。RC-001 已删除被长期手册吸收的通用设计、标准、验收和审计资料；当前只保留 HR 生产准入证据、Integration Sync 前置冻结链和 Report 重设计参考。
 
 | 子目录 | 内容 | 默认最终动作 |
 | --- | --- | --- |
-| `design/` | 架构与施工设计 | MERGE 或 REWRITE |
-| `standards/` | 阶段工程规范 | 合并入长期 Engineering 文档 |
-| `reviews/` | Acceptance、Freeze、Audit、Change Review | Gate 满足后删除 |
-| `planning/` | Backlog 和阶段规划 | 稳定后删除 |
-| `report-designer/` | Report V1 活跃设计与实现证据 | 活跃实施结束后吸收/删除 |
-| `report-v2/` | Report V2 活跃产品与技术设计 | 转正后吸收/删除 |
+| `design/` | Integration Runtime/Retry/Sync 与 Organization HR Gate 设计 | HR Production Gate 后吸收/删除 |
+| `reviews/` | Integration 冻结链与 Organization HR 准入证据 | HR Production Gate 后删除 |
+| `report-designer/` | Report V1 当前运行设计和未来重构参考 | Report 重设计后吸收/删除 |
+| `report-v2/` | Report V2 产品与技术参考 | Report 重设计后取舍 |
 | `analysis/` | 生产准入分析边界 | Gate 关闭后删除；敏感内容不跟踪 |
 
 当前逐文件生命周期见 [DocumentationInventory.md](DocumentationInventory.md)。

@@ -3,10 +3,7 @@
     "info": {
         "description": "基于 Gin、Gorm 和 Quasar 的低代码管理底座",
         "title": "Sweet Admin",
-        "contact": {
-            "name": "南",
-            "email": "maxdwy@gmail.com"
-        },
+        "contact": {},
         "version": "0.1"
     },
     "basePath": "/sweet_admin",

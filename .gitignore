@@ -4,6 +4,17 @@ backend/logs/
 .env.external
 backups/
 reports/
+/tmp/
+/output/
+/logs/
+/coverage/
+/backend/work/
+backend/coverage.out
+frontend/coverage/
+*.tmp
+*.bak
+*.old
+*.copy
 backend/sweet_admin*
 backend/bin/
 frontend/bin/
@@ -16,5 +27,4 @@ AGENTS.md
 # Local construction records and source material that must never enter Git.
 docs/development/
 docs/_construction/analysis/organization-source/
-/design/
 /work/

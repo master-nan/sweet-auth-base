@@ -13,5 +13,5 @@
 
 - Engineering 文档只描述当前稳定代码和长期扩展约束，不记录 Task 过程。
 - 新增目录、公共接口或跨模块依赖时，应同步核对并更新工程手册。
-- Authentication、Data Permission、Integration、Organization HR 和 Report 的历史设计、验收与冻结资料仍位于 [`_construction/`](../_construction/README.md)，仅作建设期追溯。
+- `_construction/` 目前仅保留 Organization HR 生产准入证据、Integration Sync 前置冻结证据和 Report 重设计参考，不作为新代码入口。
 - 新增扩展能力时，应同步核对工程架构和扩展指南；不得用 construction 文档替代长期开发指南。

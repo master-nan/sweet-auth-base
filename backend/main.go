@@ -21,8 +21,6 @@ import (
 // @title Sweet Admin
 // @version 0.1
 // @description 基于 Gin、Gorm 和 Quasar 的低代码管理底座
-// @contact.name 南
-// @contact.email maxdwy@gmail.com
 // @BasePath  /sweet_admin
 
 func main() {

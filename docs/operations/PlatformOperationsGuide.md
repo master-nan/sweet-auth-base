@@ -401,8 +401,9 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 | 前端构建 | `cd frontend && yarn build` |
 | 文档 | `make docs-check` |
 | 基础聚合 | `make verify` |
+| 完整发布门禁 | `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check` |
 
-`make verify` 不是完整发布门禁：它不包含前端 Vitest、Race 和强制 PostgreSQL 测试。
+`make verify` 是快速验证，不包含前端 Vitest、Race 和强制 PostgreSQL 测试。`make release-check` 才是完整发布门禁，并会在缺少 `SWEET_TEST_POSTGRES_DSN` 或其不是 `postgres://` / `postgresql://` URL 时直接失败。
 
 ## 16. 发布 Checklist
 
@@ -444,8 +445,7 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - File Chunk 使用节点本地暂存，多实例需要会话粘性，尚无共享暂存。
 - 文件物理清理失败没有独立后台重试 Worker，需要受控重试和监控。
 - 只有 Worker 状态 API/页面能力，没有同等 Sync Runner 状态页面。
-- `scripts/preflight-external.mjs` 的成功提示提到 `make preflight-external-readonly`，但当前 Makefile 没有该目标；应直接使用本手册列出的 Node 命令，后续统一命令入口。
-- `make verify` 不是完整发布检查。
+- `make verify` 仍定位为日常快速检查；发布必须使用要求真实 PostgreSQL DSN 的 `make release-check`。
 - Graceful shutdown 会停止 Runner、Worker 和 HTTP Server，但 `main.go` 当前没有显式关闭 SQL/Redis Client 的生命周期步骤。
 - 当前没有平台级 Prometheus/OpenTelemetry 指标端点；运行观测主要依赖 health/readiness、结构化日志和业务审计。
 

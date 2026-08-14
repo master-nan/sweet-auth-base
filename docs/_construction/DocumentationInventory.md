@@ -1,133 +1,88 @@
-# Sweet Platform 文档资产清单
+# Sweet Platform 建设期资料清单
 
 > Audience: 文档治理、架构和项目维护人员
 > Lifecycle: construction
 > Final Action: DELETE_AFTER_STABLE
-> Removal Gate: DOC-FINAL 完成长期文档吸收、引用复核和生产 Gate 迁移后删除
 
-## 1. 盘点口径
+## 1. RC-001 清理结论
 
-DOC-001A 治理前共有 67 份非 `development` 文档资产：35 份 Git 已跟踪根目录 Markdown，以及 32 份因旧 `docs/*/` 规则而被忽略的工程、报表和脱敏分析资产。另有 `docs/development/` 下 162 份有效本地资产（不计 3 个 `.DS_Store`），保持 Git 忽略并按目录治理。
+Platform Enablement 完成后，RC-001 对建设期资料执行了第一次真实删除：
 
-本表的目标动作只允许：`KEEP`、`MERGE`、`REWRITE`、`DELETE_AFTER_STABLE`、`DELETE_AFTER_PRODUCTION_GATE`、`IGNORED_RAW`。`MERGE` 和 `REWRITE` 均表示原文件在结论吸收后删除，不代表当前内容已经成为长期事实。
+- 删除 23 份已被长期手册吸收或已失去独立价值的 tracked construction 文档；
+- 删除本地 `docs/development/` 中 103 份 Task、评审、草稿和演示资料；
+- 保留 34 份 tracked construction 文档；
+- 保留 7 份 ignored HR 脱敏分析和 69 份 ignored 原始 HR 资料；
+- Report 仅删除 6 份阶段验收/实施 Evidence，保留当前运行设计和未来重设计参考。
 
-## 2. 长期入口与使用资料
+长期规则现在只以 `docs/user-guide/`、`docs/engineering/`、`docs/operations/` 和 `docs/DocumentationStandard.md` 为准。Git 历史承担已删除施工过程的追溯职责。
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `user-guide/PlatformAdministrationGuide.md` | 平台管理员功能、配置和排错总手册 | User Guide | long-term | KEEP |
-| `user-guide/DataPermissionUserGuide.md` | 数据权限管理员操作 | User Guide | long-term | KEEP |
-| `user-guide/FieldTypeGuide.md` | 字段类型配置说明 | User Guide | long-term | KEEP |
-| `user-guide/LinkageConfig.md` | 字段联动配置说明 | User Guide | long-term | KEEP |
-| `user-guide/LowCodeManual.md` | 低代码平台使用手册 | User Guide | long-term | KEEP |
-| `user-guide/OrganizationManagementUserGuide.md` | 组织管理操作说明 | User Guide | long-term | KEEP |
-| `operations/PlatformOperationsGuide.md` | 部署、配置、运行、升级与排错唯一运维手册 | Operations Guide | long-term | KEEP |
-| `engineering/PlatformEngineeringGuide.md` | 当前工程架构、目录职责与模块边界 | Engineering Guide | long-term | KEEP |
-| `engineering/ExtensionDevelopmentGuide.md` | 平台扩展开发实施步骤 | Engineering Guide | long-term | KEEP |
+## 2. 长期文档
 
-## 3. Design 与 Architecture
+| 文件 | 用途 | 生命周期 | 最终动作 |
+| --- | --- | --- | --- |
+| `user-guide/PlatformAdministrationGuide.md` | 平台管理员总手册 | long-term | KEEP |
+| `engineering/PlatformEngineeringGuide.md` | 工程架构与目录边界 | long-term | KEEP |
+| `engineering/ExtensionDevelopmentGuide.md` | 扩展开发实施步骤 | long-term | KEEP |
+| `operations/PlatformOperationsGuide.md` | 部署、运行、发布和排错唯一真值 | long-term | KEEP |
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `_construction/design/AuthenticationArchitectureDesign.md` | 认证架构设计 | Backend Architecture | construction | REWRITE |
-| `_construction/design/DataPermissionDesign.md` | 数据权限详细设计 | Data Permission Engineering Guide | construction | MERGE |
-| `_construction/design/DataPermissionOwnershipDesign.md` | Ownership 与权限边界 | Data Permission Engineering Guide | construction | MERGE |
-| `_construction/design/IntegrationFoundationDesign.md` | Integration 基础架构 | Integration Engineering Guide | construction | MERGE |
-| `_construction/design/IntegrationConfigurationDesign.md` | Integration 配置模型 | Integration Engineering Guide | construction | MERGE |
-| `_construction/design/IntegrationRuntimeDesign.md` | Runtime 执行链设计 | Integration Engineering Guide | construction | MERGE |
-| `_construction/design/IntegrationRetryDesign.md` | Retry 设计 | Integration Engineering Guide | construction | MERGE |
-| `_construction/design/IntegrationSyncDesign.md` | Sync 设计 | Integration Engineering Guide | construction | MERGE |
-| `_construction/design/OrganizationHRSyncDesign.md` | HR Adapter 设计与生产 Gate | Organization Integration Guide | production-enablement-evidence | REWRITE |
+其他专题 User Guide 继续由 `docs/user-guide/README.md` 管理。
 
-## 4. Acceptance、Freeze、Audit 与 Review
+## 3. HR 与 Integration Sync 保护区
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `_construction/reviews/DataPermissionAcceptanceGuide.md` | 数据权限阶段验收步骤 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/DataPermissionAcceptanceReport.md` | 数据权限验收结果 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/DataPermissionFreezeReview.md` | 数据权限冻结依据 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationConfigurationAcceptanceReport.md` | Integration 配置验收 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationRuntimeAcceptanceReport.md` | Runtime 验收结果 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationRuntimeFreezeReview.md` | Runtime 冻结依据 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationRetryAcceptanceReport.md` | Retry 验收结果 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationRetryFreezeReview.md` | Retry 冻结依据 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationSyncAcceptanceReport.md` | Sync 验收结果 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationSyncFreezeReview.md` | Sync 冻结依据 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/PlatformBackendCodeAuditReport.md` | 阶段后端代码审计 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/PlatformStabilizationReview.md` | 平台稳定化评审 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/PlatformFrozenBacklogFinalReview.md` | AF-001～AF-006 最终稳定性评审 | Construction Evidence | construction | DELETE_AFTER_STABLE |
-| `_construction/reviews/IntegrationSyncSourceContractChangeReview.md` | 单下界源契约变更评审 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/reviews/OrganizationHRAssignmentContractReview.md` | 任职/离职源契约评审 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/reviews/OrganizationHRSyncAcceptanceReport.md` | HR Adapter 能力验收 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/reviews/OrganizationHRSyncFreezeReview.md` | HR Adapter 能力冻结与 Gate | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
+以下资料继续承担 HR Production Enablement 证据，不得在 DOC-FINAL 前机械删除：
 
-## 5. Standard
+| 当前范围 | 数量 | 保留原因 | 最终动作 |
+| --- | ---: | --- | --- |
+| `_construction/design/IntegrationRuntimeDesign.md` | 1 | HR Sync 前置 Runtime 契约 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/design/IntegrationRetryDesign.md` | 1 | HR Sync 前置 Retry 契约 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/design/IntegrationSyncDesign.md` | 1 | lower-bound-only 与 Checkpoint 依据 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/design/OrganizationHRSyncDesign.md` | 1 | HR Adapter 与生产 Gate 主设计 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/reviews/Integration*AcceptanceReport.md` / `*FreezeReview.md` | 6 | Runtime、Retry、Sync 冻结证据链 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/reviews/IntegrationSyncSourceContractChangeReview.md` | 1 | 单下界源契约变更证据 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/reviews/OrganizationHRAssignmentContractReview.md` | 1 | 任职/离职源契约证据 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/reviews/OrganizationHRSyncAcceptanceReport.md` / `FreezeReview.md` | 2 | HR Adapter 能力与 Gate 证据 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `_construction/analysis/organization-source/` | 7 ignored | 脱敏生产准入分析 | DELETE_AFTER_HR_PRODUCTION_GATE |
+| `development/analysis/organization-source/raw/` | 69 ignored | 原始 OpenAPI、Header、元数据和响应 | 受控销毁；永不进入 Git |
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `_construction/standards/DocumentationNamingStandard.md` | 旧文档命名约定 | Documentation Governance | superseded-construction | DELETE_AFTER_STABLE |
-| `_construction/standards/ErrorHandlingStandard.md` | 错误处理规范 | Backend Architecture | construction | MERGE |
-| `_construction/standards/TransactionUsageStandard.md` | 事务使用规范 | Engineering Development Guide | construction | MERGE |
-| `_construction/standards/TestInfrastructureStandard.md` | 测试基础设施规范 | Testing Guide | construction | MERGE |
+真实 HR Production Gate 关闭后，先将仍需长期保留的操作结论吸收到 Engineering/Operations，再删除本表所列施工证据。
 
-## 6. Report 活跃实施资料
+## 4. Report 保护区
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `_construction/report-designer/01-v1-scope.md` | 报表 V1 范围 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/02-v1-architecture-decisions.md` | 报表架构决策 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/03-v1-version-runtime-design.md` | 发布版本与运行态设计 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/04-v1-security-design.md` | 报表安全设计 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/05-v1-api-design.md` | 报表 API 设计 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/06-v1-frontend-adjustment.md` | 前端增量调整 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/07-v1-acceptance-checklist.md` | 阶段验收清单 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-designer/09-v1a-implementation-evidence.md` | V1A 实施证据 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-designer/11-v1b-export-plan.md` | 导出实施计划 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/12-v1b-implementation-evidence.md` | V1B 实施证据 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-designer/13-v1d-frontend-plan.md` | 前端实施计划 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-designer/14-v1d-ui-spec.md` | 报表 UI 规格 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/15-v1d-frontend-implementation-evidence.md` | 前端实施证据 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-designer/17-v1e-ui-redesign-spec.md` | UI 重设计规格 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-designer/18-v1e1-runtime-refactor-evidence.md` | Runtime 重构证据 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-v2/01-product-positioning.md` | 报表产品定位 | Report Product/Engineering Guide | active-implementation | REWRITE |
-| `_construction/report-v2/02-information-architecture.md` | 报表信息架构 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-v2/03-domain-model.md` | 报表领域模型 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-v2/04-ui-wireframe-spec.md` | 报表线框规格 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-v2/05-api-design.md` | 报表 API 设计 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-v2/06-implementation-roadmap.md` | 报表实施路线图 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/report-v2/07-v1-compatibility-and-migration.md` | V1 兼容与迁移 | Report Engineering Guide | active-implementation | MERGE |
-| `_construction/report-v2/08-naming-and-promotion-strategy.md` | 命名与推广策略 | Construction Evidence | active-implementation | DELETE_AFTER_STABLE |
+Report 当前运行能力和未来重设计仍需要以下资料：
 
-## 7. Planning 与 production-enablement evidence
+| 当前范围 | 数量 | 分类 | 最终动作 |
+| --- | ---: | --- | --- |
+| `_construction/report-designer/` | 9 | 当前 V1 运行设计、API、安全、导出和 UI 参考 | MERGE_AFTER_REPORT_REDESIGN |
+| `_construction/report-v2/` | 8 | 产品定位、信息架构、领域模型、原型、API、路线、兼容和命名参考 | MERGE_AFTER_REPORT_REDESIGN |
 
-| 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
-| --- | --- | --- | --- | --- |
-| `_construction/planning/platform-capability-backlog-v1.md` | 平台能力阶段 Backlog | Construction Planning | active-implementation | DELETE_AFTER_STABLE |
-| `_construction/analysis/organization-source/OrganizationSourceApiInventory.md` | HR 源接口清单 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSourceFieldDictionary.csv` | 脱敏字段字典 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSanitizedSamples.json` | 脱敏样本 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSourceDataAnalysis.md` | HR 源数据分析 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSourceMappingDraft.md` | HR 映射草案 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSourceDataQualityReport.md` | HR 数据质量报告 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
-| `_construction/analysis/organization-source/OrganizationSourceOpenQuestions.md` | HR 生产准入待确认项 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
+RC-001 已删除 report-designer 下 6 份阶段 Checklist、Plan 和 Implementation Evidence。`report-v2` 当前全部归类为未来专题参考；隐藏 prototype 有真实路由且属于保护范围，不按死代码删除。
 
-上述 7 份脱敏分析继续由 `.gitignore` 精确排除。本轮仅迁移本地位置并登记，不把未经独立隐私复核的源分析资料纳入 Git。
+## 5. 已删除 construction 分类
 
-## 8. development 本地资产
+| 分类 | 数量 | 删除依据 |
+| --- | ---: | --- |
+| Auth/Data Permission/Integration Foundation 普通设计 | 5 | 当前事实已进入 Engineering/Extension Guide |
+| Data Permission、Integration Configuration、Platform Audit/Review | 7 | 验收过程已完成，长期结论已吸收 |
+| Error/Transaction/Test/Naming Standard | 4 | 已进入 Engineering/Extension/Documentation Standard |
+| Platform Capability Backlog | 1 | 状态与路线已过期，后续专项独立规划 |
+| Report 阶段 Evidence | 6 | 代码和保留设计已能表达当前/未来事实 |
+| **合计** | **23** | Git 历史保留追溯 |
 
-| 当前范围 | 数量 | 当前用途 | 生命周期 | 最终动作 |
-| --- | ---: | --- | --- | --- |
-| `development/task/`、`bugfix/`、`design/`、`review/`、`sprint-*`、`test-data/` | 93 | Task、评审、演示数据和阶段草稿 | local-construction | DELETE_AFTER_STABLE |
-| `development/analysis/organization-source/raw/` | 69 | 原始 OpenAPI、Header、元数据和响应 | local-sensitive-raw | IGNORED_RAW |
+## 6. development 与 analysis
 
-`development` 资产按目录而非逐文件转正：它们从未属于正式产品文档，继续全部 Git 忽略。DOC-FINAL 在确认没有活跃引用后删除非原始过程资料；原始敏感资料按安全与生产准入流程单独销毁，不进入 Git 历史。
+`docs/development/` 继续整体 Git 忽略。RC-001 已删除所有非 HR Task、Bugfix、Design、Review、Sprint 和 test-data，仅保留：
 
-## 9. 最终清理摘要
+```text
+docs/development/analysis/organization-source/raw/
+```
 
-- 长期保留或重写：5 份 User Guide、1 份 Operations Runbook、1 份 Engineering Handbook。
-- 合并/重写后删除原件：9 份架构设计、3 份 Standard、14 份 Report 核心设计。
-- 稳定后删除：13 份非 HR Review、1 份旧命名规范、9 份 Report 过程资料、1 份规划 Backlog，以及 93 份本地过程资料。
-- Production Gate 后删除：4 份 HR/Source Contract Review 与 7 份脱敏分析资料。
-- 始终不进入 Git：69 份原始 HR 资料。
+`docs/_construction/analysis/organization-source/` 继续精确 Git 忽略，保留脱敏分析。两处资料均不是产品文档，不得被 README 当作普通用户入口。
 
-DOC-001A 不执行上述最终删除；所有动作留给对应 Engineering Documentation 重写、HR Production Enablement 和 DOC-FINAL。
+## 7. DOC-FINAL 条件
+
+DOC-FINAL 前仍需满足：
+
+1. HR Production Enablement 完成，生产 Gate 结论已吸收。
+2. Report Platform 重设计完成，当前设计与 V2 参考完成取舍。
+3. Frontend Consistency、Query Center 和 Final Code Review 不再引用 construction。
+4. `make docs-check`、全仓路径扫描和敏感资料复核通过。

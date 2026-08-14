@@ -1,4 +1,4 @@
-.PHONY: help verify docs-check backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify release-check docs-check backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
@@ -15,7 +15,9 @@ help:
 	@printf '%s\n' '  make docs-check                           检查文档目录、旧路径和相对链接'
 	@printf '%s\n' '  make backend-test                         只跑 Go 测试'
 	@printf '%s\n' '  make frontend-ci                          只跑前端 lint/typecheck/build'
-	@printf '%s\n' '  make verify                               后端测试 + 前端 CI'
+	@printf '%s\n' '  make verify                               快速验证，不含 Race/PostgreSQL/Vitest'
+	@printf '%s\n' '  SWEET_TEST_POSTGRES_DSN=postgres://... make release-check'
+	@printf '%s\n' '                                            完整发布门禁，强制真实 PostgreSQL'
 	@printf '%s\n' ''
 	@printf '%s\n' '数据库：'
 	@printf '%s\n' '  make db-migrate                           执行结构迁移'
@@ -37,6 +39,15 @@ help:
 	@printf '%s\n' '详细说明见 docs/operations/PlatformOperationsGuide.md'
 
 verify: docs-check backend-test frontend-ci
+
+release-check:
+	@test -n "$(SWEET_TEST_POSTGRES_DSN)" || (printf '%s\n' 'SWEET_TEST_POSTGRES_DSN is required for release-check' >&2; exit 1)
+	@case "$(SWEET_TEST_POSTGRES_DSN)" in postgres://*|postgresql://*) ;; *) printf '%s\n' 'SWEET_TEST_POSTGRES_DSN must be a postgres:// or postgresql:// URL' >&2; exit 1;; esac
+	$(MAKE) docs-check
+	cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true SWEET_TEST_POSTGRES_DSN="$(SWEET_TEST_POSTGRES_DSN)" go test ./... -count=1
+	cd backend && go test -race ./... -count=1
+	cd frontend && yarn quasar prepare && yarn test
+	$(MAKE) frontend-ci
 
 docs-check:
 	python3 scripts/check_docs.py

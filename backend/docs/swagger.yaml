@@ -1722,9 +1722,7 @@ definitions:
         type: integer
     type: object
 info:
-  contact:
-    email: maxdwy@gmail.com
-    name: 南
+  contact: {}
   description: 基于 Gin、Gorm 和 Quasar 的低代码管理底座
   title: Sweet Admin
   version: "0.1"

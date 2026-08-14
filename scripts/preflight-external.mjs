@@ -659,7 +659,7 @@ function main() {
           runtimeBoolean(['SWEET_ADMIN_EXTERNAL_ENV_INIT_FORCE']) === true,
       })
       console.log(`External env file initialized: ${result.path}`)
-      console.log('Fill real staging/production values, then run make preflight-external-readonly.')
+      console.log(`Fill real staging/production values, then run node scripts/preflight-external.mjs ${result.path}.`)
     } catch (error) {
       console.error(error.message)
       process.exitCode = 1

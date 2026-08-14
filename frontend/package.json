@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Low-code management base for Sweet Admin",
   "productName": "Sweet Admin",
-  "author": "master-nan <305062463@qq.com>",
+  "author": "Sweet Platform",
   "type": "module",
   "private": true,
   "scripts": {

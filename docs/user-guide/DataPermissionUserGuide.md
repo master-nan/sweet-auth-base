@@ -4,11 +4,7 @@
 
 本手册面向 Sweet Platform 的系统管理员、实施人员和权限管理员，用于完成数据权限配置、检查和效果验证。
 
-本手册不介绍数据库、代码或技术实现。平台架构和验收结论可查阅：
-
-- [数据权限设计](../_construction/design/DataPermissionDesign.md)
-- [数据权限归属定义设计](../_construction/design/DataPermissionOwnershipDesign.md)
-- [数据权限 V1 正式验收报告](../_construction/reviews/DataPermissionAcceptanceReport.md)
+本手册不介绍数据库、代码或技术实现。开发边界见[平台工程架构与目录手册](../engineering/PlatformEngineeringGuide.md)，具体接入步骤见[平台扩展开发指南](../engineering/ExtensionDevelopmentGuide.md)。
 
 ## 1. 数据权限是什么
 
