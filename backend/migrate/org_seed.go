@@ -515,7 +515,21 @@ func seedOrganizationMenusAndPermissions(db *gorm.DB, sf *utils.Snowflake) error
 			return err
 		}
 	}
+	if err := removeOrganizationViewRefreshButtons(db); err != nil {
+		return err
+	}
 	return retireLegacyOrganizationLegalEntityMenu(db, menuByName["organization_structure"].Id)
+}
+
+func removeOrganizationViewRefreshButtons(db *gorm.DB) error {
+	codes := []string{
+		"organization_structure_refresh",
+		"organization_employee_refresh",
+		"organization_position_refresh",
+		"organization_sync_batch_refresh",
+		"organization_sync_error_refresh",
+	}
+	return removeMenuButtonsByCode(db, codes)
 }
 
 type organizationMenuButtonSeed struct {
@@ -540,7 +554,6 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			apiPermissionWithAPI(811, structureMenu, "管理组织树查询", "organization_unit_tree", enum.Top, "query", "account_tree", "primary", 1, "/admin/org/unit/tree", "POST"),
 			apiPermissionWithAPI(812, structureMenu, "管理组织选项查询", "organization_unit_options", enum.Top, "query", "list", "primary", 2, "/admin/org/unit/options", "POST"),
 			apiPermissionWithAPI(813, structureMenu, "管理组织详情", "organization_unit_detail", enum.Line, "detail", "visibility", "primary", 4, "/admin/org/unit/:id", "GET"),
-			menuButton(816, structureMenu, "刷新", "organization_structure_refresh", enum.Top, "refresh", "refresh", "primary", 3),
 			menuButton(817, structureMenu, "查看同步", "organization_structure_view_sync", enum.Line, "view_sync", "sync", "primary", 2),
 			apiPermissionWithAPI(860, structureMenu, "管理架构查询", "organization_structure_query", enum.Top, "query", "search", "primary", 5, "/admin/org/structure/query", "POST"),
 			apiPermissionWithAPI(861, structureMenu, "管理架构选项查询", "organization_structure_options", enum.Top, "query", "list", "primary", 6, "/admin/org/structure/options", "POST"),
@@ -553,7 +566,6 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 			menuButtonWithAPI(822, employeeMenu, "详情", "organization_employee_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/employee/:id", "GET"),
 			organizationDetailButton(menuButtonWithAPI(823, employeeMenu, "绑定账号", "organization_employee_bind_user", enum.DetailTop, "bind_user", "link", "primary", 2, "/admin/org/employee/:id/bind-user", "POST"), `{"field":"row.user_id","op":"not_empty"}`),
 			organizationDetailButton(menuButtonWithAPI(824, employeeMenu, "解绑账号", "organization_employee_unbind_user", enum.DetailTop, "unbind_user", "link_off", "warning", 3, "/admin/org/employee/:id/unbind-user", "POST"), `{"field":"row.user_id","op":"empty"}`),
-			menuButton(825, employeeMenu, "刷新", "organization_employee_refresh", enum.Top, "refresh", "refresh", "primary", 2),
 			menuButton(826, employeeMenu, "查看同步", "organization_employee_view_sync", enum.DetailBottom, "view_sync", "sync", "primary", 4),
 			apiPermissionWithAPI(827, employeeMenu, "任职查询", "organization_assignment_query", enum.Line, "query", "work_history", "primary", 5, "/admin/org/assignment/query", "POST"),
 			apiPermissionWithAPI(828, employeeMenu, "任职详情", "organization_assignment_detail", enum.Line, "detail", "visibility", "primary", 6, "/admin/org/assignment/:id", "GET"),
@@ -562,20 +574,18 @@ func organizationMenuButtons(menuByName map[string]model.SysMenu) []organization
 		{menuName: "organization_position", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(830, positionMenu, "岗位查询", "organization_position_query", enum.Top, "query", "search", "primary", 0, "/admin/org/position/query", "POST"),
 			apiPermissionWithAPI(831, positionMenu, "岗位选项查询", "organization_position_options", enum.Top, "query", "list", "primary", 1, "/admin/org/position/options", "POST"),
+			apiPermissionWithAPI(835, positionMenu, "页面元数据", "organization_position_metadata", enum.Top, "metadata", "data_object", "primary", 2, "/admin/table/code/:code", "GET"),
 			menuButtonWithAPI(832, positionMenu, "详情", "organization_position_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/position/:id", "GET"),
-			menuButton(833, positionMenu, "刷新", "organization_position_refresh", enum.Top, "refresh", "refresh", "primary", 2),
 			menuButton(834, positionMenu, "查看同步", "organization_position_view_sync", enum.DetailBottom, "view_sync", "sync", "primary", 2),
 		}},
 		{menuName: "organization_sync_batch", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(840, syncBatchMenu, "同步批次查询", "organization_sync_batch_query", enum.Top, "query", "search", "primary", 0, "/admin/org/sync/batch/query", "POST"),
 			menuButtonWithAPI(841, syncBatchMenu, "详情", "organization_sync_batch_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/sync/batch/:id", "GET"),
-			menuButton(842, syncBatchMenu, "刷新", "organization_sync_batch_refresh", enum.Top, "refresh", "refresh", "primary", 1),
 			organizationDetailButton(menuButtonWithAPI(843, syncBatchMenu, "查看错误", "organization_sync_batch_view_error", enum.DetailTop, "view_error", "error_outline", "negative", 2, "/admin/org/sync/batch/:id/error", "GET"), `{"field":"row.has_error","op":"falsy"}`),
 		}},
 		{menuName: "organization_sync_error", buttons: []model.SysMenuButton{
 			apiPermissionWithAPI(850, syncErrorMenu, "同步异常查询", "organization_sync_error_query", enum.Top, "query", "search", "primary", 0, "/admin/org/sync/record/query", "POST"),
 			menuButtonWithAPI(851, syncErrorMenu, "详情", "organization_sync_error_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/org/sync/record/:id", "GET"),
-			menuButton(854, syncErrorMenu, "刷新", "organization_sync_error_refresh", enum.Top, "refresh", "refresh", "primary", 1),
 			organizationDetailButton(menuButtonWithAPI(855, syncErrorMenu, "查看错误", "organization_sync_error_view_error", enum.DetailTop, "view_error", "error_outline", "negative", 2, "/admin/org/sync/record/:id/error", "GET"), `{"field":"row.has_error","op":"falsy"}`),
 		}},
 	}
@@ -634,7 +644,6 @@ func retireLegacyOrganizationLegalEntityMenu(db *gorm.DB, structureMenuID int) e
 			"organization_legal_entity_tree":      "organization_legal_entity_tree",
 			"organization_legal_entity_options":   "organization_legal_entity_options",
 			"organization_legal_entity_detail":    "organization_legal_entity_detail",
-			"organization_legal_entity_refresh":   "organization_structure_refresh",
 			"organization_legal_entity_view_sync": "organization_structure_view_sync",
 		}
 		replacementCodes := make([]string, 0, len(replacementCodeByLegacyCode))

@@ -405,30 +405,72 @@ func TestSeedDictsCreatesSystemEnumDictionaries(t *testing.T) {
 	}
 }
 
-func TestSeedAuditMenuButtonsIncludesDetailRefresh(t *testing.T) {
+func TestSeedAuditMenuButtonsRemovesViewRefreshCapability(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}); err != nil {
 		t.Fatalf("migrate audit buttons: %v", err)
+	}
+	legacy := model.SysMenuButton{Basic: model.Basic{Id: 493, State: true}, MenuId: 206, Name: "刷新详情", Code: "system_audit_detail_refresh", Position: enum.DetailTop, EventAction: "refresh", IsButton: true}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatalf("seed legacy audit refresh: %v", err)
+	}
+	if err := db.Create(&model.SysRoleMenuButton{RoleId: 1, MenuId: 206, ButtonId: legacy.Id}).Error; err != nil {
+		t.Fatalf("seed legacy audit refresh grant: %v", err)
 	}
 	sf := newMigrationTestSnowflake(t)
 	if err := seedAuditMenuButtons(db, sf, 1, "", 206); err != nil {
 		t.Fatalf("seed audit buttons: %v", err)
 	}
 
-	var button model.SysMenuButton
-	if err := db.Where("code = ? AND position = ?", "system_audit_detail_refresh", enum.DetailTop).First(&button).Error; err != nil {
-		t.Fatalf("query audit detail refresh button: %v", err)
+	var count int64
+	if err := db.Model(&model.SysMenuButton{}).Where("code = ?", "system_audit_detail_refresh").Count(&count).Error; err != nil {
+		t.Fatalf("count retired audit refresh button: %v", err)
 	}
-	if button.EventAction != "refresh" || button.Path != "" || button.Method != "" {
-		t.Fatalf("unexpected audit detail refresh button: %+v", button)
+	if count != 0 {
+		t.Fatalf("audit detail refresh button count = %d, want 0", count)
+	}
+	if err := db.Model(&model.SysRoleMenuButton{}).Where("button_id = ?", legacy.Id).Count(&count).Error; err != nil {
+		t.Fatalf("count retired audit refresh grant: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("audit detail refresh grant count = %d, want 0", count)
+	}
+}
+
+func TestRemoveLowCodeViewRefreshConfigurationIsIdempotent(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.SysMenuButtonTemplate{}); err != nil {
+		t.Fatalf("migrate low-code view refresh fixtures: %v", err)
+	}
+	menu := model.SysMenu{Basic: model.Basic{Id: 20, State: true}, Name: "lowcode_demo", PageType: enum.MenuPageTypeLowCode, TableCode: "demo"}
+	refresh := model.SysMenuButton{Basic: model.Basic{Id: 21, State: true}, MenuId: menu.Id, Name: "刷新", Code: "demo_refresh", EventAction: "refresh", IsButton: true}
+	business := model.SysMenuButton{Basic: model.Basic{Id: 22, State: true}, MenuId: menu.Id, Name: "刷新缓存", Code: "demo_refresh_cache", EventAction: "refresh_cache", Path: "/admin/demo/cache", IsButton: true}
+	template := model.SysMenuButtonTemplate{Basic: model.Basic{Id: 23, State: true}, Scene: lowCodeCrudButtonTemplateScene, Name: "刷新", CodeSuffix: "_refresh", EventAction: "refresh", IsButton: true}
+	if err := db.Create(&menu).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&[]model.SysMenuButton{refresh, business}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&template).Error; err != nil {
+		t.Fatal(err)
 	}
 
-	var count int64
-	if err := db.Model(&model.SysRoleMenuButton{}).Where("role_id = ? AND menu_id = ? AND button_id = ?", 1, 206, button.Id).Count(&count).Error; err != nil {
-		t.Fatalf("count role button binding: %v", err)
+	if err := removeLowCodeViewRefreshConfiguration(db); err != nil {
+		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("expected super admin binding for audit detail refresh, got %d", count)
+	if err := removeLowCodeViewRefreshConfiguration(db); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := countWhere(t, db, &model.SysMenuButton{}, "code = ?", refresh.Code); got != 0 {
+		t.Fatalf("view refresh button count = %d, want 0", got)
+	}
+	if got := countWhere(t, db, &model.SysMenuButton{}, "code = ?", business.Code); got != 1 {
+		t.Fatalf("business refresh button count = %d, want 1", got)
+	}
+	if got := countWhere(t, db, &model.SysMenuButtonTemplate{}, "code_suffix = ?", "_refresh"); got != 0 {
+		t.Fatalf("view refresh template count = %d, want 0", got)
 	}
 }
 

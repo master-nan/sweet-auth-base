@@ -2,10 +2,10 @@
  * 列表列格式化工具
  * 统一处理日期时间、字典、布尔、关联表字段的列显示
  */
-import { instance } from 'boot/axios'
 import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
 import type { TableField } from 'src/api/services/sys-table'
-import type { Query } from 'src/types/global'
+import { useGeneralizationApi } from 'src/api/services/generalization'
+import type { Query, TableColumn } from 'src/types/global'
 import { parseLinkageConfig } from 'src/utils/field-metadata'
 import { useUserStore } from 'src/stores/user'
 import { resolveRelationMenuId } from 'src/utils/menu-context'
@@ -78,10 +78,8 @@ export const formatTime = (val: any): string => {
 
 export type LookupMap = Record<string, string>
 
-const relationEndpoint = (tableCode: string) => `/admin/generalization/query/code/${tableCode}`
-
 const rowsFromRelationResponse = (response: any): Array<Record<string, any>> => {
-  const rawRows = response?.data?.data
+  const rawRows = response?.data
   return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
 }
 
@@ -122,6 +120,7 @@ export const buildRelationLookups = async (
   fields: TableField[],
 ): Promise<Record<string, LookupMap>> => {
   const userStore = useUserStore()
+  const generalizationApi = useGeneralizationApi()
   const lookups: Record<string, LookupMap> = {}
   const tasks = relationLookupFields(fields).map(({ field, linkage }) => ({
     fieldCode: field.field_code,
@@ -149,7 +148,7 @@ export const buildRelationLookups = async (
       }
 
       const map: LookupMap = {}
-      const res = await instance.post(relationEndpoint(tableCode), query)
+      const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
       mergeRowsIntoLookup(map, rowsFromRelationResponse(res), cfg)
       lookups[fieldCode] = map
     } catch (error) {
@@ -170,6 +169,7 @@ export const hydrateRelationLookups = async (
   if (rows.length === 0) return existingLookups
 
   const userStore = useUserStore()
+  const generalizationApi = useGeneralizationApi()
   const tasks = relationLookupFields(fields)
 
   await Promise.all(
@@ -212,7 +212,7 @@ export const hydrateRelationLookups = async (
       }
 
       try {
-        const res = await instance.post(relationEndpoint(tableCode), query)
+        const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
         mergeRowsIntoLookup(lookup, rowsFromRelationResponse(res), linkage)
       } catch (error) {
         console.warn(`补齐关联字段 ${fieldCode} 当前页查找表失败`, error)
@@ -320,6 +320,107 @@ export const buildAllColumnFormats = (
 
 // ─── 高级封装：自动构建列数组 ─────────────────────────
 
+export interface RuntimeColumnOverride<Row extends object> {
+  fieldCode: string
+  label?: string
+  align?: TableColumn<Row>['align']
+  visible?: boolean
+  order?: number
+  format?: TableColumn<Row>['format']
+  style?: TableColumn<Row>['style']
+  classes?: TableColumn<Row>['classes']
+  headerStyle?: string
+  headerClasses?: string
+}
+
+export interface RuntimeVirtualColumn<Row extends object>
+  extends TableColumn<Row> {
+  defaultVisible?: boolean
+  order?: number
+  serverSortField?: string
+}
+
+export interface RuntimeColumnResolution<Row extends object> {
+  columns: TableColumn<Row>[]
+  visibleColumns: string[]
+  advancedFields: TableField[]
+  quickSearchFields: TableField[]
+  formFields: TableField[]
+  detailFields: TableField[]
+  sortableFields: ReadonlySet<string>
+}
+
+export interface RuntimeColumnResolverOptions<Row extends object> {
+  context: FormatContext
+  overrides?: RuntimeColumnOverride<Row>[]
+  virtualColumns?: RuntimeVirtualColumn<Row>[]
+}
+
+/**
+ * 将 Runtime Metadata 的基础字段事实与页面覆盖、虚拟列合成为 QTable 视图模型。
+ * 页面覆盖只能调整显示，元数据未声明可排序的基础字段不会被提升为可排序字段。
+ */
+export const resolveRuntimeColumns = <Row extends object>(
+  fields: TableField[],
+  options: RuntimeColumnResolverOptions<Row>,
+): RuntimeColumnResolution<Row> => {
+  const orderedFields = fields.slice().sort((left, right) => left.sequence - right.sequence)
+  const overrides = new Map(
+    (options.overrides || []).map((override) => [override.fieldCode, override]),
+  )
+  const sortableFields = new Set<string>()
+  const resolved = orderedFields
+    .filter((field) => field.is_list_show)
+    .map((field, index) => {
+      const override = overrides.get(field.field_code)
+      if (field.is_sort) sortableFields.add(field.field_code)
+      const column: TableColumn<Row> & { order: number; defaultVisible: boolean } = {
+        name: field.field_code,
+        label: override?.label || field.field_name,
+        field: field.field_code,
+        align: override?.align || 'left',
+        sortable: field.is_sort,
+        order: override?.order ?? field.sequence ?? index,
+        defaultVisible: override?.visible !== false,
+      }
+      const format = override?.format || buildColumnFormat(field, options.context)
+      if (format) column.format = format
+      if (override?.style) column.style = override.style
+      if (override?.classes) column.classes = override.classes
+      if (override?.headerStyle) column.headerStyle = override.headerStyle
+      if (override?.headerClasses) column.headerClasses = override.headerClasses
+      return column
+    })
+
+  const virtual = (options.virtualColumns || []).map((column, index) => {
+    if (column.serverSortField) sortableFields.add(column.serverSortField)
+    return {
+      ...column,
+      sortable: !!column.serverSortField,
+      order: column.order ?? 10000 + index,
+      defaultVisible: column.defaultVisible !== false,
+    }
+  })
+
+  const combined = [...resolved, ...virtual].sort((left, right) => left.order - right.order)
+  const columns = combined.map((resolvedColumn) => {
+    const { order, defaultVisible, ...column } = resolvedColumn
+    void order
+    void defaultVisible
+    return column
+  })
+
+  return {
+    columns,
+    visibleColumns: combined.filter((column) => column.defaultVisible).map((column) => column.name),
+    advancedFields: orderedFields.filter((field) => field.is_advanced_search),
+    quickSearchFields: orderedFields.filter((field) => field.is_quick_search),
+    formFields: orderedFields.filter((field) => field.is_insert_show || field.is_update_show),
+    detailFields: orderedFields.filter((field) => (field.detail_span || 0) > 0),
+    sortableFields,
+  }
+}
+
 /**
  * 从字段元数据自动构建 QTable columns 数组。
  *
@@ -340,53 +441,23 @@ export const buildTableColumns = (
   ctx: FormatContext,
   /** 自定义 format 覆盖，优先级高于自动推断 */
   customFormats?: Record<string, (val: any, row?: any) => string>,
-): {
-  columns: Array<{
-    name: string
-    label: string
-    field: string
-    sortable: boolean
-    format?: (val: any, row?: any) => string
-    [key: string]: any
-  }>
-  advancedFields: TableField[]
-} => {
-  const columns: Array<any> = []
-  const advancedFields: TableField[] = []
-
-  fields.forEach((field) => {
-    if (field.is_list_show) {
-      const column: any = {
-        name: field.field_code,
-        label: field.field_name,
-        field: field.field_code,
-        sortable: field.is_sort,
-      }
-      // 优先使用自定义 format
-      const custom = customFormats?.[field.field_code]
-      if (custom) {
-        column.format = custom
-      } else {
-        const fmt = buildColumnFormat(field, ctx)
-        if (fmt) {
-          column.format = fmt
-        }
-      }
-      columns.push(column)
-    }
-    if (field.is_advanced_search) {
-      advancedFields.push(field)
-    }
+): { columns: TableColumn<Record<string, any>>[]; advancedFields: TableField[] } => {
+  const overrides = Object.entries(customFormats || {}).map(([fieldCode, format]) => ({
+    fieldCode,
+    format,
+  }))
+  const resolution = resolveRuntimeColumns<Record<string, any>>(fields, {
+    context: ctx,
+    overrides,
+    virtualColumns: [
+      {
+        name: 'actions',
+        align: 'center',
+        label: '操作',
+        field: 'actions',
+        defaultVisible: true,
+      },
+    ],
   })
-
-  // 添加操作列
-  columns.push({
-    name: 'actions',
-    align: 'center',
-    label: '操作',
-    field: 'actions',
-    sortable: false,
-  })
-
-  return { columns, advancedFields }
+  return { columns: resolution.columns, advancedFields: resolution.advancedFields }
 }

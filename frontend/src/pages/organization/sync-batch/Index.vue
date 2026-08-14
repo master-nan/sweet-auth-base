@@ -33,13 +33,15 @@
           <q-space />
           <div class="row q-gutter-xs">
             <q-btn
-              v-for="button in refreshButtons"
-              :key="button.id || button.code"
-              v-bind="menuButtonDisplayProps(button)"
-              :color="button.color || 'primary'"
+              flat
+              dense
+              round
+              icon="refresh"
+              color="primary"
+              aria-label="刷新当前视图"
               :disable="loading"
               @click="fetchData"
-            />
+            ><q-tooltip>刷新当前视图</q-tooltip></q-btn>
           </div>
         </div>
       </template>
@@ -144,6 +146,7 @@ import {
   createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDateTime,
+  formatOrganizationValue,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'
@@ -155,7 +158,7 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 const dictStore = useDictStore()
 const userStore = useUserStore()
 const router = useRouter()
-const { line_buttons, top_buttons } = usePageButtons('organization_sync_batch')
+const { line_buttons } = usePageButtons('organization_sync_batch')
 
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
@@ -173,9 +176,6 @@ const errorLoading = ref(false)
 const errorLoadError = ref('')
 const errorSummary = ref('')
 
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const errorItems = computed<OrganizationDetailItem[]>(() => [
   { label: '错误摘要', value: errorSummary.value, fullWidth: true },
 ])
@@ -207,7 +207,7 @@ const advancedFields = [
 ]
 
 const dictLabel = (code: string, value: unknown) =>
-  dictStore.getDictLabel(code, value) || String(value || '-')
+  dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
 
 const visibleRowButtons = (row?: SyncBatchListItem) => {
   void row

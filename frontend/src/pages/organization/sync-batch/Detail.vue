@@ -86,6 +86,7 @@ import type {
 import {
   createOrganizationQuery,
   formatOrganizationDateTime,
+  formatOrganizationValue,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
@@ -173,7 +174,7 @@ const recordColumns: QTableProps['columns'] = [
 ]
 
 const dictLabel = (code: string, value: unknown) =>
-  dictStore.getDictLabel(code, value) || String(value || '-')
+  dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
 
 const loadDetail = async () => {
   if (!props.recordId) {

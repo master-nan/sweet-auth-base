@@ -168,8 +168,8 @@ func TestOrganizationFoundationRetiresLegacyLegalEntityMenuAndMigratesGrants(t *
 		"role_id = ? AND menu_id = ?",
 		legacyRole.Id,
 		structureMenu.Id,
-	); got != 6 {
-		t.Fatalf("migrated legal page grants = %d, want 6", got)
+	); got != 5 {
+		t.Fatalf("migrated legal page grants = %d, want 5", got)
 	}
 }
 
@@ -441,8 +441,8 @@ func assertOrganizationPermissions(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	allowedActions := map[string]struct{}{
 		"query":       {},
+		"metadata":    {},
 		"detail":      {},
-		"refresh":     {},
 		"bind_user":   {},
 		"unbind_user": {},
 		"view_sync":   {},

@@ -50,6 +50,7 @@ describe('external system API', () => {
       1,
       '/admin/integration/external-system/query',
       query,
+      { headers: { 'X-Skip-Global-Loading': 'true' } },
     )
     expect(getMock).toHaveBeenCalledWith('/admin/integration/external-system/12')
     expect(postMock).toHaveBeenNthCalledWith(

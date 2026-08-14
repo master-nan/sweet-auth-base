@@ -35,3 +35,15 @@ export function resolvePageButtons(menus: Menu[], routeName: string): MenuButton
     .filter(isAvailablePageButton)
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
 }
+
+export const findButtonCapability = (buttons: MenuButton[], code: string) =>
+  buttons.find((button) => isAvailablePageButton(button) && button.code === code)
+
+export const hasButtonCapability = (buttons: MenuButton[], code: string) =>
+  !!findButtonCapability(buttons, code)
+
+export const findButtonActionCapability = (buttons: MenuButton[], action: string) =>
+  buttons.find((button) => isAvailablePageButton(button) && button.event_action === action)
+
+export const hasButtonActionCapability = (buttons: MenuButton[], action: string) =>
+  !!findButtonActionCapability(buttons, action)

@@ -1,5 +1,6 @@
 import type { Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
+import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
 
 export interface GeneralizationListResult {
   data: Array<Record<string, any>>
@@ -23,6 +24,58 @@ export interface GeneralizationDeleteReq {
   id: number
   table_code: string
   menu_id?: number
+}
+
+export type RuntimeActionMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export interface RuntimeActionRequest<TPayload = Record<string, unknown>> {
+  path: string
+  method?: string
+  payload?: TPayload
+  responseType?: AxiosRequestConfig['responseType']
+}
+
+const allowedRuntimeActionMethods = new Set<RuntimeActionMethod>([
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+])
+
+export const assertControlledRuntimePath = (path: string): string => {
+  const value = path.trim()
+  if (!value.startsWith('/admin/') || value.startsWith('//') || value.includes('\\')) {
+    throw new Error('运行时动作路径不合法')
+  }
+  const parsed = new URL(value, 'https://runtime.invalid')
+  if (
+    parsed.origin !== 'https://runtime.invalid' ||
+    !parsed.pathname.startsWith('/admin/') ||
+    parsed.pathname.includes('..')
+  ) {
+    throw new Error('运行时动作路径不合法')
+  }
+  return `${parsed.pathname}${parsed.search}`
+}
+
+export const executeControlledRuntimeAction = async <
+  TResponse = unknown,
+  TPayload = Record<string, unknown>,
+>(request: RuntimeActionRequest<TPayload>): Promise<AxiosResponse<TResponse>> => {
+  const method = String(request.method || 'POST').toUpperCase() as RuntimeActionMethod
+  if (!allowedRuntimeActionMethods.has(method)) {
+    throw new Error('运行时动作方法不受支持')
+  }
+  const path = assertControlledRuntimePath(request.path)
+  const config: AxiosRequestConfig = {
+    url: path,
+    method: method as Method,
+    ...(method === 'GET' ? { params: request.payload } : { data: request.payload }),
+  }
+  if (request.responseType) config.responseType = request.responseType
+  const response = await instance.request(config)
+  return response as AxiosResponse<TResponse>
 }
 
 export const useGeneralizationApi = () => {
@@ -71,5 +124,6 @@ export const useGeneralizationApi = () => {
     createGeneralization,
     updateGeneralization,
     deleteGeneralization,
+    executeRuntimeAction: executeControlledRuntimeAction,
   }
 }

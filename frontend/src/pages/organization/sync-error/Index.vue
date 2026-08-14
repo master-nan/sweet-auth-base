@@ -34,13 +34,15 @@
           <q-space />
           <div class="row q-gutter-xs">
             <q-btn
-              v-for="button in refreshButtons"
-              :key="button.id || button.code"
-              v-bind="menuButtonDisplayProps(button)"
-              :color="button.color || 'primary'"
+              flat
+              dense
+              round
+              icon="refresh"
+              color="primary"
+              aria-label="刷新当前视图"
               :disable="loading"
               @click="fetchData"
-            />
+            ><q-tooltip>刷新当前视图</q-tooltip></q-btn>
           </div>
         </div>
       </template>
@@ -156,6 +158,7 @@ import {
   createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDateTime,
+  formatOrganizationValue,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
@@ -168,7 +171,6 @@ const dictStore = useDictStore()
 const userStore = useUserStore()
 const {
   line_buttons,
-  top_buttons,
   record_detail_top_buttons,
   record_detail_bottom_buttons,
 } = usePageButtons('organization_sync_error')
@@ -197,9 +199,6 @@ const showErrorDialog = ref(false)
 const errorLoading = ref(false)
 const errorLoadError = ref('')
 
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const objectTypeOptions = [
   { label: '法人主体', value: 'legal_entity' },
   { label: '组织单元', value: 'org_unit' },
@@ -241,7 +240,7 @@ const advancedFields = [
 ]
 
 const dictLabel = (code: string, value: unknown) =>
-  dictStore.getDictLabel(code, value) || String(value || '-')
+  dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
 
 const visibleRowButtons = (row?: SyncRecordListItem) => {
   void row

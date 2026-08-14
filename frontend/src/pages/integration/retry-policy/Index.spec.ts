@@ -18,6 +18,7 @@ const buttons = vi.hoisted(() => ({
 }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
 vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true) }) }))
@@ -32,6 +33,7 @@ import RetryPolicyPage from './Index.vue'
 import type { RetryPolicyListItem } from 'src/api/services/integration'
 
 const SlotStub = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
+const ToolbarStub = defineComponent({ setup(_, { slots }) { return () => h('div', Object.values(slots).flatMap((slot) => slot?.() || [])) } })
 const TableStub = defineComponent({
   props: { rows: { type: Array, default: () => [] } },
   setup(props, { slots }) { return () => h('section', { 'data-testid': 'table', 'data-row-count': props.rows.length }, [slots.top?.(), slots.bottom?.()]) },
@@ -39,7 +41,7 @@ const TableStub = defineComponent({
 const mountPage = () => shallowMount(RetryPolicyPage, { global: { plugins: [createPinia()], stubs: {
   BaseContent: SlotStub, QTable: TableStub, QInput: true, QSelect: true, QBtn: true, QIcon: true, QSpace: true,
   QBadge: true, QTooltip: true, QChip: true, QTd: SlotStub, TablePagination: true, AdvancedQuery: true,
-  RetryPolicyFormDialog: true, RetryPolicyDetailDialog: true,
+  RetryPolicyFormDialog: true, RetryPolicyDetailDialog: true, StandardTableToolbar: ToolbarStub, StatusChip: true,
 } } })
 const row: RetryPolicyListItem = { id: 91, policy_code: 'hr_retry', policy_name: 'HR 重试', version: 1, status: 'draft', max_attempts: 3, backoff_type: 'exponential', initial_delay_ms: 5000, max_delay_ms: 300000, retry_window_ms: 86400000, revision: 1, gmt_modify: '' }
 
@@ -48,7 +50,7 @@ describe('retry policy management page', () => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     apiMocks.queryRetryPolicies.mockResolvedValue({ data: [row], total: 1 })
-    tableApiMocks.queryTableByCode.mockResolvedValue({ data: { table_fields: [] } })
+    tableApiMocks.queryTableByCode.mockResolvedValue({ success: true, data: { table_fields: [] } })
   })
 
   it('loads metadata and the policy page through the dynamic permission surface', async () => {

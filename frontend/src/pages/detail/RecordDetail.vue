@@ -179,17 +179,16 @@ import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
 import OrganizationSyncBatchDetail from 'src/pages/organization/sync-batch/Detail.vue'
-import { instance } from 'boot/axios'
 import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import { useFileApi } from 'src/api/services/file'
 import { useGeneralizationApi } from 'src/api/services/generalization'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import {
-  useTableApi,
   type RuntimeTableMetadata,
   type TableField,
 } from 'src/api/services/sys-table'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useDictStore } from 'src/stores/dict'
 import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
 import { useTagViewStore } from 'src/stores/tagView'
@@ -208,7 +207,7 @@ import {
   findMenuPathByTableCode,
   findMenuTrailById,
 } from 'src/utils/menu-context'
-import { isPageButton } from 'src/utils/menu-button'
+import { hasButtonActionCapability, isAvailablePageButton } from 'src/utils/menu-button'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import {
   evaluateButtonDisabled,
@@ -252,7 +251,6 @@ const { confirmAction } = useConfirmDialog($q)
 const accessLogApi = useAccessLogApi()
 const fileApi = useFileApi()
 const generalizationApi = useGeneralizationApi()
-const tableApi = useTableApi()
 const dictStore = useDictStore()
 const breadcrumbsStore = useBreadcrumbsStore()
 const tagViewStore = useTagViewStore()
@@ -274,6 +272,12 @@ const pendingDetailButton = ref<MenuButton | null>(null)
 const source = computed(() => String(route.params.source || 'generalization'))
 const tableCode = computed(() => String(route.params.table_code || ''))
 const recordId = computed(() => Number(route.params.id || 0))
+const {
+  metadata: runtimeMetadata,
+  fields: runtimeFields,
+  metadataError,
+  loadMetadata,
+} = useRuntimeTableMetadata(tableCode)
 
 const isAudit = computed(() => source.value === 'audit' || tableCode.value === 'access_log')
 const isOrganizationSyncBatch = computed(
@@ -301,13 +305,13 @@ const sourceLabel = computed(() => tableName.value || tableCode.value)
 
 const detailMenuButtons = computed(() =>
   (currentMenu.value?.menu_buttons || [])
-    .filter(isPageButton)
+    .filter(isAvailablePageButton)
     .slice()
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0)),
 )
 
 const canLoadRecordDetail = computed(() =>
-  detailMenuButtons.value.some((button) => button.event_action === 'detail'),
+  hasButtonActionCapability(detailMenuButtons.value, 'detail'),
 )
 
 const detailTopButtons = computed(() =>
@@ -425,7 +429,10 @@ function defaultFormat(value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'object') return stringifyValue(value)
-  return String(value)
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
+    return String(value)
+  }
+  return '-'
 }
 
 function stringifyValue(value: unknown) {
@@ -447,7 +454,7 @@ function stringifyValue(value: unknown) {
   try {
     return JSON.stringify(value, null, 2)
   } catch {
-    return String(value)
+    return '-'
   }
 }
 
@@ -577,13 +584,13 @@ async function loadAuditDetail() {
 }
 
 async function loadGeneralizationDetail() {
-  const tableResponse = await tableApi.queryTableByCode(tableCode.value)
-  if (!tableResponse.success || !tableResponse.data) {
-    throw new Error(tableResponse.message || '加载表元数据失败')
+  const loadedMetadata = await loadMetadata()
+  if (!loadedMetadata || !runtimeMetadata.value) {
+    throw new Error(metadataError.value || '加载表元数据失败')
   }
 
-  table.value = tableResponse.data
-  tableFields.value = tableResponse.data.table_fields || []
+  table.value = runtimeMetadata.value
+  tableFields.value = runtimeFields.value
   const dictCodes = tableFields.value
     .map((field) => field.dict_code)
     .filter((code): code is string => !!code)
@@ -648,7 +655,11 @@ function interpolateDetailActionPath(path: string) {
         : key === 'table_code' || key === 'tableCode' || key === 'code'
           ? tableCode.value
           : readRecordValue(key)
-    return encodeURIComponent(value === undefined || value === null ? '' : String(value))
+    const pathValue =
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint'
+        ? String(value)
+        : ''
+    return encodeURIComponent(pathValue)
   })
 }
 
@@ -661,10 +672,10 @@ async function executeDetailApi(button: MenuButton, params?: Record<string, any>
     row: record.value,
     params: params || {},
   }
-  await instance.request({
-    url: interpolateDetailActionPath(button.api_path),
+  await generalizationApi.executeRuntimeAction({
+    path: interpolateDetailActionPath(button.api_path),
     method,
-    ...(method === 'GET' ? { params: payload } : { data: payload }),
+    payload,
   })
 }
 

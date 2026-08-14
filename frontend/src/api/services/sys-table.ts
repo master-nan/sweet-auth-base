@@ -1,4 +1,5 @@
 import { instance } from 'boot/axios'
+import { localLoadingRequestConfig } from 'src/api/request-config'
 // import qs from 'qs'
 import type { Basic, Query, ResponseData } from 'src/types/global'
 import type {
@@ -212,9 +213,12 @@ export const useTableApi = () => {
   }
 
   const queryTableByCode = async (code: string) => {
-    return instance.get<ResponseData<RuntimeTableMetadata>>(`/admin/table/code/${code}`).then((res) => {
-      return res.data
-    })
+    return instance
+      .get<ResponseData<RuntimeTableMetadata>>(
+        `/admin/table/code/${code}`,
+        localLoadingRequestConfig,
+      )
+      .then((res) => res.data)
   }
 
   const createTable = async (req: TableCreateReq) => {

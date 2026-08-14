@@ -48,18 +48,16 @@
             </q-select>
 
             <q-btn
-              v-for="button in refreshButtons"
-              :key="button.id || button.code"
-              :icon="button.icon || 'refresh'"
-              :aria-label="button.name"
+              icon="refresh"
+              aria-label="刷新当前视图"
               round
               flat
               dense
-              :color="button.color || 'primary'"
+              color="primary"
               :loading="treeLoading || structureLoading"
               @click="refreshPage"
             >
-              <q-tooltip>{{ button.name }}</q-tooltip>
+              <q-tooltip>刷新当前视图</q-tooltip>
             </q-btn>
           </div>
         </q-card-section>
@@ -207,7 +205,6 @@ import {
   type OrgUnitDetail,
   type StructureOrgTreeNode,
 } from 'src/api/services/org'
-import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
 
 type ArchitectureMode = 'management' | 'legal'
@@ -222,7 +219,6 @@ interface SelectionSummary {
 }
 
 const dictStore = useDictStore()
-const { top_buttons } = usePageButtons('organization_structure')
 
 const architectureMode = ref<ArchitectureMode>('management')
 const structures = ref<OrganizationStructure[]>([])
@@ -252,9 +248,6 @@ const selectedStructure = computed(
   () => structures.value.find((item) => item.code === selectedStructureCode.value) || null,
 )
 const showStructureSwitcher = computed(() => structures.value.length > 1)
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const pageError = computed(() => structureError.value || treeError.value)
 const filteredLegalTree = computed(() =>
   filterLegalEntityTree(legalTree.value, treeKeyword.value),

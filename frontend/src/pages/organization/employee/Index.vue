@@ -34,13 +34,15 @@
           <q-space />
           <div class="row q-gutter-xs">
             <q-btn
-              v-for="button in refreshButtons"
-              :key="button.id || button.code"
-              v-bind="menuButtonDisplayProps(button)"
-              :color="button.color || 'primary'"
+              flat
+              dense
+              round
+              icon="refresh"
+              color="primary"
+              aria-label="刷新当前视图"
               :disable="loading"
               @click="fetchData"
-            />
+            ><q-tooltip>刷新当前视图</q-tooltip></q-btn>
           </div>
         </div>
       </template>
@@ -268,6 +270,7 @@ import {
   createOrganizationQuery,
   formatOrganizationDate,
   formatOrganizationDateTime,
+  formatOrganizationValue,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 
@@ -278,7 +281,6 @@ const dictStore = useDictStore()
 const userStore = useUserStore()
 const {
   line_buttons,
-  top_buttons,
   record_detail_top_buttons,
   record_detail_bottom_buttons,
 } = usePageButtons('organization_employee')
@@ -316,9 +318,6 @@ const bindingUserPage = ref(1)
 const bindingUserTotal = ref(0)
 let bindingUserRequestId = 0
 
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const columns: QTableProps['columns'] = [
   { name: 'employee_no', field: 'employee_no', label: '员工编号', align: 'left', sortable: true },
   { name: 'name', field: 'name', label: '姓名', align: 'left', sortable: true },
@@ -381,7 +380,7 @@ const advancedFields = [
 ]
 
 const dictLabel = (code: string, value: unknown) =>
-  dictStore.getDictLabel(code, value) || String(value || '-')
+  dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
 
 const employeeDetailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = employeeDetail.value

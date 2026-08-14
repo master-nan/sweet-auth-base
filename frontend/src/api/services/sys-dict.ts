@@ -1,4 +1,5 @@
 import { instance } from 'boot/axios'
+import { localLoadingRequestConfig } from 'src/api/request-config'
 import type { Basic, Query, ResponseData } from 'src/types/global'
 
 export interface Dict extends Basic {
@@ -49,9 +50,9 @@ export const useDictApi = () => {
   }
 
   const queryDictByCode = async (code: string) => {
-    return instance.get<ResponseData<Dict>>(`/admin/dict/code/${code}`).then((res) => {
-      return res.data
-    })
+    return instance
+      .get<ResponseData<Dict>>(`/admin/dict/code/${code}`, localLoadingRequestConfig)
+      .then((res) => res.data)
   }
 
   const createDict = async (req: DictCreateReq) => {

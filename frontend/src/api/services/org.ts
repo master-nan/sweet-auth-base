@@ -575,6 +575,7 @@ export const queryPositions = async (
   const response = await instance.post<ResponseData<PositionListItem[]>>(
     '/admin/org/position/query',
     request,
+    organizationReadRequestConfig,
   )
   return listResult(response.data)
 }

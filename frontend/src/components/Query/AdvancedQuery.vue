@@ -234,7 +234,7 @@ import {
 import type { Query, QueryRule } from 'src/types/global'
 import { useDictStore } from 'src/stores/dict'
 import { useUserStore } from 'src/stores/user'
-import { instance } from 'boot/axios'
+import { useGeneralizationApi } from 'src/api/services/generalization'
 import {
   coerceFieldValue,
   isBooleanFieldMetadata,
@@ -258,6 +258,7 @@ const $q = useQuasar()
 const form = ref<QForm>()
 const dictStore = useDictStore()
 const userStore = useUserStore()
+const generalizationApi = useGeneralizationApi()
 
 type FieldRecord = Record<string, any> & Partial<TableField>
 type RelationOption = {
@@ -418,6 +419,7 @@ const updateRuleField = (rule: QueryRule, fieldCode: unknown) => {
     rule.value = null
     return
   }
+  if (typeof fieldCode !== 'string' && typeof fieldCode !== 'number') return
   const field = findField(String(fieldCode))
   if (field?.field_type !== undefined) {
     rule.type = field.field_type
@@ -668,10 +670,8 @@ const relationValueKeyForFilter = (linkage: ReturnType<typeof parseLinkageConfig
   return String(linkage?.valueKey || 'id').trim() || 'id'
 }
 
-const relationEndpoint = (tableCode: string) => `/admin/generalization/query/code/${tableCode}`
-
 const rowsFromRelationResponse = (response: any): Array<Record<string, any>> => {
-  const rawRows = response?.data?.data
+  const rawRows = response?.data
   return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
 }
 
@@ -777,7 +777,7 @@ const loadSelectedRelationOptionsForField = async (
     query.menu_id = menuId
   }
 
-  const res = await instance.post(relationEndpoint(tableCode), query)
+  const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
   return buildRelationOptionsFromRows(rowsFromRelationResponse(res), field, linkage)
 }
 
@@ -827,7 +827,7 @@ const loadRelationOptionsForField = async (
     if (menuId > 0) {
       query.menu_id = menuId
     }
-    const res = await instance.post(relationEndpoint(tableCode), query)
+    const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
     const rows = rowsFromRelationResponse(res)
     const incomingOptions = buildRelationOptionsFromRows(rows, field, linkage)
     const cachedSelectedOptions = append

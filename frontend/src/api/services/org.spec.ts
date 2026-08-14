@@ -375,11 +375,16 @@ describe('organization remaining read-only pages API', () => {
     expect(getMock).toHaveBeenCalledWith('/admin/org/employee/21/assignments/summary', {
       params: { as_of_date: '2026-07-29' },
     })
-    expect(postMock).toHaveBeenNthCalledWith(3, '/admin/org/position/query', {
-      page: 1,
-      num: 20,
-      expressions: [],
-    })
+    expect(postMock).toHaveBeenNthCalledWith(
+      3,
+      '/admin/org/position/query',
+      {
+        page: 1,
+        num: 20,
+        expressions: [],
+      },
+      { headers: { 'X-Skip-Global-Loading': 'true' } },
+    )
     expect(getMock).toHaveBeenCalledWith('/admin/org/position/31')
   })
 

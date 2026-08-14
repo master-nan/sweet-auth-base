@@ -1,5 +1,6 @@
 import type { Basic, Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
+import { localLoadingRequestConfig } from 'src/api/request-config'
 
 export interface Application extends Basic {
   name: string
@@ -38,11 +39,12 @@ export interface ApplicationSecretRes {
 
 export const useApplicationApi = () => {
   const queryApplication = async (params: Query) => {
-    return instance
-      .post<ResponseData<Array<Application>>>('/admin/application/query', params)
-      .then((res) => {
-        return res.data
-      })
+    const response = await instance.post<ResponseData<Array<Application>>>(
+      '/admin/application/query',
+      params,
+      localLoadingRequestConfig,
+    )
+    return response.data
   }
 
   const queryApplicationById = (id: number) => {

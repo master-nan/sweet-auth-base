@@ -1565,14 +1565,32 @@ func seedAuditMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName
 	buttons := []model.SysMenuButton{
 		menuButtonWithAPI(409, menuID, "查询", "system_audit_query", enum.Top, "query", "search", "primary", 1, "/admin/log/access/query", "POST"),
 		menuButtonWithAPI(410, menuID, "详情", "system_audit_detail", enum.Line, "detail", "visibility", "primary", 1, "/admin/log/access/:id", "GET"),
-		menuButton(493, menuID, "刷新详情", "system_audit_detail_refresh", enum.DetailTop, "refresh", "refresh", "primary", 1),
 	}
 	for _, button := range buttons {
 		if err := seedMenuButton(db, sf, roleID, roleName, button); err != nil {
 			return err
 		}
 	}
-	return nil
+	return removeMenuButtonsByCode(db, []string{"system_audit_detail_refresh"})
+}
+
+func removeMenuButtonsByCode(db *gorm.DB, codes []string) error {
+	if len(codes) == 0 {
+		return nil
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var buttonIDs []int
+		if err := tx.Model(&model.SysMenuButton{}).Where("code IN ?", codes).Pluck("id", &buttonIDs).Error; err != nil {
+			return err
+		}
+		if len(buttonIDs) == 0 {
+			return nil
+		}
+		if err := tx.Unscoped().Where("button_id IN ?", buttonIDs).Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+			return err
+		}
+		return tx.Unscoped().Where("id IN ?", buttonIDs).Delete(&model.SysMenuButton{}).Error
+	})
 }
 
 func seedReportCenterMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
@@ -1812,7 +1830,6 @@ func seedLowCodeMenuButtonTemplates(db *gorm.DB, sf *utils.Snowflake) error {
 	templates := []model.SysMenuButtonTemplate{
 		apiPermissionTemplate(600, "列表查询", "_query", enum.Top, "query", "search", "primary", 0, "/admin/generalization/query/code/:code", "POST"),
 		buttonTemplate(601, "新增", "_create", enum.Top, "create", "add", "primary", 1),
-		buttonTemplate(602, "刷新", "_refresh", enum.Top, "refresh", "refresh", "primary", 2),
 		buttonTemplate(603, "详情", "_detail", enum.Line, "detail", "visibility", "primary", 0),
 		buttonTemplate(604, "编辑", "_update", enum.Line, "update", "edit", "primary", 1),
 		buttonTemplate(605, "删除", "_delete", enum.Line, "delete", "delete", "negative", 2),
@@ -1822,22 +1839,53 @@ func seedLowCodeMenuButtonTemplates(db *gorm.DB, sf *utils.Snowflake) error {
 	templates[1].Path = "/admin/generalization/create"
 	templates[1].Method = "POST"
 	templates[1].AfterHooks = `["refresh"]`
-	templates[4].Path = "/admin/generalization/update"
-	templates[4].Method = "PUT"
-	templates[5].Path = "/admin/generalization/delete"
+	templates[3].Path = "/admin/generalization/update"
+	templates[3].Method = "PUT"
+	templates[4].Path = "/admin/generalization/delete"
+	templates[4].Method = "DELETE"
+	templates[4].ConfirmText = "确定要删除该数据吗？"
+	templates[5].Path = "/admin/generalization/batch-delete"
 	templates[5].Method = "DELETE"
-	templates[5].ConfirmText = "确定要删除该数据吗？"
-	templates[6].Path = "/admin/generalization/batch-delete"
-	templates[6].Method = "DELETE"
-	templates[6].ConfirmText = "确定要批量删除选中的数据吗？"
-	templates[7].Path = "/admin/generalization/export"
-	templates[7].Method = "POST"
+	templates[5].ConfirmText = "确定要批量删除选中的数据吗？"
+	templates[6].Path = "/admin/generalization/export"
+	templates[6].Method = "POST"
 	for _, template := range templates {
 		if err := seedLowCodeMenuButtonTemplate(db, sf, template); err != nil {
 			return err
 		}
 	}
-	return disableLowCodeFileButtonTemplates(db)
+	if err := disableLowCodeFileButtonTemplates(db); err != nil {
+		return err
+	}
+	return removeLowCodeViewRefreshConfiguration(db)
+}
+
+func removeLowCodeViewRefreshConfiguration(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var buttonIDs []int
+		if err := tx.Table("sys_menu_button AS button").
+			Select("button.id").
+			Joins("JOIN sys_menu AS menu ON menu.id = button.menu_id AND menu.gmt_delete IS NULL").
+			Where("menu.page_type = ?", enum.MenuPageTypeLowCode).
+			Where("button.event_action = ? AND button.path = ?", "refresh", "").
+			Where("button.gmt_delete IS NULL").
+			Scan(&buttonIDs).Error; err != nil {
+			return err
+		}
+		if len(buttonIDs) > 0 {
+			if err := tx.Unscoped().Where("button_id IN ?", buttonIDs).
+				Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Unscoped().Where("id IN ?", buttonIDs).
+				Delete(&model.SysMenuButton{}).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Unscoped().
+			Where("scene = ? AND code_suffix = ? AND event_action = ?", lowCodeCrudButtonTemplateScene, "_refresh", "refresh").
+			Delete(&model.SysMenuButtonTemplate{}).Error
+	})
 }
 
 func disableLowCodeFileButtonTemplates(db *gorm.DB) error {

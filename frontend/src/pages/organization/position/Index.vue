@@ -9,15 +9,16 @@
       row-key="id"
       :rows="rows"
       :columns="columns"
+      :visible-columns="visibleColumns"
       :loading="loading"
-      :pagination="{ rowsPerPage: 0 }"
+      v-model:pagination="pagination"
       hide-pagination
     >
       <template #top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               dense
               outlined
               debounce="300"
@@ -27,22 +28,34 @@
               <template #append><q-icon name="search" /></template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
-            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
+          </template>
+          <template #advanced-trigger>
+            <q-btn
+              outline
+              color="primary"
+              icon="tune"
+              aria-label="高级查询"
+              @click="openAdvancedQuery"
+            >
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
-          </div>
-          <q-space />
-          <div class="row q-gutter-xs">
-            <q-btn
-              v-for="button in refreshButtons"
-              :key="button.id || button.code"
-              v-bind="menuButtonDisplayProps(button)"
-              :color="button.color || 'primary'"
-              :disable="loading"
-              @click="fetchData"
+          </template>
+          <template #column-selector>
+            <q-select
+              v-model="visibleColumns"
+              multiple
+              outlined
+              dense
+              options-dense
+              emit-value
+              map-options
+              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
+              :options="columns"
+              option-value="name"
+              options-cover
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-position_type="props">
@@ -52,9 +65,10 @@
       </template>
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip dense square outline :color="organizationStatusColor(props.row.status)">
-            {{ dictLabel('org_object_status', props.row.status) }}
-          </q-chip>
+          <status-chip
+            :color="organizationStatusColor(props.row.status)"
+            :label="dictLabel('org_object_status', props.row.status)"
+          />
         </q-td>
       </template>
       <template #body-cell-validity="props">
@@ -84,7 +98,7 @@
       </template>
       <template #no-data>
         <div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ loadError || '暂无岗位数据' }}
+          {{ emptyMessage }}
         </div>
       </template>
       <template #bottom>
@@ -125,13 +139,13 @@
 <script setup lang="ts">
 defineOptions({ name: 'organization_position' })
 
-import cloneDeep from 'lodash/cloneDeep'
 import { computed, onMounted, ref, watch } from 'vue'
-import type { QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   getPositionDetail,
   queryPositions,
@@ -141,27 +155,32 @@ import {
 } from 'src/api/services/org'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
-  createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDate,
+  formatOrganizationValue,
   organizationStatusColor,
   referenceLabel,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
 import { useUserStore } from 'src/stores/user'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { resolveRuntimeColumns } from 'src/utils/column-format'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import type { TableColumn } from 'src/types/global'
+import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const router = useRouter()
 const dictStore = useDictStore()
 const userStore = useUserStore()
 const {
   line_buttons,
-  top_buttons,
+  has_line_buttons,
   record_detail_top_buttons,
   record_detail_bottom_buttons,
 } = usePageButtons('organization_position')
@@ -172,58 +191,41 @@ const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
 const canQueryPositions = computed(() => userStore.buttons.includes('organization_position_query'))
-const query = ref<PositionQueryRequest>({
-  ...createOrganizationQuery('org_position'),
-  only_effective: true,
+const canLoadPositionMetadata = computed(() =>
+  userStore.buttons.includes('organization_position_metadata'),
+)
+const queryState = useTableQueryState<PositionQueryRequest>({
+  createInitialQuery: () => ({
+    ...createOrganizationQuery('org_position'),
+    only_effective: true,
+  }),
 })
-const tempAdvancedQuery = ref<PositionQueryRequest>(cloneDeep(query.value))
+const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
 const showAdvancedQuery = ref(false)
 const showDetailDialog = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const positionDetail = ref<PositionDetail | null>(null)
 
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const rowButtons = computed(() =>
   line_buttons.value.filter((button) => button.event_action === 'detail'),
 )
-const columns: QTableProps['columns'] = [
-  { name: 'code', field: 'code', label: '岗位编码', align: 'left', sortable: true },
-  { name: 'name', field: 'name', label: '岗位名称', align: 'left', sortable: true },
-  { name: 'position_type', field: 'position_type', label: '岗位类型', align: 'center' },
-  { name: 'job_level', field: 'job_level', label: '职级', align: 'left' },
-  {
-    name: 'is_manager_position',
-    field: 'is_manager_position',
-    label: '管理岗位',
-    align: 'center',
-  },
-  { name: 'status', field: 'status', label: '状态', align: 'center' },
-  { name: 'validity', field: 'validity', label: '有效期', align: 'left' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
-]
-
-const advancedFields = [
-  createOrganizationField('岗位编码', 'code'),
-  createOrganizationField('岗位名称', 'name'),
-  createOrganizationField('岗位类型', 'position_type', SysTableFieldType.VARCHAR, {
-    inputType: SysTableFieldInputType.SELECT,
-    dictCode: 'org_position_type',
+const columns = ref<TableColumn<PositionListItem>[]>([])
+const visibleColumns = ref<string[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
+const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: false })
+const { fields: metadataFields, advancedSearchFields: advancedFields, loadMetadata } =
+  useRuntimeTableMetadata('org_position')
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: canQueryPositions.value,
+    error: loadError.value,
+    hasQuery: !!keyword.value,
   }),
-  createOrganizationField('职级', 'job_level'),
-  createOrganizationField('管理岗位', 'is_manager_position', SysTableFieldType.BOOLEAN, {
-    inputType: SysTableFieldInputType.BOOLEAN,
-  }),
-  createOrganizationField('状态', 'status', SysTableFieldType.VARCHAR, {
-    inputType: SysTableFieldInputType.SELECT,
-    dictCode: 'org_object_status',
-  }),
-]
+)
 
 const dictLabel = (code: string, value: unknown) =>
-  dictStore.getDictLabel(code, value) || String(value || '-')
+  dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
 
 const detailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = positionDetail.value
@@ -271,17 +273,18 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
 })
 
 const search = () => {
+  queryState.submitQuickSearch()
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
 }
 
 const openAdvancedQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
+  queryState.beginAdvancedEdit()
   showAdvancedQuery.value = true
 }
 
 const applyAdvancedQuery = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   showAdvancedQuery.value = false
   search()
 }
@@ -340,8 +343,36 @@ watch(
   () => void fetchData(),
 )
 
+watch(
+  () => [pagination.value.sortBy, pagination.value.descending] as const,
+  ([sortBy, descending], previous) => {
+    if (sortBy === previous[0] && descending === previous[1]) return
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
+    void fetchData()
+  },
+)
+
 onMounted(async () => {
-  await dictStore.loadDicts(['org_position_type', 'org_object_status'])
+  await Promise.all([
+    dictStore.loadDicts(['org_position_type', 'org_object_status']),
+    canLoadPositionMetadata.value ? loadMetadata() : Promise.resolve(null),
+  ])
+  const resolution = resolveRuntimeColumns<PositionListItem>(metadataFields.value, {
+    context: { getDictLabel: dictStore.getDictLabel },
+    overrides: [
+      { fieldCode: 'org_unit_id', visible: false },
+      { fieldCode: 'position_type', align: 'center' },
+      { fieldCode: 'is_manager_position', align: 'center' },
+      { fieldCode: 'status', align: 'center' },
+    ],
+    virtualColumns: [
+      { name: 'validity', field: 'validity', label: '有效期', order: 90 },
+      { name: 'actions', field: 'actions', label: '操作', align: 'center', order: 100, defaultVisible: has_line_buttons.value },
+    ],
+  })
+  columns.value = resolution.columns
+  visibleColumns.value = resolution.visibleColumns
+  sortableFields.value = resolution.sortableFields
   await fetchData()
 })
 </script>

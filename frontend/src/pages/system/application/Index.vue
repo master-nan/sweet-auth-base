@@ -17,8 +17,8 @@
       :loading="loading"
     >
       <template v-slot:top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
               dense
               outlined
@@ -31,6 +31,8 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select
               v-model="visibleColumns"
               multiple
@@ -44,6 +46,8 @@
               option-value="name"
               options-cover
             ></q-select>
+          </template>
+          <template #advanced-trigger>
             <q-btn
               outline
               icon="tune"
@@ -65,11 +69,8 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
-
-          <q-space />
-
-          <div class="row q-gutter-xs">
+          </template>
+          <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
               :key="btn.id"
@@ -78,8 +79,8 @@
               :disable="loading"
               @click="handleButtonClick(btn)"
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template v-slot:body-cell-actions="props">
@@ -101,6 +102,9 @@
       <template v-slot:bottom>
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
+      </template>
+      <template #no-data>
+        <div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div>
       </template>
     </q-table>
 
@@ -181,37 +185,38 @@
 defineOptions({ name: 'system_application' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
 import { ref, computed, watch, onMounted } from 'vue'
-import { copyToClipboard, type QTableProps, useQuasar } from 'quasar'
+import { copyToClipboard, useQuasar } from 'quasar'
 import {
   useApplicationApi,
   type Application,
   type ApplicationSecretRes,
 } from 'src/api/services/application'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import cloneDeep from 'lodash/cloneDeep'
 import { useDictStore } from 'src/stores/dict'
-import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
+import { buildRelationLookups, resolveRuntimeColumns } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import type { TableColumn } from 'src/types/global'
 
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 const dictStore = useDictStore()
 
 const $q = useQuasar()
 const { confirmAction, confirmDanger } = useConfirmDialog($q)
 const applicationApi = useApplicationApi()
-const tableApi = useTableApi()
 const rows = ref<Application[]>([])
 const total = ref(0)
 const selected = ref([])
@@ -219,7 +224,7 @@ const showAdvancedQuery = ref(false)
 
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('system_application')
 
-const action_handlers: Record<string, (row?: Application) => void> = {
+const action_handlers: PageActionHandlers<Application> = {
   create: () => openAddDialog(),
   update: (row) => {
     if (row) openEditDialog(row)
@@ -229,8 +234,7 @@ const action_handlers: Record<string, (row?: Application) => void> = {
 }
 
 const handleButtonClick = (btn: MenuButton, row?: Application) => {
-  const handler = action_handlers[btn.event_action]
-  if (handler) handler(row)
+  dispatchPageAction(btn, action_handlers, row)
 }
 
 // 表单对话框相关
@@ -241,9 +245,15 @@ const applicationSecretValue = ref<ApplicationSecretRes | null>(null)
 let applicationSecretClearTimer: ReturnType<typeof setTimeout> | null = null
 
 // 表格列定义
-const columns = ref<QTableProps['columns']>([])
-const table_fields_advanced = ref<TableField[]>([])
+const columns = ref<TableColumn<Application>[]>([])
 const visibleColumns = ref<string[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
+const {
+  fields: metadataFields,
+  advancedSearchFields: table_fields_advanced,
+  formFields: tableFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('application')
 
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
@@ -258,32 +268,32 @@ const emptyAdvancedQuery = (): Query => ({
 })
 
 // 查询参数
-const query = ref<Query>({
-  page: 1,
-  num: 15,
-  order: {
-    field: '',
-    is_asc: false,
-  },
-  table_code: 'application',
-  expressions: emptyAdvancedQuery().expressions,
-  quick_query: {
-    keyword: '',
-  },
-  include_deleted: false,
+const queryState = useTableQueryState<Query>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: '', is_asc: false },
+    table_code: 'application',
+    expressions: emptyAdvancedQuery().expressions,
+    quick_query: { keyword: '' },
+    include_deleted: false,
+  }),
+  createEmptyExpressions: () => emptyAdvancedQuery().expressions,
 })
-
-// 临时高级查询条件（在对话框中编辑但未应用）
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-
-// 跟踪已应用的高级查询条件
-const appliedAdvancedQuery = ref(cloneDeep(emptyAdvancedQuery()))
+const { query, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 // 判断是否存在已应用的高级查询条件
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 
 // 计算活跃的筛选条件数量
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!query.value.quick_query?.keyword || activeFilterCount.value > 0,
+  }),
+)
 
 const pagination = ref({
   page: query.value.page,
@@ -292,12 +302,9 @@ const pagination = ref({
   descending: true,
 })
 
-// 保存查询到的表字段，供表单使用
-const tableFields = ref<TableField[]>([])
-
 // 初始化临时查询
 const initTempQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
+  queryState.beginAdvancedEdit()
 }
 
 const resetToFirstPageOrFetch = () => {
@@ -311,26 +318,14 @@ const resetToFirstPageOrFetch = () => {
 // 基础查询处理
 const handleBasicSearch = () => {
   // 基本查询时重置高级查询部分，保留基本的关键字查询
-  query.value.expressions = emptyAdvancedQuery().expressions
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.submitQuickSearch()
   resetToFirstPageOrFetch()
 }
 
 // 高级查询处理
 const handleAdvancedSearch = () => {
   // 应用临时查询条件到实际查询
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-
-  // 更新已应用的高级查询状态
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
 
   resetToFirstPageOrFetch()
   showAdvancedQuery.value = false
@@ -338,32 +333,42 @@ const handleAdvancedSearch = () => {
 
 // 获取应用列表数据
 const fetchData = async () => {
-  const res = await applicationApi.queryApplication(query.value)
-  rows.value = res.data
-  total.value = res.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await applicationApi.queryApplication(query.value)
+    rows.value = res.data
+    total.value = res.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '应用列表加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 // 获取表结构信息
 const fetchTableFields = async () => {
-  const res = await tableApi.queryTableByCode('application')
-  if (res.data && res.data.table_fields) {
-    tableFields.value = res.data.table_fields
-    const dictCodes = res.data.table_fields.map((f) => f.dict_code).filter((c): c is string => !!c)
+  if (await loadMetadata()) {
+    const dictCodes = metadataFields.value.map((f) => f.dict_code).filter((c): c is string => !!c)
     const [, relationLookups] = await Promise.all([
       dictStore.loadDicts(dictCodes),
-      buildRelationLookups(res.data.table_fields),
+      buildRelationLookups(metadataFields.value),
     ])
 
-    const { columns: cols, advancedFields } = buildTableColumns(res.data.table_fields, {
-      getDictLabel: dictStore.getDictLabel,
-      relationLookups,
+    const resolution = resolveRuntimeColumns<Application>(metadataFields.value, {
+      context: { getDictLabel: dictStore.getDictLabel, relationLookups },
+      virtualColumns: [
+        {
+          name: 'actions', label: '操作', field: 'actions', align: 'center', order: 100,
+          defaultVisible: has_line_buttons.value,
+        },
+      ],
     })
-    columns.value = cols
-    table_fields_advanced.value = advancedFields
-    visibleColumns.value = cols.map((c) => c.name)
-    if (!has_line_buttons.value) {
-      visibleColumns.value = visibleColumns.value.filter((c) => c !== 'actions')
-    }
+    columns.value = resolution.columns
+    visibleColumns.value = resolution.visibleColumns
+    sortableFields.value = resolution.sortableFields
     await fetchData()
   }
 }
@@ -393,9 +398,7 @@ watch(
     if (sortBy === prevSortBy && descending === prevDescending) return
 
     // 同步排序到 query.order
-    query.value.order = query.value.order ?? { field: '', is_asc: false }
-    query.value.order.field = sortBy || ''
-    query.value.order.is_asc = sortBy ? !descending : false
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
 
     // 排序变化时，自动回到第1页
     if (query.value.page !== 1) {

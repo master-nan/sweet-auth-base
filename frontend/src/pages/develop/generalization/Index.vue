@@ -629,7 +629,6 @@ import {
   hydrateRelationLookups,
   type LookupMap,
 } from 'src/utils/column-format'
-import { instance } from 'boot/axios'
 import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 import { findMenuById, findMenuByTableCode, toPositiveMenuId } from 'src/utils/menu-context'
 import { isPageButton } from 'src/utils/menu-button'
@@ -795,7 +794,7 @@ const formDialogTitle = computed(() => {
 const activeMasterRelation = computed<TableRelation | null>(() => {
   const relation = currentTable.value?.table_relations?.find((item) => {
     return (
-      Number(item.relation_type) === SysTableRelationType.ONE_TO_MANY &&
+      item.relation_type === SysTableRelationType.ONE_TO_MANY &&
       Number(item.related_table_id) > 0 &&
       !!item.reference_key &&
       !!item.foreign_key
@@ -1536,10 +1535,10 @@ const executeMenuButtonAction = async (
       if (!currentTable.value?.table_code) return
       if (button.api_path) {
         const method = (button.http_method || 'DELETE').toUpperCase()
-        await instance.request({
-          url: button.api_path,
+        await generalizationApi.executeRuntimeAction({
+          path: button.api_path,
           method,
-          data: {
+          payload: {
             table_code: currentTable.value.table_code,
             ids: rows.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0),
             menu_id: resolveMenuId() || 0,
@@ -1610,11 +1609,11 @@ const executeMenuButtonAction = async (
         menu_id: resolveMenuId() || 0,
         params,
       }
-      const res = await instance.request({
-        url: button.api_path,
+      const res = await generalizationApi.executeRuntimeAction<Blob>({
+        path: button.api_path,
         method,
         responseType: 'blob',
-        ...(method === 'GET' ? { params: payload } : { data: payload }),
+        payload,
       })
       const blob = new Blob([res.data])
       const url = URL.createObjectURL(blob)
@@ -1649,12 +1648,13 @@ const executeMenuButtonAction = async (
         selection: selected.value,
         params,
       }
-      const requestConfig = {
-        url: button.api_path,
+      const res = await generalizationApi.executeRuntimeAction<{
+        success?: boolean
+      }>({
+        path: button.api_path,
         method,
-        ...(method === 'GET' ? { params: payload } : { data: payload }),
-      }
-      const res = await instance.request(requestConfig)
+        payload,
+      })
       if (res?.data?.success) {
         await fetchData()
       }

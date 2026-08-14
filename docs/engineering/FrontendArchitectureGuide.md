@@ -139,7 +139,7 @@ Metadata 不是万能动态表格。页面继续负责：
 
 ### 5.3 统一列解析边界
 
-FE-002 应在现有 `frontend/src/utils/column-format.ts` 基础上形成唯一列解析入口 `resolveRuntimeColumns`，不得并存第二套 Runtime Column Builder。
+`frontend/src/utils/column-format.ts` 的 `resolveRuntimeColumns` 是唯一 Runtime Column Resolver，不得并存第二套 Runtime Column Builder。
 
 概念输入：
 
@@ -157,9 +157,12 @@ resolveRuntimeColumns(metadataFields, {
 ```ts
 {
   columns,
-  defaultVisibleColumns,
+  visibleColumns,
   quickSearchFields,
   advancedSearchFields,
+  formFields,
+  detailFields,
+  sortableFields,
 }
 ```
 
@@ -174,7 +177,7 @@ resolveRuntimeColumns(metadataFields, {
 
 ### 5.4 列宽
 
-当前 Runtime Metadata 没有列表列宽字段。V1 最小后端扩展只建议增加可空、受控正整数 `list_width`，表示默认像素宽度；`NULL/0` 表示 `auto`。`min-width`、`max-width`、对齐和特殊布局由前端类型默认值或页面 Override 管理。
+当前 Runtime Metadata 没有列表列宽字段。FE-002 没有增加 `list_width`：现有字段类型默认值和页面 Override 已能覆盖参考页面，暂时没有足够价值为列宽增加持久化契约。未来只有在多个 Metadata 页面确需统一默认宽度时，才评审可空、受控正整数 `list_width`；`min-width`、`max-width`、对齐和特殊布局仍由前端管理。
 
 不得把组件名、CSS class、slot 名或 renderer 名称写入 Metadata。
 
@@ -237,7 +240,7 @@ Frontend Consistency 只统一当前查询状态，不实现 Query Center。页�
 
 未来 saved query/default query 只通过 Query Center 注入 applied state。页面不得继续增加只能由本页理解的私有查询协议。
 
-FE-002 应扩展现有 `frontend/src/utils/query-state.ts` 并提供窄职责 `useTableQueryState`，避免每页复制克隆、计数、应用、重置和页码联动。
+`frontend/src/composables/table-query-state.ts` 的 `useTableQueryState` 是标准列表查询状态入口，避免每页复制克隆、计数、应用、重置和页码联动。刷新只重新读取当前查询，不修改查询、分页、排序或列显示；只有明确的清空查询操作才恢复默认状态。
 
 ## 7. 分页与排序
 
@@ -250,7 +253,29 @@ FE-002 应扩展现有 `frontend/src/utils/query-state.ts` 并提供窄职责 `u
 
 ## 8. 菜单、路由与按钮权限
 
-### 8.1 稳定映射
+### 8.1 三类前端事实
+
+页面实现必须区分三类事实：
+
+| 类型 | 来源 | 示例 |
+| --- | --- | --- |
+| Platform View Action | 页面和平台组件 | 刷新当前视图、返回、分页、排序、列显示、展开/收起、关闭 Dialog |
+| Metadata Capability | Runtime Metadata | 字段标题、顺序、默认显示、排序能力、查询字段、表单控件、详情布局 |
+| Business Capability | MenuButton + Casbin | 新增、编辑、删除、启停、审核、吊销、执行、同步、轮换、业务导出 |
+
+View Action 不进入 MenuButton，也不作为 Casbin 业务按钮。名称含“刷新”但会改变业务状态或访问外部资源的动作，例如刷新 Token、重建缓存、重新同步、重新拉取和重新执行，仍属于 Business Capability。
+
+### 8.2 导航、路由与能力
+
+Navigation、Route 和 Capability 是三个概念：
+
+- Navigation 决定是否显示在左侧菜单；
+- Route 决定页面地址和生命周期；
+- Capability 决定能否读取资源或执行业务动作。
+
+当前菜单模型继续承担 Navigation 和父资源 Capability Container。普通详情使用隐藏 Route，不需要独立可见菜单；详情读取仍要求父资源 `detail` capability，后端 API 继续执行 Casbin 校验。隐藏路由不得因“不在菜单里”跳过前端预加载保护。
+
+### 8.3 稳定映射
 
 对菜单页面，以下标识应一致：
 
@@ -260,15 +285,24 @@ menu.name == route.name == defineOptions.name == usePageButtons(pageCode)
 
 泛化 Detail/Form、登录、Dashboard 等非菜单页面可以使用独立稳定名称，但必须显式记录来源页面和权限上下文。
 
-### 8.2 页面按钮
+### 8.4 页面按钮
 
 - 页面按钮统一通过 `usePageButtons` 获取 `top_buttons`、`line_buttons` 等位置；
 - `menuButtonDisplayProps` 统一决定 icon/text/round/`aria-label`；
 - 不按角色名、`isAdmin` 或硬编码管理员身份显示按钮；
-- 依赖另一资源的查询能力可以判断稳定 permission code，但 FE-002 应收口为统一 capability helper；
+- `findCapability`、`hasCapability`、`findActionCapability` 和 `hasActionCapability` 统一能力判断，页面不重复手写 `some(button.event_action === ...)`；
+- `TOP`、`LINE`、`BOTTOM`、`FORM_TOP`、`FORM_BOTTOM`、`DETAIL_TOP`、`DETAIL_BOTTOM` 是冻结的位置集合；特殊布局使用 slot，不增加技术布局枚举；
 - 前端隐藏不是安全边界，后端仍必须执行 Casbin 和数据权限检查。
 
-### 8.3 通用与领域动作
+### 8.5 View Refresh 与详情动作
+
+- 标准列表 Toolbar 和详情页固定提供当前视图刷新；刷新保留查询、分页、排序和列显示；
+- 返回、刷新、关闭和取消属于 View Action，不依赖 MenuButton；
+- 普通详情业务按钮继续挂在父 Menu 下，通过 `DETAIL_TOP`/`DETAIL_BOTTOM` 显示；
+- `FORM_TOP`/`FORM_BOTTOM` 服务表单业务动作，表单关闭/取消仍是 View Action；
+- 只有真正出现多 Tab、独立 API 权限、独立生命周期和不同访问范围的详情，才评审 Complex Detail Workspace；不得仅因详情有路由就新增菜单。
+
+### 8.6 通用与领域动作
 
 平台通用动作包括：
 
@@ -280,7 +314,7 @@ FE-002 可提供通用动作匹配、确认和导航 helper；页面只绑定实
 
 删除、吊销、停用等危险操作统一使用 `useConfirmDialog`。不得每页维护一个相同的确认 Dialog。
 
-### 8.4 隐藏路由
+### 8.7 隐藏路由
 
 - 隐藏 Detail Route 只在用户主动导航时加载；
 - 页面在加载受保护数据前校验其查询/详情 capability；
@@ -315,6 +349,8 @@ shared StatusChip renderer
 - `DetailFieldGrid`：白名单字段；
 - Metadata 可提供 label、sequence、detail span；
 - 特殊业务内容通过 slot 或领域组件提供。
+
+独立详情固定提供返回和刷新；业务动作从父 Menu 的 `DETAIL_TOP`/`DETAIL_BOTTOM` 读取。现有 Integration Detail、Organization Sync Batch Detail、Generalization Record Detail 和 System Detail 均可由该模型覆盖，当前不需要新增详情菜单或按钮位置。
 
 详情模式不得直接渲染后端 Model，也不得因打开方式不同绕过详情权限。
 
@@ -462,19 +498,22 @@ System/Develop 是历史页面主要迁移区。User、Role、Application、SMS�
 
 Report 标记为 `REPORT_DEFERRED`。Frontend Consistency 只修复公共安全、Theme、Accessibility 和 API 边界问题，不重写 Report 设计器、运行态、Prototype 或产品模式。
 
-## 20. 迁移顺序
+## 20. 公共机制与迁移顺序
 
-### FE-002：公共能力
+### 20.1 已建立的公共能力
 
-1. 在 `column-format.ts` 收口 `resolveRuntimeColumns`；
-2. 增加 `useRuntimeTableMetadata`；
-3. 在 `query-state.ts` 基础上增加 `useTableQueryState`；
-4. 增加窄职责 `StandardTableToolbar`；
-5. 增加共享 `StatusChip` renderer，状态字典仍由领域提供；
-6. 收口 Runtime Relation API 和通用 Dynamic Action API；
-7. 为上述能力补单元测试和参考页面。
+1. `resolveRuntimeColumns`：Metadata Base + typed Override + Virtual Column；
+2. `useRuntimeTableMetadata`：Metadata 局部加载及字段分组；
+3. `useTableQueryState`：Quick/Advanced/Order/Page 的单一状态语义；
+4. `StandardTableToolbar`：布局、slot 和固定 View Refresh；
+5. `StatusChip`：共享渲染，领域状态映射留在页面；
+6. Generalization API 的受控 `/admin/` Runtime Action 边界；
+7. Page Capability helper、公共动作分发和统一确认；
+8. `table-state.ts` 的无数据、无结果、无权限和错误最低文案。
 
-### FE-003：页面迁移
+参考实现为 Integration External System、Integration Retry Policy、System Application 和 Organization Position。它们证明公共 Pattern 可以保留组合列、状态映射、业务按钮和领域 formatter。
+
+### 20.2 FE-003 页面迁移
 
 1. Integration 配置页作为第一批；
 2. Organization 列表、树和同步只读页按领域 Pattern 迁移；

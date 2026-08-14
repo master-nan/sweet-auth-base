@@ -369,7 +369,55 @@ FE-002 不修改后端 Metadata，不迁移全部页面，不触碰 Report 产�
 
 每个批次完成后执行前端 test、lint、typecheck、build，并进行桌面、小屏和深色模式浏览器验收。
 
-## 21. Freeze 结论
+## 21. FE-002 实施结果
+
+FE-002 已建立公共页面基线，但没有宣称全部页面完成迁移：
+
+- Platform View Action、Metadata Capability、Business Capability 已在长期指南中分开；
+- 当前列表/详情刷新不再依赖纯页面 reload 型 MenuButton；业务刷新、同步、重试、缓存重建等能力保持不变；
+- `resolveRuntimeColumns`、`useRuntimeTableMetadata`、`useTableQueryState`、`StandardTableToolbar`、`StatusChip` 和 capability helper 已落地并有测试；
+- RecordDetail 保留固定 Back/Refresh，业务详情按钮来自父 Menu 的 `DETAIL_TOP`/`DETAIL_BOTTOM`；
+- Generalization 页面、RecordDetail、AdvancedQuery、DynamicFormDialog 和 relation formatter 不再直接依赖 `boot/axios`；
+- External System、Retry Policy、Application、Position 是 FE-003 的参考实现；
+- 参考页的列表、Runtime Metadata 和字典运行时读取使用局部 loading，不再触发全局页面遮罩；
+- Dashboard 低代码入口通过真实菜单树解析完整路由，不再假定固定 `/admin/develop` 父路径；
+- `list_width` 暂不增加，列宽继续由字段类型默认与页面 Override 管理。
+
+浏览器验收发现一个 FE-003 权限依赖项：只有列表查询和 Metadata 权限、没有业务按钮的账号可以搜索、分页、列选择和固定刷新，且不能加载 Detail；但带字典字段的参考页还会请求字典 Runtime API。角色若未同时获得对应字典读取权限，后端会稳定返回 403。FE-003 需要把只读页面的字典依赖纳入权限 Seed/配置检查，不能靠前端吞掉权限问题。
+
+Report V2 Workbench 仍保留现有 `refresh` MenuButton，归入 `REPORT_DEFERRED`，本轮未借公共刷新治理改动 Report 产品页面。
+
+### 21.1 FE-003 正式迁移清单
+
+| 批次 | 页面 | 结论 |
+| --- | --- | --- |
+| A Integration | External System | PARTIAL（FE-002 reference，FE-003 只做族内一致性复核） |
+| A Integration | Retry Policy | PARTIAL（FE-002 reference） |
+| A Integration | Interface Definition | MIGRATE |
+| A Integration | Credential | MIGRATE |
+| A Integration | Sync Task | MIGRATE |
+| B Runtime / Sync | Integration Sync Batch | MIGRATE |
+| B Runtime / Sync | Integration Execution List/Detail | MIGRATE |
+| B Runtime / Sync | Integration Log | MIGRATE |
+| B Runtime / Sync | Organization Sync Batch Detail/List | MIGRATE |
+| B Runtime / Sync | Organization Sync Error | MIGRATE |
+| C Organization | Position | PARTIAL（FE-002 reference） |
+| C Organization | Structure / Legal Entity | PARTIAL（保留树 + 详情 Pattern） |
+| C Organization | Employee / Assignment | PARTIAL（保留领域详情） |
+| D System | Application | PARTIAL（FE-002 reference） |
+| D System | User / Role / SMS | MIGRATE |
+| D System | Audit | MIGRATE（只读 Pattern） |
+| D System | Menu / Data Permission | PARTIAL（复杂配置页） |
+| E Develop | Dictionary | MIGRATE |
+| E Develop | Database / Generalization | PARTIAL（大页面，仅抽公共能力） |
+| E Develop | Configure | EXEMPT（配置 Form） |
+| F Special | RecordDetail / RecordForm | PARTIAL（保留泛化语义） |
+| F Special | Login / Dashboard / ChangePassword / 404 | EXEMPT（Theme、API、可访问性复核） |
+| G Report | Report V1/V2 全页面 | REPORT_DEFERRED |
+
+`MIGRATE` 表示按标准 Pattern 迁移；`PARTIAL` 表示只接入适用的公共能力并保留领域布局；`EXEMPT` 表示不套列表 Pattern；`REPORT_DEFERRED` 表示等待 Report 专项。
+
+## 22. Freeze 结论
 
 Frontend Architecture Standard：**通过冻结**。
 
@@ -386,7 +434,7 @@ Frontend Consistency Implementation：**未完成**，必须继续 FE-002 和 FE
 - Report `REPORT_DEFERRED`；
 - Backend Metadata 仅有 `list_width` 最小候选缺口。
 
-## 22. 验证结果
+## 23. FE-001 验证结果
 
 本 Task 未修改前端业务代码。验证使用 Node `v24.19.0` 和 Yarn `1.22.18`。
 

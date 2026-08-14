@@ -160,6 +160,7 @@ import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import { useUserStore } from 'src/stores/user'
 import { useLoadingStore } from 'src/stores/loading'
 import { isApiPermission, isPageButton } from 'src/utils/menu-button'
+import { findMenuPathByTableCode } from 'src/utils/menu-context'
 
 defineOptions({ name: 'DashboardIndex' })
 
@@ -273,7 +274,9 @@ function formatMenuTitle(title?: string) {
 
 function lowCodeRoute(menu: Menu) {
   return {
-    path: `/admin/develop/${menu.path}`,
+    path:
+      findMenuPathByTableCode(menus.value, String(menu.table_code || '')) ||
+      `/admin/develop/generalization/${menu.table_code || ''}`,
   }
 }
 

@@ -34,6 +34,7 @@ vi.mock('quasar', () => ({
 }))
 
 vi.mock('boot/axios', () => ({ instance: {} }))
+vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 
 vi.mock('src/api/services/integration', () => ({
@@ -83,6 +84,13 @@ import ExternalSystemPage from './Index.vue'
 const SlotStub = defineComponent({
   setup(_, { slots }) {
     return () => h('div', slots.default?.())
+  },
+})
+
+const ToolbarStub = defineComponent({
+  emits: ['refresh'],
+  setup(_, { slots }) {
+    return () => h('div', Object.values(slots).flatMap((slot) => slot?.() || []))
   },
 })
 
@@ -145,6 +153,8 @@ const mountPage = () =>
         QTooltip: true,
         QChip: true,
         QTd: SlotStub,
+        StandardTableToolbar: ToolbarStub,
+        StatusChip: true,
         TablePagination: true,
         AdvancedQuery: true,
         DynamicFormDialog: FormDialogStub,
@@ -180,7 +190,8 @@ describe('external system management page', () => {
     apiMocks.createExternalSystem.mockResolvedValue({ success: true })
     apiMocks.updateExternalSystem.mockResolvedValue({ success: true })
     tableApiMocks.queryTableByCode.mockResolvedValue({
-      data: { table_fields: [{ field_code: 'system_code', field_name: '系统编码' }] },
+      success: true,
+      data: { table_fields: [{ field_code: 'system_code', field_name: '系统编码', is_list_show: true, is_sort: true, sequence: 1 }] },
     })
   })
 

@@ -23,19 +23,9 @@ vi.mock('src/stores/dict', () => ({
 }))
 
 vi.mock('src/composables/page-buttons', () => ({
-  usePageButtons: () => ({
-    top_buttons: {
-      value: [
-        {
-          id: 2,
-          code: 'organization_structure_refresh',
-          name: '刷新',
-          icon: 'refresh',
-          event_action: 'refresh',
-        },
-      ],
-    },
-  }),
+  usePageButtons: () => {
+    throw new Error('平台刷新不应读取 MenuButton')
+  },
 }))
 
 import StructurePage from 'src/pages/organization/structure/Index.vue'

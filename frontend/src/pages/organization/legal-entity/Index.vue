@@ -9,16 +9,15 @@
 
         <div class="organization-page-actions">
           <q-btn
-            v-for="button in refreshButtons"
-            :key="button.id || button.code"
-            v-bind="menuButtonDisplayProps(button)"
+            icon="refresh"
+            aria-label="刷新当前视图"
             round
             outline
-            :color="button.color || 'primary'"
+            color="primary"
             :loading="treeLoading"
             @click="loadTree"
           >
-            <q-tooltip>{{ button.name }}</q-tooltip>
+            <q-tooltip>刷新当前视图</q-tooltip>
           </q-btn>
         </div>
       </header>
@@ -133,10 +132,9 @@ import {
 } from 'src/api/services/org'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 
 const dictStore = useDictStore()
-const { all_buttons, top_buttons } = usePageButtons('organization_legal_entity')
+const { all_buttons } = usePageButtons('organization_legal_entity')
 
 const tree = ref<LegalEntityTreeNode[]>([])
 const selectedNode = ref<LegalEntityTreeNode | null>(null)
@@ -148,9 +146,6 @@ const treeError = ref('')
 const detailError = ref('')
 let detailRequestSequence = 0
 
-const refreshButtons = computed(() =>
-  top_buttons.value.filter((button) => button.event_action === 'refresh'),
-)
 const canViewDetail = computed(() =>
   all_buttons.value.some((button) => button.event_action === 'detail'),
 )

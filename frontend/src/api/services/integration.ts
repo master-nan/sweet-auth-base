@@ -1,5 +1,6 @@
 import { instance } from 'boot/axios'
 import type { Query, ResponseData } from 'src/types/global'
+import { localLoadingRequestConfig } from 'src/api/request-config'
 
 export type ExternalSystemStatus = 'draft' | 'enabled' | 'disabled'
 export type ExternalSystemType = 'hr' | 'erp' | 'tms' | 'wms' | 'other'
@@ -552,7 +553,7 @@ export const useIntegrationApi = () => ({
     instance
       .post<
         ResponseData<ExternalSystemListItem[]>
-      >('/admin/integration/external-system/query', query)
+      >('/admin/integration/external-system/query', query, localLoadingRequestConfig)
       .then((response) => response.data),
   getExternalSystem: (id: number) =>
     instance
@@ -620,7 +621,11 @@ export const useIntegrationApi = () => ({
       .then((response) => response.data),
   queryRetryPolicies: (query: RetryPolicyQuery) =>
     instance
-      .post<ResponseData<RetryPolicyListItem[]>>('/admin/integration/retry-policy/query', query)
+      .post<ResponseData<RetryPolicyListItem[]>>(
+        '/admin/integration/retry-policy/query',
+        query,
+        localLoadingRequestConfig,
+      )
       .then((response) => response.data),
   getRetryPolicy: (id: number) =>
     instance

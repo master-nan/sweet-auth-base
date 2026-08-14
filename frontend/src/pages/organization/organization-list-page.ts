@@ -68,6 +68,19 @@ export const referenceLabel = (
   value?: { code: string; name: string } | null,
 ): string => (value ? `${value.code} - ${value.name}` : '-')
 
+export const formatOrganizationValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '-'
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value)
+  }
+  return '-'
+}
+
 export const organizationStatusColor = (status?: string): string => {
   if (['enabled', 'active', 'success', 'synced'].includes(status || '')) return 'positive'
   if (['failed', 'disabled', 'resigned'].includes(status || '')) return 'negative'

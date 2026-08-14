@@ -2,7 +2,11 @@ import { computed } from 'vue'
 import { useUserStore } from 'src/stores/user'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
-import { resolvePageButtons } from 'src/utils/menu-button'
+import {
+  findButtonActionCapability,
+  findButtonCapability,
+  resolvePageButtons,
+} from 'src/utils/menu-button'
 
 export function usePageButtons(route_name: string) {
   const userStore = useUserStore()
@@ -39,6 +43,13 @@ export function usePageButtons(route_name: string) {
 
   const has_line_buttons = computed(() => line_buttons.value.length > 0)
 
+  const findCapability = (code: string) =>
+    findButtonCapability(all_buttons.value, code)
+  const hasCapability = (code: string) => !!findCapability(code)
+  const findActionCapability = (action: string) =>
+    findButtonActionCapability(all_buttons.value, action)
+  const hasActionCapability = (action: string) => !!findActionCapability(action)
+
   return {
     all_buttons,
     line_buttons,
@@ -49,6 +60,10 @@ export function usePageButtons(route_name: string) {
     record_detail_top_buttons,
     record_detail_bottom_buttons,
     has_line_buttons,
+    findCapability,
+    hasCapability,
+    findActionCapability,
+    hasActionCapability,
   }
 }
 

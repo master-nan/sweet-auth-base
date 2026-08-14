@@ -514,6 +514,7 @@ import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
 import { useDictStore } from 'src/stores/dict'
 import { useUserStore } from 'src/stores/user'
 import { useDictApi } from 'src/api/services/sys-dict'
+import { useGeneralizationApi } from 'src/api/services/generalization'
 
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
@@ -525,7 +526,6 @@ import FileUpload from 'src/components/FileUpload/FileUpload.vue'
 import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
-import { instance } from 'boot/axios'
 import {
   coerceDictOptions,
   decodeHtmlEntities,
@@ -616,6 +616,7 @@ const formBottomButtons = computed(() =>
 // 使用Pinia字典存储
 const dictStore = useDictStore()
 const userStore = useUserStore()
+const generalizationApi = useGeneralizationApi()
 const dictApi = useDictApi()
 
 const loadingStore = useLoadingStore()
@@ -707,6 +708,7 @@ const normalizeBooleanFormValue = (value: unknown, fallback = false): boolean =>
   if (value === undefined || value === null || value === '') return fallback
   if (typeof value === 'boolean') return value
   if (typeof value === 'number') return value !== 0
+  if (typeof value !== 'string') return fallback
   const normalized = String(value).trim().toLowerCase()
   if (['true', '1', 't', 'yes', 'y', '是'].includes(normalized)) return true
   if (['false', '0', 'f', 'no', 'n', '否'].includes(normalized)) return false
@@ -1071,7 +1073,7 @@ const buildOptionsFromRows = (rows: Array<Record<string, any>>, cfg: any) => {
 }
 
 const rowsFromRelationResponse = (res: any): Array<Record<string, any>> => {
-  const rawRows = res?.data?.data
+  const rawRows = res?.data
   return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
 }
 
@@ -1125,7 +1127,10 @@ const buildTreeFromFlat = (
       : configuredParentKey
   const childrenKey = cfg?.childrenKey || 'children'
   const rootValue = cfg?.rootValue ?? 0
-  const normalizeTreeKey = (value: unknown) => String(value ?? '')
+  const normalizeTreeKey = (value: unknown) =>
+    typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : ''
 
   // 先构建所有节点
   const nodeMap = new Map<any, Record<string, any>>()
@@ -1233,8 +1238,7 @@ const fetchRelationOptions = async (
     query.filters = filters
   }
 
-  const endpoint = `/admin/generalization/query/code/${relatedTableCode}`
-  const res = await instance.post(endpoint, query)
+  const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
   const rows = rowsFromRelationResponse(res)
   return buildOptionsFromRows(rows, cfg)
 }
@@ -1263,8 +1267,7 @@ const loadSelectedRelationOptions = async (field: TableField, cfg: any, knownOpt
     [valueKey]: missingValues,
   }
 
-  const endpoint = `/admin/generalization/query/code/${relatedTableCode}`
-  const res = await instance.post(endpoint, query)
+  const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
   return buildOptionsFromRows(rowsFromRelationResponse(res), cfg)
 }
 
@@ -1341,10 +1344,9 @@ const loadCascaderOptions = async (field: TableField, cfg: any) => {
   }
 
   try {
-    const endpoint = `/admin/generalization/query/code/${relatedTableCode}`
-    const res = await instance.post(endpoint, query)
-    const rawRows = res?.data?.data
-    const rows = Array.isArray(rawRows) ? rawRows : rawRows?.data || []
+    const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
+    const rawRows = res?.data
+    const rows = Array.isArray(rawRows) ? rawRows : []
     return buildTreeFromFlat(rows, cfg)
   } catch (error) {
     console.warn('级联选项加载失败', error)

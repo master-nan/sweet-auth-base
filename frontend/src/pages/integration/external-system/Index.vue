@@ -15,10 +15,10 @@
       :loading="loading"
     >
       <template #top>
-        <div class="row q-gutter-xs full-width items-center">
-          <div class="col-grow row q-gutter-xs items-center">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               dense
               outlined
               debounce="300"
@@ -28,6 +28,8 @@
               <template #append><q-icon name="search" /></template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select
               v-model="visibleColumns"
               multiple
@@ -41,6 +43,8 @@
               option-value="name"
               options-cover
             />
+          </template>
+          <template #advanced-trigger>
             <q-btn
               outline
               icon="tune"
@@ -51,9 +55,8 @@
               <q-badge v-if="activeFilterCount" floating color="red">{{ activeFilterCount }}</q-badge>
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
-          </div>
-          <q-space />
-          <div class="row q-gutter-xs">
+          </template>
+          <template #right-actions>
             <q-btn
               v-for="button in top_buttons"
               :key="button.id"
@@ -62,8 +65,8 @@
               :disable="loading"
               @click="handleButtonClick(button)"
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-system_code="props">
@@ -86,10 +89,7 @@
 
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
-            outline
+          <status-chip
             :color="statusMeta[props.row.status]?.color || 'grey'"
             :label="statusMeta[props.row.status]?.label || props.row.status"
           />
@@ -116,6 +116,9 @@
       <template #bottom>
         <q-space />
         <table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" />
+      </template>
+      <template #no-data>
+        <div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div>
       </template>
     </q-table>
 
@@ -148,11 +151,12 @@
 defineOptions({ name: 'integration_external_system' })
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { type QTableProps, useQuasar } from 'quasar'
+import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import ExternalSystemDetailDialog from './ExternalSystemDetailDialog.vue'
@@ -164,23 +168,24 @@ import {
   type ExternalSystemUpdateRequest,
   useIntegrationApi,
 } from 'src/api/services/integration'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import type { Query } from 'src/types/global'
+import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveRuntimeColumns } from 'src/utils/column-format'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
 const router = useRouter()
 const api = useIntegrationApi()
-const tableApi = useTableApi()
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 const { confirmAction } = useConfirmDialog($q)
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integration_external_system')
 
@@ -192,8 +197,12 @@ const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<ExternalSystemDetail | null>(null)
-const formFields = ref<TableField[]>([])
-const advancedFields = ref<TableField[]>([])
+const {
+  fields: metadataFields,
+  advancedSearchFields: advancedFields,
+  formFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('integration_external_system')
 
 const typeLabels: Record<string, string> = {
   hr: '人力资源系统',
@@ -208,43 +217,76 @@ const statusMeta: Record<string, { label: string; color: string }> = {
   disabled: { label: '已停用', color: 'warning' },
 }
 
-const columns: QTableProps['columns'] = [
-  { name: 'system_code', label: '外部系统', field: 'system_code', align: 'left', sortable: true },
-  { name: 'system_type', label: '类型', field: 'system_type', align: 'left', sortable: true },
-  { name: 'base_url_summary', label: '地址摘要', field: 'base_url_summary', align: 'left' },
-  { name: 'owner_name', label: '负责人', field: 'owner_name', align: 'left', sortable: true },
-  { name: 'status', label: '状态', field: 'status', align: 'center', sortable: true },
-  { name: 'gmt_modify', label: '更新时间', field: 'gmt_modify', align: 'left', sortable: true },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
-]
-const visibleColumns = ref(columns.map((column) => column.name))
+const columns = ref<TableColumn<ExternalSystemListItem>[]>([])
+const visibleColumns = ref<string[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
 
 const emptyExpressions = () => [
   { rules: [{ field: '', value: null }], nested: [] },
 ]
-const query = ref<ExternalSystemQuery>({
-  page: 1,
-  num: 15,
-  order: { field: '', is_asc: false },
-  quick_query: { keyword: '' },
-  expressions: emptyExpressions(),
+const queryState = useTableQueryState<ExternalSystemQuery>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: '', is_asc: false },
+    quick_query: { keyword: '' },
+    expressions: emptyExpressions(),
+  }),
+  createEmptyExpressions: emptyExpressions,
 })
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-const appliedAdvancedQuery = ref<Query>(cloneDeep(query.value))
+const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
+  }),
+)
 
 const fetchData = async () => {
-  const response = await api.queryExternalSystems(query.value)
-  rows.value = response.data || []
-  total.value = response.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const response = await api.queryExternalSystems(query.value)
+    rows.value = response.data || []
+    total.value = response.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '外部系统加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 const fetchMetadata = async () => {
-  const response = await tableApi.queryTableByCode('integration_external_system')
-  const fields = response.data?.table_fields || []
-  formFields.value = fields
-  advancedFields.value = fields.filter((field) => field.is_advanced_search)
+  if (!(await loadMetadata())) return
+  const resolution = resolveRuntimeColumns<ExternalSystemListItem>(metadataFields.value, {
+    context: { getDictLabel: () => '' },
+    overrides: [
+      { fieldCode: 'system_code', label: '外部系统', order: 1 },
+      { fieldCode: 'name', visible: false, order: 2 },
+      { fieldCode: 'system_type', label: '类型', order: 3 },
+      { fieldCode: 'owner_name', order: 5 },
+      { fieldCode: 'status', align: 'center', order: 6 },
+    ],
+    virtualColumns: [
+      { name: 'base_url_summary', label: '地址摘要', field: 'base_url_summary', order: 4 },
+      {
+        name: 'actions',
+        label: '操作',
+        field: 'actions',
+        align: 'center',
+        order: 100,
+        defaultVisible: has_line_buttons.value,
+      },
+    ],
+  })
+  columns.value = resolution.columns
+  visibleColumns.value = resolution.visibleColumns
+  sortableFields.value = resolution.sortableFields
 }
 
 const resetAndFetch = () => {
@@ -253,14 +295,12 @@ const resetAndFetch = () => {
 }
 
 const handleBasicSearch = () => {
-  query.value.expressions = emptyExpressions()
-  appliedAdvancedQuery.value = cloneDeep(query.value)
+  queryState.submitQuickSearch()
   resetAndFetch()
 }
 
 const handleAdvancedSearch = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-  appliedAdvancedQuery.value = cloneDeep(query.value)
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   showAdvancedQuery.value = false
   resetAndFetch()
 }
@@ -307,7 +347,7 @@ const changeState = (row: ExternalSystemListItem, enable: boolean) => {
   })
 }
 
-const actionHandlers: Record<string, (row?: ExternalSystemListItem) => void> = {
+const actionHandlers: PageActionHandlers<ExternalSystemListItem> = {
   create: () => {
     currentEditData.value = null
     showFormDialog.value = true
@@ -319,7 +359,7 @@ const actionHandlers: Record<string, (row?: ExternalSystemListItem) => void> = {
 }
 
 const handleButtonClick = (button: MenuButton, row?: ExternalSystemListItem) => {
-  actionHandlers[button.event_action]?.(row)
+  dispatchPageAction(button, actionHandlers, row)
 }
 
 const handleFormSubmit = async (payload: {
@@ -357,9 +397,6 @@ const handleFormSubmit = async (payload: {
 
 onMounted(async () => {
   await Promise.all([fetchMetadata(), fetchData()])
-  if (!has_line_buttons.value) {
-    visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions')
-  }
   initialized.value = true
 })
 
@@ -376,12 +413,12 @@ watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([sortBy, descending], previous) => {
     if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return
-    query.value.order = { field: sortBy || '', is_asc: sortBy ? !descending : false }
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
     resetAndFetch()
   },
 )
 
 watch(showAdvancedQuery, (open) => {
-  if (open) tempAdvancedQuery.value = cloneDeep(query.value)
+  if (open) queryState.beginAdvancedEdit()
 })
 </script>
