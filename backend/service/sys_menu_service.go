@@ -111,10 +111,10 @@ func (s *SysMenuService) UpdateMenuOrder(ctx context.Context, data request.MenuO
 	return RunInTransaction(ctx, s.sysMenuRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		for _, item := range data.Menus {
 			if item.Id <= 0 {
-				return fmt.Errorf("菜单ID不能为空")
+				return myerrors.NewParameterError("菜单ID不能为空")
 			}
 			if _, exists := seen[item.Id]; exists {
-				return fmt.Errorf("菜单ID重复")
+				return myerrors.NewParameterError("菜单ID重复")
 			}
 			seen[item.Id] = struct{}{}
 			updateReq := model.SysMenu{Sequence: item.Sequence}
@@ -162,7 +162,7 @@ func (s *SysMenuService) DeleteMenuById(ctx context.Context, id int) error {
 			return err
 		}
 		if childCount > 0 {
-			return myerrors.NewBadRequestError("请先删除子菜单")
+			return myerrors.NewValidationError("请先删除子菜单")
 		}
 		menu, err := s.sysMenuRepo.FindByIdWithDB(tx, id)
 		if err != nil {
@@ -561,7 +561,7 @@ func (s *SysMenuService) CreateMenuButton(ctx context.Context, req request.MenuB
 		return err
 	}
 	if menu.Id == 0 {
-		return myerrors.NewBadRequestError("菜单不存在")
+		return myerrors.NewValidationError("菜单不存在")
 	}
 	if err := normalizeAndValidateMenuButton(&data, menu); err != nil {
 		return err
@@ -591,7 +591,7 @@ func (s *SysMenuService) UpdateMenuButton(ctx context.Context, req request.MenuB
 		return err
 	}
 	if menu.Id == 0 {
-		return myerrors.NewBadRequestError("菜单不存在")
+		return myerrors.NewValidationError("菜单不存在")
 	}
 	if err := normalizeAndValidateMenuButton(&data, menu); err != nil {
 		return err
@@ -627,7 +627,7 @@ func menuButtonUpdateMap(button model.SysMenuButton) map[string]any {
 
 func applyMenuButtonType(button *model.SysMenuButton, isButton *bool, isHidden bool) error {
 	if isButton == nil {
-		return myerrors.NewBadRequestError("is_button不能为空")
+		return myerrors.NewValidationError("is_button不能为空")
 	}
 	button.IsButton = *isButton
 	button.IsHidden = isHidden
@@ -659,7 +659,7 @@ func normalizeAndValidateMenuButton(button *model.SysMenuButton, menu model.SysM
 	button.Method = strings.ToUpper(strings.TrimSpace(button.Method))
 	displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(button.DisplayMode))
 	if !ok {
-		return myerrors.NewBadRequestError("按钮展示方式不支持")
+		return myerrors.NewValidationError("按钮展示方式不支持")
 	}
 	button.DisplayMode = displayMode
 	button.ParamsSchema = strings.TrimSpace(button.ParamsSchema)
@@ -667,10 +667,10 @@ func normalizeAndValidateMenuButton(button *model.SysMenuButton, menu model.SysM
 	button.BeforeHooks = strings.TrimSpace(button.BeforeHooks)
 	button.AfterHooks = strings.TrimSpace(button.AfterHooks)
 	if button.Code == "" {
-		return myerrors.NewBadRequestError("按钮编码不能为空")
+		return myerrors.NewValidationError("按钮编码不能为空")
 	}
 	if _, ok := enum.NormalizeSysMenuButtonEventAction(button.EventAction); !ok {
-		return myerrors.NewBadRequestError("按钮事件动作不支持")
+		return myerrors.NewValidationError("按钮事件动作不支持")
 	}
 	if err := validateMenuButtonRuntimeConfig(button); err != nil {
 		return err
@@ -699,11 +699,11 @@ func validateButtonParamsSchema(raw string) error {
 		return nil
 	}
 	if len(raw) > maxButtonParamsSchemaBytes {
-		return myerrors.NewBadRequestError("按钮参数Schema过大")
+		return myerrors.NewValidationError("按钮参数Schema过大")
 	}
 	var parsed any
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return myerrors.NewBadRequestError("按钮参数Schema必须是合法JSON")
+		return myerrors.NewValidationError("按钮参数Schema必须是合法JSON")
 	}
 	switch value := parsed.(type) {
 	case []any:
@@ -712,20 +712,20 @@ func validateButtonParamsSchema(raw string) error {
 		if fields, ok := value["fields"]; ok {
 			fieldList, ok := fields.([]any)
 			if !ok {
-				return myerrors.NewBadRequestError("按钮参数Schema fields必须是数组")
+				return myerrors.NewValidationError("按钮参数Schema fields必须是数组")
 			}
 			return validateButtonParamFieldList(fieldList)
 		}
 		props, ok := value["properties"].(map[string]any)
 		if !ok {
-			return myerrors.NewBadRequestError("按钮参数Schema必须包含fields或properties")
+			return myerrors.NewValidationError("按钮参数Schema必须包含fields或properties")
 		}
 		if len(props) > maxButtonParamFields {
-			return myerrors.NewBadRequestError("按钮参数Schema字段过多")
+			return myerrors.NewValidationError("按钮参数Schema字段过多")
 		}
 		for key, prop := range props {
 			if !buttonParamFieldPattern.MatchString(key) {
-				return myerrors.NewBadRequestError("按钮参数Schema字段名格式不正确")
+				return myerrors.NewValidationError("按钮参数Schema字段名格式不正确")
 			}
 			if err := validateButtonParamProperty(prop); err != nil {
 				return err
@@ -733,25 +733,25 @@ func validateButtonParamsSchema(raw string) error {
 		}
 		return nil
 	default:
-		return myerrors.NewBadRequestError("按钮参数Schema必须是对象或数组")
+		return myerrors.NewValidationError("按钮参数Schema必须是对象或数组")
 	}
 }
 
 func validateButtonParamFieldList(fields []any) error {
 	if len(fields) > maxButtonParamFields {
-		return myerrors.NewBadRequestError("按钮参数Schema字段过多")
+		return myerrors.NewValidationError("按钮参数Schema字段过多")
 	}
 	for _, item := range fields {
 		field, ok := item.(map[string]any)
 		if !ok {
-			return myerrors.NewBadRequestError("按钮参数Schema字段必须是对象")
+			return myerrors.NewValidationError("按钮参数Schema字段必须是对象")
 		}
 		code := firstStringValue(field, "field_code", "code", "name")
 		if code == "" || !buttonParamFieldPattern.MatchString(code) {
-			return myerrors.NewBadRequestError("按钮参数Schema字段名格式不正确")
+			return myerrors.NewValidationError("按钮参数Schema字段名格式不正确")
 		}
 		if options, ok := field["options"].([]any); ok && len(options) > maxButtonOptions {
-			return myerrors.NewBadRequestError("按钮参数Schema选项过多")
+			return myerrors.NewValidationError("按钮参数Schema选项过多")
 		}
 	}
 	return nil
@@ -763,7 +763,7 @@ func validateButtonParamProperty(prop any) error {
 		return nil
 	}
 	if options, ok := propMap["enum"].([]any); ok && len(options) > maxButtonOptions {
-		return myerrors.NewBadRequestError("按钮参数Schema选项过多")
+		return myerrors.NewValidationError("按钮参数Schema选项过多")
 	}
 	return nil
 }
@@ -785,11 +785,11 @@ func validateButtonDisableWhen(raw string) error {
 		return nil
 	}
 	if len(raw) > maxButtonDisableWhenBytes {
-		return myerrors.NewBadRequestError("按钮禁用条件过大")
+		return myerrors.NewValidationError("按钮禁用条件过大")
 	}
 	var parsed any
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return myerrors.NewBadRequestError("按钮禁用条件必须是合法JSON")
+		return myerrors.NewValidationError("按钮禁用条件必须是合法JSON")
 	}
 	state := disableValidationState{}
 	if err := validateButtonDisableNode(parsed, 1, &state); err != nil {
@@ -804,12 +804,12 @@ type disableValidationState struct {
 
 func validateButtonDisableNode(node any, depth int, state *disableValidationState) error {
 	if depth > maxButtonDisableDepth {
-		return myerrors.NewBadRequestError("按钮禁用条件嵌套过深")
+		return myerrors.NewValidationError("按钮禁用条件嵌套过深")
 	}
 	switch value := node.(type) {
 	case []any:
 		if len(value) == 0 {
-			return myerrors.NewBadRequestError("按钮禁用条件数组不能为空")
+			return myerrors.NewValidationError("按钮禁用条件数组不能为空")
 		}
 		for _, item := range value {
 			if err := validateButtonDisableNode(item, depth+1, state); err != nil {
@@ -820,7 +820,7 @@ func validateButtonDisableNode(node any, depth int, state *disableValidationStat
 	case map[string]any:
 		state.nodes++
 		if state.nodes > maxButtonDisableNodes {
-			return myerrors.NewBadRequestError("按钮禁用条件节点过多")
+			return myerrors.NewValidationError("按钮禁用条件节点过多")
 		}
 		if all, ok := value["all"]; ok {
 			return validateButtonDisableList(all, depth, state)
@@ -834,16 +834,16 @@ func validateButtonDisableNode(node any, depth int, state *disableValidationStat
 		if _, ok := value["field"]; ok {
 			return validateButtonDisableRule(value)
 		}
-		return myerrors.NewBadRequestError("按钮禁用条件结构不正确")
+		return myerrors.NewValidationError("按钮禁用条件结构不正确")
 	default:
-		return myerrors.NewBadRequestError("按钮禁用条件必须是对象或数组")
+		return myerrors.NewValidationError("按钮禁用条件必须是对象或数组")
 	}
 }
 
 func validateButtonDisableList(value any, depth int, state *disableValidationState) error {
 	items, ok := value.([]any)
 	if !ok || len(items) == 0 {
-		return myerrors.NewBadRequestError("按钮禁用条件all/any必须是非空数组")
+		return myerrors.NewValidationError("按钮禁用条件all/any必须是非空数组")
 	}
 	return validateButtonDisableNode(items, depth+1, state)
 }
@@ -851,7 +851,7 @@ func validateButtonDisableList(value any, depth int, state *disableValidationSta
 func validateButtonDisableRule(rule map[string]any) error {
 	field, ok := rule["field"].(string)
 	if !ok || !buttonDisableFieldPattern.MatchString(strings.TrimSpace(field)) {
-		return myerrors.NewBadRequestError("按钮禁用条件字段格式不正确")
+		return myerrors.NewValidationError("按钮禁用条件字段格式不正确")
 	}
 	op := "eq"
 	if rawOp, ok := rule["op"].(string); ok && strings.TrimSpace(rawOp) != "" {
@@ -860,10 +860,10 @@ func validateButtonDisableRule(rule map[string]any) error {
 	switch op {
 	case "eq", "ne", "gt", "gte", "lt", "lte", "in", "not_in", "includes", "not_includes", "empty", "not_empty", "truthy", "falsy":
 	default:
-		return myerrors.NewBadRequestError("按钮禁用条件操作符不支持")
+		return myerrors.NewValidationError("按钮禁用条件操作符不支持")
 	}
 	if values, ok := rule["value"].([]any); ok && len(values) > maxButtonOptions {
-		return myerrors.NewBadRequestError("按钮禁用条件选项过多")
+		return myerrors.NewValidationError("按钮禁用条件选项过多")
 	}
 	return nil
 }
@@ -875,21 +875,21 @@ func normalizeButtonHooks(label string, raw *string) error {
 		return nil
 	}
 	if len(value) > maxButtonHooksBytes {
-		return myerrors.NewBadRequestError(label + "配置过大")
+		return myerrors.NewValidationError(label + "配置过大")
 	}
 	var hooks []string
 	if err := json.Unmarshal([]byte(value), &hooks); err != nil {
-		return myerrors.NewBadRequestError(label + "必须是JSON字符串数组")
+		return myerrors.NewValidationError(label + "必须是JSON字符串数组")
 	}
 	if len(hooks) > maxButtonHooks {
-		return myerrors.NewBadRequestError(label + "数量过多")
+		return myerrors.NewValidationError(label + "数量过多")
 	}
 	normalized := make([]string, 0, len(hooks))
 	seen := make(map[string]struct{}, len(hooks))
 	for _, hook := range hooks {
 		hook = strings.TrimSpace(hook)
 		if hook == "" || !buttonHookNamePattern.MatchString(hook) {
-			return myerrors.NewBadRequestError(label + "名称格式不正确")
+			return myerrors.NewValidationError(label + "名称格式不正确")
 		}
 		if _, ok := seen[hook]; ok {
 			continue
@@ -911,22 +911,22 @@ func validateMenuButtonAPIConfig(button *model.SysMenuButton) error {
 	}
 	if strings.TrimSpace(button.EventAction) == string(enum.ButtonActionNavigate) && button.Method == "" {
 		if strings.Contains(button.Path, "://") || strings.ContainsAny(button.Path, "\r\n\t") {
-			return myerrors.NewBadRequestError("前端跳转路径格式不正确")
+			return myerrors.NewValidationError("前端跳转路径格式不正确")
 		}
 		return nil
 	}
 	if button.Path == "" || button.Method == "" {
-		return myerrors.NewBadRequestError("按钮API路径和请求方法必须同时配置")
+		return myerrors.NewValidationError("按钮API路径和请求方法必须同时配置")
 	}
 	switch button.Method {
 	case "GET", "POST", "PUT", "DELETE":
 	default:
-		return myerrors.NewBadRequestError("按钮请求方法仅支持GET/POST/PUT/DELETE")
+		return myerrors.NewValidationError("按钮请求方法仅支持GET/POST/PUT/DELETE")
 	}
 	if !adminAPIPathPattern.MatchString(button.Path) ||
 		strings.Contains(button.Path, "://") ||
 		strings.ContainsAny(button.Path, "?#\r\n\t ") {
-		return myerrors.NewBadRequestError("按钮API路径必须是/admin开头的后端路由")
+		return myerrors.NewValidationError("按钮API路径必须是/admin开头的后端路由")
 	}
 	return nil
 }
@@ -946,7 +946,7 @@ func validateLowCodeMenuButtonConfig(button *model.SysMenuButton, menu model.Sys
 		return requireLowCodeButtonAPI(button, "DELETE", "/admin/generalization/delete")
 	case string(enum.ButtonActionRefresh):
 		if button.Path != "" || button.Method != "" {
-			return myerrors.NewBadRequestError("低代码刷新按钮不能配置后端API")
+			return myerrors.NewValidationError("低代码刷新按钮不能配置后端API")
 		}
 	}
 	return nil
@@ -958,7 +958,7 @@ func isLowCodeMenu(menu model.SysMenu) bool {
 
 func requireLowCodeButtonAPI(button *model.SysMenuButton, method, path string) error {
 	if button.Method != method || button.Path != path {
-		return myerrors.NewBadRequestError(fmt.Sprintf("低代码%s按钮API必须为%s %s", strings.TrimSpace(button.EventAction), method, path))
+		return myerrors.NewValidationError(fmt.Sprintf("低代码%s按钮API必须为%s %s", strings.TrimSpace(button.EventAction), method, path))
 	}
 	return nil
 }

@@ -247,7 +247,7 @@ func (s *SysUserService) AssignRoles(ctx context.Context, userId int, roleIds []
 		normalizedRoleIds = append(normalizedRoleIds, roleId)
 	}
 	if len(normalizedRoleIds) == 0 {
-		return error2.NewBadRequestError("用户至少需要绑定一个角色")
+		return error2.NewValidationError("用户至少需要绑定一个角色")
 	}
 	tx := s.sysUserRepo.DBWithContext(ctx)
 	var count int64
@@ -255,7 +255,7 @@ func (s *SysUserService) AssignRoles(ctx context.Context, userId int, roleIds []
 		return err
 	}
 	if int(count) != len(normalizedRoleIds) {
-		return error2.NewBadRequestError("存在无效角色")
+		return error2.NewValidationError("存在无效角色")
 	}
 	err = RunInTransaction(ctx, tx, func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ?", userId).Delete(&model.SysUserRole{}).Error; err != nil {

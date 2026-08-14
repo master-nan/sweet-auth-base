@@ -6,7 +6,6 @@ import (
 	"errors"
 	"strings"
 
-	"backend/dto/response"
 	myerrors "backend/internal/errors"
 )
 
@@ -516,8 +515,8 @@ func adapterModeForDecision(decision DataScopeDecision) AdapterExecutionMode {
 }
 
 func normalizeAdapterError(err error) error {
-	var adminError *response.AdminError
-	if errors.As(err, &adminError) {
+	var applicationError *myerrors.ApplicationError
+	if errors.As(err, &applicationError) {
 		return err
 	}
 	return myerrors.ErrDataPermissionAdapterFailed

@@ -269,7 +269,7 @@ func TestOrgServiceAssignmentHistoricalReferenceReplayAndWhitelist(t *testing.T)
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryBusiness,
+		apperrors.CategoryBusiness,
 		apperrors.ErrorCodeOrgAssignmentNotFound,
 	)
 }

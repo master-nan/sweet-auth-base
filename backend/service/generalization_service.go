@@ -159,7 +159,7 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 
 func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTable, data map[string]interface{}) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	filtered := filterDataByFields(table, data, true)
 	applyDefaultValues(table, filtered)
@@ -190,7 +190,7 @@ func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTabl
 
 func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTable, id int, data map[string]interface{}) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	filtered := filterDataByFields(table, data, false)
 	delete(filtered, "id")
@@ -218,7 +218,7 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 	data map[string]interface{},
 ) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	resolution, err := gs.resolveLowCodePermission(
 		ctx,
@@ -263,7 +263,7 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 
 func (gs *GeneralizationService) Delete(ctx context.Context, table model.SysTable, id int) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	if err := gs.ensureWritableRowExists(table, id); err != nil {
 		return err
@@ -289,7 +289,7 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 	id int,
 ) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	resolution, err := gs.resolveLowCodePermission(
 		ctx,
@@ -342,7 +342,7 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 	ids []int,
 ) error {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	ids, err := normalizeGeneralizationIds(ids)
 	if err != nil {
@@ -600,7 +600,7 @@ func validateDataByBindings(table model.SysTable, data map[string]interface{}, i
 		isRequired := !field.IsNull && field.IsInsertShow && !isManagedField(field.FieldCode)
 		if isCreate && isRequired {
 			if isEmptyValue(value, exists) {
-				return error2.NewBadRequestError(fmt.Sprintf("%s不能为空", field.FieldName))
+				return error2.NewValidationError(fmt.Sprintf("%s不能为空", field.FieldName))
 			}
 		}
 		if !exists {
@@ -608,7 +608,7 @@ func validateDataByBindings(table model.SysTable, data map[string]interface{}, i
 		}
 		if isEmptyValue(value, true) {
 			if !field.IsNull && !isManagedField(field.FieldCode) {
-				return error2.NewBadRequestError(fmt.Sprintf("%s不能为空", field.FieldName))
+				return error2.NewValidationError(fmt.Sprintf("%s不能为空", field.FieldName))
 			}
 			continue
 		}
@@ -634,27 +634,27 @@ func validateValueType(field model.SysTableField, value interface{}) error {
 	switch field.FieldType {
 	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
 		if _, ok := toInt(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是整数", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是整数", field.FieldName))
 		}
 	case enum.FloatFieldType:
 		if _, ok := toFloat(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是数字", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是数字", field.FieldName))
 		}
 	case enum.BooleanFieldType:
 		if _, ok := toBool(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是布尔值", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是布尔值", field.FieldName))
 		}
 	case enum.DateFieldType:
 		if _, ok := toDate(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是日期", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是日期", field.FieldName))
 		}
 	case enum.DatetimeFieldType:
 		if _, ok := toDateTime(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是日期时间", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是日期时间", field.FieldName))
 		}
 	case enum.TimeFieldType:
 		if _, ok := toTimeValue(value); !ok {
-			return error2.NewBadRequestError(fmt.Sprintf("%s必须是时间", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s必须是时间", field.FieldName))
 		}
 	}
 	return nil
@@ -679,17 +679,17 @@ func validateValueByBindings(field model.SysTableField, value interface{}, bindi
 	}
 	if hasBinding(bindings, "email") {
 		if !matchRegex(`^[^\s@]+@[^\s@]+\.[^\s@]+$`, value) {
-			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s格式不正确", field.FieldName))
 		}
 	}
 	if hasBinding(bindings, "url") {
 		if !isValidURL(value) {
-			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s格式不正确", field.FieldName))
 		}
 	}
 	if hasBinding(bindings, "phone") || hasBinding(bindings, "mobile") {
 		if !matchRegex(`^1\d{10}$`, value) {
-			return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+			return error2.NewValidationError(fmt.Sprintf("%s格式不正确", field.FieldName))
 		}
 	}
 	if hasBinding(bindings, "regex") || hasBinding(bindings, "regexp") {
@@ -699,7 +699,7 @@ func validateValueByBindings(field model.SysTableField, value interface{}, bindi
 		}
 		if pattern != "" {
 			if !matchRegex(pattern, value) {
-				return error2.NewBadRequestError(fmt.Sprintf("%s格式不正确", field.FieldName))
+				return error2.NewValidationError(fmt.Sprintf("%s格式不正确", field.FieldName))
 			}
 		}
 	}
@@ -751,7 +751,7 @@ func validateMin(field model.SysTableField, value interface{}, minStr string) er
 		if err == nil {
 			val, ok := toFloat(value)
 			if ok && val < minVal {
-				return error2.NewBadRequestError(fmt.Sprintf("%s不能小于%v", field.FieldName, minVal))
+				return error2.NewValidationError(fmt.Sprintf("%s不能小于%v", field.FieldName, minVal))
 			}
 		}
 		return nil
@@ -760,7 +760,7 @@ func validateMin(field model.SysTableField, value interface{}, minStr string) er
 	if err == nil {
 		val := fmt.Sprintf("%v", value)
 		if len(val) < minVal {
-			return error2.NewBadRequestError(fmt.Sprintf("%s长度不能小于%d", field.FieldName, minVal))
+			return error2.NewValidationError(fmt.Sprintf("%s长度不能小于%d", field.FieldName, minVal))
 		}
 	}
 	return nil
@@ -772,7 +772,7 @@ func validateMax(field model.SysTableField, value interface{}, maxStr string) er
 		if err == nil {
 			val, ok := toFloat(value)
 			if ok && val > maxVal {
-				return error2.NewBadRequestError(fmt.Sprintf("%s不能大于%v", field.FieldName, maxVal))
+				return error2.NewValidationError(fmt.Sprintf("%s不能大于%v", field.FieldName, maxVal))
 			}
 		}
 		return nil
@@ -781,7 +781,7 @@ func validateMax(field model.SysTableField, value interface{}, maxStr string) er
 	if err == nil {
 		val := fmt.Sprintf("%v", value)
 		if len(val) > maxVal {
-			return error2.NewBadRequestError(fmt.Sprintf("%s长度不能超过%d", field.FieldName, maxVal))
+			return error2.NewValidationError(fmt.Sprintf("%s长度不能超过%d", field.FieldName, maxVal))
 		}
 	}
 	return nil

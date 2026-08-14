@@ -220,7 +220,7 @@ func buildAccessLogQueryBasic(req request.AccessLogQueryReq) (*request.Basic, er
 		return nil, err
 	}
 	if startTime != nil && endTime != nil && startTime.After(*endTime) {
-		return nil, error2.NewBadRequestError("开始时间不能晚于结束时间")
+		return nil, error2.NewValidationError("开始时间不能晚于结束时间")
 	}
 	if startTime != nil {
 		rules = append(rules, accessLogRule("gmt_create", enum.Gte, *startTime, enum.DatetimeFieldType))
@@ -260,7 +260,7 @@ func parseAccessLogQueryTime(value string) (*time.Time, error) {
 			return &parsed, nil
 		}
 	}
-	return nil, error2.NewBadRequestError("时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss")
+	return nil, error2.NewValidationError("时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss")
 }
 
 func (ls *LogService) GetAccessLogById(ctx context.Context, id int) (model.AccessLog, error) {

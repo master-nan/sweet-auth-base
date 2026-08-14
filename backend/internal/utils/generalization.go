@@ -88,7 +88,6 @@ func integralFloatToInt(value float64) (int, bool) {
 	return converted, true
 }
 
-
 func FlattenMenus(menus []model.SysMenu) []model.SysMenu {
 	result := make([]model.SysMenu, 0, len(menus))
 	var walk func(items []model.SysMenu)

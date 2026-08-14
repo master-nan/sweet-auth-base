@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"backend/dto/response"
 	myerrors "backend/internal/errors"
 )
 
@@ -717,8 +716,8 @@ func assertRegisteredAdapterError(t *testing.T, err error, code int) {
 }
 
 func isAdminErrorCode(err error, code int) bool {
-	var adminError *response.AdminError
-	return errors.As(err, &adminError) && adminError.ErrorCode == code
+	var adminError *myerrors.ApplicationError
+	return errors.As(err, &adminError) && adminError.Code == code
 }
 
 func defaultString(value string, fallback string) string {

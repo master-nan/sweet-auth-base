@@ -96,7 +96,7 @@ func TestOrgServiceStructureQueriesRespectMetadataScopeAndLegalEntity(t *testing
 	assertOrganizationResponseDoesNotLeakSourceFields(t, detail)
 
 	_, err = orgService.GetStructureDetail(nil, 999, request.OrgStructureDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgStructureNotFound)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgStructureNotFound)
 
 	options, err := orgService.QueryStructureOptions(nil, request.OrgStructureOptionsReq{
 		Page:          1,
@@ -340,7 +340,7 @@ func TestOrgServiceStructureTreePreservesNodeIdentityAndSearchContext(t *testing
 		RootOrgUnitId:   &rootOrgUnitId,
 		OrgReadScopeReq: request.OrgReadScopeReq{IncludeDisabled: true},
 	})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgTreeRootAmbiguous)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgTreeRootAmbiguous)
 
 	searched, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
 		StructureId: structure.Id,
@@ -385,7 +385,7 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 			_, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
 				StructureId: structure.Id,
 			})
-			assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgStructureCycle)
+			assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgStructureCycle)
 		}
 	})
 
@@ -396,7 +396,7 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 		_, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
 			StructureId: structure.Id,
 		})
-		assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgStructureInactive)
+		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgStructureInactive)
 	})
 
 	t.Run("missing structure and root node", func(t *testing.T) {
@@ -404,7 +404,7 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 		_, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
 			StructureId: 999,
 		})
-		assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgStructureNotFound)
+		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgStructureNotFound)
 
 		structure := managementStructureFixture(10, "MGMT", "行政架构", "enabled")
 		testutil.MustCreate(t, db, &structure)
@@ -413,7 +413,7 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 			StructureId: structure.Id,
 			RootNodeId:  &rootNodeId,
 		})
-		assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgStructureNodeMissing)
+		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgStructureNodeMissing)
 	})
 
 	t.Run("maximum nodes", func(t *testing.T) {
@@ -426,7 +426,7 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 		_, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
 			StructureId: structure.Id,
 		})
-		assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgTreeTooLarge)
+		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgTreeTooLarge)
 	})
 }
 

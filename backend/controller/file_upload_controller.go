@@ -34,7 +34,7 @@ func (c *FileUploadController) Upload(ctx *gin.Context) {
 	middleware.SetAuditContext(ctx, middleware.AuditContext{Action: "upload", ResourceType: "file", ResourceCode: "file"})
 	fileHeader, err := ctx.FormFile("file")
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError("请选择要上传的文件"))
+		_ = ctx.Error(myerrors.NewValidationError("请选择要上传的文件"))
 		return
 	}
 	result, err := c.service.UploadResponse(ctx.Request.Context(), fileAccessActor(ctx), fileHeader)
@@ -88,7 +88,7 @@ func (c *FileUploadController) UploadChunk(ctx *gin.Context) {
 	}
 	fileHeader, err := ctx.FormFile("file")
 	if err != nil {
-		_ = ctx.Error(myerrors.NewBadRequestError("请选择要上传的分片文件"))
+		_ = ctx.Error(myerrors.NewValidationError("请选择要上传的分片文件"))
 		return
 	}
 	if err = c.service.UploadChunk(ctx.Request.Context(), fileAccessActor(ctx), uploadID, chunkIndex, fileHeader); err != nil {

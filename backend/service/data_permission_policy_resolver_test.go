@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"backend/dto/response"
 	"backend/internal/database"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
@@ -479,12 +478,12 @@ func mustUpdatePolicyResolverField(
 
 func assertPolicyResolverError(t *testing.T, err error, code int) {
 	t.Helper()
-	var adminError *response.AdminError
+	var adminError *myerrors.ApplicationError
 	if !errors.As(err, &adminError) {
 		t.Fatalf("expected AdminError, got %T: %v", err, err)
 	}
-	if adminError.ErrorCode != code {
-		t.Fatalf("error code = %d, want %d", adminError.ErrorCode, code)
+	if adminError.Code != code {
+		t.Fatalf("error code = %d, want %d", adminError.Code, code)
 	}
 }
 

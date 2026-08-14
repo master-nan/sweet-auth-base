@@ -161,7 +161,7 @@ func TestOrgServiceQueryLegalEntitiesHonorsAsOfDateInclusiveBoundaries(t *testin
 	_, err = service.QueryLegalEntities(nil, request.OrgLegalEntityQueryReq{
 		OrgLegalEntityReadScopeReq: request.OrgLegalEntityReadScopeReq{AsOfDate: "2026/01/01"},
 	}, orgServiceLegalEntityTable())
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryParameter, apperrors.ErrorCodeParamInvalid)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryParameter, apperrors.ErrorCodeParamInvalid)
 }
 
 func TestOrgServiceQueryLegalEntitiesNeverExposesPlatformSoftDeletedRows(t *testing.T) {
@@ -212,15 +212,15 @@ func TestOrgServiceGetLegalEntityDetailUsesInternalIDAndSafeDTO(t *testing.T) {
 	}
 
 	_, err = service.GetLegalEntityDetail(nil, 0, request.OrgLegalEntityDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryParameter, apperrors.ErrorCodeParamInvalid)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryParameter, apperrors.ErrorCodeParamInvalid)
 
 	_, err = service.GetLegalEntityDetail(nil, 999, request.OrgLegalEntityDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgLegalEntityNotFound)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgLegalEntityNotFound)
 
 	disabled := orgServiceLegalEntity(11, "LE-011", "Disabled", "Disabled", "disabled", nil, nil)
 	testutil.MustCreate(t, db, &disabled)
 	_, err = service.GetLegalEntityDetail(nil, disabled.Id, request.OrgLegalEntityDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgLegalEntityNotFound)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgLegalEntityNotFound)
 
 	detail, err = service.GetLegalEntityDetail(nil, disabled.Id, request.OrgLegalEntityDetailReq{
 		OrgLegalEntityReadScopeReq: request.OrgLegalEntityReadScopeReq{IncludeDisabled: true},
@@ -281,7 +281,7 @@ func TestOrgServiceGetLegalEntityTreeSupportsRootsSubtreesOrphansAndCycles(t *te
 		testutil.MustCreate(t, db, &[]model.OrgLegalEntity{first, second})
 
 		_, err := service.GetLegalEntityTree(nil, request.OrgLegalEntityTreeReq{})
-		assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgLegalEntityCycle)
+		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgLegalEntityCycle)
 	})
 }
 
@@ -424,18 +424,18 @@ func orgServiceBoolPointer(value bool) *bool {
 func assertOrgServiceAdminError(
 	t *testing.T,
 	err error,
-	category response.ErrorCategory,
+	category apperrors.Category,
 	code int,
 ) {
 	t.Helper()
 	if err == nil {
 		t.Fatal("expected AdminError")
 	}
-	var adminErr *response.AdminError
+	var adminErr *apperrors.ApplicationError
 	if !errors.As(err, &adminErr) {
 		t.Fatalf("expected AdminError, got %T: %v", err, err)
 	}
-	if adminErr.Category != category || adminErr.ErrorCode != code {
+	if adminErr.Category != category || adminErr.Code != code {
 		t.Fatalf("unexpected AdminError: %+v", adminErr)
 	}
 }

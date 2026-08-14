@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/config"
-	"backend/dto/response"
 	"backend/enum"
 	"backend/internal/cache"
 	"backend/internal/errors"
@@ -133,7 +132,7 @@ func (s *AuthTokenService) ValidateAccess(_ context.Context, value string) (*tok
 func (s *AuthTokenService) ValidateRefresh(_ context.Context, value string) (*token.Claims, error) {
 	claims, err := s.validate(value, enum.RefreshToken)
 	if err != nil {
-		if errors.CategoryOf(err) == response.ErrorCategorySystem {
+		if errors.CategoryOf(err) == errors.CategorySystem {
 			return nil, err
 		}
 		return nil, errors.ErrInvalidRefreshToken

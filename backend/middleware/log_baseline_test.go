@@ -93,7 +93,7 @@ func TestLogHandlerRecordsFailedAuditWithSafeError(t *testing.T) {
 			ResourceType: "baseline_resource",
 			ResourceID:   "99",
 		})
-		_ = ctx.Error(myerrors.NewBusinessError(http.StatusConflict, 81001, "记录冲突"))
+		_ = ctx.Error(myerrors.WrapApplicationError(nil, myerrors.KindConflict, myerrors.CategoryBusiness, 81001, "记录冲突"))
 	})
 
 	recorder := httptest.NewRecorder()

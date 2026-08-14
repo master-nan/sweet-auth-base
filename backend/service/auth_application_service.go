@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	stderrors "errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -320,11 +321,18 @@ func (s *AuthApplicationService) recordStatus(ctx context.Context, req Authentic
 }
 
 func authAuditHTTPStatus(err error) int {
-	clientErr, _ := errors.ToClientError(err)
-	if clientErr == nil || clientErr.StatusCode <= 0 {
-		return 500
+	switch errors.KindOf(err) {
+	case errors.KindInvalidArgument:
+		return http.StatusBadRequest
+	case errors.KindUnauthenticated:
+		return http.StatusUnauthorized
+	case errors.KindForbidden:
+		return http.StatusForbidden
+	case errors.KindRateLimited:
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
 	}
-	return clientErr.StatusCode
 }
 
 func authenticationAttemptKey(verification CredentialVerification) string {

@@ -6,7 +6,6 @@
 package middleware
 
 import (
-	"backend/dto/response"
 	"backend/internal/errors"
 	"runtime/debug"
 
@@ -28,7 +27,8 @@ func CustomRecovery() gin.HandlerFunc {
 					zap.String("stack", string(debug.Stack())),
 				)
 				if !c.Writer.Written() {
-					c.AbortWithStatusJSON(errors.ErrInternalServer.(*response.AdminError).StatusCode, errors.ErrInternalServer)
+					clientErr, _ := toClientError(errors.ErrInternalServer)
+					c.AbortWithStatusJSON(clientErr.StatusCode, clientErr)
 					return
 				}
 				c.Abort()

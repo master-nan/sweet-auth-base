@@ -6,6 +6,7 @@
 package middleware
 
 import (
+	"backend/dto/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"net/http"
@@ -14,9 +15,11 @@ import (
 func NoRouteHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		zap.L().Info("NoRouteHandler start")
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-			"errorCode": http.StatusNotFound,
-			"message":   "请求的资源不存在",
+		c.AbortWithStatusJSON(http.StatusNotFound, response.AdminError{
+			StatusCode:   http.StatusNotFound,
+			ErrorCode:    http.StatusNotFound,
+			ErrorMessage: "请求的资源不存在",
+			Success:      false,
 		})
 		zap.L().Info("NoRouteHandler end")
 	}

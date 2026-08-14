@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/dto/response"
 	"backend/enum"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -189,9 +188,9 @@ func TestOrgServiceEmployeeScopeBindingDetailAndOptions(t *testing.T) {
 	}
 
 	_, err = orgService.GetEmployeeDetail(nil, 0, request.OrgEmployeeDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryParameter, apperrors.ErrorCodeParamInvalid)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryParameter, apperrors.ErrorCodeParamInvalid)
 	_, err = orgService.GetEmployeeDetail(nil, 999, request.OrgEmployeeDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgEmployeeNotFound)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgEmployeeNotFound)
 
 	options, err := orgService.QueryEmployeeOptions(nil, request.OrgEmployeeOptionsReq{
 		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{
@@ -219,7 +218,7 @@ func TestOrgServiceEmployeeScopeBindingDetailAndOptions(t *testing.T) {
 	_, err = orgService.QueryEmployeeOptions(nil, request.OrgEmployeeOptionsReq{
 		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{SelectedIds: tooMany},
 	}, table)
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryParameter, apperrors.ErrorCodeParamInvalid)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryParameter, apperrors.ErrorCodeParamInvalid)
 }
 
 func TestOrgServiceEmployeeListBatchesBoundAccountLookup(t *testing.T) {
@@ -341,7 +340,7 @@ func TestOrgServicePositionQueryDetailAndOptions(t *testing.T) {
 	}
 	assertOrganizationResponseDoesNotLeakSourceFields(t, detail)
 	_, err = orgService.GetPositionDetail(nil, 999, request.OrgPositionDetailReq{})
-	assertOrgServiceAdminError(t, err, response.ErrorCategoryBusiness, apperrors.ErrorCodeOrgPositionNotFound)
+	assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgPositionNotFound)
 
 	options, err := orgService.QueryPositionOptions(nil, request.OrgPositionOptionsReq{
 		OrgSelectorOptionsReq: request.OrgSelectorOptionsReq{

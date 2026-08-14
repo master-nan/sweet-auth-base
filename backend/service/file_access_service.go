@@ -254,7 +254,7 @@ func contentDisposition(disposition, fileName string) string {
 
 func parseFileAccessTTL(raw string, upload config.Upload) (time.Duration, error) {
 	if upload.AccessTTLMinutes <= 0 {
-		return 0, myerrors.NewBadRequestError("文件访问有效期配置错误")
+		return 0, myerrors.NewValidationError("文件访问有效期配置错误")
 	}
 	maxMinutes := upload.MaxAccessTTLMinutes
 	if maxMinutes <= 0 {

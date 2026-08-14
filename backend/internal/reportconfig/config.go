@@ -110,10 +110,10 @@ type CellBinding struct {
 func Parse(queryRaw datatypes.JSON, layoutRaw datatypes.JSON) (Config, error) {
 	var config Config
 	if err := unmarshalJSON(queryRaw, &config.Query); err != nil {
-		return config, myerrors.NewBadRequestError("报表 query_config 结构不合法")
+		return config, myerrors.NewValidationError("报表 query_config 结构不合法")
 	}
 	if err := unmarshalJSON(layoutRaw, &config.Layout); err != nil {
-		return config, myerrors.NewBadRequestError("报表 layout_config 结构不合法")
+		return config, myerrors.NewValidationError("报表 layout_config 结构不合法")
 	}
 	if err := validateDatasets(config.Datasets()); err != nil {
 		return config, err
@@ -188,14 +188,14 @@ func validateDatasets(datasets []Dataset) error {
 		switch normalized.Type {
 		case SourceTypeTable:
 			if normalized.SourceCode == "" {
-				return myerrors.NewBadRequestError("报表表数据集缺少 source_code")
+				return myerrors.NewValidationError("报表表数据集缺少 source_code")
 			}
 		case SourceTypeSQL:
 			if normalized.SQL == "" {
-				return myerrors.NewBadRequestError("报表 SQL 数据集缺少 sql")
+				return myerrors.NewValidationError("报表 SQL 数据集缺少 sql")
 			}
 		default:
-			return myerrors.NewBadRequestError("报表数据集类型不合法")
+			return myerrors.NewValidationError("报表数据集类型不合法")
 		}
 	}
 	return nil
@@ -218,21 +218,21 @@ func validateDatasetJoins(datasets []Dataset, joins []DatasetJoin) error {
 		leftField := strings.TrimSpace(join.LeftField)
 		rightField := strings.TrimSpace(join.RightField)
 		if leftID == "" || rightID == "" || leftField == "" || rightField == "" {
-			return myerrors.NewBadRequestError("报表数据集关联配置不完整")
+			return myerrors.NewValidationError("报表数据集关联配置不完整")
 		}
 		if leftID == rightID {
-			return myerrors.NewBadRequestError("报表数据集关联不能指向同一数据集")
+			return myerrors.NewValidationError("报表数据集关联不能指向同一数据集")
 		}
 		if _, ok := datasetByID[leftID]; !ok {
-			return myerrors.NewBadRequestError("报表数据集关联左侧数据集不存在")
+			return myerrors.NewValidationError("报表数据集关联左侧数据集不存在")
 		}
 		if _, ok := datasetByID[rightID]; !ok {
-			return myerrors.NewBadRequestError("报表数据集关联右侧数据集不存在")
+			return myerrors.NewValidationError("报表数据集关联右侧数据集不存在")
 		}
 		switch strings.ToLower(strings.TrimSpace(join.JoinType)) {
 		case "", "left", "inner":
 		default:
-			return myerrors.NewBadRequestError("报表数据集关联类型不合法")
+			return myerrors.NewValidationError("报表数据集关联类型不合法")
 		}
 	}
 	return nil

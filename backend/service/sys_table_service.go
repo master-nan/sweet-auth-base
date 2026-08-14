@@ -105,17 +105,17 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 	}
 	masterDetailMode, ok := enum.NormalizeSysMasterDetailMode(string(req.MasterDetailMode))
 	if !ok {
-		return fmt.Errorf("主子表展示模式不合法: %s", req.MasterDetailMode)
+		return myerrors.NewParameterError("主子表展示模式不合法")
 	}
 	req.MasterDetailMode = masterDetailMode
 	formOpenMode, ok := enum.NormalizeSysFormOpenMode(string(req.FormOpenMode))
 	if !ok {
-		return fmt.Errorf("表单打开方式不合法: %s", req.FormOpenMode)
+		return myerrors.NewParameterError("表单打开方式不合法")
 	}
 	req.FormOpenMode = formOpenMode
 	detailOpenMode, ok := enum.NormalizeSysDetailOpenMode(string(req.DetailOpenMode))
 	if !ok {
-		return fmt.Errorf("详情打开方式不合法: %s", req.DetailOpenMode)
+		return myerrors.NewParameterError("详情打开方式不合法")
 	}
 	req.DetailOpenMode = detailOpenMode
 	var data model.SysTable
@@ -132,7 +132,7 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 			return err
 		}
 	} else if strings.TrimSpace(req.SQL) != "" {
-		return myerrors.NewBadRequestError("普通表不允许配置视图SQL")
+		return myerrors.NewValidationError("普通表不允许配置视图SQL")
 	}
 	err = copier.Copy(&data, &req)
 	if err != nil {
@@ -252,7 +252,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 		updateReq.TableCode = current.TableCode
 	}
 	if updateReq.TableCode != current.TableCode {
-		return myerrors.NewBadRequestError("表编码是跨模块稳定标识，创建后不可修改")
+		return myerrors.NewValidationError("表编码是跨模块稳定标识，创建后不可修改")
 	}
 	if updateReq.TableType == 0 {
 		updateReq.TableType = current.TableType
@@ -266,7 +266,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 	} else {
 		masterDetailMode, ok := enum.NormalizeSysMasterDetailMode(string(updateReq.MasterDetailMode))
 		if !ok {
-			return fmt.Errorf("主子表展示模式不合法: %s", updateReq.MasterDetailMode)
+			return myerrors.NewParameterError("主子表展示模式不合法")
 		}
 		updateReq.MasterDetailMode = masterDetailMode
 	}
@@ -276,7 +276,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 	} else {
 		formOpenMode, ok := enum.NormalizeSysFormOpenMode(string(updateReq.FormOpenMode))
 		if !ok {
-			return fmt.Errorf("表单打开方式不合法: %s", updateReq.FormOpenMode)
+			return myerrors.NewParameterError("表单打开方式不合法")
 		}
 		updateReq.FormOpenMode = formOpenMode
 	}
@@ -286,7 +286,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 	} else {
 		detailOpenMode, ok := enum.NormalizeSysDetailOpenMode(string(updateReq.DetailOpenMode))
 		if !ok {
-			return fmt.Errorf("详情打开方式不合法: %s", updateReq.DetailOpenMode)
+			return myerrors.NewParameterError("详情打开方式不合法")
 		}
 		updateReq.DetailOpenMode = detailOpenMode
 	}
@@ -326,7 +326,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 		return nil
 	}
 	if strings.TrimSpace(updateReq.SQL) != "" {
-		return myerrors.NewBadRequestError("普通表不允许配置视图SQL")
+		return myerrors.NewValidationError("普通表不允许配置视图SQL")
 	}
 
 	tx := s.sysTableRepo.DBWithContext(ctx)
@@ -614,7 +614,7 @@ const maxDBIdentifierLength = 63
 
 func validateMetadataTableType(tableType enum.SysTableType) error {
 	if tableType != enum.System && tableType != enum.View {
-		return myerrors.NewBadRequestError("表类型不合法")
+		return myerrors.NewValidationError("表类型不合法")
 	}
 	return nil
 }
@@ -625,7 +625,7 @@ func validateMetadataViewSQL(raw string) (string, error) {
 		return "", myerrors.ErrTableViewSQLEmpty
 	}
 	if err != nil {
-		return "", myerrors.NewBadRequestError("视图仅允许单条SELECT/WITH只读查询")
+		return "", myerrors.NewValidationError("视图仅允许单条SELECT/WITH只读查询")
 	}
 	return query, nil
 }
@@ -633,18 +633,18 @@ func validateMetadataViewSQL(raw string) (string, error) {
 func normalizeDBIdentifier(name, value string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return "", myerrors.NewBadRequestError(fmt.Sprintf("%s不能为空", name))
+		return "", myerrors.NewValidationError(fmt.Sprintf("%s不能为空", name))
 	}
 	if len(trimmed) > maxDBIdentifierLength {
-		return "", myerrors.NewBadRequestError(fmt.Sprintf("%s长度不能超过%d", name, maxDBIdentifierLength))
+		return "", myerrors.NewValidationError(fmt.Sprintf("%s长度不能超过%d", name, maxDBIdentifierLength))
 	}
 	for i := 0; i < len(trimmed); i++ {
 		ch := trimmed[i]
 		if !isDBIdentifierChar(ch) {
-			return "", myerrors.NewBadRequestError(fmt.Sprintf("%s只能包含字母、数字、下划线", name))
+			return "", myerrors.NewValidationError(fmt.Sprintf("%s只能包含字母、数字、下划线", name))
 		}
 		if i == 0 && ch >= '0' && ch <= '9' {
-			return "", myerrors.NewBadRequestError(fmt.Sprintf("%s不能以数字开头", name))
+			return "", myerrors.NewValidationError(fmt.Sprintf("%s不能以数字开头", name))
 		}
 	}
 	return trimmed, nil
@@ -670,7 +670,7 @@ func validateTableIndexFields(table model.SysTable, indexFields []request.TableI
 		return nil, nil, myerrors.ErrDataNotFound
 	}
 	if len(indexFields) == 0 {
-		return nil, nil, myerrors.NewBadRequestError("索引字段不能为空")
+		return nil, nil, myerrors.NewValidationError("索引字段不能为空")
 	}
 	fieldByID := make(map[int]model.SysTableField, len(table.TableFields))
 	for _, field := range table.TableFields {
@@ -681,7 +681,7 @@ func validateTableIndexFields(table model.SysTable, indexFields []request.TableI
 	fieldCodeList := make([]string, 0, len(indexFields))
 	for _, indexField := range indexFields {
 		if indexField.TableId != table.Id {
-			return nil, nil, myerrors.NewBadRequestError("索引字段不属于当前表")
+			return nil, nil, myerrors.NewValidationError("索引字段不属于当前表")
 		}
 		fieldCode, err := normalizeDBIdentifier("索引字段编码", indexField.FieldCode)
 		if err != nil {
@@ -689,13 +689,13 @@ func validateTableIndexFields(table model.SysTable, indexFields []request.TableI
 		}
 		field, ok := fieldByID[indexField.FieldId]
 		if !ok {
-			return nil, nil, myerrors.NewBadRequestError("索引字段不存在")
+			return nil, nil, myerrors.NewValidationError("索引字段不存在")
 		}
 		if field.FieldCode != fieldCode {
-			return nil, nil, myerrors.NewBadRequestError("索引字段ID和字段编码不匹配")
+			return nil, nil, myerrors.NewValidationError("索引字段ID和字段编码不匹配")
 		}
 		if _, ok := seen[indexField.FieldId]; ok {
-			return nil, nil, myerrors.NewBadRequestError("索引字段不能重复")
+			return nil, nil, myerrors.NewValidationError("索引字段不能重复")
 		}
 		seen[indexField.FieldId] = struct{}{}
 		normalizedFields = append(normalizedFields, request.TableIndexFieldReq{
@@ -752,7 +752,7 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	}
 	var envelope tableFieldLinkageEnvelope
 	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
-		return "", myerrors.NewBadRequestError("联动配置JSON格式不正确")
+		return "", myerrors.NewValidationError("联动配置JSON格式不正确")
 	}
 	if envelope.Linkage == nil || !envelope.Linkage.Enabled {
 		return raw, nil
@@ -761,20 +761,20 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	switch cfg.Mode {
 	case "relation", "cascader":
 	default:
-		return "", myerrors.NewBadRequestError("联动配置mode仅支持relation或cascader")
+		return "", myerrors.NewValidationError("联动配置mode仅支持relation或cascader")
 	}
 	if strings.TrimSpace(cfg.TableCode) == "" {
-		return "", myerrors.NewBadRequestError("联动配置必须指定tableCode")
+		return "", myerrors.NewValidationError("联动配置必须指定tableCode")
 	}
 	if cfg.PageSize < 0 || cfg.PageSize > 1000 {
-		return "", myerrors.NewBadRequestError("联动配置pageSize必须在0到1000之间")
+		return "", myerrors.NewValidationError("联动配置pageSize必须在0到1000之间")
 	}
 	relatedTable, err := resolveTable(cfg)
 	if err != nil {
 		return "", err
 	}
 	if relatedTable.Id == 0 {
-		return "", myerrors.NewBadRequestError("联动配置关联表不存在")
+		return "", myerrors.NewValidationError("联动配置关联表不存在")
 	}
 	currentFields := tableFieldCodeSet(currentTable.TableFields)
 	if strings.TrimSpace(currentFieldCode) != "" {
@@ -796,19 +796,19 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 		return "", err
 	}
 	if cfg.Mode == "cascader" && strings.TrimSpace(cfg.ParentKey) == strings.TrimSpace(cfg.ValueKey) {
-		return "", myerrors.NewBadRequestError("级联配置父级字段不能和取值字段相同")
+		return "", myerrors.NewValidationError("级联配置父级字段不能和取值字段相同")
 	}
 	for targetField, sourceField := range cfg.FilterMapping {
 		targetField = strings.TrimSpace(targetField)
 		sourceField = strings.TrimSpace(sourceField)
 		if targetField == "" || sourceField == "" {
-			return "", myerrors.NewBadRequestError("联动配置filterMapping不能为空")
+			return "", myerrors.NewValidationError("联动配置filterMapping不能为空")
 		}
 		if _, ok := relatedFields[targetField]; !ok {
-			return "", myerrors.NewBadRequestError(fmt.Sprintf("联动配置filterMapping目标字段%s不存在", targetField))
+			return "", myerrors.NewValidationError(fmt.Sprintf("联动配置filterMapping目标字段%s不存在", targetField))
 		}
 		if _, ok := currentFields[sourceField]; !ok {
-			return "", myerrors.NewBadRequestError(fmt.Sprintf("联动配置filterMapping源字段%s不存在", sourceField))
+			return "", myerrors.NewValidationError(fmt.Sprintf("联动配置filterMapping源字段%s不存在", sourceField))
 		}
 	}
 	if strings.TrimSpace(cfg.TableCode) != "" || strings.TrimSpace(relatedTable.TableCode) == "" {
@@ -816,7 +816,7 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	}
 	var payload map[string]interface{}
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
-		return "", myerrors.NewBadRequestError("联动配置JSON格式不正确")
+		return "", myerrors.NewValidationError("联动配置JSON格式不正确")
 	}
 	linkage, ok := payload["linkage"].(map[string]interface{})
 	if !ok {
@@ -844,7 +844,7 @@ func validateOptionalLinkageField(name, fieldCode string, fields map[string]stru
 		return nil
 	}
 	if _, ok := fields[fieldCode]; !ok {
-		return myerrors.NewBadRequestError(fmt.Sprintf("联动配置%s字段%s不存在", name, fieldCode))
+		return myerrors.NewValidationError(fmt.Sprintf("联动配置%s字段%s不存在", name, fieldCode))
 	}
 	return nil
 }
@@ -1153,13 +1153,13 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 
 func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableCode string) error {
 	if relationType < enum.OneToOne || relationType > enum.ManyToMany {
-		return myerrors.NewBadRequestError("关系类型不合法")
+		return myerrors.NewValidationError("关系类型不合法")
 	}
 	if relationType == enum.ManyToMany && manyTableCode == "" {
-		return myerrors.NewBadRequestError("多对多关系必须指定中间表编码")
+		return myerrors.NewValidationError("多对多关系必须指定中间表编码")
 	}
 	if relationType != enum.ManyToMany && manyTableCode != "" {
-		return myerrors.NewBadRequestError("非多对多关系不允许配置中间表")
+		return myerrors.NewValidationError("非多对多关系不允许配置中间表")
 	}
 	return nil
 }
@@ -1272,7 +1272,7 @@ func (s *SysTableService) UpdateTableIndex(ctx context.Context, req request.Tabl
 		return myerrors.ErrDataNotFound
 	}
 	if oldIndex.TableId != req.TableId {
-		return myerrors.NewBadRequestError("索引不能切换所属表")
+		return myerrors.NewValidationError("索引不能切换所属表")
 	}
 	if req.IndexName, err = normalizeDBIdentifier("索引名称", req.IndexName); err != nil {
 		return err
@@ -1719,7 +1719,7 @@ func (s *SysTableService) ensureTableCanPublishLowCode(tx *gorm.DB, table model.
 	if title == "" {
 		title = menu.Name
 	}
-	return myerrors.NewBadRequestError(fmt.Sprintf("表 %s 已绑定固定菜单 %s，不能发布成低代码页面", table.TableCode, title))
+	return myerrors.NewValidationError(fmt.Sprintf("表 %s 已绑定固定菜单 %s，不能发布成低代码页面", table.TableCode, title))
 }
 
 // resolvePublishParentMenu 解析低代码页面发布目录。
@@ -1731,15 +1731,15 @@ func (s *SysTableService) resolvePublishParentMenu(tx *gorm.DB, parentID int) (i
 	menu, err := s.sysMenuRepo.FindById(parentID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, myerrors.NewBadRequestError("发布目录不存在")
+			return 0, myerrors.NewValidationError("发布目录不存在")
 		}
 		return 0, err
 	}
 	if menu.IsHidden || !menu.State {
-		return 0, myerrors.NewBadRequestError("发布目录不可用")
+		return 0, myerrors.NewValidationError("发布目录不可用")
 	}
 	if !isLowCodePublishParentMenu(menu) {
-		return 0, myerrors.NewBadRequestError("低代码页面只能发布到目录菜单下")
+		return 0, myerrors.NewValidationError("低代码页面只能发布到目录菜单下")
 	}
 	return menu.Id, nil
 }
@@ -1971,7 +1971,7 @@ func (s *SysTableService) ensureDefaultCrudButtons(tx *gorm.DB, tableCode string
 		return nil, err
 	}
 	if len(templates) == 0 {
-		return nil, myerrors.NewBadRequestError("低代码默认按钮模板未初始化")
+		return nil, myerrors.NewValidationError("低代码默认按钮模板未初始化")
 	}
 	defaults := lowCodeDefaultMenuButtons(tableCode, templates)
 	buttonIDs := make([]int, 0, len(defaults))

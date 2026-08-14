@@ -334,8 +334,8 @@ func lowCodeRuntimeFilteredResult(
 
 func assertLowCodeRuntimeErrorCode(t *testing.T, err error, want int) {
 	t.Helper()
-	clientError, classified := myerrors.ToClientError(err)
-	if !classified || clientError.ErrorCode != want {
+	clientError, classified := myerrors.Classify(err)
+	if !classified || clientError.Code != want {
 		t.Fatalf("error = %v, code = %v, want %d", err, clientError, want)
 	}
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 
 	"backend/dto/response"
@@ -274,9 +273,10 @@ func intValuesAsAny(values []int) []any {
 }
 
 func wrapDimensionProviderFailure(cause error) error {
-	return myerrors.WrapBusinessError(
+	return myerrors.WrapApplicationError(
 		cause,
-		http.StatusServiceUnavailable,
+		myerrors.KindUnavailable,
+		myerrors.CategoryBusiness,
 		myerrors.ErrorCodeDataPermissionDimensionProviderFailed,
 		"数据权限维度Provider调用失败",
 	)

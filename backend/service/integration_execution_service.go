@@ -411,7 +411,7 @@ func (s *IntegrationExecutionService) CancelExecution(
 }
 
 func integrationExecutionReadError(err error) error {
-	if myerrors.CategoryOf(err) != response.ErrorCategorySystem {
+	if myerrors.CategoryOf(err) != myerrors.CategorySystem {
 		return err
 	}
 	return myerrors.WrapDatabaseError(err)

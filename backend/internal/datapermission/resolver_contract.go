@@ -3,10 +3,8 @@ package datapermission
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 
-	"backend/dto/response"
 	myerrors "backend/internal/errors"
 )
 
@@ -98,17 +96,18 @@ func (resolve ResolverFunc) Resolve(
 }
 
 func normalizeResolverError(err error) error {
-	var adminError *response.AdminError
-	if errors.As(err, &adminError) {
+	var applicationError *myerrors.ApplicationError
+	if errors.As(err, &applicationError) {
 		return err
 	}
 	return wrapResolverFailure(err)
 }
 
 func wrapResolverFailure(cause error) error {
-	return myerrors.WrapBusinessError(
+	return myerrors.WrapApplicationError(
 		cause,
-		http.StatusInternalServerError,
+		myerrors.KindInternal,
+		myerrors.CategoryBusiness,
 		myerrors.ErrorCodeDataPermissionResolverFailed,
 		"数据权限解析失败",
 	)

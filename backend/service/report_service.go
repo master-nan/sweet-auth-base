@@ -157,7 +157,7 @@ func (s *ReportService) GetDataSources() ([]response.ReportDataSourceRes, error)
 
 func (s *ReportService) ResolveRuntimeTable(ctx context.Context, tableCode string) (model.SysTable, error) {
 	if s == nil || s.metadataRuntime == nil {
-		return model.SysTable{}, myerrors.NewBadRequestError("报表元数据服务未初始化")
+		return model.SysTable{}, myerrors.NewValidationError("报表元数据服务未初始化")
 	}
 	table, err := s.metadataRuntime.GetTable(ctx, tableCode)
 	if errors.Is(err, myerrors.ErrDataNotFound) {
@@ -171,7 +171,7 @@ func (s *ReportService) ResolveRuntimeTable(ctx context.Context, tableCode strin
 
 func (s *ReportService) InferSQLFields(ctx *gin.Context, req request.ReportSQLFieldsReq) ([]response.ReportPreviewColumn, error) {
 	if s.reportRepo == nil {
-		return nil, myerrors.NewBadRequestError("报表数据仓储未初始化")
+		return nil, myerrors.NewValidationError("报表数据仓储未初始化")
 	}
 	sqlText, err := safeReportPreviewSQL(req.SQL)
 	if err != nil {
@@ -196,7 +196,7 @@ func (s *ReportService) CreateReportDefinition(ctx *gin.Context, req request.Rep
 		return 0, err
 	}
 	if existing.Id != 0 {
-		return 0, myerrors.NewBadRequestError("报表编码已存在")
+		return 0, myerrors.NewValidationError("报表编码已存在")
 	}
 	id, err := s.sf.GenerateUniqueID()
 	if err != nil {
@@ -216,7 +216,7 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 		return err
 	}
 	if existing.Id != 0 && existing.Id != req.Id {
-		return myerrors.NewBadRequestError("报表编码已存在")
+		return myerrors.NewValidationError("报表编码已存在")
 	}
 	current, err := s.reportRepo.FindById(req.Id)
 	if err != nil {
@@ -226,7 +226,7 @@ func (s *ReportService) UpdateReportDefinition(ctx *gin.Context, req request.Rep
 		return err
 	}
 	if report.Status == reportStatusPublished && current.PublishedVersionId <= 0 {
-		return myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
+		return myerrors.NewValidationError("发布报表必须调用 /admin/report/:id/publish")
 	}
 	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", req.Id).Updates(map[string]any{
 		"code":                  report.Code,
@@ -262,7 +262,7 @@ func (s *ReportService) UpdateReportDefinitionStatus(ctx *gin.Context, id int, s
 		return myerrors.ErrParamInvalid
 	}
 	if status == reportStatusPublished {
-		return myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
+		return myerrors.NewValidationError("发布报表必须调用 /admin/report/:id/publish")
 	}
 	tx := s.reportRepo.DBWithContext(ctx).Model(&model.ReportDefinition{}).Where("id = ?", id).Updates(map[string]any{
 		"status":     status,
@@ -292,7 +292,7 @@ func (s *ReportService) PublishReport(ctx *gin.Context, reportId int, req reques
 			return err
 		}
 		if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
-			return myerrors.NewBadRequestError("报表已停用，不能发布")
+			return myerrors.NewValidationError("报表已停用，不能发布")
 		}
 		config, err := reportconfig.Parse(report.QueryConfig, report.LayoutConfig)
 		if err != nil {
@@ -411,20 +411,20 @@ func (s *ReportService) PublishReportAsMenu(ctx *gin.Context, reportId int, req 
 			return err
 		}
 		if normalizeReportStatus(report.Status) != reportStatusPublished || !report.State {
-			return myerrors.NewBadRequestError("报表未发布，不能发布到菜单")
+			return myerrors.NewValidationError("报表未发布，不能发布到菜单")
 		}
 		if report.PublishedVersionId <= 0 {
-			return myerrors.NewBadRequestError("报表缺少发布版本，不能发布到菜单")
+			return myerrors.NewValidationError("报表缺少发布版本，不能发布到菜单")
 		}
 		var version model.ReportDefinitionVersion
 		if err := tx.First(&version, "id = ? AND report_id = ?", report.PublishedVersionId, report.Id).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return myerrors.NewBadRequestError("报表发布版本不存在")
+				return myerrors.NewValidationError("报表发布版本不存在")
 			}
 			return err
 		}
 		if !version.State || normalizeReportStatus(version.Status) != reportVersionPublished {
-			return myerrors.NewBadRequestError("报表发布版本状态不可发布到菜单")
+			return myerrors.NewValidationError("报表发布版本状态不可发布到菜单")
 		}
 		parent, err := s.validateReportMenuParent(tx, req.ParentMenuId)
 		if err != nil {
@@ -532,10 +532,10 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 			return err
 		}
 		if menu.PageType != enum.MenuPageTypeReport {
-			return myerrors.NewBadRequestError("报表运行菜单类型不匹配")
+			return myerrors.NewValidationError("报表运行菜单类型不匹配")
 		}
 		if option, ok := parseReportMenuOption(menu.Option); ok && option.ReportId != report.Id {
-			return myerrors.NewBadRequestError("报表运行菜单绑定信息不匹配")
+			return myerrors.NewValidationError("报表运行菜单绑定信息不匹配")
 		}
 		buttons, err := s.reportMenuButtons(tx, menu.Id)
 		if err != nil {
@@ -596,7 +596,7 @@ func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req reques
 	}
 	snapshot = reportSnapshotFromDefinition(report, reportRuntimeDesignPreview)
 	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
-		err = myerrors.NewBadRequestError("报表已停用")
+		err = myerrors.NewValidationError("报表已停用")
 		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
@@ -626,10 +626,10 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 		format = reportExportFormatCSV
 	}
 	if format == "xlsx" {
-		return fail(myerrors.NewBadRequestError("报表导出暂不支持 xlsx 格式，仅支持 csv"))
+		return fail(myerrors.NewValidationError("报表导出暂不支持 xlsx 格式，仅支持 csv"))
 	}
 	if format != reportExportFormatCSV {
-		return fail(myerrors.NewBadRequestError("报表导出格式不支持，仅支持 csv"))
+		return fail(myerrors.NewValidationError("报表导出格式不支持，仅支持 csv"))
 	}
 	effectiveMaxRows, err := normalizeReportExportMaxRows(req)
 	if err != nil {
@@ -653,7 +653,7 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 		return fail(err)
 	}
 	if preview.Total > effectiveMaxRows {
-		return fail(myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试"))
+		return fail(myerrors.NewValidationError("导出行数超过系统限制，请缩小查询条件后重试"))
 	}
 	content, err := buildReportCSV(preview.Columns, preview.Rows)
 	if err != nil {
@@ -682,23 +682,23 @@ func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId i
 	snapshot.ReportId = report.Id
 	snapshot.Code = report.Code
 	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
-		return snapshot, myerrors.NewBadRequestError("报表已停用")
+		return snapshot, myerrors.NewValidationError("报表已停用")
 	}
 	if normalizeReportStatus(report.Status) != reportStatusPublished || report.PublishedVersionId <= 0 {
-		return snapshot, myerrors.NewBadRequestError("报表未发布，请先调用发布接口")
+		return snapshot, myerrors.NewValidationError("报表未发布，请先调用发布接口")
 	}
 	version, err := s.reportVersionRepo.FindByReportAndId(report.Id, report.PublishedVersionId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = myerrors.NewBadRequestError("报表发布版本不存在")
+			err = myerrors.NewValidationError("报表发布版本不存在")
 		}
 		return snapshot, err
 	}
 	if !version.State {
-		return snapshot, myerrors.NewBadRequestError("报表发布版本不可用")
+		return snapshot, myerrors.NewValidationError("报表发布版本不可用")
 	}
 	if normalizeReportStatus(version.Status) != reportVersionPublished {
-		return snapshot, myerrors.NewBadRequestError("报表发布版本状态不可运行")
+		return snapshot, myerrors.NewValidationError("报表发布版本状态不可运行")
 	}
 	snapshot = reportSnapshotFromVersion(version, runtimeType)
 	return snapshot, nil
@@ -747,7 +747,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 		var ok bool
 		selectedDataset, ok = config.DatasetByID(req.DatasetId)
 		if !ok {
-			err = myerrors.NewBadRequestError("报表数据集不存在")
+			err = myerrors.NewValidationError("报表数据集不存在")
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
@@ -803,7 +803,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 	}
 	if options.ExportMode {
 		if result.Total > options.MaxRows {
-			err = myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试")
+			err = myerrors.NewValidationError("导出行数超过系统限制，请缩小查询条件后重试")
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
@@ -853,7 +853,7 @@ func (s *ReportService) reportFromCreateReq(req request.ReportDefinitionCreateRe
 		return report, myerrors.ErrParamInvalid
 	}
 	if report.Status == reportStatusPublished {
-		return report, myerrors.NewBadRequestError("发布报表必须调用 /admin/report/:id/publish")
+		return report, myerrors.NewValidationError("发布报表必须调用 /admin/report/:id/publish")
 	}
 	if len(report.QueryConfig) == 0 {
 		report.QueryConfig = datatypes.JSON([]byte("{}"))
@@ -923,7 +923,7 @@ func (s *ReportService) applyReportPrimaryDataset(report *model.ReportDefinition
 	if config.HasDatasets() {
 		dataset, ok := config.PrimaryTableDataset()
 		if !ok {
-			return myerrors.NewBadRequestError("报表必须配置 primary table 数据集")
+			return myerrors.NewValidationError("报表必须配置 primary table 数据集")
 		}
 		report.SourceType = reportSourceTypeTable
 		report.SourceCode = dataset.SourceCode
@@ -935,7 +935,7 @@ func (s *ReportService) applyReportPrimaryDataset(report *model.ReportDefinition
 	report.SourceType = normalizeReportSourceType(report.SourceType)
 	report.SourceCode = strings.TrimSpace(report.SourceCode)
 	if report.SourceType == "" {
-		return myerrors.NewBadRequestError("报表数据源类型不合法")
+		return myerrors.NewValidationError("报表数据源类型不合法")
 	}
 	if report.SourceCode == "" {
 		return myerrors.ErrParamInvalid
@@ -959,18 +959,18 @@ func (s *ReportService) validateReportTables(report model.ReportDefinition) erro
 
 func (s *ReportService) resolveReportTables(report model.ReportDefinition) (model.SysTable, model.SysTable, error) {
 	if normalizeReportSourceType(report.SourceType) == "" {
-		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表数据源类型不合法")
+		return model.SysTable{}, model.SysTable{}, myerrors.NewValidationError("报表数据源类型不合法")
 	}
 	sourceTable, err := s.ResolveRuntimeTable(context.Background(), strings.TrimSpace(report.SourceCode))
 	if err != nil {
 		return model.SysTable{}, model.SysTable{}, err
 	}
 	if sourceTable.Id == 0 {
-		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表数据源表不存在")
+		return model.SysTable{}, model.SysTable{}, myerrors.NewValidationError("报表数据源表不存在")
 	}
 	permissionTable := sourceTable
 	if strings.TrimSpace(report.PermissionTableCode) != "" && report.PermissionTableCode != sourceTable.TableCode {
-		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表权限表暂仅支持与数据源表一致")
+		return model.SysTable{}, model.SysTable{}, myerrors.NewValidationError("报表权限表暂仅支持与数据源表一致")
 	}
 	return sourceTable, permissionTable, nil
 }
@@ -984,14 +984,14 @@ func (s *ReportService) resolveReportPreviewTable(snapshot ReportExecutionSnapsh
 		return model.SysTable{}, model.SysTable{}, err
 	}
 	if sourceTable.Id == 0 {
-		return model.SysTable{}, model.SysTable{}, myerrors.NewBadRequestError("报表数据集表不存在")
+		return model.SysTable{}, model.SysTable{}, myerrors.NewValidationError("报表数据集表不存在")
 	}
 	return sourceTable, sourceTable, nil
 }
 
 func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) error {
 	if s.metadataRuntime == nil {
-		return myerrors.NewBadRequestError("报表表结构服务未初始化")
+		return myerrors.NewValidationError("报表表结构服务未初始化")
 	}
 	datasetByID := make(map[string]reportconfig.Dataset, len(config.Datasets()))
 	for _, dataset := range config.Datasets() {
@@ -1007,14 +1007,14 @@ func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) 
 			return err
 		}
 		if table.Id == 0 {
-			return myerrors.NewBadRequestError(fmt.Sprintf("报表数据集表不存在: %s", dataset.SourceCode))
+			return myerrors.NewValidationError(fmt.Sprintf("报表数据集表不存在: %s", dataset.SourceCode))
 		}
 	}
 	for _, join := range config.DatasetJoins() {
 		left := datasetByID[strings.TrimSpace(join.LeftDatasetId)]
 		right := datasetByID[strings.TrimSpace(join.RightDatasetId)]
 		if left.Type != reportconfig.SourceTypeTable || right.Type != reportconfig.SourceTypeTable {
-			return myerrors.NewBadRequestError("报表数据集关联暂仅支持表数据集")
+			return myerrors.NewValidationError("报表数据集关联暂仅支持表数据集")
 		}
 	}
 	return nil
@@ -1061,7 +1061,7 @@ func (s *ReportService) previewSQLDataset(ctx *gin.Context, snapshot ReportExecu
 func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot ReportExecutionSnapshot, config reportconfig.Config, req request.ReportPreviewReq, options ReportExecutionOptions) (response.ReportPreviewRes, error) {
 	primaryDataset, ok := config.PrimaryTableDataset()
 	if !ok {
-		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表必须配置 primary table 数据集")
+		return response.ReportPreviewRes{}, myerrors.NewValidationError("报表必须配置 primary table 数据集")
 	}
 	datasets := config.Datasets()
 	datasetByID := make(map[string]reportconfig.Dataset, len(datasets))
@@ -1080,13 +1080,13 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 			return response.ReportPreviewRes{}, err
 		}
 		if table.Id == 0 {
-			return response.ReportPreviewRes{}, myerrors.NewBadRequestError(fmt.Sprintf("报表数据集表不存在: %s", dataset.SourceCode))
+			return response.ReportPreviewRes{}, myerrors.NewValidationError(fmt.Sprintf("报表数据集表不存在: %s", dataset.SourceCode))
 		}
 		tableByDatasetID[dataset.Id] = table
 	}
 	primaryTable, ok := tableByDatasetID[primaryDataset.Id]
 	if !ok {
-		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表主数据集表不存在")
+		return response.ReportPreviewRes{}, myerrors.NewValidationError("报表主数据集表不存在")
 	}
 
 	aliasByDatasetID := reportDatasetAliases(config, primaryDataset.Id, primaryTable.TableCode)
@@ -1125,7 +1125,7 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 		return response.ReportPreviewRes{}, err
 	}
 	if len(selections) == 0 {
-		return response.ReportPreviewRes{}, myerrors.NewBadRequestError("报表未配置可预览字段")
+		return response.ReportPreviewRes{}, myerrors.NewValidationError("报表未配置可预览字段")
 	}
 	keyword := ""
 	if req.Query.QuickQuery != nil {
@@ -1196,14 +1196,14 @@ func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gor
 func safeReportPreviewSQL(raw string) (string, error) {
 	sqlText, err := platformmetadata.ValidateReadOnlyQuery(raw)
 	if err != nil {
-		return "", myerrors.NewBadRequestError("SQL 数据集仅允许单条 SELECT/WITH 只读查询")
+		return "", myerrors.NewValidationError("SQL 数据集仅允许单条 SELECT/WITH 只读查询")
 	}
 	return sqlText, nil
 }
 
 func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereClause string, args []any, page int, limit int) ([]map[string]interface{}, []response.ReportPreviewColumn, int, error) {
 	if s.reportRepo == nil {
-		return nil, nil, 0, myerrors.NewBadRequestError("报表数据仓储未初始化")
+		return nil, nil, 0, myerrors.NewValidationError("报表数据仓储未初始化")
 	}
 	wrapped := fmt.Sprintf("SELECT * FROM (%s) AS report_sql_dataset_preview", sqlText)
 	if strings.TrimSpace(whereClause) != "" {
@@ -1356,21 +1356,21 @@ func reportJoinSQL(join reportconfig.DatasetJoin, primaryDatasetID string, prima
 	leftDataset, leftOK := datasetByID[leftID]
 	rightDataset, rightOK := datasetByID[rightID]
 	if !leftOK || !rightOK {
-		return "", myerrors.NewBadRequestError("报表数据集关联缺少数据集")
+		return "", myerrors.NewValidationError("报表数据集关联缺少数据集")
 	}
 	if leftDataset.Type != reportconfig.SourceTypeTable || rightDataset.Type != reportconfig.SourceTypeTable {
-		return "", myerrors.NewBadRequestError("报表数据集关联暂仅支持表数据集")
+		return "", myerrors.NewValidationError("报表数据集关联暂仅支持表数据集")
 	}
 	leftTable, leftTableOK := tableByDatasetID[leftID]
 	rightTable, rightTableOK := tableByDatasetID[rightID]
 	if !leftTableOK || !rightTableOK {
-		return "", myerrors.NewBadRequestError("报表数据集关联表不存在")
+		return "", myerrors.NewValidationError("报表数据集关联表不存在")
 	}
 	if _, ok := reportFindTableField(leftTable, join.LeftField); !ok {
-		return "", myerrors.NewBadRequestError("报表数据集关联左字段不存在")
+		return "", myerrors.NewValidationError("报表数据集关联左字段不存在")
 	}
 	if _, ok := reportFindTableField(rightTable, join.RightField); !ok {
-		return "", myerrors.NewBadRequestError("报表数据集关联右字段不存在")
+		return "", myerrors.NewValidationError("报表数据集关联右字段不存在")
 	}
 	targetID := reportJoinTargetDatasetID(join, primaryDatasetID)
 	targetTable := rightTable
@@ -1382,12 +1382,12 @@ func reportJoinSQL(join reportconfig.DatasetJoin, primaryDatasetID string, prima
 	}
 	targetAlias := aliasByDatasetID[targetID]
 	if !isSafeReportIdentifier(targetAlias) {
-		return "", myerrors.NewBadRequestError("报表数据集关联别名不合法")
+		return "", myerrors.NewValidationError("报表数据集关联别名不合法")
 	}
 	leftExpr := reportDatasetFieldExpr(leftID, join.LeftField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
 	rightExpr := reportDatasetFieldExpr(rightID, join.RightField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
 	if leftExpr == "" || rightExpr == "" {
-		return "", myerrors.NewBadRequestError("报表数据集关联字段不合法")
+		return "", myerrors.NewValidationError("报表数据集关联字段不合法")
 	}
 	joinType := "LEFT"
 	if strings.EqualFold(strings.TrimSpace(join.JoinType), "inner") {
@@ -1455,7 +1455,7 @@ func reportJoinedPreviewSelections(config reportconfig.Config, primaryDatasetID 
 		seen[alias] = struct{}{}
 		expr := reportDatasetFieldExpr(datasetID, field.FieldCode, primaryDatasetID, primaryTable.TableCode, aliasByDatasetID)
 		if expr == "" {
-			return nil, nil, myerrors.NewBadRequestError("报表绑定字段不合法")
+			return nil, nil, myerrors.NewValidationError("报表绑定字段不合法")
 		}
 		label := strings.TrimSpace(cell.Value)
 		if label == "" {
@@ -1475,7 +1475,7 @@ func reportJoinedPreviewSelections(config reportconfig.Config, primaryDatasetID 
 			alias := reportColumnAlias(primaryDatasetID, column.Field)
 			expr := reportDatasetFieldExpr(primaryDatasetID, column.Field, primaryDatasetID, primaryTable.TableCode, aliasByDatasetID)
 			if expr == "" {
-				return nil, nil, myerrors.NewBadRequestError("报表绑定字段不合法")
+				return nil, nil, myerrors.NewValidationError("报表绑定字段不合法")
 			}
 			selections = append(selections, reportJoinedSelection{Expr: expr, Alias: alias, Label: column.Label, Type: column.Type, Field: field, DatasetID: primaryDatasetID})
 		}
@@ -1507,15 +1507,15 @@ func reportApplyJoinedParameters(query *gorm.DB, config reportconfig.Config, pri
 		}
 		table, ok := tableByDatasetID[datasetID]
 		if !ok {
-			return query, myerrors.NewBadRequestError("报表参数绑定数据集不存在")
+			return query, myerrors.NewValidationError("报表参数绑定数据集不存在")
 		}
 		field, ok := reportFindTableField(table, param.Field)
 		if !ok {
-			return query, myerrors.NewBadRequestError("报表参数绑定字段不存在")
+			return query, myerrors.NewValidationError("报表参数绑定字段不存在")
 		}
 		fieldExpr := reportDatasetFieldExpr(datasetID, field.FieldCode, primaryDatasetID, primaryTableCode, aliasByDatasetID)
 		if fieldExpr == "" {
-			return query, myerrors.NewBadRequestError("报表参数绑定字段不合法")
+			return query, myerrors.NewValidationError("报表参数绑定字段不合法")
 		}
 		switch strings.ToLower(strings.TrimSpace(param.Operator)) {
 		case "", "eq":
@@ -1525,7 +1525,7 @@ func reportApplyJoinedParameters(query *gorm.DB, config reportconfig.Config, pri
 		case "between":
 			items, ok := reportRangeValues(value)
 			if !ok {
-				return query, myerrors.NewBadRequestError("报表区间参数必须传入两个值")
+				return query, myerrors.NewValidationError("报表区间参数必须传入两个值")
 			}
 			query = query.Where(fmt.Sprintf("%s BETWEEN ? AND ?", fieldExpr), items[0], items[1])
 		case "gte":
@@ -1533,7 +1533,7 @@ func reportApplyJoinedParameters(query *gorm.DB, config reportconfig.Config, pri
 		case "lte":
 			query = query.Where(fmt.Sprintf("%s <= ?", fieldExpr), value)
 		default:
-			return query, myerrors.NewBadRequestError("报表参数操作符不支持")
+			return query, myerrors.NewValidationError("报表参数操作符不支持")
 		}
 	}
 	return query, nil
@@ -1622,7 +1622,7 @@ func applyReportParameterValues(query *request.Basic, config reportconfig.Config
 		}
 		field := strings.TrimSpace(param.Field)
 		if field == "" {
-			return myerrors.NewBadRequestError("报表参数缺少绑定字段")
+			return myerrors.NewValidationError("报表参数缺少绑定字段")
 		}
 		switch strings.ToLower(strings.TrimSpace(param.Operator)) {
 		case "", "eq":
@@ -1635,7 +1635,7 @@ func applyReportParameterValues(query *request.Basic, config reportconfig.Config
 			}
 		case "between":
 			if !reportValueIsRange(value) {
-				return myerrors.NewBadRequestError("报表区间参数必须传入两个值")
+				return myerrors.NewValidationError("报表区间参数必须传入两个值")
 			}
 			rules = append(rules, request.QueryRule{Field: field, ExpressionType: enum.Between, Value: value})
 		case "gte":
@@ -1643,7 +1643,7 @@ func applyReportParameterValues(query *request.Basic, config reportconfig.Config
 		case "lte":
 			rules = append(rules, request.QueryRule{Field: field, ExpressionType: enum.Lte, Value: value})
 		default:
-			return myerrors.NewBadRequestError("报表参数操作符不支持")
+			return myerrors.NewValidationError("报表参数操作符不支持")
 		}
 	}
 	if len(rules) > 0 {
@@ -1712,7 +1712,7 @@ func reportSQLParameterWhere(config reportconfig.Config, datasetID string, value
 		}
 		field := strings.TrimSpace(param.Field)
 		if !isSafeReportIdentifier(field) {
-			return "", nil, myerrors.NewBadRequestError("报表 SQL 参数绑定字段不合法")
+			return "", nil, myerrors.NewValidationError("报表 SQL 参数绑定字段不合法")
 		}
 		fieldExpr := quoteReportIdentifier(field)
 		switch strings.ToLower(strings.TrimSpace(param.Operator)) {
@@ -1725,7 +1725,7 @@ func reportSQLParameterWhere(config reportconfig.Config, datasetID string, value
 		case "between":
 			items, ok := reportRangeValues(value)
 			if !ok {
-				return "", nil, myerrors.NewBadRequestError("报表区间参数必须传入两个值")
+				return "", nil, myerrors.NewValidationError("报表区间参数必须传入两个值")
 			}
 			conditions = append(conditions, fmt.Sprintf("%s BETWEEN ? AND ?", fieldExpr))
 			args = append(args, items[0], items[1])
@@ -1736,7 +1736,7 @@ func reportSQLParameterWhere(config reportconfig.Config, datasetID string, value
 			conditions = append(conditions, fmt.Sprintf("%s <= ?", fieldExpr))
 			args = append(args, value)
 		default:
-			return "", nil, myerrors.NewBadRequestError("报表参数操作符不支持")
+			return "", nil, myerrors.NewValidationError("报表参数操作符不支持")
 		}
 	}
 	return strings.Join(conditions, " AND "), args, nil
@@ -1881,11 +1881,11 @@ func (s *ReportService) completeReportTableExportRows(query request.Basic, table
 			return err
 		}
 		if len(nextResult.Data) == 0 {
-			return myerrors.NewBadRequestError("报表导出查询结果不完整")
+			return myerrors.NewValidationError("报表导出查询结果不完整")
 		}
 		result.Data = append(result.Data, nextResult.Data...)
 		if len(result.Data) > maxRows {
-			return myerrors.NewBadRequestError("导出行数超过系统限制，请缩小查询条件后重试")
+			return myerrors.NewValidationError("导出行数超过系统限制，请缩小查询条件后重试")
 		}
 	}
 	if len(result.Data) > result.Total {
@@ -1905,7 +1905,7 @@ func normalizeReportExportMaxRows(req request.ReportExportReq) (int, error) {
 	hasSnake := req.MaxRows != nil
 	hasCamel := req.MaxRowsAlt != nil
 	if hasSnake && hasCamel && *req.MaxRows != *req.MaxRowsAlt {
-		return 0, myerrors.NewBadRequestError("max_rows 与 maxRows 不能同时传入不同值")
+		return 0, myerrors.NewValidationError("max_rows 与 maxRows 不能同时传入不同值")
 	}
 	value := defaultReportExportMaxRows
 	switch {
@@ -1918,7 +1918,7 @@ func normalizeReportExportMaxRows(req request.ReportExportReq) (int, error) {
 		return defaultReportExportMaxRows, nil
 	}
 	if value > maxReportExportRows {
-		return 0, myerrors.NewBadRequestError("导出行数超过系统最大限制")
+		return 0, myerrors.NewValidationError("导出行数超过系统最大限制")
 	}
 	return value, nil
 }
@@ -2046,8 +2046,7 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecu
 		ErrorMessage: "",
 	}
 	if runErr != nil {
-		clientErr, _ := myerrors.ToClientError(runErr)
-		log.ErrorMessage = clientErr.ErrorMessage
+		log.ErrorMessage = myerrors.SafeMessageOf(runErr)
 	}
 	db := s.reportLogRepo.DBWithContext(ctx)
 	if err := db.Create(&log).Error; err != nil {
@@ -2458,17 +2457,17 @@ type reportMenuPolicy struct {
 
 func (s *ReportService) validateReportMenuParent(tx *gorm.DB, parentID int) (model.SysMenu, error) {
 	if parentID <= 0 {
-		return model.SysMenu{}, myerrors.NewBadRequestError("请选择发布父级菜单")
+		return model.SysMenu{}, myerrors.NewValidationError("请选择发布父级菜单")
 	}
 	var menu model.SysMenu
 	if err := tx.First(&menu, parentID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return model.SysMenu{}, myerrors.NewBadRequestError("发布父级菜单不存在")
+			return model.SysMenu{}, myerrors.NewValidationError("发布父级菜单不存在")
 		}
 		return model.SysMenu{}, err
 	}
 	if !isReportPublishParentMenu(menu) {
-		return model.SysMenu{}, myerrors.NewBadRequestError("报表只能发布到目录菜单下")
+		return model.SysMenu{}, myerrors.NewValidationError("报表只能发布到目录菜单下")
 	}
 	return menu, nil
 }
@@ -2528,7 +2527,7 @@ func (s *ReportService) ensureReportMenuPathAvailable(tx *gorm.DB, path string, 
 	}
 	err := query.First(&existing).Error
 	if err == nil {
-		return myerrors.NewBadRequestError("菜单路径已被占用")
+		return myerrors.NewValidationError("菜单路径已被占用")
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
@@ -2803,7 +2802,7 @@ func (s *ReportService) reportMenuGrantRoles(permissionRoleIDs []int) ([]model.S
 		role, err := s.sysRoleRepo.FindById(roleID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, myerrors.NewBadRequestError("授权角色不存在")
+				return nil, myerrors.NewValidationError("授权角色不存在")
 			}
 			return nil, err
 		}

@@ -22,20 +22,20 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 		return myerrors.ErrParamInvalid
 	}
 	if !validStorageType(field.FieldType) {
-		return myerrors.NewBadRequestError("字段存储类型不合法")
+		return myerrors.NewValidationError("字段存储类型不合法")
 	}
 	if !validUIComponent(field.InputType) {
-		return myerrors.NewBadRequestError("字段组件类型不合法")
+		return myerrors.NewValidationError("字段组件类型不合法")
 	}
 	if sequence <= 0 || sequence > 255 {
-		return myerrors.NewBadRequestError("字段顺序必须在1到255之间")
+		return myerrors.NewValidationError("字段顺序必须在1到255之间")
 	}
 	if field.FieldLength < 0 || field.FieldLength > maxMetadataFieldLength ||
 		field.FieldDecimalLength < 0 || field.FieldDecimalLength > field.FieldLength {
-		return myerrors.NewBadRequestError("字段长度或小数位数不合法")
+		return myerrors.NewValidationError("字段长度或小数位数不合法")
 	}
 	if len(strings.TrimSpace(stringValue(field.Tag))) > maxMetadataTagLength {
-		return myerrors.NewBadRequestError(fmt.Sprintf("字段标签长度不能超过%d", maxMetadataTagLength))
+		return myerrors.NewValidationError(fmt.Sprintf("字段标签长度不能超过%d", maxMetadataTagLength))
 	}
 
 	category := field.FieldCategory
@@ -47,26 +47,26 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 	switch category {
 	case enum.NormalField:
 		if expression != "" {
-			return myerrors.NewBadRequestError("普通字段不允许配置表达式")
+			return myerrors.NewValidationError("普通字段不允许配置表达式")
 		}
 	case enum.VirtualField, enum.CalculatedField:
 		if !isStructuredRelationExpression(expression) {
-			return myerrors.NewBadRequestError("虚拟或计算字段仅允许受控rel:table.field表达式")
+			return myerrors.NewValidationError("虚拟或计算字段仅允许受控rel:table.field表达式")
 		}
 	default:
-		return myerrors.NewBadRequestError("字段类别不合法")
+		return myerrors.NewValidationError("字段类别不合法")
 	}
 
 	if security.IsSensitiveFieldName(field.FieldCode) || security.IsManagedMetadataField(field.FieldCode) {
 		if field.IsListShow || field.IsInsertShow || field.IsUpdateShow ||
 			field.IsQuickSearch || field.IsAdvancedSearch {
-			return myerrors.NewBadRequestError("受保护字段不能用于列表、写入或查询元数据")
+			return myerrors.NewValidationError("受保护字段不能用于列表、写入或查询元数据")
 		}
 	}
 	if field.IsQuickSearch || field.IsAdvancedSearch {
 		if category != enum.NormalField || field.IsPrimaryKey || expression != "" ||
 			field.InputType == enum.FilePickerInputType || field.InputType == enum.RichTextInputType {
-			return myerrors.NewBadRequestError("该字段不能注册为查询字段")
+			return myerrors.NewValidationError("该字段不能注册为查询字段")
 		}
 	}
 	if err := validateMetadataDefaultValue(field.FieldType, stringValue(field.DefaultValue)); err != nil {
@@ -105,15 +105,15 @@ func validateMetadataDefaultValue(fieldType enum.SysTableFieldType, value string
 	switch fieldType {
 	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
 		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
-			return myerrors.NewBadRequestError("整数默认值不合法")
+			return myerrors.NewValidationError("整数默认值不合法")
 		}
 	case enum.FloatFieldType:
 		if _, err := strconv.ParseFloat(value, 64); err != nil {
-			return myerrors.NewBadRequestError("数值默认值不合法")
+			return myerrors.NewValidationError("数值默认值不合法")
 		}
 	case enum.BooleanFieldType:
 		if value != "true" && value != "false" && value != "0" && value != "1" {
-			return myerrors.NewBadRequestError("布尔默认值不合法")
+			return myerrors.NewValidationError("布尔默认值不合法")
 		}
 	}
 	return nil

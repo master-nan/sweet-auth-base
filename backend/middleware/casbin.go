@@ -285,7 +285,7 @@ func authorizationDiagnosticsEnabled() bool {
 }
 
 func authorizationErrorCode(err error) int {
-	clientErr, _ := errors.ToClientError(err)
+	clientErr, _ := toClientError(err)
 	if clientErr == nil {
 		return 0
 	}

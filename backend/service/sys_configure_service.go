@@ -82,34 +82,34 @@ func (cs *SysConfigureService) Update(ctx context.Context, req request.Configure
 
 func validateConfigureUpdate(req request.ConfigureUpdateReq) error {
 	if req.PasswordLength < 6 {
-		return myerrors.NewBadRequestError("密码长度不能小于6位")
+		return myerrors.NewValidationError("密码长度不能小于6位")
 	}
 	if req.PasswordComplexity < 1 || req.PasswordComplexity > 3 {
-		return myerrors.NewBadRequestError("密码复杂度不正确")
+		return myerrors.NewValidationError("密码复杂度不正确")
 	}
 	if req.PasswordExpireTime < 0 {
-		return myerrors.NewBadRequestError("密码过期时间不能为负数")
+		return myerrors.NewValidationError("密码过期时间不能为负数")
 	}
 	if req.PasswordErrorCount <= 0 {
-		return myerrors.NewBadRequestError("密码错误次数必须大于0")
+		return myerrors.NewValidationError("密码错误次数必须大于0")
 	}
 	if req.PasswordLockMinutes <= 0 {
-		return myerrors.NewBadRequestError("密码错误锁定时长必须大于0")
+		return myerrors.NewValidationError("密码错误锁定时长必须大于0")
 	}
 	if strings.TrimSpace(req.PasswordPolicy) == "" {
-		return myerrors.NewBadRequestError("密码策略不能为空")
+		return myerrors.NewValidationError("密码策略不能为空")
 	}
 	switch strings.ToLower(strings.TrimSpace(req.PasswordPolicy)) {
 	case "low", "medium", "strong", "high", "custom":
 	default:
-		return myerrors.NewBadRequestError("密码策略不正确")
+		return myerrors.NewValidationError("密码策略不正确")
 	}
 	if strings.TrimSpace(req.SystemName) == "" {
-		return myerrors.NewBadRequestError("系统名称不能为空")
+		return myerrors.NewValidationError("系统名称不能为空")
 	}
 	if req.EnableEmail != nil && *req.EnableEmail {
 		if strings.TrimSpace(req.SmtpServer) == "" || req.SmtpPort <= 0 || strings.TrimSpace(req.SenderEmail) == "" || strings.TrimSpace(req.SenderPassword) == "" {
-			return myerrors.NewBadRequestError("启用邮件服务时，请完整配置 SMTP 服务器、端口、发件邮箱和授权码")
+			return myerrors.NewValidationError("启用邮件服务时，请完整配置 SMTP 服务器、端口、发件邮箱和授权码")
 		}
 	}
 	return nil
@@ -128,16 +128,16 @@ func (cs *SysConfigureService) SendTestEmail(to string) error {
 func SendEmailWithConfigure(cfg model.SysConfigure, to, subject, body string) error {
 	recipient := strings.TrimSpace(to)
 	if !cfg.EnableEmail {
-		return myerrors.NewBadRequestError("邮件服务未启用")
+		return myerrors.NewValidationError("邮件服务未启用")
 	}
 	if recipient == "" {
-		return myerrors.NewBadRequestError("收件人邮箱不能为空")
+		return myerrors.NewValidationError("收件人邮箱不能为空")
 	}
 	host := strings.TrimSpace(cfg.SmtpServer)
 	from := strings.TrimSpace(cfg.SenderEmail)
 	password := strings.TrimSpace(cfg.SenderPassword)
 	if host == "" || cfg.SmtpPort <= 0 || from == "" || password == "" {
-		return myerrors.NewBadRequestError("邮件服务配置不完整")
+		return myerrors.NewValidationError("邮件服务配置不完整")
 	}
 
 	message := buildEmailMessage(from, recipient, subject, body)

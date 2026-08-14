@@ -6,7 +6,6 @@
 package middleware
 
 import (
-	"backend/dto/response"
 	error2 "backend/internal/errors"
 	"net/http"
 
@@ -19,11 +18,9 @@ func ResponseHandler() gin.HandlerFunc {
 		c.Next()
 		if len(c.Errors) > 0 {
 			requestErr := c.Errors[0].Err
-			clientErr, classified := error2.ToClientError(requestErr)
+			clientErr, classified := toClientError(requestErr)
 			category := error2.CategoryOf(requestErr)
-			if !classified ||
-				category == response.ErrorCategoryDatabase ||
-				category == response.ErrorCategorySystem {
+			if shouldLogApplicationError(requestErr, classified) {
 				zap.L().Error(
 					"request failed",
 					zap.Error(requestErr),

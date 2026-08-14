@@ -3,10 +3,8 @@ package response
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -31,36 +29,24 @@ func TestNewResponseUsesStableSuccessContract(t *testing.T) {
 	}
 }
 
-func TestAdminErrorPreservesCauseWithoutSerializingIt(t *testing.T) {
-	rootErr := errors.New("database password=do-not-expose")
+func TestAdminErrorUsesHTTPResponseFieldsOnly(t *testing.T) {
 	adminErr := &AdminError{
 		StatusCode:   http.StatusInternalServerError,
 		ErrorCode:    10000,
 		ErrorMessage: "系统异常",
 		Success:      false,
-		Category:     ErrorCategoryDatabase,
-		Cause:        rootErr,
 	}
 
-	if !errors.Is(adminErr, rootErr) {
-		t.Fatal("expected AdminError to preserve its cause")
-	}
 	payload, err := json.Marshal(adminErr)
 	if err != nil {
 		t.Fatalf("marshal admin error: %v", err)
 	}
-	if strings.Contains(string(payload), "do-not-expose") ||
-		strings.Contains(string(payload), "database") {
-		t.Fatalf("internal error details leaked into JSON: %s", payload)
+	var fields map[string]any
+	if err = json.Unmarshal(payload, &fields); err != nil {
+		t.Fatalf("decode admin error: %v", err)
 	}
-
-	clientErr := adminErr.ForClient()
-	if clientErr == adminErr || clientErr.Cause != nil {
-		t.Fatalf("expected a detached client error without cause: %#v", clientErr)
-	}
-	if clientErr.ErrorCode != adminErr.ErrorCode ||
-		clientErr.ErrorMessage != adminErr.ErrorMessage {
-		t.Fatalf("client error changed public contract: %#v", clientErr)
+	if len(fields) != 4 || fields["error_message"] != "系统异常" || fields["success"] != false {
+		t.Fatalf("unexpected HTTP error fields: %#v", fields)
 	}
 }
 

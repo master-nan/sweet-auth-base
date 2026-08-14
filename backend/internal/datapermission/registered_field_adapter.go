@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"backend/dto/response"
 	myerrors "backend/internal/errors"
 )
 
@@ -219,8 +218,8 @@ func (adapter *RegisteredFieldAdapter) prepareCondition(
 		condition: condition.clone(),
 	}
 	if err = entry.registration.Executor.Prepare(ctx, request); err != nil {
-		var adminError *response.AdminError
-		if errors.As(err, &adminError) {
+		var applicationError *myerrors.ApplicationError
+		if errors.As(err, &applicationError) {
 			return err
 		}
 		return myerrors.ErrRegisteredAdapterPartialConversion

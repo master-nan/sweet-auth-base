@@ -215,7 +215,7 @@ func TestOrgPermissionTreeProviderRejectsMissingStructureAndOrganizations(t *tes
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryParameter,
+		apperrors.CategoryParameter,
 		apperrors.ErrorCodeParamInvalid,
 	)
 
@@ -229,7 +229,7 @@ func TestOrgPermissionTreeProviderRejectsMissingStructureAndOrganizations(t *tes
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryParameter,
+		apperrors.CategoryParameter,
 		apperrors.ErrorCodeParamInvalid,
 	)
 
@@ -243,7 +243,7 @@ func TestOrgPermissionTreeProviderRejectsMissingStructureAndOrganizations(t *tes
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryBusiness,
+		apperrors.CategoryBusiness,
 		apperrors.ErrorCodeOrgStructureNotFound,
 	)
 
@@ -257,7 +257,7 @@ func TestOrgPermissionTreeProviderRejectsMissingStructureAndOrganizations(t *tes
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryBusiness,
+		apperrors.CategoryBusiness,
 		apperrors.ErrorCodeOrgUnitNotFound,
 	)
 
@@ -271,7 +271,7 @@ func TestOrgPermissionTreeProviderRejectsMissingStructureAndOrganizations(t *tes
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryBusiness,
+		apperrors.CategoryBusiness,
 		apperrors.ErrorCodeOrgStructureMembershipNotFound,
 	)
 }
@@ -296,7 +296,7 @@ func TestOrgPermissionTreeProviderRejectsCyclesAndOrphans(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgStructureCycle,
 		)
 	})
@@ -320,7 +320,7 @@ func TestOrgPermissionTreeProviderRejectsCyclesAndOrphans(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgStructureNodeMissing,
 		)
 	})
@@ -354,7 +354,7 @@ func TestOrgPermissionTreeProviderRejectsOversizeAndInvalidDates(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgTreeTooLarge,
 		)
 	})
@@ -379,7 +379,7 @@ func TestOrgPermissionTreeProviderRejectsOversizeAndInvalidDates(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgStructureInactive,
 		)
 	})
@@ -404,7 +404,7 @@ func TestOrgPermissionTreeProviderRejectsOversizeAndInvalidDates(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgUnitInactive,
 		)
 	})
@@ -429,7 +429,7 @@ func TestOrgPermissionTreeProviderRejectsOversizeAndInvalidDates(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgStructureNodeMissing,
 		)
 	})

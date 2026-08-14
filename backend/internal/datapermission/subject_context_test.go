@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"backend/dto/response"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 )
@@ -221,12 +220,12 @@ func assertSubjectContextError(t *testing.T, err error, errorCode int) {
 	if err == nil {
 		t.Fatalf("expected error code %d", errorCode)
 	}
-	var adminError *response.AdminError
+	var adminError *myerrors.ApplicationError
 	if !stderrors.As(err, &adminError) {
-		t.Fatalf("error = %T, want *response.AdminError", err)
+		t.Fatalf("error = %T, want *myerrors.ApplicationError", err)
 	}
-	if adminError.ErrorCode != errorCode {
-		t.Fatalf("error code = %d, want %d", adminError.ErrorCode, errorCode)
+	if adminError.Code != errorCode {
+		t.Fatalf("error code = %d, want %d", adminError.Code, errorCode)
 	}
 }
 

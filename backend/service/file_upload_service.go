@@ -198,7 +198,7 @@ func (f *FileUploadService) InitChunkUpload(ctx context.Context, actor FileAcces
 	// 计算分片数
 	chunkSize := f.config.Upload.ChunkSize
 	if chunkSize <= 0 {
-		return request.ChunkUploadInitRes{}, myerrors.NewBadRequestError("上传分片大小配置错误")
+		return request.ChunkUploadInitRes{}, myerrors.NewValidationError("上传分片大小配置错误")
 	}
 	chunkSizeBytes := chunkSize << 20
 	chunkCount := int(math.Ceil(float64(req.FileSize) / float64(chunkSizeBytes)))
@@ -266,11 +266,11 @@ func validateUploadSize(size int64, cfg config.Upload) error {
 	}
 	maxSizeMB := cfg.MaxSize
 	if maxSizeMB <= 0 {
-		return myerrors.NewBadRequestError("上传大小配置错误")
+		return myerrors.NewValidationError("上传大小配置错误")
 	}
 	maxSize := maxSizeMB << 20
 	if size > maxSize {
-		return myerrors.NewBadRequestError(fmt.Sprintf("文件大小不能超过%dMB", maxSizeMB))
+		return myerrors.NewValidationError(fmt.Sprintf("文件大小不能超过%dMB", maxSizeMB))
 	}
 	return nil
 }
@@ -293,7 +293,7 @@ func validateUploadExtension(fileName string, cfg config.Upload) error {
 			return nil
 		}
 	}
-	return myerrors.NewBadRequestError(fmt.Sprintf("不允许上传%s类型文件", ext))
+	return myerrors.NewValidationError(fmt.Sprintf("不允许上传%s类型文件", ext))
 }
 
 // validateUploadMimeType 校验上传内容 MIME 白名单。
@@ -307,7 +307,7 @@ func validateUploadMimeType(contentType string, cfg config.Upload) error {
 			return nil
 		}
 	}
-	return myerrors.NewBadRequestError(fmt.Sprintf("不允许上传%s类型文件", normalized))
+	return myerrors.NewValidationError(fmt.Sprintf("不允许上传%s类型文件", normalized))
 }
 
 // detectUploadContentType 读取文件头识别 MIME，并把读取位置恢复到开头。
@@ -412,7 +412,7 @@ func (f *FileUploadService) MergeChunks(ctx context.Context, actor FileAccessAct
 		return model.File{}, err
 	}
 	if int(uploadedCount) < firstChunk.ChunkCount {
-		return model.File{}, myerrors.NewBadRequestError(
+		return model.File{}, myerrors.NewValidationError(
 			fmt.Sprintf("分片未全部上传，已上传 %d/%d", uploadedCount, firstChunk.ChunkCount),
 		)
 	}

@@ -7,7 +7,6 @@ package middleware
 
 import (
 	"backend/dto/response"
-	error2 "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
 	"bytes"
@@ -226,7 +225,7 @@ func resolveAccessAuditResult(c *gin.Context, statusCode int, responseBody strin
 
 	result.Result = accessAuditResultFailed
 	if len(c.Errors) > 0 && (result.ErrorCode == "" || result.ErrorMessage == "") {
-		clientErr, _ := error2.ToClientError(c.Errors[0].Err)
+		clientErr, _ := toClientError(c.Errors[0].Err)
 		if clientErr != nil {
 			if result.ErrorCode == "" {
 				result.ErrorCode = strconv.Itoa(clientErr.ErrorCode)

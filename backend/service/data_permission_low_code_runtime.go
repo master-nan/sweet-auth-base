@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"backend/dto/response"
 	"backend/internal/audit"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
@@ -297,8 +296,8 @@ func runtimeContext(ctx context.Context) context.Context {
 }
 
 func mapLowCodeRuntimeDependencyError(err error) error {
-	var adminError *response.AdminError
-	if errors.As(err, &adminError) {
+	var applicationError *myerrors.ApplicationError
+	if errors.As(err, &applicationError) {
 		return err
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {

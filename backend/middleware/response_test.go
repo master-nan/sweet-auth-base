@@ -29,7 +29,7 @@ func (responseBaselineController) success(ctx *gin.Context) {
 
 func (responseBaselineController) businessError(ctx *gin.Context) {
 	rootErr := stderrors.New("internal conflict detail")
-	err := myerrors.WrapBusinessError(rootErr, http.StatusConflict, 81001, "记录冲突")
+	err := myerrors.WrapApplicationError(rootErr, myerrors.KindConflict, myerrors.CategoryBusiness, 81001, "记录冲突")
 	_ = ctx.Error(fmt.Errorf("service: %w", err))
 }
 
@@ -97,6 +97,38 @@ func TestResponseHandlerClassifiesRawParameterError(t *testing.T) {
 		20003,
 		"参数错误",
 	)
+}
+
+func TestHTTPErrorTranslationMapsApplicationKinds(t *testing.T) {
+	tests := []struct {
+		kind   myerrors.Kind
+		status int
+	}{
+		{kind: myerrors.KindInvalidArgument, status: http.StatusBadRequest},
+		{kind: myerrors.KindUnauthenticated, status: http.StatusUnauthorized},
+		{kind: myerrors.KindForbidden, status: http.StatusForbidden},
+		{kind: myerrors.KindNotFound, status: http.StatusNotFound},
+		{kind: myerrors.KindConflict, status: http.StatusConflict},
+		{kind: myerrors.KindUnprocessable, status: http.StatusUnprocessableEntity},
+		{kind: myerrors.KindPayloadTooLarge, status: http.StatusRequestEntityTooLarge},
+		{kind: myerrors.KindRateLimited, status: http.StatusTooManyRequests},
+		{kind: myerrors.KindDependencyFailed, status: http.StatusBadGateway},
+		{kind: myerrors.KindUnavailable, status: http.StatusServiceUnavailable},
+		{kind: myerrors.KindTimeout, status: http.StatusGatewayTimeout},
+		{kind: myerrors.KindInternal, status: http.StatusInternalServerError},
+	}
+	for _, test := range tests {
+		if got := httpStatusForErrorKind(test.kind); got != test.status {
+			t.Fatalf("kind %q mapped to %d, want %d", test.kind, got, test.status)
+		}
+	}
+}
+
+func TestInternalBusinessErrorIsLoggedAsServerFailure(t *testing.T) {
+	err := myerrors.WrapApplicationError(nil, myerrors.KindInternal, myerrors.CategoryBusiness, 81002, "处理失败")
+	if !shouldLogApplicationError(err, true) {
+		t.Fatal("internal application failure must be logged even when its domain category is business")
+	}
 }
 
 func performResponseRequest(t *testing.T, handler gin.HandlerFunc) *httptest.ResponseRecorder {

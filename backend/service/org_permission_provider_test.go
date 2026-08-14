@@ -51,7 +51,7 @@ func TestOrgPermissionProviderGetEmployeeByUser(t *testing.T) {
 	assertOrgServiceAdminError(
 		t,
 		err,
-		response.ErrorCategoryBusiness,
+		errors.CategoryBusiness,
 		errors.ErrorCodeOrgUserNotFound,
 	)
 }
@@ -287,7 +287,7 @@ func TestOrgPermissionProviderRejectsInactiveEmployeeAndReferences(t *testing.T)
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			errors.CategoryBusiness,
 			errors.ErrorCodeOrgEmployeeInactive,
 		)
 	})
@@ -319,7 +319,7 @@ func TestOrgPermissionProviderRejectsInactiveEmployeeAndReferences(t *testing.T)
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			errors.CategoryBusiness,
 			errors.ErrorCodeOrgLegalEntityInactive,
 		)
 	})
@@ -350,7 +350,7 @@ func TestOrgPermissionProviderRejectsInactiveEmployeeAndReferences(t *testing.T)
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			errors.CategoryBusiness,
 			errors.ErrorCodeOrgUnitInactive,
 		)
 	})

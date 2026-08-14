@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/dto/response"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
 	"backend/internal/utils"
@@ -551,11 +550,11 @@ func TestDataResourceConfigServiceBoundariesAndErrorConversion(t *testing.T) {
 		t.Fatalf("drop resource table: %v", err)
 	}
 	_, err := service.GetResource(dataResourceConfigContext(), 1)
-	clientErr, _ := apperrors.ToClientError(err)
+	clientErr, _ := apperrors.Classify(err)
 	if clientErr == nil ||
-		clientErr.Category != response.ErrorCategoryDatabase ||
-		clientErr.ErrorMessage != "系统异常" ||
-		strings.Contains(clientErr.ErrorMessage, "sys_data_resource") {
+		clientErr.Category != apperrors.CategoryDatabase ||
+		clientErr.SafeMessage != "系统异常" ||
+		strings.Contains(clientErr.SafeMessage, "sys_data_resource") {
 		t.Fatalf("unexpected converted database error: %+v cause=%v", clientErr, err)
 	}
 }
@@ -672,8 +671,8 @@ func assertDataResourceConfigError(t *testing.T, err error, expectedCode int) {
 	if err == nil {
 		t.Fatalf("expected error code %d", expectedCode)
 	}
-	clientErr, _ := apperrors.ToClientError(err)
-	if clientErr == nil || clientErr.ErrorCode != expectedCode {
+	clientErr, _ := apperrors.Classify(err)
+	if clientErr == nil || clientErr.Code != expectedCode {
 		t.Fatalf("error = %+v, want code %d, cause=%v", clientErr, expectedCode, err)
 	}
 }

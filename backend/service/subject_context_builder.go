@@ -153,8 +153,8 @@ func effectiveSubjectRoleIds(roles []model.SysRole) ([]int, error) {
 }
 
 func wrapSubjectContextDependencyError(err error) error {
-	var adminError *response.AdminError
-	if errors.As(err, &adminError) {
+	var applicationError *myerrors.ApplicationError
+	if errors.As(err, &applicationError) {
 		return err
 	}
 	return myerrors.WrapDatabaseError(err)

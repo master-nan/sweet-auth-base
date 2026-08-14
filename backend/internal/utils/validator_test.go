@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"backend/dto/response"
+	myerrors "backend/internal/errors"
 	stderrors "errors"
 	"net/http/httptest"
 	"strings"
@@ -54,11 +54,11 @@ func TestValidatorBodyReturnsParameterErrorForMalformedJSON(t *testing.T) {
 	err := ValidatorBody(ctx, &data, newValidatorTranslator(t))
 	assertValidatorParameterError(t, err)
 
-	var adminErr *response.AdminError
-	if !stderrors.As(err, &adminErr) || adminErr.Cause == nil {
+	var adminErr *myerrors.ApplicationError
+	if !stderrors.As(err, &adminErr) || stderrors.Unwrap(adminErr) == nil {
 		t.Fatalf("expected malformed JSON cause to be retained: %#v", err)
 	}
-	if adminErr.ErrorMessage != "参数错误" {
+	if adminErr.SafeMessage != "参数错误" {
 		t.Fatalf("malformed JSON details must not be exposed: %#v", adminErr)
 	}
 }
@@ -72,8 +72,8 @@ func TestValidatorBodyReturnsTranslatedParameterError(t *testing.T) {
 	err := ValidatorBody(ctx, &data, newValidatorTranslator(t))
 	assertValidatorParameterError(t, err)
 
-	var adminErr *response.AdminError
-	if !stderrors.As(err, &adminErr) || !strings.Contains(adminErr.ErrorMessage, "name") {
+	var adminErr *myerrors.ApplicationError
+	if !stderrors.As(err, &adminErr) || !strings.Contains(adminErr.SafeMessage, "name") {
 		t.Fatalf("expected translated validation message, got %#v", adminErr)
 	}
 }
@@ -157,8 +157,8 @@ func TestValidateStructUsesJSONFieldNameAndParameterResponse(t *testing.T) {
 	)
 	assertValidatorParameterError(t, err)
 
-	var adminErr *response.AdminError
-	if !stderrors.As(err, &adminErr) || !strings.Contains(adminErr.ErrorMessage, "enum_value") {
+	var adminErr *myerrors.ApplicationError
+	if !stderrors.As(err, &adminErr) || !strings.Contains(adminErr.SafeMessage, "enum_value") {
 		t.Fatalf("expected JSON field name in validation response, got %#v", adminErr)
 	}
 }
@@ -170,8 +170,8 @@ func TestValidateEnum(t *testing.T) {
 
 	err := ValidateEnum("status", "unknown", "draft", "published")
 	assertValidatorParameterError(t, err)
-	var adminErr *response.AdminError
-	if !stderrors.As(err, &adminErr) || adminErr.ErrorMessage != "status取值不合法" {
+	var adminErr *myerrors.ApplicationError
+	if !stderrors.As(err, &adminErr) || adminErr.SafeMessage != "status取值不合法" {
 		t.Fatalf("unexpected enum validation error: %#v", adminErr)
 	}
 }
@@ -222,13 +222,13 @@ func assertValidatorParameterError(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("expected validator error")
 	}
-	var adminErr *response.AdminError
+	var adminErr *myerrors.ApplicationError
 	if !stderrors.As(err, &adminErr) {
 		t.Fatalf("expected AdminError, got %T", err)
 	}
-	if adminErr.Category != response.ErrorCategoryParameter ||
-		adminErr.StatusCode != 400 ||
-		adminErr.ErrorCode != 20003 {
+	if adminErr.Category != myerrors.CategoryParameter ||
+		adminErr.Kind != myerrors.KindInvalidArgument ||
+		adminErr.Code != 20003 {
 		t.Fatalf("unexpected parameter error: %#v", adminErr)
 	}
 }

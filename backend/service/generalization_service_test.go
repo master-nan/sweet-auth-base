@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/dto/response"
 	"backend/enum"
 	"backend/internal/audit"
 	error2 "backend/internal/errors"
@@ -107,12 +106,12 @@ func TestGeneralizationServiceRejectsProtectedTableWrites(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected protected table write to fail")
 			}
-			var adminErr *response.AdminError
-			if !errors.As(err, &adminErr) || adminErr.StatusCode != 400 {
+			var adminErr *error2.ApplicationError
+			if !errors.As(err, &adminErr) || adminErr.Kind != error2.KindInvalidArgument {
 				t.Fatalf("expected bad request AdminError, got %T %v", err, err)
 			}
-			if !strings.Contains(adminErr.ErrorMessage, "受保护的系统表") {
-				t.Fatalf("expected protected table error message, got %q", adminErr.ErrorMessage)
+			if !strings.Contains(adminErr.SafeMessage, "受保护的系统表") {
+				t.Fatalf("expected protected table error message, got %q", adminErr.SafeMessage)
 			}
 			if repo.called {
 				t.Fatal("protected table write reached repository")
@@ -209,12 +208,12 @@ func TestValidateDataByBindingsRejectsInvalidFieldTypes(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected type validation error")
 			}
-			var adminErr *response.AdminError
-			if !errors.As(err, &adminErr) || adminErr.StatusCode != 400 {
+			var adminErr *error2.ApplicationError
+			if !errors.As(err, &adminErr) || adminErr.Kind != error2.KindInvalidArgument {
 				t.Fatalf("expected bad request AdminError, got %T %v", err, err)
 			}
-			if !strings.Contains(adminErr.ErrorMessage, tt.wantError) {
-				t.Fatalf("expected %q in error message, got %q", tt.wantError, adminErr.ErrorMessage)
+			if !strings.Contains(adminErr.SafeMessage, tt.wantError) {
+				t.Fatalf("expected %q in error message, got %q", tt.wantError, adminErr.SafeMessage)
 			}
 		})
 	}
@@ -246,12 +245,12 @@ func TestValidateDataByBindingsRejectsEmptyNonNullableUpdates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected empty non-null update to fail")
 	}
-	var adminErr *response.AdminError
-	if !errors.As(err, &adminErr) || adminErr.StatusCode != 400 {
+	var adminErr *error2.ApplicationError
+	if !errors.As(err, &adminErr) || adminErr.Kind != error2.KindInvalidArgument {
 		t.Fatalf("expected bad request AdminError, got %T %v", err, err)
 	}
-	if !strings.Contains(adminErr.ErrorMessage, "数量不能为空") {
-		t.Fatalf("expected required error, got %q", adminErr.ErrorMessage)
+	if !strings.Contains(adminErr.SafeMessage, "数量不能为空") {
+		t.Fatalf("expected required error, got %q", adminErr.SafeMessage)
 	}
 }
 

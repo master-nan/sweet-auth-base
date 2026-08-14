@@ -176,11 +176,11 @@ func TestSubjectContextBuilderWrapsRawDependencyErrors(t *testing.T) {
 	)
 
 	_, err := builder.Build(authenticatedSubjectContext(101), 101)
-	var adminError *response.AdminError
+	var adminError *myerrors.ApplicationError
 	if !errors.As(err, &adminError) {
 		t.Fatalf("Build() error = %T, want AdminError", err)
 	}
-	if adminError.Category != response.ErrorCategoryDatabase || adminError.ErrorCode != myerrors.ErrorCodeGeneric {
+	if adminError.Category != myerrors.CategoryDatabase || adminError.Code != myerrors.ErrorCodeGeneric {
 		t.Fatalf("Build() error = %+v, want stable database error", adminError)
 	}
 }
@@ -219,11 +219,11 @@ func assertSubjectContextBuilderError(t *testing.T, err error, errorCode int) {
 	if err == nil {
 		t.Fatalf("expected error code %d", errorCode)
 	}
-	var adminError *response.AdminError
+	var adminError *myerrors.ApplicationError
 	if !errors.As(err, &adminError) {
 		t.Fatalf("error = %T, want AdminError", err)
 	}
-	if adminError.ErrorCode != errorCode {
-		t.Fatalf("error code = %d, want %d", adminError.ErrorCode, errorCode)
+	if adminError.Code != errorCode {
+		t.Fatalf("error code = %d, want %d", adminError.Code, errorCode)
 	}
 }

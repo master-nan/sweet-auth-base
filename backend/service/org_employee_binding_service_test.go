@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/dto/response"
 	"backend/internal/audit"
 	apperrors "backend/internal/errors"
 	"backend/internal/test"
@@ -100,7 +99,7 @@ func TestOrgServiceBindEmployeeUser(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgEmployeeNotFound,
 		)
 	})
@@ -116,7 +115,7 @@ func TestOrgServiceBindEmployeeUser(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgUserNotFound,
 		)
 	})
@@ -137,7 +136,7 @@ func TestOrgServiceBindEmployeeUser(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgEmployeeAlreadyBound,
 		)
 	})
@@ -158,7 +157,7 @@ func TestOrgServiceBindEmployeeUser(t *testing.T) {
 		assertOrgServiceAdminError(
 			t,
 			err,
-			response.ErrorCategoryBusiness,
+			apperrors.CategoryBusiness,
 			apperrors.ErrorCodeOrgUserAlreadyBound,
 		)
 	})
@@ -195,9 +194,9 @@ func TestOrgServiceBindEmployeeUserConcurrentConflict(t *testing.T) {
 			successCount++
 			continue
 		}
-		var adminErr *response.AdminError
+		var adminErr *apperrors.ApplicationError
 		if errors.As(err, &adminErr) &&
-			adminErr.ErrorCode == apperrors.ErrorCodeOrgUserAlreadyBound {
+			adminErr.Code == apperrors.ErrorCodeOrgUserAlreadyBound {
 			conflictCount++
 			continue
 		}

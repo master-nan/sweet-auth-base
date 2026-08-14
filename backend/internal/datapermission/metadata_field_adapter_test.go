@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"backend/dto/response"
 	"backend/enum"
 	myerrors "backend/internal/errors"
 )
@@ -678,11 +677,11 @@ func assertMetadataAdapterError(t *testing.T, err error, code int) {
 	if err == nil {
 		t.Fatalf("expected metadata adapter error code %d", code)
 	}
-	var adminError *response.AdminError
+	var adminError *myerrors.ApplicationError
 	if !errors.As(err, &adminError) {
 		t.Fatalf("error is not AdminError: %T %v", err, err)
 	}
-	if adminError.ErrorCode != code {
-		t.Fatalf("error code=%d, want %d: %v", adminError.ErrorCode, code, err)
+	if adminError.Code != code {
+		t.Fatalf("error code=%d, want %d: %v", adminError.Code, code, err)
 	}
 }
