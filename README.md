@@ -5,7 +5,8 @@ Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字�
 常用入口：
 
 - 文档总导航：[docs/README.md](docs/README.md)
-- 运行、测试、Docker、数据库和发布说明：[运行手册](docs/operations/Runbook.md)
+- 工程扩展步骤：[平台扩展开发指南](docs/engineering/ExtensionDevelopmentGuide.md)
+- 运行、测试、Docker、数据库和发布说明：[平台部署运维指南](docs/operations/PlatformOperationsGuide.md)
 - 低代码发布、字段、按钮和权限排查：[低代码配置手册](docs/user-guide/LowCodeManual.md)
 - 字段输入类型：[字段类型指南](docs/user-guide/FieldTypeGuide.md)
 - 字段联动配置：[联动配置说明](docs/user-guide/LinkageConfig.md)

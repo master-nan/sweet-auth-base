@@ -28,7 +28,8 @@
 ### 工程与运行
 
 - [平台工程架构与目录手册](engineering/PlatformEngineeringGuide.md)
-- [运行手册](operations/Runbook.md)
+- [平台扩展开发指南](engineering/ExtensionDevelopmentGuide.md)
+- [平台部署运维指南](operations/PlatformOperationsGuide.md)
 
 ### 建设期参考资料
 

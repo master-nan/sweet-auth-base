@@ -4,7 +4,7 @@
 - 读者：平台开发人员、项目维护人员、接手人员、架构维护者
 - 依据：当前 `backend/`、`frontend/`、启动配置、迁移、测试和部署代码
 
-本文说明 Sweet Platform 当前如何分层、各目录承担什么职责、模块如何依赖，以及新增代码应复用哪些稳定边界。管理员操作请阅读[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)，部署和排错请阅读[运行手册](../operations/Runbook.md)。历史设计、验收和冻结记录不属于本文正文。
+本文说明 Sweet Platform 当前如何分层、各目录承担什么职责、模块如何依赖，以及新增代码应复用哪些稳定边界。具体扩展步骤见[平台扩展开发指南](ExtensionDevelopmentGuide.md)，管理员操作请阅读[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)，部署和排错请阅读[平台部署运维指南](../operations/PlatformOperationsGuide.md)。历史设计、验收和冻结记录不属于本文正文。
 
 ## 1. 总体架构
 
@@ -689,7 +689,8 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 ## 29. 文档关系
 
 - 使用和配置：[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)
-- 部署、环境和排错：[运行手册](../operations/Runbook.md)
+- 扩展实施：[平台扩展开发指南](ExtensionDevelopmentGuide.md)
+- 部署、环境和排错：[平台部署运维指南](../operations/PlatformOperationsGuide.md)
 - 文档归类：[DocumentationStandard](../DocumentationStandard.md)
 - 建设期设计、验收和冻结证据：`docs/_construction/`，仅供追溯，不作为当前代码入口手册
 

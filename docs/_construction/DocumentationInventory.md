@@ -21,8 +21,9 @@ DOC-001A 治理前共有 67 份非 `development` 文档资产：35 份 Git 已�
 | `user-guide/LinkageConfig.md` | 字段联动配置说明 | User Guide | long-term | KEEP |
 | `user-guide/LowCodeManual.md` | 低代码平台使用手册 | User Guide | long-term | KEEP |
 | `user-guide/OrganizationManagementUserGuide.md` | 组织管理操作说明 | User Guide | long-term | KEEP |
-| `operations/Runbook.md` | 本地运行、构建和排错 | Operations Guide | active-maintenance | REWRITE |
+| `operations/PlatformOperationsGuide.md` | 部署、配置、运行、升级与排错唯一运维手册 | Operations Guide | long-term | KEEP |
 | `engineering/PlatformEngineeringGuide.md` | 当前工程架构、目录职责与模块边界 | Engineering Guide | long-term | KEEP |
+| `engineering/ExtensionDevelopmentGuide.md` | 平台扩展开发实施步骤 | Engineering Guide | long-term | KEEP |
 
 ## 3. Design 与 Architecture
 

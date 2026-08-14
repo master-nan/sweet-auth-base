@@ -2,6 +2,6 @@
 
 本目录面向部署、运维和本地开发人员，记录环境、配置、运行、升级与排错。
 
-- [Sweet Admin 运行手册](Runbook.md)
+- [平台部署运维指南](PlatformOperationsGuide.md)：本地启动、Docker、配置、Migration/Seed、备份恢复、Worker/Runner、发布检查和故障排查。
 
-后续应从现有 Runbook 中逐步分离本地开发、部署配置和故障处理，但本 Task 不进行大规模内容重写。
+本目录以 `PlatformOperationsGuide.md` 为当前唯一运维真值，不再另行维护同内容的 Runbook。功能配置请阅读[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)，开发扩展请阅读[平台扩展开发指南](../engineering/ExtensionDevelopmentGuide.md)。
