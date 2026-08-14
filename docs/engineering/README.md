@@ -6,6 +6,7 @@
 
 - [平台工程架构与目录手册](PlatformEngineeringGuide.md)：总体分层、目录职责、模块边界、关键文件、测试架构和新代码落位规则。
 - [平台扩展开发指南](ExtensionDevelopmentGuide.md)：新增业务模块、权限、数据权限、Metadata、Integration Consumer、Migration、前端和测试的实施步骤。
+- [前端架构与页面模式指南](FrontendArchitectureGuide.md)：Vue/Quasar 页面模式、Runtime Metadata、查询、权限按钮、表单详情、CSS/Theme 和前端扩展约束。
 
 平台管理员如何操作系统请阅读[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)，部署和排错请阅读[平台部署运维指南](../operations/PlatformOperationsGuide.md)。
 
@@ -13,5 +14,5 @@
 
 - Engineering 文档只描述当前稳定代码和长期扩展约束，不记录 Task 过程。
 - 新增目录、公共接口或跨模块依赖时，应同步核对并更新工程手册。
-- `_construction/` 目前仅保留 Organization HR 生产准入证据、Integration Sync 前置冻结证据和 Report 重设计参考，不作为新代码入口。
+- `_construction/` 目前保留 Organization HR 生产准入证据、Integration Sync 前置冻结证据、Report 重设计参考和进行中的专项评审，不作为新代码入口。
 - 新增扩展能力时，应同步核对工程架构和扩展指南；不得用 construction 文档替代长期开发指南。

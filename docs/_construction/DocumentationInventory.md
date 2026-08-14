@@ -27,6 +27,15 @@ Platform Enablement 完成后，RC-001 对建设期资料执行了第一次真�
 
 其他专题 User Guide 继续由 `docs/user-guide/README.md` 管理。
 
+## 2.1 Frontend Consistency 活跃评审
+
+| 文件 | 用途 | 生命周期 | 最终动作 |
+| --- | --- | --- | --- |
+| `engineering/FrontendArchitectureGuide.md` | 前端架构和页面模式长期标准 | long-term | KEEP |
+| `_construction/reviews/FrontendConsistencyReview.md` | FE-001 统计、页面样本、风险分级和 FE-002/003 迁移依据 | construction | DELETE_AFTER_STABLE |
+
+`FrontendConsistencyReview.md` 仅保留至 FE-002、FE-003 完成且最终规则已同步到长期指南，不作为新页面直接复制的实现模板。
+
 ## 3. HR 与 Integration Sync 保护区
 
 以下资料继续承担 HR Production Enablement 证据，不得在 DOC-FINAL 前机械删除：
