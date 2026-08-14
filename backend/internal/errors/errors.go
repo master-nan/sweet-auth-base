@@ -240,6 +240,7 @@ var (
 	ErrSmsTemplateExist     = NewError(http.StatusBadRequest, 50008, "短信模板已存在")
 	ErrSmsSendTooFrequent   = NewError(http.StatusTooManyRequests, 50009, "短信发送过于频繁，请稍后再试")
 	ErrSmsStatusQueryFailed = NewError(http.StatusBadGateway, 50010, "短信状态查询失败")
+	ErrSmsStatusNotFound    = NewError(http.StatusNotFound, 50011, "短信状态不存在")
 
 	ErrDingTalkSecretNotFound = NewError(http.StatusBadRequest, 60001, "钉钉密钥未配置")
 	ErrDingTalkMsgTypeInvalid = NewError(http.StatusBadRequest, 60002, "钉钉消息类型错误")

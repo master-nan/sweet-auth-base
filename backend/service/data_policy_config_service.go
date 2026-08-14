@@ -8,6 +8,7 @@ import (
 	"backend/model"
 	"backend/repository"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -84,7 +84,7 @@ func NewDataPolicyConfigService(
 }
 
 func (s *DataPolicyConfigService) CreatePolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyCreateReq,
 ) (response.DataPolicyDetailRes, error) {
 	if ctx == nil {
@@ -158,7 +158,7 @@ func (s *DataPolicyConfigService) CreatePolicy(
 }
 
 func (s *DataPolicyConfigService) GetPolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 ) (response.DataPolicyDetailRes, error) {
 	if policyId <= 0 {
@@ -178,7 +178,7 @@ func (s *DataPolicyConfigService) GetPolicy(
 }
 
 func (s *DataPolicyConfigService) PagePolicies(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataPolicyListRes], error) {
@@ -200,7 +200,7 @@ func (s *DataPolicyConfigService) PagePolicies(
 }
 
 func (s *DataPolicyConfigService) UpdatePolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyUpdateReq,
 ) (response.DataPolicyDetailRes, error) {
 	if ctx == nil {
@@ -271,7 +271,7 @@ func (s *DataPolicyConfigService) UpdatePolicy(
 }
 
 func (s *DataPolicyConfigService) AddPolicyRule(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyRuleCreateReq,
 ) (response.DataPolicyRuleDetailRes, error) {
 	if ctx == nil {
@@ -323,7 +323,7 @@ func (s *DataPolicyConfigService) AddPolicyRule(
 }
 
 func (s *DataPolicyConfigService) ReplacePolicyRules(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyRuleBatchReq,
 ) ([]response.DataPolicyRuleListRes, error) {
 	if ctx == nil {
@@ -385,22 +385,8 @@ func (s *DataPolicyConfigService) ReplacePolicyRules(
 	return dataPolicyRuleListResponses(created), nil
 }
 
-func (s *DataPolicyConfigService) GetPolicyRule(
-	ctx *gin.Context,
-	ruleId int,
-) (response.DataPolicyRuleDetailRes, error) {
-	if ruleId <= 0 {
-		return response.DataPolicyRuleDetailRes{}, myerrors.NewParameterError("rule_id必须大于0")
-	}
-	rule, err := s.ruleRepo.WithContext(ctx).FindById(ruleId)
-	if err != nil {
-		return response.DataPolicyRuleDetailRes{}, mapDataPolicyRuleReadError(err)
-	}
-	return s.policyRuleDetail(ctx, rule)
-}
-
 func (s *DataPolicyConfigService) PagePolicyRules(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataPolicyRuleQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataPolicyRuleListRes], error) {
@@ -418,24 +404,7 @@ func (s *DataPolicyConfigService) PagePolicyRules(
 	return result, nil
 }
 
-func (s *DataPolicyConfigService) ListPolicyRules(
-	ctx *gin.Context,
-	policyId int,
-) ([]response.DataPolicyRuleListRes, error) {
-	if policyId <= 0 {
-		return nil, myerrors.NewParameterError("policy_id必须大于0")
-	}
-	if _, err := s.policyRepo.WithContext(ctx).FindById(policyId); err != nil {
-		return nil, mapDataPolicyReadError(err)
-	}
-	rules, err := s.ruleRepo.ListByPolicyForConfigDB(s.ruleRepo.DBWithContext(ctx), policyId)
-	if err != nil {
-		return nil, myerrors.WrapDatabaseError(err)
-	}
-	return dataPolicyRuleListResponses(rules), nil
-}
-
-func (s *DataPolicyConfigService) DisablePolicyRule(ctx *gin.Context, ruleId int) error {
+func (s *DataPolicyConfigService) DisablePolicyRule(ctx context.Context, ruleId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -809,7 +778,7 @@ func (s *DataPolicyConfigService) findActivePolicyDimension(
 }
 
 func (s *DataPolicyConfigService) policyRuleDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	rule model.DataPolicyRule,
 ) (response.DataPolicyRuleDetailRes, error) {
 	policy, err := s.policyRepo.WithContext(ctx).FindById(rule.PolicyId)
@@ -849,7 +818,7 @@ func (s *DataPolicyConfigService) generateId() (int, error) {
 }
 
 func (s *DataPolicyConfigService) recordPolicyAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	policy model.DataPolicy,
@@ -871,7 +840,7 @@ func (s *DataPolicyConfigService) recordPolicyAudit(
 }
 
 func (s *DataPolicyConfigService) recordRuleAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	rule model.DataPolicyRule,

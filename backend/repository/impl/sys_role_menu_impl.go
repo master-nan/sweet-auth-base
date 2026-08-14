@@ -35,13 +35,6 @@ func (s *SysRoleMenuRepositoryImpl) GetRoleMenusByRoleIds(roleIds []int) ([]mode
 	return menus, err
 }
 
-func (s *SysRoleMenuRepositoryImpl) DeleteRoleMenuByRoleIdAndMenuId(tx *gorm.DB, roleId, menuId int) error {
-	if tx == nil {
-		tx = s.db
-	}
-	return tx.Where("role_id = ? and menu_id = ?", roleId, menuId).Delete(&model.SysRoleMenu{}).Error
-}
-
 func (s *SysRoleMenuRepositoryImpl) DeleteByMenuIds(tx *gorm.DB, menuIds []int) error {
 	if len(menuIds) == 0 {
 		return nil

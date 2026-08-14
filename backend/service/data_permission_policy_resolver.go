@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -12,26 +13,25 @@ import (
 	"backend/model"
 	"backend/repository"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type policyResolverResourceLookup func(*gin.Context, string) (model.DataResource, error)
-type policyResolverOperationLookup func(*gin.Context, int, string) (model.DataResourceOperation, error)
+type policyResolverResourceLookup func(context.Context, string) (model.DataResource, error)
+type policyResolverOperationLookup func(context.Context, int, string) (model.DataResourceOperation, error)
 type policyResolverGrantLookup func(
-	*gin.Context,
+	context.Context,
 	int,
 	[]int,
 	int,
 	string,
 	time.Time,
 ) ([]model.DataGrant, error)
-type policyResolverPolicyLookup func(*gin.Context, int) (model.DataPolicy, error)
-type policyResolverRuleLookup func(*gin.Context, int) ([]model.DataPolicyRule, error)
-type policyResolverOwnershipLookup func(*gin.Context, int, string) (model.DataOwnershipField, error)
-type policyResolverDimensionLookup func(*gin.Context, int) (model.DataDimensionDefinition, error)
+type policyResolverPolicyLookup func(context.Context, int) (model.DataPolicy, error)
+type policyResolverRuleLookup func(context.Context, int) ([]model.DataPolicyRule, error)
+type policyResolverOwnershipLookup func(context.Context, int, string) (model.DataOwnershipField, error)
+type policyResolverDimensionLookup func(context.Context, int) (model.DataDimensionDefinition, error)
 type policyResolverDimensionValuesLookup func(
-	*gin.Context,
+	context.Context,
 	datapermission.SubjectContext,
 	DimensionProviderRequest,
 ) (datapermission.DimensionValues, error)
@@ -62,25 +62,25 @@ func NewDataPermissionPolicyResolver(
 	dimensionProvider DimensionProvider,
 ) *DataPermissionPolicyResolver {
 	return newDataPermissionPolicyResolver(
-		func(ctx *gin.Context, code string) (model.DataResource, error) {
+		func(ctx context.Context, code string) (model.DataResource, error) {
 			return resourceRepo.WithContext(ctx).FindByField("resource_code", code)
 		},
-		func(ctx *gin.Context, resourceId int, operation string) (model.DataResourceOperation, error) {
+		func(ctx context.Context, resourceId int, operation string) (model.DataResourceOperation, error) {
 			return operationRepo.FindByStableKey(ctx, resourceId, operation)
 		},
-		func(ctx *gin.Context, userId int, roleIds []int, resourceId int, operation string, asOf time.Time) ([]model.DataGrant, error) {
+		func(ctx context.Context, userId int, roleIds []int, resourceId int, operation string, asOf time.Time) ([]model.DataGrant, error) {
 			return grantRepo.ListEffectiveBySubjects(ctx, userId, roleIds, resourceId, operation, asOf)
 		},
-		func(ctx *gin.Context, id int) (model.DataPolicy, error) {
+		func(ctx context.Context, id int) (model.DataPolicy, error) {
 			return policyRepo.WithContext(ctx).FindById(id)
 		},
-		func(ctx *gin.Context, policyId int) ([]model.DataPolicyRule, error) {
+		func(ctx context.Context, policyId int) ([]model.DataPolicyRule, error) {
 			return ruleRepo.ListByPolicy(ctx, policyId)
 		},
-		func(ctx *gin.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {
+		func(ctx context.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {
 			return ownershipRepo.FindByStableKey(ctx, resourceId, ownershipCode)
 		},
-		func(ctx *gin.Context, id int) (model.DataDimensionDefinition, error) {
+		func(ctx context.Context, id int) (model.DataDimensionDefinition, error) {
 			return dimensionRepo.WithContext(ctx).FindById(id)
 		},
 		dimensionProvider.ResolveDimensionValues,
@@ -110,7 +110,7 @@ func newDataPermissionPolicyResolver(
 }
 
 func (resolver *DataPermissionPolicyResolver) Resolve(
-	ctx *gin.Context,
+	ctx context.Context,
 	input datapermission.ResolverInput,
 ) (datapermission.DataScopeResult, error) {
 	if resolver == nil {
@@ -118,7 +118,7 @@ func (resolver *DataPermissionPolicyResolver) Resolve(
 	}
 	var request *policyResolverRequestContext
 	result, err := datapermission.ResolverFunc(func(
-		ctx *gin.Context,
+		ctx context.Context,
 		input datapermission.ResolverInput,
 	) (datapermission.DataScopeResult, error) {
 		request = newPolicyResolverRequestContext(input)
@@ -138,7 +138,7 @@ func (resolver *DataPermissionPolicyResolver) Resolve(
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 ) (datapermission.DataScopeResult, error) {
 	if !resolver.hasRequiredLookups() {
@@ -207,7 +207,7 @@ func (resolver *DataPermissionPolicyResolver) resolveGrantPolicies(
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 	resource model.DataResource,
 	grant model.DataGrant,
@@ -289,7 +289,7 @@ func mergeGrantScopeResults(
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveRule(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 	resource model.DataResource,
 	rule model.DataPolicyRule,
@@ -362,7 +362,7 @@ func (resolver *DataPermissionPolicyResolver) resolveRule(
 }
 
 func (resolver *DataPermissionPolicyResolver) resolveRuleValues(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 	rule model.DataPolicyRule,
 	dimension model.DataDimensionDefinition,
@@ -422,7 +422,7 @@ func newResolverDimensionProviderRequest(
 }
 
 func (resolver *DataPermissionPolicyResolver) loadResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 	resourceCode string,
 ) (model.DataResource, error) {
@@ -444,7 +444,7 @@ func (resolver *DataPermissionPolicyResolver) loadResource(
 }
 
 func (resolver *DataPermissionPolicyResolver) loadPolicyConfig(
-	ctx *gin.Context,
+	ctx context.Context,
 	request *policyResolverRequestContext,
 	policyId int,
 ) (policyResolverPolicyConfig, error) {

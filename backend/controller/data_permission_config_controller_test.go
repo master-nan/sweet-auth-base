@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -41,7 +42,7 @@ type dataPermissionConfigResourceStub struct {
 }
 
 func (s *dataPermissionConfigResourceStub) CreateResource(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataResourceCreateReq,
 ) (response.DataResourceDetailRes, error) {
 	s.createReq = req
@@ -50,7 +51,7 @@ func (s *dataPermissionConfigResourceStub) CreateResource(
 }
 
 func (s *dataPermissionConfigResourceStub) UpdateResource(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataResourceUpdateReq,
 ) (response.DataResourceDetailRes, error) {
 	s.updateReq = req
@@ -59,14 +60,14 @@ func (s *dataPermissionConfigResourceStub) UpdateResource(
 }
 
 func (s *dataPermissionConfigResourceStub) GetResource(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataResourceDetailRes, error) {
 	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigResourceStub) PageResources(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataResourceQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataResourceListRes], error) {
@@ -76,7 +77,7 @@ func (s *dataPermissionConfigResourceStub) PageResources(
 }
 
 func (s *dataPermissionConfigResourceStub) ListResourceOperations(
-	*gin.Context,
+	context.Context,
 	int,
 ) ([]response.DataResourceOperationListRes, error) {
 	s.operationCalls++
@@ -84,7 +85,7 @@ func (s *dataPermissionConfigResourceStub) ListResourceOperations(
 }
 
 func (s *dataPermissionConfigResourceStub) ReplaceResourceOperations(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataResourceOperationBatchReq,
 ) ([]response.DataResourceOperationListRes, error) {
 	s.replaceReq = req
@@ -105,7 +106,7 @@ type dataPermissionConfigOwnershipStub struct {
 }
 
 func (s *dataPermissionConfigOwnershipStub) PageDimensions(
-	_ *gin.Context,
+	_ context.Context,
 	_ request.DataDimensionDefinitionQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
@@ -114,7 +115,7 @@ func (s *dataPermissionConfigOwnershipStub) PageDimensions(
 }
 
 func (s *dataPermissionConfigOwnershipStub) CreateOwnership(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataOwnershipFieldCreateReq,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	s.createReq = req
@@ -122,7 +123,7 @@ func (s *dataPermissionConfigOwnershipStub) CreateOwnership(
 }
 
 func (s *dataPermissionConfigOwnershipStub) UpdateOwnership(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataOwnershipFieldUpdateReq,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	s.updateReq = req
@@ -130,21 +131,21 @@ func (s *dataPermissionConfigOwnershipStub) UpdateOwnership(
 }
 
 func (s *dataPermissionConfigOwnershipStub) GetOwnership(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigOwnershipStub) ListOwnershipsByResource(
-	*gin.Context,
+	context.Context,
 	int,
 ) ([]response.DataOwnershipFieldListRes, error) {
 	return s.list, s.err
 }
 
 func (s *dataPermissionConfigOwnershipStub) PageOwnerships(
-	_ *gin.Context,
+	_ context.Context,
 	_ request.DataOwnershipFieldQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataOwnershipFieldListRes], error) {
@@ -163,7 +164,7 @@ type dataPermissionConfigPolicyStub struct {
 }
 
 func (s *dataPermissionConfigPolicyStub) CreatePolicy(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataPolicyCreateReq,
 ) (response.DataPolicyDetailRes, error) {
 	s.createReq = req
@@ -171,7 +172,7 @@ func (s *dataPermissionConfigPolicyStub) CreatePolicy(
 }
 
 func (s *dataPermissionConfigPolicyStub) UpdatePolicy(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataPolicyUpdateReq,
 ) (response.DataPolicyDetailRes, error) {
 	s.updateReq = req
@@ -179,14 +180,14 @@ func (s *dataPermissionConfigPolicyStub) UpdatePolicy(
 }
 
 func (s *dataPermissionConfigPolicyStub) GetPolicy(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataPolicyDetailRes, error) {
 	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigPolicyStub) PagePolicies(
-	*gin.Context,
+	context.Context,
 	request.DataPolicyQueryReq,
 	model.SysTable,
 ) (response.ListResult[response.DataPolicyListRes], error) {
@@ -194,7 +195,7 @@ func (s *dataPermissionConfigPolicyStub) PagePolicies(
 }
 
 func (s *dataPermissionConfigPolicyStub) PagePolicyRules(
-	*gin.Context,
+	context.Context,
 	request.DataPolicyRuleQueryReq,
 	model.SysTable,
 ) (response.ListResult[response.DataPolicyRuleListRes], error) {
@@ -202,7 +203,7 @@ func (s *dataPermissionConfigPolicyStub) PagePolicyRules(
 }
 
 func (s *dataPermissionConfigPolicyStub) ReplacePolicyRules(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataPolicyRuleBatchReq,
 ) ([]response.DataPolicyRuleListRes, error) {
 	s.replaceReq = req
@@ -217,7 +218,7 @@ type dataPermissionConfigGrantStub struct {
 }
 
 func (s *dataPermissionConfigGrantStub) CreateGrant(
-	_ *gin.Context,
+	_ context.Context,
 	req request.DataGrantCreateReq,
 ) (response.DataGrantDetailRes, error) {
 	s.createReq = req
@@ -225,14 +226,14 @@ func (s *dataPermissionConfigGrantStub) CreateGrant(
 }
 
 func (s *dataPermissionConfigGrantStub) GetGrant(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataGrantDetailRes, error) {
 	return s.detail, s.err
 }
 
 func (s *dataPermissionConfigGrantStub) PageGrants(
-	*gin.Context,
+	context.Context,
 	request.DataGrantQueryReq,
 	model.SysTable,
 ) (response.ListResult[response.DataGrantListRes], error) {
@@ -256,28 +257,28 @@ type dataPermissionConfigPreflightStub struct {
 }
 
 func (s *dataPermissionConfigPreflightStub) PreflightResource(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.resource, s.err
 }
 
 func (s *dataPermissionConfigPreflightStub) PreflightPolicy(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.policy, s.err
 }
 
 func (s *dataPermissionConfigPreflightStub) PreflightGrant(
-	*gin.Context,
+	context.Context,
 	int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.grant, s.err
 }
 
 func (s *dataPermissionConfigPreflightStub) EnableResource(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.enableResourceCalls++
@@ -286,7 +287,7 @@ func (s *dataPermissionConfigPreflightStub) EnableResource(
 }
 
 func (s *dataPermissionConfigPreflightStub) DisableResource(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.disableResourceCalls++
@@ -295,7 +296,7 @@ func (s *dataPermissionConfigPreflightStub) DisableResource(
 }
 
 func (s *dataPermissionConfigPreflightStub) EnablePolicy(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.enablePolicyCalls++
@@ -304,7 +305,7 @@ func (s *dataPermissionConfigPreflightStub) EnablePolicy(
 }
 
 func (s *dataPermissionConfigPreflightStub) DisablePolicy(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.disablePolicyCalls++
@@ -313,7 +314,7 @@ func (s *dataPermissionConfigPreflightStub) DisablePolicy(
 }
 
 func (s *dataPermissionConfigPreflightStub) EnableGrant(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.enableGrantCalls++
@@ -322,7 +323,7 @@ func (s *dataPermissionConfigPreflightStub) EnableGrant(
 }
 
 func (s *dataPermissionConfigPreflightStub) DisableGrant(
-	_ *gin.Context,
+	_ context.Context,
 	id int,
 ) (response.DataPermissionValidationResultRes, error) {
 	s.disableGrantCalls++

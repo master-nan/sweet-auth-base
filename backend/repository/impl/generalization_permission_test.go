@@ -3,17 +3,16 @@ package impl
 import (
 	"database/sql"
 	"errors"
-	"strings"
 	"testing"
 
 	"backend/enum"
 	"backend/internal/database"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -144,10 +143,8 @@ func TestGeneralizationPermissionRepositoryBatchDeleteRollsBackPartialAuthorizat
 
 func generalizationPermissionRepositoryDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
+	db := testutil.OpenSQLiteWithConfig(t, &gorm.Config{})
+	var err error
 	if err = db.Exec(`CREATE TABLE permission_record (
 		id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,

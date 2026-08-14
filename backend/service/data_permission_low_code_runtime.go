@@ -8,20 +8,20 @@ import (
 	"time"
 
 	"backend/dto/response"
+	"backend/internal/audit"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-type lowCodeResourceLookup func(*gin.Context, int) ([]model.DataResource, error)
-type lowCodeOwnershipLookup func(*gin.Context, int) ([]model.DataOwnershipField, error)
-type lowCodeSubjectBuilder func(*gin.Context, int) (datapermission.SubjectContext, error)
-type lowCodeResolver func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error)
+type lowCodeResourceLookup func(context.Context, int) ([]model.DataResource, error)
+type lowCodeOwnershipLookup func(context.Context, int) ([]model.DataOwnershipField, error)
+type lowCodeSubjectBuilder func(context.Context, int) (datapermission.SubjectContext, error)
+type lowCodeResolver func(context.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error)
 type lowCodeMetadataAdapter func(context.Context, datapermission.AdapterInput) (datapermission.AdapterExecution, error)
 
 type lowCodePermissionResolution struct {
@@ -64,10 +64,10 @@ func NewLowCodeDataPermissionRuntime(
 	metadataAdapter *datapermission.MetadataFieldAdapter,
 ) *LowCodeDataPermissionRuntime {
 	return newLowCodeDataPermissionRuntime(
-		func(ctx *gin.Context, tableId int) ([]model.DataResource, error) {
+		func(ctx context.Context, tableId int) ([]model.DataResource, error) {
 			return resourceRepo.ListByTableId(ctx, tableId)
 		},
-		func(ctx *gin.Context, resourceId int) ([]model.DataOwnershipField, error) {
+		func(ctx context.Context, resourceId int) ([]model.DataOwnershipField, error) {
 			return ownershipRepo.ListByResource(ctx, resourceId)
 		},
 		subjectBuilder.Build,
@@ -93,7 +93,7 @@ func newLowCodeDataPermissionRuntime(
 }
 
 func (runtime *LowCodeDataPermissionRuntime) Resolve(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	operation string,
 ) (lowCodePermissionResolution, error) {
@@ -131,11 +131,11 @@ func (runtime *LowCodeDataPermissionRuntime) Resolve(
 		)
 	}
 
-	user, err := trustedRuntimeUser(ctx)
+	userID, err := trustedRuntimeUserID(ctx)
 	if err != nil {
 		return lowCodePermissionResolution{}, err
 	}
-	subject, err := runtime.buildSubject(ctx, user.Id)
+	subject, err := runtime.buildSubject(ctx, userID)
 	if err != nil {
 		return lowCodePermissionResolution{}, err
 	}
@@ -143,7 +143,8 @@ func (runtime *LowCodeDataPermissionRuntime) Resolve(
 	if err != nil {
 		return lowCodePermissionResolution{}, err
 	}
-	result, err := runtime.resolveScope(ctx, resolverInput)
+	resolverCtx := datapermission.WithResolverSummaryContext(ctx)
+	result, err := runtime.resolveScope(resolverCtx, resolverInput)
 	if err != nil {
 		return lowCodePermissionResolution{}, err
 	}
@@ -178,7 +179,7 @@ func (runtime *LowCodeDataPermissionRuntime) Resolve(
 		return lowCodePermissionResolution{}, err
 	}
 
-	zapLowCodePermissionDecision(ctx, result, execution.Mode(), startedAt)
+	zapLowCodePermissionDecision(resolverCtx, result, execution.Mode(), startedAt)
 	return lowCodePermissionResolution{
 		permission: repository.GeneralizationPermission{
 			AdapterExecution: &execution,
@@ -188,7 +189,7 @@ func (runtime *LowCodeDataPermissionRuntime) Resolve(
 }
 
 func (runtime *LowCodeDataPermissionRuntime) resolveNotApplicable(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	operation string,
 	resourceCode string,
@@ -277,26 +278,20 @@ func lowCodeOwnershipDefinitions(
 	return definitions, fieldIds, nil
 }
 
-func trustedRuntimeUser(ctx *gin.Context) (model.SysUser, error) {
+func trustedRuntimeUserID(ctx context.Context) (int, error) {
 	if ctx == nil {
-		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
+		return 0, myerrors.ErrDataPermissionSubjectContextInvalid
 	}
-	value, exists := ctx.Get("user")
-	user, ok := value.(model.SysUser)
-	if !exists || !ok || user.Id <= 0 {
-		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
+	subject, ok := audit.GetAuditSubject(ctx)
+	if !ok || subject.UserID <= 0 {
+		return 0, myerrors.ErrDataPermissionSubjectContextInvalid
 	}
-	trustedId, exists := ctx.Get("id")
-	id, ok := trustedId.(int)
-	if !exists || !ok || id != user.Id {
-		return model.SysUser{}, myerrors.ErrDataPermissionSubjectContextInvalid
-	}
-	return user, nil
+	return subject.UserID, nil
 }
 
-func runtimeContext(ctx *gin.Context) context.Context {
-	if ctx != nil && ctx.Request != nil {
-		return ctx.Request.Context()
+func runtimeContext(ctx context.Context) context.Context {
+	if ctx != nil {
+		return ctx
 	}
 	return context.Background()
 }
@@ -313,7 +308,7 @@ func mapLowCodeRuntimeDependencyError(err error) error {
 }
 
 func zapLowCodePermissionDecision(
-	ctx *gin.Context,
+	ctx context.Context,
 	result datapermission.DataScopeResult,
 	mode datapermission.AdapterExecutionMode,
 	startedAt time.Time,

@@ -6,11 +6,11 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -106,7 +106,7 @@ func NewDataPermissionConfigPreflightService(
 }
 
 func (s *DataPermissionConfigPreflightService) PreflightResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	if resourceId <= 0 {
@@ -118,7 +118,7 @@ func (s *DataPermissionConfigPreflightService) PreflightResource(
 }
 
 func (s *DataPermissionConfigPreflightService) PreflightPolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	if policyId <= 0 {
@@ -130,7 +130,7 @@ func (s *DataPermissionConfigPreflightService) PreflightPolicy(
 }
 
 func (s *DataPermissionConfigPreflightService) PreflightGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	grantId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	if grantId <= 0 {
@@ -142,14 +142,14 @@ func (s *DataPermissionConfigPreflightService) PreflightGrant(
 }
 
 func (s *DataPermissionConfigPreflightService) EnableResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.EnableResources(ctx, []int{resourceId})
 }
 
 func (s *DataPermissionConfigPreflightService) EnableResources(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceIds []int,
 ) (response.DataPermissionValidationResultRes, error) {
 	if ctx == nil {
@@ -218,7 +218,7 @@ func (s *DataPermissionConfigPreflightService) EnableResources(
 }
 
 func (s *DataPermissionConfigPreflightService) DisableResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	if ctx == nil {
@@ -267,35 +267,35 @@ func (s *DataPermissionConfigPreflightService) DisableResource(
 }
 
 func (s *DataPermissionConfigPreflightService) EnablePolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.setPolicyState(ctx, policyId, true)
 }
 
 func (s *DataPermissionConfigPreflightService) DisablePolicy(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.setPolicyState(ctx, policyId, false)
 }
 
 func (s *DataPermissionConfigPreflightService) EnableGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	grantId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.setGrantState(ctx, grantId, true)
 }
 
 func (s *DataPermissionConfigPreflightService) DisableGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	grantId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	return s.setGrantState(ctx, grantId, false)
 }
 
 func (s *DataPermissionConfigPreflightService) setPolicyState(
-	ctx *gin.Context,
+	ctx context.Context,
 	policyId int,
 	state bool,
 ) (response.DataPermissionValidationResultRes, error) {
@@ -358,7 +358,7 @@ func (s *DataPermissionConfigPreflightService) setPolicyState(
 }
 
 func (s *DataPermissionConfigPreflightService) setGrantState(
-	ctx *gin.Context,
+	ctx context.Context,
 	grantId int,
 	state bool,
 ) (response.DataPermissionValidationResultRes, error) {
@@ -421,7 +421,7 @@ func (s *DataPermissionConfigPreflightService) setGrantState(
 }
 
 func (s *DataPermissionConfigPreflightService) recordStateAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	resourceType string,
 	resourceCode string,

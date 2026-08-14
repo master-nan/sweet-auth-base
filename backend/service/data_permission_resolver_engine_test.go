@@ -1,15 +1,13 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"backend/internal/datapermission"
 	"backend/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 func TestDataPermissionResolverEngineCombinesPolicyRulesWithAnd(t *testing.T) {
@@ -43,7 +41,7 @@ func TestDataPermissionResolverEngineCombinesPolicyRulesWithAnd(t *testing.T) {
 func TestDataPermissionResolverEnginePublishesSafeSummaryAndUsesRequestCache(t *testing.T) {
 	resolver, state := newGrantMergeResolver(t)
 	state.grants = append(state.grants, grantMergeGrant(411, 7, state.grants[0].PolicyId))
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx := datapermission.WithResolverSummaryContext(context.Background())
 
 	result, err := resolver.Resolve(ctx, policyResolverInput(t))
 	if err != nil {

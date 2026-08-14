@@ -333,14 +333,3 @@ func passwordChangedAt(user model.SysUser) time.Time {
 func boolPtr(value bool) *bool {
 	return &value
 }
-
-// 获取所有用户
-
-func (s *SysUserService) GetAll(ctx context.Context) ([]model.SysUser, error) {
-	var userList []model.SysUser
-	err := s.sysUserRepo.DBWithContext(ctx).Find(&userList).Error
-	if err != nil {
-		return nil, err
-	}
-	return userList, nil
-}

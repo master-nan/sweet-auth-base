@@ -5,13 +5,8 @@
 
 package repository
 
-import (
-	"backend/dto/request"
-	"backend/dto/response"
-	"backend/model"
-)
+import "backend/model"
 
 type SmsLogRepository interface {
 	BasicRepository[model.SmsLog]
-	GetSmsLogList(*request.Basic) (response.ListResult[model.SmsLog], error)
 }

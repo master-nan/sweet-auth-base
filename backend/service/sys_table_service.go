@@ -1353,34 +1353,6 @@ func (s *SysTableService) DeleteTableIndexById(ctx context.Context, id int) erro
 	return nil
 }
 
-func (s *SysTableService) DeleteTableIndexByTableId(ctx context.Context, id int) error {
-	table, e := s.GetTableById(id)
-	if e != nil {
-		return e
-	}
-	indexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, id)
-	if e != nil {
-		return e
-	}
-	err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		if e := s.sysTableIndexRepo.DeleteByField(tx, "table_id", id); e != nil {
-			return e
-		}
-		for _, index := range indexes {
-			// 使用索引名称删除表索引
-			if e := s.sysTableRepo.DropTableIndex(tx, index.IndexName, table.TableCode); e != nil {
-				return e
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	s.DeleteCache(table.Id)
-	return nil
-}
-
 func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error {
 	var err error
 	tableCode, err = normalizeDBIdentifier("表编码", tableCode)

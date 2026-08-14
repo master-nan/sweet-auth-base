@@ -33,7 +33,6 @@ type GeneralizationRepository interface {
 	Update(table model.SysTable, id int, data map[string]interface{}) error
 	SoftDelete(table model.SysTable, id int, deleteData map[string]interface{}) error
 	HardDelete(table model.SysTable, id int) error
-	GetFieldById(tableCode string, id int, fieldName string) (interface{}, error)
 }
 
 type GeneralizationPermissionRepository interface {

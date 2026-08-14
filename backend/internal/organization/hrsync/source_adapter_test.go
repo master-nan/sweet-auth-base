@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"backend/internal/integration"
+	testutil "backend/internal/test"
 	"backend/model"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -164,13 +164,7 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 }
 
 func TestOrganizationConsumerHarnessFiltersLogicalWindowAndPersistsNoBody(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:hrsync-harness?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
-		t.Fatal(err)
-	}
+	db := testutil.OpenSQLiteWithConfig(t, &gorm.Config{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{})
 	start := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
 	end := start.Add(time.Hour)
 	body := []byte(`{"data":[{"zjkid_ignore":"lookback","pk_corp":"C0","name":"Replay","isenable":1,"changeTime":"2026-08-12T09:55:00"},{"zjkid_ignore":"inside","pk_corp":"C1","name":"Current","isenable":1,"changeTime":"2026-08-12T10:20:00"},{"zjkid_ignore":"future","pk_corp":"C2","name":"Future","isenable":1,"changeTime":"2026-08-12T11:00:00"}]}`)

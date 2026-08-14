@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"strconv"
 
 	"backend/dto/request"
@@ -25,84 +26,84 @@ const (
 )
 
 type dataResourceConfigReader interface {
-	CreateResource(*gin.Context, request.DataResourceCreateReq) (response.DataResourceDetailRes, error)
-	UpdateResource(*gin.Context, request.DataResourceUpdateReq) (response.DataResourceDetailRes, error)
-	GetResource(*gin.Context, int) (response.DataResourceDetailRes, error)
+	CreateResource(context.Context, request.DataResourceCreateReq) (response.DataResourceDetailRes, error)
+	UpdateResource(context.Context, request.DataResourceUpdateReq) (response.DataResourceDetailRes, error)
+	GetResource(context.Context, int) (response.DataResourceDetailRes, error)
 	PageResources(
-		*gin.Context,
+		context.Context,
 		request.DataResourceQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataResourceListRes], error)
-	ListResourceOperations(*gin.Context, int) ([]response.DataResourceOperationListRes, error)
+	ListResourceOperations(context.Context, int) ([]response.DataResourceOperationListRes, error)
 	ReplaceResourceOperations(
-		*gin.Context,
+		context.Context,
 		request.DataResourceOperationBatchReq,
 	) ([]response.DataResourceOperationListRes, error)
 }
 
 type dataOwnershipConfigReader interface {
 	PageDimensions(
-		*gin.Context,
+		context.Context,
 		request.DataDimensionDefinitionQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataDimensionDefinitionListRes], error)
 	CreateOwnership(
-		*gin.Context,
+		context.Context,
 		request.DataOwnershipFieldCreateReq,
 	) (response.DataOwnershipFieldDetailRes, error)
 	UpdateOwnership(
-		*gin.Context,
+		context.Context,
 		request.DataOwnershipFieldUpdateReq,
 	) (response.DataOwnershipFieldDetailRes, error)
-	GetOwnership(*gin.Context, int) (response.DataOwnershipFieldDetailRes, error)
+	GetOwnership(context.Context, int) (response.DataOwnershipFieldDetailRes, error)
 	PageOwnerships(
-		*gin.Context,
+		context.Context,
 		request.DataOwnershipFieldQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataOwnershipFieldListRes], error)
-	ListOwnershipsByResource(*gin.Context, int) ([]response.DataOwnershipFieldListRes, error)
+	ListOwnershipsByResource(context.Context, int) ([]response.DataOwnershipFieldListRes, error)
 }
 
 type dataPolicyConfigReader interface {
-	CreatePolicy(*gin.Context, request.DataPolicyCreateReq) (response.DataPolicyDetailRes, error)
-	UpdatePolicy(*gin.Context, request.DataPolicyUpdateReq) (response.DataPolicyDetailRes, error)
-	GetPolicy(*gin.Context, int) (response.DataPolicyDetailRes, error)
+	CreatePolicy(context.Context, request.DataPolicyCreateReq) (response.DataPolicyDetailRes, error)
+	UpdatePolicy(context.Context, request.DataPolicyUpdateReq) (response.DataPolicyDetailRes, error)
+	GetPolicy(context.Context, int) (response.DataPolicyDetailRes, error)
 	PagePolicies(
-		*gin.Context,
+		context.Context,
 		request.DataPolicyQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataPolicyListRes], error)
 	PagePolicyRules(
-		*gin.Context,
+		context.Context,
 		request.DataPolicyRuleQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataPolicyRuleListRes], error)
 	ReplacePolicyRules(
-		*gin.Context,
+		context.Context,
 		request.DataPolicyRuleBatchReq,
 	) ([]response.DataPolicyRuleListRes, error)
 }
 
 type dataGrantConfigReader interface {
-	CreateGrant(*gin.Context, request.DataGrantCreateReq) (response.DataGrantDetailRes, error)
-	GetGrant(*gin.Context, int) (response.DataGrantDetailRes, error)
+	CreateGrant(context.Context, request.DataGrantCreateReq) (response.DataGrantDetailRes, error)
+	GetGrant(context.Context, int) (response.DataGrantDetailRes, error)
 	PageGrants(
-		*gin.Context,
+		context.Context,
 		request.DataGrantQueryReq,
 		model.SysTable,
 	) (response.ListResult[response.DataGrantListRes], error)
 }
 
 type dataPermissionConfigPreflightReader interface {
-	PreflightResource(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	PreflightPolicy(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	PreflightGrant(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	EnableResource(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	DisableResource(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	EnablePolicy(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	DisablePolicy(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	EnableGrant(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
-	DisableGrant(*gin.Context, int) (response.DataPermissionValidationResultRes, error)
+	PreflightResource(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	PreflightPolicy(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	PreflightGrant(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	EnableResource(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	DisableResource(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	EnablePolicy(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	DisablePolicy(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	EnableGrant(context.Context, int) (response.DataPermissionValidationResultRes, error)
+	DisableGrant(context.Context, int) (response.DataPermissionValidationResultRes, error)
 }
 
 // DataPermissionConfigController 开放经过审查的数据权限配置 Service，
@@ -157,7 +158,7 @@ func (d *DataPermissionConfigController) QueryDimensions(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.ownershipService.PageDimensions(ctx, req, dataDimensionConfigTable())
+	result, err := d.ownershipService.PageDimensions(ctx.Request.Context(), req, dataDimensionConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -166,7 +167,7 @@ func (d *DataPermissionConfigController) CreateResource(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.resourceService.CreateResource(ctx, req)
+	result, err := d.resourceService.CreateResource(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -175,7 +176,7 @@ func (d *DataPermissionConfigController) QueryResources(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.resourceService.PageResources(ctx, req, dataResourceConfigTable())
+	result, err := d.resourceService.PageResources(ctx.Request.Context(), req, dataResourceConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -184,7 +185,7 @@ func (d *DataPermissionConfigController) GetResource(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.resourceService.GetResource(ctx, id)
+	result, err := d.resourceService.GetResource(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -198,7 +199,7 @@ func (d *DataPermissionConfigController) UpdateResource(ctx *gin.Context) {
 		return
 	}
 	req.Id = id
-	result, err := d.resourceService.UpdateResource(ctx, req)
+	result, err := d.resourceService.UpdateResource(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -207,7 +208,7 @@ func (d *DataPermissionConfigController) ListResourceOperations(ctx *gin.Context
 	if !ok {
 		return
 	}
-	result, err := d.resourceService.ListResourceOperations(ctx, id)
+	result, err := d.resourceService.ListResourceOperations(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -221,7 +222,7 @@ func (d *DataPermissionConfigController) ReplaceResourceOperations(ctx *gin.Cont
 		return
 	}
 	req.ResourceId = id
-	result, err := d.resourceService.ReplaceResourceOperations(ctx, req)
+	result, err := d.resourceService.ReplaceResourceOperations(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -239,9 +240,9 @@ func (d *DataPermissionConfigController) SetResourcePermission(ctx *gin.Context)
 		err    error
 	)
 	if *req.PermissionEnabled {
-		result, err = d.preflightService.EnableResource(ctx, id)
+		result, err = d.preflightService.EnableResource(ctx.Request.Context(), id)
 	} else {
-		result, err = d.preflightService.DisableResource(ctx, id)
+		result, err = d.preflightService.DisableResource(ctx.Request.Context(), id)
 	}
 	d.setResult(ctx, result, err)
 }
@@ -251,7 +252,7 @@ func (d *DataPermissionConfigController) QueryOwnerships(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.ownershipService.PageOwnerships(ctx, req, dataOwnershipConfigTable())
+	result, err := d.ownershipService.PageOwnerships(ctx.Request.Context(), req, dataOwnershipConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -260,7 +261,7 @@ func (d *DataPermissionConfigController) CreateOwnership(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.ownershipService.CreateOwnership(ctx, req)
+	result, err := d.ownershipService.CreateOwnership(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -269,7 +270,7 @@ func (d *DataPermissionConfigController) ListOwnershipsByResource(ctx *gin.Conte
 	if !ok {
 		return
 	}
-	result, err := d.ownershipService.ListOwnershipsByResource(ctx, id)
+	result, err := d.ownershipService.ListOwnershipsByResource(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -278,7 +279,7 @@ func (d *DataPermissionConfigController) GetOwnership(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.ownershipService.GetOwnership(ctx, id)
+	result, err := d.ownershipService.GetOwnership(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -292,7 +293,7 @@ func (d *DataPermissionConfigController) UpdateOwnership(ctx *gin.Context) {
 		return
 	}
 	req.Id = id
-	result, err := d.ownershipService.UpdateOwnership(ctx, req)
+	result, err := d.ownershipService.UpdateOwnership(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -301,7 +302,7 @@ func (d *DataPermissionConfigController) CreatePolicy(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.policyService.CreatePolicy(ctx, req)
+	result, err := d.policyService.CreatePolicy(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -310,7 +311,7 @@ func (d *DataPermissionConfigController) QueryPolicies(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.policyService.PagePolicies(ctx, req, dataPolicyConfigTable())
+	result, err := d.policyService.PagePolicies(ctx.Request.Context(), req, dataPolicyConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -319,7 +320,7 @@ func (d *DataPermissionConfigController) GetPolicy(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.policyService.GetPolicy(ctx, id)
+	result, err := d.policyService.GetPolicy(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -333,7 +334,7 @@ func (d *DataPermissionConfigController) UpdatePolicy(ctx *gin.Context) {
 		return
 	}
 	req.Id = id
-	result, err := d.policyService.UpdatePolicy(ctx, req)
+	result, err := d.policyService.UpdatePolicy(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -342,7 +343,7 @@ func (d *DataPermissionConfigController) QueryPolicyRules(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.policyService.PagePolicyRules(ctx, req, dataPolicyRuleConfigTable())
+	result, err := d.policyService.PagePolicyRules(ctx.Request.Context(), req, dataPolicyRuleConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -356,7 +357,7 @@ func (d *DataPermissionConfigController) ReplacePolicyRules(ctx *gin.Context) {
 		return
 	}
 	req.PolicyId = id
-	result, err := d.policyService.ReplacePolicyRules(ctx, req)
+	result, err := d.policyService.ReplacePolicyRules(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -374,9 +375,9 @@ func (d *DataPermissionConfigController) SetPolicyState(ctx *gin.Context) {
 		err    error
 	)
 	if *req.State {
-		result, err = d.preflightService.EnablePolicy(ctx, id)
+		result, err = d.preflightService.EnablePolicy(ctx.Request.Context(), id)
 	} else {
-		result, err = d.preflightService.DisablePolicy(ctx, id)
+		result, err = d.preflightService.DisablePolicy(ctx.Request.Context(), id)
 	}
 	d.setResult(ctx, result, err)
 }
@@ -386,7 +387,7 @@ func (d *DataPermissionConfigController) CreateGrant(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.grantService.CreateGrant(ctx, req)
+	result, err := d.grantService.CreateGrant(ctx.Request.Context(), req)
 	d.setResult(ctx, result, err)
 }
 
@@ -395,7 +396,7 @@ func (d *DataPermissionConfigController) QueryGrants(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.grantService.PageGrants(ctx, req, dataGrantConfigTable())
+	result, err := d.grantService.PageGrants(ctx.Request.Context(), req, dataGrantConfigTable())
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -404,7 +405,7 @@ func (d *DataPermissionConfigController) GetGrant(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.grantService.GetGrant(ctx, id)
+	result, err := d.grantService.GetGrant(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -422,9 +423,9 @@ func (d *DataPermissionConfigController) SetGrantState(ctx *gin.Context) {
 		err    error
 	)
 	if *req.State {
-		result, err = d.preflightService.EnableGrant(ctx, id)
+		result, err = d.preflightService.EnableGrant(ctx.Request.Context(), id)
 	} else {
-		result, err = d.preflightService.DisableGrant(ctx, id)
+		result, err = d.preflightService.DisableGrant(ctx.Request.Context(), id)
 	}
 	d.setResult(ctx, result, err)
 }
@@ -434,7 +435,7 @@ func (d *DataPermissionConfigController) PreflightResource(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.preflightService.PreflightResource(ctx, id)
+	result, err := d.preflightService.PreflightResource(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -443,7 +444,7 @@ func (d *DataPermissionConfigController) PreflightPolicy(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.preflightService.PreflightPolicy(ctx, id)
+	result, err := d.preflightService.PreflightPolicy(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 
@@ -452,7 +453,7 @@ func (d *DataPermissionConfigController) PreflightGrant(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := d.preflightService.PreflightGrant(ctx, id)
+	result, err := d.preflightService.PreflightGrant(ctx.Request.Context(), id)
 	d.setResult(ctx, result, err)
 }
 

@@ -89,7 +89,7 @@ type integrationExecutionPermissionResolverStub struct {
 }
 
 func (s *integrationExecutionPermissionResolverStub) ResolveDataPermission(
-	_ *gin.Context,
+	_ context.Context,
 	table model.SysTable,
 	operation string,
 ) (repository.GeneralizationPermission, error) {

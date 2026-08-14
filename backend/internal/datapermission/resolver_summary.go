@@ -1,15 +1,21 @@
 package datapermission
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 
 	myerrors "backend/internal/errors"
-
-	"github.com/gin-gonic/gin"
 )
 
-const resolverSummaryContextKey = "data_permission_resolver_summary"
+type resolverSummaryContextKey struct{}
+
+type resolverSummaryHolder struct {
+	mu      sync.RWMutex
+	summary ResolverSummary
+	set     bool
+}
 
 // ResolverSummaryInput 是单次请求级解析摘要的受控构造边界。
 type ResolverSummaryInput struct {
@@ -97,28 +103,47 @@ func (summary ResolverSummary) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// StoreResolverSummary 仅将已校验摘要附加到当前请求。
-// 它不提供包级或跨请求缓存。
-func StoreResolverSummary(ctx *gin.Context, summary ResolverSummary) error {
+// WithResolverSummaryContext 为单次解析创建并发安全的诊断摘要容器。
+// 容器只存储白名单计数和决策，不包含主体或配置明细。
+func WithResolverSummaryContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, resolverSummaryContextKey{}, &resolverSummaryHolder{})
+}
+
+// StoreResolverSummary 仅将已校验摘要附加到当前标准 Context。
+// 未安装摘要容器时安全忽略，不提供包级或跨请求缓存。
+func StoreResolverSummary(ctx context.Context, summary ResolverSummary) error {
 	if err := summary.Validate(); err != nil {
 		return err
 	}
-	if ctx != nil {
-		ctx.Set(resolverSummaryContextKey, summary)
+	if ctx == nil {
+		return nil
 	}
+	holder, ok := ctx.Value(resolverSummaryContextKey{}).(*resolverSummaryHolder)
+	if !ok || holder == nil {
+		return nil
+	}
+	holder.mu.Lock()
+	holder.summary = summary
+	holder.set = true
+	holder.mu.Unlock()
 	return nil
 }
 
-func ResolverSummaryFromContext(ctx *gin.Context) (ResolverSummary, bool) {
+func ResolverSummaryFromContext(ctx context.Context) (ResolverSummary, bool) {
 	if ctx == nil {
 		return ResolverSummary{}, false
 	}
-	value, exists := ctx.Get(resolverSummaryContextKey)
-	if !exists {
+	holder, ok := ctx.Value(resolverSummaryContextKey{}).(*resolverSummaryHolder)
+	if !ok || holder == nil {
 		return ResolverSummary{}, false
 	}
-	summary, ok := value.(ResolverSummary)
-	if !ok || summary.Validate() != nil {
+	holder.mu.RLock()
+	summary, set := holder.summary, holder.set
+	holder.mu.RUnlock()
+	if !set || summary.Validate() != nil {
 		return ResolverSummary{}, false
 	}
 	return summary, true

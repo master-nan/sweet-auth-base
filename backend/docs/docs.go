@@ -92,42 +92,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/application/key/{appKey}": {
-            "get": {
-                "description": "根据appKey获取应用详情",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "应用"
-                ],
-                "summary": "应用详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "应用Key",
-                        "name": "appKey",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/application/query": {
             "post": {
                 "description": "获取应用列表",
@@ -437,7 +401,6 @@ const docTemplate = `{
         },
         "/admin/file/download-url/{uuid}": {
             "get": {
-                "description": "为当前用户可访问的文件生成短期签名下载地址",
                 "produces": [
                     "application/json"
                 ],
@@ -445,41 +408,11 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "获取文件签名下载地址",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "有效期秒数，最大3600秒",
-                        "name": "ttl",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/download/{uuid}": {
             "get": {
-                "description": "通过文件UUID下载文件（支持本地和OSS存储）",
                 "produces": [
                     "application/octet-stream"
                 ],
@@ -487,35 +420,11 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "下载文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/preview-url/{uuid}": {
             "get": {
-                "description": "为当前用户可访问的文件生成短期签名预览地址，用于富文本预览等无法携带 Authorization 头的场景",
                 "produces": [
                     "application/json"
                 ],
@@ -523,41 +432,11 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "获取文件签名预览地址",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "有效期秒数，最大3600秒",
-                        "name": "ttl",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/preview/{uuid}": {
             "get": {
-                "description": "通过文件UUID预览文件（图片、PDF等），支持本地和OSS存储",
                 "produces": [
                     "application/octet-stream"
                 ],
@@ -565,35 +444,11 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "预览文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/upload": {
             "post": {
-                "description": "上传文件，支持秒传（MD5去重）",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -604,35 +459,11 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "上传文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "上传文件",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/upload/chunk": {
             "post": {
-                "description": "上传单个文件分片，支持断点续传（幂等操作）",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -642,50 +473,12 @@ const docTemplate = `{
                 "tags": [
                     "文件"
                 ],
-                "summary": "上传分片",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "上传ID",
-                        "name": "upload_id",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "分片索引（从0开始）",
-                        "name": "chunk_index",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "file",
-                        "description": "分片文件",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "summary": "上传文件分片",
+                "responses": {}
             }
         },
         "/admin/file/upload/init": {
             "post": {
-                "description": "初始化分片上传，返回uploadId和分片信息。支持秒传检测。",
                 "consumes": [
                     "application/json"
                 ],
@@ -696,143 +489,45 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "初始化分片上传",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "初始化参数",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.ChunkUploadInitReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/file/upload/merge/{upload_id}": {
             "post": {
-                "description": "所有分片上传完成后，调用此接口合并分片生成最终文件",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "文件"
                 ],
-                "summary": "合并分片",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "上传ID",
-                        "name": "upload_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "summary": "合并文件分片",
+                "responses": {}
             }
         },
         "/admin/file/upload/progress/{upload_id}": {
             "get": {
-                "description": "获取分片上传进度，返回已上传的分片索引列表（用于断点续传）",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "文件"
                 ],
-                "summary": "获取上传进度",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "上传ID",
-                        "name": "upload_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "summary": "获取分片上传进度",
+                "responses": {}
             }
         },
         "/admin/file/{id}": {
             "get": {
-                "description": "根据ID获取文件详情",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "文件"
                 ],
-                "summary": "获取文件信息",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "文件ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "summary": "获取文件详情",
+                "responses": {}
             },
             "delete": {
-                "description": "根据ID删除文件（同时删除存储中的物理文件）",
                 "produces": [
                     "application/json"
                 ],
@@ -840,30 +535,7 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "删除文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "文件ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "请求成功",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/admin/log/access/query": {
@@ -1472,6 +1144,871 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/assignment/query": {
+            "post": {
+                "description": "按员工和时间范围查询只读任职镜像",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员任职列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgAssignmentQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/assignment/{id}": {
+            "get": {
+                "description": "按内部 assignment_id 查询只读任职详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员任职详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "任职ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/options": {
+            "post": {
+                "description": "查询以 employee_id 为 value 的企业人员选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgEmployeeOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/query": {
+            "post": {
+                "description": "分页查询组织镜像中的企业人员",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgEmployeeQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/user-options": {
+            "post": {
+                "description": "按账号名查询员工绑定所需的最小安全账号选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "可绑定平台账号选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "账号选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgEmployeeUserOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/{id}": {
+            "get": {
+                "description": "按内部 employee_id 查询企业人员及安全账号摘要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "企业人员ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/{id}/assignments/summary": {
+            "get": {
+                "description": "返回员工全部当前有效任职对应的法人、组织和岗位集合",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "企业人员当前任职归属摘要",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "企业人员ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/{id}/bind-user": {
+            "post": {
+                "description": "将企业人员绑定到明确指定的当前 Sweet Platform 登录账号",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "绑定企业人员账号",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "企业人员ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "账号绑定参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgEmployeeBindUserReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/employee/{id}/unbind-user": {
+            "post": {
+                "description": "清除企业人员与当前 Sweet Platform 登录账号的绑定",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "解绑企业人员账号",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "企业人员ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/legal-entity/options": {
+            "post": {
+                "description": "查询以 legal_entity_id 为 value 的法人主体选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "法人主体选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgLegalEntityOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/legal-entity/query": {
+            "post": {
+                "description": "分页查询当前有效或显式请求的历史法人主体",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "法人主体列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgLegalEntityQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/legal-entity/tree": {
+            "post": {
+                "description": "使用 org_legal_entity.parent_id 组装法人主体树",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "法人主体树",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "树查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgLegalEntityTreeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/legal-entity/{id}": {
+            "get": {
+                "description": "按内部 legal_entity_id 查询法人主体详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "法人主体详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "法人主体ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/position/options": {
+            "post": {
+                "description": "查询以 position_id 为 value 的岗位选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "岗位选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgPositionOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/position/query": {
+            "post": {
+                "description": "分页查询组织镜像中的岗位",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "岗位列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgPositionQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/position/{id}": {
+            "get": {
+                "description": "按内部 position_id 查询岗位详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "岗位详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "岗位ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/structure/options": {
+            "post": {
+                "description": "查询以 structure_id 为 value 的管理架构选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理架构选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgStructureOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/structure/query": {
+            "post": {
+                "description": "分页查询管理架构定义",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理架构列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgStructureQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/structure/{id}": {
+            "get": {
+                "description": "按内部 structure_id 查询管理架构详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理架构详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "管理架构ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/unit/options": {
+            "post": {
+                "description": "查询以 org_unit_id 为 value 的管理组织选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理组织选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "选项查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgUnitOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/unit/query": {
+            "post": {
+                "description": "分页查询管理组织单元",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理组织列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgUnitQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/unit/tree": {
+            "post": {
+                "description": "使用 org_structure_node.parent_node_id 组装指定管理架构的组织树",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理组织树",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "树查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.OrgStructureOrgTreeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/org/unit/{id}": {
+            "get": {
+                "description": "按内部 org_unit_id 查询组织单元详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "组织主数据"
+                ],
+                "summary": "管理组织详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "组织单元ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "请求成功",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
                         }
@@ -2261,42 +2798,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/request.TableIndexCreateReq"
                         }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/table/index/table/{id}": {
-            "delete": {
-                "description": "根据表ID删除表索引",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "表"
-                ],
-                "summary": "根据表ID删除表索引",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "表ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -3274,42 +3775,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/user/{username}": {
-            "get": {
-                "description": "根据用户名获取用户",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "用户"
-                ],
-                "summary": "根据用户名获取用户",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "用户名",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/api/app_token": {
             "post": {
                 "description": "获取AppToken",
@@ -4184,79 +4649,30 @@ const docTemplate = `{
         },
         "/files/access/download/{uuid}": {
             "get": {
-                "description": "通过短期签名 token 下载文件",
                 "produces": [
                     "application/octet-stream"
                 ],
                 "tags": [
                     "文件"
                 ],
-                "summary": "签名下载文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "签名 token",
-                        "name": "token",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
+                "summary": "通过签名下载文件",
+                "responses": {}
             }
         },
         "/files/access/preview/{uuid}": {
             "get": {
-                "description": "通过短期签名 token 预览文件",
                 "produces": [
                     "application/octet-stream"
                 ],
                 "tags": [
                     "文件"
                 ],
-                "summary": "签名预览文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "签名 token",
-                        "name": "token",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
+                "summary": "通过签名预览文件",
+                "responses": {}
             }
         },
         "/files/{uuid}": {
             "get": {
-                "description": "通过文件UUID公开预览文件，仅在 upload.public_preview 开启时可用",
                 "produces": [
                     "application/octet-stream"
                 ],
@@ -4264,23 +4680,7 @@ const docTemplate = `{
                     "文件"
                 ],
                 "summary": "公开预览文件",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "文件UUID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    }
-                }
+                "responses": {}
             }
         }
     },
@@ -4427,12 +4827,14 @@ const docTemplate = `{
             "enum": [
                 "directory",
                 "fixed",
-                "low_code"
+                "low_code",
+                "report"
             ],
             "x-enum-varnames": [
                 "MenuPageTypeDirectory",
                 "MenuPageTypeFixed",
-                "MenuPageTypeLowCode"
+                "MenuPageTypeLowCode",
+                "MenuPageTypeReport"
             ]
         },
         "enum.SysTableFieldCategory": {
@@ -4579,7 +4981,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "menu_id": {
-                    "description": "当前菜单ID（用于数据权限）",
+                    "description": "当前菜单ID（用于功能权限）",
                     "type": "integer"
                 },
                 "method": {
@@ -4711,7 +5113,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "menu_id": {
-                    "description": "当前菜单ID（用于数据权限）",
+                    "description": "当前菜单ID（用于功能权限）",
                     "type": "integer"
                 },
                 "num": {
@@ -4731,31 +5133,6 @@ const docTemplate = `{
                 "table_code": {
                     "type": "string",
                     "example": "sys_dict"
-                }
-            }
-        },
-        "request.ChunkUploadInitReq": {
-            "type": "object",
-            "required": [
-                "file_name",
-                "file_size"
-            ],
-            "properties": {
-                "file_md5": {
-                    "description": "完整文件MD5（用于秒传检测）",
-                    "type": "string"
-                },
-                "file_name": {
-                    "description": "文件名",
-                    "type": "string"
-                },
-                "file_size": {
-                    "description": "文件总大小（字节）",
-                    "type": "integer"
-                },
-                "file_type": {
-                    "description": "文件MIME类型",
-                    "type": "string"
                 }
             }
         },
@@ -4940,6 +5317,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "code",
+                "is_button",
                 "menu_id",
                 "name",
                 "position"
@@ -5015,6 +5393,7 @@ const docTemplate = `{
             "required": [
                 "code",
                 "id",
+                "is_button",
                 "menu_id",
                 "name",
                 "position"
@@ -5255,6 +5634,787 @@ const docTemplate = `{
                 }
             }
         },
+        "request.OrgAssignmentQueryReq": {
+            "type": "object",
+            "required": [
+                "employee_id"
+            ],
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "assignment_type": {
+                    "type": "string",
+                    "enum": [
+                        "primary",
+                        "part_time",
+                        "temporary",
+                        "project"
+                    ]
+                },
+                "employee_id": {
+                    "type": "integer"
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "is_manager": {
+                    "type": "boolean"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "org_unit_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "position_id": {
+                    "type": "integer"
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "enabled",
+                        "disabled"
+                    ]
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                },
+                "time_scope": {
+                    "type": "string",
+                    "enum": [
+                        "current",
+                        "history",
+                        "future",
+                        "timeline"
+                    ]
+                }
+            }
+        },
+        "request.OrgEmployeeBindUserReq": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgEmployeeOptionsReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "org_unit_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "position_id": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "request.OrgEmployeeQueryReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "bound_status": {
+                    "type": "string",
+                    "enum": [
+                        "all",
+                        "bound",
+                        "unbound"
+                    ]
+                },
+                "employment_status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "probation",
+                        "suspended",
+                        "resigned",
+                        "retired"
+                    ]
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "org_unit_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "position_id": {
+                    "type": "integer"
+                },
+                "primary_legal_entity_id": {
+                    "type": "integer"
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "source_system_code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgEmployeeUserOptionsReq": {
+            "type": "object",
+            "required": [
+                "num",
+                "page"
+            ],
+            "properties": {
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "num": {
+                    "type": "integer",
+                    "maximum": 50
+                },
+                "page": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgLegalEntityOptionsReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "request.OrgLegalEntityQueryReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string",
+                    "enum": [
+                        "group",
+                        "legal_company",
+                        "branch",
+                        "accounting_unit"
+                    ]
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "source_system_code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "enabled",
+                        "disabled"
+                    ]
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                }
+            }
+        },
+        "request.OrgLegalEntityTreeReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "root_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgPositionOptionsReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "org_unit_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "request.OrgPositionQueryReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "is_manager_position": {
+                    "type": "boolean"
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "org_unit_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "position_type": {
+                    "type": "string",
+                    "enum": [
+                        "management",
+                        "professional",
+                        "technical",
+                        "operation",
+                        "service"
+                    ]
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "source_system_code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "enabled",
+                        "disabled"
+                    ]
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                }
+            }
+        },
+        "request.OrgStructureOptionsReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "request.OrgStructureOrgTreeReq": {
+            "type": "object",
+            "required": [
+                "structure_id"
+            ],
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "root_node_id": {
+                    "type": "integer"
+                },
+                "root_org_unit_id": {
+                    "type": "integer"
+                },
+                "structure_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgStructureQueryReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "source_system_code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "enabled",
+                        "disabled"
+                    ]
+                },
+                "structure_type": {
+                    "type": "string",
+                    "enum": [
+                        "management",
+                        "legal"
+                    ]
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                }
+            }
+        },
+        "request.OrgUnitOptionsReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "structure_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "request.OrgUnitQueryReq": {
+            "type": "object",
+            "properties": {
+                "as_of_date": {
+                    "type": "string"
+                },
+                "expressions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.ExpressionGroup"
+                    }
+                },
+                "filters": {
+                    "description": "额外过滤条件（联动/级联）",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "include_deleted": {
+                    "description": "是否查询删除数据",
+                    "type": "boolean"
+                },
+                "include_disabled": {
+                    "type": "boolean"
+                },
+                "include_history": {
+                    "type": "boolean"
+                },
+                "legal_entity_id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "description": "当前菜单ID（用于功能权限）",
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "only_effective": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "$ref": "#/definitions/request.Order"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "primary_legal_entity_id": {
+                    "type": "integer"
+                },
+                "quick_query": {
+                    "$ref": "#/definitions/request.QuickQuery"
+                },
+                "source_system_code": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "enabled",
+                        "disabled"
+                    ]
+                },
+                "table_code": {
+                    "type": "string",
+                    "example": "sys_dict"
+                },
+                "unit_type": {
+                    "type": "string",
+                    "enum": [
+                        "business_unit",
+                        "region",
+                        "center",
+                        "department",
+                        "team",
+                        "project_group"
+                    ]
+                }
+            }
+        },
         "request.QueryRule": {
             "type": "object",
             "properties": {
@@ -5425,13 +6585,7 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
-                "is_reset": {
-                    "type": "boolean"
-                },
                 "password": {
-                    "type": "string"
-                },
-                "password_changed_at": {
                     "type": "string"
                 }
             }
@@ -5445,23 +6599,11 @@ const docTemplate = `{
                 "user_name"
             ],
             "properties": {
-                "access_tokens": {
-                    "type": "string"
-                },
                 "email": {
-                    "type": "string"
-                },
-                "gmt_delete": {
-                    "type": "string"
-                },
-                "gmt_last_login": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
-                },
-                "is_reset": {
-                    "type": "boolean"
                 },
                 "phone_number": {
                     "type": "string"

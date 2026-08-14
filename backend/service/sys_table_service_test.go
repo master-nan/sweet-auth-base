@@ -6,9 +6,9 @@ import (
 
 	"backend/enum"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository/impl"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -60,13 +60,7 @@ func TestLowCodeDefaultMenuButtonsUseTemplateData(t *testing.T) {
 }
 
 func TestFindPublishedLowCodeMenuIgnoresSystemMenuOptionBinding(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenu{}); err != nil {
-		t.Fatalf("migrate menu: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenu{})
 	menus := []model.SysMenu{
 		{
 			Basic:     model.Basic{Id: 205, State: true},
@@ -102,13 +96,7 @@ func TestFindPublishedLowCodeMenuIgnoresSystemMenuOptionBinding(t *testing.T) {
 }
 
 func TestFindPublishedLowCodeMenuPrefersVisibleEnabledMenu(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenu{}); err != nil {
-		t.Fatalf("migrate menu: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenu{})
 	menus := []model.SysMenu{
 		{
 			Basic:     model.Basic{Id: 1, State: false},
@@ -143,13 +131,7 @@ func TestFindPublishedLowCodeMenuPrefersVisibleEnabledMenu(t *testing.T) {
 }
 
 func TestFindPublishedLowCodeMenuDoesNotReturnSystemMenu(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenu{}); err != nil {
-		t.Fatalf("migrate menu: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenu{})
 	menu := model.SysMenu{
 		Basic:     model.Basic{Id: 205, State: true},
 		Name:      "system_user",
@@ -163,7 +145,7 @@ func TestFindPublishedLowCodeMenuDoesNotReturnSystemMenu(t *testing.T) {
 	}
 
 	svc := newSysTablePublishTestService(db)
-	_, err = svc.findPublishedLowCodeMenu(db, "sys_user")
+	_, err := svc.findPublishedLowCodeMenu(db, "sys_user")
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("err = %v, want record not found", err)
 	}
@@ -232,13 +214,7 @@ func TestIsLowCodePublishParentMenuOnlyAllowsDirectory(t *testing.T) {
 }
 
 func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysRoleMenu{}, &model.SysRoleMenuButton{}); err != nil {
-		t.Fatalf("migrate models: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenu{}, &model.SysRoleMenu{}, &model.SysRoleMenuButton{})
 	menus := []model.SysMenu{
 		{
 			Basic:     model.Basic{Id: 1, State: true},
@@ -293,13 +269,7 @@ func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
 }
 
 func TestCleanupLegacyLowCodeMenuButtonsRemovesSystemButtonsOnly(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}); err != nil {
-		t.Fatalf("migrate buttons: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenuButton{}, &model.SysRoleMenuButton{})
 	buttons := []model.SysMenuButton{
 		{Basic: model.Basic{Id: 1, State: true}, MenuId: 900, Name: "旧查询", Code: "system_user_query", Position: enum.Top, EventAction: "query"},
 		{Basic: model.Basic{Id: 2, State: true}, MenuId: 900, Name: "新查询", Code: "sys_user_query", Position: enum.Top, EventAction: "query"},

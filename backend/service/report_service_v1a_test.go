@@ -6,6 +6,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/datapermission"
+	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
@@ -17,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -189,12 +189,7 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 	if err != nil {
 		t.Fatalf("create snowflake: %v", err)
 	}
-	dbName := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
-	db, err := gorm.Open(sqlite.Open("file:"+dbName+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(
+	db := testutil.OpenSQLiteWithConfig(t, &gorm.Config{},
 		&model.SysUser{},
 		&model.SysRole{},
 		&model.SysUserRole{},
@@ -208,19 +203,17 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 		&model.ReportDefinition{},
 		&model.ReportDefinitionVersion{},
 		&model.ReportExecutionLog{},
-	); err != nil {
-		t.Fatalf("migrate test schema: %v", err)
-	}
+	)
 	seedReportV1ATable(t, db)
 	primaryDB := &database.PrimaryDB{DB: db}
 	store := newJSONMemoryCacher()
 	permissionRuntime := newLowCodeDataPermissionRuntime(
-		func(*gin.Context, int) ([]model.DataResource, error) { return nil, nil },
-		func(*gin.Context, int) ([]model.DataOwnershipField, error) { return nil, nil },
-		func(*gin.Context, int) (datapermission.SubjectContext, error) {
+		func(context.Context, int) ([]model.DataResource, error) { return nil, nil },
+		func(context.Context, int) ([]model.DataOwnershipField, error) { return nil, nil },
+		func(context.Context, int) (datapermission.SubjectContext, error) {
 			return datapermission.SubjectContext{}, nil
 		},
-		func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+		func(context.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 			return datapermission.DataScopeResult{}, nil
 		},
 		func(_ context.Context, input datapermission.AdapterInput) (datapermission.AdapterExecution, error) {

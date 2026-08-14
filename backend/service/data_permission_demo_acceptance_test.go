@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/database"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
@@ -17,7 +19,6 @@ import (
 	"backend/model"
 	"backend/repository/impl"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -81,7 +82,7 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := lowCodeRuntimeGinContext(tt.userId)
+			ctx := demoAcceptanceContext(tt.userId)
 			result, err := service.QueryWithDataPermission(
 				ctx,
 				&request.Basic{
@@ -122,6 +123,13 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func demoAcceptanceContext(userID int) context.Context {
+	return audit.WithAuditSubject(
+		context.Background(),
+		audit.NewAuditSubject(userID, "data-permission-acceptance"),
+	)
 }
 
 func newDataPermissionDemoAcceptanceService(
@@ -177,7 +185,7 @@ func newDataPermissionDemoAcceptanceService(
 	grantRepo := impl.NewDataGrantRepositoryImpl(primaryDB)
 
 	dimensionRuntime := newDimensionProviderRuntime(
-		func(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
+		func(ctx context.Context, code string) (model.DataDimensionDefinition, error) {
 			return dimensionRepo.WithContext(ctx).FindByField("code", code)
 		},
 		demoAcceptanceOrganizationScope,
@@ -207,7 +215,7 @@ func newDataPermissionDemoAcceptanceService(
 			}
 			return []model.SysRole{{Basic: model.Basic{Id: roleId, State: true}}}, nil
 		},
-		func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+		func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 			employeeId := userId - 500
 			return response.NewOrgEmployeeContextRes(userId, &employeeId), nil
 		},
@@ -227,10 +235,10 @@ func newDataPermissionDemoAcceptanceService(
 		t.Fatalf("create Metadata Adapter: %v", err)
 	}
 	runtime := newLowCodeDataPermissionRuntime(
-		func(ctx *gin.Context, tableId int) ([]model.DataResource, error) {
+		func(ctx context.Context, tableId int) ([]model.DataResource, error) {
 			return resourceRepo.ListByTableId(ctx, tableId)
 		},
-		func(ctx *gin.Context, resourceId int) ([]model.DataOwnershipField, error) {
+		func(ctx context.Context, resourceId int) ([]model.DataOwnershipField, error) {
 			return ownershipRepo.ListByResource(ctx, resourceId)
 		},
 		subjectBuilder.Build,
@@ -307,7 +315,7 @@ func demoAcceptancePermissionConfig(t *testing.T, db *gorm.DB, table model.SysTa
 }
 
 func demoAcceptanceOrganizationScope(
-	_ *gin.Context,
+	_ context.Context,
 	employeeId int,
 	asOfDate string,
 ) (response.OrgEffectiveOrganizationScopeRes, error) {
@@ -324,7 +332,7 @@ func demoAcceptanceOrganizationScope(
 }
 
 func demoAcceptanceOrganizationDescendants(
-	_ *gin.Context,
+	_ context.Context,
 	structureCode string,
 	rootId int,
 	asOfDate string,

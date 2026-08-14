@@ -791,7 +791,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 	if snapshot.PermissionMenuId > 0 {
 		query.MenuId = snapshot.PermissionMenuId
 	}
-	permission, err := s.generalizationService.ResolveDataPermission(ctx, sourceTable, reportDataPermissionOperation(options.DataPermissionAction))
+	permission, err := s.generalizationService.ResolveDataPermission(reportRequestContext(ctx), sourceTable, reportDataPermissionOperation(options.DataPermissionAction))
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
@@ -1182,7 +1182,7 @@ func reportRequestContext(ctx *gin.Context) context.Context {
 }
 
 func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
-	permission, err := s.generalizationService.ResolveDataPermission(ctx, primaryTable, reportDataPermissionOperation(action))
+	permission, err := s.generalizationService.ResolveDataPermission(reportRequestContext(ctx), primaryTable, reportDataPermissionOperation(action))
 	if err != nil {
 		return err
 	}

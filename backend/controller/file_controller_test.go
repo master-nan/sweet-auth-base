@@ -23,7 +23,6 @@ func TestContentDispositionEscapesFileName(t *testing.T) {
 }
 
 func TestDeleteBusinessActionCannotBeDowngraded(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest("DELETE", "/admin/file/1?table_code=orders&record_id=2&action=detail", nil)
 	_, _, err := parseFileBusinessContext(ctx, enum.ButtonActionDelete, false)
@@ -33,7 +32,6 @@ func TestDeleteBusinessActionCannotBeDowngraded(t *testing.T) {
 }
 
 func TestDetailBusinessActionAllowsExplicitOperation(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest("GET", "/admin/file/1?table_code=orders&record_id=2&action=update", nil)
 	business, found, err := parseFileBusinessContext(ctx, enum.ButtonActionDetail, true)

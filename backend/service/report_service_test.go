@@ -7,6 +7,7 @@ import (
 	"backend/internal/cache"
 	"backend/internal/database"
 	"backend/internal/reportconfig"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository/impl"
 	"net/http/httptest"
@@ -370,13 +371,7 @@ func hasReportColumn(columns []response.ReportPreviewColumn, field string) bool 
 
 func newReportServiceForConfigTest(t *testing.T) *ReportService {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysTable{}, &model.SysTableField{}, &model.SysTableRelation{}, &model.SysTableIndex{}, &model.SysTableIndexField{}); err != nil {
-		t.Fatalf("migrate metadata: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysTable{}, &model.SysTableField{}, &model.SysTableRelation{}, &model.SysTableIndex{}, &model.SysTableIndexField{})
 	table := model.SysTable{
 		Basic:     model.Basic{Id: 1, State: true},
 		TableName: "订单",

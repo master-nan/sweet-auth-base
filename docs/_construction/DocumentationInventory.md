@@ -53,6 +53,7 @@ DOC-001A 治理前共有 67 份非 `development` 文档资产：35 份 Git 已�
 | `_construction/reviews/IntegrationSyncFreezeReview.md` | Sync 冻结依据 | Construction Evidence | construction | DELETE_AFTER_STABLE |
 | `_construction/reviews/PlatformBackendCodeAuditReport.md` | 阶段后端代码审计 | Construction Evidence | construction | DELETE_AFTER_STABLE |
 | `_construction/reviews/PlatformStabilizationReview.md` | 平台稳定化评审 | Construction Evidence | construction | DELETE_AFTER_STABLE |
+| `_construction/reviews/PlatformFrozenBacklogFinalReview.md` | AF-001～AF-006 最终稳定性评审 | Construction Evidence | construction | DELETE_AFTER_STABLE |
 | `_construction/reviews/IntegrationSyncSourceContractChangeReview.md` | 单下界源契约变更评审 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
 | `_construction/reviews/OrganizationHRAssignmentContractReview.md` | 任职/离职源契约评审 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
 | `_construction/reviews/OrganizationHRSyncAcceptanceReport.md` | HR Adapter 能力验收 | Production Gate Evidence | production-enablement-evidence | DELETE_AFTER_PRODUCTION_GATE |
@@ -123,7 +124,7 @@ DOC-001A 治理前共有 67 份非 `development` 文档资产：35 份 Git 已�
 
 - 长期保留或重写：5 份 User Guide、1 份 Operations Runbook、1 份 Engineering Handbook。
 - 合并/重写后删除原件：9 份架构设计、3 份 Standard、14 份 Report 核心设计。
-- 稳定后删除：12 份非 HR Review、1 份旧命名规范、9 份 Report 过程资料、1 份规划 Backlog，以及 93 份本地过程资料。
+- 稳定后删除：13 份非 HR Review、1 份旧命名规范、9 份 Report 过程资料、1 份规划 Backlog，以及 93 份本地过程资料。
 - Production Gate 后删除：4 份 HR/Source Contract Review 与 7 份脱敏分析资料。
 - 始终不进入 Git：69 份原始 HR 资料。
 

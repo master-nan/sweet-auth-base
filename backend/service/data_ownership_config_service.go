@@ -10,12 +10,12 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -62,7 +62,7 @@ func NewDataOwnershipConfigService(
 }
 
 func (s *DataOwnershipConfigService) PageDimensions(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataDimensionDefinitionQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
@@ -84,7 +84,7 @@ func (s *DataOwnershipConfigService) PageDimensions(
 }
 
 func (s *DataOwnershipConfigService) CreateOwnership(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataOwnershipFieldCreateReq,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	if ctx == nil {
@@ -156,7 +156,7 @@ func (s *DataOwnershipConfigService) CreateOwnership(
 }
 
 func (s *DataOwnershipConfigService) GetOwnership(
-	ctx *gin.Context,
+	ctx context.Context,
 	ownershipId int,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	if ownershipId <= 0 {
@@ -170,7 +170,7 @@ func (s *DataOwnershipConfigService) GetOwnership(
 }
 
 func (s *DataOwnershipConfigService) PageOwnerships(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataOwnershipFieldQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataOwnershipFieldListRes], error) {
@@ -192,7 +192,7 @@ func (s *DataOwnershipConfigService) PageOwnerships(
 }
 
 func (s *DataOwnershipConfigService) ListOwnershipsByResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) ([]response.DataOwnershipFieldListRes, error) {
 	if resourceId <= 0 {
@@ -216,7 +216,7 @@ func (s *DataOwnershipConfigService) ListOwnershipsByResource(
 }
 
 func (s *DataOwnershipConfigService) UpdateOwnership(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataOwnershipFieldUpdateReq,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	if ctx == nil {
@@ -288,7 +288,7 @@ func (s *DataOwnershipConfigService) UpdateOwnership(
 	return s.ownershipDetail(ctx, updated)
 }
 
-func (s *DataOwnershipConfigService) DisableOwnership(ctx *gin.Context, ownershipId int) error {
+func (s *DataOwnershipConfigService) DisableOwnership(ctx context.Context, ownershipId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -335,7 +335,7 @@ func (s *DataOwnershipConfigService) DisableOwnership(ctx *gin.Context, ownershi
 
 // RemoveOwnership 遵循平台软删除基线。
 // 无论是否启用，任何 PolicyRule 引用都会保护该 Ownership 身份。
-func (s *DataOwnershipConfigService) RemoveOwnership(ctx *gin.Context, ownershipId int) error {
+func (s *DataOwnershipConfigService) RemoveOwnership(ctx context.Context, ownershipId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -709,7 +709,7 @@ func (s *DataOwnershipConfigService) ownershipHasPolicyReferences(
 }
 
 func (s *DataOwnershipConfigService) ownershipDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	ownership model.DataOwnershipField,
 ) (response.DataOwnershipFieldDetailRes, error) {
 	resource, err := s.resourceRepo.WithContext(ctx).FindById(ownership.ResourceId)
@@ -749,7 +749,7 @@ func (s *DataOwnershipConfigService) generateId() (int, error) {
 }
 
 func (s *DataOwnershipConfigService) recordOwnershipAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	ownership model.DataOwnershipField,

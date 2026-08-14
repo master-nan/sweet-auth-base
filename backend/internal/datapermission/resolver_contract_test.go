@@ -1,14 +1,13 @@
 package datapermission_test
 
 import (
+	"context"
 	stderrors "errors"
 	"testing"
 
 	"backend/dto/response"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -19,7 +18,7 @@ const (
 func TestResolverContractConstructionAndNormalOutput(t *testing.T) {
 	input := newResolverInput(t)
 	var resolver datapermission.Resolver = datapermission.ResolverFunc(
-		func(_ *gin.Context, received datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+		func(_ context.Context, received datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 			if received.ResourceCode() != testResolverResource || received.Operation() != testResolverOperation {
 				t.Fatalf("unexpected resolver input: %s %s", received.ResourceCode(), received.Operation())
 			}
@@ -65,7 +64,7 @@ func TestResolverInputRejectsInvalidSubjectContext(t *testing.T) {
 
 func TestResolverContractRejectsResultIdentityConflict(t *testing.T) {
 	resolver := datapermission.ResolverFunc(
-		func(_ *gin.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+		func(_ context.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 			return datapermission.NewNoneResult("service:tms.other_resource", testResolverOperation)
 		},
 	)
@@ -80,7 +79,7 @@ func TestResolverContractFailsClosedOnErrorsAndInvalidResults(t *testing.T) {
 
 	t.Run("raw resolver failure", func(t *testing.T) {
 		resolver := datapermission.ResolverFunc(
-			func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			func(_ context.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 				all, err := datapermission.NewAllResult(input.ResourceCode(), input.Operation())
 				if err != nil {
 					t.Fatalf("create all result: %v", err)
@@ -95,7 +94,7 @@ func TestResolverContractFailsClosedOnErrorsAndInvalidResults(t *testing.T) {
 
 	t.Run("stable resolver error", func(t *testing.T) {
 		resolver := datapermission.ResolverFunc(
-			func(_ *gin.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			func(_ context.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 				return datapermission.DataScopeResult{}, myerrors.ErrDataPermissionResolverGrantMissing
 			},
 		)
@@ -106,7 +105,7 @@ func TestResolverContractFailsClosedOnErrorsAndInvalidResults(t *testing.T) {
 
 	t.Run("invalid output", func(t *testing.T) {
 		resolver := datapermission.ResolverFunc(
-			func(_ *gin.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			func(_ context.Context, _ datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 				return datapermission.DataScopeResult{}, nil
 			},
 		)

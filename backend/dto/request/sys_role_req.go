@@ -16,12 +16,6 @@ type RoleUpdateReq struct {
 	Memo string `json:"memo" binding:"required"`
 }
 
-// RoleMenuCreateReq 角色菜单关联
-type RoleMenuCreateReq struct {
-	RoleId int `json:"role_id" binding:"required"`
-	MenuId int `json:"menu_id" binding:"required"`
-}
-
 // RoleAssignPermissionsReq 分配权限
 type RoleAssignPermissionsReq struct {
 	RoleId    int   `json:"role_id" binding:"required"`

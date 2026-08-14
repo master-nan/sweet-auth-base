@@ -6,6 +6,7 @@ import (
 	"backend/enum"
 	"backend/internal/cache"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository/impl"
 	"encoding/json"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -136,19 +136,13 @@ func TestRefreshCacheInvalidatesRemovedFieldCache(t *testing.T) {
 
 func sysTableCacheTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
-	if err := db.AutoMigrate(
+	db := testutil.OpenSQLite(t,
 		&model.SysTable{},
 		&model.SysTableField{},
 		&model.SysTableRelation{},
 		&model.SysTableIndex{},
 		&model.SysTableIndexField{},
-	); err != nil {
-		t.Fatalf("migrate sys table metadata: %v", err)
-	}
+	)
 	return db
 }
 

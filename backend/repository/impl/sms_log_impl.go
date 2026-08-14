@@ -6,11 +6,8 @@
 package impl
 
 import (
-	"backend/dto/request"
-	"backend/dto/response"
 	"backend/internal/database"
 	"backend/model"
-	"backend/repository/util"
 	"context"
 	"gorm.io/gorm"
 )
@@ -29,16 +26,4 @@ func NewSmsLogImpl(primaryDB *database.PrimaryDB) *SmsLogImpl {
 
 func (s *SmsLogImpl) CreateSmsLogContext(ctx context.Context, log *model.SmsLog) error {
 	return s.db.WithContext(ctx).Create(log).Error
-}
-
-func (s *SmsLogImpl) GetSmsLogList(basic *request.Basic) (response.ListResult[model.SmsLog], error) {
-	var repo response.ListResult[model.SmsLog]
-	var table model.SysTable
-	query := util.ExecuteQuery(s.db, basic, table)
-	var smsLogList []model.SmsLog
-	var total int64 = 0
-	err := query.Find(&smsLogList).Limit(-1).Offset(-1).Count(&total).Error
-	repo.Data = smsLogList
-	repo.Total = int(total)
-	return repo, err
 }

@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
+	dysmsapi20170525 "github.com/alibabacloud-go/dysmsapi-20170525/v4/client"
 	"github.com/jinzhu/copier"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -160,50 +162,70 @@ func logAsyncSmsError(ctx context.Context, err error) {
 
 func redactSmsTemplateParamsForLog(params map[string]interface{}) map[string]interface{} {
 	redacted := make(map[string]interface{}, len(params))
-	for key, value := range params {
-		if key == "code" {
-			redacted[key] = "***"
-			continue
-		}
-		redacted[key] = value
+	for key := range params {
+		redacted[key] = "***"
 	}
 	return redacted
 }
 
 // CheckSmsStatus 检查短信发送状态
-func (s *SmsService) CheckSmsStatus(ctx context.Context, bizId, mobile string) (interface{}, error) {
+func (s *SmsService) CheckSmsStatus(ctx context.Context, applicationID int, bizID, mobile string) (response.SmsStatusRes, error) {
+	if applicationID <= 0 {
+		return response.SmsStatusRes{}, error2.ErrAppUnauthorized
+	}
+	log, err := s.smsLogRepo.FindByFieldWithDB(s.smsLogRepo.DBWithContext(ctx), "biz_id", bizID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.SmsStatusRes{}, error2.ErrSmsStatusNotFound
+		}
+		return response.SmsStatusRes{}, err
+	}
+	if !smsStatusLogOwnedBy(log, applicationID, mobile) {
+		return response.SmsStatusRes{}, error2.ErrSmsStatusNotFound
+	}
+
 	client, err := sms.GetSmsClient(s.serverConfig.ALiYun.SMS.AccessKeyId, s.serverConfig.ALiYun.SMS.AccessKeySecret)
 	if err != nil {
 		zap.L().Error("获取短信客户端失败", zap.Error(err))
-		return nil, error2.ErrClientNotFound
+		return response.SmsStatusRes{}, error2.ErrClientNotFound
 	}
-	// 根据 BizId 查询短信记录
-	log, err := s.smsLogRepo.FindByField("biz_id", bizId)
-	if err != nil {
-		return nil, err
-	}
-	// 获取创建日期
 	sendData := log.GmtCreate.Format("20060102")
-	result, err := sms.CheckSmsStatus(client, bizId, mobile, sendData)
+	result, err := sms.CheckSmsStatus(client, bizID, mobile, sendData)
 	if err != nil {
-		return nil, err
+		return response.SmsStatusRes{}, err
 	}
-	if *result.Code != "OK" {
-		return nil, error2.ErrSmsSendFailed
+	status, err := smsStatusFromProvider(result)
+	if err != nil {
+		return response.SmsStatusRes{}, err
 	}
-	sms := map[string]interface{}{
-		"status": enum.SmsStatusFailed,
+	if err := s.smsLogRepo.Update(s.smsLogRepo.DBWithContext(ctx), map[string]interface{}{"status": status}, log.Id); err != nil {
+		return response.SmsStatusRes{}, err
 	}
-	if result.SmsSendDetailDTOs != nil {
-		if *result.SmsSendDetailDTOs.SmsSendDetailDTO[0].SendStatus == 3 {
-			sms["status"] = enum.SmsStatusSuccess
-		}
+	return response.SmsStatusRes{Status: status}, nil
+}
+
+func smsStatusFromProvider(result *dysmsapi20170525.QuerySendDetailsResponseBody) (enum.SmsStatus, error) {
+	if result == nil || result.Code == nil || *result.Code != "OK" || result.SmsSendDetailDTOs == nil {
+		return 0, error2.ErrSmsStatusQueryFailed
 	}
-	// 更新短信发送状态
-	if err := s.smsLogRepo.Update(s.smsLogRepo.DBWithContext(ctx), sms, log.Id); err != nil {
-		return nil, err
+	details := result.SmsSendDetailDTOs.SmsSendDetailDTO
+	if len(details) == 0 || details[0] == nil || details[0].SendStatus == nil {
+		return 0, error2.ErrSmsStatusQueryFailed
 	}
-	return result.SmsSendDetailDTOs.SmsSendDetailDTO[0], nil
+	switch *details[0].SendStatus {
+	case 1:
+		return enum.SmsStatusSending, nil
+	case 2:
+		return enum.SmsStatusFailed, nil
+	case 3:
+		return enum.SmsStatusSuccess, nil
+	default:
+		return 0, error2.ErrSmsStatusQueryFailed
+	}
+}
+
+func smsStatusLogOwnedBy(log model.SmsLog, applicationID int, mobile string) bool {
+	return applicationID > 0 && log.ApplicationId == applicationID && log.Mobile == mobile
 }
 
 // GetSmsTemplateList 获取短信模板列表

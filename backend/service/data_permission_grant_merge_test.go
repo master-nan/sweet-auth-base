@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -9,7 +10,6 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -211,26 +211,26 @@ func newGrantMergeResolver(
 		ruleCalls:      make(map[int]int),
 	}
 	resolver := newDataPermissionPolicyResolver(
-		func(_ *gin.Context, code string) (model.DataResource, error) {
+		func(_ context.Context, code string) (model.DataResource, error) {
 			state.resourceCalls++
 			if code != state.resource.ResourceCode {
 				return model.DataResource{}, gorm.ErrRecordNotFound
 			}
 			return state.resource, nil
 		},
-		func(_ *gin.Context, resourceId int, operation string) (model.DataResourceOperation, error) {
+		func(_ context.Context, resourceId int, operation string) (model.DataResourceOperation, error) {
 			if resourceId != state.operation.ResourceId || operation != state.operation.Operation {
 				return model.DataResourceOperation{}, gorm.ErrRecordNotFound
 			}
 			return state.operation, nil
 		},
-		func(_ *gin.Context, _ int, _ []int, resourceId int, operation string, _ time.Time) ([]model.DataGrant, error) {
+		func(_ context.Context, _ int, _ []int, resourceId int, operation string, _ time.Time) ([]model.DataGrant, error) {
 			if resourceId != state.resource.Id || operation != state.operation.Operation {
 				return nil, nil
 			}
 			return append([]model.DataGrant(nil), state.grants...), nil
 		},
-		func(_ *gin.Context, policyId int) (model.DataPolicy, error) {
+		func(_ context.Context, policyId int) (model.DataPolicy, error) {
 			state.policyCalls[policyId]++
 			policy, ok := state.policies[policyId]
 			if !ok {
@@ -238,18 +238,18 @@ func newGrantMergeResolver(
 			}
 			return policy, nil
 		},
-		func(_ *gin.Context, policyId int) ([]model.DataPolicyRule, error) {
+		func(_ context.Context, policyId int) ([]model.DataPolicyRule, error) {
 			state.ruleCalls[policyId]++
 			return append([]model.DataPolicyRule(nil), state.rules[policyId]...), nil
 		},
-		func(_ *gin.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {
+		func(_ context.Context, resourceId int, ownershipCode string) (model.DataOwnershipField, error) {
 			ownership, ok := state.ownerships[ownershipCode]
 			if !ok || ownership.ResourceId != resourceId {
 				return model.DataOwnershipField{}, gorm.ErrRecordNotFound
 			}
 			return ownership, nil
 		},
-		func(_ *gin.Context, dimensionId int) (model.DataDimensionDefinition, error) {
+		func(_ context.Context, dimensionId int) (model.DataDimensionDefinition, error) {
 			dimension, ok := state.dimensions[dimensionId]
 			if !ok {
 				return model.DataDimensionDefinition{}, gorm.ErrRecordNotFound
@@ -257,7 +257,7 @@ func newGrantMergeResolver(
 			return dimension, nil
 		},
 		func(
-			_ *gin.Context,
+			_ context.Context,
 			_ datapermission.SubjectContext,
 			request DimensionProviderRequest,
 		) (datapermission.DimensionValues, error) {

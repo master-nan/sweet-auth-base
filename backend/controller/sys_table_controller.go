@@ -713,40 +713,6 @@ func (t *TableController) DeleteTableIndexById(ctx *gin.Context) {
 	}
 }
 
-// DeleteTableIndexByTableId 根据表ID删除表索引
-// @Summary 根据表ID删除表索引
-// @Description 根据表ID删除表索引
-// @Tags 表
-// @Produce application/json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param id path int true "表ID"
-// @Success 200 {object} response.Response
-// @Router /admin/table/index/table/{id} [delete]
-func (t *TableController) DeleteTableIndexByTableId(ctx *gin.Context) {
-	resp := response.NewResponse()
-	ctx.Set("response", resp)
-	id, err := strconv.Atoi(ctx.Param("id"))
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	user := ctx.MustGet("user").(model.SysUser)
-	allowed, err := t.sysMenuService.HasUserMenuButtonActionByMenuName(user.Id, "develop_database", "field_manager")
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	if !allowed {
-		_ = ctx.Error(myerrors.ErrPermissionDenied)
-		return
-	}
-	err = t.sysTableService.DeleteTableIndexByTableId(ctx.Request.Context(), id)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-}
-
 // InitTable 初始化表
 // @Summary 初始化表
 // @Description 初始化表

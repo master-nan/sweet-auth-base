@@ -3,6 +3,7 @@ package service
 import (
 	"backend/internal/database"
 	"backend/internal/organization/hrsync"
+	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
@@ -16,7 +17,6 @@ import (
 
 	"backend/internal/integration"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -538,13 +538,7 @@ func TestOrganizationHRResignationMissingEmployeeFutureAndAssignmentRollback(t *
 
 func newOrganizationHRSyncTestService(t *testing.T) (*OrganizationHRSyncService, *gorm.DB) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:org-hr-%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "-"))), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.AutoMigrate(&model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgEmployee{}, &model.OrgAssignment{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{}); err != nil {
-		t.Fatal(err)
-	}
+	db := testutil.OpenSQLiteWithConfig(t, &gorm.Config{}, &model.IntegrationSyncBatch{}, &model.IntegrationExecution{}, &model.OrgLegalEntity{}, &model.OrgUnit{}, &model.OrgStructure{}, &model.OrgStructureNode{}, &model.OrgPosition{}, &model.OrgEmployee{}, &model.OrgAssignment{}, &model.OrgSyncBatch{}, &model.OrgSyncRecord{})
 	sf, err := utils.NewSnowflake(11)
 	if err != nil {
 		t.Fatal(err)

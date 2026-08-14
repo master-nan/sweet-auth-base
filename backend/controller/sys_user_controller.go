@@ -131,27 +131,6 @@ func (u *UserController) UpdatePassword(ctx *gin.Context) {
 	_ = ctx.Error(myerrors.ErrParamInvalid)
 }
 
-// GetUserByUserName 根据用户名获取用户
-// @Summary 根据用户名获取用户
-// @Description 根据用户名获取用户
-// @Tags 用户
-// @Produce application/json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param username path string true "用户名"
-// @Success 200 {object} response.Response
-// @Router /admin/user/{username} [get]
-func (u *UserController) GetUserByUserName(ctx *gin.Context) {
-	resp := response.NewResponse()
-	ctx.Set("response", resp)
-	username := ctx.Param("username")
-	data, err := u.sysUserService.GetByUserNameResponse(username)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(data)
-}
-
 // GetUserById 根据ID获取用户
 // @Summary 根据ID获取用户
 // @Description 根据ID获取用户

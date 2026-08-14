@@ -156,7 +156,7 @@ func (gc *GeneralizationController) QueryByCode(ctx *gin.Context) {
 	}
 	data.MenuId = menuId
 	result, err := gc.generalizationService.QueryWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		&data,
 		table,
 		model.DataPermissionOperationQuery,
@@ -208,7 +208,7 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 		return
 	}
 	data, err := gc.generalizationService.GetByIdWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		table,
 		id,
 		model.DataPermissionOperationDetail,
@@ -245,7 +245,7 @@ func (gc *GeneralizationController) Create(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
-	if err := gc.generalizationService.Create(ctx, table, data.Data); err != nil {
+	if err := gc.generalizationService.Create(ctx.Request.Context(), table, data.Data); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -277,7 +277,7 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 	}
 	data.MenuId = menuId
 	if err := gc.generalizationService.UpdateWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		table,
 		data.Id,
 		data.Data,
@@ -313,7 +313,7 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 	}
 	data.MenuId = menuId
 	if err := gc.generalizationService.DeleteWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		table,
 		data.Id,
 	); err != nil {
@@ -346,7 +346,7 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		return
 	}
 	if err := gc.generalizationService.BatchDeleteWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		table,
 		data.Ids,
 	); err != nil {
@@ -394,7 +394,7 @@ func (gc *GeneralizationController) Export(ctx *gin.Context) {
 		data.Num = 10000
 	}
 	result, err := gc.generalizationService.QueryWithDataPermission(
-		ctx,
+		ctx.Request.Context(),
 		&data,
 		table,
 		model.DataPermissionOperationExport,

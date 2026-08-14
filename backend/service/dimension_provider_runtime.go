@@ -12,20 +12,19 @@ import (
 	"backend/model"
 	"backend/repository"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 const organizationDimensionProviderCode = "organization"
 
-type dimensionDefinitionLookup func(*gin.Context, string) (model.DataDimensionDefinition, error)
+type dimensionDefinitionLookup func(context.Context, string) (model.DataDimensionDefinition, error)
 type dimensionOrganizationScopeLookup func(
-	*gin.Context,
+	context.Context,
 	int,
 	string,
 ) (response.OrgEffectiveOrganizationScopeRes, error)
 type dimensionOrganizationDescendantsLookup func(
-	*gin.Context,
+	context.Context,
 	string,
 	int,
 	string,
@@ -36,7 +35,7 @@ type dimensionOrganizationDescendantsLookup func(
 // 它不读取 Grant、Policy、Resource 或业务数据。
 type DimensionProvider interface {
 	ResolveDimensionValues(
-		*gin.Context,
+		context.Context,
 		datapermission.SubjectContext,
 		DimensionProviderRequest,
 	) (datapermission.DimensionValues, error)
@@ -55,22 +54,20 @@ func NewDimensionProviderRuntime(
 	organizationProvider OrgPermissionProvider,
 ) *DimensionProviderRuntime {
 	return newDimensionProviderRuntime(
-		func(ctx *gin.Context, code string) (model.DataDimensionDefinition, error) {
+		func(ctx context.Context, code string) (model.DataDimensionDefinition, error) {
 			return dimensionRepo.WithContext(ctx).FindByField("code", code)
 		},
-		func(ctx *gin.Context, employeeId int, asOfDate string) (response.OrgEffectiveOrganizationScopeRes, error) {
-			requestContext := context.Background()
-			if ctx != nil && ctx.Request != nil {
-				requestContext = ctx.Request.Context()
+		func(ctx context.Context, employeeId int, asOfDate string) (response.OrgEffectiveOrganizationScopeRes, error) {
+			if ctx == nil {
+				ctx = context.Background()
 			}
-			return organizationProvider.GetEmployeeEffectiveOrganizationScope(requestContext, employeeId, asOfDate)
+			return organizationProvider.GetEmployeeEffectiveOrganizationScope(ctx, employeeId, asOfDate)
 		},
-		func(ctx *gin.Context, structureCode string, orgUnitId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
-			requestContext := context.Background()
-			if ctx != nil && ctx.Request != nil {
-				requestContext = ctx.Request.Context()
+		func(ctx context.Context, structureCode string, orgUnitId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
+			if ctx == nil {
+				ctx = context.Background()
 			}
-			return organizationProvider.GetOrgDescendants(requestContext, structureCode, orgUnitId, asOfDate, includeSelf)
+			return organizationProvider.GetOrgDescendants(ctx, structureCode, orgUnitId, asOfDate, includeSelf)
 		},
 	)
 }
@@ -88,7 +85,7 @@ func newDimensionProviderRuntime(
 }
 
 func (runtime *DimensionProviderRuntime) ResolveDimensionValues(
-	ctx *gin.Context,
+	ctx context.Context,
 	subject datapermission.SubjectContext,
 	request DimensionProviderRequest,
 ) (datapermission.DimensionValues, error) {
@@ -168,7 +165,7 @@ func (runtime *DimensionProviderRuntime) ResolveDimensionValues(
 }
 
 func (runtime *DimensionProviderRuntime) resolveManagementOrgDescendants(
-	ctx *gin.Context,
+	ctx context.Context,
 	subject datapermission.SubjectContext,
 	request DimensionProviderRequest,
 	directOrgUnitIds []int,

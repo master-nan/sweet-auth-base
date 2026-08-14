@@ -33,7 +33,7 @@ type integrationExecutionTableProvider interface {
 }
 
 type integrationExecutionPermissionResolver interface {
-	ResolveDataPermission(*gin.Context, model.SysTable, string) (repository.GeneralizationPermission, error)
+	ResolveDataPermission(context.Context, model.SysTable, string) (repository.GeneralizationPermission, error)
 }
 
 type IntegrationExecutionController struct {
@@ -156,7 +156,7 @@ func (c *IntegrationExecutionController) resolveReadPermission(
 		_ = ctx.Error(err)
 		return model.SysTable{}, repository.GeneralizationPermission{}, false
 	}
-	permission, err := c.permissionResolver.ResolveDataPermission(ctx, table, operation)
+	permission, err := c.permissionResolver.ResolveDataPermission(ctx.Request.Context(), table, operation)
 	if err != nil {
 		_ = ctx.Error(err)
 		return model.SysTable{}, repository.GeneralizationPermission{}, false
@@ -174,7 +174,7 @@ func (c *IntegrationExecutionController) resolvePermissionForTable(
 		_ = ctx.Error(err)
 		return model.SysTable{}, repository.GeneralizationPermission{}, false
 	}
-	permission, err := c.permissionResolver.ResolveDataPermission(ctx, table, operation)
+	permission, err := c.permissionResolver.ResolveDataPermission(ctx.Request.Context(), table, operation)
 	if err != nil {
 		_ = ctx.Error(err)
 		return model.SysTable{}, repository.GeneralizationPermission{}, false

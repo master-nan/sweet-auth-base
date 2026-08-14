@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	myerrors "backend/internal/errors"
 	"backend/model"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +29,7 @@ func TestDimensionProviderRuntimeResolvesOrganizationDimensions(t *testing.T) {
 			calls := 0
 			runtime := newDimensionProviderRuntime(
 				dimensionLookup(dimensionFixture(tt.dimensionCode, model.DataDimensionValueTypeBigint)),
-				func(_ *gin.Context, employeeId int, asOfDate string) (response.OrgEffectiveOrganizationScopeRes, error) {
+				func(_ context.Context, employeeId int, asOfDate string) (response.OrgEffectiveOrganizationScopeRes, error) {
 					calls++
 					if employeeId != subject.EmployeeId() || asOfDate != subject.AsOfDate() {
 						t.Fatalf("unexpected Organization Provider input: %d %s", employeeId, asOfDate)
@@ -59,7 +59,7 @@ func TestDimensionProviderRuntimeReturnsEmployeeWithoutOrganizationLookup(t *tes
 	subject := dimensionProviderSubject(t)
 	runtime := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeEmployee, model.DataDimensionValueTypeBigint)),
-		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+		func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			t.Fatal("employee dimension must not call Organization scope Provider")
 			return response.OrgEffectiveOrganizationScopeRes{}, nil
 		},
@@ -82,7 +82,7 @@ func TestDimensionProviderRuntimeReturnsEmptyOrganizationFacts(t *testing.T) {
 	subject := dimensionProviderSubject(t)
 	runtime := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
-		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+		func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return response.OrgEffectiveOrganizationScopeRes{
 				EmployeeId:      subject.EmployeeId(),
 				AsOfDate:        subject.AsOfDate(),
@@ -110,10 +110,10 @@ func TestDimensionProviderRuntimeResolvesManagementOrgDescendants(t *testing.T) 
 	requestedRoots := make([]int, 0, 2)
 	runtime := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
-		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+		func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return resolvedDimensionScope(subject, []int{21}, []int{21, 11, 11}), nil
 		},
-		func(_ *gin.Context, code string, rootId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
+		func(_ context.Context, code string, rootId int, asOfDate string, includeSelf bool) (response.OrgDescendantsRes, error) {
 			if code != structureCode || asOfDate != subject.AsOfDate() || !includeSelf {
 				t.Fatalf("unexpected descendant request: code=%s date=%s include_self=%v", code, asOfDate, includeSelf)
 			}
@@ -160,23 +160,23 @@ func TestDimensionProviderRuntimeFailsClosedOnInvalidOrganizationTrees(t *testin
 	structureCode := "DP-ACCEPTANCE-MGMT"
 	tests := []struct {
 		name       string
-		dependency func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
+		dependency func(context.Context, string, int, string, bool) (response.OrgDescendantsRes, error)
 	}{
 		{
 			name: "cycle",
-			dependency: func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
+			dependency: func(context.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
 				return response.OrgDescendantsRes{}, myerrors.ErrOrgStructureCycle
 			},
 		},
 		{
 			name: "orphan",
-			dependency: func(*gin.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
+			dependency: func(context.Context, string, int, string, bool) (response.OrgDescendantsRes, error) {
 				return response.OrgDescendantsRes{}, myerrors.ErrOrgStructureNodeMissing
 			},
 		},
 		{
 			name: "invalid organization response",
-			dependency: func(_ *gin.Context, _ string, rootId int, _ string, _ bool) (response.OrgDescendantsRes, error) {
+			dependency: func(_ context.Context, _ string, rootId int, _ string, _ bool) (response.OrgDescendantsRes, error) {
 				return response.OrgDescendantsRes{
 					StructureCode: structureCode,
 					OrgUnitId:     rootId,
@@ -190,7 +190,7 @@ func TestDimensionProviderRuntimeFailsClosedOnInvalidOrganizationTrees(t *testin
 		t.Run(tt.name, func(t *testing.T) {
 			runtime := newDimensionProviderRuntime(
 				dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
-				func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+				func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 					return resolvedDimensionScope(subject, []int{21}, []int{11}), nil
 				},
 				tt.dependency,
@@ -237,7 +237,7 @@ func TestDimensionProviderRuntimeRejectsMissingAndUnsupportedDimensions(t *testi
 	subject := dimensionProviderSubject(t)
 
 	missing := newDimensionProviderRuntime(
-		func(_ *gin.Context, _ string) (model.DataDimensionDefinition, error) {
+		func(_ context.Context, _ string) (model.DataDimensionDefinition, error) {
 			return model.DataDimensionDefinition{}, gorm.ErrRecordNotFound
 		},
 		nil,
@@ -271,7 +271,7 @@ func TestDimensionProviderRuntimeWrapsDependencyFailures(t *testing.T) {
 	subject := dimensionProviderSubject(t)
 
 	dimensionFailure := newDimensionProviderRuntime(
-		func(_ *gin.Context, _ string) (model.DataDimensionDefinition, error) {
+		func(_ context.Context, _ string) (model.DataDimensionDefinition, error) {
 			return model.DataDimensionDefinition{}, errors.New("database unavailable")
 		},
 		nil,
@@ -282,7 +282,7 @@ func TestDimensionProviderRuntimeWrapsDependencyFailures(t *testing.T) {
 
 	organizationFailure := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeLegalEntity, model.DataDimensionValueTypeBigint)),
-		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+		func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return response.OrgEffectiveOrganizationScopeRes{}, errors.New("organization unavailable")
 		},
 		nil,
@@ -294,7 +294,7 @@ func TestDimensionProviderRuntimeWrapsDependencyFailures(t *testing.T) {
 func TestDimensionProviderRuntimeRejectsInvalidSubjectAndProviderData(t *testing.T) {
 	runtime := newDimensionProviderRuntime(
 		dimensionLookup(dimensionFixture(datapermission.DimensionCodeManagementOrg, model.DataDimensionValueTypeBigint)),
-		func(_ *gin.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
+		func(_ context.Context, _ int, _ string) (response.OrgEffectiveOrganizationScopeRes, error) {
 			return response.OrgEffectiveOrganizationScopeRes{}, nil
 		},
 		nil,
@@ -329,7 +329,7 @@ func exactDimensionProviderRequest(t *testing.T, dimensionCode string) Dimension
 func dimensionLookup(
 	dimension model.DataDimensionDefinition,
 ) dimensionDefinitionLookup {
-	return func(_ *gin.Context, code string) (model.DataDimensionDefinition, error) {
+	return func(_ context.Context, code string) (model.DataDimensionDefinition, error) {
 		if dimension.Code != code {
 			return model.DataDimensionDefinition{}, gorm.ErrRecordNotFound
 		}

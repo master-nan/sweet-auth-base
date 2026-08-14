@@ -3,17 +3,15 @@ package service
 import (
 	"context"
 	"errors"
-	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 	"backend/model"
-
-	"github.com/gin-gonic/gin"
 )
 
 func TestLowCodeDataPermissionRuntimeReturnsNotApplicableWithoutLegacyFallback(t *testing.T) {
@@ -33,21 +31,21 @@ func TestLowCodeDataPermissionRuntimeReturnsNotApplicableWithoutLegacyFallback(t
 			var subjectCalls atomic.Int32
 			var adapterCalls atomic.Int32
 			runtime := newLowCodeDataPermissionRuntime(
-				func(_ *gin.Context, tableId int) ([]model.DataResource, error) {
+				func(_ context.Context, tableId int) ([]model.DataResource, error) {
 					if tableId != table.Id {
 						t.Fatalf("table id = %d, want %d", tableId, table.Id)
 					}
 					return tt.resources, nil
 				},
-				func(*gin.Context, int) ([]model.DataOwnershipField, error) {
+				func(context.Context, int) ([]model.DataOwnershipField, error) {
 					t.Fatal("not_applicable route must not load Ownership configuration")
 					return nil, nil
 				},
-				func(*gin.Context, int) (datapermission.SubjectContext, error) {
+				func(context.Context, int) (datapermission.SubjectContext, error) {
 					subjectCalls.Add(1)
 					return datapermission.SubjectContext{}, nil
 				},
-				func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+				func(context.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 					t.Fatal("not_applicable route must not call Resolver")
 					return datapermission.DataScopeResult{}, nil
 				},
@@ -58,7 +56,7 @@ func TestLowCodeDataPermissionRuntimeReturnsNotApplicableWithoutLegacyFallback(t
 			)
 
 			resolution, err := runtime.Resolve(
-				lowCodeRuntimeGinContext(101),
+				lowCodeRuntimeContext(101),
 				table,
 				model.DataPermissionOperationQuery,
 			)
@@ -83,23 +81,23 @@ func TestLowCodeDataPermissionRuntimeUsesTrustedResourceAndBuildsOnce(t *testing
 	var resolverCalls atomic.Int32
 	var adapterCalls atomic.Int32
 	runtime := newLowCodeDataPermissionRuntime(
-		func(*gin.Context, int) ([]model.DataResource, error) {
+		func(context.Context, int) ([]model.DataResource, error) {
 			return []model.DataResource{resource}, nil
 		},
-		func(_ *gin.Context, resourceId int) ([]model.DataOwnershipField, error) {
+		func(_ context.Context, resourceId int) ([]model.DataOwnershipField, error) {
 			if resourceId != resource.Id {
 				t.Fatalf("resource id = %d, want %d", resourceId, resource.Id)
 			}
 			return []model.DataOwnershipField{lowCodeRuntimeOwnership(resource.Id)}, nil
 		},
-		func(_ *gin.Context, userId int) (datapermission.SubjectContext, error) {
+		func(_ context.Context, userId int) (datapermission.SubjectContext, error) {
 			subjectCalls.Add(1)
 			if userId != 101 {
 				t.Fatalf("subject user = %d, want trusted user 101", userId)
 			}
 			return lowCodeRuntimeSubject(t, userId), nil
 		},
-		func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+		func(_ context.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 			resolverCalls.Add(1)
 			if input.ResourceCode() != resource.ResourceCode || input.Operation() != model.DataPermissionOperationQuery {
 				t.Fatalf("Resolver identity = %s/%s", input.ResourceCode(), input.Operation())
@@ -113,7 +111,7 @@ func TestLowCodeDataPermissionRuntimeUsesTrustedResourceAndBuildsOnce(t *testing
 	)
 
 	resolution, err := runtime.Resolve(
-		lowCodeRuntimeGinContext(101),
+		lowCodeRuntimeContext(101),
 		table,
 		model.DataPermissionOperationQuery,
 	)
@@ -155,14 +153,14 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 		{
 			name:      "Resolver failure is not downgraded to legacy",
 			resources: []model.DataResource{resource},
-			resolver: func(*gin.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			resolver: func(context.Context, datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 				return datapermission.DataScopeResult{}, sentinel
 			},
 		},
 		{
 			name:      "not applicable from enabled resource is a route conflict",
 			resources: []model.DataResource{resource},
-			resolver: func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+			resolver: func(_ context.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 				return datapermission.NewNotApplicableResult(input.ResourceCode(), input.Operation())
 			},
 			wantErrorCode: myerrors.ErrorCodeDataPermissionRuntimeRouteConflict,
@@ -180,7 +178,7 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resolver := tt.resolver
 			if resolver == nil {
-				resolver = func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+				resolver = func(_ context.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 					return lowCodeRuntimeFilteredResult(t, input.ResourceCode(), input.Operation()), nil
 				}
 			}
@@ -191,11 +189,11 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 				}
 			}
 			runtime := newLowCodeDataPermissionRuntime(
-				func(*gin.Context, int) ([]model.DataResource, error) { return tt.resources, nil },
-				func(*gin.Context, int) ([]model.DataOwnershipField, error) {
+				func(context.Context, int) ([]model.DataResource, error) { return tt.resources, nil },
+				func(context.Context, int) ([]model.DataOwnershipField, error) {
 					return []model.DataOwnershipField{lowCodeRuntimeOwnership(resource.Id)}, nil
 				},
-				func(*gin.Context, int) (datapermission.SubjectContext, error) {
+				func(context.Context, int) (datapermission.SubjectContext, error) {
 					return lowCodeRuntimeSubject(t, 101), nil
 				},
 				resolver,
@@ -203,7 +201,7 @@ func TestLowCodeDataPermissionRuntimeFailsClosed(t *testing.T) {
 			)
 
 			_, err := runtime.Resolve(
-				lowCodeRuntimeGinContext(101),
+				lowCodeRuntimeContext(101),
 				table,
 				model.DataPermissionOperationQuery,
 			)
@@ -221,14 +219,14 @@ func TestLowCodeDataPermissionRuntimeSupportsConcurrentRequestIsolation(t *testi
 	table := lowCodeRuntimeTestTable()
 	resource := lowCodeRuntimeResource(table.Id, true)
 	runtime := newLowCodeDataPermissionRuntime(
-		func(*gin.Context, int) ([]model.DataResource, error) { return []model.DataResource{resource}, nil },
-		func(*gin.Context, int) ([]model.DataOwnershipField, error) {
+		func(context.Context, int) ([]model.DataResource, error) { return []model.DataResource{resource}, nil },
+		func(context.Context, int) ([]model.DataOwnershipField, error) {
 			return []model.DataOwnershipField{lowCodeRuntimeOwnership(resource.Id)}, nil
 		},
-		func(_ *gin.Context, userId int) (datapermission.SubjectContext, error) {
+		func(_ context.Context, userId int) (datapermission.SubjectContext, error) {
 			return lowCodeRuntimeSubject(t, userId), nil
 		},
-		func(_ *gin.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
+		func(_ context.Context, input datapermission.ResolverInput) (datapermission.DataScopeResult, error) {
 			return lowCodeRuntimeFilteredResult(t, input.ResourceCode(), input.Operation()), nil
 		},
 		func(_ context.Context, input datapermission.AdapterInput) (datapermission.AdapterExecution, error) {
@@ -243,7 +241,7 @@ func TestLowCodeDataPermissionRuntimeSupportsConcurrentRequestIsolation(t *testi
 		go func() {
 			defer wait.Done()
 			resolution, err := runtime.Resolve(
-				lowCodeRuntimeGinContext(userId), table,
+				lowCodeRuntimeContext(userId), table,
 				model.DataPermissionOperationQuery,
 			)
 			if err != nil {
@@ -293,12 +291,8 @@ func lowCodeRuntimeOwnership(resourceId int) model.DataOwnershipField {
 	}
 }
 
-func lowCodeRuntimeGinContext(userId int) *gin.Context {
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = httptest.NewRequest("GET", "/admin/generalization/query/code/permission_demo", nil)
-	ctx.Set("id", userId)
-	ctx.Set("user", model.SysUser{Basic: model.Basic{Id: userId, State: true}})
-	return ctx
+func lowCodeRuntimeContext(userId int) context.Context {
+	return audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(userId, "runtime-test"))
 }
 
 func lowCodeRuntimeSubject(t *testing.T, userId int) datapermission.SubjectContext {

@@ -7,12 +7,12 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
@@ -71,7 +71,7 @@ func NewDataResourceConfigService(
 }
 
 func (s *DataResourceConfigService) CreateResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataResourceCreateReq,
 ) (response.DataResourceDetailRes, error) {
 	if ctx == nil {
@@ -142,7 +142,7 @@ func (s *DataResourceConfigService) CreateResource(
 }
 
 func (s *DataResourceConfigService) UpdateResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataResourceUpdateReq,
 ) (response.DataResourceDetailRes, error) {
 	if ctx == nil {
@@ -206,7 +206,7 @@ func (s *DataResourceConfigService) UpdateResource(
 }
 
 func (s *DataResourceConfigService) GetResource(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) (response.DataResourceDetailRes, error) {
 	if resourceId <= 0 {
@@ -220,7 +220,7 @@ func (s *DataResourceConfigService) GetResource(
 }
 
 func (s *DataResourceConfigService) PageResources(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataResourceQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataResourceListRes], error) {
@@ -241,7 +241,7 @@ func (s *DataResourceConfigService) PageResources(
 	return result, nil
 }
 
-func (s *DataResourceConfigService) DisableResource(ctx *gin.Context, resourceId int) error {
+func (s *DataResourceConfigService) DisableResource(ctx context.Context, resourceId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -282,7 +282,7 @@ func (s *DataResourceConfigService) DisableResource(ctx *gin.Context, resourceId
 
 // RemoveResource 执行平台软删除。
 // 已被引用的资源会在持久化前被拒绝，本 Service 不执行物理删除。
-func (s *DataResourceConfigService) RemoveResource(ctx *gin.Context, resourceId int) error {
+func (s *DataResourceConfigService) RemoveResource(ctx context.Context, resourceId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -317,7 +317,7 @@ func (s *DataResourceConfigService) RemoveResource(ctx *gin.Context, resourceId 
 }
 
 func (s *DataResourceConfigService) AddResourceOperations(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataResourceOperationBatchReq,
 ) ([]response.DataResourceOperationListRes, error) {
 	if ctx == nil {
@@ -363,7 +363,7 @@ func (s *DataResourceConfigService) AddResourceOperations(
 }
 
 func (s *DataResourceConfigService) ReplaceResourceOperations(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataResourceOperationBatchReq,
 ) ([]response.DataResourceOperationListRes, error) {
 	if ctx == nil {
@@ -441,7 +441,7 @@ func (s *DataResourceConfigService) ReplaceResourceOperations(
 }
 
 func (s *DataResourceConfigService) ListResourceOperations(
-	ctx *gin.Context,
+	ctx context.Context,
 	resourceId int,
 ) ([]response.DataResourceOperationListRes, error) {
 	if resourceId <= 0 {
@@ -465,7 +465,7 @@ func (s *DataResourceConfigService) ListResourceOperations(
 }
 
 func (s *DataResourceConfigService) DisableResourceOperation(
-	ctx *gin.Context,
+	ctx context.Context,
 	operationId int,
 ) error {
 	if ctx == nil {
@@ -503,7 +503,7 @@ func (s *DataResourceConfigService) DisableResourceOperation(
 }
 
 func (s *DataResourceConfigService) RemoveResourceOperation(
-	ctx *gin.Context,
+	ctx context.Context,
 	operationId int,
 ) error {
 	if ctx == nil {
@@ -890,7 +890,7 @@ func (s *DataResourceConfigService) generateId() (int, error) {
 }
 
 func (s *DataResourceConfigService) recordResourceAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	resource model.DataResource,

@@ -3,21 +3,13 @@ package impl
 import (
 	"backend/enum"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"testing"
-
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestSysMenuButtonRepositoryCreatePersistsFalseBoolDefaults(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenuButton{}); err != nil {
-		t.Fatalf("migrate sys_menu_button: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenuButton{})
 
 	repo := NewSysMenuButtonRepositoryImpl(&database.PrimaryDB{DB: db})
 	button := model.SysMenuButton{

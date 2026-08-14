@@ -417,7 +417,17 @@ func (a *AuthApi) CheckSmsStatus(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrParamInvalid)
 		return
 	}
-	result, err := a.smsService.CheckSmsStatus(ctx.Request.Context(), bizId, mobile)
+	applicationValue, exists := ctx.Get("application")
+	if !exists {
+		_ = ctx.Error(errors.ErrAppUnauthorized)
+		return
+	}
+	application, ok := applicationValue.(model.Application)
+	if !ok {
+		_ = ctx.Error(errors.ErrAppUnauthorized)
+		return
+	}
+	result, err := a.smsService.CheckSmsStatus(ctx.Request.Context(), application.Id, bizId, mobile)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

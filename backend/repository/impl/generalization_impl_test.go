@@ -2,11 +2,11 @@ package impl
 
 import (
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -57,10 +57,7 @@ func TestGeneralizationRepositoryUpdateDoesNotTouchSoftDeletedRows(t *testing.T)
 
 func newGeneralizationRepositoryForTest(t *testing.T) (*GeneralizationRepositoryImpl, *gorm.DB) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
+	db := testutil.OpenSQLite(t)
 	if err := db.Exec("CREATE TABLE smk_generalization_repo (id INTEGER PRIMARY KEY, name TEXT, gmt_delete DATETIME)").Error; err != nil {
 		t.Fatalf("create table: %v", err)
 	}

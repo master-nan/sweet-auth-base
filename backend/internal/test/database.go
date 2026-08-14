@@ -19,14 +19,8 @@ var sqliteDatabaseSequence atomic.Uint64
 // PostgreSQL 特有行为需要真实 PostgreSQL 集成测试，不能从此辅助方法推断。
 func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 	t.Helper()
-
-	databaseName := fmt.Sprintf(
-		"sweet_test_%s_%d",
-		normalizeDatabaseName(t.Name()),
-		sqliteDatabaseSequence.Add(1),
-	)
 	db, err := gorm.Open(
-		sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", databaseName)),
+		sqlite.Open(isolatedSQLiteDSN(t, "standard")),
 		&gorm.Config{
 			NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 			DisableForeignKeyConstraintWhenMigrating: true,
@@ -38,14 +32,7 @@ func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 		t.Fatalf("open test sqlite database: %v", err)
 	}
 
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("open test sqlite handle: %v", err)
-	}
-	sqlDB.SetMaxOpenConns(1)
-	t.Cleanup(func() {
-		_ = sqlDB.Close()
-	})
+	registerSQLiteCleanup(t, db, 1)
 
 	if len(models) > 0 {
 		if err := db.AutoMigrate(models...); err != nil {
@@ -53,6 +40,51 @@ func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 		}
 	}
 	return db
+}
+
+// OpenSQLiteWithConfig creates an isolated SQLite database for tests that need
+// DryRun, multiple connections, or another explicit GORM configuration.
+func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface{}) *gorm.DB {
+	t.Helper()
+	if config == nil {
+		config = &gorm.Config{}
+	}
+	db, err := gorm.Open(sqlite.Open(isolatedSQLiteDSN(t, "custom")), config)
+	if err != nil {
+		t.Fatalf("open custom test sqlite database: %v", err)
+	}
+	registerSQLiteCleanup(t, db, 0)
+	if len(models) > 0 {
+		if err := db.AutoMigrate(models...); err != nil {
+			t.Fatalf("migrate custom test fixtures: %v", err)
+		}
+	}
+	return db
+}
+
+func isolatedSQLiteDSN(t testing.TB, purpose string) string {
+	t.Helper()
+	databaseName := fmt.Sprintf(
+		"sweet_test_%s_%s_%d",
+		normalizeDatabaseName(t.Name()),
+		normalizeDatabaseName(purpose),
+		sqliteDatabaseSequence.Add(1),
+	)
+	return fmt.Sprintf("file:%s?mode=memory&cache=shared", databaseName)
+}
+
+func registerSQLiteCleanup(t testing.TB, db *gorm.DB, maxOpenConnections int) {
+	t.Helper()
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("open test sqlite handle: %v", err)
+	}
+	if maxOpenConnections > 0 {
+		sqlDB.SetMaxOpenConns(maxOpenConnections)
+	}
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+	})
 }
 
 // MustCreate 写入显式测试夹具，发生错误时终止当前测试。

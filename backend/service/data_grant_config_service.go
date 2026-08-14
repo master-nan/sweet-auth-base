@@ -8,12 +8,12 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -73,7 +73,7 @@ func NewDataGrantConfigService(
 }
 
 func (s *DataGrantConfigService) CreateGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataGrantCreateReq,
 ) (response.DataGrantDetailRes, error) {
 	created, err := s.createGrants(ctx, []request.DataGrantCreateReq{req})
@@ -84,7 +84,7 @@ func (s *DataGrantConfigService) CreateGrant(
 }
 
 func (s *DataGrantConfigService) CreateGrants(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataGrantBatchCreateReq,
 ) ([]response.DataGrantListRes, error) {
 	created, err := s.createGrants(ctx, req.Items)
@@ -95,7 +95,7 @@ func (s *DataGrantConfigService) CreateGrants(
 }
 
 func (s *DataGrantConfigService) GetGrant(
-	ctx *gin.Context,
+	ctx context.Context,
 	grantId int,
 ) (response.DataGrantDetailRes, error) {
 	if grantId <= 0 {
@@ -109,7 +109,7 @@ func (s *DataGrantConfigService) GetGrant(
 }
 
 func (s *DataGrantConfigService) PageGrants(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataGrantQueryReq,
 	table model.SysTable,
 ) (response.ListResult[response.DataGrantListRes], error) {
@@ -128,7 +128,7 @@ func (s *DataGrantConfigService) PageGrants(
 }
 
 func (s *DataGrantConfigService) SetGrantState(
-	ctx *gin.Context,
+	ctx context.Context,
 	req request.DataGrantStateReq,
 ) error {
 	if ctx == nil {
@@ -180,19 +180,19 @@ func (s *DataGrantConfigService) SetGrantState(
 	})
 }
 
-func (s *DataGrantConfigService) DisableGrant(ctx *gin.Context, grantId int) error {
+func (s *DataGrantConfigService) DisableGrant(ctx context.Context, grantId int) error {
 	state := false
 	return s.SetGrantState(ctx, request.DataGrantStateReq{Id: grantId, State: &state})
 }
 
-func (s *DataGrantConfigService) RestoreGrant(ctx *gin.Context, grantId int) error {
+func (s *DataGrantConfigService) RestoreGrant(ctx context.Context, grantId int) error {
 	state := true
 	return s.SetGrantState(ctx, request.DataGrantStateReq{Id: grantId, State: &state})
 }
 
 // RemoveGrant 仅执行平台软删除。
 // Service 不提供物理删除路径，以保留历史授权身份的可审计性，数据库引用也不会级联删除。
-func (s *DataGrantConfigService) RemoveGrant(ctx *gin.Context, grantId int) error {
+func (s *DataGrantConfigService) RemoveGrant(ctx context.Context, grantId int) error {
 	if ctx == nil {
 		return myerrors.WrapSystemError(ErrTransactionContextRequired)
 	}
@@ -220,7 +220,7 @@ func (s *DataGrantConfigService) RemoveGrant(ctx *gin.Context, grantId int) erro
 }
 
 func (s *DataGrantConfigService) createGrants(
-	ctx *gin.Context,
+	ctx context.Context,
 	items []request.DataGrantCreateReq,
 ) ([]model.DataGrant, error) {
 	if ctx == nil {
@@ -415,7 +415,7 @@ func (s *DataGrantConfigService) findGrantForUpdate(
 }
 
 func (s *DataGrantConfigService) grantDetail(
-	ctx *gin.Context,
+	ctx context.Context,
 	grant model.DataGrant,
 ) (response.DataGrantDetailRes, error) {
 	resource, err := s.resourceRepo.WithContext(ctx).FindById(grant.ResourceId)
@@ -452,7 +452,7 @@ func (s *DataGrantConfigService) generateGrantId() (int, error) {
 }
 
 func (s *DataGrantConfigService) recordGrantAudit(
-	ctx *gin.Context,
+	ctx context.Context,
 	tx *gorm.DB,
 	action string,
 	grant model.DataGrant,

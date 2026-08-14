@@ -3,21 +3,13 @@ package impl
 import (
 	"backend/enum"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"testing"
-
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestSysTableFieldRepositoryCreatePersistsFalseBoolDefaults(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysTableField{}); err != nil {
-		t.Fatalf("migrate sys_table_field: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysTableField{})
 
 	repo := NewSysTableFieldRepositoryImpl(&database.PrimaryDB{DB: db})
 	field := model.SysTableField{

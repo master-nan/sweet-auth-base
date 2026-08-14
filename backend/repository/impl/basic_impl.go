@@ -25,7 +25,6 @@ type BasicRepositoryImpl[T any] struct {
 	db       *gorm.DB
 	preloads []string
 	selects  []string
-	omits    []string
 	model    *T
 	unscoped bool
 	ctx      context.Context
@@ -328,16 +327,6 @@ func (b *BasicRepositoryImpl[T]) WithSelect(selects ...string) repository.BasicR
 	return newImpl
 }
 
-func (b *BasicRepositoryImpl[T]) WithOmit(omits ...string) repository.BasicRepository[T] {
-	newImpl := b.clone()
-	// 判断omits是否为空，如果为空则直接返回
-	if len(omits) == 0 {
-		return newImpl
-	}
-	newImpl.omits = append(newImpl.omits, omits...)
-	return newImpl
-}
-
 func (b *BasicRepositoryImpl[T]) WithContext(ctx context.Context) repository.BasicRepository[T] {
 	newImpl := b.clone()
 	newImpl.ctx = nil
@@ -362,9 +351,6 @@ func (b *BasicRepositoryImpl[T]) applyReadOptions(query *gorm.DB) *gorm.DB {
 	if len(b.selects) > 0 {
 		query = query.Select(b.selects)
 	}
-	if len(b.omits) > 0 {
-		query = query.Omit(b.omits...)
-	}
 	for _, preload := range b.preloads {
 		query = query.Preload(preload)
 	}
@@ -375,7 +361,6 @@ func (b *BasicRepositoryImpl[T]) clone() *BasicRepositoryImpl[T] {
 	newImpl := *b
 	newImpl.preloads = append([]string(nil), b.preloads...)
 	newImpl.selects = append([]string(nil), b.selects...)
-	newImpl.omits = append([]string(nil), b.omits...)
 	return &newImpl
 }
 

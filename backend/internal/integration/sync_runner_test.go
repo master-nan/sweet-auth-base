@@ -86,7 +86,7 @@ func TestIntegrationSyncRunnerLifecycle(t *testing.T) {
 }
 
 func TestIntegrationSyncRunnerRecoversPollPanic(t *testing.T) {
-	runtime := &syncRunnerRuntimeStub{panicAt: 1}
+	runtime := &syncRunnerRuntimeStub{panicAt: 1, entered: make(chan struct{}, 1)}
 	runner, err := NewIntegrationSyncRunner(runtime, SyncRunnerConfig{Enabled: true, RunnerID: "panic-test", PollInterval: time.Second, ShutdownTimeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +94,11 @@ func TestIntegrationSyncRunnerRecoversPollPanic(t *testing.T) {
 	if err := runner.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case <-runtime.entered:
+	case <-time.After(time.Second):
+		t.Fatal("runner did not enter panic test poll")
+	}
 	if err := runner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}

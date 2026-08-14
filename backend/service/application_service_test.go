@@ -3,24 +3,16 @@ package service
 import (
 	"backend/dto/request"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
+	"context"
 	"testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestApplicationUpdatePreservesDingSecretWhenRequestSecretIsBlank(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.Application{}); err != nil {
-		t.Fatalf("migrate application: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.Application{})
 	if err := db.Create(&model.Application{
 		Basic:      model.Basic{Id: 1, State: true},
 		Name:       "Default Admin App",
@@ -37,7 +29,7 @@ func TestApplicationUpdatePreservesDingSecretWhenRequestSecretIsBlank(t *testing
 
 	repo := impl.NewApplicationRepositoryImpl(&database.PrimaryDB{DB: db})
 	svc := &ApplicationService{applicationRepo: repo}
-	err = svc.UpdateApplication(testContextWithUser(), request.ApplicationUpdateReq{
+	err := svc.UpdateApplication(testContextWithUser(), request.ApplicationUpdateReq{
 		Id:         1,
 		Name:       "Updated Admin App",
 		Expiration: 3600,
@@ -63,13 +55,7 @@ func TestApplicationUpdatePreservesDingSecretWhenRequestSecretIsBlank(t *testing
 }
 
 func TestCreateApplicationReturnsGeneratedCredential(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.Application{}); err != nil {
-		t.Fatalf("migrate application: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.Application{})
 	repo := impl.NewApplicationRepositoryImpl(&database.PrimaryDB{DB: db})
 	sf, err := utils.NewSnowflake(1)
 	if err != nil {
@@ -98,20 +84,12 @@ func TestCreateApplicationReturnsGeneratedCredential(t *testing.T) {
 	}
 }
 
-func testContextWithUser() *gin.Context {
-	ctx := &gin.Context{}
-	ctx.Set("user", model.SysUser{Basic: model.Basic{Id: 1}, UserName: "admin"})
-	return ctx
+func testContextWithUser() context.Context {
+	return context.Background()
 }
 
 func TestRotateApplicationSecretReplacesStoredSecret(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.Application{}); err != nil {
-		t.Fatalf("migrate application: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.Application{})
 	if err := db.Create(&model.Application{
 		Basic:      model.Basic{Id: 1, State: true},
 		Name:       "Default Admin App",

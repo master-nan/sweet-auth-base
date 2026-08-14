@@ -50,6 +50,5 @@ type BasicRepository[T any] interface {
 	WithPreload(...string) BasicRepository[T]
 	WithUnscoped() BasicRepository[T]
 	WithSelect(...string) BasicRepository[T]
-	WithOmit(...string) BasicRepository[T]
 	WithContext(context.Context) BasicRepository[T]
 }

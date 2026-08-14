@@ -104,17 +104,6 @@ func (s *SysMenuService) GetRoleMenuButtons(roleId, menuId int) ([]model.SysMenu
 	return s.sysRoleMenuButtonRepo.GetRoleMenuButtons(roleId, menuId)
 }
 
-// CreateRoleMenu 新增角色菜单
-func (s *SysRoleService) CreateRoleMenu(ctx context.Context, req request.RoleMenuCreateReq) error {
-	var data model.SysRoleMenu
-	err := copier.Copy(&data, &req)
-	if err != nil {
-		zap.L().Error("结构体字段映射失败", zap.String("target", "SysRoleMenu"), zap.Error(err))
-		return err
-	}
-	return s.sysRoleMenuRepo.Create(s.sysRoleMenuRepo.DBWithContext(ctx), &data)
-}
-
 // AssignPermissions 分配角色权限
 func (s *SysRoleService) AssignPermissions(ctx context.Context, data request.RoleAssignPermissionsReq) error {
 	role, err := s.sysRoleRepo.FindById(data.RoleId)
@@ -260,9 +249,4 @@ func filterAssignableRoleButtons(buttons []model.SysMenuButton, menuIDSet map[in
 		}
 	}
 	return result
-}
-
-// DeleteRoleMenu 删除角色菜单
-func (s *SysRoleService) DeleteRoleMenu(ctx context.Context, roleId, menuId int) error {
-	return s.sysRoleMenuRepo.DeleteRoleMenuByRoleIdAndMenuId(s.sysRoleMenuRepo.DBWithContext(ctx), roleId, menuId)
 }

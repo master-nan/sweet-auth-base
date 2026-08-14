@@ -1,11 +1,11 @@
 package datapermission
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
-
-	"github.com/gin-gonic/gin"
 )
 
 func TestResolverSummaryUsesWhitelistSerializationAndRequestContext(t *testing.T) {
@@ -31,7 +31,7 @@ func TestResolverSummaryUsesWhitelistSerializationAndRequestContext(t *testing.T
 		}
 	}
 
-	ctx, _ := gin.CreateTestContext(nil)
+	ctx := WithResolverSummaryContext(context.Background())
 	if err = StoreResolverSummary(ctx, summary); err != nil {
 		t.Fatalf("store Resolver summary: %v", err)
 	}
@@ -44,6 +44,32 @@ func TestResolverSummaryUsesWhitelistSerializationAndRequestContext(t *testing.T
 		stored.CheckedPolicyCount() != 2 {
 		t.Fatalf("unexpected stored summary: %s", encoded)
 	}
+}
+
+func TestResolverSummaryContextSupportsConcurrentReads(t *testing.T) {
+	summary, err := NewResolverSummary(ResolverSummaryInput{
+		ResourceCode: "transport_order", Operation: "query", Decision: DataScopeDecisionAll,
+		CheckedGrantCount: 1, CheckedPolicyCount: 1,
+	})
+	if err != nil {
+		t.Fatalf("create Resolver summary: %v", err)
+	}
+	ctx := WithResolverSummaryContext(context.Background())
+	if err = StoreResolverSummary(ctx, summary); err != nil {
+		t.Fatalf("store Resolver summary: %v", err)
+	}
+	var wait sync.WaitGroup
+	for index := 0; index < 16; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			stored, ok := ResolverSummaryFromContext(ctx)
+			if !ok || stored.Decision() != DataScopeDecisionAll {
+				t.Errorf("unexpected concurrent summary: ok=%v decision=%q", ok, stored.Decision())
+			}
+		}()
+	}
+	wait.Wait()
 }
 
 func TestResolverSummaryRejectsInvalidCounts(t *testing.T) {

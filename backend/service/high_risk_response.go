@@ -159,11 +159,6 @@ func (s *ApplicationService) GetApplicationByIdResponse(id int) (response.Applic
 	return applicationResponse(data), err
 }
 
-func (s *ApplicationService) GetApplicationByAppKeyResponse(appKey string) (response.ApplicationRes, error) {
-	data, err := s.GetApplicationByAppKey(appKey)
-	return applicationResponse(data), err
-}
-
 func (s *ApplicationService) GetApplicationListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.ApplicationRes], error) {
 	data, err := s.GetApplicationList(basic, table)
 	if err != nil {
@@ -200,11 +195,6 @@ func SysUserResponse(data model.SysUser) response.SysUserRes {
 		Email: data.Email, PhoneNumber: data.PhoneNumber, GmtLastLogin: lastLogin,
 		Language: data.Language, IsReset: data.IsReset, Roles: roles,
 	}
-}
-
-func (s *SysUserService) GetByUserNameResponse(username string) (response.SysUserRes, error) {
-	data, err := s.GetByUserName(username)
-	return SysUserResponse(data), err
 }
 
 func (s *SysUserService) GetByIdResponse(id int) (response.SysUserRes, error) {

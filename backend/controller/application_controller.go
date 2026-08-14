@@ -86,27 +86,6 @@ func (t *ApplicationController) QueryApplication(ctx *gin.Context) {
 	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
-// GetApplicationByAppKey 根据appKey获取应用详情
-// @Summary 应用详情
-// @Description 根据appKey获取应用详情
-// @Tags 应用
-// @Produce application/json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Param appKey path string true "应用Key"
-// @Success 200 {object} response.Response "请求成功"
-// @Router /admin/application/key/{appKey} [get]
-func (t *ApplicationController) GetApplicationByAppKey(ctx *gin.Context) {
-	resp := response.NewResponse()
-	ctx.Set("response", resp)
-	appKey := ctx.Param("appKey")
-	data, err := t.applicationService.GetApplicationByAppKeyResponse(appKey)
-	if err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(data)
-}
-
 // CreateApplication 创建应用
 // @Summary 创建应用
 // @Description 创建应用

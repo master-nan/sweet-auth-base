@@ -2,6 +2,7 @@ package service
 
 import (
 	"backend/dto/response"
+	"backend/internal/audit"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
 	"backend/model"
@@ -10,13 +11,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type subjectContextUserLookup func(int) (model.SysUser, error)
 type subjectContextRoleLookup func(int) ([]model.SysRole, error)
-type subjectContextEmployeeLookup func(*gin.Context, int) (response.OrgEmployeeContextRes, error)
+type subjectContextEmployeeLookup func(context.Context, int) (response.OrgEmployeeContextRes, error)
 
 // SubjectContextBuilder 仅从服务端可信来源生成 Resolver 主体身份。
 // 它不接受角色、员工或日期覆盖值。
@@ -35,12 +35,11 @@ func NewSubjectContextBuilder(
 	return newSubjectContextBuilder(
 		userRepo.FindById,
 		userRoleRepo.GetUserRoles,
-		func(ctx *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
-			requestContext := context.Background()
-			if ctx != nil && ctx.Request != nil {
-				requestContext = ctx.Request.Context()
+		func(ctx context.Context, userId int) (response.OrgEmployeeContextRes, error) {
+			if ctx == nil {
+				ctx = context.Background()
 			}
-			return orgProvider.GetEmployeeByUser(requestContext, userId)
+			return orgProvider.GetEmployeeByUser(ctx, userId)
 		},
 		model.Now,
 	)
@@ -62,7 +61,7 @@ func newSubjectContextBuilder(
 
 // Build 校验 userId 是否为 AuthHandler 设置的身份，再从服务端 Repository 和 Provider 生成其余字段。
 func (builder *SubjectContextBuilder) Build(
-	ctx *gin.Context,
+	ctx context.Context,
 	userId int,
 ) (datapermission.SubjectContext, error) {
 	if err := validateTrustedSubjectUser(ctx, userId); err != nil {
@@ -125,16 +124,15 @@ func (builder *SubjectContextBuilder) Build(
 	return datapermission.NewSubjectContext(userId, roleIds, employee.EmployeeId, asOfDate)
 }
 
-func validateTrustedSubjectUser(ctx *gin.Context, userId int) error {
+func validateTrustedSubjectUser(ctx context.Context, userId int) error {
 	if userId <= 0 {
 		return myerrors.ErrDataPermissionSubjectUserNotFound
 	}
 	if ctx == nil {
 		return myerrors.ErrDataPermissionSubjectContextInvalid
 	}
-	trustedUser, exists := ctx.Get("id")
-	trustedUserId, valid := trustedUser.(int)
-	if !exists || !valid || trustedUserId <= 0 || trustedUserId != userId {
+	trustedUser, exists := audit.GetAuditSubject(ctx)
+	if !exists || trustedUser.UserID <= 0 || trustedUser.UserID != userId {
 		return myerrors.ErrDataPermissionSubjectContextInvalid
 	}
 	return nil

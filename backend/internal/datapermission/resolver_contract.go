@@ -1,14 +1,13 @@
 package datapermission
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
-
-	"github.com/gin-gonic/gin"
 )
 
 // ResolverInput 是单次数据范围解析的不可变身份。
@@ -65,17 +64,17 @@ func (input ResolverInput) Operation() string {
 // 实现只能使用数据权限配置 Reader 和 Dimension Provider 类型的事实端口。
 // SQL、ORM Scope、Adapter、组织表和业务 Repository 均不属于此接口。
 type Resolver interface {
-	Resolve(*gin.Context, ResolverInput) (DataScopeResult, error)
+	Resolve(context.Context, ResolverInput) (DataScopeResult, error)
 }
 
 // ResolverFunc 将函数适配为 Resolver，同时执行已冻结的输入、输出身份和失败关闭契约。
 // 它不包含解析算法。
-type ResolverFunc func(*gin.Context, ResolverInput) (DataScopeResult, error)
+type ResolverFunc func(context.Context, ResolverInput) (DataScopeResult, error)
 
 var _ Resolver = ResolverFunc(nil)
 
 func (resolve ResolverFunc) Resolve(
-	ctx *gin.Context,
+	ctx context.Context,
 	input ResolverInput,
 ) (DataScopeResult, error) {
 	if err := input.Validate(); err != nil {

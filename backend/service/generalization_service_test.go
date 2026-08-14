@@ -4,16 +4,15 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/audit"
 	error2 "backend/internal/errors"
 	"backend/model"
 	"backend/repository"
+	"context"
 	"errors"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 type generalizationRepoSpy struct {
@@ -61,10 +60,6 @@ func (r *generalizationRepoSpy) HardDelete(model.SysTable, int) error {
 	return nil
 }
 
-func (r *generalizationRepoSpy) GetFieldById(string, int, string) (interface{}, error) {
-	return nil, nil
-}
-
 func copyMap(data map[string]interface{}) map[string]interface{} {
 	copied := make(map[string]interface{}, len(data))
 	for key, value := range data {
@@ -73,10 +68,8 @@ func copyMap(data map[string]interface{}) map[string]interface{} {
 	return copied
 }
 
-func testUserContext() *gin.Context {
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Set("user", model.SysUser{Basic: model.Basic{Id: 1}})
-	return ctx
+func testUserContext() context.Context {
+	return audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(1, "generalization-test"))
 }
 
 func TestGeneralizationServiceRejectsProtectedTableWrites(t *testing.T) {

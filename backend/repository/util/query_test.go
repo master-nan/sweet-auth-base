@@ -9,6 +9,7 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/datapermission"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
 
@@ -600,10 +601,7 @@ func TestListResultFieldsRejectsArbitraryCalculatedExpressions(t *testing.T) {
 }
 
 func TestDynamicQueryDoesNotDuplicateRowsForOneToManyRelations(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
+	db := testutil.OpenSQLite(t)
 	if err := db.Exec("CREATE TABLE sys_table (id INTEGER PRIMARY KEY, table_code TEXT)").Error; err != nil {
 		t.Fatalf("create sys_table: %v", err)
 	}
@@ -807,11 +805,8 @@ func queryTestTable() model.SysTable {
 
 func generalizationPermissionTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:"+strings.ReplaceAll(t.Name(), "/", "_")+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite db: %v", err)
-	}
-	if err = db.Exec(`CREATE TABLE permission_demo (
+	db := testutil.OpenSQLiteWithConfig(t, &gorm.Config{})
+	if err := db.Exec(`CREATE TABLE permission_demo (
 		id INTEGER PRIMARY KEY,
 		name TEXT NOT NULL,
 		owner_org_id INTEGER NOT NULL,
@@ -819,7 +814,7 @@ func generalizationPermissionTestDB(t *testing.T) *gorm.DB {
 	)`).Error; err != nil {
 		t.Fatalf("create permission demo table: %v", err)
 	}
-	if err = db.Exec(`INSERT INTO permission_demo (id, name, owner_org_id, legal_entity_id) VALUES
+	if err := db.Exec(`INSERT INTO permission_demo (id, name, owner_org_id, legal_entity_id) VALUES
 		(1, 'alpha', 11, 100),
 		(2, 'beta', 11, 200),
 		(3, 'alpha', 12, 100),

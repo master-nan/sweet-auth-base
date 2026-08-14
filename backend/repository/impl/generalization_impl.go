@@ -226,15 +226,6 @@ func (g *GeneralizationRepositoryImpl) BatchHardDeleteWithPermission(
 	return true, nil
 }
 
-func (g *GeneralizationRepositoryImpl) GetFieldById(tableCode string, id int, fieldName string) (interface{}, error) {
-	var result map[string]interface{}
-	err := g.db.Table(tableCode).Select(fieldName).Where("id = ?", id).Take(&result).Error
-	if err != nil {
-		return nil, err
-	}
-	return result[fieldName], nil
-}
-
 func activeRowQuery(db *gorm.DB, table model.SysTable) *gorm.DB {
 	if hasGeneralizationTableField(table, "gmt_delete") {
 		return db.Where("gmt_delete IS NULL")

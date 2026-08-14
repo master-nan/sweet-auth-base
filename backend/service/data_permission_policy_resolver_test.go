@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -14,7 +15,6 @@ import (
 	"backend/model"
 	"backend/repository/impl"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -41,7 +41,7 @@ type policyResolverTestProvider struct {
 }
 
 func (provider *policyResolverTestProvider) ResolveDimensionValues(
-	_ *gin.Context,
+	_ context.Context,
 	subject datapermission.SubjectContext,
 	request DimensionProviderRequest,
 ) (datapermission.DimensionValues, error) {

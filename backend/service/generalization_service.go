@@ -8,6 +8,7 @@ package service
 import (
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/audit"
 	error2 "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
 	"backend/internal/security"
@@ -24,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -99,7 +99,7 @@ func (gs *GeneralizationService) Query(basic *request.Basic, table model.SysTabl
 }
 
 func (gs *GeneralizationService) QueryWithDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	basic *request.Basic,
 	table model.SysTable,
 	operation string,
@@ -126,7 +126,7 @@ func (gs *GeneralizationService) QueryWithResolvedDataPermission(
 }
 
 func (gs *GeneralizationService) ResolveDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	operation string,
 ) (repository.GeneralizationPermission, error) {
@@ -142,7 +142,7 @@ func (gs *GeneralizationService) GetById(table model.SysTable, id int) (map[stri
 }
 
 func (gs *GeneralizationService) GetByIdWithDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	operation string,
@@ -157,12 +157,7 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 	return gs.permissionRepo.GetByIdWithPermission(table, id, resolution.permission)
 }
 
-// GetFieldById 获取指定行的指定字段值
-func (gs *GeneralizationService) GetFieldById(tableCode string, id int, fieldName string) (interface{}, error) {
-	return gs.generalizationRepo.GetFieldById(tableCode, id, fieldName)
-}
-
-func (gs *GeneralizationService) Create(ctx *gin.Context, table model.SysTable, data map[string]interface{}) error {
+func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTable, data map[string]interface{}) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
@@ -184,13 +179,16 @@ func (gs *GeneralizationService) Create(ctx *gin.Context, table model.SysTable, 
 	now := model.Now()
 	setIfFieldExists(table, filtered, "gmt_create", now)
 	setIfFieldExists(table, filtered, "gmt_modify", now)
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, filtered, "gmt_create_user", user.Id)
-	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, filtered, "gmt_create_user", userID)
+	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
 	return gs.generalizationRepo.Create(table, filtered)
 }
 
-func (gs *GeneralizationService) Update(ctx *gin.Context, table model.SysTable, id int, data map[string]interface{}) error {
+func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTable, id int, data map[string]interface{}) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
@@ -205,13 +203,16 @@ func (gs *GeneralizationService) Update(ctx *gin.Context, table model.SysTable, 
 	normalizeDataByFieldTypes(table, filtered)
 	// 填充审计字段
 	setIfFieldExists(table, filtered, "gmt_modify", model.Now())
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
 	return gs.generalizationRepo.Update(table, id, filtered)
 }
 
 func (gs *GeneralizationService) UpdateWithDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	data map[string]interface{},
@@ -237,8 +238,11 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 	}
 	normalizeDataByFieldTypes(table, filtered)
 	setIfFieldExists(table, filtered, "gmt_modify", model.Now())
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, filtered, "gmt_modify_user", user.Id)
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
 	if gs.permissionRepo == nil {
 		return error2.ErrDataPermissionRuntimeFailed
 	}
@@ -257,7 +261,7 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 	return nil
 }
 
-func (gs *GeneralizationService) Delete(ctx *gin.Context, table model.SysTable, id int) error {
+func (gs *GeneralizationService) Delete(ctx context.Context, table model.SysTable, id int) error {
 	if isProtectedTable(table.TableCode) {
 		return error2.NewBadRequestError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
@@ -271,13 +275,16 @@ func (gs *GeneralizationService) Delete(ctx *gin.Context, table model.SysTable, 
 	deleteData := map[string]interface{}{
 		"gmt_delete": model.Now(),
 	}
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, deleteData, "gmt_delete_user", userID)
 	return gs.generalizationRepo.SoftDelete(table, id, deleteData)
 }
 
 func (gs *GeneralizationService) DeleteWithDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 ) error {
@@ -306,8 +313,11 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 		return nil
 	}
 	deleteData := map[string]interface{}{"gmt_delete": model.Now()}
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, deleteData, "gmt_delete_user", userID)
 	if gs.permissionRepo == nil {
 		return error2.ErrDataPermissionRuntimeFailed
 	}
@@ -327,7 +337,7 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 }
 
 func (gs *GeneralizationService) BatchDeleteWithDataPermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	ids []int,
 ) error {
@@ -349,9 +359,9 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 	if gs.permissionRepo == nil {
 		return error2.ErrDataPermissionRuntimeFailed
 	}
-	db := gs.permissionRepo.DBWithContext(ctx.Request.Context())
+	db := gs.permissionRepo.DBWithContext(ctx)
 	if !utils.HasTableField(table, "gmt_delete") {
-		return RunInTransaction(ctx.Request.Context(), db, func(tx *gorm.DB) error {
+		return RunInTransaction(ctx, db, func(tx *gorm.DB) error {
 			deleted, deleteErr := gs.permissionRepo.BatchHardDeleteWithPermission(tx, table, ids, resolution.permission)
 			if deleteErr != nil {
 				return deleteErr
@@ -363,9 +373,12 @@ func (gs *GeneralizationService) BatchDeleteWithDataPermission(
 		})
 	}
 	deleteData := map[string]interface{}{"gmt_delete": model.Now()}
-	user := ctx.MustGet("user").(model.SysUser)
-	setIfFieldExists(table, deleteData, "gmt_delete_user", user.Id)
-	return RunInTransaction(ctx.Request.Context(), db, func(tx *gorm.DB) error {
+	userID, err := generalizationActorID(ctx)
+	if err != nil {
+		return err
+	}
+	setIfFieldExists(table, deleteData, "gmt_delete_user", userID)
+	return RunInTransaction(ctx, db, func(tx *gorm.DB) error {
 		deleted, err := gs.permissionRepo.BatchSoftDeleteWithPermission(tx, table, ids, deleteData, resolution.permission)
 		if err != nil {
 			return err
@@ -397,7 +410,7 @@ func normalizeGeneralizationIds(ids []int) ([]int, error) {
 }
 
 func (gs *GeneralizationService) resolveLowCodePermission(
-	ctx *gin.Context,
+	ctx context.Context,
 	table model.SysTable,
 	operation string,
 ) (lowCodePermissionResolution, error) {
@@ -405,6 +418,14 @@ func (gs *GeneralizationService) resolveLowCodePermission(
 		return lowCodePermissionResolution{}, error2.ErrDataPermissionRuntimeFailed
 	}
 	return gs.permissionRuntime.Resolve(ctx, table, operation)
+}
+
+func generalizationActorID(ctx context.Context) (int, error) {
+	subject, ok := audit.GetAuditSubject(ctx)
+	if !ok || subject.UserID <= 0 {
+		return 0, error2.ErrDataPermissionSubjectContextInvalid
+	}
+	return subject.UserID, nil
 }
 
 func permissionMissError(repository.GeneralizationPermission) error {

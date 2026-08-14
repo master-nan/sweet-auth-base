@@ -406,19 +406,6 @@ func (s *SysMenuService) HasUserMenuPermission(userId, menuId int) (bool, error)
 	return false, nil
 }
 
-func (s *SysMenuService) HasPublishedTableMenu(tableCode string) (bool, error) {
-	menus, err := s.GetPublishedTableMenus(tableCode)
-	if err != nil {
-		return false, err
-	}
-	for _, menu := range menus {
-		if menu.State && !menu.IsHidden {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (s *SysMenuService) GetPublishedTableMenus(tableCode string) ([]model.SysMenu, error) {
 	tableCode = strings.TrimSpace(tableCode)
 	if tableCode == "" {

@@ -2,14 +2,15 @@ package service
 
 import (
 	"backend/dto/response"
+	"backend/internal/audit"
 	myerrors "backend/internal/errors"
 	"backend/model"
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +32,7 @@ func TestSubjectContextBuilderBuildsTrustedContext(t *testing.T) {
 				inactiveSubjectRole(5),
 			}, nil
 		},
-		func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+		func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 			requestedUserIds = append(requestedUserIds, userId)
 			return response.NewOrgEmployeeContextRes(userId, &employeeId), nil
 		},
@@ -69,7 +70,7 @@ func TestSubjectContextBuilderDoesNotInventRoleContext(t *testing.T) {
 		func(int) ([]model.SysRole, error) {
 			return []model.SysRole{inactiveSubjectRole(1)}, nil
 		},
-		func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+		func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 			employeeLookupCalled = true
 			employeeId := 301
 			return response.NewOrgEmployeeContextRes(userId, &employeeId), nil
@@ -85,7 +86,7 @@ func TestSubjectContextBuilderDoesNotInventRoleContext(t *testing.T) {
 }
 
 func TestSubjectContextBuilderRejectsUnboundEmployee(t *testing.T) {
-	builder := validSubjectContextBuilder(func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+	builder := validSubjectContextBuilder(func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 		return response.NewOrgEmployeeContextRes(userId, nil), nil
 	})
 
@@ -97,7 +98,7 @@ func TestSubjectContextBuilderRejectsMissingUser(t *testing.T) {
 	builder := newSubjectContextBuilder(
 		func(int) (model.SysUser, error) { return model.SysUser{}, gorm.ErrRecordNotFound },
 		func(int) ([]model.SysRole, error) { return nil, nil },
-		func(*gin.Context, int) (response.OrgEmployeeContextRes, error) {
+		func(context.Context, int) (response.OrgEmployeeContextRes, error) {
 			return response.OrgEmployeeContextRes{}, nil
 		},
 		model.Now,
@@ -115,7 +116,7 @@ func TestSubjectContextBuilderRejectsUntrustedUserOverride(t *testing.T) {
 			return activeSubjectUser(userId), nil
 		},
 		func(int) ([]model.SysRole, error) { return []model.SysRole{activeSubjectRole(3)}, nil },
-		func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+		func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 			employeeId := 301
 			return response.NewOrgEmployeeContextRes(userId, &employeeId), nil
 		},
@@ -132,18 +133,18 @@ func TestSubjectContextBuilderRejectsUntrustedUserOverride(t *testing.T) {
 func TestSubjectContextBuilderRejectsBindingDataAnomaly(t *testing.T) {
 	tests := []struct {
 		name    string
-		binding func(*gin.Context, int) (response.OrgEmployeeContextRes, error)
+		binding func(context.Context, int) (response.OrgEmployeeContextRes, error)
 	}{
 		{
 			name: "binding belongs to another user",
-			binding: func(_ *gin.Context, _ int) (response.OrgEmployeeContextRes, error) {
+			binding: func(_ context.Context, _ int) (response.OrgEmployeeContextRes, error) {
 				employeeId := 301
 				return response.NewOrgEmployeeContextRes(202, &employeeId), nil
 			},
 		},
 		{
 			name: "bound status without employee",
-			binding: func(_ *gin.Context, userId int) (response.OrgEmployeeContextRes, error) {
+			binding: func(_ context.Context, userId int) (response.OrgEmployeeContextRes, error) {
 				return response.OrgEmployeeContextRes{
 					UserId: userId, BindingStatus: response.OrgEmployeeBindingBound,
 				}, nil
@@ -168,7 +169,7 @@ func TestSubjectContextBuilderWrapsRawDependencyErrors(t *testing.T) {
 	builder := newSubjectContextBuilder(
 		func(int) (model.SysUser, error) { return model.SysUser{}, errors.New("database unavailable") },
 		func(int) ([]model.SysRole, error) { return nil, nil },
-		func(*gin.Context, int) (response.OrgEmployeeContextRes, error) {
+		func(context.Context, int) (response.OrgEmployeeContextRes, error) {
 			return response.OrgEmployeeContextRes{}, nil
 		},
 		model.Now,
@@ -197,10 +198,8 @@ func validSubjectContextBuilder(
 	)
 }
 
-func authenticatedSubjectContext(userId int) *gin.Context {
-	ctx, _ := gin.CreateTestContext(nil)
-	ctx.Set("id", userId)
-	return ctx
+func authenticatedSubjectContext(userId int) context.Context {
+	return audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(userId, "subject-test"))
 }
 
 func activeSubjectUser(userId int) model.SysUser {

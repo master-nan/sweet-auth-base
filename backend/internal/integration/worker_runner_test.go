@@ -52,13 +52,16 @@ func TestNewWorkerRunnerConfigRejectsUnsafeValues(t *testing.T) {
 }
 
 func TestIntegrationWorkerRunnerBoundsConcurrencyAndPreservesRetryWaiting(t *testing.T) {
+	entered := make(chan struct{}, 3)
+	release := make(chan struct{})
 	runtime := &workerRuntimeStub{claimed: [][]repository.ClaimedIntegrationExecution{{
 		workerClaim(1), workerClaim(2), workerClaim(3),
 	}}}
 	runtime.run = func(context.Context, repository.ClaimedIntegrationExecution) (AttemptResult, error) {
 		runtime.enterExecution()
 		defer runtime.leaveExecution()
-		time.Sleep(20 * time.Millisecond)
+		entered <- struct{}{}
+		<-release
 		return AttemptResult{Succeeded: true}, nil
 	}
 	runner, err := NewIntegrationWorkerRunner(runtime, WorkerRunnerConfig{
@@ -66,8 +69,26 @@ func TestIntegrationWorkerRunnerBoundsConcurrencyAndPreservesRetryWaiting(t *tes
 		PollInterval: time.Second, LeaseRecoveryInterval: 10 * time.Second, ShutdownTimeout: time.Second,
 	})
 	mustWorkerNoError(t, err)
-	if runner.runPoll(context.Background()) {
-		t.Fatal("successful poll returned failure")
+	pollDone := make(chan bool, 1)
+	go func() { pollDone <- runner.runPoll(context.Background()) }()
+	for index := 0; index < 2; index++ {
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatal("concurrent executions did not enter")
+		}
+	}
+	if runtime.maxActive() != 2 {
+		t.Fatalf("expected exactly two active executions, got %d", runtime.maxActive())
+	}
+	close(release)
+	select {
+	case failed := <-pollDone:
+		if failed {
+			t.Fatal("successful poll returned failure")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("poll did not complete")
 	}
 	status := runner.Status()
 	if status.ClaimedTotal != 3 || status.CompletedTotal != 3 || status.ActiveExecutionCount != 0 || runtime.maxActive() > 2 || runtime.recoveryCount() != 0 {
@@ -183,7 +204,14 @@ func TestIntegrationWorkerRunnerDoesNotReclaimRetryBeforeNextRunAt(t *testing.T)
 		var stored model.IntegrationExecution
 		return db.First(&stored, execution.Id).Error == nil && stored.Status == model.IntegrationExecutionStatusRetryWaiting
 	}, time.Second)
-	time.Sleep(30 * time.Millisecond)
+	if err := db.Model(&model.IntegrationExecution{}).
+		Where("id = ?", execution.Id).
+		Update("next_run_at", time.Now().UTC().Add(time.Hour)).Error; err != nil {
+		t.Fatalf("move retry schedule into the future: %v", err)
+	}
+	if runner.runPoll(context.Background()) {
+		t.Fatal("retry-waiting recheck returned a poll failure")
+	}
 	var stored model.IntegrationExecution
 	mustWorkerNoError(t, db.First(&stored, execution.Id).Error)
 	if stored.CurrentAttempt != 1 {

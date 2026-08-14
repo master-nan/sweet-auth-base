@@ -3,13 +3,10 @@ package service
 import (
 	"backend/enum"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository/impl"
 	"testing"
-
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/schema"
 )
 
 func TestFilterGrantedMenuButtons(t *testing.T) {
@@ -236,15 +233,7 @@ func TestValidateLowCodeMenuButtonConfig(t *testing.T) {
 }
 
 func TestMenuButtonUpdateUsesScalarColumns(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		NamingStrategy: schema.NamingStrategy{SingularTable: true},
-	})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysRole{}, &model.SysMenuButton{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysMenu{}, &model.SysRole{}, &model.SysMenuButton{})
 	original := model.SysMenuButton{
 		Basic:       model.Basic{Id: 438, State: true},
 		MenuId:      203,
@@ -303,15 +292,7 @@ func TestMenuButtonUpdateUsesScalarColumns(t *testing.T) {
 }
 
 func TestOrphanRolePolicyCleanups(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
-		NamingStrategy: schema.NamingStrategy{SingularTable: true},
-	})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysRole{}, &model.SysMenuButton{}, &model.SysRoleMenuButton{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysRole{}, &model.SysMenuButton{}, &model.SysRoleMenuButton{})
 	if err := db.Create(&model.SysRole{Basic: model.Basic{Id: 1, State: true}, Name: "smoke_role"}).Error; err != nil {
 		t.Fatalf("create role: %v", err)
 	}

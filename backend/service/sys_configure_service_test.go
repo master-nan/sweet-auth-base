@@ -4,25 +4,18 @@ import (
 	"backend/dto/request"
 	"backend/internal/cache"
 	"backend/internal/database"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository/impl"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/pkg/errors"
-	"gorm.io/gorm"
 )
 
 func TestSysConfigureQueryReturnsRepositoryDataOnCacheMiss(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&model.SysConfigure{}); err != nil {
-		t.Fatalf("migrate sys configure: %v", err)
-	}
+	db := testutil.OpenSQLite(t, &model.SysConfigure{})
 	if err := db.Create(&model.SysConfigure{
 		Basic:               model.Basic{Id: 1, State: true},
 		EnableCaptcha:       true,
