@@ -15,6 +15,7 @@ DOC-001A 治理前共有 67 份非 `development` 文档资产：35 份 Git 已�
 
 | 当前文件 | 当前用途 | 目标长期类型 | 生命周期 | 最终动作 |
 | --- | --- | --- | --- | --- |
+| `user-guide/PlatformAdministrationGuide.md` | 平台管理员功能、配置和排错总手册 | User Guide | long-term | KEEP |
 | `user-guide/DataPermissionUserGuide.md` | 数据权限管理员操作 | User Guide | long-term | KEEP |
 | `user-guide/FieldTypeGuide.md` | 字段类型配置说明 | User Guide | long-term | KEEP |
 | `user-guide/LinkageConfig.md` | 字段联动配置说明 | User Guide | long-term | KEEP |

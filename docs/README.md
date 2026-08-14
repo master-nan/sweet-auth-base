@@ -18,6 +18,7 @@
 
 ### 使用与配置
 
+- [平台管理员使用手册](user-guide/PlatformAdministrationGuide.md)
 - [低代码配置手册](user-guide/LowCodeManual.md)
 - [字段类型指南](user-guide/FieldTypeGuide.md)
 - [字段联动配置](user-guide/LinkageConfig.md)
@@ -29,7 +30,7 @@
 - [Sweet Platform 工程手册 V1](engineering/sweet-platform-engineering-handbook-v1.md)
 - [运行手册](operations/Runbook.md)
 
-### 当前仍需建设证据的模块
+### 建设期参考资料
 
 Data Permission、Integration Runtime/Retry/Sync、Organization HR 和 Report 的阶段设计、验收与冻结资料位于 `_construction/`。其中 Organization HR 的真实生产源 Gate 尚未关闭，相关资料不得提前删除，也不得据此启用生产 Consumer。
 
