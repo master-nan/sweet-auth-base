@@ -50,7 +50,7 @@ export function useRuntimeTableMetadata(
     try {
       const response = options.loader
         ? await options.loader(code)
-        : await tableApi.queryTableByCode(code)
+        : await tableApi.queryRuntimeTableByCode(code)
       if (!response.success || !response.data) {
         throw new Error(response.message || '元数据加载失败')
       }

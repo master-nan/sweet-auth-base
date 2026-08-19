@@ -12,7 +12,9 @@ const menus = vi.hoisted(() => [
   },
 ])
 
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus }) }))
+vi.mock('src/stores/user', () => ({
+  useUserStore: () => ({ menus, buttons: ['demo_query', 'demo_metadata'] }),
+}))
 
 import { usePageButtons } from './page-buttons'
 
@@ -28,5 +30,7 @@ describe('usePageButtons capabilities', () => {
       'demo_history',
     ])
     expect(buttons.hasActionCapability('refresh')).toBe(false)
+    expect(buttons.hasGrantedCapability('demo_query')).toBe(true)
+    expect(buttons.hasGrantedCapability('demo_delete')).toBe(false)
   })
 })

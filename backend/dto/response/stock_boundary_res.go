@@ -17,6 +17,20 @@ type SysDictItemRes struct {
 	ItemValue string `json:"item_value"`
 }
 
+// RuntimeDictRes is the read-only dictionary shape used by authenticated pages.
+// Administration audit fields and internal identifiers are intentionally absent.
+type RuntimeDictRes struct {
+	DictName  string               `json:"dict_name"`
+	DictCode  string               `json:"dict_code"`
+	DictItems []RuntimeDictItemRes `json:"dict_items"`
+}
+
+type RuntimeDictItemRes struct {
+	ItemName  string `json:"item_name"`
+	ItemCode  string `json:"item_code"`
+	ItemValue string `json:"item_value"`
+}
+
 type SmsTemplateRes struct {
 	BasicRes
 	SignName       string          `json:"sign_name"`

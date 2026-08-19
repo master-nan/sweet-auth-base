@@ -46,6 +46,29 @@ func (s *SysDictService) GetSysDictByCodeResponse(code string) (response.SysDict
 	return sysDictResponse(data), err
 }
 
+func (s *SysDictService) GetRuntimeDictByCodeResponse(code string) (response.RuntimeDictRes, error) {
+	data, err := s.GetSysDictByCode(code)
+	if err != nil {
+		return response.RuntimeDictRes{}, err
+	}
+	return runtimeDictResponse(data), nil
+}
+
+func runtimeDictResponse(data model.SysDict) response.RuntimeDictRes {
+	items := make([]response.RuntimeDictItemRes, 0, len(data.DictItems))
+	for _, item := range data.DictItems {
+		if !item.State {
+			continue
+		}
+		items = append(items, response.RuntimeDictItemRes{
+			ItemName:  item.ItemName,
+			ItemCode:  item.ItemCode,
+			ItemValue: item.ItemValue,
+		})
+	}
+	return response.RuntimeDictRes{DictName: data.DictName, DictCode: data.DictCode, DictItems: items}
+}
+
 func (s *SysDictService) GetSysDictListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SysDictRes], error) {
 	data, err := s.GetSysDictList(basic, table)
 	if err != nil {

@@ -157,10 +157,10 @@ import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import CountTo from 'src/components/CountTo/CountTo.vue'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
 import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
-import { useUserStore } from 'src/stores/user'
 import { useLoadingStore } from 'src/stores/loading'
 import { isApiPermission, isPageButton } from 'src/utils/menu-button'
 import { findMenuPathByTableCode } from 'src/utils/menu-context'
+import { usePageButtons } from 'src/composables/page-buttons'
 
 defineOptions({ name: 'DashboardIndex' })
 
@@ -173,14 +173,14 @@ type MenuGroup = {
 
 const menuApi = useMenuApi()
 const accessLogApi = useAccessLogApi()
-const userStore = useUserStore()
+const { hasGrantedCapability } = usePageButtons('home')
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 
 const menus = ref<Menu[]>([])
 const recentLogs = ref<AccessLog[]>([])
 
-const auditAvailable = computed(() => userStore.buttons.includes('system_audit_query'))
+const auditAvailable = computed(() => hasGrantedCapability('system_audit_query'))
 
 const flatMenus = computed(() => flattenMenus(menus.value))
 const visibleMenus = computed(() => flatMenus.value.filter((menu) => !menu.is_hidden))

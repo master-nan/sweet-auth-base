@@ -168,7 +168,7 @@ async function loadForm() {
   formVisible.value = true
 
   try {
-    const tableRes = await tableApi.queryTableByCode(tableCode.value)
+    const tableRes = await tableApi.queryRuntimeTableByCode(tableCode.value)
     if (!tableRes.success || !tableRes.data) {
       throw new Error(tableRes.message || '表元数据不存在')
     }

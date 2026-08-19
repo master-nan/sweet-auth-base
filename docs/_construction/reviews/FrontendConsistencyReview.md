@@ -127,7 +127,7 @@ i18n 当前是半套状态。正式决策为中文平台：保留登录、布局
 | JsonEditor 组件族 | KEEP | JSON/数组/键值编辑是稳定特殊控件 |
 | `OrganizationSelect` | KEEP | Organization selector 是明确平台语义 |
 | `MasterDetailPage` | KEEP/EXTEND | Dictionary/Generalization 等主从页面需要；补小屏策略 |
-| `TreeTable` | DEPRECATE CANDIDATE | 当前无生产消费者；FE-002 二次确认后再删除 |
+| `TreeTable` | DELETE | FE-003 二次确认无生产消费者后已删除 |
 | `usePageButtons` | KEEP/EXTEND | 权限按钮唯一入口；补 capability helper |
 | `useConfirmDialog` | KEEP | 危险操作统一确认入口 |
 | `field-metadata.ts` | KEEP/EXTEND | 类型、控件、选择器和联动解析真值 |
@@ -421,7 +421,7 @@ Report V2 Workbench 仍保留现有 `refresh` MenuButton，归入 `REPORT_DEFERR
 
 Frontend Architecture Standard：**通过冻结**。
 
-Frontend Consistency Implementation：**未完成**，必须继续 FE-002 和 FE-003。
+Frontend Consistency Implementation：**已完成并冻结**。最终页面矩阵、指标和双账号浏览器验收见 [FrontendConsistencyFreezeReview](FrontendConsistencyFreezeReview.md)。
 
 冻结内容包括：
 

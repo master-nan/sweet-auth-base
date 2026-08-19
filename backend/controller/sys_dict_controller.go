@@ -77,6 +77,19 @@ func (t *DictController) GetSysDictByCode(ctx *gin.Context) {
 	resp.SetData(data)
 }
 
+// GetRuntimeDictByCode returns safe dictionary facts used to render authenticated pages.
+func (t *DictController) GetRuntimeDictByCode(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	code := utils.SanitizeInput(ctx.Param("code"))
+	data, err := t.sysDictService.GetRuntimeDictByCodeResponse(code)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(data)
+}
+
 // QuerySysDict 字典列表
 // @Summary 字典列表
 // @Description 根据查询条件查询字段列表

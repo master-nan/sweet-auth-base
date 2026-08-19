@@ -168,7 +168,6 @@ import {
   referenceLabel,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
@@ -177,12 +176,12 @@ import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const router = useRouter()
 const dictStore = useDictStore()
-const userStore = useUserStore()
 const {
   line_buttons,
   has_line_buttons,
   record_detail_top_buttons,
   record_detail_bottom_buttons,
+  hasGrantedCapability,
 } = usePageButtons('organization_position')
 const detailMode = useOrganizationDetailMode('organization_position', 'dialog')
 
@@ -190,10 +189,7 @@ const rows = ref<PositionListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
-const canQueryPositions = computed(() => userStore.buttons.includes('organization_position_query'))
-const canLoadPositionMetadata = computed(() =>
-  userStore.buttons.includes('organization_position_metadata'),
-)
+const canQueryPositions = computed(() => hasGrantedCapability('organization_position_query'))
 const queryState = useTableQueryState<PositionQueryRequest>({
   createInitialQuery: () => ({
     ...createOrganizationQuery('org_position'),
@@ -355,7 +351,7 @@ watch(
 onMounted(async () => {
   await Promise.all([
     dictStore.loadDicts(['org_position_type', 'org_object_status']),
-    canLoadPositionMetadata.value ? loadMetadata() : Promise.resolve(null),
+    loadMetadata(),
   ])
   const resolution = resolveRuntimeColumns<PositionListItem>(metadataFields.value, {
     context: { getDictLabel: dictStore.getDictLabel },

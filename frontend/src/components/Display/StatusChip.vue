@@ -1,5 +1,12 @@
 <template>
-  <q-chip dense square :outline="outline" :color="color" :icon="icon || undefined">
+  <q-chip
+    dense
+    square
+    :outline="outline"
+    :color="color"
+    :text-color="textColor || (outline ? undefined : 'white')"
+    :icon="icon || undefined"
+  >
     {{ label }}
   </q-chip>
 </template>
@@ -11,10 +18,12 @@ withDefaults(
     color: string
     icon?: string
     outline?: boolean
+    textColor?: string
   }>(),
   {
     icon: '',
     outline: true,
+    textColor: '',
   },
 )
 </script>

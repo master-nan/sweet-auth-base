@@ -15,6 +15,18 @@ export interface DictItem extends Basic {
   item_value: string
 }
 
+export interface RuntimeDict {
+  dict_name: string
+  dict_code: string
+  dict_items: RuntimeDictItem[]
+}
+
+export interface RuntimeDictItem {
+  item_name: string
+  item_code: string
+  item_value: string
+}
+
 export interface DictCreateReq {
   dict_name: string
   dict_code: string
@@ -52,6 +64,12 @@ export const useDictApi = () => {
   const queryDictByCode = async (code: string) => {
     return instance
       .get<ResponseData<Dict>>(`/admin/dict/code/${code}`, localLoadingRequestConfig)
+      .then((res) => res.data)
+  }
+
+  const queryRuntimeDictByCode = async (code: string) => {
+    return instance
+      .get<ResponseData<RuntimeDict>>(`/admin/runtime/dict/${code}`, localLoadingRequestConfig)
       .then((res) => res.data)
   }
 
@@ -108,6 +126,7 @@ export const useDictApi = () => {
     queryDict,
     queryDictById,
     queryDictByCode,
+    queryRuntimeDictByCode,
     createDict,
     updateDict,
     deleteDict,

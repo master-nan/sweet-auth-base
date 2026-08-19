@@ -7,7 +7,7 @@ const apiMocks = vi.hoisted(() => ({
   queryRetryPolicies: vi.fn(), getRetryPolicy: vi.fn(), createRetryPolicy: vi.fn(), updateRetryPolicy: vi.fn(),
   createRetryPolicyVersion: vi.fn(), enableRetryPolicy: vi.fn(), disableRetryPolicy: vi.fn(),
 }))
-const tableApiMocks = vi.hoisted(() => ({ queryTableByCode: vi.fn() }))
+const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const buttons = vi.hoisted(() => ({
   top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
   line: [
@@ -50,13 +50,13 @@ describe('retry policy management page', () => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     apiMocks.queryRetryPolicies.mockResolvedValue({ data: [row], total: 1 })
-    tableApiMocks.queryTableByCode.mockResolvedValue({ success: true, data: { table_fields: [] } })
+    tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({ success: true, data: { table_fields: [] } })
   })
 
   it('loads metadata and the policy page through the dynamic permission surface', async () => {
     const wrapper = mountPage()
     await flushPromises()
-    expect(tableApiMocks.queryTableByCode).toHaveBeenCalledWith('integration_retry_policy')
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_retry_policy')
     expect(apiMocks.queryRetryPolicies).toHaveBeenCalledWith(expect.objectContaining({ page: 1, num: 15 }))
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
   })

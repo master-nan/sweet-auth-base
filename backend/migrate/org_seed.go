@@ -523,6 +523,7 @@ func seedOrganizationMenusAndPermissions(db *gorm.DB, sf *utils.Snowflake) error
 
 func removeOrganizationViewRefreshButtons(db *gorm.DB) error {
 	codes := []string{
+		"organization_legal_entity_refresh",
 		"organization_structure_refresh",
 		"organization_employee_refresh",
 		"organization_position_refresh",

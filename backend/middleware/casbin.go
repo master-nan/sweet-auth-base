@@ -130,7 +130,7 @@ func allowAuthenticatedCommonRoute(objs []string, act string) bool {
 			if act == "POST" {
 				return true
 			}
-		case "/admin/user/me", "/admin/menu/my":
+		case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code":
 			if act == "GET" {
 				return true
 			}
@@ -175,7 +175,7 @@ func allowMissingCasbinPolicy(objs []string, act string) bool {
 			if act == "POST" {
 				return true
 			}
-		case "/admin/user/me", "/admin/menu/my":
+		case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code":
 			if act == "GET" {
 				return true
 			}

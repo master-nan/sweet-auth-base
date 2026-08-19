@@ -8,7 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   createInterfaceDefinition: vi.fn(), updateInterfaceDefinition: vi.fn(), createInterfaceDefinitionVersion: vi.fn(),
   enableInterfaceDefinition: vi.fn(), disableInterfaceDefinition: vi.fn(),
 }))
-const tableApiMocks = vi.hoisted(() => ({ queryTableByCode: vi.fn() }))
+const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const permissionCodes = vi.hoisted(() => [] as string[])
 const buttons = vi.hoisted(() => ({
   top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
@@ -24,7 +24,7 @@ vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
 vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
-vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true) }) }))
+vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true), hasGrantedCapability: (code: string) => permissionCodes.includes(code) }) }))
 vi.mock('src/composables/confirm-dialog', () => ({ useConfirmDialog: () => ({ confirmAction: vi.fn(() => ({ onOk: vi.fn() })) }) }))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({ default: { template: '<div><slot /></div>' } }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
@@ -35,6 +35,11 @@ vi.mock('./InterfaceDefinitionDetailDialog.vue', () => ({ default: { template: '
 import InterfaceDefinitionPage from './Index.vue'
 
 const SlotStub = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
+const ToolbarStub = defineComponent({
+  setup(_, { slots }) {
+    return () => h('div', Object.values(slots).flatMap((slot) => slot?.() || []))
+  },
+})
 const TableStub = defineComponent({
   name: 'QTable', props: { rows: { type: Array, default: () => [] } },
   setup(props, { slots }) { return () => h('section', { 'data-testid': 'table', 'data-row-count': props.rows.length }, [slots.top?.(), slots.bottom?.()]) },
@@ -47,6 +52,7 @@ let pinia: Pinia
 const mountPage = () => shallowMount(InterfaceDefinitionPage, { global: { plugins: [pinia], stubs: {
   BaseContent: SlotStub, QTable: TableStub, QInput: true, QSelect: true, QBtn: ButtonStub, QIcon: true, QSpace: true,
   QBadge: true, QTooltip: true, QChip: true, QTd: SlotStub, TablePagination: true, AdvancedQuery: true,
+  StandardTableToolbar: ToolbarStub,
   InterfaceDefinitionFormDialog: true, InterfaceDefinitionDetailDialog: true,
 } } })
 
@@ -59,12 +65,12 @@ describe('interface definition management page', () => {
     setActivePinia(pinia)
     permissionCodes.splice(0, permissionCodes.length, 'integration_retry_policy_query')
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
-    tableApiMocks.queryTableByCode.mockReset()
+    tableApiMocks.queryRuntimeTableByCode.mockReset()
     apiMocks.queryInterfaceDefinitions.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [system], total: 1 })
     apiMocks.queryRetryPolicies.mockResolvedValue({ data: [], total: 0 })
     apiMocks.queryCredentials.mockResolvedValue({ data: [], total: 0 })
-    tableApiMocks.queryTableByCode.mockResolvedValue({ data: { table_fields: [] } })
+    tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({ data: { table_fields: [] } })
   })
 
   it('does not request retry policies without independent query permission', async () => {
@@ -78,7 +84,7 @@ describe('interface definition management page', () => {
   it('loads metadata, systems and the paged interface list', async () => {
     const wrapper = mountPage()
     await flushPromises()
-    expect(tableApiMocks.queryTableByCode).toHaveBeenCalledWith('integration_interface_definition')
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_interface_definition')
     expect(apiMocks.queryExternalSystems).toHaveBeenCalled()
     expect(apiMocks.queryCredentials).toHaveBeenCalled()
     expect(apiMocks.queryInterfaceDefinitions).toHaveBeenCalledWith(expect.objectContaining({ page: 1, num: 15 }))

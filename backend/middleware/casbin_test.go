@@ -4,6 +4,7 @@ import (
 	"backend/model"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/casbin/casbin/v2"
@@ -63,24 +64,45 @@ func TestCasbinHandlerCompatibilityModeAllowsRouteWithoutPolicy(t *testing.T) {
 }
 
 func TestCasbinHandlerAllowsAuthenticatedCommonRouteWithoutPolicy(t *testing.T) {
+	for _, route := range []string{
+		"/admin/menu/my",
+		"/admin/runtime/dict/:code",
+		"/admin/runtime/table/:code",
+	} {
+		t.Run(route, func(t *testing.T) {
+			enforcer := newTestEnforcer(t)
+			called := false
+			router := gin.New()
+			router.Use(func(ctx *gin.Context) {
+				ctx.Set("user", model.SysUser{UserName: "tom", Roles: []model.SysRole{{Name: "audit_viewer"}}})
+				ctx.Next()
+			})
+			router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
+			router.GET(route, func(ctx *gin.Context) {
+				called = true
+				ctx.Status(http.StatusNoContent)
+			})
+
+			requestPath := strings.Replace(route, ":code", "example", 1)
+			req := httptest.NewRequest(http.MethodGet, requestPath, nil)
+			router.ServeHTTP(httptest.NewRecorder(), req)
+			if !called {
+				t.Fatalf("expected authenticated common route %s to pass without policy", route)
+			}
+		})
+	}
+}
+
+func TestCasbinHandlerRuntimeReadStillRequiresAuthenticatedUser(t *testing.T) {
 	enforcer := newTestEnforcer(t)
 	called := false
 	router := gin.New()
-	router.Use(func(ctx *gin.Context) {
-		ctx.Set("user", model.SysUser{UserName: "tom", Roles: []model.SysRole{{Name: "audit_viewer"}}})
-		ctx.Next()
-	})
 	router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
-	router.GET("/admin/menu/my", func(ctx *gin.Context) {
-		called = true
-		ctx.Status(http.StatusNoContent)
-	})
+	router.GET("/admin/runtime/dict/:code", func(ctx *gin.Context) { called = true })
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/menu/my", nil)
-	router.ServeHTTP(httptest.NewRecorder(), req)
-
-	if !called {
-		t.Fatal("expected authenticated common route to pass without policy")
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin/runtime/dict/example", nil))
+	if called {
+		t.Fatal("runtime dictionary route must reject unauthenticated users")
 	}
 }
 

@@ -171,6 +171,15 @@ func TestOrganizationFoundationRetiresLegacyLegalEntityMenuAndMigratesGrants(t *
 	); got != 5 {
 		t.Fatalf("migrated legal page grants = %d, want 5", got)
 	}
+	var legacyRefreshCount int64
+	if err := db.Unscoped().Model(&model.SysMenuButton{}).
+		Where("code = ?", "organization_legal_entity_refresh").
+		Count(&legacyRefreshCount).Error; err != nil {
+		t.Fatalf("count legacy legal entity view refresh buttons: %v", err)
+	}
+	if legacyRefreshCount != 0 {
+		t.Fatalf("legacy legal entity view refresh buttons = %d, want 0", legacyRefreshCount)
+	}
 }
 
 func organizationSeedCountSnapshot(t *testing.T, db *gorm.DB) map[string]int64 {

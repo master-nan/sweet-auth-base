@@ -14,15 +14,16 @@
       :loading="loading"
     >
       <template #top>
-        <div class="row q-gutter-xs full-width items-center">
-          <q-input v-model="query.quick_query!.keyword" dense outlined debounce="300" placeholder="搜索批次编号或任务" @keyup.enter="resetAndFetch">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
+          <q-input v-model="keyword" dense outlined debounce="300" placeholder="搜索批次编号或任务" @keyup.enter="handleBasicSearch">
             <template #append><q-icon name="search" /></template>
           </q-input>
           <q-select v-model="query.status" dense outlined emit-value map-options clearable :options="statusOptions" label="状态" style="min-width: 140px" @update:model-value="resetAndFetch" />
           <q-select v-model="query.trigger_type" dense outlined emit-value map-options clearable :options="triggerOptions" label="触发类型" style="min-width: 140px" @update:model-value="resetAndFetch" />
-          <q-btn color="primary" label="搜索" @click="resetAndFetch" />
-          <q-space />
-        </div>
+          <q-btn color="primary" label="搜索" @click="handleBasicSearch" />
+          </template>
+        </standard-table-toolbar>
       </template>
       <template #body-cell-batch_no="props">
         <q-td :props="props">
@@ -32,7 +33,7 @@
         </q-td>
       </template>
       <template #body-cell-trigger_type="props"><q-td :props="props">{{ triggerLabel(props.row.trigger_type) }}</q-td></template>
-      <template #body-cell-status="props"><q-td :props="props"><q-chip dense square outline :color="statusFor(props.row).color" :label="statusFor(props.row).label" /></q-td></template>
+      <template #body-cell-status="props"><q-td :props="props"><status-chip :color="statusFor(props.row).color" :label="statusFor(props.row).label" /></q-td></template>
       <template #body-cell-window="props"><q-td :props="props">{{ formatDate(props.row.window_start) }}<div class="text-caption text-grey-7">至 {{ formatDate(props.row.window_end) }}</div></q-td></template>
       <template #body-cell-checkpoint="props"><q-td :props="props">{{ formatDate(props.row.checkpoint_before) }}<div class="text-caption text-grey-7">至 {{ formatDate(props.row.checkpoint_after) }}</div></q-td></template>
       <template #body-cell-progress="props"><q-td :props="props">{{ props.row.current_slice_no }} / {{ props.row.planned_slice_count }}<div class="text-caption text-grey-7">Execution {{ props.row.execution_count }}</div></q-td></template>
@@ -41,6 +42,7 @@
       <template #body-cell-started_at="props"><q-td :props="props">{{ formatDate(props.row.started_at) }}</q-td></template>
       <template #body-cell-completed_at="props"><q-td :props="props">{{ formatDate(props.row.completed_at) }}</q-td></template>
       <template #bottom><q-space /><table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" /></template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
     <form-dialog-shell v-model="showDetail" title="同步批次详情" :subtitle="detail?.batch_no || '正在读取批次'" icon="view_timeline" readonly :loading="detailLoading" width="min(1040px, calc(100vw - 48px))">
@@ -81,6 +83,8 @@ import { type QTableProps, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import {
   type IntegrationExecutionListItem,
@@ -89,16 +93,17 @@ import {
   type SyncBatchQuery,
   useIntegrationApi,
 } from 'src/api/services/integration'
-import { useUserStore } from 'src/stores/user'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
+import { usePageButtons } from 'src/composables/page-buttons'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
-const $q = useQuasar()
 const router = useRouter()
+const $q = useQuasar()
 const api = useIntegrationApi()
-const userStore = useUserStore()
-const { loading } = storeToRefs(useLoadingStore())
+const loading = ref(false)
+const loadError = ref('')
+const { hasGrantedCapability } = usePageButtons('integration_sync_batch')
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
@@ -106,10 +111,10 @@ const showDetail = ref(false)
 const detailLoading = ref(false)
 const detail = ref<SyncBatchDetail | null>(null)
 const executions = ref<IntegrationExecutionListItem[]>([])
-const canQueryBatches = computed(() => userStore.buttons.includes('integration_sync_batch_query'))
-const canDetail = computed(() => userStore.buttons.includes('integration_sync_batch_detail'))
-const canQueryExecutions = computed(() => userStore.buttons.includes('integration_execution_query'))
-const canViewExecutionDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
+const canQueryBatches = computed(() => hasGrantedCapability('integration_sync_batch_query'))
+const canDetail = computed(() => hasGrantedCapability('integration_sync_batch_detail'))
+const canQueryExecutions = computed(() => hasGrantedCapability('integration_execution_query'))
+const canViewExecutionDetail = computed(() => hasGrantedCapability('integration_execution_detail'))
 const statusMeta = { created: { label: '待运行', color: 'grey-7' }, running: { label: '运行中', color: 'primary' }, succeeded: { label: '成功', color: 'positive' }, failed: { label: '失败', color: 'negative' } }
 const statusFor = (row: SyncBatchListItem) => statusMeta[row.status]
 const statusOptions = Object.entries(statusMeta).map(([value, item]) => ({ label: item.label, value }))
@@ -128,10 +133,13 @@ const columns: QTableProps['columns'] = [
   { name: 'started_at', label: '开始时间', field: 'started_at', align: 'left', sortable: true },
   { name: 'completed_at', label: '结束时间', field: 'completed_at', align: 'left', sortable: true },
 ]
-const query = ref<SyncBatchQuery>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ rules: [{ field: '', value: null }], nested: [] }] })
+const queryState = useTableQueryState<SyncBatchQuery>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ rules: [{ field: '', value: null }], nested: [] }] }) })
+const { query, keyword } = queryState
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const fetchData = async () => { if (!canQueryBatches.value) return; const result = await api.querySyncBatches(query.value); rows.value = result.data || []; total.value = result.total || 0 }
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryBatches.value, error: loadError.value, hasQuery: !!keyword.value || !!query.value.status || !!query.value.trigger_type }))
+const fetchData = async () => { if (!canQueryBatches.value) return; loading.value = true; loadError.value = ''; try { const result = await api.querySyncBatches(query.value); rows.value = result.data || []; total.value = result.total || 0 } catch { rows.value = []; total.value = 0; loadError.value = '同步批次加载失败' } finally { loading.value = false } }
 const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
+const handleBasicSearch = () => { queryState.submitQuickSearch(); resetAndFetch() }
 const openDetail = async (id: number) => {
   if (!canDetail.value) return
   showDetail.value = true
@@ -165,5 +173,5 @@ const detailItems = computed(() => detail.value ? [
 ] : [])
 onMounted(async () => { await fetchData(); initialized.value = true })
 watch(() => [query.value.page, query.value.num] as const, () => { if (initialized.value) void fetchData() })
-watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([field, descending]) => { if (!initialized.value) return; query.value.order = { field: field || '', is_asc: field ? !descending : false }; resetAndFetch() })
+watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([field, descending]) => { if (!initialized.value || !queryState.applySorting(field || '', descending, new Set(['batch_no', 'trigger_type', 'status', 'window_start', 'started_at', 'completed_at']))) return; resetAndFetch() })
 </script>

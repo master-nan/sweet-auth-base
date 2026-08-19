@@ -15,6 +15,7 @@ vi.mock('src/composables/page-buttons', () => ({
   usePageButtons: () => ({
     line_buttons: computed(() => detailButtons),
     top_buttons: computed(() => []),
+    hasGrantedCapability: (code: string) => permissionCodes.includes(code),
   }),
 }))
 vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))

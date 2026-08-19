@@ -17,13 +17,13 @@
       :loading="loading"
     >
       <template v-slot:top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
               dense
               outlined
               debounce="300"
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               placeholder="搜索关键词"
             >
               <template v-slot:append>
@@ -31,6 +31,8 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select
               v-model="visibleColumns"
               multiple
@@ -44,6 +46,8 @@
               option-value="name"
               options-cover
             />
+          </template>
+          <template #advanced-trigger>
             <q-btn
               outline
               icon="tune"
@@ -65,11 +69,8 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
-
-          <q-space />
-
-          <div class="row q-gutter-xs">
+          </template>
+          <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
               :key="btn.id"
@@ -78,16 +79,8 @@
               :disable="loading"
               @click="handleButtonClick(btn)"
             />
-            <q-btn
-              color="primary"
-              outline
-              icon="refresh"
-              label="刷新"
-              :disable="loading"
-              @click="fetchData"
-            />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template v-slot:body-cell-actions="props">
@@ -110,6 +103,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
     <advanced-query
@@ -220,10 +214,10 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 
 import { computed, ref, watch, onMounted } from 'vue'
 import { copyToClipboard, type QTableProps, useQuasar } from 'quasar'
-import cloneDeep from 'lodash/cloneDeep'
 
 import type { Query } from 'src/types/global'
 import {
@@ -233,31 +227,31 @@ import {
   type UserUpdateReq,
 } from 'src/api/services/sys-user'
 import { useRoleApi, type Role } from 'src/api/services/sys-role'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
 const { confirmAction, confirmDanger } = useConfirmDialog($q)
 const dictStore = useDictStore()
 const router = useRouter()
 
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 
 const sysUserApi = useSysUserApi()
 const roleApi = useRoleApi()
-const tableApi = useTableApi()
 
 const rows = ref<User[]>([])
 const total = ref(0)
@@ -267,7 +261,7 @@ const showAdvancedQuery = ref(false)
 
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('system_user')
 
-const action_handlers: Record<string, (row?: User) => void> = {
+const action_handlers: PageActionHandlers<User> = {
   create: () => openAddDialog(),
   update: (row) => {
     if (row) openEditDialog(row)
@@ -280,9 +274,7 @@ const action_handlers: Record<string, (row?: User) => void> = {
 }
 
 const handleButtonClick = (btn: MenuButton, row?: User) => {
-  const action = (btn.event_action || '').trim()
-  const handler = action_handlers[action]
-  if (handler) handler(row)
+  dispatchPageAction(btn, action_handlers, row)
 }
 
 const openRecordDetail = (tableCode: string, id: number) => {
@@ -311,9 +303,9 @@ const roleOptions = ref<Role[]>([])
 const selectedRoleIds = ref<number[]>([])
 
 const columns = ref<QTableProps['columns']>([])
-const table_fields_advanced = ref<TableField[]>([])
+const { fields: metadataFields, advancedSearchFields: table_fields_advanced, formFields: tableFields, loadMetadata } = useRuntimeTableMetadata('sys_user')
 const visibleColumns = ref<string[]>([])
-const tableFields = ref<TableField[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
 
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
@@ -326,23 +318,8 @@ const emptyAdvancedQuery = (): Query => ({
   ],
 })
 
-const query = ref<Query>({
-  page: 1,
-  num: 15,
-  order: {
-    field: '',
-    is_asc: false,
-  },
-  table_code: 'sys_user',
-  expressions: emptyAdvancedQuery().expressions,
-  quick_query: {
-    keyword: '',
-  },
-  include_deleted: false,
-})
-
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-const appliedAdvancedQuery = ref(cloneDeep(emptyAdvancedQuery()))
+const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, table_code: 'sys_user', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
+const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 
@@ -355,10 +332,6 @@ const pagination = ref({
   descending: false,
 })
 
-const initTempQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
-}
-
 const resetToFirstPageOrFetch = () => {
   if (query.value.page !== 1) {
     query.value.page = 1
@@ -368,31 +341,32 @@ const resetToFirstPageOrFetch = () => {
 }
 
 const handleBasicSearch = () => {
-  query.value.expressions = emptyAdvancedQuery().expressions
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.submitQuickSearch()
   resetToFirstPageOrFetch()
 }
 
 const handleAdvancedSearch = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   resetToFirstPageOrFetch()
   showAdvancedQuery.value = false
 }
 
 const fetchData = async () => {
-  const res = await sysUserApi.queryUser(query.value)
-  rows.value = res.data
-  total.value = res.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await sysUserApi.queryUser(query.value)
+    rows.value = res.data
+    total.value = res.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '用户列表加载失败'
+  } finally {
+    loading.value = false
+  }
 }
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value }))
 
 const openAddDialog = () => {
   currentEditData.value = null
@@ -589,22 +563,20 @@ const handleFormSubmit = async (formPayload: { data: User; isEdit: boolean; id?:
 
 // 获取表结构信息
 const fetchTableFields = async () => {
-  const res = await tableApi.queryTableByCode('sys_user')
-  if (res.data && res.data.table_fields) {
-    tableFields.value = res.data.table_fields
-    const dictCodes = res.data.table_fields.map((f) => f.dict_code).filter((c): c is string => !!c)
+  if (await loadMetadata()) {
+    const dictCodes = metadataFields.value.map((f) => f.dict_code).filter((c): c is string => !!c)
     const [, relationLookups] = await Promise.all([
       dictStore.loadDicts(dictCodes),
-      buildRelationLookups(res.data.table_fields),
+      buildRelationLookups(metadataFields.value),
     ])
 
-    const { columns: cols, advancedFields } = buildTableColumns(res.data.table_fields, {
+    const { columns: cols } = buildTableColumns(metadataFields.value, {
       getDictLabel: dictStore.getDictLabel,
       relationLookups,
     })
     columns.value = cols
-    table_fields_advanced.value = advancedFields
     visibleColumns.value = cols.map((c) => c.name)
+    sortableFields.value = new Set(metadataFields.value.filter((field) => field.is_sort).map((field) => field.field_code))
     if (!has_line_buttons.value) {
       visibleColumns.value = visibleColumns.value.filter((c) => c !== 'actions')
     }
@@ -636,10 +608,7 @@ watch(
     if (!initialized.value) return
     if (sortBy === prevSortBy && descending === prevDescending) return
 
-    // 同步排序到 query.order
-    query.value.order = query.value.order ?? { field: '', is_asc: false }
-    query.value.order.field = sortBy || ''
-    query.value.order.is_asc = sortBy ? !descending : false
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
 
     // 排序变化时，自动回到第1页
     if (query.value.page !== 1) {
@@ -656,7 +625,7 @@ watch(
   () => showAdvancedQuery.value,
   (isOpen) => {
     if (isOpen) {
-      initTempQuery()
+      queryState.beginAdvancedEdit()
     }
   },
 )

@@ -9,15 +9,16 @@
       row-key="id"
       :rows="rows"
       :columns="columns"
+      :visible-columns="visibleColumns"
       :loading="loading"
-      :pagination="{ rowsPerPage: 0 }"
+      v-model:pagination="pagination"
       hide-pagination
     >
       <template #top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               dense
               outlined
               debounce="300"
@@ -27,49 +28,31 @@
               <template #append><q-icon name="search" /></template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+          </template>
+          <template #advanced-trigger>
             <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
-          </div>
-          <q-space />
-          <div class="row q-gutter-xs">
-            <q-btn
-              flat
-              dense
-              round
-              icon="refresh"
-              color="primary"
-              aria-label="刷新当前视图"
-              :disable="loading"
-              @click="fetchData"
-            ><q-tooltip>刷新当前视图</q-tooltip></q-btn>
-          </div>
-        </div>
+          </template>
+          <template #column-selector><q-select v-model="visibleColumns" multiple outlined dense options-dense emit-value map-options :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')" :options="columns" option-value="name" options-cover /></template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-employment_status="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
-            outline
+          <status-chip
             :color="organizationStatusColor(props.row.employment_status)"
-          >
-            {{ dictLabel('org_employment_status', props.row.employment_status) }}
-          </q-chip>
+            :label="dictLabel('org_employment_status', props.row.employment_status)"
+          />
         </q-td>
       </template>
 
       <template #body-cell-binding_status="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
-            outline
+          <status-chip
             :color="props.row.binding_status === 'bound' ? 'positive' : 'grey-7'"
-          >
-            {{ dictLabel('org_user_binding_status', props.row.binding_status) }}
-          </q-chip>
+            :label="dictLabel('org_user_binding_status', props.row.binding_status)"
+          />
         </q-td>
       </template>
 
@@ -99,7 +82,7 @@
 
       <template #no-data>
         <div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ loadError || '暂无人员数据' }}
+          {{ emptyMessage }}
         </div>
       </template>
 
@@ -232,7 +215,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'organization_employee' })
 
-import cloneDeep from 'lodash/cloneDeep'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
@@ -240,6 +222,8 @@ import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   bindEmployeeUser,
   getEmployeeDetail,
@@ -257,16 +241,19 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { compactSelectionDisplay } from 'src/utils/select-display'
+import { resolveRuntimeColumns } from 'src/utils/column-format'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import type { TableColumn } from 'src/types/global'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import AssignmentScopeSwitch from 'src/pages/organization/employee/AssignmentScopeSwitch.vue'
 import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
 import {
-  createOrganizationField,
   createOrganizationQuery,
   formatOrganizationDate,
   formatOrganizationDateTime,
@@ -278,26 +265,24 @@ const $q = useQuasar()
 const router = useRouter()
 const { confirmAction } = useConfirmDialog($q)
 const dictStore = useDictStore()
-const userStore = useUserStore()
 const {
   line_buttons,
   record_detail_top_buttons,
   record_detail_bottom_buttons,
+  has_line_buttons,
+  hasGrantedCapability,
 } = usePageButtons('organization_employee')
 const detailMode = useOrganizationDetailMode('organization_employee', 'dialog')
 
 const rows = ref<EmployeeListItem[]>([])
-const canQueryEmployees = computed(() => userStore.buttons.includes('organization_employee_query'))
+const canQueryEmployees = computed(() => hasGrantedCapability('organization_employee_query'))
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
 const showAdvancedQuery = ref(false)
-const query = ref<EmployeeQueryRequest>({
-  ...createOrganizationQuery('org_employee'),
-  only_effective: true,
-  bound_status: 'all',
-})
-const tempAdvancedQuery = ref<EmployeeQueryRequest>(cloneDeep(query.value))
+const queryState = useTableQueryState<EmployeeQueryRequest>({ createInitialQuery: () => ({ ...createOrganizationQuery('org_employee'), only_effective: true, bound_status: 'all' }) })
+const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
+const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 
 const showDetailDialog = ref(false)
 const detailLoading = ref(false)
@@ -318,25 +303,10 @@ const bindingUserPage = ref(1)
 const bindingUserTotal = ref(0)
 let bindingUserRequestId = 0
 
-const columns: QTableProps['columns'] = [
-  { name: 'employee_no', field: 'employee_no', label: '员工编号', align: 'left', sortable: true },
-  { name: 'name', field: 'name', label: '姓名', align: 'left', sortable: true },
-  {
-    name: 'employment_status',
-    field: 'employment_status',
-    label: '人员状态',
-    align: 'center',
-  },
-  { name: 'binding_status', field: 'binding_status', label: '账号绑定', align: 'center' },
-  {
-    name: 'bound_account',
-    field: (row: EmployeeListItem) => row.bound_account?.user_name || '-',
-    label: '平台账号',
-    align: 'left',
-  },
-  { name: 'validity', field: 'validity', label: '有效期', align: 'left' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
-]
+const columns = ref<TableColumn<EmployeeListItem>[]>([])
+const visibleColumns = ref<string[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
+const { fields: metadataFields, advancedSearchFields: advancedFields, loadMetadata } = useRuntimeTableMetadata('org_employee')
 
 const assignmentColumns: QTableProps['columns'] = [
   {
@@ -361,23 +331,31 @@ const assignmentColumns: QTableProps['columns'] = [
   { name: 'validity', field: 'validity', label: '有效期', align: 'left' },
 ]
 
-const advancedFields = [
-  createOrganizationField('员工编号', 'employee_no'),
-  createOrganizationField('姓名', 'name'),
-  createOrganizationField('人员状态', 'employment_status', SysTableFieldType.VARCHAR, {
-    inputType: SysTableFieldInputType.SELECT,
-    dictCode: 'org_employment_status',
-  }),
-  createOrganizationField('账号绑定', 'user_id', SysTableFieldType.BIGINT, {
-    inputType: SysTableFieldInputType.INPUT_NUMBER,
-  }),
-  createOrganizationField('有效期开始', 'valid_from', SysTableFieldType.DATETIME, {
-    inputType: SysTableFieldInputType.DATE_PICKER,
-  }),
-  createOrganizationField('有效期结束', 'valid_to', SysTableFieldType.DATETIME, {
-    inputType: SysTableFieldInputType.DATE_PICKER,
-  }),
-]
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryEmployees.value, error: loadError.value, hasQuery: !!keyword.value || query.value.expressions.length > 0 }))
+
+const fetchMetadata = async () => {
+  if (!(await loadMetadata())) return
+  const resolution = resolveRuntimeColumns<EmployeeListItem>(metadataFields.value, {
+    context: { getDictLabel: dictLabel },
+    overrides: [
+      { fieldCode: 'employee_no', order: 1 },
+      { fieldCode: 'name', order: 2 },
+      { fieldCode: 'employment_status', align: 'center', order: 3 },
+      { fieldCode: 'user_id', visible: false },
+      { fieldCode: 'valid_from', visible: false },
+      { fieldCode: 'valid_to', visible: false },
+    ],
+    virtualColumns: [
+      { name: 'binding_status', field: 'binding_status', label: '账号绑定', align: 'center', order: 4 },
+      { name: 'bound_account', field: (row) => row.bound_account?.user_name || '-', label: '平台账号', order: 5 },
+      { name: 'validity', field: 'validity', label: '有效期', order: 6 },
+      { name: 'actions', field: 'actions', label: '操作', align: 'center', order: 100, defaultVisible: has_line_buttons.value },
+    ],
+  })
+  columns.value = resolution.columns
+  visibleColumns.value = resolution.visibleColumns
+  sortableFields.value = resolution.sortableFields
+}
 
 const dictLabel = (code: string, value: unknown) =>
   dictStore.getDictLabel(code, value) || formatOrganizationValue(value)
@@ -459,17 +437,18 @@ const visibleRowButtons = (row?: EmployeeListItem) => {
 }
 
 const search = () => {
+  queryState.submitQuickSearch()
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
 }
 
 const openAdvancedQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
+  queryState.beginAdvancedEdit()
   showAdvancedQuery.value = true
 }
 
 const applyAdvancedQuery = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   showAdvancedQuery.value = false
   search()
 }
@@ -672,13 +651,21 @@ watch(
   () => void fetchData(),
 )
 
+watch(
+  () => [pagination.value.sortBy, pagination.value.descending] as const,
+  ([field, descending]) => {
+    if (!queryState.applySorting(field || '', descending, sortableFields.value)) return
+    void fetchData()
+  },
+)
+
 onMounted(async () => {
   await dictStore.loadDicts([
     'org_employment_status',
     'org_user_binding_status',
     'org_assignment_type',
   ])
-  await fetchData()
+  await Promise.all([fetchMetadata(), fetchData()])
 })
 </script>
 

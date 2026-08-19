@@ -489,6 +489,8 @@ func strictCoverageException(route auditedRoute) bool {
 		{path: "/admin/logout", method: "POST"}:                              {},
 		{path: "/admin/user/me", method: "GET"}:                              {},
 		{path: "/admin/menu/my", method: "GET"}:                              {},
+		{path: "/admin/runtime/dict/:code", method: "GET"}:                   {},
+		{path: "/admin/runtime/table/:code", method: "GET"}:                  {},
 		{path: "/admin/user/password", method: "POST"}:                       {},
 		{path: "/admin/generalization/query/code/:code", method: "POST"}:     {},
 		{path: "/admin/generalization/detail/code/:code/:id", method: "GET"}: {},

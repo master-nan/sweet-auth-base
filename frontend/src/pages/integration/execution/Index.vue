@@ -37,7 +37,8 @@
               color="primary"
               :loading="loading"
               @click="refresh"
-            />
+              aria-label="刷新执行状态"
+            ><q-tooltip>刷新执行状态</q-tooltip></q-btn>
           </q-card-section>
         </q-card>
       </div>
@@ -56,9 +57,10 @@
       :loading="loading"
     >
       <template #top>
-        <div class="row q-gutter-xs full-width items-center">
+        <standard-table-toolbar :refreshing="loading" @refresh="refresh">
+          <template #quick-search>
           <q-input
-            v-model="query.quick_query!.keyword"
+            v-model="keyword"
             dense
             outlined
             debounce="300"
@@ -79,7 +81,8 @@
             style="min-width: 150px"
           />
           <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
-          <q-space />
+          </template>
+          <template #right-actions>
           <q-btn
             v-for="button in top_buttons"
             :key="button.id"
@@ -88,7 +91,8 @@
             :disable="loading"
             @click="handleButton(button)"
           />
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-execution_no="props">
@@ -106,10 +110,7 @@
       </template>
       <template #body-cell-status="props">
         <q-td :props="props"
-          ><q-chip
-            dense
-            square
-            outline
+          ><status-chip
             :color="statusMeta[props.row.status]?.color || 'grey'"
             :label="statusMeta[props.row.status]?.label || props.row.status"
         /></q-td>
@@ -163,6 +164,7 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
   </base-content>
 </template>
@@ -175,6 +177,8 @@ import { type QTableProps, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
   type IntegrationExecutionListItem,
@@ -183,34 +187,30 @@ import {
 } from 'src/api/services/integration'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useLoadingStore } from 'src/stores/loading'
-import { useUserStore } from 'src/stores/user'
-import { storeToRefs } from 'pinia'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
 const router = useRouter()
 const api = useIntegrationApi()
-const userStore = useUserStore()
-const { loading } = storeToRefs(useLoadingStore())
+const loading = ref(false)
+const loadError = ref('')
 const { confirmAction } = useConfirmDialog($q)
-const { line_buttons, top_buttons } = usePageButtons('integration_execution')
-const canQueryExecutions = computed(() => userStore.buttons.includes('integration_execution_query'))
-const canViewWorkerStatus = computed(() => userStore.buttons.includes('integration_worker_status'))
-const canViewDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
+const { line_buttons, top_buttons, hasGrantedCapability } = usePageButtons('integration_execution')
+const canQueryExecutions = computed(() => hasGrantedCapability('integration_execution_query'))
+const canViewWorkerStatus = computed(() => hasGrantedCapability('integration_worker_status'))
+const canViewDetail = computed(() => hasGrantedCapability('integration_execution_detail'))
 const rows = ref<IntegrationExecutionListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const query = ref<IntegrationExecutionQuery>({
-  page: 1,
-  num: 15,
-  order: { field: 'gmt_create', is_asc: false },
-  quick_query: { keyword: '' },
-  expressions: [],
-})
+const queryState = useTableQueryState<IntegrationExecutionQuery>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: 'gmt_create', is_asc: false }, quick_query: { keyword: '' }, expressions: [] }) })
+const { query, keyword } = queryState
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryExecutions.value, error: loadError.value, hasQuery: !!keyword.value || !!query.value.status }))
 const workerStatus = ref<IntegrationWorkerStatus>({
   enabled: false,
   running: false,
@@ -258,9 +258,19 @@ const columns: QTableProps['columns'] = [
 const formatDate = formatRuntimeDateTime
 const fetchData = async () => {
   if (!canQueryExecutions.value) return
-  const response = await api.queryExecutions(query.value)
-  rows.value = response.data || []
-  total.value = response.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const response = await api.queryExecutions(query.value)
+    rows.value = response.data || []
+    total.value = response.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = 'Execution 加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 const fetchWorker = async () => {
   if (!canViewWorkerStatus.value) return
@@ -272,7 +282,7 @@ const refresh = async () => {
   await fetchWorker().catch(() => undefined)
 }
 const search = () => {
-  query.value.page = 1
+  queryState.submitQuickSearch()
   void fetchData()
 }
 const openDetail = (row: IntegrationExecutionListItem) => {
@@ -297,10 +307,8 @@ const cancel = (row: IntegrationExecutionListItem) => {
     })()
   })
 }
-const handleButton = (button: MenuButton, row?: IntegrationExecutionListItem) => {
-  if (button.event_action === 'detail' && row) openDetail(row)
-  if (button.event_action === 'cancel' && row) cancel(row)
-}
+const handlers: PageActionHandlers<IntegrationExecutionListItem> = { detail: (row) => row && openDetail(row), cancel: (row) => row && cancel(row) }
+const handleButton = (button: MenuButton, row?: IntegrationExecutionListItem) => { dispatchPageAction(button, handlers, row) }
 onMounted(async () => {
   await refresh()
   initialized.value = true
@@ -309,6 +317,13 @@ watch(
   () => [query.value.page, query.value.num] as const,
   () => {
     if (initialized.value) void fetchData()
+  },
+)
+watch(
+  () => [pagination.value.sortBy, pagination.value.descending] as const,
+  ([field, descending]) => {
+    if (!initialized.value || !queryState.applySorting(field || '', descending, new Set(['execution_no']))) return
+    void fetchData()
   },
 )
 </script>

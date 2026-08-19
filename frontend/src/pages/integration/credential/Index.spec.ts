@@ -8,7 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   createCredential: vi.fn(), updateCredential: vi.fn(), rotateCredential: vi.fn(),
   enableCredential: vi.fn(), disableCredential: vi.fn(), revokeCredential: vi.fn(),
 }))
-const tableApiMocks = vi.hoisted(() => ({ queryTableByCode: vi.fn() }))
+const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const buttons = vi.hoisted(() => ({
   top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
   line: [
@@ -19,6 +19,7 @@ const buttons = vi.hoisted(() => ({
 }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
@@ -51,16 +52,16 @@ describe('credential management page', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
-    tableApiMocks.queryTableByCode.mockReset()
+    tableApiMocks.queryRuntimeTableByCode.mockReset()
     apiMocks.queryCredentials.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [system], total: 1 })
-    tableApiMocks.queryTableByCode.mockResolvedValue({ data: { table_fields: [] } })
+    tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({ data: { table_fields: [] } })
   })
 
   it('loads metadata, systems and the credential page without exposing secret fields', async () => {
     const wrapper = mountPage()
     await flushPromises()
-    expect(tableApiMocks.queryTableByCode).toHaveBeenCalledWith('integration_credential')
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_credential')
     expect(apiMocks.queryCredentials).toHaveBeenCalledWith(expect.objectContaining({ page: 1, num: 15 }))
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).not.toContain('secret')

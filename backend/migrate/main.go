@@ -1580,7 +1580,7 @@ func removeMenuButtonsByCode(db *gorm.DB, codes []string) error {
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		var buttonIDs []int
-		if err := tx.Model(&model.SysMenuButton{}).Where("code IN ?", codes).Pluck("id", &buttonIDs).Error; err != nil {
+		if err := tx.Unscoped().Model(&model.SysMenuButton{}).Where("code IN ?", codes).Pluck("id", &buttonIDs).Error; err != nil {
 			return err
 		}
 		if len(buttonIDs) == 0 {

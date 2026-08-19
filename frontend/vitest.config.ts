@@ -10,6 +10,7 @@ export default defineConfig({
       boot: fileURLToPath(new URL('./src/boot', import.meta.url)),
       pages: fileURLToPath(new URL('./src/pages', import.meta.url)),
       layouts: fileURLToPath(new URL('./src/layouts', import.meta.url)),
+      stores: fileURLToPath(new URL('./src/stores', import.meta.url)),
     },
   },
   test: {

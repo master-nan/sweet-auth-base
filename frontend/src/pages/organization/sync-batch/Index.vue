@@ -9,14 +9,14 @@
       :rows="rows"
       :columns="columns"
       :loading="loading"
-      :pagination="{ rowsPerPage: 0 }"
+      v-model:pagination="pagination"
       hide-pagination
     >
       <template #top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               dense
               outlined
               debounce="300"
@@ -26,24 +26,13 @@
               <template #append><q-icon name="search" /></template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+          </template>
+          <template #advanced-trigger>
             <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
-          </div>
-          <q-space />
-          <div class="row q-gutter-xs">
-            <q-btn
-              flat
-              dense
-              round
-              icon="refresh"
-              color="primary"
-              aria-label="刷新当前视图"
-              :disable="loading"
-              @click="fetchData"
-            ><q-tooltip>刷新当前视图</q-tooltip></q-btn>
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-sync_type="props">
@@ -51,9 +40,7 @@
       </template>
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip dense square outline :color="organizationStatusColor(props.row.status)">
-            {{ dictLabel('org_sync_record_status', props.row.status) }}
-          </q-chip>
+          <status-chip :color="organizationStatusColor(props.row.status)" :label="dictLabel('org_sync_record_status', props.row.status)" />
         </q-td>
       </template>
       <template #body-cell-started_at="props">
@@ -91,7 +78,7 @@
       </template>
       <template #no-data>
         <div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ loadError || '暂无同步批次' }}
+          {{ emptyMessage }}
         </div>
       </template>
       <template #bottom>
@@ -125,13 +112,14 @@
 <script setup lang="ts">
 defineOptions({ name: 'organization_sync_batch' })
 
-import cloneDeep from 'lodash/cloneDeep'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   getSyncBatchError,
   querySyncBatches,
@@ -140,6 +128,7 @@ import {
 } from 'src/api/services/org'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
 import {
@@ -151,23 +140,24 @@ import {
 } from 'src/pages/organization/organization-list-page'
 import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'
 import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const dictStore = useDictStore()
-const userStore = useUserStore()
 const router = useRouter()
-const { line_buttons } = usePageButtons('organization_sync_batch')
+const { line_buttons, hasGrantedCapability } = usePageButtons('organization_sync_batch')
 
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
-const query = ref<SyncBatchQueryRequest>(createOrganizationQuery('org_sync_batch'))
-const tempAdvancedQuery = ref<SyncBatchQueryRequest>(cloneDeep(query.value))
+const queryState = useTableQueryState<SyncBatchQueryRequest>({ createInitialQuery: () => createOrganizationQuery('org_sync_batch') })
+const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
+const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const showAdvancedQuery = ref(false)
-const canQueryBatches = computed(() => userStore.buttons.includes('organization_sync_batch_query'))
+const canQueryBatches = computed(() => hasGrantedCapability('organization_sync_batch_query'))
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryBatches.value, error: loadError.value, hasQuery: !!keyword.value }))
 
 const currentBatch = ref<SyncBatchListItem | null>(null)
 
@@ -223,17 +213,18 @@ const formatDuration = (startedAt?: string | null, completedAt?: string | null) 
 }
 
 const search = () => {
+  queryState.submitQuickSearch()
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
 }
 
 const openAdvancedQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
+  queryState.beginAdvancedEdit()
   showAdvancedQuery.value = true
 }
 
 const applyAdvancedQuery = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   showAdvancedQuery.value = false
   search()
 }
@@ -283,6 +274,14 @@ const handleRowAction = (button: MenuButton, row: SyncBatchListItem) => {
 watch(
   () => [query.value.page, query.value.num],
   () => void fetchData(),
+)
+
+watch(
+  () => [pagination.value.sortBy, pagination.value.descending] as const,
+  ([field, descending]) => {
+    if (!queryState.applySorting(field || '', descending, new Set(['batch_no', 'started_at']))) return
+    void fetchData()
+  },
 )
 
 onMounted(async () => {

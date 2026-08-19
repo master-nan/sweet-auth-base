@@ -16,6 +16,7 @@ vi.mock('src/composables/page-buttons', () => ({
   usePageButtons: () => ({
     record_detail_top_buttons: { value: [] },
     record_detail_bottom_buttons: { value: [] },
+    hasGrantedCapability: (code: string) => permissions.values.includes(code),
   }),
 }))
 

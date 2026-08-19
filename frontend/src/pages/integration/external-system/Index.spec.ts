@@ -14,7 +14,7 @@ const apiMocks = vi.hoisted(() => ({
 const routerPush = vi.hoisted(() => vi.fn())
 
 const tableApiMocks = vi.hoisted(() => ({
-  queryTableByCode: vi.fn(),
+  queryRuntimeTableByCode: vi.fn(),
 }))
 
 const permissionButtons = vi.hoisted(() => ({
@@ -181,7 +181,7 @@ describe('external system management page', () => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     routerPush.mockReset()
-    tableApiMocks.queryTableByCode.mockReset()
+    tableApiMocks.queryRuntimeTableByCode.mockReset()
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.getExternalSystem.mockResolvedValue({
       success: true,
@@ -189,7 +189,7 @@ describe('external system management page', () => {
     })
     apiMocks.createExternalSystem.mockResolvedValue({ success: true })
     apiMocks.updateExternalSystem.mockResolvedValue({ success: true })
-    tableApiMocks.queryTableByCode.mockResolvedValue({
+    tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({
       success: true,
       data: { table_fields: [{ field_code: 'system_code', field_name: '系统编码', is_list_show: true, is_sort: true, sequence: 1 }] },
     })
@@ -199,7 +199,7 @@ describe('external system management page', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(tableApiMocks.queryTableByCode).toHaveBeenCalledWith('integration_external_system')
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_external_system')
     expect(apiMocks.queryExternalSystems).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, num: 15, quick_query: { keyword: '' } }),
     )

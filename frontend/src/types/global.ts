@@ -53,20 +53,8 @@ export interface Query {
   menu_id?: number
 }
 
-export interface TreeTableRow {
-  id: number
-  children?: TreeTableRow[]
-  level?: number
-  name?: string
-  description?: string
-  status?: string
-  // createdAt?: string
-  // updatedAt?: string
-  [key: string]: any
-}
-
 // 定义表格列的接口
-export interface TableColumn<T = TreeTableRow> {
+export interface TableColumn<T = Record<string, unknown>> {
   name: string
   label: string
   field: string | ((row: T) => unknown)

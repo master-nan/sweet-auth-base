@@ -1776,7 +1776,7 @@ const handleFormButtonClick = (button: MenuButton, formData: Record<string, any>
 }
 
 const fetchTableMeta = async (tableCode: string) => {
-  const res = await tableApi.queryTableByCode(tableCode)
+  const res = await tableApi.queryRuntimeTableByCode(tableCode)
   if (res.data && res.data.table_fields) {
 		currentTable.value = res.data
     tableFields.value = res.data.table_fields

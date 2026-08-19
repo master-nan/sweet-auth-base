@@ -12,10 +12,11 @@
       :columns="columns"
       :loading="loading"
     >
-      <template #top
-        ><div class="row q-gutter-xs full-width items-center">
+      <template #top>
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
           <q-input
-            v-model="query.quick_query!.keyword"
+            v-model="keyword"
             dense
             outlined
             debounce="300"
@@ -38,30 +39,21 @@
             label="查询"
             :disable="loading"
             @click="search"
-          /><q-space /><q-btn
-            v-for="button in top_buttons"
-            :key="button.id"
-            v-bind="menuButtonDisplayProps(button)"
-            :color="button.color || 'primary'"
-            @click="search"
-          /></div
-      ></template>
+          />
+          </template>
+        </standard-table-toolbar>
+      </template>
       <template #body-cell-status="props"
         ><q-td :props="props"
-          ><q-chip
-            dense
-            square
-            outline
+          ><status-chip
             :color="statusMeta[props.row.status]?.color || 'grey'"
             :label="statusMeta[props.row.status]?.label || props.row.status" /></q-td
       ></template>
       <template #body-cell-result_certainty="props"
         ><q-td :props="props"
-          ><q-chip
-            dense
-            square
+          ><status-chip
             :color="props.row.result_certainty === 'confirmed' ? 'positive' : 'warning'"
-            text-color="white"
+            :outline="false"
             :label="props.row.result_certainty === 'confirmed' ? '结果已确认' : '结果未知'" /></q-td
       ></template>
       <template #body-cell-actions="props"
@@ -85,6 +77,7 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
     <q-dialog v-model="showDetail"
       ><q-card style="min-width: min(720px, 92vw)"
@@ -159,6 +152,8 @@ import { type QTableProps } from 'quasar'
 import { useRoute } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
   type IntegrationLogDetail,
@@ -166,37 +161,32 @@ import {
   type IntegrationLogQuery,
 } from 'src/api/services/integration'
 import { usePageButtons } from 'src/composables/page-buttons'
-import { useLoadingStore } from 'src/stores/loading'
-import { useUserStore } from 'src/stores/user'
-import { storeToRefs } from 'pinia'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const route = useRoute()
 const api = useIntegrationApi()
-const userStore = useUserStore()
-const { loading } = storeToRefs(useLoadingStore())
-const { line_buttons, top_buttons } = usePageButtons('integration_log')
+const loading = ref(false)
+const loadError = ref('')
+const { line_buttons, hasGrantedCapability } = usePageButtons('integration_log')
 const detailButtons = computed(() =>
   line_buttons.value.filter((button) => button.event_action === 'detail'),
 )
 const canViewDetail = computed(() => detailButtons.value.length > 0)
-const canQueryLogs = computed(() => userStore.buttons.includes('integration_log_query'))
+const canQueryLogs = computed(() => hasGrantedCapability('integration_log_query'))
 const rows = ref<IntegrationLogListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
 const showDetail = ref(false)
 const detail = ref<IntegrationLogDetail | null>(null)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const query = ref<IntegrationLogQuery>({
-  page: 1,
-  num: 15,
-  order: { field: 'started_at', is_asc: false },
-  quick_query: { keyword: '' },
-  expressions: [],
-})
+const queryState = useTableQueryState<IntegrationLogQuery>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: 'started_at', is_asc: false }, quick_query: { keyword: '' }, expressions: [] }) })
+const { query, keyword } = queryState
 if (typeof route.query.execution_no === 'string')
   query.value.execution_no = route.query.execution_no
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryLogs.value, error: loadError.value, hasQuery: !!keyword.value || !!query.value.status }))
 const statusOptions = [
   { label: '执行中', value: 'running' },
   { label: '成功', value: 'succeeded' },
@@ -233,12 +223,22 @@ const columns: QTableProps['columns'] = [
 ]
 const fetchData = async () => {
   if (!canQueryLogs.value) return
-  const response = await api.queryLogs(query.value)
-  rows.value = response.data || []
-  total.value = response.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const response = await api.queryLogs(query.value)
+    rows.value = response.data || []
+    total.value = response.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '调用日志加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 const search = () => {
-  query.value.page = 1
+  queryState.submitQuickSearch()
   void fetchData()
 }
 const openDetail = async (row: IntegrationLogListItem) => {

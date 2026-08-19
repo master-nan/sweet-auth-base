@@ -16,10 +16,10 @@
       hide-pagination
     >
       <template #top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               dense
               outlined
               debounce="300"
@@ -31,6 +31,8 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select
               v-model="visibleColumns"
               multiple
@@ -44,6 +46,8 @@
               option-value="name"
               options-cover
             />
+          </template>
+          <template #advanced-trigger>
             <q-btn
               outline
               icon="tune"
@@ -62,24 +66,17 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
-          <q-space />
-          <q-btn flat color="primary" icon="refresh" :disable="loading" @click="fetchData">
-            <q-tooltip>刷新</q-tooltip>
-          </q-btn>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-success="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
+          <status-chip
             :color="props.row.success ? 'positive' : 'negative'"
-            text-color="white"
-          >
-            {{ props.row.success ? '成功' : '失败' }}
-          </q-chip>
+            :outline="false"
+            :label="props.row.success ? '成功' : '失败'"
+          />
         </q-td>
       </template>
 
@@ -102,18 +99,6 @@
           >
             <q-tooltip>{{ btn.name }}</q-tooltip>
           </q-btn>
-          <q-btn
-            v-if="lineButtons.length === 0"
-            flat
-            round
-            color="primary"
-            icon="visibility"
-            size="sm"
-            data-testid="audit-open-detail"
-            @click="openDetail(props.row)"
-          >
-            <q-tooltip>查看详情</q-tooltip>
-          </q-btn>
         </q-td>
       </template>
 
@@ -121,6 +106,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
     <advanced-query
@@ -141,15 +127,14 @@ defineOptions({ name: 'system_audit' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import cloneDeep from 'lodash/cloneDeep'
 import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import type { TableField } from 'src/api/services/sys-table'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
 import type { Query } from 'src/types/global'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import type { MenuButton } from 'src/api/services/sys-menu'
@@ -157,14 +142,16 @@ import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/quer
 import { metadataDictDefault } from 'src/utils/field-metadata'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { executeButtonAction, type ButtonActionContext } from 'src/utils/button-handlers'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
 const router = useRouter()
 const accessLogApi = useAccessLogApi()
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 const { line_buttons: lineButtons } = usePageButtons('system_audit')
 
 const rows = ref<AccessLog[]>([])
@@ -182,23 +169,8 @@ const emptyAdvancedQuery = (): Query => ({
   ],
 })
 
-const query = ref<Query>({
-  page: 1,
-  num: 20,
-  order: {
-    field: 'gmt_create',
-    is_asc: false,
-  },
-  table_code: 'access_log',
-  expressions: emptyAdvancedQuery().expressions,
-  quick_query: {
-    keyword: '',
-  },
-  include_deleted: false,
-})
-
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-const appliedAdvancedQuery = ref<Query>(cloneDeep(emptyAdvancedQuery()))
+const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 20, order: { field: 'gmt_create', is_asc: false }, table_code: 'access_log', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
+const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 
@@ -308,10 +280,6 @@ function buildAuditField(
   }
 }
 
-const initTempQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
-}
-
 const resetToFirstPageOrFetch = () => {
   if (query.value.page !== 1) {
     query.value.page = 1
@@ -321,33 +289,32 @@ const resetToFirstPageOrFetch = () => {
 }
 
 const handleBasicSearch = () => {
-  query.value.expressions = emptyAdvancedQuery().expressions
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.submitQuickSearch()
   resetToFirstPageOrFetch()
 }
 
 const handleAdvancedSearch = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   resetToFirstPageOrFetch()
   showAdvancedQuery.value = false
 }
 
 const fetchData = async () => {
-  const response = await accessLogApi.queryAccessLogs(query.value)
-  if (response.success) {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const response = await accessLogApi.queryAccessLogs(query.value)
     rows.value = response.data || []
     total.value = response.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '审计日志加载失败'
+  } finally {
+    loading.value = false
   }
 }
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value }))
 
 const openDetail = async (row: AccessLog) => {
   await router.push({
@@ -382,9 +349,7 @@ watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([sortBy, descending], [prevSortBy, prevDescending]) => {
     if (sortBy === prevSortBy && descending === prevDescending) return
-    query.value.order = query.value.order ?? { field: 'gmt_create', is_asc: false }
-    query.value.order.field = sortBy || 'gmt_create'
-    query.value.order.is_asc = sortBy ? !descending : false
+    if (!queryState.applySorting(sortBy || 'gmt_create', descending, new Set(['gmt_create', 'user_name', 'action', 'resource_code', 'method', 'status_code', 'success', 'duration_ms']))) return
     resetToFirstPageOrFetch()
   },
 )
@@ -393,7 +358,7 @@ watch(
   () => showAdvancedQuery.value,
   (isOpen) => {
     if (isOpen) {
-      initTempQuery()
+      queryState.beginAdvancedEdit()
     }
   },
 )

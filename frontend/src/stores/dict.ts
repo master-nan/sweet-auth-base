@@ -97,7 +97,7 @@ export const useDictStore = defineStore('dict', {
 
       try {
         const dictApi = useDictApi()
-        const result = await dictApi.queryDictByCode(dictCode)
+        const result = await dictApi.queryRuntimeDictByCode(dictCode)
 
         if (result.data && result.data.dict_items) {
           const formattedOptions = result.data.dict_items.map((item) => ({

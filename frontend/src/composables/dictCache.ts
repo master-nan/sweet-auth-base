@@ -22,7 +22,7 @@ export function useDictCache() {
     }
 
     try {
-      const result = await dictApi.queryDictByCode(dictCode)
+      const result = await dictApi.queryRuntimeDictByCode(dictCode)
       if (result.data && result.data.dict_items) {
         // 存入缓存
         dictCache.value[dictCode] = result.data.dict_items

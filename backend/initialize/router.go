@@ -88,6 +88,7 @@ func InitRouter(app *App) *gin.Engine {
 		// 字典
 		adminGroup.GET("/dict/id/:id", app.DictController.GetSysDictById)
 		adminGroup.GET("/dict/code/:code", app.DictController.GetSysDictByCode)
+		adminGroup.GET("/runtime/dict/:code", app.DictController.GetRuntimeDictByCode)
 		adminGroup.POST("/dict/query", app.DictController.QuerySysDict)
 		adminGroup.POST("/dict", app.DictController.CreateSysDict)
 		adminGroup.PUT("/dict/:id", app.DictController.UpdateSysDict)
@@ -103,6 +104,7 @@ func InitRouter(app *App) *gin.Engine {
 		// 数据表
 		adminGroup.GET("/table/id/:id", app.TableController.GetTableByID)
 		adminGroup.GET("/table/code/:code", app.TableController.GetTableByCode)
+		adminGroup.GET("/runtime/table/:code", app.TableController.GetRuntimeTableByCode)
 		adminGroup.POST("/table/query", app.TableController.QueryTable)
 		adminGroup.POST("/table", app.TableController.CreateTable)
 		adminGroup.PUT("/table/:id", app.TableController.UpdateTable)

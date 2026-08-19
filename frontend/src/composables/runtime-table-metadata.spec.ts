@@ -9,7 +9,7 @@ import {
 } from 'src/types/enum'
 
 vi.mock('src/api/services/sys-table', () => ({
-  useTableApi: () => ({ queryTableByCode: vi.fn() }),
+  useTableApi: () => ({ queryRuntimeTableByCode: vi.fn() }),
 }))
 
 describe('useRuntimeTableMetadata', () => {

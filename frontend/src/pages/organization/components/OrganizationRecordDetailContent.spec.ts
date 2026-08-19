@@ -160,7 +160,7 @@ describe('OrganizationRecordDetailContent', () => {
     expect(wrapper.text()).not.toContain('员工编号')
   })
 
-  it('uses the platform detail page header and field grid in page mode', () => {
+  it('uses the platform detail page header and field grid in page mode', async () => {
     const wrapper = mount(OrganizationRecordDetailContent, {
       props: {
         mode: 'page',
@@ -194,5 +194,12 @@ describe('OrganizationRecordDetailContent', () => {
     expect(wrapper.find('.detail-field-grid--card').exists()).toBe(true)
     expect(wrapper.text()).toContain('同步批次详情：BATCH-001')
     expect(wrapper.text()).toContain('批次号')
+
+    const refreshButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('刷新'))
+    expect(refreshButton).toBeDefined()
+    await refreshButton?.trigger('click')
+    expect(wrapper.emitted('refresh')).toHaveLength(1)
   })
 })

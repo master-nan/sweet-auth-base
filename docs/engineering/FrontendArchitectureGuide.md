@@ -177,7 +177,7 @@ resolveRuntimeColumns(metadataFields, {
 
 ### 5.4 列宽
 
-当前 Runtime Metadata 没有列表列宽字段。FE-002 没有增加 `list_width`：现有字段类型默认值和页面 Override 已能覆盖参考页面，暂时没有足够价值为列宽增加持久化契约。未来只有在多个 Metadata 页面确需统一默认宽度时，才评审可空、受控正整数 `list_width`；`min-width`、`max-width`、对齐和特殊布局仍由前端管理。
+当前 Runtime Metadata 没有列表列宽字段。现有字段类型默认值和页面 Override 已能覆盖正式页面，暂时没有足够价值为列宽增加持久化契约。未来只有在多个 Metadata 页面确需统一默认宽度时，才评审可空、受控正整数 `list_width`；`min-width`、`max-width`、对齐和特殊布局仍由前端管理。
 
 不得把组件名、CSS class、slot 名或 renderer 名称写入 Metadata。
 
@@ -188,7 +188,7 @@ V1 采用页面会话状态：
 - 默认值来自 `defaultVisibleColumns`；
 - 用户在当前页面可临时调整；
 - 不在每个页面各自写 LocalStorage key；
-- FE-002 不建设后端个人偏好表。
+- 当前不建设后端个人偏好表。
 
 以后如需跨会话偏好，应由统一用户偏好能力提供，并与 Query Center 的默认/保存查询方案分开。
 
@@ -205,7 +205,7 @@ V1 采用页面会话状态：
 - Top Buttons；
 - 页面扩展 slot。
 
-FE-002 可以新增窄职责 `StandardTableToolbar`，但不得让它请求数据、解析 Metadata、分发领域动作或成为超级组件。Quasar 的 `row`、`items-center`、`q-gutter-*`、`q-space` 和响应式 class 负责布局。
+`StandardTableToolbar` 是标准列表与主从列表的窄职责 Toolbar，不得让它请求数据、解析 Metadata、分发领域动作或成为超级组件。Quasar 的 `row`、`items-center`、`q-gutter-*`、`q-space` 和响应式 class 负责布局。
 
 ### 6.2 Quick Search
 
@@ -310,7 +310,7 @@ menu.name == route.name == defineOptions.name == usePageButtons(pageCode)
 create, edit, detail, delete, enable, disable, revoke, version, run
 ```
 
-FE-002 可提供通用动作匹配、确认和导航 helper；页面只绑定实际支持的动作。Credential rotate、Assignment bind、Execution retry 等领域动作继续留在领域页面，不进入全局 switch。
+公共 helper 提供通用动作匹配、确认和导航；页面只绑定实际支持的动作。Credential rotate、Assignment bind、Execution retry 等领域动作继续留在领域页面，不进入全局 switch。
 
 删除、吊销、停用等危险操作统一使用 `useConfirmDialog`。不得每页维护一个相同的确认 Dialog。
 
@@ -409,7 +409,7 @@ margin、padding、flex、对齐、常见宽高、基础文字色和基础边框
 
 ## 14. i18n 决策
 
-当前产品冻结为中文管理平台。`vue-i18n` 继续服务登录、布局、菜单和路由等已有框架级文本，但 FE-002/003 不开展全量业务页面翻译，也不宣称产品已经支持完整双语。
+当前产品冻结为中文管理平台。`vue-i18n` 继续服务登录、布局、菜单和路由等已有框架级文本；当前不开展全量业务页面翻译，也不宣称产品已经支持完整双语。
 
 规则：
 
@@ -425,10 +425,18 @@ margin、padding、flex、对齐、常见宽高、基础文字色和基础边框
 - 页面调用 `frontend/src/api/services/` 中的领域 API；
 - 页面不得直接导入原生 Axios、拼固定 API URL 或调用 `instance.get/post`；
 - 服务器配置的动态按钮 URL 只能通过受控 Dynamic Action API 边界执行；
-- `AdvancedQuery`、`DynamicFormDialog` 和列关联查询可读取 Runtime 通用数据，但 FE-002 应把直接 `instance` 调用收口到窄职责 Runtime API Service；
+- `AdvancedQuery`、`DynamicFormDialog` 和列关联查询通过窄职责 Runtime API Service 读取通用数据；
 - API Service 不处理页面通知、Dialog 或路由。
 
-### 15.2 类型放置
+### 15.2 Runtime Read 与管理权限
+
+- 字典展示读取使用 `/admin/runtime/dict/:code`，Metadata 展示读取使用 `/admin/runtime/table/:code`；
+- Runtime Read 只要求已认证会话，返回经过白名单投影的字典项或字段事实，不要求 Dictionary/SysTable 管理权限；
+- `/admin/dict/*` 和 `/admin/table/*` 继续属于配置管理 API，页面不得为了展示标签或列定义调用它们；
+- Runtime Read 不是业务数据授权。页面查询、详情和业务动作仍分别接受 MenuButton、Casbin 和 Data Permission 校验；
+- Runtime API 不返回管理审计字段、内部标识、受保护字段或配置秘密。
+
+### 15.3 类型放置
 
 | 类型 | 位置 |
 | --- | --- |
@@ -492,13 +500,13 @@ Integration 配置页是标准列表页的首选参考族。External System、In
 
 ### 19.3 System 与 Develop
 
-System/Develop 是历史页面主要迁移区。User、Role、Application、SMS、Audit、Database、Dictionary 已复用部分平台能力，但查询、列、Toolbar、样式和动作仍需逐步迁移。Menu、Data Permission 和 Database 属于复杂配置页面，不强制套普通列表。
+User、Role、Application、SMS、Audit 和 Dictionary 已使用统一查询、Toolbar、按钮与局部状态能力。Menu、Data Permission 和 Database 属于复杂配置页面，复用适用的公共能力，但不强制套普通列表。
 
 ### 19.4 Report
 
 Report 标记为 `REPORT_DEFERRED`。Frontend Consistency 只修复公共安全、Theme、Accessibility 和 API 边界问题，不重写 Report 设计器、运行态、Prototype 或产品模式。
 
-## 20. 公共机制与迁移顺序
+## 20. 公共机制与页面覆盖
 
 ### 20.1 已建立的公共能力
 
@@ -511,15 +519,16 @@ Report 标记为 `REPORT_DEFERRED`。Frontend Consistency 只修复公共安全�
 7. Page Capability helper、公共动作分发和统一确认；
 8. `table-state.ts` 的无数据、无结果、无权限和错误最低文案。
 
-参考实现为 Integration External System、Integration Retry Policy、System Application 和 Organization Position。它们证明公共 Pattern 可以保留组合列、状态映射、业务按钮和领域 formatter。
+Integration 配置页、System 标准列表和 Organization Position 是标准参考。它们证明公共 Pattern 可以保留组合列、状态映射、业务按钮和领域 formatter。
 
-### 20.2 FE-003 页面迁移
+### 20.2 页面覆盖规则
 
-1. Integration 配置页作为第一批；
-2. Organization 列表、树和同步只读页按领域 Pattern 迁移；
-3. System/Develop 历史页面分批迁移；
-4. Login/Dashboard 只核对 Theme、API、i18n 和 Accessibility；
-5. Report 保持 `REPORT_DEFERRED`。
+1. Integration 配置页使用标准实体列表 Pattern，Execution、Log、Sync Batch 使用只读 Runtime Pattern；
+2. Organization 标准列表使用公共机制，组织树、Assignment 和同步诊断保留领域 Pattern；
+3. System 标准列表使用公共机制，Menu 和 Data Permission 保留复杂配置 Pattern；
+4. Dictionary 使用主从列表 Pattern，Database 和 Generalization 保留复杂 Runtime/配置布局；
+5. Login、Dashboard、Change Password 和 404 不套 CRUD Pattern；
+6. Report 保持 `REPORT_DEFERRED`。
 
 ## 21. 架构保护规则
 

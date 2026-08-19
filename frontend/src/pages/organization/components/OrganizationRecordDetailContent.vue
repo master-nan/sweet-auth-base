@@ -31,6 +31,14 @@
           @click="emit('button-click', button)"
         />
         <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="emit('close')" />
+        <q-btn
+          outline
+          color="primary"
+          icon="refresh"
+          label="刷新"
+          :loading="loading"
+          @click="emit('refresh')"
+        />
       </div>
     </header>
 
@@ -121,6 +129,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   close: []
+  refresh: []
   'button-click': [button: MenuButton]
 }>()
 

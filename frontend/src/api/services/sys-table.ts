@@ -221,6 +221,15 @@ export const useTableApi = () => {
       .then((res) => res.data)
   }
 
+  const queryRuntimeTableByCode = async (code: string) => {
+    return instance
+      .get<ResponseData<RuntimeTableMetadata>>(
+        `/admin/runtime/table/${code}`,
+        localLoadingRequestConfig,
+      )
+      .then((res) => res.data)
+  }
+
   const createTable = async (req: TableCreateReq) => {
     return instance.post<ResponseData<BigInteger>>('/admin/table', req).then((res) => {
       return res.data
@@ -365,6 +374,7 @@ export const useTableApi = () => {
     queryTable,
     queryTableById,
     queryTableByCode,
+    queryRuntimeTableByCode,
     createTable,
     updateTable,
     deleteTable,

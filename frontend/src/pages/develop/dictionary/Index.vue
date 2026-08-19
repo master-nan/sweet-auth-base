@@ -1,5 +1,8 @@
 <template>
-  <base-content class="q-pa-sm dictionary-page">
+  <base-content
+    class="q-pa-sm dictionary-page"
+    :class="{ 'dictionary-page--dark': $q.dark.isActive }"
+  >
     <div class="dictionary-workspace">
       <master-detail-page
         :mode="SysMasterDetailMode.SUMMARY"
@@ -9,28 +12,21 @@
         min-height="calc(100vh - 142px)"
       >
         <template #master-actions>
-          <q-btn
-            v-for="btn in masterTopButtons"
-            :key="btn.id"
-            v-bind="menuButtonDisplayProps(btn, { label: masterButtonLabel(btn) })"
-            dense
-            color="primary"
-            :disable="loading"
-            @click="handleButtonClick(btn)"
-          >
-            <q-tooltip>{{ btn.name }}</q-tooltip>
-          </q-btn>
-          <q-btn
-            outline
-            round
-            dense
-            color="primary"
-            icon="refresh"
-            @click="fetchData"
-            :loading="loading"
-          >
-            <q-tooltip>刷新列表</q-tooltip>
-          </q-btn>
+          <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+            <template #right-actions>
+              <q-btn
+                v-for="btn in masterTopButtons"
+                :key="btn.id"
+                v-bind="menuButtonDisplayProps(btn, { label: masterButtonLabel(btn) })"
+                dense
+                color="primary"
+                :disable="loading"
+                @click="handleButtonClick(btn)"
+              >
+                <q-tooltip>{{ btn.name }}</q-tooltip>
+              </q-btn>
+            </template>
+          </standard-table-toolbar>
         </template>
 
         <template #master-toolbar>
@@ -41,7 +37,7 @@
                 dense
                 outlined
                 debounce="300"
-                v-model="query.quick_query!.keyword"
+                v-model="keyword"
                 placeholder="搜索字典名称 / 编码"
               >
                 <template v-slot:append>
@@ -95,7 +91,7 @@
             </q-item>
 
             <q-item v-if="rows.length === 0 && !loading">
-              <q-item-section class="text-center text-grey"> 暂无字典数据 </q-item-section>
+              <q-item-section class="text-center text-grey"> {{ listEmptyMessage }} </q-item-section>
             </q-item>
 
             <q-item v-if="loading">
@@ -136,54 +132,41 @@
         </template>
 
         <template #detail-toolbar>
-          <div class="dictionary-detail-toolbar">
-            <q-btn
-              v-for="btn in detailTopButtons"
-              :key="btn.id"
-              v-bind="menuButtonDisplayProps(btn, { label: detailButtonLabel(btn) })"
-              dense
-              color="primary"
-              :disable="!currentDict"
-              @click="handleButtonClick(btn)"
-            >
-              <q-tooltip>{{ btn.name }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              outline
-              dense
-              color="primary"
-              icon="cached"
-              label="刷新缓存"
-              :disable="!currentDict"
-              @click="refreshDictCache"
-            />
-            <q-input
-              class="detail-search"
-              dense
-              outlined
-              debounce="300"
-              v-model="itemSearchText"
-              placeholder="搜索字典项名称 / 编码 / 值"
-              :disable="!currentDict"
-            >
-              <template v-slot:append>
-                <q-icon name="search" />
-              </template>
-            </q-input>
-            <q-btn
-              class="detail-refresh-btn"
-              outline
-              round
-              dense
-              color="primary"
-              icon="refresh"
-              @click="refreshDictItems"
-              :loading="itemsLoading"
-              :disable="!currentDict"
-            >
-              <q-tooltip>刷新字典项</q-tooltip>
-            </q-btn>
-          </div>
+          <standard-table-toolbar
+            class="dictionary-detail-toolbar"
+            :refreshing="itemsLoading"
+            :disabled="!currentDict"
+            @refresh="refreshDictItems"
+          >
+            <template #quick-search>
+              <q-input
+                class="detail-search"
+                dense
+                outlined
+                debounce="300"
+                v-model="itemSearchText"
+                placeholder="搜索字典项名称 / 编码 / 值"
+                :disable="!currentDict"
+              >
+                <template v-slot:append>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+            </template>
+            <template #right-actions>
+              <q-btn
+                v-for="btn in detailTopButtons"
+                :key="btn.id"
+                v-bind="menuButtonDisplayProps(btn, { label: detailButtonLabel(btn) })"
+                dense
+                color="primary"
+                :disable="!currentDict"
+                @click="handleButtonClick(btn)"
+              >
+                <q-tooltip>{{ btn.name }}</q-tooltip>
+              </q-btn>
+            </template>
+          </standard-table-toolbar>
         </template>
 
         <template #detail-content>
@@ -255,6 +238,7 @@ defineOptions({ name: 'develop_dictionary' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import {
@@ -263,11 +247,10 @@ import {
   type Dict,
   type DictItem,
 } from 'src/api/services/sys-dict'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import cloneDeep from 'lodash/cloneDeep'
 import { useDictCache } from 'src/composables/dictCache'
 import { useDictStore } from 'src/stores/dict'
@@ -277,15 +260,15 @@ import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 const dictStore = useDictStore()
 
 const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)
 const dictApi = useDictApi()
-const tableApi = useTableApi()
 const dictCache = useDictCache()
 const rows = ref<Dict[]>([])
 const total = ref(0)
@@ -391,15 +374,12 @@ const showDictItemFormDialog = ref(false)
 const currentEditDictItem = ref<DictItemUpdateReq | null>(null)
 
 // 表格列定义
-const columns = ref<QTableProps['columns']>([])
 const itemColumns = ref<QTableProps['columns']>([])
 const rawDictItemColumns = ref<QTableProps['columns']>([])
-const table_fields_advanced = ref<TableField[]>([])
-const visibleColumns = ref<string[]>([])
 
-// 字典和字典项字段定义
-const dictFields = ref<TableField[]>([])
-const dictItemFields = ref<TableField[]>([])
+const { fields: dictMetadataFields, formFields: dictFields, loadMetadata: loadDictMetadata } = useRuntimeTableMetadata('sys_dict')
+const { fields: dictItemMetadataFields, formFields: runtimeDictItemFields, loadMetadata: loadDictItemMetadata } = useRuntimeTableMetadata('sys_dict_item')
+const dictItemFields = computed(() => runtimeDictItemFields.value.filter((field) => field.field_code !== 'dict_id'))
 
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
@@ -414,30 +394,25 @@ const emptyAdvancedQuery = (): Query => ({
 })
 
 // 查询参数
-const query = ref<Query>({
-  page: 1,
-  num: 15,
-  order: {
-    field: '',
-    is_asc: false,
-  },
-  table_code: 'sys_dict',
-  expressions: emptyAdvancedQuery().expressions,
-  quick_query: {
-    keyword: '',
-  },
-  include_deleted: false,
-})
+const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, table_code: 'sys_dict', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
+const { query, keyword } = queryState
+const listEmptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value }))
 
 // 获取字典列表数据
 const fetchData = async () => {
+  loading.value = true
+  loadError.value = ''
   try {
     const res = await dictApi.queryDict(query.value)
     rows.value = res.data
     total.value = res.total || 0
     await syncCurrentDictAfterFetch()
-  } catch (error) {
-    console.error('获取字典列表失败', error)
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '字典列表加载失败'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -468,6 +443,7 @@ const resetToFirstPageOrFetch = () => {
 }
 
 const handleBasicSearch = () => {
+  queryState.submitQuickSearch()
   clearCurrentSelection()
   resetToFirstPageOrFetch()
 }
@@ -504,28 +480,6 @@ const fetchDictItems = async (dictId: number) => {
 const refreshDictItems = async () => {
   if (currentDict.value) {
     await fetchDictItems(currentDict.value.id)
-  }
-}
-
-// 刷新字典缓存
-const refreshDictCache = () => {
-  if (!currentDict.value) return
-
-  try {
-    // 清除缓存
-    dictCache.clearDictCache(currentDict.value.dict_code)
-    $q.notify({
-      type: 'positive',
-      position: 'top-right',
-      message: `字典 ${currentDict.value.dict_name} 缓存已刷新`,
-    })
-  } catch (error) {
-    console.error('刷新字典缓存失败', error)
-    $q.notify({
-      type: 'negative',
-      position: 'top-right',
-      message: '刷新字典缓存失败',
-    })
   }
 }
 
@@ -669,63 +623,24 @@ const handleDictItemFormSubmit = async (formData: { data: any; isEdit: boolean; 
 // 获取表结构信息
 const fetchTableFields = async () => {
   try {
-    // 获取字典表字段
-    const dictTableRes = await tableApi.queryTableByCode('sys_dict')
-    if (dictTableRes.data && dictTableRes.data.table_fields) {
-      // 过滤字典表字段，只保留需要在表单中显示的字段
-      dictFields.value = dictTableRes.data.table_fields.filter(
-        (field) => field.is_insert_show || field.is_update_show,
-      )
-
-      // 加载字典数据
-      const dictCodes1 = dictTableRes.data.table_fields
+    if (await loadDictMetadata()) {
+      const dictCodes1 = dictMetadataFields.value
         .map((f) => f.dict_code)
         .filter((c): c is string => !!c)
       await dictStore.loadDicts(dictCodes1)
-
-      // 构建字典表格列
-      const { columns: cols, advancedFields } = buildTableColumns(dictTableRes.data.table_fields, {
-        getDictLabel: dictStore.getDictLabel,
-      })
-      // 字典表不需要操作列，移除 buildTableColumns 自动添加的
-      columns.value = cols.filter((c) => c.name !== 'actions')
-      table_fields_advanced.value = advancedFields
-      visibleColumns.value = columns.value.map((c) => c.name)
     }
 
-    // 获取字典项表字段
-    const dictItemTableRes = await tableApi.queryTableByCode('sys_dict_item')
-    if (dictItemTableRes.data && dictItemTableRes.data.table_fields) {
-      // 过滤字典项表字段，移除不需要用户填写的字段
-      dictItemFields.value = dictItemTableRes.data.table_fields.filter(
-        (field) =>
-          // 排除dict_id字段，这个字段会自动设置
-          field.field_code !== 'dict_id' && (field.is_insert_show || field.is_update_show),
-      )
-      // 加载字典项字典数据
-      const dictCodes2 = dictItemTableRes.data.table_fields
+    if (await loadDictItemMetadata()) {
+      const dictCodes2 = dictItemMetadataFields.value
         .map((f) => f.dict_code)
         .filter((c): c is string => !!c)
       await dictStore.loadDicts(dictCodes2)
 
-      const { columns: itemCols } = buildTableColumns(dictItemTableRes.data.table_fields, {
+      const { columns: itemCols } = buildTableColumns(dictItemMetadataFields.value, {
         getDictLabel: dictStore.getDictLabel,
       })
       rawDictItemColumns.value = itemCols
       refreshDictItemColumns()
-
-      // 对字段进行排序，使重要字段显示在前面
-      dictItemFields.value.sort((a, b) => {
-        // 优先展示名称、编码和值字段
-        const priorityFields = ['item_name', 'item_code', 'item_value']
-        const aIndex = priorityFields.indexOf(a.field_code)
-        const bIndex = priorityFields.indexOf(b.field_code)
-
-        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-        if (aIndex !== -1) return -1
-        if (bIndex !== -1) return 1
-        return a.sequence - b.sequence
-      })
     }
     await fetchData()
   } catch (error) {
@@ -758,7 +673,22 @@ watch(
 
 <style scoped lang="scss">
 .dictionary-page {
-  background: #f5f7fb;
+  --dictionary-page: #f5f7fb;
+  --dictionary-surface: #fff;
+  --dictionary-border: #e3e8f2;
+  --dictionary-text: #172033;
+  --dictionary-muted: #657189;
+  --dictionary-selected: linear-gradient(90deg, #f3f1ff, #fff 72%);
+  background: var(--dictionary-page);
+}
+
+.dictionary-page--dark {
+  --dictionary-page: var(--app-dark-page);
+  --dictionary-surface: var(--app-dark-surface);
+  --dictionary-border: var(--app-dark-border);
+  --dictionary-text: var(--app-dark-heading);
+  --dictionary-muted: var(--app-dark-muted);
+  --dictionary-selected: linear-gradient(90deg, var(--app-primary-soft-strong), var(--app-dark-surface) 72%);
 }
 
 .dictionary-workspace {
@@ -770,8 +700,8 @@ watch(
 
 .dictionary-master-toolbar {
   padding: 12px 14px;
-  border-bottom: 1px solid #e3e8f2;
-  background: #ffffff;
+  border-bottom: 1px solid var(--dictionary-border);
+  background: var(--dictionary-surface);
 }
 
 .master-search {
@@ -785,14 +715,14 @@ watch(
   align-items: center;
   justify-content: flex-end;
   padding: 8px 10px;
-  border-top: 1px solid #e3e8f2;
-  background: #ffffff;
+  border-top: 1px solid var(--dictionary-border);
+  background: var(--dictionary-surface);
 }
 
 .dictionary-list {
   height: 100%;
   overflow: auto;
-  background: #ffffff;
+  background: var(--dictionary-surface);
 }
 
 .dictionary-row {
@@ -802,19 +732,19 @@ watch(
 }
 
 .dictionary-row--active {
-  color: #172033;
+  color: var(--dictionary-text);
   border-left-color: var(--q-primary);
-  background: linear-gradient(90deg, #f3f1ff, #ffffff 72%);
+  background: var(--dictionary-selected);
 }
 
 .dictionary-name {
-  color: #172033;
+  color: var(--dictionary-text);
   font-weight: 800;
 }
 
 .dictionary-code {
   margin-top: 4px;
-  color: #657189;
+  color: var(--dictionary-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -838,9 +768,9 @@ watch(
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid #e3e8f2;
+  border: 1px solid var(--dictionary-border);
   border-radius: 8px;
-  background: linear-gradient(90deg, #fbfcff, #f8fbff);
+  background: var(--dictionary-surface);
 }
 
 .dictionary-context-icon {
@@ -861,7 +791,7 @@ watch(
 
 .dictionary-context-title {
   overflow: hidden;
-  color: #172033;
+  color: var(--dictionary-text);
   font-size: 18px;
   font-weight: 800;
   text-overflow: ellipsis;
@@ -891,8 +821,8 @@ watch(
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  border-bottom: 1px solid #e3e8f2;
-  background: #ffffff;
+  border-bottom: 1px solid var(--dictionary-border);
+  background: var(--dictionary-surface);
 }
 
 .detail-search {

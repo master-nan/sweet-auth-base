@@ -16,6 +16,7 @@
       :bottom-buttons="record_detail_bottom_buttons"
       :record-context="batchDetail"
       @close="emit('close')"
+      @refresh="loadDetail"
       @button-click="handleDetailAction"
     >
       <template #section="{ sectionKey }">
@@ -90,7 +91,6 @@ import {
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
 
 const props = defineProps<{
   recordId: number
@@ -102,8 +102,7 @@ const emit = defineEmits<{
 }>()
 
 const dictStore = useDictStore()
-const userStore = useUserStore()
-const { record_detail_top_buttons, record_detail_bottom_buttons } = usePageButtons(
+const { record_detail_top_buttons, record_detail_bottom_buttons, hasGrantedCapability } = usePageButtons(
   'organization_sync_batch',
 )
 
@@ -116,7 +115,7 @@ const showErrorDialog = ref(false)
 const errorLoading = ref(false)
 const errorLoadError = ref('')
 const errorSummary = ref('')
-const canQueryRecords = computed(() => userStore.buttons.includes('organization_sync_error_query'))
+const canQueryRecords = computed(() => hasGrantedCapability('organization_sync_error_query'))
 
 const title = computed(() =>
   batchDetail.value

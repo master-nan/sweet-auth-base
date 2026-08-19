@@ -1,17 +1,15 @@
 <template>
   <base-content class="q-pa-md">
     <div class="row items-center q-mb-md q-gutter-sm">
-      <q-btn flat round icon="arrow_back" color="primary" @click="router.back()" />
+      <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"><q-tooltip>返回</q-tooltip></q-btn>
       <div>
         <div class="text-h5">执行详情</div>
         <div class="text-caption text-grey-7">{{ detail?.execution_no || '-' }}</div>
       </div>
       <q-space />
-      <q-chip
+      <q-btn flat round icon="refresh" color="primary" aria-label="刷新执行详情" :loading="loading" @click="loadDetail"><q-tooltip>刷新执行详情</q-tooltip></q-btn>
+      <status-chip
         v-if="detail"
-        dense
-        square
-        outline
         :color="statusMeta[detail.status]?.color || 'grey'"
         :label="statusMeta[detail.status]?.label || detail.status"
       />
@@ -181,11 +179,9 @@
               ></template
             ><template #body-cell-status="props"
               ><q-td :props="props"
-                ><q-chip
-                  dense
-                  square
+                ><status-chip
                   :color="logStatusMeta[props.row.status]?.color || 'grey'"
-                  text-color="white"
+                  :outline="false"
                   :label="
                     logStatusMeta[props.row.status]?.label || props.row.status
                   " /></q-td></template></q-table></q-card-section
@@ -199,28 +195,27 @@ defineOptions({ name: 'integration_execution_detail_page' })
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
   type IntegrationExecutionDetail,
   type IntegrationLogListItem,
 } from 'src/api/services/integration'
-import { useLoadingStore } from 'src/stores/loading'
-import { useUserStore } from 'src/stores/user'
-import { storeToRefs } from 'pinia'
+import { usePageButtons } from 'src/composables/page-buttons'
 import type { QTableProps } from 'quasar'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const route = useRoute()
 const router = useRouter()
 const api = useIntegrationApi()
-const userStore = useUserStore()
-const { loading } = storeToRefs(useLoadingStore())
+const loading = ref(false)
 const detail = ref<IntegrationExecutionDetail | null>(null)
 const attempts = ref<IntegrationLogListItem[]>([])
 const attemptsLoading = ref(false)
-const canViewExecutionDetail = computed(() => userStore.buttons.includes('integration_execution_detail'))
-const canQueryLogs = computed(() => userStore.buttons.includes('integration_log_query'))
-const canViewLogDetail = computed(() => userStore.buttons.includes('integration_log_detail'))
+const { hasGrantedCapability } = usePageButtons('integration_execution')
+const canViewExecutionDetail = computed(() => hasGrantedCapability('integration_execution_detail'))
+const canQueryLogs = computed(() => hasGrantedCapability('integration_log_query'))
+const canViewLogDetail = computed(() => hasGrantedCapability('integration_log_detail'))
 const statusMeta: Record<string, { label: string; color: string }> = {
   created: { label: '待执行', color: 'grey-7' },
   running: { label: '执行中', color: 'primary' },
@@ -251,15 +246,17 @@ const openLog = (logId: number) => {
       query: { execution_no: detail.value.execution_no, log_id: String(logId) },
     })
 }
-onMounted(async () => {
+const loadDetail = async () => {
   if (!canViewExecutionDetail.value) return
   const id = Number(route.params.id)
   if (id > 0) {
-    const response = await api.getExecution(id)
-    detail.value = response.data || null
-    if (detail.value && canQueryLogs.value) {
-      attemptsLoading.value = true
-      try {
+    loading.value = true
+    try {
+      const response = await api.getExecution(id)
+      detail.value = response.data || null
+      attempts.value = []
+      if (detail.value && canQueryLogs.value) {
+        attemptsLoading.value = true
         const logs = await api.queryLogs({
           page: 1,
           num: 500,
@@ -269,10 +266,14 @@ onMounted(async () => {
           execution_id: detail.value.id,
         })
         attempts.value = logs.data || []
-      } finally {
-        attemptsLoading.value = false
       }
+    } finally {
+      attemptsLoading.value = false
+      loading.value = false
     }
   }
+}
+onMounted(async () => {
+  await loadDetail()
 })
 </script>

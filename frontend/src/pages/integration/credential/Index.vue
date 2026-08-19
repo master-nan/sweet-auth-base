@@ -2,28 +2,32 @@
   <base-content class="q-pa-sm">
     <q-table v-model:pagination="pagination" class="fit sticky-header-table" color="primary" :dense="$q.screen.lt.md" separator="cell" flat bordered :rows="rows" :columns="columns" :visible-columns="visibleColumns" row-key="id" :loading="loading">
       <template #top>
-        <div class="row q-gutter-xs full-width items-center">
-          <div class="col-grow row q-gutter-xs items-center">
-            <q-input v-model="query.quick_query!.keyword" dense outlined debounce="300" placeholder="搜索凭证编码或名称" @keyup.enter="handleBasicSearch"><template #append><q-icon name="search" /></template></q-input>
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
+            <q-input v-model="keyword" dense outlined debounce="300" placeholder="搜索凭证编码或名称" @keyup.enter="handleBasicSearch"><template #append><q-icon name="search" /></template></q-input>
             <q-select v-model="query.external_system_id" dense outlined emit-value map-options clearable :options="systemOptions" label="所属系统" style="min-width: 220px" @update:model-value="resetAndFetch" />
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select v-model="visibleColumns" multiple outlined dense options-dense emit-value map-options :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')" :options="columns" option-value="name" options-cover />
+          </template>
+          <template #advanced-trigger>
             <q-btn outline icon="tune" color="primary" :aria-label="activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'" @click="showAdvancedQuery = true"><q-badge v-if="activeFilterCount" floating color="red">{{ activeFilterCount }}</q-badge><q-tooltip>高级查询</q-tooltip></q-btn>
-          </div>
-          <q-space />
-          <div class="row q-gutter-xs"><q-btn v-for="button in top_buttons" :key="button.id" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" :disable="loading" @click="handleButtonClick(button)" /></div>
-        </div>
+          </template>
+          <template #right-actions><q-btn v-for="button in top_buttons" :key="button.id" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" :disable="loading" @click="handleButtonClick(button)" /></template>
+        </standard-table-toolbar>
       </template>
 
       <template #body-cell-external_system="props"><q-td :props="props"><div class="text-weight-bold">{{ props.row.external_system.name }}</div><div class="text-caption text-grey-7">{{ props.row.external_system.system_code }}</div></q-td></template>
       <template #body-cell-credential_code="props"><q-td :props="props"><div class="text-weight-bold">{{ props.row.name }}</div><div class="text-caption text-mono text-grey-7">{{ props.row.credential_code }}</div></q-td></template>
       <template #body-cell-credential_type="props"><q-td :props="props">{{ typeLabels[props.row.credential_type] }}</q-td></template>
-      <template #body-cell-effective_status="props"><q-td :props="props"><q-chip dense square outline :color="statusMeta[props.row.effective_status]?.color || 'grey'" :label="statusMeta[props.row.effective_status]?.label || props.row.effective_status" /></q-td></template>
+      <template #body-cell-effective_status="props"><q-td :props="props"><status-chip :color="statusMeta[props.row.effective_status]?.color || 'grey'" :label="statusMeta[props.row.effective_status]?.label || props.row.effective_status" /></q-td></template>
       <template #body-cell-expires_at="props"><q-td :props="props">{{ props.row.expires_at || '长期有效' }}</q-td></template>
       <template #body-cell-version="props"><q-td :props="props"><span class="text-mono">v{{ props.row.version }}</span><div class="text-caption text-grey-7">{{ props.row.fingerprint_summary }}</div></q-td></template>
       <template #body-cell-rotated_at="props"><q-td :props="props">{{ props.row.rotated_at || '尚未轮换' }}</q-td></template>
       <template #body-cell-actions="props"><q-td :props="props" class="q-gutter-xs no-wrap"><q-btn v-for="button in availableLineButtons(props.row)" :key="button.id" flat dense size="sm" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" @click="handleButtonClick(button, props.row)"><q-tooltip>{{ button.name }}</q-tooltip></q-btn></q-td></template>
       <template #bottom><q-space /><table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" /></template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
     <advanced-query v-model="showAdvancedQuery" v-model:query-model="tempAdvancedQuery" :fields="advancedFields" @search="handleAdvancedSearch" />
@@ -36,31 +40,34 @@
 defineOptions({ name: 'integration_credential' })
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { type QTableProps, useQuasar } from 'quasar'
+import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
-import cloneDeep from 'lodash/cloneDeep'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import StatusChip from 'src/components/Display/StatusChip.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import CredentialFormDialog from './CredentialFormDialog.vue'
 import CredentialDetailDialog from './CredentialDetailDialog.vue'
 import { type CredentialCreateRequest, type CredentialDetail, type CredentialListItem, type CredentialQuery, type CredentialSecret, type CredentialUpdateRequest, type ExternalSystemListItem, useIntegrationApi } from 'src/api/services/integration'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import type { Query } from 'src/types/global'
+import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveRuntimeColumns } from 'src/utils/column-format'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
 const route = useRoute()
 const api = useIntegrationApi()
-const tableApi = useTableApi()
-const { loading } = storeToRefs(useLoadingStore())
+const loading = ref(false)
+const loadError = ref('')
 const { confirmAction } = useConfirmDialog($q)
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integration_credential')
 const rows = ref<CredentialListItem[]>([])
@@ -73,40 +80,31 @@ const showDetailDialog = ref(false)
 const rotateMode = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<CredentialDetail | null>(null)
-const advancedFields = ref<TableField[]>([])
+const { fields: metadataFields, advancedSearchFields: metadataAdvancedFields, loadMetadata } = useRuntimeTableMetadata('integration_credential')
+const advancedFields = computed(() => metadataAdvancedFields.value.filter((field) => field.field_code !== 'external_system_id'))
 const typeLabels: Record<string, string> = { basic: 'Basic', api_key: 'API Key', bearer_token: 'Bearer Token', oauth_client: 'OAuth Client' }
 const statusMeta: Record<string, { label: string; color: string }> = {
   draft: { label: '草稿', color: 'grey-7' }, active: { label: '已启用', color: 'positive' },
   disabled: { label: '已停用', color: 'warning' }, revoked: { label: '已吊销', color: 'negative' }, expired: { label: '已过期', color: 'negative' },
 }
-const columns: QTableProps['columns'] = [
-  { name: 'external_system', label: '所属系统', field: (row) => row.external_system.name, align: 'left' },
-  { name: 'credential_code', label: '集成凭证', field: 'credential_code', align: 'left', sortable: true },
-  { name: 'credential_type', label: '类型', field: 'credential_type', align: 'left', sortable: true },
-  { name: 'effective_status', label: '状态', field: 'effective_status', align: 'center' },
-  { name: 'expires_at', label: '有效期', field: 'expires_at', align: 'left', sortable: true },
-  { name: 'version', label: '版本 / 指纹', field: 'version', align: 'left', sortable: true },
-  { name: 'rotated_at', label: '轮换时间', field: 'rotated_at', align: 'left', sortable: true },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
-]
-const visibleColumns = ref(columns.map((column) => column.name))
+const columns = ref<TableColumn<CredentialListItem>[]>([])
+const visibleColumns = ref<string[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
 const systemOptions = computed(() => systems.value.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })))
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const routeSystemID = Number(route.query.external_system_id)
-const initialQuery: CredentialQuery = { page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() }
-if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0) initialQuery.external_system_id = routeSystemID
-const query = ref<CredentialQuery>(initialQuery)
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-const appliedAdvancedQuery = ref<Query>(cloneDeep(query.value))
+const queryState = useTableQueryState<CredentialQuery>({ createInitialQuery: () => { const initial: CredentialQuery = { page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() }; if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0) initial.external_system_id = routeSystemID; return initial }, createEmptyExpressions: emptyExpressions })
+const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || activeFilterCount.value > 0 }))
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 
-const fetchData = async () => { const response = await api.queryCredentials(query.value); rows.value = response.data || []; total.value = response.total || 0 }
+const fetchData = async () => { loading.value = true; loadError.value = ''; try { const response = await api.queryCredentials(query.value); rows.value = response.data || []; total.value = response.total || 0 } catch { rows.value = []; total.value = 0; loadError.value = '集成凭证加载失败' } finally { loading.value = false } }
 const fetchSystems = async () => { const response = await api.queryExternalSystems({ page: 1, num: 500, order: { field: 'name', is_asc: true }, quick_query: { keyword: '' }, expressions: [] }); systems.value = response.data || [] }
-const fetchMetadata = async () => { const response = await tableApi.queryTableByCode('integration_credential'); advancedFields.value = (response.data?.table_fields || []).filter((field) => field.is_advanced_search && field.field_code !== 'external_system_id') }
+const fetchMetadata = async () => { if (!(await loadMetadata())) return; const resolution = resolveRuntimeColumns<CredentialListItem>(metadataFields.value, { context: { getDictLabel: () => '' }, overrides: [{ fieldCode: 'external_system_id', visible: false }, { fieldCode: 'name', visible: false }, { fieldCode: 'status', visible: false }, { fieldCode: 'credential_code', label: '集成凭证', order: 2 }, { fieldCode: 'credential_type', order: 3 }, { fieldCode: 'expires_at', order: 5 }, { fieldCode: 'rotated_at', order: 7 }], virtualColumns: [{ name: 'external_system', label: '所属系统', field: (row) => row.external_system.name, order: 1 }, { name: 'effective_status', label: '状态', field: 'effective_status', align: 'center', order: 4 }, { name: 'version', label: '版本 / 指纹', field: 'version', order: 6, serverSortField: 'version' }, { name: 'actions', label: '操作', field: 'actions', align: 'center', order: 100, defaultVisible: has_line_buttons.value }] }); columns.value = resolution.columns; visibleColumns.value = resolution.visibleColumns; sortableFields.value = resolution.sortableFields }
 const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
-const handleBasicSearch = () => { query.value.expressions = emptyExpressions(); appliedAdvancedQuery.value = cloneDeep(query.value); resetAndFetch() }
-const handleAdvancedSearch = () => { query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions); appliedAdvancedQuery.value = cloneDeep(query.value); showAdvancedQuery.value = false; resetAndFetch() }
+const handleBasicSearch = () => { queryState.submitQuickSearch(); resetAndFetch() }
+const handleAdvancedSearch = () => { queryState.applyAdvancedQuery(tempAdvancedQuery.value); showAdvancedQuery.value = false; resetAndFetch() }
 const availableLineButtons = (row: CredentialListItem) => line_buttons.value.filter((button) => {
   if (row.status === 'revoked') return button.event_action === 'detail'
   if (button.event_action === 'enable') return row.status === 'draft' || row.status === 'disabled'
@@ -123,12 +121,12 @@ const changeState = (row: CredentialListItem, target: 'active' | 'disabled' | 'r
     if (response.success) await fetchData()
   })() })
 }
-const actionHandlers: Record<string, (row?: CredentialListItem) => void> = {
+const actionHandlers: PageActionHandlers<CredentialListItem> = {
   create: () => { currentEditData.value = null; rotateMode.value = false; showFormDialog.value = true },
   detail: (row) => row && openDetail(row), update: (row) => row && void openEdit(row), rotate: (row) => row && void openEdit(row, true),
   enable: (row) => row && changeState(row, 'active'), disable: (row) => row && changeState(row, 'disabled'), revoke: (row) => row && changeState(row, 'revoked'),
 }
-const handleButtonClick = (button: MenuButton, row?: CredentialListItem) => { actionHandlers[button.event_action]?.(row) }
+const handleButtonClick = (button: MenuButton, row?: CredentialListItem) => { dispatchPageAction(button, actionHandlers, row) }
 const toAPIDate = (value: string) => new Date(value).toISOString()
 const handleFormSubmit = async (form: { external_system_id: number | null; credential_code: string; name: string; credential_type: CredentialCreateRequest['credential_type']; expires_at: string; description: string; secret: CredentialSecret }) => {
   if (rotateMode.value && currentEditData.value) {
@@ -145,8 +143,8 @@ const handleFormSubmit = async (form: { external_system_id: number | null; crede
   }
   await fetchData()
 }
-onMounted(async () => { await Promise.all([fetchMetadata(), fetchSystems(), fetchData()]); if (!has_line_buttons.value) visibleColumns.value = visibleColumns.value.filter((name) => name !== 'actions'); initialized.value = true })
+onMounted(async () => { await Promise.all([fetchMetadata(), fetchSystems(), fetchData()]); initialized.value = true })
 watch(() => [query.value.page, query.value.num] as const, ([page]) => { if (!initialized.value) return; pagination.value.page = page; void fetchData() })
-watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; query.value.order = { field: sortBy || '', is_asc: sortBy ? !descending : false }; resetAndFetch() })
-watch(showAdvancedQuery, (open) => { if (open) tempAdvancedQuery.value = cloneDeep(query.value) })
+watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return; resetAndFetch() })
+watch(showAdvancedQuery, (open) => { if (open) queryState.beginAdvancedEdit() })
 </script>

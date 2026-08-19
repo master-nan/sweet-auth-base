@@ -82,6 +82,11 @@ func (t *TableController) GetTableByCode(ctx *gin.Context) {
 	resp.SetData(data)
 }
 
+// GetRuntimeTableByCode exposes safe metadata independently from SysTable administration.
+func (t *TableController) GetRuntimeTableByCode(ctx *gin.Context) {
+	t.GetTableByCode(ctx)
+}
+
 // QueryTable 查询表列表
 // @Summary 查询表列表
 // @Description 查询表列表

@@ -134,7 +134,7 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useDictStore } from 'src/stores/dict'
 
 const dictStore = useDictStore()
-const { all_buttons } = usePageButtons('organization_legal_entity')
+const { hasActionCapability } = usePageButtons('organization_legal_entity')
 
 const tree = ref<LegalEntityTreeNode[]>([])
 const selectedNode = ref<LegalEntityTreeNode | null>(null)
@@ -146,9 +146,7 @@ const treeError = ref('')
 const detailError = ref('')
 let detailRequestSequence = 0
 
-const canViewDetail = computed(() =>
-  all_buttons.value.some((button) => button.event_action === 'detail'),
-)
+const canViewDetail = computed(() => hasActionCapability('detail'))
 const filteredTree = computed(() => filterLegalEntityTree(tree.value, keyword.value))
 const displayTree = computed(() => mapLegalEntityTree(filteredTree.value))
 const treeSummary = computed(

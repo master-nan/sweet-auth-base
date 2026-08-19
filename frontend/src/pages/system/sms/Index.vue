@@ -17,13 +17,13 @@
       :loading="loading"
     >
       <template v-slot:top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
               dense
               outlined
               debounce="300"
-              v-model="query.quick_query!.keyword"
+              v-model="keyword"
               placeholder="搜索关键词"
             >
               <template v-slot:append>
@@ -31,6 +31,8 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          </template>
+          <template #column-selector>
             <q-select
               v-model="visibleColumns"
               multiple
@@ -44,6 +46,8 @@
               option-value="name"
               options-cover
             ></q-select>
+          </template>
+          <template #advanced-trigger>
             <q-btn
               outline
               icon="tune"
@@ -63,11 +67,8 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
-
-          <q-space />
-
-          <div class="row q-gutter-xs">
+          </template>
+          <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
               :key="btn.id"
@@ -76,8 +77,8 @@
               :disable="loading"
               @click="handleButtonClick(btn)"
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
       <template v-slot:body-cell-template_params="props">
         <q-td :props="props">
@@ -116,6 +117,7 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
+      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
     <advanced-query
@@ -140,33 +142,33 @@
 defineOptions({ name: 'system_sms' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
+import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useSmsApi, type SmsTemplate } from 'src/api/services/sms'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useLoadingStore } from 'src/stores/loading'
-import { storeToRefs } from 'pinia'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import cloneDeep from 'lodash/cloneDeep'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useTableQueryState } from 'src/composables/table-query-state'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const loading = ref(false)
+const loadError = ref('')
 const dictStore = useDictStore()
 
 const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)
 const smsApi = useSmsApi()
-const tableApi = useTableApi()
 const rows = ref<SmsTemplate[]>([])
 const total = ref(0)
 const selected = ref([])
@@ -174,7 +176,7 @@ const showAdvancedQuery = ref(false)
 
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('system_sms')
 
-const action_handlers: Record<string, (row?: SmsTemplate) => void> = {
+const action_handlers: PageActionHandlers<SmsTemplate> = {
   create: () => openAddDialog(),
   update: (row) => {
     if (row) openEditDialog(row)
@@ -183,8 +185,7 @@ const action_handlers: Record<string, (row?: SmsTemplate) => void> = {
 }
 
 const handleButtonClick = (btn: MenuButton, row?: SmsTemplate) => {
-  const handler = action_handlers[btn.event_action]
-  if (handler) handler(row)
+  dispatchPageAction(btn, action_handlers, row)
 }
 
 // 表单对话框相关
@@ -193,10 +194,9 @@ const currentEditData = ref<SmsTemplate | null>(null)
 
 // 表格列定义
 const columns = ref<QTableProps['columns']>([])
-const table_fields_advanced = ref<TableField[]>([])
+const { fields: metadataFields, advancedSearchFields: table_fields_advanced, formFields: tableFields, loadMetadata } = useRuntimeTableMetadata('sms_template')
 const visibleColumns = ref<string[]>([])
-// 保存查询到的表字段，供表单使用
-const tableFields = ref<TableField[]>([])
+const sortableFields = ref<ReadonlySet<string>>(new Set())
 
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
@@ -210,26 +210,8 @@ const emptyAdvancedQuery = (): Query => ({
   ],
 })
 // 查询参数
-const query = ref<Query>({
-  page: 1,
-  num: 15,
-  order: {
-    field: '',
-    is_asc: false,
-  },
-  table_code: 'sms_template',
-  expressions: emptyAdvancedQuery().expressions,
-  quick_query: {
-    keyword: '',
-  },
-  include_deleted: false,
-})
-
-// 临时高级查询条件（在对话框中编辑但未应用）
-const tempAdvancedQuery = ref<Query>(cloneDeep(query.value))
-
-// 跟踪已应用的高级查询条件
-const appliedAdvancedQuery = ref(cloneDeep(emptyAdvancedQuery()))
+const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, table_code: 'sms_template', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
+const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 // 判断是否存在已应用的高级查询条件
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
@@ -244,11 +226,6 @@ const pagination = ref({
   descending: true,
 })
 
-// 初始化临时查询
-const initTempQuery = () => {
-  tempAdvancedQuery.value = cloneDeep(query.value)
-}
-
 const resetToFirstPageOrFetch = () => {
   if (query.value.page !== 1) {
     query.value.page = 1
@@ -260,36 +237,35 @@ const resetToFirstPageOrFetch = () => {
 // 基础查询处理
 const handleBasicSearch = () => {
   // 基本查询时重置高级查询部分，保留基本的关键字查询
-  query.value.expressions = emptyAdvancedQuery().expressions
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.submitQuickSearch()
   resetToFirstPageOrFetch()
 }
 
 // 高级查询处理
 const handleAdvancedSearch = () => {
   // 应用临时查询条件到实际查询
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
-
-  // 更新已应用的高级查询状态
-  appliedAdvancedQuery.value = cloneDeep({
-    expressions: query.value.expressions,
-    page: query.value.page,
-    num: query.value.num,
-  })
+  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   resetToFirstPageOrFetch()
   showAdvancedQuery.value = false
 }
 
 // 获取短信模板列表数据
 const fetchData = async () => {
-  const res = await smsApi.querySmsTemplate(query.value)
-  rows.value = res.data
-  total.value = res.total || 0
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await smsApi.querySmsTemplate(query.value)
+    rows.value = res.data
+    total.value = res.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '短信模板加载失败'
+  } finally {
+    loading.value = false
+  }
 }
+const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value }))
 
 const formatTemplateParams = (value: any): string[] => {
   if (!value) return []
@@ -318,22 +294,20 @@ const formatTemplateParams = (value: any): string[] => {
 
 // 获取表结构信息
 const fetchTableFields = async () => {
-  const res = await tableApi.queryTableByCode('sms_template')
-  if (res.data && res.data.table_fields) {
-    tableFields.value = res.data.table_fields
-    const dictCodes = res.data.table_fields.map((f) => f.dict_code).filter((c): c is string => !!c)
+  if (await loadMetadata()) {
+    const dictCodes = metadataFields.value.map((f) => f.dict_code).filter((c): c is string => !!c)
     const [, relationLookups] = await Promise.all([
       dictStore.loadDicts(dictCodes),
-      buildRelationLookups(res.data.table_fields),
+      buildRelationLookups(metadataFields.value),
     ])
 
-    const { columns: cols, advancedFields } = buildTableColumns(res.data.table_fields, {
+    const { columns: cols } = buildTableColumns(metadataFields.value, {
       getDictLabel: dictStore.getDictLabel,
       relationLookups,
     })
     columns.value = cols
-    table_fields_advanced.value = advancedFields
     visibleColumns.value = cols.map((c) => c.name)
+    sortableFields.value = new Set(metadataFields.value.filter((field) => field.is_sort).map((field) => field.field_code))
     if (!has_line_buttons.value) {
       visibleColumns.value = visibleColumns.value.filter((c) => c !== 'actions')
     }
@@ -366,9 +340,7 @@ watch(
     if (sortBy === prevSortBy && descending === prevDescending) return
 
     // 同步排序到 query.order
-    query.value.order = query.value.order ?? { field: '', is_asc: false }
-    query.value.order.field = sortBy || ''
-    query.value.order.is_asc = sortBy ? !descending : false
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
 
     // 排序变化时，自动回到第1页
     if (query.value.page !== 1) {
@@ -386,7 +358,7 @@ watch(
   () => showAdvancedQuery.value,
   (isOpen) => {
     if (isOpen) {
-      initTempQuery()
+      queryState.beginAdvancedEdit()
     }
   },
 )

@@ -11,6 +11,9 @@ import {
 export function usePageButtons(route_name: string) {
   const userStore = useUserStore()
 
+  const grantedCapabilityCodes = computed(() => new Set(userStore.buttons))
+  const hasGrantedCapability = (code: string) => grantedCapabilityCodes.value.has(code)
+
   const all_buttons = computed(() => resolvePageButtons(userStore.menus, route_name))
 
   const line_buttons = computed(() =>
@@ -64,6 +67,7 @@ export function usePageButtons(route_name: string) {
     hasCapability,
     findActionCapability,
     hasActionCapability,
+    hasGrantedCapability,
   }
 }
 

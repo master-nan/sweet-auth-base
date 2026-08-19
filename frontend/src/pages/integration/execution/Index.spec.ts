@@ -22,6 +22,7 @@ vi.mock('src/composables/page-buttons', () => ({
   usePageButtons: () => ({
     line_buttons: computed(() => lineButtons),
     top_buttons: computed(() => []),
+    hasGrantedCapability: (code: string) => permissionCodes.includes(code),
   }),
 }))
 vi.mock('src/composables/confirm-dialog', () => ({
