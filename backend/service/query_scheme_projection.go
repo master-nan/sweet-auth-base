@@ -44,12 +44,20 @@ func (service *QuerySchemeService) detailResponse(
 	validation queryscheme.ValidationResult,
 	knownRoleIDs []int,
 ) (response.QuerySchemeDetailRes, error) {
-	item, err := service.listResponse(ctx, value)
+	scopeLabels, err := service.repository.FindActiveScopeLabels(ctx, []string{value.ScopeCode})
+	if err != nil {
+		return response.QuerySchemeDetailRes{}, myerrors.WrapDatabaseError(err)
+	}
+	roleIDs := knownRoleIDs
+	if value.SchemeType == model.QuerySchemeTypeRole && roleIDs == nil {
+		roleIDs, err = service.repository.RoleIDs(service.repository.DBWithContext(ctx), value.Id)
+		if err != nil {
+			return response.QuerySchemeDetailRes{}, myerrors.WrapDatabaseError(err)
+		}
+	}
+	item, err := service.listResponse(ctx, value, scopeLabels[value.ScopeCode], roleIDs)
 	if err != nil {
 		return response.QuerySchemeDetailRes{}, err
-	}
-	if knownRoleIDs != nil {
-		item.RoleIDs = append([]int(nil), knownRoleIDs...)
 	}
 	return response.QuerySchemeDetailRes{QuerySchemeListRes: item, Payload: payload, Issues: validation.Issues}, nil
 }
@@ -57,6 +65,8 @@ func (service *QuerySchemeService) detailResponse(
 func (service *QuerySchemeService) listResponse(
 	ctx context.Context,
 	value model.QueryScheme,
+	scopeLabel string,
+	roleIDs []int,
 ) (response.QuerySchemeListRes, error) {
 	status := queryscheme.ValidationInvalid
 	payload, err := queryscheme.DecodePayload(value.QueryPayload)
@@ -75,13 +85,6 @@ func (service *QuerySchemeService) listResponse(
 			}
 		}
 	}
-	var roleIDs []int
-	if value.SchemeType == model.QuerySchemeTypeRole {
-		roleIDs, err = service.repository.RoleIDs(service.repository.DBWithContext(ctx), value.Id)
-		if err != nil {
-			return response.QuerySchemeListRes{}, myerrors.WrapDatabaseError(err)
-		}
-	}
 	creator := ""
 	if value.CreateName != nil {
 		creator = *value.CreateName
@@ -90,7 +93,7 @@ func (service *QuerySchemeService) listResponse(
 		QuerySchemeSummaryRes: response.QuerySchemeSummaryRes{
 			ID: value.Id, Name: value.Name, Type: value.SchemeType, IsDefault: value.IsDefault, Status: status,
 		},
-		ScopeCode: value.ScopeCode, ScopeLabel: value.ScopeCode, Enabled: value.Enabled,
-		Creator: creator, RoleIDs: roleIDs, Revision: value.Revision, UpdatedAt: value.GmtModify,
+		ScopeCode: value.ScopeCode, ScopeLabel: scopeLabel, Enabled: value.Enabled,
+		Creator: creator, RoleIDs: append([]int(nil), roleIDs...), Revision: value.Revision, UpdatedAt: value.GmtModify,
 	}, nil
 }

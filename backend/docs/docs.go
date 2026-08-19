@@ -5983,10 +5983,6 @@ const docTemplate = `{
                 "pid": {
                     "type": "integer"
                 },
-                "query_scope_code": {
-                    "type": "string",
-                    "maxLength": 128
-                },
                 "redirect": {
                     "type": "string"
                 },
@@ -6069,10 +6065,6 @@ const docTemplate = `{
                 },
                 "pid": {
                     "type": "integer"
-                },
-                "query_scope_code": {
-                    "type": "string",
-                    "maxLength": 128
                 },
                 "redirect": {
                     "type": "string"

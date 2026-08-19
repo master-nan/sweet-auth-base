@@ -10,7 +10,6 @@ import (
 	"backend/enum"
 	myerrors "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
-	"backend/internal/queryscheme"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
@@ -69,13 +68,6 @@ func (s *SysMenuService) GetMenuById(id int) (model.SysMenu, error) {
 
 // CreateMenu 新增菜单
 func (s *SysMenuService) CreateMenu(ctx context.Context, req request.MenuCreateReq) error {
-	if req.QueryScopeCode != nil && !queryscheme.ValidScopeCode(strings.TrimSpace(*req.QueryScopeCode)) {
-		return myerrors.NewParameterError("查询范围编码格式不合法")
-	}
-	if req.QueryScopeCode != nil {
-		normalized := strings.TrimSpace(*req.QueryScopeCode)
-		req.QueryScopeCode = &normalized
-	}
 	var data model.SysMenu
 	err := copier.Copy(&data, &req)
 	if err != nil {
@@ -93,13 +85,6 @@ func (s *SysMenuService) CreateMenu(ctx context.Context, req request.MenuCreateR
 
 // UpdateMenu 更新菜单
 func (s *SysMenuService) UpdateMenu(ctx context.Context, data request.MenuUpdateReq) error {
-	if data.QueryScopeCode != nil && !queryscheme.ValidScopeCode(strings.TrimSpace(*data.QueryScopeCode)) {
-		return myerrors.NewParameterError("查询范围编码格式不合法")
-	}
-	if data.QueryScopeCode != nil {
-		normalized := strings.TrimSpace(*data.QueryScopeCode)
-		data.QueryScopeCode = &normalized
-	}
 	if data.PageType == "" {
 		existing, err := s.sysMenuRepo.WithContext(ctx).FindById(data.Id)
 		if err == nil {

@@ -30,10 +30,12 @@ type QuerySchemeRepository interface {
 	FindVisibleByScope(context.Context, int, []int, string) ([]model.QueryScheme, error)
 	List(context.Context, QuerySchemeListFilter) (QuerySchemePage, error)
 	RoleIDs(*gorm.DB, int) ([]int, error)
+	FindRoleIDsBySchemeIDs(context.Context, []int) (map[int][]int, error)
 	ReplaceRoles(*gorm.DB, int, []int) error
 	ClearDefault(*gorm.DB, model.QuerySchemeType, int, string, int) error
 	DeleteByRevision(*gorm.DB, int, int) (bool, error)
 	FindActiveScopeMenu(context.Context, int, string) (model.SysMenu, error)
+	FindActiveScopeLabels(context.Context, []string) (map[string]string, error)
 	ActiveRoleIDs(context.Context, int) ([]int, error)
 	EmployeeID(context.Context, int) (*int, error)
 	CountActiveRoles(context.Context, []int) (int64, error)

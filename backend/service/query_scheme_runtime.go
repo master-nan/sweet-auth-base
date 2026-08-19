@@ -21,11 +21,11 @@ func (service *QuerySchemeService) GetScopeConfig(
 	ctx context.Context,
 	scopeCode string,
 ) (response.QueryScopeConfigRes, error) {
-	_, config, _, err := service.authorizeScope(ctx, scopeCode)
+	_, config, menu, err := service.authorizeScope(ctx, scopeCode)
 	if err != nil {
 		return response.QueryScopeConfigRes{}, err
 	}
-	return scopeConfigResponse(strings.TrimSpace(scopeCode), config), nil
+	return scopeConfigResponse(strings.TrimSpace(scopeCode), menu.Title, config), nil
 }
 
 func (service *QuerySchemeService) Available(
@@ -97,6 +97,17 @@ func (service *QuerySchemeService) Resolve(
 	if metadataResult.Status != queryscheme.ValidationValid {
 		return resolveResponse(value, metadataResult, nil, payload.Bindings), nil
 	}
+	for _, binding := range payload.Bindings {
+		if binding.Kind != queryscheme.BindingCurrentEmployee {
+			continue
+		}
+		employeeID, employeeErr := service.repository.EmployeeID(ctx, actor.UserID)
+		if employeeErr != nil && !errors.Is(employeeErr, gorm.ErrRecordNotFound) {
+			return response.QuerySchemeResolveRes{}, myerrors.WrapDatabaseError(employeeErr)
+		}
+		actor.EmployeeID = employeeID
+		break
+	}
 	resolved, err := service.bindings.Resolve(ctx, payload, config, actor)
 	if err != nil {
 		result := queryscheme.ValidationResult{Status: queryscheme.ValidationDegraded, Issues: []queryscheme.ValidationIssue{{
@@ -132,9 +143,29 @@ func (service *QuerySchemeService) List(
 	if err != nil {
 		return response.ListResult[response.QuerySchemeListRes]{}, myerrors.WrapDatabaseError(err)
 	}
+	scopeCodes := make([]string, 0, len(page.Data))
+	roleSchemeIDs := make([]int, 0, len(page.Data))
+	seenScopes := make(map[string]struct{}, len(page.Data))
+	for _, value := range page.Data {
+		if _, exists := seenScopes[value.ScopeCode]; !exists {
+			seenScopes[value.ScopeCode] = struct{}{}
+			scopeCodes = append(scopeCodes, value.ScopeCode)
+		}
+		if value.SchemeType == model.QuerySchemeTypeRole {
+			roleSchemeIDs = append(roleSchemeIDs, value.Id)
+		}
+	}
+	scopeLabels, err := service.repository.FindActiveScopeLabels(ctx, scopeCodes)
+	if err != nil {
+		return response.ListResult[response.QuerySchemeListRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	roleIDsByScheme, err := service.repository.FindRoleIDsBySchemeIDs(ctx, roleSchemeIDs)
+	if err != nil {
+		return response.ListResult[response.QuerySchemeListRes]{}, myerrors.WrapDatabaseError(err)
+	}
 	result := make([]response.QuerySchemeListRes, 0, len(page.Data))
 	for _, value := range page.Data {
-		item, err := service.listResponse(ctx, value)
+		item, err := service.listResponse(ctx, value, scopeLabels[value.ScopeCode], roleIDsByScheme[value.Id])
 		if err != nil {
 			return response.ListResult[response.QuerySchemeListRes]{}, err
 		}
@@ -239,11 +270,7 @@ func (service *QuerySchemeService) actor(ctx context.Context) (queryscheme.Subje
 	if err != nil {
 		return queryscheme.Subject{}, myerrors.WrapDatabaseError(err)
 	}
-	employeeID, err := service.repository.EmployeeID(ctx, subject.UserID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return queryscheme.Subject{}, myerrors.WrapDatabaseError(err)
-	}
-	return queryscheme.Subject{UserID: subject.UserID, RoleIDs: roleIDs, EmployeeID: employeeID}, nil
+	return queryscheme.Subject{UserID: subject.UserID, RoleIDs: roleIDs}, nil
 }
 
 func (service *QuerySchemeService) requireSharedManager(ctx context.Context, userID int) error {
@@ -337,11 +364,11 @@ func (service *QuerySchemeService) isVisible(ctx context.Context, actor querysch
 	return false, nil
 }
 
-func scopeConfigResponse(scopeCode string, config queryscheme.ScopeConfig) response.QueryScopeConfigRes {
+func scopeConfigResponse(scopeCode, scopeLabel string, config queryscheme.ScopeConfig) response.QueryScopeConfigRes {
 	bindings := append([]queryscheme.BindingKind(nil), config.AllowedDynamicBindings...)
 	sort.Slice(bindings, func(i, j int) bool { return bindings[i] < bindings[j] })
 	return response.QueryScopeConfigRes{
-		ScopeCode: scopeCode, TableCode: config.TableCode, QuickDateField: config.QuickDateField,
+		ScopeCode: scopeCode, ScopeLabel: scopeLabel, TableCode: config.TableCode, QuickDateField: config.QuickDateField,
 		QuickPresets: config.QuickPresets, VirtualSortFields: config.AllowedVirtualSortFields,
 		DynamicBindingKinds: bindings,
 	}

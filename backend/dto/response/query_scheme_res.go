@@ -7,6 +7,7 @@ import (
 
 type QueryScopeConfigRes struct {
 	ScopeCode           string                    `json:"scope_code"`
+	ScopeLabel          string                    `json:"scope_label"`
 	TableCode           string                    `json:"table_code"`
 	QuickDateField      string                    `json:"quick_date_field,omitempty"`
 	QuickPresets        []queryscheme.QuickPreset `json:"quick_presets"`

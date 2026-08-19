@@ -605,9 +605,6 @@ definitions:
         type: string
       pid:
         type: integer
-      query_scope_code:
-        maxLength: 128
-        type: string
       redirect:
         type: string
       sequence:
@@ -664,9 +661,6 @@ definitions:
         type: string
       pid:
         type: integer
-      query_scope_code:
-        maxLength: 128
-        type: string
       redirect:
         type: string
       sequence:

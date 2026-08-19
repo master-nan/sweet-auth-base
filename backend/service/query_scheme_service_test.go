@@ -2,6 +2,7 @@ package service
 
 import (
 	"backend/dto/request"
+	"backend/dto/response"
 	"backend/enum"
 	"backend/internal/audit"
 	"backend/internal/database"
@@ -11,6 +12,7 @@ import (
 	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
+	repositorypkg "backend/repository"
 	"backend/repository/impl"
 	"context"
 	"encoding/json"
@@ -21,6 +23,34 @@ import (
 )
 
 type querySchemeMetadataStub struct{ table metadata.TableMetadata }
+
+type querySchemeRepositorySpy struct {
+	repositorypkg.QuerySchemeRepository
+	employeeCalls        int
+	roleIDCalls          int
+	roleIDBatchCalls     int
+	scopeLabelBatchCalls int
+}
+
+func (spy *querySchemeRepositorySpy) EmployeeID(ctx context.Context, userID int) (*int, error) {
+	spy.employeeCalls++
+	return spy.QuerySchemeRepository.EmployeeID(ctx, userID)
+}
+
+func (spy *querySchemeRepositorySpy) RoleIDs(db *gorm.DB, schemeID int) ([]int, error) {
+	spy.roleIDCalls++
+	return spy.QuerySchemeRepository.RoleIDs(db, schemeID)
+}
+
+func (spy *querySchemeRepositorySpy) FindRoleIDsBySchemeIDs(ctx context.Context, schemeIDs []int) (map[int][]int, error) {
+	spy.roleIDBatchCalls++
+	return spy.QuerySchemeRepository.FindRoleIDsBySchemeIDs(ctx, schemeIDs)
+}
+
+func (spy *querySchemeRepositorySpy) FindActiveScopeLabels(ctx context.Context, scopeCodes []string) (map[string]string, error) {
+	spy.scopeLabelBatchCalls++
+	return spy.QuerySchemeRepository.FindActiveScopeLabels(ctx, scopeCodes)
+}
 
 func (stub querySchemeMetadataStub) GetTable(context.Context, string) (metadata.TableMetadata, error) {
 	return stub.table, nil
@@ -183,6 +213,127 @@ func TestQuerySchemeRejectsInvalidBindingWithStableError(t *testing.T) {
 	}
 }
 
+func TestQuerySchemeCurrentEmployeeIsResolvedLazily(t *testing.T) {
+	service, db := newQuerySchemeTestService(t, false)
+	spy := &querySchemeRepositorySpy{QuerySchemeRepository: service.repository}
+	service.repository = spy
+	ctx := querySchemeContext(101)
+
+	currentUserPayload := queryscheme.QuerySchemePayloadV1{
+		Expressions: []request.ExpressionGroup{{Logic: enum.And, Rules: []request.QueryRule{{
+			Field: "owner_id", ExpressionType: enum.Eq, Value: 0, Type: enum.BigIntFieldType,
+		}}}},
+		Bindings: []queryscheme.Binding{{Pointer: "/expressions/0/rules/0/value", Kind: queryscheme.BindingCurrentUser}},
+	}
+	currentUserRaw, _ := json.Marshal(currentUserPayload)
+	currentUserScheme, err := service.CreatePersonal(ctx, request.QuerySchemePersonalCreateReq{
+		Name: "当前用户惰性测试", ScopeCode: "system.user.list", Payload: currentUserRaw,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Resolve(ctx, currentUserScheme.ID, request.QuerySchemeResolveReq{ScopeCode: "system.user.list"}); err != nil {
+		t.Fatal(err)
+	}
+	if spy.employeeCalls != 0 {
+		t.Fatalf("CURRENT_USER queried employee binding %d times", spy.employeeCalls)
+	}
+
+	organizationScope := "organization.employee.list"
+	testutil.MustCreate(t, db, &model.SysMenu{
+		Basic: model.Basic{Id: 33, State: true}, Name: "organization_employee", Title: "员工管理",
+		TableCode: "org_employee", QueryScopeCode: &organizationScope,
+	})
+	testutil.MustCreate(t, db, &model.SysRoleMenu{RoleId: 11, MenuId: 33})
+	currentEmployeePayload := currentUserPayload
+	currentEmployeePayload.Bindings = []queryscheme.Binding{{
+		Pointer: "/expressions/0/rules/0/value", Kind: queryscheme.BindingCurrentEmployee,
+	}}
+	currentEmployeeRaw, _ := json.Marshal(currentEmployeePayload)
+	created, err := service.CreatePersonal(ctx, request.QuerySchemePersonalCreateReq{
+		Name: "当前员工惰性测试", ScopeCode: organizationScope, Payload: currentEmployeeRaw,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Available(ctx, organizationScope); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.List(ctx, request.QuerySchemeManagementQueryReq{ScopeCode: organizationScope}); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := service.UpdatePersonal(ctx, created.ID, request.QuerySchemePersonalUpdateReq{
+		Name: created.Name, Payload: currentEmployeeRaw, Revision: created.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spy.employeeCalls != 0 {
+		t.Fatalf("non-resolve operations queried employee binding %d times", spy.employeeCalls)
+	}
+
+	degraded, err := service.Resolve(ctx, updated.ID, request.QuerySchemeResolveReq{ScopeCode: organizationScope})
+	if err != nil || degraded.ValidationStatus != queryscheme.ValidationDegraded || spy.employeeCalls != 1 {
+		t.Fatalf("unbound employee resolve: result=%+v calls=%d err=%v", degraded, spy.employeeCalls, err)
+	}
+	testutil.MustCreate(t, db, &model.OrgEmployee{
+		Basic: model.Basic{Id: 501, State: true}, SourceSystemCode: "local", SourceId: "employee-501",
+		EmployeeNo: "E501", Name: "测试员工", EmploymentStatus: "active", UserId: intPointerForTest(101),
+	})
+	resolved, err := service.Resolve(ctx, updated.ID, request.QuerySchemeResolveReq{ScopeCode: organizationScope})
+	if err != nil || resolved.ResolvedQuery == nil || spy.employeeCalls != 2 {
+		t.Fatalf("bound employee resolve: result=%+v calls=%d err=%v", resolved, spy.employeeCalls, err)
+	}
+	if resolved.ResolvedQuery.Expressions[0].Rules[0].Value != float64(501) {
+		t.Fatalf("resolved employee = %#v", resolved.ResolvedQuery.Expressions[0].Rules[0].Value)
+	}
+}
+
+func TestQuerySchemeManagementListBatchesScopeLabelsAndRoleRelations(t *testing.T) {
+	service, _ := newQuerySchemeTestService(t, true)
+	spy := &querySchemeRepositorySpy{QuerySchemeRepository: service.repository}
+	service.repository = spy
+	ctx := querySchemeContext(101)
+	first, err := service.CreateShared(ctx, request.QuerySchemeSharedCreateReq{
+		Name: "角色方案一", ScopeCode: "system.user.list", SchemeType: model.QuerySchemeTypeRole,
+		Payload: querySchemePayloadJSON(t), Enabled: true, RoleIDs: []int{11},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.CreateShared(ctx, request.QuerySchemeSharedCreateReq{
+		Name: "角色方案二", ScopeCode: "system.role.list", SchemeType: model.QuerySchemeTypeRole,
+		Payload: querySchemePayloadJSON(t), Enabled: true, RoleIDs: []int{11, 22},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spy.roleIDCalls = 0
+	spy.roleIDBatchCalls = 0
+	spy.scopeLabelBatchCalls = 0
+	page, err := service.List(ctx, request.QuerySchemeManagementQueryReq{SchemeType: model.QuerySchemeTypeRole, Page: 1, Num: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spy.roleIDCalls != 0 || spy.roleIDBatchCalls != 1 || spy.scopeLabelBatchCalls != 1 {
+		t.Fatalf("list query counts: role=%d role_batch=%d scope_batch=%d", spy.roleIDCalls, spy.roleIDBatchCalls, spy.scopeLabelBatchCalls)
+	}
+	byID := make(map[int]response.QuerySchemeListRes, len(page.Data))
+	for _, item := range page.Data {
+		byID[item.ID] = item
+	}
+	if got := byID[first.ID]; got.ScopeLabel != "用户管理" || len(got.RoleIDs) != 1 || got.RoleIDs[0] != 11 {
+		t.Fatalf("first role scheme projection: %+v", got)
+	}
+	if got := byID[second.ID]; got.ScopeLabel != "角色管理" || len(got.RoleIDs) != 2 || got.RoleIDs[0] != 11 || got.RoleIDs[1] != 22 {
+		t.Fatalf("second role scheme projection: %+v", got)
+	}
+	config, err := service.GetScopeConfig(ctx, "system.user.list")
+	if err != nil || config.ScopeLabel != "用户管理" {
+		t.Fatalf("scope config label: result=%+v err=%v", config, err)
+	}
+}
+
 func newQuerySchemeTestService(t *testing.T, manager bool) (*QuerySchemeService, *gorm.DB) {
 	t.Helper()
 	db := testutil.OpenSQLite(t,
@@ -194,8 +345,8 @@ func newQuerySchemeTestService(t *testing.T, manager bool) (*QuerySchemeService,
 	roles := []model.SysRole{{Basic: model.Basic{Id: 11, State: true}, Name: "manager"}, {Basic: model.Basic{Id: 22, State: true}, Name: "ordinary"}}
 	scopes := []string{"system.user.list", "system.role.list"}
 	menus := []model.SysMenu{
-		{Basic: model.Basic{Id: 31, State: true}, Name: "system_user", TableCode: "sys_user", QueryScopeCode: &scopes[0]},
-		{Basic: model.Basic{Id: 32, State: true}, Name: "system_role", TableCode: "sys_role", QueryScopeCode: &scopes[1]},
+		{Basic: model.Basic{Id: 31, State: true}, Name: "system_user", Title: "用户管理", TableCode: "sys_user", QueryScopeCode: &scopes[0]},
+		{Basic: model.Basic{Id: 32, State: true}, Name: "system_role", Title: "角色管理", TableCode: "sys_role", QueryScopeCode: &scopes[1]},
 	}
 	for index := range users {
 		testutil.MustCreate(t, db, &users[index])
@@ -229,6 +380,8 @@ func newQuerySchemeTestService(t *testing.T, manager bool) (*QuerySchemeService,
 	repository := impl.NewQuerySchemeRepositoryImpl(&database.PrimaryDB{DB: db})
 	return NewQuerySchemeService(repository, queryscheme.NewRegistry(), reader, sf, nil), db
 }
+
+func intPointerForTest(value int) *int { return &value }
 
 func querySchemeContext(userID int) context.Context {
 	return audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(userID, "test"))

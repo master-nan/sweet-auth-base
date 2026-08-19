@@ -127,6 +127,25 @@ func (repositoryImpl *QuerySchemeRepositoryImpl) RoleIDs(db *gorm.DB, schemeID i
 	return roleIDs, err
 }
 
+func (repositoryImpl *QuerySchemeRepositoryImpl) FindRoleIDsBySchemeIDs(
+	ctx context.Context,
+	schemeIDs []int,
+) (map[int][]int, error) {
+	result := make(map[int][]int, len(schemeIDs))
+	if len(schemeIDs) == 0 {
+		return result, nil
+	}
+	var rows []model.QuerySchemeRole
+	if err := repositoryImpl.db.WithContext(ctx).Model(&model.QuerySchemeRole{}).
+		Where("scheme_id IN ?", schemeIDs).Order("scheme_id ASC, role_id ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.SchemeID] = append(result[row.SchemeID], row.RoleID)
+	}
+	return result, nil
+}
+
 func (repositoryImpl *QuerySchemeRepositoryImpl) ReplaceRoles(db *gorm.DB, schemeID int, roleIDs []int) error {
 	if err := db.Where("scheme_id = ?", schemeID).Delete(&model.QuerySchemeRole{}).Error; err != nil {
 		return err
@@ -180,6 +199,31 @@ func (repositoryImpl *QuerySchemeRepositoryImpl) FindActiveScopeMenu(
 		Where("sys_menu.query_scope_code = ? AND sys_menu.state = TRUE AND sys_menu.gmt_delete IS NULL", scopeCode).
 		Distinct("sys_menu.*").First(&menu).Error
 	return menu, err
+}
+
+func (repositoryImpl *QuerySchemeRepositoryImpl) FindActiveScopeLabels(
+	ctx context.Context,
+	scopeCodes []string,
+) (map[string]string, error) {
+	result := make(map[string]string, len(scopeCodes))
+	if len(scopeCodes) == 0 {
+		return result, nil
+	}
+	var rows []struct {
+		ScopeCode string
+		Title     string
+	}
+	err := repositoryImpl.db.WithContext(ctx).Model(&model.SysMenu{}).
+		Select("query_scope_code AS scope_code, title").
+		Where("query_scope_code IN ? AND state = TRUE AND gmt_delete IS NULL", scopeCodes).
+		Order("query_scope_code ASC").Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ScopeCode] = row.Title
+	}
+	return result, nil
 }
 
 func (repositoryImpl *QuerySchemeRepositoryImpl) ActiveRoleIDs(ctx context.Context, userID int) ([]int, error) {
