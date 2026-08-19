@@ -107,7 +107,12 @@ const load = async () => {
     const tableCode = scope.data?.table_code
     fields.value = tableCode ? (await tableApi.queryRuntimeTableByCode(tableCode)).data?.table_fields || [] : []
     if (detail.value.type === QuerySchemeType.ROLE) {
-      roles.value = (await roleApi.queryRole({ page: 1, num: 100, expressions: [] })).data || []
+      const results = await Promise.allSettled(
+        (detail.value.role_ids || []).map((id) => roleApi.queryRoleById(id)),
+      )
+      roles.value = results.flatMap((result) =>
+        result.status === 'fulfilled' && result.value.data ? [result.value.data] : [],
+      )
     }
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '方案详情加载失败'

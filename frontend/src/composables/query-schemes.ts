@@ -67,7 +67,7 @@ export function useQuerySchemes<TQuery extends Query>(
   )
 
   const loadAvailable = async () => {
-    if (!scope.scopeCode.value) return []
+    if (!scope.scopeCode.value) return null
     loading.value = true
     error.value = ''
     try {
@@ -77,7 +77,7 @@ export function useQuerySchemes<TQuery extends Query>(
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : '查询方案加载失败'
       schemes.value = []
-      return []
+      return null
     } finally {
       loading.value = false
     }
@@ -115,13 +115,19 @@ export function useQuerySchemes<TQuery extends Query>(
     if (initialized.value) return false
     const config = await scope.loadScope()
     if (!config) return false
-    await loadAvailable()
-    initialized.value = true
+    const availableSchemes = await loadAvailable()
+    if (!availableSchemes) return false
     const requestedScheme = requestedSchemeId
       ? schemes.value.find((scheme) => scheme.id === requestedSchemeId)
       : undefined
     const defaultScheme = requestedScheme || personalDefault.value || pageDefault.value
-    return defaultScheme ? applyScheme(defaultScheme) : false
+    if (!defaultScheme) {
+      initialized.value = true
+      return false
+    }
+    const applied = await applyScheme(defaultScheme)
+    initialized.value = applied || blockedScheme.value !== null
+    return applied
   }
 
   const applyPreset = (payload: QuerySchemePayloadV1) => {

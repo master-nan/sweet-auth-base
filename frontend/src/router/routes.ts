@@ -16,7 +16,6 @@ declare module 'vue-router' {
     reportId?: number
     reportCode?: string
     permissionTableCode?: string
-    queryScopeCode?: string
     showTag?: boolean
     fullscreen?: boolean
   }

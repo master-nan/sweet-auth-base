@@ -13,16 +13,13 @@
           <q-input class="col-12 col-md-6" v-model="name" outlined dense label="方案名称" maxlength="64" />
         </div>
         <div class="row items-center q-gutter-lg">
-          <q-toggle v-if="schemeType !== QuerySchemeType.PERSONAL" v-model="enabled" label="启用" />
           <q-checkbox v-if="schemeType === QuerySchemeType.PERSONAL || schemeType === QuerySchemeType.PAGE_DEFAULT" v-model="isDefault" :label="schemeType === QuerySchemeType.PERSONAL ? '设为我的默认方案' : '设为页面默认方案'" />
         </div>
-        <q-select
+        <role-select
           v-if="schemeType === QuerySchemeType.ROLE"
           v-model="roleIds"
-          outlined dense multiple use-chips emit-value map-options
-          :options="roleOptions"
           label="适用角色（最多32个）"
-          :rules="[(value) => (value.length > 0 && value.length <= 32) || '请选择1至32个角色']"
+          :rules="[validateRoleIds]"
         />
         <q-banner v-if="scopeError" class="bg-warning text-dark rounded-borders">{{ scopeError }}</q-banner>
         <q-btn outline color="primary" icon="tune" label="编辑查询条件" :disable="!scopeConfig" @click="showQuery = true" />
@@ -50,9 +47,9 @@ import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
+import RoleSelect from 'src/components/Select/RoleSelect.vue'
 import { useQuerySchemeApi } from 'src/api/services/query-scheme'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
-import { useRoleApi } from 'src/api/services/sys-role'
 import { normalizeQuerySchemePayload } from 'src/utils/query-state'
 import { ExpressionLogic } from 'src/types/enum'
 import type { Query } from 'src/types/global'
@@ -75,13 +72,10 @@ const emit = defineEmits<{ 'update:modelValue': [value: boolean]; saved: [] }>()
 const visible = computed({ get: () => props.modelValue, set: (value) => emit('update:modelValue', value) })
 const api = useQuerySchemeApi()
 const tableApi = useTableApi()
-const roleApi = useRoleApi()
 const name = ref('')
 const scopeCode = ref('')
-const enabled = ref(true)
 const isDefault = ref(false)
 const roleIds = ref<number[]>([])
-const roles = ref<Array<{ id: number; name: string }>>([])
 const fields = ref<TableField[]>([])
 const scopeConfig = ref<QueryScopeConfig | null>(null)
 const scopeError = ref('')
@@ -90,8 +84,9 @@ const showQuery = ref(false)
 const bindings = ref<QuerySchemeBinding[]>([])
 const query = ref<Query>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] })
 const payload = computed(() => normalizeQuerySchemePayload(query.value, bindings.value))
-const roleOptions = computed(() => roles.value.map((role) => ({ label: role.name, value: role.id })))
 const valid = computed(() => !!scopeCode.value && !!name.value.trim() && (props.schemeType !== QuerySchemeType.ROLE || (roleIds.value.length > 0 && roleIds.value.length <= 32)))
+const validateRoleIds = (value: number[]) =>
+  (value.length > 0 && value.length <= 32) || '请选择1至32个角色'
 
 const loadScope = async () => {
   scopeConfig.value = null
@@ -112,16 +107,12 @@ const reset = async () => {
   const detail = props.detail
   name.value = detail?.name || ''
   scopeCode.value = detail?.scope_code || props.scopeOptions[0]?.value || ''
-  enabled.value = detail?.enabled ?? true
   isDefault.value = detail?.is_default ?? props.schemeType === QuerySchemeType.PAGE_DEFAULT
   roleIds.value = [...(detail?.role_ids || [])]
   const source = detail?.query_payload
   query.value = { page: 1, num: 15, order: source?.order || { field: '', is_asc: false }, quick_query: source?.quick_query || { keyword: '' }, expressions: source?.expressions || [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] }
   bindings.value = [...(source?.bindings || [])]
   await loadScope()
-  if (props.schemeType === QuerySchemeType.ROLE && !roles.value.length) {
-    roles.value = (await roleApi.queryRole({ page: 1, num: 100, expressions: [] })).data || []
-  }
 }
 
 const submit = async () => {
@@ -132,12 +123,9 @@ const submit = async () => {
       if (!props.detail) throw new Error('请从业务页面新建个人方案')
       await api.updatePersonal(props.detail.id, { name: name.value.trim(), query_payload: payload.value, is_default: isDefault.value, revision: props.detail.revision })
     } else if (props.detail) {
-      const updated = await api.updateShared(props.detail.id, { name: name.value.trim(), query_payload: payload.value, is_default: props.schemeType === QuerySchemeType.PAGE_DEFAULT ? isDefault.value : false, role_ids: props.schemeType === QuerySchemeType.ROLE ? roleIds.value : [], revision: props.detail.revision })
-      if (updated.data && updated.data.enabled !== enabled.value) {
-        await api.setSharedEnabled(updated.data.id, enabled.value, updated.data.revision)
-      }
+      await api.updateShared(props.detail.id, { name: name.value.trim(), query_payload: payload.value, is_default: props.schemeType === QuerySchemeType.PAGE_DEFAULT ? isDefault.value : false, role_ids: props.schemeType === QuerySchemeType.ROLE ? roleIds.value : [], revision: props.detail.revision })
     } else {
-      await api.createShared({ name: name.value.trim(), scope_code: scopeCode.value, scheme_type: props.schemeType as Exclude<SchemeType, 'PERSONAL'>, query_payload: payload.value, is_default: props.schemeType === QuerySchemeType.PAGE_DEFAULT ? isDefault.value : false, enabled: enabled.value, role_ids: props.schemeType === QuerySchemeType.ROLE ? roleIds.value : [] })
+      await api.createShared({ name: name.value.trim(), scope_code: scopeCode.value, scheme_type: props.schemeType as Exclude<SchemeType, 'PERSONAL'>, query_payload: payload.value, is_default: props.schemeType === QuerySchemeType.PAGE_DEFAULT ? isDefault.value : false, enabled: true, role_ids: props.schemeType === QuerySchemeType.ROLE ? roleIds.value : [] })
     }
     visible.value = false
     emit('saved')

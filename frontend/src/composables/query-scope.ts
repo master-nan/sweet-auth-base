@@ -39,9 +39,7 @@ export function useQueryScope(routeName?: MaybeRefOrGetter<string>) {
     String(routeName ? toValue(routeName) : route?.name || ''),
   )
   const menu = computed(() => findMenu(userStore.menus, currentRouteName.value))
-  const scopeCode = computed(
-    () => String(route?.meta.queryScopeCode || menu.value?.query_scope_code || '').trim(),
-  )
+  const scopeCode = computed(() => String(menu.value?.query_scope_code || '').trim())
   const available = computed(() => !!scopeCode.value && !!config.value)
 
   const loadScope = async () => {

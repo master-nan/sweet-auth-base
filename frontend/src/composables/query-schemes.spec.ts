@@ -73,4 +73,43 @@ describe('useQuerySchemes', () => {
     expect(state.schemeSource.value?.revision).toBe(3)
     expect(state.dirty.value).toBe(true)
   })
+
+  it('allows initialization to retry after loading available schemes fails', async () => {
+    api.available
+      .mockRejectedValueOnce(new Error('网络异常'))
+      .mockResolvedValueOnce({ data: [] })
+    const runtime = useQuerySchemes('system_user', createState())
+
+    expect(await runtime.initialize()).toBe(false)
+    expect(runtime.initialized.value).toBe(false)
+    expect(await runtime.initialize()).toBe(false)
+    expect(runtime.initialized.value).toBe(true)
+    expect(api.available).toHaveBeenCalledTimes(2)
+  })
+
+  it('allows initialization to retry after resolving the default scheme fails', async () => {
+    const personal = { id: 1, name: '个人默认', type: QuerySchemeType.PERSONAL, is_default: true, status: QuerySchemeValidationStatus.VALID }
+    api.available.mockResolvedValue({ data: [personal] })
+    api.resolve
+      .mockRejectedValueOnce(new Error('网络异常'))
+      .mockResolvedValueOnce({ data: { scheme: { ...personal, revision: 1 }, validation_status: QuerySchemeValidationStatus.VALID, issues: [], bindings: [], binding_kinds: [], resolved_query: { expressions: [], quick_query: { keyword: '' }, order: { field: '', is_asc: false } } } })
+    const runtime = useQuerySchemes('system_user', createState())
+
+    expect(await runtime.initialize()).toBe(false)
+    expect(runtime.initialized.value).toBe(false)
+    expect(await runtime.initialize()).toBe(true)
+    expect(runtime.initialized.value).toBe(true)
+    expect(api.resolve).toHaveBeenCalledTimes(2)
+  })
+
+  it('finishes initialization without applying a degraded default scheme', async () => {
+    const degraded = { id: 3, name: '旧字段方案', type: QuerySchemeType.PAGE_DEFAULT, is_default: true, status: QuerySchemeValidationStatus.DEGRADED }
+    api.available.mockResolvedValue({ data: [degraded] })
+    api.resolve.mockResolvedValue({ data: { scheme: { ...degraded, revision: 1 }, validation_status: QuerySchemeValidationStatus.DEGRADED, issues: [{ code: 'field_unavailable', message: '字段已不可用' }], bindings: [], binding_kinds: [] } })
+    const runtime = useQuerySchemes('system_user', createState())
+
+    expect(await runtime.initialize()).toBe(false)
+    expect(runtime.initialized.value).toBe(true)
+    expect(runtime.blockedScheme.value?.id).toBe(3)
+  })
 })
