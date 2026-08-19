@@ -68,6 +68,8 @@ func TestCasbinHandlerAllowsAuthenticatedCommonRouteWithoutPolicy(t *testing.T) 
 		"/admin/menu/my",
 		"/admin/runtime/dict/:code",
 		"/admin/runtime/table/:code",
+		"/admin/runtime/query-scopes/:scope",
+		"/admin/runtime/query-schemes/available",
 	} {
 		t.Run(route, func(t *testing.T) {
 			enforcer := newTestEnforcer(t)
@@ -83,13 +85,32 @@ func TestCasbinHandlerAllowsAuthenticatedCommonRouteWithoutPolicy(t *testing.T) 
 				ctx.Status(http.StatusNoContent)
 			})
 
-			requestPath := strings.Replace(route, ":code", "example", 1)
+			requestPath := strings.Replace(strings.Replace(route, ":code", "example", 1), ":scope", "system.user.list", 1)
 			req := httptest.NewRequest(http.MethodGet, requestPath, nil)
 			router.ServeHTTP(httptest.NewRecorder(), req)
 			if !called {
 				t.Fatalf("expected authenticated common route %s to pass without policy", route)
 			}
 		})
+	}
+}
+
+func TestCasbinHandlerQuerySchemePersonalIsControllerScopedButSharedIsNot(t *testing.T) {
+	enforcer := newTestEnforcer(t)
+	router := gin.New()
+	router.Use(func(ctx *gin.Context) {
+		ctx.Set("user", model.SysUser{UserName: "tom", Roles: []model.SysRole{{Name: "viewer"}}})
+		ctx.Next()
+	})
+	router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
+	personalCalled := false
+	sharedCalled := false
+	router.POST("/admin/query-schemes/personal", func(ctx *gin.Context) { personalCalled = true })
+	router.POST("/admin/query-schemes/shared", func(ctx *gin.Context) { sharedCalled = true })
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/admin/query-schemes/personal", nil))
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/admin/query-schemes/shared", nil))
+	if !personalCalled || sharedCalled {
+		t.Fatalf("personal_called=%v shared_called=%v", personalCalled, sharedCalled)
 	}
 }
 

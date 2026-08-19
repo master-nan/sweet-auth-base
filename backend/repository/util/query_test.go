@@ -9,6 +9,7 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/datapermission"
+	"backend/internal/queryscheme"
 	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
@@ -756,6 +757,27 @@ func TestDynamicQueryWithPermissionKeepsNotApplicableUnfiltered(t *testing.T) {
 	}
 	if result.Total != 4 {
 		t.Fatalf("not_applicable total = %d, want 4", result.Total)
+	}
+}
+
+func TestResolvedQuerySchemeIsANDedWithDataPermission(t *testing.T) {
+	db := generalizationPermissionTestDB(t)
+	table := generalizationPermissionTestTable()
+	resolved := queryscheme.ResolvedQuery{Expressions: []request.ExpressionGroup{{
+		Logic: enum.And,
+		Rules: []request.QueryRule{{Field: "name", ExpressionType: enum.Eq, Value: "alpha", Type: enum.VarcharFieldType}},
+	}}}
+	execution := mustQueryAdapterExecution(t, datapermission.DataScopeDecisionFiltered, [][]datapermission.DataScopeCondition{{
+		mustQueryScopeCondition(t, "owner_org", 101, datapermission.DataScopeOperatorEqual, []any{int64(11)}),
+	}})
+	result, err := DynamicQueryWithPermission(db, &request.Basic{
+		Page: 1, Num: 10, Expressions: resolved.Expressions, QuickQuery: &resolved.QuickQuery, Order: resolved.Order,
+	}, table, repository.GeneralizationPermission{AdapterExecution: &execution})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ids := generalizationPermissionResultIds(t, result.Data); !reflect.DeepEqual(ids, []int64{1}) {
+		t.Fatalf("scheme query must narrow, never replace, data permission: ids=%v", ids)
 	}
 }
 

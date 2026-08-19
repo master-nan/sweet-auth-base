@@ -2013,6 +2013,378 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/query-schemes/personal": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "新建个人查询方案",
+                "parameters": [
+                    {
+                        "description": "个人方案",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemePersonalCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/personal/{id}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "更新个人查询方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "个人方案",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemePersonalUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "删除个人查询方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "修订号",
+                        "name": "revision",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/personal/{id}/default": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "设置或取消个人默认方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "默认状态与修订号",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeDefaultReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/query": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "分页查询可管理或可使用的查询方案",
+                "parameters": [
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeManagementQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/shared": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "新建共享查询方案",
+                "parameters": [
+                    {
+                        "description": "共享方案",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeSharedCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/shared/{id}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "更新共享查询方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "共享方案",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeSharedUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "删除共享查询方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "修订号",
+                        "name": "revision",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/shared/{id}/enabled": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "启停共享查询方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "启停参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeEnabledReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "获取查询方案详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/query-schemes/{id}/copy-to-personal": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "复制可见共享方案为个人方案",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "来源方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "复制参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeCopyReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/role": {
             "post": {
                 "description": "创建角色",
@@ -2312,6 +2684,102 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "请求成功",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/query-schemes/available": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "获取当前查询范围可用方案摘要",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "查询范围编码",
+                        "name": "scope_code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/query-schemes/{id}/resolve": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "解析查询方案为标准查询",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "方案ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "解析参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.QuerySchemeResolveReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/query-scopes/{scope}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "查询方案中心"
+                ],
+                "summary": "获取查询范围运行配置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "查询范围编码",
+                        "name": "scope",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
                         }
@@ -4950,6 +5418,21 @@ const docTemplate = `{
                 "View"
             ]
         },
+        "model.QuerySchemeType": {
+            "type": "string",
+            "enum": [
+                "PERSONAL",
+                "PUBLIC",
+                "ROLE",
+                "PAGE_DEFAULT"
+            ],
+            "x-enum-varnames": [
+                "QuerySchemeTypePersonal",
+                "QuerySchemeTypePublic",
+                "QuerySchemeTypeRole",
+                "QuerySchemeTypePageDefault"
+            ]
+        },
         "request.AccessLogQueryReq": {
             "type": "object",
             "properties": {
@@ -5500,6 +5983,10 @@ const docTemplate = `{
                 "pid": {
                     "type": "integer"
                 },
+                "query_scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                },
                 "redirect": {
                     "type": "string"
                 },
@@ -5582,6 +6069,10 @@ const docTemplate = `{
                 },
                 "pid": {
                     "type": "integer"
+                },
+                "query_scope_code": {
+                    "type": "string",
+                    "maxLength": 128
                 },
                 "redirect": {
                     "type": "string"
@@ -6437,6 +6928,229 @@ const docTemplate = `{
                 },
                 "value": {
                     "description": "值"
+                }
+            }
+        },
+        "request.QuerySchemeCopyReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "scope_code"
+            ],
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "request.QuerySchemeDefaultReq": {
+            "type": "object",
+            "required": [
+                "revision"
+            ],
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "request.QuerySchemeEnabledReq": {
+            "type": "object",
+            "required": [
+                "revision"
+            ],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "request.QuerySchemeManagementQueryReq": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "num": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1
+                },
+                "page": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "scheme_type": {
+                    "$ref": "#/definitions/model.QuerySchemeType"
+                },
+                "scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "request.QuerySchemePersonalCreateReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "query_payload",
+                "scope_code"
+            ],
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "query_payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "request.QuerySchemePersonalUpdateReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "query_payload",
+                "revision"
+            ],
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "query_payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "request.QuerySchemeResolveReq": {
+            "type": "object",
+            "required": [
+                "scope_code"
+            ],
+            "properties": {
+                "expected_revision": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "request.QuerySchemeSharedCreateReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "query_payload",
+                "scheme_type",
+                "scope_code"
+            ],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "query_payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "scheme_type": {
+                    "$ref": "#/definitions/model.QuerySchemeType"
+                },
+                "scope_code": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "request.QuerySchemeSharedUpdateReq": {
+            "type": "object",
+            "required": [
+                "name",
+                "query_payload",
+                "revision"
+            ],
+            "properties": {
+                "is_default": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "query_payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },

@@ -16,6 +16,7 @@ import (
 	"backend/internal/datapermission"
 	"backend/internal/integration"
 	"backend/internal/metadata"
+	"backend/internal/queryscheme"
 	"backend/internal/security"
 	"backend/internal/storage"
 	"backend/internal/token"
@@ -51,6 +52,7 @@ type App struct {
 	RetryPolicyController          *controller.RetryPolicyController
 	IntegrationSyncController      *controller.IntegrationSyncController
 	IntegrationExecutionController *controller.IntegrationExecutionController
+	QuerySchemeController          *controller.QuerySchemeController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -132,6 +134,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewSmsTemplateImpl,
 	impl.NewFileRepositoryImpl,
 	impl.NewFileChunkRepositoryImpl,
+	impl.NewQuerySchemeRepositoryImpl,
 	wire.Bind(new(repository.AccessLogRepository), new(*impl.AccessLogRepositoryImpl)),
 	wire.Bind(new(repository.LoginLogRepository), new(*impl.LoginLogRepositoryImpl)),
 	wire.Bind(new(repository.SysConfigureRepository), new(*impl.SysConfigureRepositoryImpl)),
@@ -186,6 +189,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.SmsTemplateRepository), new(*impl.SmsTemplateImpl)),
 	wire.Bind(new(repository.FileRepository), new(*impl.FileRepositoryImpl)),
 	wire.Bind(new(repository.FileChunkRepository), new(*impl.FileChunkRepositoryImpl)),
+	wire.Bind(new(repository.QuerySchemeRepository), new(*impl.QuerySchemeRepositoryImpl)),
 )
 
 // Cache 提供者
@@ -282,6 +286,8 @@ var ServiceProvider = wire.NewSet(
 	service.NewFileUploadService,
 	service.NewFileAccessService,
 	service.NewFileMetadataService,
+	queryscheme.NewRegistry,
+	service.NewQuerySchemeService,
 )
 
 // Controller 提供者
@@ -308,6 +314,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewFileUploadController,
 	controller.NewFileMetadataController,
 	controller.NewFileAccessController,
+	controller.NewQuerySchemeController,
 )
 
 // API 提供者

@@ -464,7 +464,7 @@ Management query 支持 name、scope、type、enabled、page/num；最大 pageSi
 
 ### 14.3 DTO 白名单
 
-**AvailableSummary**：`id,name,type,is_default,status,revision,updated_at`。不返回 owner ID、角色 ID、Payload。
+**AvailableSummary**：`id,name,type,is_default,status`。不返回 owner ID、角色 ID、Payload 或普通用户无需感知的 revision 技术字段；revision 仅由 Resolve/Management 编辑链路携带。
 
 **ListItem**：上述字段 + `scope_code,scope_label,enabled,creator_display_name,role_summary`。PERSONAL 的创建者只显示“本人”。
 
@@ -618,7 +618,7 @@ Query Manager 使用隐藏 Route，四个 Tab：我的方案、公共方案、�
 | Special | Login/Change Password/Dashboard/404 | NO | 非业务列表 |
 | Report | 全部 V1/V2 页面 | REPORT_DEFERRED | Query Center 不接 Report |
 
-首批固定 Scope 18 个，Dictionary Master 1 个，共 19 个 ENABLE；Generalization 条件接入不计入首批门禁。
+首批固定 Scope 共 18 个：System 5 个、Organization 4 个、Integration 8 个、Dictionary Master 1 个；Generalization 条件接入不计入首批门禁。
 
 ## 21. 路由与导航
 
@@ -648,7 +648,7 @@ V1 不新增一级“查询中心”菜单。共享管理员使用同一隐藏�
 | `src/pages/query-scheme/Index.vue` | NEW | Manager |
 | `src/pages/query-scheme/QuerySchemeDetailDrawer.vue` | NEW | Detail |
 | `src/router/routes.ts` | EXTEND | hidden Route |
-| 19 个 Eligible 页面 | INTEGRATE | scope config + Toolbar slots + useQuerySchemes，不复制逻辑 |
+| 18 个 Eligible 页面 | INTEGRATE | scope config + Toolbar slots + useQuerySchemes，不复制逻辑 |
 
 ### 22.2 Backend
 
@@ -722,7 +722,7 @@ V1 不新增一级“查询中心”菜单。共享管理员使用同一隐藏�
 16. Admin 与 Limited User；
 17. 亮色/深色、Toolbar wrap、Dialog maximize、键盘与 tooltip；
 18. Console Error/Unhandled Promise/误 403 为 0；
-19. 19 个首批 Eligible 页面集成回归；
+19. 18 个首批 Eligible 页面集成回归；
 20. Report 公共组件兼容，仍 REPORT_DEFERRED。
 
 ## 24. 性能与运维
@@ -764,7 +764,7 @@ AdvancedQuery Simple/Preview、Toolbar slots、Query State dirty/source、Select
 
 ### QC-002C Page Integration + Browser Acceptance
 
-19 个 Eligible 页面接入、Generalization 条件评审、Admin/Limited User、Data Permission E2E、动态日期跨边界、Report 回归和 Query Center Freeze Review。
+18 个 Eligible 页面接入、Generalization 条件评审、Admin/Limited User、Data Permission E2E、动态日期跨边界、Report 回归和 Query Center Freeze Review。
 
 不得把 A/B/C 压成一个超大提交。QC-001 Reviewer Gate 已通过，允许进入 QC-002A；QC-002A 仍必须遵守本设计的生产代码范围和验收要求。
 

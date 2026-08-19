@@ -94,6 +94,22 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/dict/:id", app.DictController.UpdateSysDict)
 		adminGroup.DELETE("/dict/:id", app.DictController.DeleteSysDictById)
 
+		// 查询方案中心：Runtime只返回当前Scope可见方案，个人写入继续由Owner约束。
+		adminGroup.GET("/runtime/query-scopes/:scope", app.QuerySchemeController.ScopeConfig)
+		adminGroup.GET("/runtime/query-schemes/available", app.QuerySchemeController.Available)
+		adminGroup.POST("/runtime/query-schemes/:id/resolve", app.QuerySchemeController.Resolve)
+		adminGroup.POST("/query-schemes/query", app.QuerySchemeController.Query)
+		adminGroup.GET("/query-schemes/:id", app.QuerySchemeController.Detail)
+		adminGroup.POST("/query-schemes/personal", app.QuerySchemeController.CreatePersonal)
+		adminGroup.PUT("/query-schemes/personal/:id", app.QuerySchemeController.UpdatePersonal)
+		adminGroup.DELETE("/query-schemes/personal/:id", app.QuerySchemeController.DeletePersonal)
+		adminGroup.PUT("/query-schemes/personal/:id/default", app.QuerySchemeController.SetPersonalDefault)
+		adminGroup.POST("/query-schemes/:id/copy-to-personal", app.QuerySchemeController.CopyToPersonal)
+		adminGroup.POST("/query-schemes/shared", app.QuerySchemeController.CreateShared)
+		adminGroup.PUT("/query-schemes/shared/:id", app.QuerySchemeController.UpdateShared)
+		adminGroup.DELETE("/query-schemes/shared/:id", app.QuerySchemeController.DeleteShared)
+		adminGroup.PUT("/query-schemes/shared/:id/enabled", app.QuerySchemeController.SetSharedEnabled)
+
 		// 字典项
 		adminGroup.GET("/dict/items/:id", app.DictController.GetSysDictItemsByDictId)
 		adminGroup.GET("/dict/item/:id", app.DictController.GetSysDictItemById)

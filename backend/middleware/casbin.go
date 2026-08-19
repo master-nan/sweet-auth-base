@@ -125,26 +125,29 @@ func authenticatedUser(c *gin.Context) (model.SysUser, bool) {
 func allowAuthenticatedCommonRoute(objs []string, act string) bool {
 	act = strings.ToUpper(strings.TrimSpace(act))
 	for _, obj := range objs {
-		switch obj {
-		case "/admin/logout":
-			if act == "POST" {
-				return true
-			}
-		case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code":
-			if act == "GET" {
-				return true
-			}
-		case "/admin/user/password":
-			if act == "POST" {
-				return true
-			}
-		default:
-			if allowControllerScopedPermissionRoute(obj, act) {
-				return true
-			}
+		if allowAuthenticatedIdentityRoute(obj, act) || (obj == "/admin/user/password" && act == "POST") || allowControllerScopedPermissionRoute(obj, act) {
+			return true
 		}
 	}
 	return false
+}
+
+func allowAuthenticatedIdentityRoute(obj, act string) bool {
+	switch obj {
+	case "/admin/logout":
+		return act == "POST"
+	case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code",
+		"/admin/runtime/query-scopes/:scope", "/admin/runtime/query-schemes/available",
+		"/admin/query-schemes/:id":
+		return act == "GET"
+	case "/admin/runtime/query-schemes/:id/resolve", "/admin/query-schemes/query",
+		"/admin/query-schemes/personal", "/admin/query-schemes/:id/copy-to-personal":
+		return act == "POST"
+	case "/admin/query-schemes/personal/:id", "/admin/query-schemes/personal/:id/default":
+		return act == "PUT" || act == "DELETE"
+	default:
+		return false
+	}
 }
 
 // allowControllerScopedPermissionRoute 只允许已登录用户进入由控制器做二次权限判断的通用接口。
@@ -170,15 +173,10 @@ func allowControllerScopedPermissionRoute(obj, act string) bool {
 func allowMissingCasbinPolicy(objs []string, act string) bool {
 	act = strings.ToUpper(strings.TrimSpace(act))
 	for _, obj := range objs {
+		if allowAuthenticatedIdentityRoute(obj, act) {
+			return true
+		}
 		switch obj {
-		case "/admin/logout":
-			if act == "POST" {
-				return true
-			}
-		case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code":
-			if act == "GET" {
-				return true
-			}
 		case "/admin/generalization/detail/code/:code/:id":
 			if act == "GET" {
 				return true

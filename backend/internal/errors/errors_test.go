@@ -117,3 +117,25 @@ func TestClassifyRecognizesRawParameterError(t *testing.T) {
 		t.Fatalf("unexpected parameter error: %#v", applicationErr)
 	}
 }
+
+func TestQuerySchemeErrorsRemainStableAndSafe(t *testing.T) {
+	tests := []struct {
+		err  error
+		code int
+		kind Kind
+	}{
+		{ErrQuerySchemeScopeForbidden, ErrorCodeQuerySchemeScopeForbidden, KindForbidden},
+		{ErrQuerySchemeRevisionConflict, ErrorCodeQuerySchemeRevisionConflict, KindConflict},
+		{ErrQuerySchemePayloadTooLarge, ErrorCodeQuerySchemePayloadTooLarge, KindPayloadTooLarge},
+		{ErrQuerySchemeMetadataDegraded, ErrorCodeQuerySchemeMetadataDegraded, KindUnprocessable},
+	}
+	for _, test := range tests {
+		applicationErr, ok := AsApplicationError(test.err)
+		if !ok || applicationErr.Code != test.code || applicationErr.Kind != test.kind {
+			t.Fatalf("query scheme error mismatch: %+v", applicationErr)
+		}
+		if strings.Contains(strings.ToLower(applicationErr.SafeMessage), "sql") {
+			t.Fatalf("technical detail leaked: %q", applicationErr.SafeMessage)
+		}
+	}
+}

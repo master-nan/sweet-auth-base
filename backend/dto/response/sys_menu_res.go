@@ -39,6 +39,7 @@ type SysMenuListRes struct {
 	Sequence       uint8                  `json:"sequence"`
 	PageType       enum.SysMenuPageType   `json:"page_type"`
 	TableCode      string                 `json:"table_code"`
+	QueryScopeCode *string                `json:"query_scope_code,omitempty"`
 	Option         string                 `json:"option"`
 	Icon           *string                `json:"icon"`
 	Redirect       *string                `json:"redirect"`

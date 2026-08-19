@@ -10,6 +10,7 @@ import (
 	"backend/enum"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
+	"backend/internal/querycapability"
 	"backend/internal/security"
 	"backend/model"
 	"backend/repository"
@@ -427,6 +428,9 @@ func applyRule(query *gorm.DB, rule request.QueryRule, value interface{}, table 
 	}
 	tableField, ok := findField(table, rule.Field)
 	if !ok || security.IsSensitiveFieldName(rule.Field) {
+		return query.Where("1 = 0")
+	}
+	if !querycapability.SupportsExecution(rule.ExpressionType) {
 		return query.Where("1 = 0")
 	}
 	fieldType := tableField.FieldType

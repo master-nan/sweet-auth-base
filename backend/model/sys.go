@@ -47,6 +47,7 @@ type SysMenu struct {
 	Sequence       uint8                  `gorm:"comment:排序;type:smallint" json:"sequence"`
 	PageType       enum.SysMenuPageType   `gorm:"size:32;comment:页面类型" json:"page_type"`
 	TableCode      string                 `gorm:"size:128;comment:绑定表编码" json:"table_code"`
+	QueryScopeCode *string                `gorm:"size:128;comment:查询方案范围编码" json:"query_scope_code,omitempty"`
 	Option         string                 `gorm:"type:text;comment:扩展配置" json:"option"`
 	Icon           *string                `gorm:"size:32;comment:图标" json:"icon"`
 	Redirect       *string                `gorm:"size:128;comment:重定向地址" json:"redirect"`

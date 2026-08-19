@@ -225,6 +225,18 @@ definitions:
     x-enum-varnames:
     - System
     - View
+  model.QuerySchemeType:
+    enum:
+    - PERSONAL
+    - PUBLIC
+    - ROLE
+    - PAGE_DEFAULT
+    type: string
+    x-enum-varnames:
+    - QuerySchemeTypePersonal
+    - QuerySchemeTypePublic
+    - QuerySchemeTypeRole
+    - QuerySchemeTypePageDefault
   request.AccessLogQueryReq:
     properties:
       action:
@@ -593,6 +605,9 @@ definitions:
         type: string
       pid:
         type: integer
+      query_scope_code:
+        maxLength: 128
+        type: string
       redirect:
         type: string
       sequence:
@@ -649,6 +664,9 @@ definitions:
         type: string
       pid:
         type: integer
+      query_scope_code:
+        maxLength: 128
+        type: string
       redirect:
         type: string
       sequence:
@@ -1255,6 +1273,162 @@ definitions:
         description: 字段类型
       value:
         description: 值
+    type: object
+  request.QuerySchemeCopyReq:
+    properties:
+      is_default:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      scope_code:
+        maxLength: 128
+        type: string
+    required:
+    - name
+    - scope_code
+    type: object
+  request.QuerySchemeDefaultReq:
+    properties:
+      is_default:
+        type: boolean
+      revision:
+        minimum: 1
+        type: integer
+    required:
+    - revision
+    type: object
+  request.QuerySchemeEnabledReq:
+    properties:
+      enabled:
+        type: boolean
+      revision:
+        minimum: 1
+        type: integer
+    required:
+    - revision
+    type: object
+  request.QuerySchemeManagementQueryReq:
+    properties:
+      enabled:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      num:
+        maximum: 100
+        minimum: 1
+        type: integer
+      page:
+        minimum: 1
+        type: integer
+      scheme_type:
+        $ref: '#/definitions/model.QuerySchemeType'
+      scope_code:
+        maxLength: 128
+        type: string
+    type: object
+  request.QuerySchemePersonalCreateReq:
+    properties:
+      is_default:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      query_payload:
+        items:
+          type: integer
+        type: array
+      scope_code:
+        maxLength: 128
+        type: string
+    required:
+    - name
+    - query_payload
+    - scope_code
+    type: object
+  request.QuerySchemePersonalUpdateReq:
+    properties:
+      is_default:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      query_payload:
+        items:
+          type: integer
+        type: array
+      revision:
+        minimum: 1
+        type: integer
+    required:
+    - name
+    - query_payload
+    - revision
+    type: object
+  request.QuerySchemeResolveReq:
+    properties:
+      expected_revision:
+        minimum: 1
+        type: integer
+      scope_code:
+        maxLength: 128
+        type: string
+    required:
+    - scope_code
+    type: object
+  request.QuerySchemeSharedCreateReq:
+    properties:
+      enabled:
+        type: boolean
+      is_default:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      query_payload:
+        items:
+          type: integer
+        type: array
+      role_ids:
+        items:
+          type: integer
+        maxItems: 32
+        type: array
+      scheme_type:
+        $ref: '#/definitions/model.QuerySchemeType'
+      scope_code:
+        maxLength: 128
+        type: string
+    required:
+    - name
+    - query_payload
+    - scheme_type
+    - scope_code
+    type: object
+  request.QuerySchemeSharedUpdateReq:
+    properties:
+      is_default:
+        type: boolean
+      name:
+        maxLength: 64
+        type: string
+      query_payload:
+        items:
+          type: integer
+        type: array
+      revision:
+        minimum: 1
+        type: integer
+      role_ids:
+        items:
+          type: integer
+        maxItems: 32
+        type: array
+    required:
+    - name
+    - query_payload
+    - revision
     type: object
   request.QuickQuery:
     properties:
@@ -3049,6 +3223,247 @@ paths:
       summary: 管理组织树
       tags:
       - 组织主数据
+  /admin/query-schemes/{id}:
+    get:
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取查询方案详情
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/{id}/copy-to-personal:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 来源方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 复制参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeCopyReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 复制可见共享方案为个人方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/personal:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 个人方案
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemePersonalCreateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 新建个人查询方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/personal/{id}:
+    delete:
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 修订号
+        in: query
+        name: revision
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除个人查询方案
+      tags:
+      - 查询方案中心
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 个人方案
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemePersonalUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新个人查询方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/personal/{id}/default:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 默认状态与修订号
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeDefaultReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 设置或取消个人默认方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/query:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 查询参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeManagementQueryReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 分页查询可管理或可使用的查询方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/shared:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 共享方案
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeSharedCreateReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 新建共享查询方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/shared/{id}:
+    delete:
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 修订号
+        in: query
+        name: revision
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 删除共享查询方案
+      tags:
+      - 查询方案中心
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 共享方案
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeSharedUpdateReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新共享查询方案
+      tags:
+      - 查询方案中心
+  /admin/query-schemes/shared/{id}/enabled:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 启停参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeEnabledReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 启停共享查询方案
+      tags:
+      - 查询方案中心
   /admin/role:
     post:
       description: 创建角色
@@ -3253,6 +3668,68 @@ paths:
       summary: 查询角色列表
       tags:
       - 角色
+  /admin/runtime/query-schemes/{id}/resolve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 方案ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 解析参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.QuerySchemeResolveReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 解析查询方案为标准查询
+      tags:
+      - 查询方案中心
+  /admin/runtime/query-schemes/available:
+    get:
+      parameters:
+      - description: 查询范围编码
+        in: query
+        name: scope_code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取当前查询范围可用方案摘要
+      tags:
+      - 查询方案中心
+  /admin/runtime/query-scopes/{scope}:
+    get:
+      parameters:
+      - description: 查询范围编码
+        in: path
+        name: scope
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取查询范围运行配置
+      tags:
+      - 查询方案中心
   /admin/sms/template:
     post:
       description: 创建短信模板

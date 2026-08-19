@@ -3,6 +3,7 @@ package main
 import (
 	"backend/config"
 	"backend/enum"
+	"backend/internal/queryscheme"
 	"backend/model"
 	"os"
 	"regexp"
@@ -133,6 +134,22 @@ func TestFunctionalPermissionProjectionSeedIsIdempotentAndCoversStrictRoutes(t *
 	assertNoDuplicateGroups(t, db, "sys_menu_button_template", []string{"scene", "code_suffix"})
 	assertNoDuplicateGroups(t, db, "sys_role_menu_button", []string{"role_id", "menu_id", "button_id"})
 	assertNoDuplicateGroups(t, db, "casbin_rule", []string{"ptype", "v0", "v1", "v2"})
+	var scopeCount int64
+	if err := db.Model(&model.SysMenu{}).Where("query_scope_code IS NOT NULL AND state = ?", true).Count(&scopeCount).Error; err != nil {
+		t.Fatalf("count query scopes: %v", err)
+	}
+	if scopeCount != int64(len(queryscheme.FixedScopeDeclarations())) {
+		t.Fatalf("query scope count=%d, want %d", scopeCount, len(queryscheme.FixedScopeDeclarations()))
+	}
+	var sharedCapabilityCount int64
+	if err := db.Model(&model.SysMenuButton{}).
+		Where("event_action = ? AND state = ?", queryscheme.SharedManageCapability, true).
+		Count(&sharedCapabilityCount).Error; err != nil {
+		t.Fatalf("count query scheme shared capability: %v", err)
+	}
+	if sharedCapabilityCount != 4 {
+		t.Fatalf("shared capability policy projections=%d, want 4", sharedCapabilityCount)
+	}
 
 	for _, spec := range filePermissionSpecs {
 		assertActivePermissionSource(t, db, spec.path, spec.method)
@@ -491,6 +508,16 @@ func strictCoverageException(route auditedRoute) bool {
 		{path: "/admin/menu/my", method: "GET"}:                              {},
 		{path: "/admin/runtime/dict/:code", method: "GET"}:                   {},
 		{path: "/admin/runtime/table/:code", method: "GET"}:                  {},
+		{path: "/admin/runtime/query-scopes/:scope", method: "GET"}:          {},
+		{path: "/admin/runtime/query-schemes/available", method: "GET"}:      {},
+		{path: "/admin/runtime/query-schemes/:id/resolve", method: "POST"}:   {},
+		{path: "/admin/query-schemes/query", method: "POST"}:                 {},
+		{path: "/admin/query-schemes/:id", method: "GET"}:                    {},
+		{path: "/admin/query-schemes/personal", method: "POST"}:              {},
+		{path: "/admin/query-schemes/personal/:id", method: "PUT"}:           {},
+		{path: "/admin/query-schemes/personal/:id", method: "DELETE"}:        {},
+		{path: "/admin/query-schemes/personal/:id/default", method: "PUT"}:   {},
+		{path: "/admin/query-schemes/:id/copy-to-personal", method: "POST"}:  {},
 		{path: "/admin/user/password", method: "POST"}:                       {},
 		{path: "/admin/generalization/query/code/:code", method: "POST"}:     {},
 		{path: "/admin/generalization/detail/code/:code/:id", method: "GET"}: {},

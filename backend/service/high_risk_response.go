@@ -599,6 +599,7 @@ func menuListResponse(data model.SysMenu) response.SysMenuListRes {
 		Sequence:       data.Sequence,
 		PageType:       data.PageType,
 		TableCode:      data.TableCode,
+		QueryScopeCode: data.QueryScopeCode,
 		Option:         data.Option,
 		Icon:           data.Icon,
 		Redirect:       data.Redirect,

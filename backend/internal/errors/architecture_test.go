@@ -13,6 +13,7 @@ func TestErrorPackageUsesStableDomainFiles(t *testing.T) {
 	allowed := map[string]struct{}{
 		"auth.go": {}, "common.go": {}, "data_permission.go": {}, "errors.go": {},
 		"file.go": {}, "integration.go": {}, "metadata.go": {}, "organization.go": {},
+		"query_scheme.go": {},
 	}
 	packages, err := parser.ParseDir(token.NewFileSet(), ".", nil, parser.ImportsOnly)
 	if err != nil {
