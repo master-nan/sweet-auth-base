@@ -9,6 +9,8 @@
 > Removal Gate: Query Center V1 完成实现、验收，稳定规则已吸收进长期 Engineering/User Guide
 >
 > Audit Baseline: `291f22e231883dfab66ac32db4b40b9444fd3d66`
+>
+> Review Status: `DESIGN_APPROVED_FOR_QC-002A`
 
 ## 1. 结论摘要
 
@@ -17,7 +19,7 @@ Query Center V1 保存和复用当前业务列表的查询方法。`AdvancedQuer
 V1 冻结以下结论：
 
 1. 业务查询协议继续使用现有 `Query`、`ExpressionGroup`、`QueryRule`、`Order` 和 `QuickQuery`，不新增 Query V2。
-2. 新增稳定 `query_scope_code`，由菜单资源显式声明；不使用 URL、中文菜单名、Vue 文件路径或单独 `table_code` 作为方案身份。
+2. `sys_menu.query_scope_code` 是 Query Scope 唯一持久化身份真值；不使用 URL、中文菜单名、Vue 文件路径、Registry key、前端常量或单独 `table_code` 作为方案身份。
 3. 方案类型固定为 `PERSONAL`、`PUBLIC`、`ROLE`、`PAGE_DEFAULT`。
 4. 默认优先级为个人默认 > 页面默认 > 页面代码初始 Query；ROLE 不参与自动默认。
 5. 一张 `query_scheme` 主表和一张 `query_scheme_role` 关联表足够；表达式存受 Schema 约束的 PostgreSQL JSONB，不拆条件 EAV 表。
@@ -27,7 +29,8 @@ V1 冻结以下结论：
 9. 普通用户可管理自己的 PERSONAL 方案；共享类型写操作只用一个 `query_scheme_shared_manage` Business Capability。
 10. Query Center 使用隐藏路由，由业务页“管理查询方案”进入；V1 不新增左侧一级菜单。
 11. 条件预览是 V1 必需；左侧条件树、字段说明面板 V1 延期。
-12. 动态日期/身份不是新查询操作符。方案可携带受控 value bindings，服务端解析成当前协议的具体值后才交给业务查询。
+12. 动态日期/身份不是新查询操作符。方案只可携带平台注册白名单内的强类型 value bindings，服务端解析成当前协议的具体值后才交给业务查询；Binding 不是 DSL。
+13. V1 UI 最大可编辑嵌套深度为 2，后端 Query Scheme Schema 防御上限为 3；超出 UI 编辑能力的合法结构必须受限展示，不能静默降级或丢失。
 
 ## 2. 产品边界
 
@@ -85,7 +88,7 @@ Business List Page
 
 Query Scheme Runtime API
   -> QuerySchemeService
-       |- QueryScopeRegistry / SysMenu scope binding
+       |- SysMenu scope identity / QueryScopeRegistry runtime config
        |- Runtime Metadata Reader
        |- Query Payload Validator
        |- Dynamic Binding Resolver
@@ -104,7 +107,7 @@ Query Center 不位于业务 Service 与 Repository 之间，也不保存 `DataS
 
 ### 5.1 身份规则
 
-新增 `sys_menu.query_scope_code varchar(128) null`，其值是稳定、非展示性的页面查询上下文，例如：
+新增 `sys_menu.query_scope_code varchar(128) null`。它是 Query Scope 的**唯一持久化身份真值**，其值是稳定、非展示性的页面查询上下文，例如：
 
 - `system.user.list`
 - `system.audit.list`
@@ -122,11 +125,11 @@ Query Center 不位于业务 Service 与 Repository 之间，也不保存 `DataS
 - `table_code` 无法区分同表多页面，也无法表达 Dictionary 主从两个查询上下文；
 - `SysMenu.Name` 已承担 Router/Page Button 映射，继续叠加公开持久化契约会放大重命名风险。
 
-`query_scope_code` 不形成第二套权限体系。它只定位现有 Menu Resource；授权仍由 Menu/Casbin 和方案可见性共同决定。
+`query_scope_code` 不形成第二套权限体系。它只定位现有 Menu Resource；授权仍由 Menu/Casbin 和方案可见性共同决定。后端 Registry 与前端页面配置都不得再次声明或映射另一份 scope identity。
 
 ### 5.2 Page Query Config
 
-每个启用 scope 有一份强类型配置，不新增配置表。固定页面由后端 `QueryScopeRegistry` 注册，前端通过 Runtime API 读取；低代码页面在后续批次由受控 Metadata 生成。
+每个已由 `sys_menu.query_scope_code` 声明的 scope 有一份强类型运行配置，不新增配置表。固定页面由后端 `QueryScopeRegistry` 为这个**既有 scope** 注册配置，前端通过 Runtime Scope Config API 读取；低代码页面在后续批次由受控 Metadata 生成。
 
 ```text
 QueryScopeConfig
@@ -140,6 +143,8 @@ QueryScopeConfig
 ```
 
 `quick_date_field` 必须显式配置，不能从 `created_at` 等字段名猜测。V1 不给 SysTableField 增加 `is_primary_time_filter`；当前需求是页面级语义，放入 Page Query Config 更准确，也避免扩张 Metadata 数据模型。
+
+`QueryScopeRegistry` 只提供 `table_code`、`quick_date_field`、`quick_presets`、Virtual Sort allowlist 和 Dynamic Binding allowlist 等运行事实。它不创建 scope、不覆盖 `sys_menu.query_scope_code`，也不把 Registry key 持久化为方案身份。前端不得维护第二份 `scope_code` 常量映射表作为业务真值；页面从 Runtime Scope Config 获取当前菜单对应的 Query Center 配置。
 
 ### 5.3 Scope 权限
 
@@ -223,14 +228,14 @@ ROLE 至少关联一个活动角色，最多 32 个。角色删除后关联自�
 | JSONB 文本大小 | 32 KiB |
 | 顶层 Expression Group | 8 |
 | 总有效 Rule | 50 |
-| 最大嵌套深度 | 3（根 Group 深度为 1） |
+| 后端 Schema 最大嵌套深度 | 3（根 Group 深度为 1） |
 | 单个多值数组 | 100 |
 | Quick keyword | 256 字符 |
 | ROLE 角色数 | 32 |
 | 单用户单 scope 活动 PERSONAL | 100 |
 | 单 scope 活动共享方案 | 200 |
 
-限制在后端 Schema Validator 执行，数据库只承担 JSON 大小和基础 CHECK。超限请求返回稳定 Application Error，不截断、不静默降级。
+限制在后端 Schema Validator 执行，数据库只承担 JSON 大小和基础 CHECK。超限请求返回稳定 Application Error，不截断、不静默降级。这里的深度 3 是防御性存储/读取上限，不代表 V1 UI 必须提供第三层编辑能力。
 
 ### 7.3 标准化与 Hash
 
@@ -257,37 +262,42 @@ ROLE 至少关联一个活动角色，最多 32 个。角色删除后关联自�
 
 ### 8.2 Value Binding
 
-当前 ExpressionType 没有相对日期或当前主体操作符，业务 Query 协议不能修改。V1 在 Scheme Payload 中允许可选 `bindings`，它们只是值解析指令：
+当前 ExpressionType 没有相对日期或当前主体操作符，业务 Query 协议不能修改。V1 在 Scheme Payload 中允许可选 `bindings`，它们只是由平台解释的强类型值解析指令：
 
 ```json
 {
-  "pointer": "/expressions/0/rules/1/value",
-  "kind": "CURRENT_MONTH_RANGE"
+  "pointer": "/expressions/0/rules/1/value/0",
+  "kind": "START_OF_MONTH",
+  "params": {"month_offset": 0}
 }
 ```
 
-允许的 kind：
+V1 Binding kind 白名单固定为：
 
-- `TODAY_RANGE`
-- `YESTERDAY_RANGE`
-- `CURRENT_WEEK_RANGE`
-- `CURRENT_MONTH_RANGE`
-- `PREVIOUS_MONTH_RANGE`
-- `CURRENT_USER_ID`
-- `CURRENT_EMPLOYEE_ID`
+- `TODAY`
+- `START_OF_WEEK`
+- `END_OF_WEEK`
+- `START_OF_MONTH`
+- `END_OF_MONTH`
+- `CURRENT_USER`
+- `CURRENT_EMPLOYEE`
+
+日期偏移只允许强类型有限参数：`TODAY.day_offset` 为 `[-366, 366]` 的整数，周边界的 `week_offset` 为 `[-52, 52]` 的整数，月边界的 `month_offset` 为 `[-120, 120]` 的整数；缺省均为 0。主体 Binding 不接受参数。一个动态范围使用两个受控 Binding 分别指向 range value 的起止项，例如“本月”为 `START_OF_MONTH(month_offset=0)` 与 `END_OF_MONTH(month_offset=0)`，“上月”为 offset=-1。未知 kind、未知参数、越界数值或不匹配的 pointer/type 一律拒绝。
 
 Payload 中对应 rule 同时保存最近一次解析得到的合法具体值，因此 expressions 本身始终是现有标准 Query。`POST .../:id/resolve` 在服务端根据应用时刻、平台时区和认证 Subject 覆盖该 value，然后只返回普通 Query 子集。业务 API 永远看不到 binding。
 
 安全规则：
 
 - binding kind、目标 JSON Pointer、字段和操作符必须在 scope config 白名单内；
-- CURRENT_USER/EMPLOYEE 由服务端 Subject/Employee Binding 解析，客户端不能提交 ID；
+- CURRENT_USER/CURRENT_EMPLOYEE 由服务端 Subject/Employee Binding 解析，客户端不能提交 ID；
 - “我的”优先由业务 Preset 注册，不自动假定 `owner_id=current_user_id`；
 - 身份缺失时 resolve 失败，不以空条件放宽结果；
 - 日期边界使用平台业务时区，输出当前 DATE/DATETIME 类型可接受的具体值；
 - 编辑 bound expression 的字段、操作符、值或结构时，前端清除受影响 binding 并提示“动态条件已转为当前固定值”；仅修改 quick keyword/sort 时可保留 bindings。
 
-该 envelope 解决“本月方案跨月仍动态”与“不修改业务 Query 协议”的冲突。它是 QC-001 需要 Reviewer 明确认可的核心决策。
+禁止任意变量名、自由表达式、JavaScript、SQL、模板语言、函数名字符串、动态函数调用、用户自定义 Binding 和反射式 Binding Resolver。Binding 不是 DSL，也不是通用计算引擎。
+
+该 envelope 解决“本月方案跨月仍动态”与“不修改业务 Query 协议”的冲突。Reviewer 已批准该受控白名单机制。
 
 ### 8.3 Preset 与 Scheme
 
@@ -464,6 +474,8 @@ Management query 支持 name、scope、type、enabled、page/num；最大 pageSi
 
 列表永远不返回完整 Query JSON。底层 JSON/数据库错误不进入响应。
 
+`revision` 是 API 乐观锁字段，不是业务展示字段。前端可以在 Scheme state 中保存并随更新请求回传，但普通用户列表、Selector、Detail/Drawer 和表单均不渲染 revision 数值。
+
 ## 15. Audit 与 Reason Code
 
 PUBLIC、ROLE、PAGE_DEFAULT 的 create/update/enable/disable/delete/default/role-scope 变更写业务 Audit。PERSONAL 只记录 action、scheme id、type、scope 和结果，不把完整 query value 写入自由文本。
@@ -481,7 +493,7 @@ PUBLIC、ROLE、PAGE_DEFAULT 的 create/update/enable/disable/delete/default/rol
 ## 16. 并发与事务
 
 - Create/Update/Default/Enable/Delete 在 Service 定义短事务；
-- Update 使用 `WHERE id=? AND revision=?`，0 行返回稳定 conflict；
+- Update 使用 `WHERE id=? AND revision=?`，0 行返回稳定 `query_scheme_revision_conflict`；HTTP 响应不得暴露数据库条件或 revision 数值，前端统一提示“方案已被其他操作更新，请刷新后重试。”；
 - Default 替换在同事务中清旧值、设新值，由 partial unique 兜底；
 - ROLE 更新在同事务替换关联行；
 - Metadata 读取、动态主体解析和 Payload 预校验尽量在事务外；事务内再次检查 record revision 和约束；
@@ -516,7 +528,9 @@ Simple Mode 是默认 Tab：只显示字段、操作符、值；所有规则位�
 - source scheme name/dirty 提示；
 - 失效条件的显式错误样式。
 
-现有 UI 只渲染顶层 Group + 一层 nested，后端结构可递归。V1 编辑器按产品限制最大深度 3，但 QC-002 首批 UI 仍只创建到深度 2；加载深度 3 方案时可展示/删除第三层，不能创建更深。若实现成本超出评估，QC-002A 必须把存储限制同步降为 2，不能出现“可保存但不可编辑”。
+V1 UI 最大可编辑嵌套深度正式冻结为 2（根 Group 深度为 1），不得创建或修改第三层。后端 Query Scheme Schema 防御上限仍为 3，以便安全识别未来版本或受控导入的合法结构；V1 不鼓励产生第三层结构，也不为此重写 `AdvancedQuery`。
+
+如果未来加载到深度 3、仍处于后端合法上限内的结构，前端必须完整保留原 Payload，并明确显示“当前版本仅支持查看该层级，无法编辑”的受限状态，阻止会造成覆盖或丢失的保存操作；可引导用户等待后续增强能力。不得静默扁平化、截断、删除条件或伪装为可编辑。深度超过 3 则按 `INVALID` 拒绝。
 
 ### 17.4 条件树、预览和字段说明
 
@@ -530,7 +544,7 @@ Simple Mode 是默认 Tab：只显示字段、操作符、值；所有规则位�
 
 Query Manager 使用隐藏 Route，四个 Tab：我的方案、公共方案、角色方案、页面默认。共享管理者看到新增/编辑/启停/删除；普通用户对可见共享方案只看到使用、详情、复制。
 
-方案详情采用右侧 Drawer：它是管理页上下文详情，不需要独立 Route；字段包括方案名、scope、类型、状态、默认、创建/更新时间、条件预览、排序、ROLE 范围和 issues。复杂编辑使用 Dialog，避免 Manager Table 与 Detail Route 重复。
+方案详情采用右侧 Drawer：它是管理页上下文详情，不需要独立 Route；字段包括方案名、scope、类型、状态、默认、创建/更新时间、条件预览、排序、ROLE 范围和 issues。`revision` 仅保存在前端并发控制状态，不展示给普通用户。复杂编辑使用 Dialog，避免 Manager Table 与 Detail Route 重复。
 
 ### 17.6 Empty/Error
 
@@ -722,7 +736,7 @@ V1 不新增一级“查询中心”菜单。共享管理员使用同一隐藏�
 
 ## 25. UI 原型
 
-静态交互原型位于 [prototype/index.html](prototype/index.html)，覆盖：
+静态交互原型位于 [prototype/index.html](prototype/index.html)。该目录是 **Interaction Prototype / Design Review Artifact**，用于评审信息架构和交互流，不是生产页面视觉定稿。它覆盖：
 
 1. 业务列表 + Scheme Selector；
 2. AdvancedQuery Simple；
@@ -732,7 +746,9 @@ V1 不新增一级“查询中心”菜单。共享管理员使用同一隐藏�
 6. Scheme Detail；
 7. Empty/Degraded State。
 
-原型标注 REUSE/EXTEND/NEW，并使用当前 Quasar 主色、紧凑 Toolbar、Table、Drawer/Dialog 语言；不进入 `frontend/src` 或正式 Router。
+生产 UI 必须沿用当前 Sweet Platform 正式页面视觉和 FE-001/002/003 已冻结 Pattern。业务列表使用 Query Scheme Selector、Quick Presets、Advanced Query、Save Scheme、Business Actions、Column Selector 和 Refresh；Manager 使用当前平台正式表格风格；Detail 使用正式 Drawer/Detail Pattern。
+
+原型中的左侧“原型视图 1~7”导航、REUSE/NEW/EXTEND 技术标签、设计规则说明栏、实现说明文字、`Revision 6` 等技术控制字段和“字段说明 V1 延期”等开发提示均不得进入生产 UI。原型不进入 `frontend/src` 或正式 Router。
 
 ## 26. QC-002 拆分建议
 
@@ -750,15 +766,15 @@ AdvancedQuery Simple/Preview、Toolbar slots、Query State dirty/source、Select
 
 19 个 Eligible 页面接入、Generalization 条件评审、Admin/Limited User、Data Permission E2E、动态日期跨边界、Report 回归和 Query Center Freeze Review。
 
-不得把 A/B/C 压成一个超大提交。QC-001 仅提交设计，必须完成 Reviewer 评审后才允许进入 QC-002A。
+不得把 A/B/C 压成一个超大提交。QC-001 Reviewer Gate 已通过，允许进入 QC-002A；QC-002A 仍必须遵守本设计的生产代码范围和验收要求。
 
-## 27. 待 Reviewer 明确认可的冲突
+## 27. Reviewer Gate 最终结论
 
-1. **动态值与现有协议**：采用“标准 Query 快照 + 受控 binding envelope + resolve 后输出标准 Query”，不增加业务 Query V2。Reviewer 需确认这是可接受的持久化扩展。
-2. **Scope Identity**：新增 `sys_menu.query_scope_code`，而非复用不唯一的 Menu Name 或不稳定 Menu ID。
-3. **Advanced 深度**：存储上限 3，但当前 UI 只完整编辑到 2；QC-002A/B 必须统一最终可编辑上限。
-4. **共享权限粒度**：V1 只有一个 `query_scheme_shared_manage`，不分别制造 public/role/page-default 十余个按钮权限。
-5. **Query Center 导航**：V1 采用 Hidden Route，不新增左侧菜单。
-6. **字段说明/条件树**：附件中存在，但当前 Metadata/交互收益不足，V1 延期；条件预览保留。
+1. **动态值与现有协议：APPROVED**。采用“标准 Query 快照 + 七类受控 Binding 白名单 + resolve 后输出标准 Query”，不增加业务 Query V2，Binding 不是 DSL。
+2. **Scope Identity：APPROVED**。`sys_menu.query_scope_code` 是唯一持久化身份真值；Registry 只提供运行配置，Frontend 只消费 Runtime Scope Config。
+3. **Advanced 深度：APPROVED**。V1 UI 最大可编辑深度 2，后端 Schema 防御上限 3；合法第三层必须受限展示并无损保留。
+4. **共享权限粒度：APPROVED**。V1 只有一个 `query_scheme_shared_manage`，不分别制造 public/role/page-default 十余个按钮权限。
+5. **Query Center 导航：APPROVED**。V1 采用 Hidden Route，不新增左侧菜单。
+6. **字段说明/条件树：APPROVED_DEFERRED**。V1 延期；条件预览保留为 REQUIRED。
 
-以上六项未通过产品、架构和代码边界 Review 前，QC-002 不得开始。
+QC-001 Gate 状态：**`DESIGN_APPROVED_FOR_QC-002A`**。以上六项已完成产品、架构和代码边界 Review，可直接进入 QC-002A。

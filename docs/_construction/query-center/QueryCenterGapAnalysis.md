@@ -9,6 +9,8 @@
 > Removal Gate: QC V1 实现完成，Gap 已关闭或转入正式 Backlog
 >
 > Audit Baseline: `291f22e231883dfab66ac32db4b40b9444fd3d66`
+>
+> Review Status: `DESIGN_APPROVED_FOR_QC-002A`
 
 ## 1. 审计范围
 
@@ -43,7 +45,7 @@
 | AND / OR | EXISTING | `ExpressionLogic` 支持 AND/OR；同组规则和 nested 复用 group logic |
 | 多 Expression Group | EXISTING | Query 顶层支持多个 Group，后端以 AND 组合顶层组 |
 | Nested Group 数据结构 | EXISTING | 前后端结构递归；Repository `buildQuery` 递归处理 |
-| Nested Group UI | NEEDS_UI_REFACTOR | 当前只完整渲染顶层 + 一层 nested，缺深层编辑和折叠 |
+| Nested Group UI | NEEDS_UI_REFACTOR | V1 UI 最大可编辑深度冻结为 2；后端 Schema 防御上限 3，合法第三层需受限展示并无损保留 |
 | 字段类型约束 | EXISTING | VARCHAR/TEXT/数值/Boolean/DATE/DATETIME/TIME 映射不同 operator |
 | 字典字段 | EXISTING | Runtime Dict 选项，值按字段类型转换 |
 | 关系字段 | EXISTING | Linkage config + Generalization Runtime API，含分页/回填已选项 |
@@ -62,8 +64,8 @@
 | 条件预览 | MISSING | V1 必须新增可读摘要 |
 | Group 折叠 | MISSING | V1 高级模式新增 |
 | 字段说明 | V1_DEFERRED | Runtime Metadata 无可靠 description/help text |
-| Dynamic Date operator | MISSING | ExpressionType 无 relative date；用 Scheme binding 解析，不改协议 |
-| CURRENT_USER/EMPLOYEE | MISSING | 需服务端 binding resolver，不能保存实际用户 ID |
+| Dynamic Date operator | MISSING | ExpressionType 无 relative date；用强类型 Scheme Binding 白名单解析，不改协议、不引入 DSL |
+| CURRENT_USER/EMPLOYEE | MISSING | 仅允许 `CURRENT_USER`/`CURRENT_EMPLOYEE`，由服务端受控 resolver 解析，不能保存实际用户 ID |
 | SQL/DSL | NOT_NEEDED | 明确禁止 |
 
 ## 3. Query State Gap
@@ -109,10 +111,10 @@
 | --- | --- |
 | 字段 description/help text | V1 不扩，字段说明面板延期 |
 | 业务主时间字段 | 不放 SysTableField；由 Page Query Config `quick_date_field` 显式声明 |
-| Query Scope | 新增 `SysMenu.QueryScopeCode`，不是字段 Metadata |
+| Query Scope | 新增 `SysMenu.QueryScopeCode`，它是唯一持久化身份真值，不是字段 Metadata |
 | 业务 Preset | Scope Registry 显式注册，不从字段名猜 |
 | Virtual Sort | Scope Config 白名单；Metadata 继续只管实体字段 |
-| Dynamic Binding allowlist | Scope Config 声明并由后端验证 |
+| Dynamic Binding allowlist | Scope Config 只声明既有 scope 的允许项；V1 固定七类受控 Binding，由后端验证 |
 
 ## 5. 后端 Query 协议审计
 
@@ -138,6 +140,8 @@
 
 QC V1 在 `internal/queryscheme` 进行更严格的保存/解析验证，不改变现有业务 Query Builder。业务端现有 fail-closed 行为继续作为第二道防线。
 
+QC V1 的深度规则已经冻结：UI 最大可编辑深度 2，Scheme Schema 防御上限 3。深度 3 的合法结构不得被 UI 静默扁平化、截断或覆盖；必须完整保留并以受限/不可编辑状态呈现。超过 3 则拒绝。
+
 ## 6. UI 基线对照
 
 | 附件区域 | 结论 | 组件边界 |
@@ -157,6 +161,8 @@ QC V1 在 `internal/queryscheme` 进行更严格的保存/解析验证，不改�
 | 方案 Detail | V1 REQUIRED | Drawer，不新增独立 Route |
 | 空状态 | V1 REQUIRED | Manager/Selector 使用统一状态语义 |
 
+`docs/_construction/query-center/prototype/` 仅是 Interaction Prototype / Design Review Artifact，不是生产视觉定稿。生产页面沿用 Sweet Platform 正式 Toolbar、Table、Drawer/Detail Pattern；原型视图导航、REUSE/NEW/EXTEND 标签、设计/实现说明、revision 数值和延期提示不得进入生产 UI。
+
 ## 7. 权限与身份 Gap
 
 ### 7.1 现有可复用
@@ -169,7 +175,9 @@ QC V1 在 `internal/queryscheme` 进行更严格的保存/解析验证，不改�
 
 ### 7.2 新增
 
-- `query_scope_code` 作为稳定 Scheme 隔离身份；
+- `sys_menu.query_scope_code` 作为唯一持久化 Scheme 隔离身份；
+- `QueryScopeRegistry` 只为既有 scope 提供 table、quick preset、virtual sort 和 binding allowlist 等运行配置，不重新定义身份；
+- Frontend 只从 Runtime Scope Config 获取当前页面配置，不维护第二份 scope 常量映射真值；
 - Runtime Scheme Read：scope 页面访问 + owner/public/role/page-default 可见性；
 - PERSONAL 写：owner；
 - 共享写：单一 `query_scheme_shared_manage`；
@@ -201,6 +209,8 @@ QC V1 在 `internal/queryscheme` 进行更严格的保存/解析验证，不改�
 - copy-to-personal。
 
 Runtime 与 Management 必须分路由/DTO；普通 Selector 不能调用管理全量查询。
+
+`revision` 只作为 API 乐观锁字段进入前端 state 和更新请求，普通用户列表、Selector、Detail/Drawer、表单不展示数值。冲突返回稳定业务错误，统一提示“方案已被其他操作更新，请刷新后重试。”，不泄露数据库并发细节。
 
 ## 10. Eligible Matrix 摘要
 
@@ -254,13 +264,15 @@ Runtime 与 Management 必须分路由/DTO；普通 Selector 不能调用管理�
 
 ## 12. QC-002 Gate
 
-以下问题必须先由 Reviewer 书面确认：
+六个 Reviewer Gate 已冻结：
 
-1. 标准 Query 快照 + bindings envelope 是否满足动态值和协议不变；
-2. `sys_menu.query_scope_code` 是否接受为稳定身份；
-3. Advanced UI 最终支持深度 2 还是 3；
-4. 一个 shared manage capability 是否足够；
-5. Manager 使用 Hidden Route；
-6. 条件树和字段说明延期。
+1. **APPROVED**：标准 Query 快照 + 受控 bindings envelope；Binding 白名单为 `TODAY`、`START_OF_WEEK`、`END_OF_WEEK`、`START_OF_MONTH`、`END_OF_MONTH`、`CURRENT_USER`、`CURRENT_EMPLOYEE`。日期 offset 采用强类型、有限范围参数。
+2. **APPROVED**：`sys_menu.query_scope_code` 是唯一持久化身份；Registry 不重复定义，Frontend 不维护第二份真值。
+3. **APPROVED**：Advanced UI 最大可编辑深度 2，后端 Schema 防御上限 3；合法第三层受限展示、无损保留。
+4. **APPROVED**：V1 使用一个 `query_scheme_shared_manage` capability。
+5. **APPROVED**：Manager 使用 Hidden Route。
+6. **APPROVED_DEFERRED**：条件树和字段说明延期；条件预览为 V1 REQUIRED。
 
-在这六项确认前，状态是 **DESIGN_COMPLETE / IMPLEMENTATION_NOT_APPROVED**。QC-001 的完成不等于允许直接实现。
+Binding 明确禁止任意变量名、自由表达式、JavaScript、SQL、模板语言、函数名字符串、动态函数调用、用户自定义 Binding 和反射式 Binding Resolver。它不是 DSL。
+
+Gate 状态：**`DESIGN_APPROVED_FOR_QC-002A`**。QC-002A 可以按已批准边界开始实现。
