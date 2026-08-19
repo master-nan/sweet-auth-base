@@ -1,0 +1,24 @@
+import { defineComponent, h } from 'vue'
+import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
+import QuerySchemeSelector from './QuerySchemeSelector.vue'
+import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
+
+const SlotStub = defineComponent({ setup(_, { slots }) { return () => h('div', slots.default?.()) } })
+const ItemStub = defineComponent({ emits: ['click'], setup(_, { emit, slots }) { return () => h('button', { onClick: () => emit('click') }, slots.default?.()) } })
+
+describe('QuerySchemeSelector', () => {
+  it('groups runtime summaries and opens management without loading payloads', async () => {
+    const scheme = { id: 1, name: '本月异常', type: QuerySchemeType.PERSONAL, is_default: true, status: QuerySchemeValidationStatus.VALID }
+    const wrapper = mount(QuerySchemeSelector, {
+      props: { schemes: [scheme], currentLabel: '本月异常（已修改）' },
+      global: { stubs: { QBtnDropdown: SlotStub, QList: SlotStub, QItem: ItemStub, QItemLabel: SlotStub, QItemSection: SlotStub, QIcon: true, QTooltip: true, QSeparator: true } },
+    })
+    expect(wrapper.text()).toContain('本月异常')
+    const items = wrapper.findAll('button')
+    await items[0]!.trigger('click')
+    await items.at(-1)!.trigger('click')
+    expect(wrapper.emitted('select')?.[0]?.[0]).toEqual(scheme)
+    expect(wrapper.emitted('manage')).toHaveLength(1)
+  })
+})

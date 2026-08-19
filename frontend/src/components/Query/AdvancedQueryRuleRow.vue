@@ -1,7 +1,7 @@
 <template>
   <div class="rule-item">
     <div class="row q-col-gutter-xs items-center">
-      <div class="col-12 col-md-2" v-if="isFirst">
+      <div class="col-12 col-md-2" v-if="isFirst && showLogic">
         <q-select
           :model-value="logic"
           outlined
@@ -78,7 +78,23 @@
 
       <div class="col-12 col-md-3">
         <q-input
-          v-if="isNullOperator(rule)"
+          v-if="bindingLabels?.length"
+          dense
+          outlined
+          readonly
+          :model-value="bindingLabels.join(' 至 ')"
+          label="动态值"
+          class="field-input"
+          hide-bottom-space
+        >
+          <template #append>
+            <q-btn flat round dense icon="close" aria-label="改为固定值" @click="emit('clear-bindings')">
+              <q-tooltip>改为固定值</q-tooltip>
+            </q-btn>
+          </template>
+        </q-input>
+        <q-input
+          v-else-if="isNullOperator(rule)"
           dense
           outlined
           disable
@@ -288,6 +304,8 @@ const props = defineProps<{
   logic: number | undefined
   isFirst: boolean
   canRemove: boolean
+  showLogic?: boolean
+  bindingLabels?: string[]
   fields: unknown[]
   fieldLabelKey: string
   fieldValueKey: string
@@ -329,7 +347,10 @@ const emit = defineEmits<{
   (event: 'update-expression-type'): void
   (event: 'remove'): void
   (event: 'add'): void
+  (event: 'clear-bindings'): void
 }>()
+
+const showLogic = props.showLogic !== false
 
 const hasValue = (value: unknown) => {
   return value !== null && value !== undefined && value !== ''

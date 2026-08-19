@@ -53,5 +53,6 @@ type QuerySchemeResolveRes struct {
 	ValidationStatus queryscheme.ValidationStatus  `json:"validation_status"`
 	Issues           []queryscheme.ValidationIssue `json:"issues"`
 	ResolvedQuery    *queryscheme.ResolvedQuery    `json:"resolved_query,omitempty"`
+	Bindings         []queryscheme.Binding         `json:"bindings"`
 	BindingKinds     []queryscheme.BindingKind     `json:"binding_kinds"`
 }

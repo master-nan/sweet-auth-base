@@ -47,3 +47,19 @@ export const findButtonActionCapability = (buttons: MenuButton[], action: string
 
 export const hasButtonActionCapability = (buttons: MenuButton[], action: string) =>
   !!findButtonActionCapability(buttons, action)
+
+export function hasGrantedActionCapability(menus: Menu[], action: string): boolean {
+  for (const menu of menus) {
+    if (menu.menu_buttons?.some((button) =>
+      button.state !== false &&
+      button.is_disabled !== true &&
+      button.event_action === action,
+    )) {
+      return true
+    }
+    if (menu.children?.length && hasGrantedActionCapability(menu.children, action)) {
+      return true
+    }
+  }
+  return false
+}

@@ -11,9 +11,31 @@
         <q-btn icon="close" flat round dense size="sm" v-close-popup />
       </q-card-section>
 
+      <q-tabs
+        :model-value="queryMode"
+        dense
+        active-color="primary"
+        indicator-color="primary"
+        @update:model-value="changeQueryMode"
+      >
+        <q-tab name="simple" label="简单模式" :disable="!simpleModeAvailable || readOnlyDepth" />
+        <q-tab name="advanced" label="高级模式" />
+      </q-tabs>
+      <q-separator />
+
+      <q-banner v-if="sourceName" dense class="bg-primary-1 text-primary q-mx-md q-mt-sm rounded-borders">
+        当前方案：{{ sourceName }}<span v-if="dirty">（已修改）</span>
+      </q-banner>
+      <q-banner v-if="!simpleModeAvailable && queryMode === 'advanced'" dense class="bg-grey-2 text-grey-8 q-mx-md q-mt-sm rounded-borders">
+        当前条件包含 OR 或分组结构，只能在高级模式编辑。
+      </q-banner>
+      <q-banner v-if="readOnlyDepth" dense class="bg-warning text-dark q-mx-md q-mt-sm rounded-borders">
+        当前方案包含第三层条件。本版本会完整保留并展示，但不能编辑或覆盖该结构。
+      </q-banner>
+
       <!-- 内容区域（可滚动） -->
       <q-card-section class="advanced-search-content q-pa-md">
-        <q-form ref="form" greedy>
+        <q-form v-if="!readOnlyDepth" ref="form" greedy>
           <div class="row justify-center">
             <div class="col-12" :style="{ maxWidth: maxWidth + 'px' }">
               <!-- 表达式组循环 -->
@@ -23,7 +45,7 @@
                 class="q-mb-md"
               >
                 <q-card flat class="expression-card">
-                  <q-card-section class="expression-card-head">
+                  <q-card-section v-if="queryMode === 'advanced'" class="expression-card-head">
                     <div class="row items-center">
                       <div class="text-subtitle2 text-weight-medium text-primary">
                         表达式组 {{ eIndex + 1 }}
@@ -60,6 +82,8 @@
                       :rule="rule"
                       :is-first="rIndex === 0"
                       :can-remove="expression.rules.length > 1"
+                      :show-logic="queryMode === 'advanced'"
+                      :binding-labels="bindingLabelsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)"
                       :fields="fields"
                       :field-label-key="fieldLabelKey"
                       :field-value-key="fieldValueKey"
@@ -86,14 +110,15 @@
                       :filter-relation-options="filterRelationOptions"
                       :preload-relation-options="preloadRelationOptions"
                       :load-more-relation-options="loadMoreRelationOptions"
-                      @update-field="(value) => updateRuleField(rule, value)"
-                      @update-expression-type="() => updateRuleExpressionType(rule)"
+                      @update-field="(value) => updateRuleFieldAt(rule, value, `/expressions/${eIndex}/rules/${rIndex}/value`)"
+                      @update-expression-type="() => updateRuleExpressionTypeAt(rule, `/expressions/${eIndex}/rules/${rIndex}/value`)"
                       @remove="() => removeRule(eIndex, rIndex)"
                       @add="() => addRule(eIndex)"
+                      @clear-bindings="() => clearBindingsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)"
                     />
 
                     <!-- 嵌套查询区域 -->
-                    <div v-if="enableNested" class="nested-section q-ml-sm">
+                    <div v-if="enableNested && queryMode === 'advanced'" class="nested-section q-ml-sm">
                       <q-card flat class="nested-card">
                         <q-card-section class="nested-section-head">
                           <div class="row items-center">
@@ -156,6 +181,8 @@
                                   :rule="rule"
                                   :is-first="rIndex === 0"
                                   :can-remove="nest.rules.length > 1"
+                                  :show-logic="true"
+                                  :binding-labels="bindingLabelsForRule(`/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
                                   :fields="fields"
                                   :field-label-key="fieldLabelKey"
                                   :field-value-key="fieldValueKey"
@@ -186,10 +213,11 @@
                                   :filter-relation-options="filterRelationOptions"
                                   :preload-relation-options="preloadRelationOptions"
                                   :load-more-relation-options="loadMoreRelationOptions"
-                                  @update-field="(value) => updateRuleField(rule, value)"
-                                  @update-expression-type="() => updateRuleExpressionType(rule)"
+                                  @update-field="(value) => updateRuleFieldAt(rule, value, `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
+                                  @update-expression-type="() => updateRuleExpressionTypeAt(rule, `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
                                   @remove="() => removeNestRule(eIndex, nIndex, rIndex)"
                                   @add="() => addNestRule(eIndex, nIndex)"
+                                  @clear-bindings="() => clearBindingsForRule(`/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
                                 />
                               </q-card-section>
                             </q-card>
@@ -203,15 +231,26 @@
             </div>
           </div>
         </q-form>
+        <query-scheme-preview
+          v-else
+          :payload="previewPayload"
+          :fields="previewFields"
+        />
+        <q-separator v-if="!readOnlyDepth" class="q-my-md" />
+        <query-scheme-preview
+          v-if="!readOnlyDepth"
+          :payload="previewPayload"
+          :fields="previewFields"
+        />
       </q-card-section>
 
       <!-- 固定底部按钮区域 -->
       <q-card-actions align="right" class="advanced-search-footer">
-        <q-btn outline color="secondary" @click="resetFilter">
+        <q-btn v-if="!readOnlyDepth" outline color="secondary" @click="resetFilter">
           <q-icon left size="sm" name="restart_alt" />
           重置
         </q-btn>
-        <q-btn color="primary" @click="search()">
+        <q-btn v-if="!readOnlyDepth" color="primary" @click="search()">
           <q-icon left size="sm" name="search" />
           搜索
         </q-btn>
@@ -222,7 +261,7 @@
 
 <script setup lang="ts">
 defineOptions({ name: 'AdvancedQuery' })
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, type PropType } from 'vue'
 import { useQuasar, type QForm } from 'quasar'
 import {
   ExpressionLogic,
@@ -247,12 +286,19 @@ import {
   isMultiValueExpressionType,
   isRangeExpressionType,
   isTextMultiKeywordExpressionType,
-  sanitizeQueryExpressions,
   splitMultiValueText,
+  isSimpleQueryExpression,
+  normalizeQuerySchemePayload,
+  queryExpressionDepth,
 } from 'src/utils/query-state'
 import type { TableField } from 'src/api/services/sys-table'
+import {
+  QUERY_SCHEME_BINDING_LABELS,
+  type QuerySchemeBinding,
+} from 'src/modules/query-scheme/types'
 import { resolveRelationMenuId } from 'src/utils/menu-context'
 import AdvancedQueryRuleRow from './AdvancedQueryRuleRow.vue'
+import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
 
 const $q = useQuasar()
 const form = ref<QForm>()
@@ -322,14 +368,69 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  bindings: {
+    type: Array as PropType<QuerySchemeBinding[]>,
+    default: () => [],
+  },
+  sourceName: {
+    type: String,
+    default: '',
+  },
+  dirty: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['update:modelValue', 'update:queryModel', 'search'])
+const emit = defineEmits(['update:modelValue', 'update:queryModel', 'update:bindings', 'search'])
 
 const booleanOptions = [
   { label: '是', value: true },
   { label: '否', value: false },
 ]
+
+const queryMode = ref<'simple' | 'advanced'>('simple')
+const simpleModeAvailable = computed(() => isSimpleQueryExpression(props.queryModel.expressions))
+const readOnlyDepth = computed(() => queryExpressionDepth(props.queryModel.expressions) > 2)
+const previewPayload = computed(() => normalizeQuerySchemePayload(props.queryModel, props.bindings))
+const previewFields = computed(() => props.fields as TableField[])
+const bindingLabelsForRule = (pointer: string) =>
+  props.bindings
+    .filter((binding) => binding.pointer === pointer || binding.pointer.startsWith(`${pointer}/`))
+    .map((binding) => QUERY_SCHEME_BINDING_LABELS[binding.kind])
+const clearBindingsForRule = (pointer: string) => {
+  emit(
+    'update:bindings',
+    props.bindings.filter(
+      (binding) => binding.pointer !== pointer && !binding.pointer.startsWith(`${pointer}/`),
+    ),
+  )
+}
+const clearAllBindings = () => {
+  if (props.bindings.length) emit('update:bindings', [])
+}
+const updateRuleFieldAt = (rule: QueryRule, value: unknown, pointer: string) => {
+  clearBindingsForRule(pointer)
+  updateRuleField(rule, value)
+}
+const updateRuleExpressionTypeAt = (rule: QueryRule, pointer: string) => {
+  clearBindingsForRule(pointer)
+  updateRuleExpressionType(rule)
+}
+
+const changeQueryMode = (mode: 'simple' | 'advanced') => {
+  if (mode === 'simple' && !simpleModeAvailable.value) {
+    $q.notify({ type: 'warning', message: '当前条件包含复杂逻辑，只能在高级模式编辑' })
+    return
+  }
+  queryMode.value = mode
+  if (mode === 'simple' && props.queryModel.expressions[0]) {
+    const expressions = props.queryModel.expressions.map((group, index) =>
+      index === 0 ? { ...group, logic: ExpressionLogic.AND } : group,
+    )
+    emit('update:queryModel', { ...props.queryModel, expressions })
+  }
+}
 
 const relationOptionsMap = ref<Record<string, RelationOption[]>>({})
 const filteredRelationOptionsMap = ref<Record<string, RelationOption[]>>({})
@@ -590,10 +691,6 @@ const coerceDictValue = (value: unknown, rule: QueryRule) => {
   const field = findField(rule.field)
   const fieldType = rule.type ?? field?.field_type
   return coerceFieldValue(value, fieldType)
-}
-
-const resolveRuleFieldType = (rule: QueryRule) => {
-  return rule.type ?? findField(rule.field)?.field_type
 }
 
 const hasDictRule = (rule: QueryRule) => {
@@ -1014,7 +1111,7 @@ const emptyExpressionGroup = () => ({
 })
 
 const submitQueryModel = () => {
-  const expressions = sanitizeQueryExpressions(props.queryModel.expressions, resolveRuleFieldType)
+  const expressions = normalizeQuerySchemePayload(props.queryModel, props.bindings).expressions
   const nextQuery = {
     ...props.queryModel,
     expressions: expressions.length > 0 ? expressions : [emptyExpressionGroup()],
@@ -1025,6 +1122,7 @@ const submitQueryModel = () => {
 watch(
   () => props.fields,
   (fields) => {
+    if (readOnlyDepth.value) return
     const dictCodes = Array.from(
       new Set(
         (fields as FieldRecord[])
@@ -1043,6 +1141,8 @@ watch(
   () => props.modelValue,
   (visible) => {
     if (!visible) return
+    queryMode.value = simpleModeAvailable.value ? 'simple' : 'advanced'
+    if (readOnlyDepth.value) return
     normalizeQueryExpressionTypes()
     props.queryModel.expressions.forEach((expression) => {
       expression.rules.forEach((rule) => {
@@ -1059,6 +1159,7 @@ watch(
 
 // 移除表达式组
 const removeExpression = (eIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions.splice(eIndex, 1)
   emit('update:queryModel', newQuery)
@@ -1066,6 +1167,7 @@ const removeExpression = (eIndex: number) => {
 
 // 添加表达式组
 const addExpression = (eIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions.splice(eIndex + 1, 0, {
     rules: [
@@ -1081,6 +1183,7 @@ const addExpression = (eIndex: number) => {
 
 // 移除规则
 const removeRule = (eIndex: number, rIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions[eIndex]!.rules.splice(rIndex, 1)
   emit('update:queryModel', newQuery)
@@ -1088,6 +1191,7 @@ const removeRule = (eIndex: number, rIndex: number) => {
 
 // 移除嵌套组
 const removeNest = (eIndex: number, nIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions[eIndex]!.nested!.splice(nIndex, 1)
   emit('update:queryModel', newQuery)
@@ -1095,6 +1199,7 @@ const removeNest = (eIndex: number, nIndex: number) => {
 
 // 添加规则
 const addRule = (eIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions[eIndex]!.rules.push({
     field: '',
@@ -1105,6 +1210,7 @@ const addRule = (eIndex: number) => {
 
 // 添加嵌套组
 const addNestedGroup = (eIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   if (!newQuery.expressions[eIndex]!.nested) {
     newQuery.expressions[eIndex]!.nested = []
@@ -1122,6 +1228,7 @@ const addNestedGroup = (eIndex: number) => {
 
 // 添加嵌套规则
 const addNestRule = (eIndex: number, nIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions[eIndex]!.nested![nIndex]!.rules.push({
     field: '',
@@ -1132,6 +1239,7 @@ const addNestRule = (eIndex: number, nIndex: number) => {
 
 // 移除嵌套规则
 const removeNestRule = (eIndex: number, nIndex: number, rIndex: number) => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   if (newQuery.expressions[eIndex]?.nested?.[nIndex]) {
     if (newQuery.expressions[eIndex]?.nested?.[nIndex].rules.length === 1) {
@@ -1145,6 +1253,7 @@ const removeNestRule = (eIndex: number, nIndex: number, rIndex: number) => {
 
 // 重置筛选条件
 const resetFilter = () => {
+  clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions = [emptyExpressionGroup()]
   emit('update:queryModel', newQuery)

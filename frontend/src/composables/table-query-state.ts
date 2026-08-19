@@ -1,6 +1,16 @@
 import cloneDeep from 'lodash/cloneDeep'
 import { computed, ref, type Ref } from 'vue'
 import type { ExpressionGroup, Query } from 'src/types/global'
+import type {
+  QuerySchemeBinding,
+  QuerySchemePayloadV1,
+  QuerySchemeResolvedQuery,
+  QuerySchemeSource,
+} from 'src/modules/query-scheme/types'
+import {
+  normalizeQuerySchemePayload,
+  serializeQuerySchemePayload,
+} from 'src/utils/query-state'
 
 export interface TableQueryStateOptions<TQuery extends Query> {
   createInitialQuery: () => TQuery
@@ -17,6 +27,9 @@ export function useTableQueryState<TQuery extends Query>(
   const query = ref(options.createInitialQuery()) as Ref<TQuery>
   const draftAdvanced = ref(cloneDeep(query.value)) as Ref<TQuery>
   const appliedAdvanced = ref(cloneDeep(query.value)) as Ref<TQuery>
+  const schemeSource = ref<QuerySchemeSource | null>(null)
+  const schemeBaseline = ref<QuerySchemePayloadV1 | null>(null)
+  const bindings = ref<QuerySchemeBinding[]>([])
 
   const keyword = computed({
     get: () => query.value.quick_query?.keyword || '',
@@ -31,6 +44,7 @@ export function useTableQueryState<TQuery extends Query>(
 
   const submitQuickSearch = () => {
     query.value.expressions = (options.createEmptyExpressions || defaultEmptyExpressions)()
+    bindings.value = []
     appliedAdvanced.value = cloneDeep(query.value)
     resetPage()
   }
@@ -67,10 +81,65 @@ export function useTableQueryState<TQuery extends Query>(
 
   const refreshSnapshot = () => cloneDeep(query.value)
 
-  const clearQuery = () => {
+  const currentSchemePayload = computed(() =>
+    normalizeQuerySchemePayload(query.value, bindings.value),
+  )
+  const dirty = computed(() => {
+    if (!schemeSource.value || !schemeBaseline.value) return false
+    return (
+      serializeQuerySchemePayload(currentSchemePayload.value) !==
+      serializeQuerySchemePayload(schemeBaseline.value)
+    )
+  })
+
+  const applyResolvedScheme = (
+    source: QuerySchemeSource,
+    resolved: QuerySchemeResolvedQuery,
+    sourceBindings: QuerySchemeBinding[] = [],
+  ) => {
+    query.value.expressions = cloneDeep(resolved.expressions)
+    query.value.quick_query = cloneDeep(resolved.quick_query)
+    query.value.order = cloneDeep(resolved.order)
+    bindings.value = cloneDeep(sourceBindings)
+    resetPage()
+    draftAdvanced.value = cloneDeep(query.value)
+    appliedAdvanced.value = cloneDeep(query.value)
+    schemeSource.value = { ...source }
+    schemeBaseline.value = cloneDeep(currentSchemePayload.value)
+  }
+
+  const applySchemePayload = (payload: QuerySchemePayloadV1) => {
+    query.value.expressions = cloneDeep(payload.expressions)
+    query.value.quick_query = cloneDeep(payload.quick_query)
+    query.value.order = cloneDeep(payload.order)
+    bindings.value = cloneDeep(payload.bindings)
+    resetPage()
+    draftAdvanced.value = cloneDeep(query.value)
+    appliedAdvanced.value = cloneDeep(query.value)
+  }
+
+  const markSchemeSaved = (source: QuerySchemeSource) => {
+    schemeSource.value = { ...source }
+    schemeBaseline.value = cloneDeep(currentSchemePayload.value)
+  }
+
+  const detachSchemeSource = () => {
+    schemeSource.value = null
+    schemeBaseline.value = null
+  }
+
+  const discardSchemeChanges = () => {
+    if (!schemeBaseline.value) return false
+    applySchemePayload(schemeBaseline.value)
+    return true
+  }
+
+const clearQuery = () => {
     query.value = options.createInitialQuery()
     draftAdvanced.value = cloneDeep(query.value)
     appliedAdvanced.value = cloneDeep(query.value)
+    bindings.value = []
+    detachSchemeSource()
   }
 
   return {
@@ -86,6 +155,16 @@ export function useTableQueryState<TQuery extends Query>(
     setPage,
     setPageSize,
     refreshSnapshot,
+    currentSchemePayload,
+    schemeSource,
+    schemeBaseline,
+    bindings,
+    dirty,
+    applyResolvedScheme,
+    applySchemePayload,
+    markSchemeSaved,
+    detachSchemeSource,
+    discardSchemeChanges,
     clearQuery,
   }
 }

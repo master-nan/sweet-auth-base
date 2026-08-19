@@ -145,6 +145,17 @@ func TestBindingResolverRejectsClientControlledAndUnknownBindings(t *testing.T) 
 	}
 }
 
+func TestOrganizationScopesAllowTheirExistingSystemSort(t *testing.T) {
+	registry := NewRegistry()
+	config, ok := registry.Get(context.Background(), "organization.position.list")
+	if !ok || !config.AllowsSort("gmt_modify") {
+		t.Fatalf("organization position scope must allow its existing gmt_modify sort: %+v", config)
+	}
+	if config.AllowsSort("unregistered_field") {
+		t.Fatal("scope accepted an unregistered sort field")
+	}
+}
+
 func TestBindingResolverCurrentEmployeeAndWeekBoundary(t *testing.T) {
 	payload := testPayload()
 	payload.Expressions[0].Rules = []request.QueryRule{

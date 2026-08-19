@@ -16,6 +16,8 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector><query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @manage="openSchemeManager" /></template>
+          <template #quick-presets><query-quick-presets :config="querySchemes.scope.config.value" @apply="applyQuickPreset" /></template>
           <template #quick-search>
             <q-input
               v-model="keyword"
@@ -40,6 +42,7 @@
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </template>
+          <template #save-scheme><q-btn outline color="primary" icon="bookmark_add" label="保存方案" @click="showSchemeSave = true" /></template>
           <template #column-selector>
             <q-select
               v-model="visibleColumns"
@@ -110,10 +113,14 @@
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:queryModel="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       title="岗位高级查询"
       @search="applyAdvancedQuery"
     />
+    <query-scheme-save-dialog v-model="showSchemeSave" :source="queryState.schemeSource.value" :loading="schemeSaving" @save="saveScheme" />
 
     <organization-record-detail-dialog
       v-model="showDetailDialog"
@@ -141,11 +148,15 @@ defineOptions({ name: 'organization_position' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import {
   getPositionDetail,
   queryPositions,
@@ -157,6 +168,8 @@ import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemes } from 'src/composables/query-schemes'
+import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
 import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
@@ -175,6 +188,7 @@ import type { TableColumn } from 'src/types/global'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const router = useRouter()
+const $q = useQuasar()
 const dictStore = useDictStore()
 const {
   line_buttons,
@@ -199,9 +213,12 @@ const queryState = useTableQueryState<PositionQueryRequest>({
 const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
 const showAdvancedQuery = ref(false)
 const showDetailDialog = ref(false)
+const showSchemeSave = ref(false)
+const schemeSaving = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
 const positionDetail = ref<PositionDetail | null>(null)
+const querySchemes = useQuerySchemes('organization_position', queryState)
 
 const rowButtons = computed(() =>
   line_buttons.value.filter((button) => button.event_action === 'detail'),
@@ -284,6 +301,12 @@ const applyAdvancedQuery = () => {
   showAdvancedQuery.value = false
   search()
 }
+const applySelectedScheme = async (scheme: QuerySchemeSummary) => { if (await querySchemes.applyScheme(scheme)) { if (query.value.page !== 1) query.value.page = 1; else void fetchData() } else $q.notify({ type: 'warning', message: querySchemes.issues.value[0]?.message || querySchemes.error.value || '该方案当前不可用' }) }
+const applyQuickPreset = (payload: QuerySchemePayloadV1) => { querySchemes.applyPreset(payload); if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
+const openSchemeManager = () => { void router.push({ name: 'query_scheme_manager' }) }
+const restoreSchemeQuery = () => { if (querySchemes.restoreCurrentScheme()) { if (query.value.page !== 1) query.value.page = 1; else void fetchData() } }
+const resetDefaultQuery = async () => { if (await querySchemes.resetToDefault()) { if (query.value.page !== 1) query.value.page = 1; else void fetchData() } }
+const saveScheme = async (value: { name: string; isDefault: boolean; saveAs: boolean }) => { schemeSaving.value = true; try { await querySchemes.savePersonal(value.name, value.isDefault, value.saveAs); showSchemeSave.value = false } finally { schemeSaving.value = false } }
 
 const fetchData = async () => {
   if (!canQueryPositions.value) return
@@ -369,6 +392,7 @@ onMounted(async () => {
   columns.value = resolution.columns
   visibleColumns.value = resolution.visibleColumns
   sortableFields.value = resolution.sortableFields
+  if (canQueryPositions.value) await querySchemes.initialize(Number(router.currentRoute?.value?.query?.query_scheme_id) || undefined)
   await fetchData()
 })
 </script>

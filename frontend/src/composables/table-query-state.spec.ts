@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import type { Query } from 'src/types/global'
+import { QuerySchemeType } from 'src/modules/query-scheme/types'
 
 const createQuery = (): Query => ({
   page: 3,
@@ -44,5 +45,28 @@ describe('useTableQueryState', () => {
     const state = useTableQueryState({ createInitialQuery: createQuery })
     expect(state.applySorting('secret', false, new Set(['name']))).toBe(false)
     expect(state.query.value.order).toEqual({ field: '', is_asc: false })
+  })
+
+  it('tracks scheme dirty state without pagination changes', () => {
+    const state = useTableQueryState({ createInitialQuery: createQuery })
+    state.applyResolvedScheme(
+      { id: 8, name: '常用查询', type: QuerySchemeType.PERSONAL, revision: 2, is_default: false },
+      {
+        expressions: createQuery().expressions,
+        quick_query: { keyword: 'Sweet' },
+        order: { field: '', is_asc: false },
+      },
+    )
+    expect(state.dirty.value).toBe(false)
+
+    state.setPage(9)
+    state.setPageSize(50)
+    expect(state.dirty.value).toBe(false)
+
+    state.keyword.value = 'Platform'
+    expect(state.dirty.value).toBe(true)
+    expect(state.discardSchemeChanges()).toBe(true)
+    expect(state.keyword.value).toBe('Sweet')
+    expect(state.dirty.value).toBe(false)
   })
 })

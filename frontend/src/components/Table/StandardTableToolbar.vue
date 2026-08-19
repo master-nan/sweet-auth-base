@@ -1,8 +1,11 @@
 <template>
   <div class="row items-center q-gutter-xs full-width">
     <div class="col-grow row items-center q-gutter-xs">
+      <slot name="scheme-selector" />
+      <slot name="quick-presets" />
       <slot name="quick-search" />
       <slot name="advanced-trigger" />
+      <slot name="save-scheme" />
       <slot name="column-selector" />
       <slot name="left-actions" />
     </div>

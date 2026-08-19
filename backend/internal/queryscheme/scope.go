@@ -133,10 +133,10 @@ func FixedScopeDeclarations() []ScopeDeclaration {
 		fixedScope("system_role", "system.role.list", "sys_role", dateAndUser),
 		fixedScope("system_sms", "system.sms.list", "sms_template", dateAndUser),
 		fixedScope("system_audit", "system.audit.list", "access_log", dateAndUser),
-		fixedScope("organization_employee", "organization.employee.list", "org_employee", dateUserEmployee),
-		fixedScope("organization_position", "organization.position.list", "org_position", dateUserEmployee),
-		fixedScope("organization_sync_batch", "organization.sync_batch.list", "org_sync_batch", dateAndUser),
-		fixedScope("organization_sync_error", "organization.sync_error.list", "org_sync_record", dateAndUser),
+		fixedScope("organization_employee", "organization.employee.list", "org_employee", dateUserEmployee, "gmt_modify"),
+		fixedScope("organization_position", "organization.position.list", "org_position", dateUserEmployee, "gmt_modify"),
+		fixedScope("organization_sync_batch", "organization.sync_batch.list", "org_sync_batch", dateAndUser, "gmt_modify"),
+		fixedScope("organization_sync_error", "organization.sync_error.list", "org_sync_record", dateAndUser, "gmt_modify"),
 		fixedScope("integration_external_system", "integration.external_system.list", "integration_external_system", dateAndUser),
 		fixedScope("integration_interface_definition", "integration.interface_definition.list", "integration_interface_definition", dateAndUser),
 		fixedScope("integration_credential", "integration.credential.list", "integration_credential", dateAndUser),
@@ -149,11 +149,15 @@ func FixedScopeDeclarations() []ScopeDeclaration {
 	}
 }
 
-func fixedScope(menuName, scopeCode, tableCode string, bindings []BindingKind) ScopeDeclaration {
+func fixedScope(menuName, scopeCode, tableCode string, bindings []BindingKind, virtualSortFields ...string) ScopeDeclaration {
 	return ScopeDeclaration{
 		MenuName:  menuName,
 		ScopeCode: scopeCode,
-		Config:    ScopeConfig{TableCode: tableCode, AllowedDynamicBindings: append([]BindingKind(nil), bindings...)},
+		Config: ScopeConfig{
+			TableCode:                tableCode,
+			AllowedDynamicBindings:   append([]BindingKind(nil), bindings...),
+			AllowedVirtualSortFields: append([]string(nil), virtualSortFields...),
+		},
 	}
 }
 

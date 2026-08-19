@@ -79,6 +79,7 @@ function mergeBackendMenuMeta(route: Route, menu: Menu) {
     isHidden: menu.is_hidden,
     menuId: menu.id,
     ...(menu.table_code ? { tableCode: menu.table_code } : {}),
+    ...(menu.query_scope_code ? { queryScopeCode: menu.query_scope_code } : {}),
     ...(menu.page_type ? { pageType: menu.page_type } : {}),
     ...(reportOption
       ? {
@@ -123,6 +124,7 @@ function menuToDynamicRoute(menu: Menu): Route | null {
       ...(menu.icon ? { icon: menu.icon } : {}),
       isHidden: menu.is_hidden,
       menuId: menu.id,
+      ...(menu.query_scope_code ? { queryScopeCode: menu.query_scope_code } : {}),
     },
     children,
   }
@@ -181,6 +183,7 @@ function menuToReportRoute(menu: Menu): Route | null {
       isHidden: menu.is_hidden,
       pageType: 'report',
       menuId: menu.id,
+      ...(menu.query_scope_code ? { queryScopeCode: menu.query_scope_code } : {}),
       reportId: option.report_id,
       ...(option.report_code ? { reportCode: option.report_code } : {}),
       ...(menu.table_code ? { permissionTableCode: menu.table_code } : {}),

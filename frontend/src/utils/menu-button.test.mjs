@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolvePageButtons } from './menu-button.ts'
+import { hasGrantedActionCapability, resolvePageButtons } from './menu-button.ts'
 
 const pageButton = (overrides = {}) => ({
   id: 1,
@@ -58,4 +58,22 @@ test('resolvePageButtons returns granted visible buttons for a nested menu in se
 
 test('resolvePageButtons returns an empty list when the current route has no granted menu', () => {
   assert.deepEqual(resolvePageButtons([], 'missing_page'), [])
+})
+
+test('granted action capability includes hidden API permissions in nested menus', () => {
+  const menus = [{
+    name: 'system',
+    children: [{
+      name: 'query_scheme_capabilities',
+      menu_buttons: [pageButton({
+        code: 'query_scheme_shared_manage_create',
+        event_action: 'query_scheme_shared_manage',
+        is_button: false,
+        is_hidden: true,
+      })],
+    }],
+  }]
+
+  assert.equal(hasGrantedActionCapability(menus, 'query_scheme_shared_manage'), true)
+  assert.equal(hasGrantedActionCapability(menus, 'query_scheme_unknown'), false)
 })

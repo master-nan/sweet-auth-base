@@ -16,12 +16,25 @@ declare module 'vue-router' {
     reportId?: number
     reportCode?: string
     permissionTableCode?: string
+    queryScopeCode?: string
     showTag?: boolean
     fullscreen?: boolean
   }
 }
 
 const asyncRoutesChildren: Route[] = [
+  {
+    component: () => import('pages/query-scheme/Index.vue'),
+    path: 'query-schemes',
+    name: 'query_scheme_manager',
+    meta: {
+      title: '查询方案管理',
+      icon: 'manage_search',
+      keepAlive: false,
+      isHidden: true,
+      showTag: true,
+    },
+  },
   {
     component: () => import('pages/detail/RecordDetail.vue'),
     path: 'detail/:source/:table_code/:id',

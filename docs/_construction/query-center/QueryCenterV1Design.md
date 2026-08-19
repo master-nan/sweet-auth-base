@@ -444,6 +444,10 @@ Available endpoint 不返回完整 query_payload，不分页但每类有服务�
 
 Resolve body 只含 `scope_code` 和可选 `expected_revision`。不能用 ID 读取其他 scope 或其他用户 PERSONAL。
 
+QC-002B 实施确认：Resolve 除解析后的标准 Query 与 `binding_kinds` 摘要外，还返回当前方案经过服务端校验的受控 `bindings`（pointer、白名单 kind、有限 offset 参数）。这是前端无损 Dirty、保存修改和另存为动态方案所需的最小 Runtime DTO；Available 仍不返回 Payload/Binding 明细，Scheme 协议、数据库结构与 Binding 白名单均不变。
+
+固定页面若已有受后端支持、但因系统字段保护而不进入 Runtime Metadata `is_sort` 的默认排序，必须由 Scope Registry 的 `allowed_virtual_sort_fields` 显式声明。QC-002B 参考页验收确认 Organization 列表的既有 `gmt_modify` 排序属于该类；仅相应固定 Organization scope 获得该 allowlist，不允许前端省略排序校验或提交任意字段。
+
 ### 14.2 Management API
 
 | Method/Path | 用途 |

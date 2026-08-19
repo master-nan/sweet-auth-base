@@ -392,6 +392,7 @@ func resolveResponse(
 		Scheme: response.QuerySchemeResolveSourceRes{
 			ID: value.Id, Name: value.Name, Type: value.SchemeType, Revision: value.Revision, IsDefault: value.IsDefault,
 		},
-		ValidationStatus: validation.Status, Issues: validation.Issues, ResolvedQuery: resolved, BindingKinds: kinds,
+		ValidationStatus: validation.Status, Issues: validation.Issues, ResolvedQuery: resolved,
+		Bindings: append([]queryscheme.Binding(nil), bindings...), BindingKinds: kinds,
 	}
 }

@@ -43,6 +43,7 @@ export interface Menu extends Basic {
   sequence: number
   page_type?: 'directory' | 'fixed' | 'low_code' | string
   table_code?: string
+  query_scope_code?: string
   detail_open_mode?: SysDetailOpenMode
   option: string
   icon?: string

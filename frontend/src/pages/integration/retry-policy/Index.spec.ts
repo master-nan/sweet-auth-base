@@ -19,6 +19,7 @@ const buttons = vi.hoisted(() => ({
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
 vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn(), currentRoute: { value: { query: {} } } }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
 vi.mock('src/composables/page-buttons', () => ({ usePageButtons: () => ({ top_buttons: computed(() => buttons.top), line_buttons: computed(() => buttons.line), has_line_buttons: computed(() => true) }) }))

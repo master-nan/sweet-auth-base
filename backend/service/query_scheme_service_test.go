@@ -180,6 +180,9 @@ func TestQuerySchemeResolveCurrentIdentityAndDegradedMetadata(t *testing.T) {
 	if err != nil || resolved.ResolvedQuery == nil || resolved.ResolvedQuery.Expressions[0].Rules[0].Value != float64(101) {
 		t.Fatalf("resolve current user: result=%+v err=%v", resolved, err)
 	}
+	if len(resolved.Bindings) != 1 || resolved.Bindings[0].Kind != queryscheme.BindingCurrentUser {
+		t.Fatalf("resolve must preserve controlled binding metadata: %+v", resolved.Bindings)
+	}
 	payload.Expressions[0].Rules[0].Field = "removed"
 	payload.Bindings = nil
 	degradedRaw, _ := json.Marshal(payload)

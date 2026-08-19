@@ -1,5 +1,10 @@
 import { ExpressionType, SysTableFieldType } from 'src/types/enum'
 import type { ExpressionGroup, Query, QueryRule } from 'src/types/global'
+import { ExpressionLogic } from 'src/types/enum'
+import type {
+  QuerySchemeBinding,
+  QuerySchemePayloadV1,
+} from 'src/modules/query-scheme/types'
 
 const nullExpressionTypes = new Set<ExpressionType>([
   ExpressionType.IS_NULL,
@@ -225,3 +230,83 @@ export const sanitizeQueryExpressions = (
     .map((expression) => sanitizeExpressionGroup(expression, resolveFieldType))
     .filter((expression): expression is ExpressionGroup => !!expression)
 }
+
+const normalizeExpressionLogic = (groups: ExpressionGroup[]): ExpressionGroup[] =>
+  groups.map((group) => ({
+    ...group,
+    logic: group.logic ?? ExpressionLogic.AND,
+    rules: group.rules.map((rule) => ({ ...rule })),
+    nested: normalizeExpressionLogic(group.nested || []),
+  }))
+
+const stableValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(stableValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, stableValue(item)]),
+  )
+}
+
+export const normalizeQuerySchemePayload = (
+  query: Pick<Query, 'expressions' | 'quick_query' | 'order'>,
+  bindings: QuerySchemeBinding[] = [],
+): QuerySchemePayloadV1 => ({
+  expressions: normalizeExpressionLogic(
+    query.expressions
+      .map((group, index) => sanitizeSchemeGroup(group, `/expressions/${index}`, bindings))
+      .filter((group): group is ExpressionGroup => !!group),
+  ),
+  quick_query: { keyword: query.quick_query?.keyword?.trim() || '' },
+  order: {
+    field: query.order?.field?.trim() || '',
+    is_asc: !!query.order?.field && !!query.order?.is_asc,
+  },
+  bindings: bindings
+    .map((binding) => ({
+      pointer: binding.pointer.trim(),
+      kind: binding.kind,
+      ...(binding.params && Object.keys(binding.params).length
+        ? { params: { ...binding.params } }
+        : {}),
+    }))
+    .sort((left, right) => left.pointer.localeCompare(right.pointer)),
+})
+
+const sanitizeSchemeGroup = (
+  group: ExpressionGroup,
+  path: string,
+  bindings: QuerySchemeBinding[],
+): ExpressionGroup | null => {
+  const rules = group.rules
+    .map((rule, index) => {
+      const valuePointer = `${path}/rules/${index}/value`
+      const bound = bindings.some(
+        (binding) =>
+          binding.pointer === valuePointer || binding.pointer.startsWith(`${valuePointer}/`),
+      )
+      if (!bound && !isEffectiveQueryRule(rule)) return null
+      return normalizeQueryRuleForSubmit(rule)
+    })
+    .filter((rule): rule is QueryRule => !!rule)
+  const nested = (group.nested || [])
+    .map((child, index) => sanitizeSchemeGroup(child, `${path}/nested/${index}`, bindings))
+    .filter((child): child is ExpressionGroup => !!child)
+  if (!rules.length && !nested.length) return null
+  return { ...group, rules, nested }
+}
+
+export const serializeQuerySchemePayload = (payload: QuerySchemePayloadV1) =>
+  JSON.stringify(stableValue(payload))
+
+export const queryExpressionDepth = (groups: ExpressionGroup[]): number => {
+  const groupDepth = (group: ExpressionGroup): number =>
+    1 + Math.max(0, ...(group.nested || []).map(groupDepth))
+  return Math.max(0, ...groups.map(groupDepth))
+}
+
+export const isSimpleQueryExpression = (groups: ExpressionGroup[]) =>
+  groups.length <= 1 &&
+  (groups[0]?.logic ?? ExpressionLogic.AND) === ExpressionLogic.AND &&
+  (groups[0]?.nested?.length || 0) === 0

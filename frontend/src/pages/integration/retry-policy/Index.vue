@@ -15,6 +15,8 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector><query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @manage="openSchemeManager" /></template>
+          <template #quick-presets><query-quick-presets :config="querySchemes.scope.config.value" @apply="applyQuickPreset" /></template>
           <template #quick-search>
             <q-input v-model="keyword" dense outlined debounce="300" placeholder="搜索策略编码或名称" @keyup.enter="handleBasicSearch">
               <template #append><q-icon name="search" /></template>
@@ -32,6 +34,7 @@
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </template>
+          <template #save-scheme><q-btn outline color="primary" icon="bookmark_add" label="保存方案" @click="showSchemeSave = true" /></template>
           <template #right-actions>
             <q-btn v-for="button in top_buttons" :key="button.id" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" :disable="loading" @click="handleButtonClick(button)" />
           </template>
@@ -55,7 +58,8 @@
       <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
     </q-table>
 
-    <advanced-query v-model="showAdvancedQuery" v-model:query-model="tempAdvancedQuery" :fields="advancedFields" @search="handleAdvancedSearch" />
+    <advanced-query v-model="showAdvancedQuery" v-model:query-model="tempAdvancedQuery" v-model:bindings="queryState.bindings.value" :fields="advancedFields" :source-name="queryState.schemeSource.value?.name || ''" :dirty="queryState.dirty.value" @search="handleAdvancedSearch" />
+    <query-scheme-save-dialog v-model="showSchemeSave" :source="queryState.schemeSource.value" :loading="schemeSaving" @save="saveScheme" />
     <retry-policy-form-dialog v-model="showFormDialog" :edit-data="currentEditData" :loading="loading" @submit="handleFormSubmit" />
     <retry-policy-detail-dialog v-model="showDetailDialog" :id="currentDetailId" />
   </base-content>
@@ -66,11 +70,15 @@ defineOptions({ name: 'integration_retry_policy' })
 
 import { onMounted, ref, watch, computed } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import RetryPolicyFormDialog, { type RetryPolicyFormValue } from './RetryPolicyFormDialog.vue'
 import RetryPolicyDetailDialog from './RetryPolicyDetailDialog.vue'
 import {
@@ -87,6 +95,8 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemes } from 'src/composables/query-schemes'
+import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
@@ -97,6 +107,7 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ac
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
 const $q = useQuasar()
+const router = useRouter()
 const api = useIntegrationApi()
 const loading = ref(false)
 const loadError = ref('')
@@ -108,6 +119,8 @@ const initialized = ref(false)
 const showAdvancedQuery = ref(false)
 const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
+const showSchemeSave = ref(false)
+const schemeSaving = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<RetryPolicyDetail | null>(null)
 const { fields: metadataFields, advancedSearchFields: advancedFields, loadMetadata } =
@@ -127,6 +140,7 @@ const queryState = useTableQueryState<RetryPolicyQuery>({
   createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
+const querySchemes = useQuerySchemes('integration_retry_policy', queryState)
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || activeFilterCount.value > 0 }))
@@ -165,6 +179,12 @@ const fetchMetadata = async () => {
 const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
 const handleBasicSearch = () => { queryState.submitQuickSearch(); resetAndFetch() }
 const handleAdvancedSearch = () => { queryState.applyAdvancedQuery(tempAdvancedQuery.value); showAdvancedQuery.value = false; resetAndFetch() }
+const applySelectedScheme = async (scheme: QuerySchemeSummary) => { if (await querySchemes.applyScheme(scheme)) resetAndFetch(); else $q.notify({ type: 'warning', message: querySchemes.issues.value[0]?.message || querySchemes.error.value || '该方案当前不可用' }) }
+const applyQuickPreset = (payload: QuerySchemePayloadV1) => { querySchemes.applyPreset(payload); resetAndFetch() }
+const openSchemeManager = () => { void router.push({ name: 'query_scheme_manager' }) }
+const restoreSchemeQuery = () => { if (querySchemes.restoreCurrentScheme()) resetAndFetch() }
+const resetDefaultQuery = async () => { if (await querySchemes.resetToDefault()) resetAndFetch() }
+const saveScheme = async (value: { name: string; isDefault: boolean; saveAs: boolean }) => { schemeSaving.value = true; try { await querySchemes.savePersonal(value.name, value.isDefault, value.saveAs); showSchemeSave.value = false } finally { schemeSaving.value = false } }
 const availableLineButtons = (row: RetryPolicyListItem) => line_buttons.value.filter((button) => {
   if (button.event_action === 'update') return row.status === 'draft'
   if (button.event_action === 'create_version') return row.status !== 'draft'
@@ -200,7 +220,7 @@ const handleFormSubmit = async (form: RetryPolicyFormValue) => {
   await fetchData()
 }
 
-onMounted(async () => { await Promise.all([fetchMetadata(), fetchData()]); initialized.value = true })
+onMounted(async () => { await fetchMetadata(); await querySchemes.initialize(Number(router.currentRoute?.value?.query?.query_scheme_id) || undefined); await fetchData(); initialized.value = true })
 watch(() => [query.value.page, query.value.num] as const, ([page]) => { if (!initialized.value) return; pagination.value.page = page; void fetchData() })
 watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return; resetAndFetch() })
 watch(showAdvancedQuery, (open) => { if (open) queryState.beginAdvancedEdit() })

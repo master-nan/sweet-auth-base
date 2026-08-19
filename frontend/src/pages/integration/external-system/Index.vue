@@ -16,6 +16,12 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @manage="openSchemeManager" />
+          </template>
+          <template #quick-presets>
+            <query-quick-presets :config="querySchemes.scope.config.value" @apply="applyQuickPreset" />
+          </template>
           <template #quick-search>
             <q-input
               v-model="keyword"
@@ -55,6 +61,9 @@
               <q-badge v-if="activeFilterCount" floating color="red">{{ activeFilterCount }}</q-badge>
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
+          </template>
+          <template #save-scheme>
+            <q-btn outline color="primary" icon="bookmark_add" label="保存方案" @click="showSchemeSave = true" />
           </template>
           <template #right-actions>
             <q-btn
@@ -125,9 +134,14 @@
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:query-model="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       @search="handleAdvancedSearch"
     />
+
+    <query-scheme-save-dialog v-model="showSchemeSave" :source="queryState.schemeSource.value" :loading="schemeSaving" @save="saveScheme" />
 
     <dynamic-form-dialog
       v-model="showFormDialog"
@@ -159,6 +173,9 @@ import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import ExternalSystemDetailDialog from './ExternalSystemDetailDialog.vue'
 import {
   type ExternalSystemCreateRequest,
@@ -172,6 +189,8 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemes } from 'src/composables/query-schemes'
+import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
@@ -195,6 +214,8 @@ const initialized = ref(false)
 const showAdvancedQuery = ref(false)
 const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
+const showSchemeSave = ref(false)
+const schemeSaving = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<ExternalSystemDetail | null>(null)
 const {
@@ -235,6 +256,7 @@ const queryState = useTableQueryState<ExternalSystemQuery>({
   createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
+const querySchemes = useQuerySchemes('integration_external_system', queryState)
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const emptyMessage = computed(() =>
@@ -303,6 +325,20 @@ const handleAdvancedSearch = () => {
   queryState.applyAdvancedQuery(tempAdvancedQuery.value)
   showAdvancedQuery.value = false
   resetAndFetch()
+}
+
+const applySelectedScheme = async (scheme: QuerySchemeSummary) => {
+  if (await querySchemes.applyScheme(scheme)) resetAndFetch()
+  else $q.notify({ type: 'warning', message: querySchemes.issues.value[0]?.message || querySchemes.error.value || '该方案当前不可用' })
+}
+const applyQuickPreset = (payload: QuerySchemePayloadV1) => { querySchemes.applyPreset(payload); resetAndFetch() }
+const openSchemeManager = () => { void router.push({ name: 'query_scheme_manager' }) }
+const restoreSchemeQuery = () => { if (querySchemes.restoreCurrentScheme()) resetAndFetch() }
+const resetDefaultQuery = async () => { if (await querySchemes.resetToDefault()) resetAndFetch() }
+const saveScheme = async (value: { name: string; isDefault: boolean; saveAs: boolean }) => {
+  schemeSaving.value = true
+  try { await querySchemes.savePersonal(value.name, value.isDefault, value.saveAs); showSchemeSave.value = false }
+  finally { schemeSaving.value = false }
 }
 
 const availableLineButtons = (row: ExternalSystemListItem) =>
@@ -396,7 +432,9 @@ const handleFormSubmit = async (payload: {
 }
 
 onMounted(async () => {
-  await Promise.all([fetchMetadata(), fetchData()])
+  await fetchMetadata()
+  await querySchemes.initialize(Number(router.currentRoute?.value?.query?.query_scheme_id) || undefined)
+  await fetchData()
   initialized.value = true
 })
 

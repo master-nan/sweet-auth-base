@@ -21,4 +21,18 @@ describe('StandardTableToolbar', () => {
     await wrapper.find('[data-testid="refresh"]').trigger('click')
     expect(wrapper.emitted('refresh')).toHaveLength(1)
   })
+
+  it('lays out query scheme slots without owning their API behavior', () => {
+    const wrapper = mount(StandardTableToolbar, {
+      slots: {
+        'scheme-selector': '<span data-testid="scheme">方案</span>',
+        'quick-presets': '<span data-testid="preset">本月</span>',
+        'save-scheme': '<span data-testid="save">保存方案</span>',
+      },
+      global: { stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true } },
+    })
+    expect(wrapper.find('[data-testid="scheme"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="preset"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save"]').exists()).toBe(true)
+  })
 })
