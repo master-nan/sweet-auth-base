@@ -12,10 +12,21 @@ const tableApi = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 vi.mock('src/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
 vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
 vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
-  default: { name: 'AdvancedQuery', template: '<div />' },
+  default: {
+    name: 'AdvancedQuery',
+    props: ['modelValue', 'queryModel', 'bindings', 'usage', 'title'],
+    emits: [
+      'update:modelValue',
+      'update:queryModel',
+      'update:bindings',
+      'confirm',
+      'cancel',
+    ],
+    template: '<div />',
+  },
 }))
 vi.mock('src/components/QueryScheme/QuerySchemePreview.vue', () => ({
-  default: { name: 'QuerySchemePreview', template: '<div />' },
+  default: { name: 'QuerySchemePreview', props: ['payload', 'fields'], template: '<div />' },
 }))
 vi.mock('src/components/Select/RoleSelect.vue', () => ({
   default: { name: 'RoleSelect', template: '<div />' },
@@ -101,8 +112,6 @@ describe('QuerySchemeEditDialog', () => {
           QCheckbox: true,
           QBanner: true,
           QTooltip: true,
-          AdvancedQuery: true,
-          QuerySchemePreview: true,
           RoleSelect: true,
         },
       },
@@ -123,5 +132,77 @@ describe('QuerySchemeEditDialog', () => {
     )
     expect(api.setSharedEnabled).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('启用')
+  })
+
+  it('commits condition drafts only after the second dialog is confirmed', async () => {
+    const wrapper = mount(QuerySchemeEditDialog, {
+      props: {
+        modelValue: false,
+        schemeType: QuerySchemeType.PUBLIC,
+        scopeOptions: [{ label: '用户管理', value: 'system.user.list' }],
+        detail: {
+          id: 8,
+          name: '公共用户查询',
+          scope_code: 'system.user.list',
+          scope_label: '用户管理',
+          type: QuerySchemeType.PUBLIC,
+          is_default: false,
+          enabled: true,
+          revision: 2,
+          status: QuerySchemeValidationStatus.VALID,
+          updated_at: '2026-08-19 10:00:00',
+          query_payload: {
+            expressions: [],
+            quick_query: { keyword: 'before' },
+            order: { field: '', is_asc: false },
+            bindings: [],
+          },
+          issues: [],
+        },
+      },
+      global: {
+        directives: { closePopup: () => undefined },
+        stubs: {
+          QDialog: SlotStub,
+          QCard: SlotStub,
+          QCardSection: SlotStub,
+          QCardActions: SlotStub,
+          QBtn: ButtonStub,
+          QSpace: true,
+          QSeparator: true,
+          QSelect: true,
+          QInput: true,
+          QCheckbox: true,
+          QBanner: true,
+          QTooltip: true,
+          RoleSelect: true,
+        },
+      },
+    })
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '编辑查询条件')!.trigger('click')
+    await nextTick()
+
+    const editor = wrapper.findComponent({ name: 'AdvancedQuery' })
+    const preview = wrapper.findComponent({ name: 'QuerySchemePreview' })
+    expect(editor.props('usage')).toBe('scheme-condition-editor')
+    expect(editor.props('title')).toBe('编辑查询条件')
+    editor.vm.$emit('update:queryModel', {
+      ...editor.props('queryModel'),
+      quick_query: { keyword: 'cancelled' },
+    })
+    editor.vm.$emit('cancel')
+    await nextTick()
+    expect(preview.props('payload').quick_query.keyword).toBe('before')
+
+    await wrapper.findAll('button').find((button) => button.text() === '编辑查询条件')!.trigger('click')
+    editor.vm.$emit('update:queryModel', {
+      ...editor.props('queryModel'),
+      quick_query: { keyword: 'confirmed' },
+    })
+    editor.vm.$emit('confirm')
+    await nextTick()
+    expect(preview.props('payload').quick_query.keyword).toBe('confirmed')
   })
 })

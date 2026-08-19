@@ -15,10 +15,30 @@ describe('QuerySchemeSelector', () => {
       global: { stubs: { QBtnDropdown: SlotStub, QList: SlotStub, QItem: ItemStub, QItemLabel: SlotStub, QItemSection: SlotStub, QIcon: true, QTooltip: true, QSeparator: true } },
     })
     expect(wrapper.text()).toContain('本月异常')
+    expect(wrapper.text()).toContain('我的方案')
+    expect(wrapper.text()).not.toContain('公共方案')
+    expect(wrapper.text()).not.toContain('角色方案')
     const items = wrapper.findAll('button')
     await items[0]!.trigger('click')
     await items.at(-1)!.trigger('click')
     expect(wrapper.emitted('select')?.[0]?.[0]).toEqual(scheme)
     expect(wrapper.emitted('manage')).toHaveLength(1)
+  })
+
+  it('distinguishes an empty selector from a failed runtime request', async () => {
+    const emptyWrapper = mount(QuerySchemeSelector, {
+      props: { schemes: [] },
+      global: { stubs: { QBtnDropdown: SlotStub, QList: SlotStub, QItem: ItemStub, QItemLabel: SlotStub, QItemSection: SlotStub, QIcon: true, QTooltip: true, QSeparator: true } },
+    })
+    expect(emptyWrapper.text()).toContain('暂无已保存方案')
+
+    const failedWrapper = mount(QuerySchemeSelector, {
+      props: { schemes: [], loadError: 'network error' },
+      global: { stubs: { QBtnDropdown: SlotStub, QList: SlotStub, QItem: ItemStub, QItemLabel: SlotStub, QItemSection: SlotStub, QIcon: true, QTooltip: true, QSeparator: true } },
+    })
+    const retry = failedWrapper.findAll('button').find((item) => item.text().includes('点击重试'))
+    await retry!.trigger('click')
+    expect(failedWrapper.text()).toContain('查询方案加载失败')
+    expect(failedWrapper.emitted('retry')).toHaveLength(1)
   })
 })

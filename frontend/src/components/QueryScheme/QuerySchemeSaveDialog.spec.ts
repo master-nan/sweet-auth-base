@@ -22,6 +22,6 @@ describe('QuerySchemeSaveDialog', () => {
   it('does not allow direct shared scheme updates', () => {
     const wrapper = mount(QuerySchemeSaveDialog, { props: { modelValue: true, source: { id: 2, name: '公共方案', type: QuerySchemeType.PUBLIC, revision: 1, is_default: false } }, global: { stubs: { QDialog: SlotStub, QCard: SlotStub, QCardSection: SlotStub, QCardActions: SlotStub, QSeparator: true, QSpace: true, QBtn: ButtonStub, QInput: InputStub, QCheckbox: true, QTooltip: true } } })
     expect(wrapper.text()).not.toContain('保存修改')
-    expect(wrapper.text()).toContain('保存')
+    expect(wrapper.text()).toContain('另存为我的方案')
   })
 })

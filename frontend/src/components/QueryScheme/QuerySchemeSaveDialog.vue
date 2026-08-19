@@ -27,7 +27,7 @@
           :disable="!valid"
           @click="submit(false)"
         />
-        <q-btn color="primary" :label="canUpdate ? '另存为' : '保存'" :loading="loading" :disable="!valid" @click="submit(true)" />
+        <q-btn color="primary" :label="saveAsLabel" :loading="loading" :disable="!valid" @click="submit(true)" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -52,6 +52,10 @@ const name = ref('')
 const isDefault = ref(false)
 const visible = computed({ get: () => props.modelValue, set: (value) => emit('update:modelValue', value) })
 const canUpdate = computed(() => props.source?.type === QuerySchemeType.PERSONAL)
+const saveAsLabel = computed(() => {
+  if (canUpdate.value) return '另存为'
+  return props.source ? '另存为我的方案' : '保存'
+})
 const valid = computed(() => name.value.trim().length > 0 && name.value.trim().length <= 64)
 
 watch(() => props.modelValue, (open) => {

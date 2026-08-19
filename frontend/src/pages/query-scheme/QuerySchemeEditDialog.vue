@@ -22,7 +22,7 @@
           :rules="[validateRoleIds]"
         />
         <q-banner v-if="scopeError" class="bg-warning text-dark rounded-borders">{{ scopeError }}</q-banner>
-        <q-btn outline color="primary" icon="tune" label="编辑查询条件" :disable="!scopeConfig" @click="showQuery = true" />
+        <q-btn outline color="primary" icon="tune" label="编辑查询条件" :disable="!scopeConfig" @click="openConditionEditor" />
         <query-scheme-preview v-if="scopeConfig" :payload="payload" :fields="fields" />
       </q-card-section>
       <q-card-actions align="right" class="q-pa-md">
@@ -34,16 +34,19 @@
 
   <advanced-query
     v-model="showQuery"
-    v-model:query-model="query"
-    v-model:bindings="bindings"
+    v-model:query-model="conditionDraft"
+    v-model:bindings="conditionBindingDraft"
     :fields="fields"
-    title="编辑方案查询条件"
-    @search="showQuery = false"
+    title="编辑查询条件"
+    usage="scheme-condition-editor"
+    @confirm="confirmConditionEdit"
+    @cancel="showQuery = false"
   />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import cloneDeep from 'lodash/cloneDeep'
 import { useQuasar } from 'quasar'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
@@ -83,6 +86,8 @@ const loading = ref(false)
 const showQuery = ref(false)
 const bindings = ref<QuerySchemeBinding[]>([])
 const query = ref<Query>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] })
+const conditionDraft = ref<Query>(cloneDeep(query.value))
+const conditionBindingDraft = ref<QuerySchemeBinding[]>([])
 const payload = computed(() => normalizeQuerySchemePayload(query.value, bindings.value))
 const valid = computed(() => !!scopeCode.value && !!name.value.trim() && (props.schemeType !== QuerySchemeType.ROLE || (roleIds.value.length > 0 && roleIds.value.length <= 32)))
 const validateRoleIds = (value: number[]) =>
@@ -113,6 +118,18 @@ const reset = async () => {
   query.value = { page: 1, num: 15, order: source?.order || { field: '', is_asc: false }, quick_query: source?.quick_query || { keyword: '' }, expressions: source?.expressions || [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] }
   bindings.value = [...(source?.bindings || [])]
   await loadScope()
+}
+
+const openConditionEditor = () => {
+  conditionDraft.value = cloneDeep(query.value)
+  conditionBindingDraft.value = cloneDeep(bindings.value)
+  showQuery.value = true
+}
+
+const confirmConditionEdit = () => {
+  query.value = cloneDeep(conditionDraft.value)
+  bindings.value = cloneDeep(conditionBindingDraft.value)
+  showQuery.value = false
 }
 
 const submit = async () => {

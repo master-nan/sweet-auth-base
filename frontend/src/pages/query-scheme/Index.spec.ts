@@ -1,5 +1,5 @@
-import { defineComponent, h, nextTick } from 'vue'
-import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
 
@@ -67,8 +67,15 @@ const QTabStub = defineComponent({
 })
 const QTableStub = defineComponent({
   name: 'QTable',
-  setup(_, { slots }) {
-    return () => h('div', [slots.top?.(), slots.noData?.(), slots.bottom?.()])
+  props: { rows: Array },
+  setup(props, { slots }) {
+    return () => h('div', [
+      slots.top?.(),
+      props.rows?.length
+        ? slots['body-cell-actions']?.({ row: props.rows[0] })
+        : slots['no-data']?.(),
+      slots.bottom?.(),
+    ])
   },
 })
 const QSelectStub = defineComponent({
@@ -77,6 +84,45 @@ const QSelectStub = defineComponent({
     return () => h('div', (props.options || []).map((option) => String((option as { label?: string }).label || '')))
   },
 })
+const QBtnStub = defineComponent({
+  props: { label: String, ariaLabel: String },
+  emits: ['click'],
+  setup(props, { emit, slots }) {
+    return () => h('button', {
+      'aria-label': props.ariaLabel,
+      onClick: () => emit('click'),
+    }, [props.label, slots.default?.()])
+  },
+})
+const QItemStub = defineComponent({
+  emits: ['click'],
+  setup(_, { emit, slots }) {
+    return () => h('button', { onClick: () => emit('click') }, slots.default?.())
+  },
+})
+const managerStubs = {
+  BaseContent: SlotStub,
+  QTable: QTableStub,
+  QTabs: SlotStub,
+  QTab: QTabStub,
+  QInput: true,
+  QSelect: QSelectStub,
+  QBtn: QBtnStub,
+  QTd: SlotStub,
+  QMenu: SlotStub,
+  QList: SlotStub,
+  QItem: QItemStub,
+  QItemSection: SlotStub,
+  QTooltip: true,
+  QIcon: true,
+  QSpace: true,
+  QSeparator: true,
+  StandardTableToolbar: ToolbarStub,
+  TablePagination: true,
+  QuerySchemeDetailDrawer: true,
+  QuerySchemeEditDialog: true,
+}
+const mountManager = () => mount(QuerySchemeManager, { global: { stubs: managerStubs } })
 
 describe('QuerySchemeManager', () => {
   beforeEach(() => {
@@ -100,29 +146,8 @@ describe('QuerySchemeManager', () => {
   })
 
   it('loads personal schemes and exposes all four management categories', async () => {
-    const wrapper = mount(QuerySchemeManager, {
-      global: {
-        stubs: {
-          BaseContent: SlotStub,
-          QTable: QTableStub,
-          QTabs: SlotStub,
-          QTab: QTabStub,
-          QInput: true,
-          QSelect: QSelectStub,
-          QBtn: true,
-          QTd: true,
-          QTooltip: true,
-          QIcon: true,
-          QSpace: true,
-          QSeparator: true,
-          StandardTableToolbar: ToolbarStub,
-          TablePagination: true,
-          QuerySchemeDetailDrawer: true,
-          QuerySchemeEditDialog: true,
-        },
-      },
-    })
-    await nextTick()
+    const wrapper = mountManager()
+    await flushPromises()
 
     expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ scheme_type: QuerySchemeType.PERSONAL }))
     expect(wrapper.text()).toContain('我的方案')
@@ -132,5 +157,26 @@ describe('QuerySchemeManager', () => {
     expect(wrapper.text()).toContain('用户管理')
     expect(wrapper.text()).not.toContain('router.system.user')
     expect(wrapper.html()).not.toContain('revision')
+    expect(['使用方案', '编辑方案', '查看方案详情'].every((label) =>
+      wrapper.find(`[aria-label="${label}"]`).exists(),
+    )).toBe(true)
+    expect(wrapper.find('[aria-label="更多方案操作"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('取消默认')
+    expect(wrapper.text()).toContain('删除方案')
+  })
+
+  it('distinguishes no matches from a loading failure', async () => {
+    api.list.mockResolvedValueOnce({ data: [], total: 0 })
+    const emptyWrapper = mountManager()
+    await flushPromises()
+    expect(emptyWrapper.text()).toContain('当前分类暂无查询方案')
+    emptyWrapper.unmount()
+
+    api.list.mockRejectedValueOnce(new Error('database details'))
+    const failedWrapper = mountManager()
+    await flushPromises()
+    expect(failedWrapper.text()).toContain('查询方案加载失败，可重试')
+    expect(failedWrapper.text()).toContain('重试')
+    expect(failedWrapper.text()).not.toContain('database details')
   })
 })

@@ -35,16 +35,41 @@
       <template #body-cell-enabled="props"><q-td :props="props"><status-chip :label="props.row.enabled ? '已启用' : '已停用'" :color="props.row.enabled ? 'positive' : 'grey'" /></q-td></template>
       <template #body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs no-wrap">
-          <q-btn flat round dense icon="visibility" aria-label="查看方案详情" @click="openDetail(props.row)"><q-tooltip>详情</q-tooltip></q-btn>
           <q-btn flat round dense icon="play_arrow" color="primary" aria-label="使用方案" @click="useScheme(props.row)"><q-tooltip>使用</q-tooltip></q-btn>
-          <q-btn v-if="props.row.type !== QuerySchemeType.PERSONAL" flat round dense icon="content_copy" aria-label="复制为我的方案" @click="copyScheme(props.row)"><q-tooltip>复制为我的方案</q-tooltip></q-btn>
           <q-btn v-if="canEdit(props.row)" flat round dense icon="edit" color="primary" aria-label="编辑方案" @click="openEdit(props.row)"><q-tooltip>编辑</q-tooltip></q-btn>
-          <q-btn v-if="props.row.type === QuerySchemeType.PERSONAL" flat round dense icon="star" color="amber-8" aria-label="设置默认方案" @click="setPersonalDefault(props.row)"><q-tooltip>{{ props.row.is_default ? '取消默认' : '设为默认' }}</q-tooltip></q-btn>
-          <q-btn v-if="canManageShared && props.row.type !== QuerySchemeType.PERSONAL" flat round dense :icon="props.row.enabled ? 'toggle_off' : 'toggle_on'" :color="props.row.enabled ? 'warning' : 'positive'" :aria-label="props.row.enabled ? '停用方案' : '启用方案'" @click="toggleEnabled(props.row)"><q-tooltip>{{ props.row.enabled ? '停用' : '启用' }}</q-tooltip></q-btn>
-          <q-btn v-if="canEdit(props.row)" flat round dense icon="delete" color="negative" aria-label="删除方案" @click="deleteScheme(props.row)"><q-tooltip>删除</q-tooltip></q-btn>
+          <q-btn flat round dense icon="visibility" aria-label="查看方案详情" @click="openDetail(props.row)"><q-tooltip>详情</q-tooltip></q-btn>
+          <q-btn flat round dense icon="more_horiz" aria-label="更多方案操作">
+            <q-tooltip>更多操作</q-tooltip>
+            <q-menu auto-close>
+              <q-list dense style="min-width: 180px">
+                <q-item v-if="props.row.type !== QuerySchemeType.PERSONAL" clickable @click="copyScheme(props.row)">
+                  <q-item-section avatar><q-icon name="content_copy" /></q-item-section>
+                  <q-item-section>复制为我的方案</q-item-section>
+                </q-item>
+                <q-item v-if="props.row.type === QuerySchemeType.PERSONAL" clickable @click="setPersonalDefault(props.row)">
+                  <q-item-section avatar><q-icon :name="props.row.is_default ? 'star_border' : 'star'" color="amber-8" /></q-item-section>
+                  <q-item-section>{{ props.row.is_default ? '取消默认' : '设为默认' }}</q-item-section>
+                </q-item>
+                <q-item v-if="canManageShared && props.row.type !== QuerySchemeType.PERSONAL" clickable @click="toggleEnabled(props.row)">
+                  <q-item-section avatar><q-icon :name="props.row.enabled ? 'toggle_off' : 'toggle_on'" :color="props.row.enabled ? 'warning' : 'positive'" /></q-item-section>
+                  <q-item-section>{{ props.row.enabled ? '停用方案' : '启用方案' }}</q-item-section>
+                </q-item>
+                <q-separator v-if="canEdit(props.row)" />
+                <q-item v-if="canEdit(props.row)" clickable class="text-negative" @click="deleteScheme(props.row)">
+                  <q-item-section avatar><q-icon name="delete" color="negative" /></q-item-section>
+                  <q-item-section>删除方案</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
         </q-td>
       </template>
-      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ error || '当前分类暂无查询方案' }}</div></template>
+      <template #no-data>
+        <div class="full-width column flex-center q-gutter-sm q-pa-xl text-grey-7">
+          <div>{{ emptyMessage }}</div>
+          <q-btn v-if="error" outline color="primary" icon="refresh" label="重试" @click="fetchData" />
+        </div>
+      </template>
       <template #bottom><q-space /><table-pagination v-model:page="page" v-model:page-size="pageSize" :total="total" /></template>
     </q-table>
 
@@ -123,6 +148,12 @@ const statusLabel = (status: ValidationStatus) => status === QuerySchemeValidati
 const statusColor = (status: ValidationStatus) => status === QuerySchemeValidationStatus.VALID ? 'positive' : status === QuerySchemeValidationStatus.DEGRADED ? 'warning' : 'negative'
 const canEdit = (row: QuerySchemeListItem) => row.type === QuerySchemeType.PERSONAL || canManageShared.value
 const typeLabel = (row: QuerySchemeListItem) => QUERY_SCHEME_TYPE_LABELS[row.type]
+const hasFilters = computed(() => !!nameFilter.value.trim() || !!scopeFilter.value)
+const emptyMessage = computed(() => {
+  if (error.value) return '查询方案加载失败，可重试'
+  if (hasFilters.value) return '没有符合当前查询条件的方案'
+  return '当前分类暂无查询方案'
+})
 
 const fetchData = async () => {
   loading.value = true
@@ -137,10 +168,10 @@ const fetchData = async () => {
     })
     rows.value = response.data || []
     total.value = response.total || 0
-  } catch (cause) {
+  } catch {
     rows.value = []
     total.value = 0
-    error.value = cause instanceof Error ? cause.message : '查询方案加载失败'
+    error.value = '查询方案加载失败'
   } finally {
     loading.value = false
   }

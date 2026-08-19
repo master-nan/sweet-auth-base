@@ -8,7 +8,9 @@
           <span>{{ title }}</span>
         </div>
         <q-space />
-        <q-btn icon="close" flat round dense size="sm" v-close-popup />
+        <q-btn icon="close" flat round dense size="sm" aria-label="关闭查询条件窗口" v-close-popup>
+          <q-tooltip>关闭</q-tooltip>
+        </q-btn>
       </q-card-section>
 
       <q-tabs
@@ -246,13 +248,19 @@
 
       <!-- 固定底部按钮区域 -->
       <q-card-actions align="right" class="advanced-search-footer">
-        <q-btn v-if="!readOnlyDepth" outline color="secondary" @click="resetFilter">
+        <q-btn
+          v-if="isSchemeConditionEditor"
+          flat
+          label="取消"
+          @click="cancelConditionEdit"
+        />
+        <q-btn v-else-if="!readOnlyDepth" outline color="secondary" @click="resetFilter">
           <q-icon left size="sm" name="restart_alt" />
           重置
         </q-btn>
-        <q-btn v-if="!readOnlyDepth" color="primary" @click="search()">
-          <q-icon left size="sm" name="search" />
-          搜索
+        <q-btn v-if="!readOnlyDepth" color="primary" @click="completeQueryAction">
+          <q-icon left size="sm" :name="isSchemeConditionEditor ? 'check' : 'search'" />
+          {{ isSchemeConditionEditor ? '确定' : '搜索' }}
         </q-btn>
       </q-card-actions>
     </q-card>
@@ -328,6 +336,7 @@ type QSelectFilterAbort = () => void
 type VirtualScrollDetails = {
   to?: number
 }
+type AdvancedQueryUsage = 'business-query' | 'scheme-condition-editor'
 
 const props = defineProps({
   // 第一个v-model，控制对话框显示/隐藏
@@ -380,9 +389,20 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  usage: {
+    type: String as PropType<AdvancedQueryUsage>,
+    default: 'business-query',
+  },
 })
 
-const emit = defineEmits(['update:modelValue', 'update:queryModel', 'update:bindings', 'search'])
+const emit = defineEmits([
+  'update:modelValue',
+  'update:queryModel',
+  'update:bindings',
+  'search',
+  'confirm',
+  'cancel',
+])
 
 const booleanOptions = [
   { label: '是', value: true },
@@ -392,6 +412,7 @@ const booleanOptions = [
 const queryMode = ref<'simple' | 'advanced'>('simple')
 const simpleModeAvailable = computed(() => isSimpleQueryExpression(props.queryModel.expressions))
 const readOnlyDepth = computed(() => queryExpressionDepth(props.queryModel.expressions) > 2)
+const isSchemeConditionEditor = computed(() => props.usage === 'scheme-condition-editor')
 const previewPayload = computed(() => normalizeQuerySchemePayload(props.queryModel, props.bindings))
 const previewFields = computed(() => props.fields as TableField[])
 const bindingLabelsForRule = (pointer: string) =>
@@ -1262,14 +1283,13 @@ const resetFilter = () => {
   }
 }
 
-// 搜索
-const search = () => {
+const completeQueryAction = () => {
   normalizeQueryExpressionTypes()
   if (hasIncompleteExpressionRules(props.queryModel.expressions)) {
     void form.value?.validate()
     $q.notify({
       color: 'negative',
-      message: '请完善搜索条件',
+      message: isSchemeConditionEditor.value ? '请完善查询条件' : '请完善搜索条件',
       position: 'top-right',
       timeout: 6000,
     })
@@ -1277,7 +1297,12 @@ const search = () => {
   }
   form.value?.resetValidation()
   submitQueryModel()
-  emit('search')
+  emit(isSchemeConditionEditor.value ? 'confirm' : 'search')
+}
+
+const cancelConditionEdit = () => {
+  emit('cancel')
+  dialogVisible.value = false
 }
 
 // 暴露方法

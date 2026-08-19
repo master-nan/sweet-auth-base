@@ -1,6 +1,7 @@
 <template>
   <q-btn-dropdown
-    outline
+    flat
+    dense
     color="primary"
     icon="bookmark_border"
     :label="currentLabel"
@@ -10,7 +11,7 @@
   >
     <q-list dense style="min-width: 260px">
       <template v-for="group in groupedSchemes" :key="group.type">
-        <q-item-label v-if="group.items.length" header>{{ group.label }}</q-item-label>
+        <q-item-label header>{{ group.label }}</q-item-label>
         <q-item
           v-for="scheme in group.items"
           :key="scheme.id"
@@ -22,12 +23,13 @@
             <q-item-label>{{ scheme.name }}</q-item-label>
           </q-item-section>
           <q-item-section side class="row items-center no-wrap q-gutter-xs">
-            <q-icon v-if="scheme.is_default" name="star" color="amber-7">
+            <q-icon v-if="scheme.is_default" name="star" color="amber-7" size="16px">
               <q-tooltip>默认方案</q-tooltip>
             </q-icon>
             <q-icon
               v-if="scheme.status !== QuerySchemeValidationStatus.VALID"
               name="warning_amber"
+              size="17px"
               :color="scheme.status === QuerySchemeValidationStatus.INVALID ? 'negative' : 'warning'"
             >
               <q-tooltip>{{ scheme.status === QuerySchemeValidationStatus.INVALID ? '方案不可用' : '方案需要修复' }}</q-tooltip>
@@ -35,8 +37,17 @@
           </q-item-section>
         </q-item>
       </template>
-      <q-item v-if="!schemes.length && !loading">
-        <q-item-section class="text-grey-7">当前页面暂无查询方案</q-item-section>
+      <q-item v-if="loadError && !loading" clickable @click="$emit('retry')">
+        <q-item-section avatar><q-icon name="error_outline" color="negative" /></q-item-section>
+        <q-item-section>
+          <q-item-label class="text-negative">查询方案加载失败</q-item-label>
+          <q-item-label caption>点击重试</q-item-label>
+        </q-item-section>
+      </q-item>
+      <q-item v-else-if="!schemes.length && !loading">
+        <q-item-section class="text-grey-7">
+          暂无已保存方案，可保存当前查询条件以便下次使用
+        </q-item-section>
       </q-item>
       <q-separator />
       <q-item v-if="dirty" clickable v-close-popup @click="$emit('restore-current')">
@@ -81,8 +92,15 @@ const props = withDefaults(
     loading?: boolean
     disabled?: boolean
     dirty?: boolean
+    loadError?: string
   }>(),
-  { currentLabel: '查询方案', loading: false, disabled: false, dirty: false },
+  {
+    currentLabel: '查询方案',
+    loading: false,
+    disabled: false,
+    dirty: false,
+    loadError: '',
+  },
 )
 
 const emit = defineEmits<{
@@ -90,6 +108,7 @@ const emit = defineEmits<{
   manage: []
   'restore-current': []
   'reset-default': []
+  retry: []
 }>()
 
 const confirmVisible = ref(false)
@@ -115,10 +134,12 @@ const order = [
   QuerySchemeType.PAGE_DEFAULT,
 ]
 const groupedSchemes = computed(() =>
-  order.map((type) => ({
-    type,
-    label: QUERY_SCHEME_TYPE_LABELS[type],
-    items: props.schemes.filter((scheme) => scheme.type === type),
-  })),
+  order
+    .map((type) => ({
+      type,
+      label: QUERY_SCHEME_TYPE_LABELS[type],
+      items: props.schemes.filter((scheme) => scheme.type === type),
+    }))
+    .filter((group) => group.items.length > 0),
 )
 </script>

@@ -18,7 +18,7 @@
     >
       <template v-slot:top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector><query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @manage="openSchemeManager" /></template>
+          <template #scheme-selector><query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" :load-error="querySchemes.error.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @retry="querySchemes.loadAvailable" @manage="openSchemeManager" /></template>
           <template #quick-presets><query-quick-presets :config="querySchemes.scope.config.value" @apply="applyQuickPreset" /></template>
           <template #quick-search>
             <q-input

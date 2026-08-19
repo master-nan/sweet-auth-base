@@ -61,8 +61,9 @@ const QFormStub = defineComponent({
 
 const QBtnStub = defineComponent({
   name: 'QBtn',
+  props: { label: String },
   emits: ['click'],
-  setup(_, { emit, slots }) {
+  setup(props, { emit, slots }) {
     return () =>
       h(
         'button',
@@ -70,7 +71,7 @@ const QBtnStub = defineComponent({
           type: 'button',
           onClick: () => emit('click'),
         },
-        slots.default?.(),
+        props.label || slots.default?.(),
       )
   },
 })
@@ -132,6 +133,7 @@ const makeQuery = (fieldCode: string, expressionType = ExpressionType.EQ): Query
 const mountQuery = async (
   selectorType?: OrganizationSelectorType,
   expressionType = ExpressionType.EQ,
+  usage: 'business-query' | 'scheme-condition-editor' = 'business-query',
 ) => {
   const field = makeField(selectorType)
   const query = makeQuery(field.field_code, expressionType)
@@ -140,6 +142,7 @@ const mountQuery = async (
       modelValue: true,
       queryModel: query,
       fields: [field],
+      usage,
     },
     global: {
       stubs: {
@@ -152,6 +155,7 @@ const mountQuery = async (
         QIcon: true,
         QSpace: true,
         QSeparator: true,
+        QTooltip: true,
         AdvancedQueryRuleRow: AdvancedQueryRuleRowStub,
       },
     },
@@ -237,5 +241,29 @@ describe('AdvancedQuery organization selector integration', () => {
     expect(expressionOptions(rule).map((option) => option.value)).toContain(
       ExpressionType.LIKE,
     )
+  })
+
+  it('uses reset and search actions for immediate business queries', async () => {
+    const { wrapper } = await mountQuery()
+
+    expect(wrapper.text()).toContain('重置')
+    expect(wrapper.text()).toContain('搜索')
+    expect(wrapper.text()).not.toContain('确定')
+    expect(wrapper.text()).not.toContain('取消')
+  })
+
+  it('uses cancel and confirm actions when editing scheme conditions', async () => {
+    const { wrapper, query } = await mountQuery(undefined, ExpressionType.EQ, 'scheme-condition-editor')
+    query.expressions[0]!.rules[0]!.value = 'ready'
+
+    expect(wrapper.text()).toContain('取消')
+    expect(wrapper.text()).toContain('确定')
+    expect(wrapper.text()).not.toContain('重置')
+    const confirm = wrapper.findAllComponents(QBtnStub).find((button) => button.text() === '确定')
+    await confirm!.trigger('click')
+    await nextTick()
+
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
+    expect(wrapper.emitted('search')).toBeUndefined()
   })
 })
