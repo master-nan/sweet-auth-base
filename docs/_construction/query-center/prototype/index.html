@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Sweet Platform Query Center V1 Prototype</title>
+    <style>
+      :root {
+        --primary: #7367f0;
+        --primary-soft: #f0eefe;
+        --primary-border: #cbc6fb;
+        --positive: #28c76f;
+        --warning: #ff9f43;
+        --negative: #ea5455;
+        --info: #00a7c4;
+        --page: #f7f9fa;
+        --surface: #ffffff;
+        --line: #e1e6ef;
+        --text: #172033;
+        --muted: #667085;
+        --soft: #f3f5f8;
+        --shadow: 0 8px 24px rgba(31, 38, 59, 0.08);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: var(--text);
+        background: var(--page);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      .app { min-height: 100vh; display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+      .sidebar {
+        position: sticky; top: 0; height: 100vh; padding: 20px 14px;
+        color: #e9edfa; background: #202638;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 20px; }
+      .brand-mark {
+        width: 34px; height: 34px; display: grid; place-items: center; border-radius: 6px;
+        color: #fff; background: var(--primary); font-weight: 800;
+      }
+      .brand strong { display: block; color: #fff; }
+      .brand small { color: #aab4c8; }
+      .nav-title { padding: 12px 10px 6px; color: #8390a8; font-size: 12px; }
+      .nav-button {
+        width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+        border: 0; border-radius: 6px; color: #c5cddd; background: transparent; text-align: left;
+      }
+      .nav-button:hover, .nav-button.active { color: #fff; background: rgba(115, 103, 240, 0.25); }
+      .nav-index {
+        width: 22px; height: 22px; display: grid; place-items: center; border-radius: 4px;
+        color: #c7c2ff; background: rgba(115, 103, 240, 0.22); font-size: 12px;
+      }
+      .main { min-width: 0; }
+      .topbar {
+        height: 58px; display: flex; align-items: center; gap: 14px; padding: 0 24px;
+        border-bottom: 1px solid var(--line); background: var(--surface);
+      }
+      .topbar h1 { margin: 0; font-size: 18px; }
+      .topbar .crumb { color: var(--muted); font-size: 12px; }
+      .topbar .spacer { flex: 1; }
+      .avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); }
+      .content { padding: 18px 22px 36px; }
+      .screen { display: none; }
+      .screen.active { display: block; }
+      .screen-head { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+      .screen-head h2 { margin: 0; font-size: 20px; }
+      .screen-head p { margin: 2px 0 0; color: var(--muted); }
+      .surface { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow); }
+      .toolbar {
+        display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .toolbar .spacer { flex: 1; }
+      .btn, .field, .select {
+        min-height: 36px; border: 1px solid #cfd6e2; border-radius: 5px; background: #fff; color: var(--text);
+      }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 7px 12px; }
+      .btn.icon { width: 36px; padding: 0; }
+      .btn.primary { border-color: var(--primary); color: #fff; background: var(--primary); }
+      .btn.primary-outline { border-color: var(--primary); color: var(--primary); background: #fff; }
+      .btn.danger { border-color: #f7c2c2; color: var(--negative); background: #fff7f7; }
+      .btn:disabled { opacity: 0.48; cursor: not-allowed; }
+      .field { min-width: 190px; padding: 8px 10px; outline: none; }
+      .select { display: inline-flex; align-items: center; justify-content: space-between; gap: 16px; padding: 7px 10px; }
+      .chip {
+        display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px;
+        border: 1px solid var(--line); border-radius: 5px; background: #fff; color: #344054;
+      }
+      .chip.active { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+      .tag { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 4px; font-size: 12px; }
+      .tag.green { color: #167445; background: #e6f7ee; }
+      .tag.orange { color: #a65300; background: #fff1df; }
+      .tag.red { color: #b42332; background: #fdebec; }
+      .tag.blue { color: #08748a; background: #e7f8fb; }
+      .tag.purple { color: #574bd0; background: var(--primary-soft); }
+      .scheme-trigger { position: relative; }
+      .scheme-menu {
+        position: absolute; z-index: 5; top: 42px; left: 0; width: 320px; padding: 8px 0;
+        border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: var(--shadow);
+      }
+      .scheme-menu.hidden { display: none; }
+      .scheme-group { padding: 8px 12px 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+      .scheme-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; }
+      .scheme-item:hover { background: var(--soft); }
+      .scheme-item span:first-child { flex: 1; }
+      .scheme-menu-footer { padding: 9px 12px 3px; border-top: 1px solid var(--line); color: var(--primary); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+      th { color: #475467; background: #f8fafc; font-size: 12px; }
+      td a { color: #356ae6; text-decoration: none; }
+      .table-wrap { overflow: auto; }
+      .pagination { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px; }
+      .page { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+      .page.active { color: #fff; border-color: var(--primary); background: var(--primary); }
+      .editor-shell { display: grid; grid-template-columns: minmax(0, 1fr) 290px; min-height: 610px; }
+      .editor-main { padding: 18px; }
+      .editor-side { padding: 18px; border-left: 1px solid var(--line); background: #fbfcfe; }
+      .tabs { display: inline-flex; padding: 3px; border-radius: 5px; background: var(--soft); }
+      .tab { padding: 7px 18px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; }
+      .tab.active { color: var(--primary); background: #fff; box-shadow: 0 2px 8px rgba(31, 38, 59, 0.08); }
+      .section-title { margin: 18px 0 10px; font-size: 13px; color: #475467; font-weight: 700; }
+      .rule-row { display: grid; grid-template-columns: 1.2fr 0.8fr 1.5fr 36px; gap: 8px; margin-bottom: 8px; }
+      .rule-row .select, .rule-row .field { width: 100%; min-width: 0; }
+      .group {
+        margin: 12px 0; padding: 14px; border: 1px solid var(--primary-border);
+        border-radius: 6px; background: #fcfbff;
+      }
+      .group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 700; }
+      .group-head .spacer { flex: 1; }
+      .logic-connector { width: 66px; margin: -2px auto; padding: 5px; border: 1px solid var(--line); border-radius: 4px; background: #fff; text-align: center; }
+      .preview {
+        margin-top: 18px; padding: 14px; border-left: 3px solid var(--info); border-radius: 4px;
+        color: #344054; background: #f0fbfd; line-height: 1.8;
+      }
+      .preview strong { color: #08748a; }
+      .side-list { margin: 0; padding: 0; list-style: none; }
+      .side-list li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+      .side-list small { display: block; margin-top: 3px; color: var(--muted); }
+      .dialog-backdrop {
+        min-height: 620px; display: grid; place-items: center; padding: 24px;
+        background: rgba(23, 32, 51, 0.25);
+      }
+      .dialog { width: min(520px, 100%); border-radius: 6px; background: #fff; box-shadow: 0 18px 48px rgba(23, 32, 51, 0.2); }
+      .dialog-head, .dialog-body, .dialog-actions { padding: 16px 18px; }
+      .dialog-head { display: flex; align-items: center; border-bottom: 1px solid var(--line); font-weight: 700; }
+      .dialog-head .spacer { flex: 1; }
+      .dialog-body label { display: block; margin-bottom: 7px; color: #475467; font-size: 13px; }
+      .dialog-body .field { width: 100%; margin-bottom: 16px; }
+      .check { display: flex; align-items: center; gap: 8px; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); }
+      .manager { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+      .manager-main { min-width: 0; }
+      .manager-tabs { display: flex; gap: 22px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+      .manager-tab { padding: 14px 2px 11px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; }
+      .manager-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+      .drawer { padding: 18px; border-left: 1px solid var(--line); background: #fbfcfe; }
+      .drawer h3 { margin: 0 0 16px; }
+      .detail-grid { display: grid; grid-template-columns: 105px 1fr; gap: 12px 8px; }
+      .detail-grid dt { color: var(--muted); }
+      .detail-grid dd { margin: 0; }
+      .empty { min-height: 590px; display: grid; place-items: center; padding: 30px; text-align: center; }
+      .empty-mark { width: 64px; height: 64px; display: grid; place-items: center; margin: 0 auto 14px; border-radius: 50%; color: var(--primary); background: var(--primary-soft); font-size: 24px; }
+      .empty h3 { margin: 0 0 8px; }
+      .empty p { max-width: 460px; margin: 0 auto 18px; color: var(--muted); line-height: 1.7; }
+      .degraded { max-width: 660px; margin-top: 24px; padding: 14px; border: 1px solid #ffd3a8; border-radius: 6px; background: #fff8ef; text-align: left; }
+      .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+      .legend b { padding: 3px 6px; border-radius: 4px; color: #344054; background: #e9edf3; }
+      .toast { display: none; position: fixed; right: 24px; bottom: 24px; padding: 12px 16px; border-radius: 5px; color: #fff; background: #202638; box-shadow: var(--shadow); }
+      .toast.show { display: block; }
+
+      @media (max-width: 980px) {
+        .app { grid-template-columns: 74px minmax(0, 1fr); }
+        .brand-copy, .nav-button span:last-child, .nav-title { display: none; }
+        .sidebar { padding: 16px 10px; }
+        .nav-button { justify-content: center; }
+        .editor-shell, .manager { grid-template-columns: 1fr; }
+        .editor-side, .drawer { border-left: 0; border-top: 1px solid var(--line); }
+      }
+      @media (max-width: 700px) {
+        .app { display: block; }
+        .sidebar { position: static; width: 100%; height: auto; display: flex; overflow-x: auto; }
+        .brand, .nav-title { display: none; }
+        .nav-button { width: auto; flex: 0 0 auto; }
+        .content { padding: 12px; }
+        .topbar { padding: 0 14px; }
+        .rule-row { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand"><div class="brand-mark">S</div><div class="brand-copy"><strong>Sweet Platform</strong><small>Query Center V1</small></div></div>
+        <div class="nav-title">原型视图</div>
+        <button class="nav-button active" data-screen="list"><span class="nav-index">1</span><span>业务列表入口</span></button>
+        <button class="nav-button" data-screen="simple"><span class="nav-index">2</span><span>简单模式</span></button>
+        <button class="nav-button" data-screen="advanced"><span class="nav-index">3</span><span>高级模式</span></button>
+        <button class="nav-button" data-screen="save"><span class="nav-index">4</span><span>保存方案</span></button>
+        <button class="nav-button" data-screen="manager"><span class="nav-index">5</span><span>方案管理</span></button>
+        <button class="nav-button" data-screen="detail"><span class="nav-index">6</span><span>方案详情</span></button>
+        <button class="nav-button" data-screen="empty"><span class="nav-index">7</span><span>空与失效状态</span></button>
+      </aside>
+
+      <main class="main">
+        <header class="topbar"><div><div class="crumb">数据管理 / 订单</div><h1 id="pageTitle">订单列表</h1></div><div class="spacer"></div><span class="tag green">运行正常</span><div class="avatar">管</div></header>
+        <div class="content">
+          <section class="screen active" id="screen-list">
+            <div class="screen-head"><div><h2>订单列表</h2><p>方案是附加查询条件，不改变业务权限和数据权限。</p></div></div>
+            <div class="surface">
+              <div class="toolbar">
+                <div class="scheme-trigger">
+                  <button class="btn primary-outline" id="schemeToggle">本月异常订单 <span>⌄</span></button>
+                  <div class="scheme-menu hidden" id="schemeMenu">
+                    <div class="scheme-group">我的方案</div>
+                    <div class="scheme-item"><span>本月异常订单</span><span class="tag purple">默认</span></div>
+                    <div class="scheme-item"><span>我负责的订单</span></div>
+                    <div class="scheme-group">公共方案</div>
+                    <div class="scheme-item"><span>全部异常记录</span></div>
+                    <div class="scheme-group">角色方案</div>
+                    <div class="scheme-item"><span>销售经理常用</span></div>
+                    <div class="scheme-group">页面默认</div>
+                    <div class="scheme-item"><span>系统默认查询</span></div>
+                    <div class="scheme-menu-footer" data-jump="manager">管理查询方案</div>
+                  </div>
+                </div>
+                <span class="chip">今天</span><span class="chip">昨天</span><span class="chip">本周</span><span class="chip active">本月</span><span class="chip">我的</span><span class="chip">异常</span>
+                <button class="btn primary-outline" data-jump="advanced">高级查询 <span class="tag red">2</span></button>
+                <button class="btn" data-jump="save">保存方案</button>
+                <div class="spacer"></div>
+                <button class="btn primary">新增订单</button><button class="btn icon" title="列设置">列</button><button class="btn icon" id="refreshList" title="刷新当前视图">↻</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>订单编号</th><th>订单状态</th><th>客户名称</th><th>订单金额</th><th>下单时间</th><th>操作</th></tr></thead>
+                  <tbody>
+                    <tr><td><a href="#">SO-2026-0819-001</a></td><td><span class="tag red">异常</span></td><td>示例科技有限公司</td><td>¥ 35,600.00</td><td>2026-08-19 09:42</td><td><a href="#">详情</a>&nbsp;&nbsp;<a href="#">编辑</a></td></tr>
+                    <tr><td><a href="#">SO-2026-0818-014</a></td><td><span class="tag orange">待审核</span></td><td>示例供应链有限公司</td><td>¥ 12,880.00</td><td>2026-08-18 16:20</td><td><a href="#">详情</a></td></tr>
+                    <tr><td><a href="#">SO-2026-0817-006</a></td><td><span class="tag green">已完成</span></td><td>示例制造有限公司</td><td>¥ 78,900.00</td><td>2026-08-17 11:05</td><td><a href="#">详情</a></td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination"><span>共 1,256 条</span><button class="page">‹</button><button class="page active">1</button><button class="page">2</button><button class="page">3</button><button class="page">›</button></div>
+            </div>
+            <div class="legend"><b>REUSE</b> StandardTableToolbar / TablePagination / StatusChip <b>EXTEND</b> Toolbar slots <b>NEW</b> Selector / Presets / Save Dialog</div>
+          </section>
+
+          <section class="screen" id="screen-simple">
+            <div class="screen-head"><div><h2>高级查询</h2><p>简单模式只产生一个 AND Group，可无损进入高级模式。</p></div></div>
+            <div class="surface editor-shell">
+              <div class="editor-main">
+                <div class="tabs"><button class="tab active">简单模式</button><button class="tab" data-jump="advanced">高级模式</button></div>
+                <div class="section-title">查询条件</div>
+                <div class="rule-row"><div class="select">订单状态 <span>⌄</span></div><div class="select">等于 <span>⌄</span></div><div class="select">异常 <span>⌄</span></div><button class="btn icon danger">删</button></div>
+                <div class="rule-row"><div class="select">下单时间 <span>⌄</span></div><div class="select">区间 <span>⌄</span></div><div class="field">2026-08-01 至 2026-08-31</div><button class="btn icon danger">删</button></div>
+                <button class="btn primary-outline">添加条件</button>
+                <div class="preview"><strong>条件预览</strong><br />订单状态 等于 异常<br />并且 下单时间 在 2026-08-01 至 2026-08-31 之间</div>
+                <div class="toolbar" style="margin: 18px -18px -18px; border-top: 1px solid var(--line); border-bottom: 0;"><div class="spacer"></div><button class="btn">重置</button><button class="btn primary">应用查询</button></div>
+              </div>
+              <aside class="editor-side"><h3>当前来源</h3><p><strong>本月异常订单</strong></p><p class="tag orange">已修改</p><div class="section-title">规则</div><ul class="side-list"><li>条件之间固定 AND</li><li>不显示嵌套 Group</li><li>复杂结构只能在高级模式编辑</li></ul></aside>
+            </div>
+            <div class="legend"><b>REUSE</b> AdvancedQueryRuleRow <b>EXTEND</b> AdvancedQuery mode shell <b>NEW</b> readable preview</div>
+          </section>
+
+          <section class="screen" id="screen-advanced">
+            <div class="screen-head"><div><h2>高级查询</h2><p>继续使用现有 Expression/Nested Group 协议；V1 不增加字符串 DSL。</p></div></div>
+            <div class="surface editor-shell">
+              <div class="editor-main">
+                <div class="tabs"><button class="tab" data-jump="simple">简单模式</button><button class="tab active">高级模式</button></div>
+                <div class="group"><div class="group-head"><span class="tag purple">AND</span><span>全部条件</span><div class="spacer"></div><button class="btn">添加条件</button><button class="btn">添加分组</button><button class="btn icon">⌃</button></div><div class="rule-row"><div class="select">订单状态 <span>⌄</span></div><div class="select">等于 <span>⌄</span></div><div class="select">异常 <span>⌄</span></div><button class="btn icon danger">删</button></div><div class="rule-row"><div class="select">订单金额 <span>⌄</span></div><div class="select">大于 <span>⌄</span></div><input class="field" value="10000" /><button class="btn icon danger">删</button></div></div>
+                <div class="logic-connector">AND</div>
+                <div class="group"><div class="group-head"><span class="tag blue">OR</span><span>任一时间条件</span><div class="spacer"></div><button class="btn">添加条件</button><button class="btn icon">⌃</button></div><div class="rule-row"><div class="select">下单时间 <span>⌄</span></div><div class="select">区间 <span>⌄</span></div><div class="field">本月（动态）</div><button class="btn icon danger">删</button></div><div class="rule-row"><div class="select">更新时间 <span>⌄</span></div><div class="select">区间 <span>⌄</span></div><div class="field">最近一次固定区间</div><button class="btn icon danger">删</button></div></div>
+                <div class="preview"><strong>条件预览</strong><br />(订单状态 等于 异常 AND 订单金额 大于 10,000)<br />AND (下单时间 为 本月 OR 更新时间 在固定区间内)</div>
+                <div class="toolbar" style="margin: 18px -18px -18px; border-top: 1px solid var(--line); border-bottom: 0;"><div class="spacer"></div><button class="btn">重置</button><button class="btn primary">应用查询</button></div>
+              </div>
+              <aside class="editor-side"><h3>结构摘要</h3><ul class="side-list"><li>全部条件 <small>2 条规则，AND</small></li><li>任一时间条件 <small>2 条规则，OR</small></li></ul><div class="section-title">字段说明</div><p class="tag orange">V1 延期</p><p class="muted">当前 Runtime Metadata 没有可靠字段说明，不展示虚构帮助文本。</p></aside>
+            </div>
+            <div class="legend"><b>REUSE</b> Expression/Nested Group protocol <b>EXTEND</b> collapse / preview / degraded state <b>DEFER</b> left tree / field help</div>
+          </section>
+
+          <section class="screen" id="screen-save">
+            <div class="screen-head"><div><h2>保存查询方案</h2><p>业务页保存只创建或修改个人方案，共享类型由管理页维护。</p></div></div>
+            <div class="surface dialog-backdrop">
+              <div class="dialog">
+                <div class="dialog-head"><span>另存为我的方案</span><div class="spacer"></div><button class="btn icon">×</button></div>
+                <div class="dialog-body"><label for="schemeName">方案名称</label><input id="schemeName" class="field" value="本月异常订单" maxlength="64" /><label class="check"><input type="checkbox" checked /> 设为我的默认方案</label><div class="preview"><strong>将保存</strong><br />2 个高级条件、快捷关键字、服务端排序<br /><span class="tag purple">本月动态日期将保留</span></div></div>
+                <div class="dialog-actions"><button class="btn">取消</button><button class="btn primary" id="saveScheme">保存</button></div>
+              </div>
+            </div>
+            <div class="legend"><b>NEW</b> QuerySchemeSaveDialog <b>RULE</b> no owner/type/share radio for ordinary user</div>
+          </section>
+
+          <section class="screen" id="screen-manager">
+            <div class="screen-head"><div><h2>查询方案管理</h2><p>隐藏路由；普通用户管理个人方案，共享管理员维护其他三类。</p></div></div>
+            <div class="surface manager">
+              <div class="manager-main">
+                <div class="manager-tabs"><button class="manager-tab active">我的方案</button><button class="manager-tab">公共方案</button><button class="manager-tab">角色方案</button><button class="manager-tab">页面默认</button></div>
+                <div class="toolbar"><input class="field" placeholder="搜索方案名称" /><div class="select">全部页面 <span>⌄</span></div><div class="spacer"></div><button class="btn primary">新建共享方案</button><button class="btn icon">↻</button></div>
+                <div class="table-wrap"><table><thead><tr><th>方案名称</th><th>所属页面</th><th>类型</th><th>默认</th><th>更新时间</th><th>操作</th></tr></thead><tbody><tr><td>本月异常订单</td><td>订单列表</td><td><span class="tag purple">个人</span></td><td>是</td><td>2026-08-19 10:20</td><td><a href="#">使用</a>&nbsp; <a href="#">编辑</a>&nbsp; <a href="#">复制</a>&nbsp; <a href="#">删除</a></td></tr><tr><td>我负责的订单</td><td>订单列表</td><td><span class="tag purple">个人</span></td><td>否</td><td>2026-08-18 16:30</td><td><a href="#">使用</a>&nbsp; <a href="#">编辑</a>&nbsp; <a href="#">复制</a>&nbsp; <a href="#">删除</a></td></tr><tr><td>最近失败执行</td><td>集成执行</td><td><span class="tag purple">个人</span></td><td>否</td><td>2026-08-16 09:12</td><td><a href="#">使用</a>&nbsp; <a href="#">编辑</a>&nbsp; <a href="#">复制</a>&nbsp; <a href="#">删除</a></td></tr></tbody></table></div>
+                <div class="pagination"><span>共 3 条</span><button class="page active">1</button></div>
+              </div>
+              <aside class="drawer"><h3>选择一条方案</h3><p style="color: var(--muted); line-height: 1.7;">查看条件预览、排序、共享范围和 Metadata 校验状态。共享管理动作由后端 capability 校验。</p><button class="btn primary-outline" data-jump="detail">查看详情示例</button></aside>
+            </div>
+            <div class="legend"><b>REUSE</b> StandardTableToolbar / TablePagination / StatusChip <b>NEW</b> Manager / Detail Drawer</div>
+          </section>
+
+          <section class="screen" id="screen-detail">
+            <div class="screen-head"><div><h2>方案详情</h2><p>详情使用管理页 Drawer，不新增独立路由或可见菜单。</p></div></div>
+            <div class="surface manager">
+              <div class="manager-main" style="padding: 22px;"><h3>本月异常订单</h3><div class="preview"><strong>查询条件</strong><br />订单状态 等于 异常<br />并且 下单时间 为 本月（按平台时区动态计算）<br /><br /><strong>排序</strong><br />下单时间 降序</div><div class="toolbar" style="margin: 20px -22px -22px; border-top: 1px solid var(--line); border-bottom: 0;"><button class="btn primary">使用方案</button><button class="btn">复制为我的方案</button><div class="spacer"></div><button class="btn">编辑</button><button class="btn danger">删除</button></div></div>
+              <aside class="drawer"><h3>方案详情</h3><dl class="detail-grid"><dt>方案名称</dt><dd>本月异常订单</dd><dt>所属页面</dt><dd>订单列表</dd><dt>方案类型</dt><dd><span class="tag purple">个人方案</span></dd><dt>默认状态</dt><dd>我的默认</dd><dt>校验状态</dt><dd><span class="tag green">VALID</span></dd><dt>版本</dt><dd>Revision 6</dd><dt>更新时间</dt><dd>2026-08-19 10:20</dd></dl></aside>
+            </div>
+            <div class="legend"><b>NEW</b> QuerySchemePreview / QuerySchemeDetailDrawer <b>RULE</b> query JSON is fetched only for detail/resolve</div>
+          </section>
+
+          <section class="screen" id="screen-empty">
+            <div class="screen-head"><div><h2>空状态与失效状态</h2><p>无方案、筛选无结果、请求失败和 Metadata 失效必须有不同反馈。</p></div></div>
+            <div class="surface empty">
+              <div><div class="empty-mark">Q</div><h3>还没有个人查询方案</h3><p>在任一支持 Query Center 的业务列表设置查询条件，然后保存为个人方案。公共、角色和页面默认方案由共享方案管理员维护。</p><button class="btn primary" data-jump="save">保存当前查询</button><div class="degraded"><strong>DEGRADED 示例：方案包含已失效字段</strong><p>“客户等级”已不允许高级查询。为避免改变过滤语义，该方案不会自动执行。</p><button class="btn primary-outline">进入编辑修复</button>&nbsp;<button class="btn">查看失效条件</button></div></div>
+            </div>
+            <div class="legend"><b>NEW</b> Query Scheme empty/degraded states <b>RULE</b> never silently drop invalid rules</div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast">已刷新当前查询，查询条件保持不变</div>
+    <script>
+      const titles = { list: '订单列表', simple: '高级查询 · 简单模式', advanced: '高级查询 · 高级模式', save: '保存查询方案', manager: '查询方案管理', detail: '方案详情', empty: '状态设计' }
+      function showScreen(name) {
+        document.querySelectorAll('.screen').forEach((item) => item.classList.toggle('active', item.id === `screen-${name}`))
+        document.querySelectorAll('.nav-button').forEach((item) => item.classList.toggle('active', item.dataset.screen === name))
+        document.getElementById('pageTitle').textContent = titles[name] || 'Query Center'
+        document.getElementById('schemeMenu').classList.add('hidden')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+      document.querySelectorAll('[data-screen]').forEach((button) => button.addEventListener('click', () => showScreen(button.dataset.screen)))
+      document.querySelectorAll('[data-jump]').forEach((button) => button.addEventListener('click', () => showScreen(button.dataset.jump)))
+      document.getElementById('schemeToggle').addEventListener('click', () => document.getElementById('schemeMenu').classList.toggle('hidden'))
+      document.getElementById('refreshList').addEventListener('click', () => {
+        const toast = document.getElementById('toast'); toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 1600)
+      })
+      document.getElementById('saveScheme').addEventListener('click', () => {
+        const toast = document.getElementById('toast'); toast.textContent = '原型：个人方案已保存'; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 1600)
+      })
+    </script>
+  </body>
+</html>
