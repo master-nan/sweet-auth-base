@@ -6,7 +6,8 @@
       color="primary"
       :dense="$q.screen.lt.md"
       separator="cell"
-      flat bordered
+      flat
+      bordered
       :rows="rows"
       :columns="columns"
       :visible-columns="visibleColumns"
@@ -15,13 +16,43 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector
+              :schemes="querySchemes.schemes.value"
+              :current-label="querySchemes.currentLabel.value"
+              :loading="querySchemes.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="querySchemes.error.value"
+              @select="applySelectedScheme"
+              @restore-current="restoreSchemeQuery"
+              @reset-default="resetDefaultQuery"
+              @retry="querySchemes.loadAvailable"
+              @manage="openSchemeManager"
+            />
+          </template>
+          <template #quick-presets
+            ><query-quick-presets
+              :config="querySchemes.scope.config.value"
+              @apply="applyQuickPreset"
+          /></template>
           <template #quick-search>
-            <q-input v-model="keyword" dense outlined debounce="300" placeholder="搜索接口编码、名称或路径" @keyup.enter="handleBasicSearch">
+            <q-input
+              v-model="keyword"
+              dense
+              outlined
+              debounce="300"
+              placeholder="搜索接口编码、名称或路径"
+              @keyup.enter="handleBasicSearch"
+            >
               <template #append><q-icon name="search" /></template>
             </q-input>
             <q-select
               v-model="query.external_system_id"
-              dense outlined emit-value map-options clearable
+              dense
+              outlined
+              emit-value
+              map-options
+              clearable
               :options="systemOptions"
               label="所属系统"
               style="min-width: 220px"
@@ -30,40 +61,147 @@
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
           </template>
           <template #column-selector>
-            <q-select v-model="visibleColumns" multiple outlined dense options-dense emit-value map-options :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')" :options="columns" option-value="name" options-cover />
+            <q-select
+              v-model="visibleColumns"
+              multiple
+              outlined
+              dense
+              options-dense
+              emit-value
+              map-options
+              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
+              :options="columns"
+              option-value="name"
+              options-cover
+            />
           </template>
           <template #advanced-trigger>
-            <q-btn outline icon="tune" color="primary" :aria-label="activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'" @click="showAdvancedQuery = true">
-              <q-badge v-if="activeFilterCount" floating color="red">{{ activeFilterCount }}</q-badge>
+            <q-btn
+              outline
+              icon="tune"
+              color="primary"
+              :aria-label="
+                activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+              "
+              @click="showAdvancedQuery = true"
+            >
+              <q-badge v-if="activeFilterCount" floating color="red">{{
+                activeFilterCount
+              }}</q-badge>
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </template>
+          <template #save-scheme
+            ><q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="showSchemeSave = true"
+          /></template>
           <template #right-actions>
-            <q-btn v-for="button in top_buttons" :key="button.id" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" :disable="loading" @click="handleButtonClick(button)" />
+            <q-btn
+              v-for="button in top_buttons"
+              :key="button.id"
+              v-bind="menuButtonDisplayProps(button)"
+              :color="button.color || 'primary'"
+              :disable="loading"
+              @click="handleButtonClick(button)"
+            />
           </template>
         </standard-table-toolbar>
       </template>
 
       <template #body-cell-external_system="props">
-        <q-td :props="props"><div class="text-weight-bold">{{ props.row.external_system.name }}</div><div class="text-caption text-grey-7">{{ props.row.external_system.system_code }}</div></q-td>
+        <q-td :props="props"
+          ><div class="text-weight-bold">{{ props.row.external_system.name }}</div>
+          <div class="text-caption text-grey-7">
+            {{ props.row.external_system.system_code }}
+          </div></q-td
+        >
       </template>
       <template #body-cell-interface_code="props">
-        <q-td :props="props"><div class="text-weight-bold">{{ props.row.name }}</div><div class="text-caption text-mono text-grey-7">{{ props.row.interface_code }} · v{{ props.row.version }}</div></q-td>
+        <q-td :props="props"
+          ><div class="text-weight-bold">{{ props.row.name }}</div>
+          <div class="text-caption text-mono text-grey-7">
+            {{ props.row.interface_code }} · v{{ props.row.version }}
+          </div></q-td
+        >
       </template>
-      <template #body-cell-http_method="props"><q-td :props="props"><q-chip dense square color="primary" text-color="white" :label="props.row.http_method" /></q-td></template>
-      <template #body-cell-path_summary="props"><q-td :props="props"><span class="text-mono">{{ props.row.path_summary }}</span></q-td></template>
-      <template #body-cell-status="props"><q-td :props="props"><status-chip :color="statusMeta[props.row.effective_status]?.color || 'grey'" :label="statusMeta[props.row.effective_status]?.label || props.row.effective_status" /></q-td></template>
+      <template #body-cell-http_method="props"
+        ><q-td :props="props"
+          ><q-chip
+            dense
+            square
+            color="primary"
+            text-color="white"
+            :label="props.row.http_method" /></q-td
+      ></template>
+      <template #body-cell-path_summary="props"
+        ><q-td :props="props"
+          ><span class="text-mono">{{ props.row.path_summary }}</span></q-td
+        ></template
+      >
+      <template #body-cell-status="props"
+        ><q-td :props="props"
+          ><status-chip
+            :color="statusMeta[props.row.effective_status]?.color || 'grey'"
+            :label="
+              statusMeta[props.row.effective_status]?.label || props.row.effective_status
+            " /></q-td
+      ></template>
       <template #body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs no-wrap">
-          <q-btn v-for="button in availableLineButtons(props.row)" :key="button.id" flat dense size="sm" v-bind="menuButtonDisplayProps(button)" :color="button.color || 'primary'" @click="handleButtonClick(button, props.row)"><q-tooltip>{{ button.name }}</q-tooltip></q-btn>
+          <q-btn
+            v-for="button in availableLineButtons(props.row)"
+            :key="button.id"
+            flat
+            dense
+            size="sm"
+            v-bind="menuButtonDisplayProps(button)"
+            :color="button.color || 'primary'"
+            @click="handleButtonClick(button, props.row)"
+            ><q-tooltip>{{ button.name }}</q-tooltip></q-btn
+          >
         </q-td>
       </template>
-      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
-      <template #bottom><q-space /><table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" /></template>
+      <template #no-data
+        ><div class="full-width row flex-center q-pa-xl text-grey-7">
+          {{ emptyMessage }}
+        </div></template
+      >
+      <template #bottom
+        ><q-space /><table-pagination
+          v-model:page="query.page"
+          v-model:page-size="query.num"
+          :total="total"
+      /></template>
     </q-table>
 
-    <advanced-query v-model="showAdvancedQuery" v-model:query-model="tempAdvancedQuery" :fields="advancedFields" @search="handleAdvancedSearch" />
-    <interface-definition-form-dialog v-model="showFormDialog" :edit-data="currentEditData" :systems="systems" :credentials="credentials" :retry-policies="retryPolicies" :loading="loading" @submit="handleFormSubmit" />
+    <advanced-query
+      v-model="showAdvancedQuery"
+      v-model:query-model="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
+      :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
+      @search="handleAdvancedSearch"
+    />
+    <query-scheme-save-dialog
+      v-model="showSchemeSave"
+      :source="queryState.schemeSource.value"
+      :loading="schemeSaving"
+      @save="saveScheme"
+    />
+    <interface-definition-form-dialog
+      v-model="showFormDialog"
+      :edit-data="currentEditData"
+      :systems="systems"
+      :credentials="credentials"
+      :retry-policies="retryPolicies"
+      :loading="loading"
+      @submit="handleFormSubmit"
+    />
     <interface-definition-detail-dialog v-model="showDetailDialog" :id="currentDetailId" />
   </base-content>
 </template>
@@ -79,6 +217,9 @@ import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import InterfaceDefinitionFormDialog from './InterfaceDefinitionFormDialog.vue'
 import InterfaceDefinitionDetailDialog from './InterfaceDefinitionDetailDialog.vue'
 import {
@@ -96,6 +237,7 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
@@ -111,7 +253,9 @@ const api = useIntegrationApi()
 const loading = ref(false)
 const loadError = ref('')
 const { confirmAction } = useConfirmDialog($q)
-const { line_buttons, top_buttons, has_line_buttons, hasGrantedCapability } = usePageButtons('integration_interface_definition')
+const { line_buttons, top_buttons, has_line_buttons, hasGrantedCapability } = usePageButtons(
+  'integration_interface_definition',
+)
 const rows = ref<InterfaceDefinitionListItem[]>([])
 const systems = ref<ExternalSystemListItem[]>([])
 const credentials = ref<CredentialListItem[]>([])
@@ -123,64 +267,268 @@ const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<InterfaceDefinitionDetail | null>(null)
-const { fields: metadataFields, advancedSearchFields: metadataAdvancedFields, loadMetadata } = useRuntimeTableMetadata('integration_interface_definition')
-const advancedFields = computed(() => metadataAdvancedFields.value.filter((field) => field.field_code !== 'external_system_id'))
-const statusMeta: Record<string, { label: string; color: string }> = { draft: { label: '草稿', color: 'grey-7' }, enabled: { label: '已启用', color: 'positive' }, disabled: { label: '已停用', color: 'warning' }, unavailable: { label: '当前不可用', color: 'negative' } }
+const {
+  fields: metadataFields,
+  advancedSearchFields: metadataAdvancedFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('integration_interface_definition')
+const advancedFields = computed(() =>
+  metadataAdvancedFields.value.filter((field) => field.field_code !== 'external_system_id'),
+)
+const statusMeta: Record<string, { label: string; color: string }> = {
+  draft: { label: '草稿', color: 'grey-7' },
+  enabled: { label: '已启用', color: 'positive' },
+  disabled: { label: '已停用', color: 'warning' },
+  unavailable: { label: '当前不可用', color: 'negative' },
+}
 const columns = ref<TableColumn<InterfaceDefinitionListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
-const systemOptions = computed(() => systems.value.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })))
+const systemOptions = computed(() =>
+  systems.value.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })),
+)
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const routeSystemID = Number(route.query.external_system_id)
-const queryState = useTableQueryState<InterfaceDefinitionQuery>({ createInitialQuery: () => {
-  const initial: InterfaceDefinitionQuery = { page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: emptyExpressions() }
-  if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0) initial.external_system_id = routeSystemID
-  return initial
-}, createEmptyExpressions: emptyExpressions })
-const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
+const queryState = useTableQueryState<InterfaceDefinitionQuery>({
+  createInitialQuery: () => {
+    const initial: InterfaceDefinitionQuery = {
+      page: 1,
+      num: 15,
+      order: { field: '', is_asc: false },
+      quick_query: { keyword: '' },
+      expressions: emptyExpressions(),
+    }
+    if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0)
+      initial.external_system_id = routeSystemID
+    return initial
+  },
+  createEmptyExpressions: emptyExpressions,
+})
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || activeFilterCount.value > 0 }))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
+  }),
+)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 
-const fetchData = async () => { loading.value = true; loadError.value = ''; try { const response = await api.queryInterfaceDefinitions(query.value); rows.value = response.data || []; total.value = response.total || 0 } catch { rows.value = []; total.value = 0; loadError.value = '接口定义加载失败' } finally { loading.value = false } }
-const fetchSystems = async () => { const response = await api.queryExternalSystems({ page: 1, num: 500, order: { field: 'name', is_asc: true }, quick_query: { keyword: '' }, expressions: [] }); systems.value = response.data || [] }
-const fetchCredentials = async () => { const response = await api.queryCredentials({ page: 1, num: 500, order: { field: 'credential_code', is_asc: true }, quick_query: { keyword: '' }, expressions: [] }); credentials.value = response.data || [] }
-const fetchRetryPolicies = async () => { const response = await api.queryRetryPolicies({ page: 1, num: 500, order: { field: 'policy_code', is_asc: true }, quick_query: { keyword: '' }, expressions: [], status: 'enabled' }); retryPolicies.value = response.data || [] }
-const fetchMetadata = async () => { if (!(await loadMetadata())) return; const resolution = resolveRuntimeColumns<InterfaceDefinitionListItem>(metadataFields.value, { context: { getDictLabel: () => '' }, overrides: [{ fieldCode: 'external_system_id', visible: false }, { fieldCode: 'name', visible: false }, { fieldCode: 'relative_path', visible: false }, { fieldCode: 'interface_code', label: '接口定义', order: 2 }, { fieldCode: 'http_method', label: 'Method', align: 'center', order: 3 }, { fieldCode: 'protocol', align: 'center', order: 5 }, { fieldCode: 'status', align: 'center', order: 6 }], virtualColumns: [{ name: 'external_system', label: '所属系统', field: (row) => row.external_system.name, order: 1 }, { name: 'path_summary', label: '相对路径', field: 'path_summary', order: 4 }, { name: 'actions', label: '操作', field: 'actions', align: 'center', order: 100, defaultVisible: has_line_buttons.value }] }); columns.value = resolution.columns; visibleColumns.value = resolution.visibleColumns; sortableFields.value = resolution.sortableFields }
-const resetAndFetch = () => { if (query.value.page !== 1) query.value.page = 1; else void fetchData() }
-const handleBasicSearch = () => { queryState.submitQuickSearch(); resetAndFetch() }
-const handleAdvancedSearch = () => { queryState.applyAdvancedQuery(tempAdvancedQuery.value); showAdvancedQuery.value = false; resetAndFetch() }
-const availableLineButtons = (row: InterfaceDefinitionListItem) => line_buttons.value.filter((button) => {
-  if (button.event_action === 'update') return row.status === 'draft'
-  if (button.event_action === 'create_version') return row.status !== 'draft'
-  if (button.event_action === 'enable') return row.status !== 'enabled'
-  if (button.event_action === 'disable') return row.status === 'enabled'
-  return true
-})
-const openDetail = (row: InterfaceDefinitionListItem) => { currentDetailId.value = row.id; showDetailDialog.value = true }
-const openEdit = async (row: InterfaceDefinitionListItem) => { currentEditData.value = (await api.getInterfaceDefinition(row.id)).data; showFormDialog.value = true }
+const fetchData = async () => {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const response = await api.queryInterfaceDefinitions(query.value)
+    rows.value = response.data || []
+    total.value = response.total || 0
+  } catch {
+    rows.value = []
+    total.value = 0
+    loadError.value = '接口定义加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+const fetchSystems = async () => {
+  const response = await api.queryExternalSystems({
+    page: 1,
+    num: 500,
+    order: { field: 'name', is_asc: true },
+    quick_query: { keyword: '' },
+    expressions: [],
+  })
+  systems.value = response.data || []
+}
+const fetchCredentials = async () => {
+  const response = await api.queryCredentials({
+    page: 1,
+    num: 500,
+    order: { field: 'credential_code', is_asc: true },
+    quick_query: { keyword: '' },
+    expressions: [],
+  })
+  credentials.value = response.data || []
+}
+const fetchRetryPolicies = async () => {
+  const response = await api.queryRetryPolicies({
+    page: 1,
+    num: 500,
+    order: { field: 'policy_code', is_asc: true },
+    quick_query: { keyword: '' },
+    expressions: [],
+    status: 'enabled',
+  })
+  retryPolicies.value = response.data || []
+}
+const fetchMetadata = async () => {
+  if (!(await loadMetadata())) return
+  const resolution = resolveRuntimeColumns<InterfaceDefinitionListItem>(metadataFields.value, {
+    context: { getDictLabel: () => '' },
+    overrides: [
+      { fieldCode: 'external_system_id', visible: false },
+      { fieldCode: 'name', visible: false },
+      { fieldCode: 'relative_path', visible: false },
+      { fieldCode: 'interface_code', label: '接口定义', order: 2 },
+      { fieldCode: 'http_method', label: 'Method', align: 'center', order: 3 },
+      { fieldCode: 'protocol', align: 'center', order: 5 },
+      { fieldCode: 'status', align: 'center', order: 6 },
+    ],
+    virtualColumns: [
+      {
+        name: 'external_system',
+        label: '所属系统',
+        field: (row) => row.external_system.name,
+        order: 1,
+      },
+      { name: 'path_summary', label: '相对路径', field: 'path_summary', order: 4 },
+      {
+        name: 'actions',
+        label: '操作',
+        field: 'actions',
+        align: 'center',
+        order: 100,
+        defaultVisible: has_line_buttons.value,
+      },
+    ],
+  })
+  columns.value = resolution.columns
+  visibleColumns.value = resolution.visibleColumns
+  sortableFields.value = resolution.sortableFields
+}
+const resetAndFetch = () => {
+  if (query.value.page !== 1) query.value.page = 1
+  else void fetchData()
+}
+const {
+  runtime: querySchemes,
+  showSaveDialog: showSchemeSave,
+  saving: schemeSaving,
+  initialize: initializeQuerySchemes,
+  runQueryChange,
+  selectScheme: applySelectedScheme,
+  applyPreset: applyQuickPreset,
+  restoreCurrent: restoreSchemeQuery,
+  resetDefault: resetDefaultQuery,
+  openManager: openSchemeManager,
+  savePersonal: saveScheme,
+} = useQuerySchemePage('integration_interface_definition', queryState, resetAndFetch)
+const handleBasicSearch = () => runQueryChange(queryState.submitQuickSearch)
+const handleAdvancedSearch = () => {
+  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
+  showAdvancedQuery.value = false
+}
+const availableLineButtons = (row: InterfaceDefinitionListItem) =>
+  line_buttons.value.filter((button) => {
+    if (button.event_action === 'update') return row.status === 'draft'
+    if (button.event_action === 'create_version') return row.status !== 'draft'
+    if (button.event_action === 'enable') return row.status !== 'enabled'
+    if (button.event_action === 'disable') return row.status === 'enabled'
+    return true
+  })
+const openDetail = (row: InterfaceDefinitionListItem) => {
+  currentDetailId.value = row.id
+  showDetailDialog.value = true
+}
+const openEdit = async (row: InterfaceDefinitionListItem) => {
+  currentEditData.value = (await api.getInterfaceDefinition(row.id)).data
+  showFormDialog.value = true
+}
 const changeState = (row: InterfaceDefinitionListItem, enable: boolean) => {
-  confirmAction({ title: enable ? '确认启用' : '确认停用', message: `${enable ? '启用' : '停用'}接口“${row.name}”v${row.version}？`, loading: loading.value, disable: loading.value }).onOk(() => { void (async () => { const response = enable ? await api.enableInterfaceDefinition(row.id, row.revision) : await api.disableInterfaceDefinition(row.id, row.revision); if (response.success) await fetchData() })() })
+  confirmAction({
+    title: enable ? '确认启用' : '确认停用',
+    message: `${enable ? '启用' : '停用'}接口“${row.name}”v${row.version}？`,
+    loading: loading.value,
+    disable: loading.value,
+  }).onOk(() => {
+    void (async () => {
+      const response = enable
+        ? await api.enableInterfaceDefinition(row.id, row.revision)
+        : await api.disableInterfaceDefinition(row.id, row.revision)
+      if (response.success) await fetchData()
+    })()
+  })
 }
 const createVersion = (row: InterfaceDefinitionListItem) => {
-  confirmAction({ title: '创建新版本', message: `基于“${row.name}”v${row.version}创建下一草稿版本？`, loading: loading.value, disable: loading.value }).onOk(() => { void (async () => { const response = await api.createInterfaceDefinitionVersion(row.id, row.revision); if (response.success) { await fetchData(); if (response.data) { currentEditData.value = response.data; showFormDialog.value = true } } })() })
+  confirmAction({
+    title: '创建新版本',
+    message: `基于“${row.name}”v${row.version}创建下一草稿版本？`,
+    loading: loading.value,
+    disable: loading.value,
+  }).onOk(() => {
+    void (async () => {
+      const response = await api.createInterfaceDefinitionVersion(row.id, row.revision)
+      if (response.success) {
+        await fetchData()
+        if (response.data) {
+          currentEditData.value = response.data
+          showFormDialog.value = true
+        }
+      }
+    })()
+  })
 }
 const actionHandlers: PageActionHandlers<InterfaceDefinitionListItem> = {
-  create: () => { currentEditData.value = null; showFormDialog.value = true },
-  detail: (row) => row && openDetail(row), update: (row) => row && void openEdit(row), create_version: (row) => row && createVersion(row),
-  enable: (row) => row && changeState(row, true), disable: (row) => row && changeState(row, false),
+  create: () => {
+    currentEditData.value = null
+    showFormDialog.value = true
+  },
+  detail: (row) => row && openDetail(row),
+  update: (row) => row && void openEdit(row),
+  create_version: (row) => row && createVersion(row),
+  enable: (row) => row && changeState(row, true),
+  disable: (row) => row && changeState(row, false),
 }
-const handleButtonClick = (button: MenuButton, row?: InterfaceDefinitionListItem) => { dispatchPageAction(button, actionHandlers, row) }
-const handleFormSubmit = async (form: { external_system_id: number | null; interface_code: string; name: string; protocol: 'http' | 'https'; http_method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; relative_path: string; credential_id: number | null; retry_policy_id: number | null; timeout_seconds: number; response_limit: number; description: string }) => {
+const handleButtonClick = (button: MenuButton, row?: InterfaceDefinitionListItem) => {
+  dispatchPageAction(button, actionHandlers, row)
+}
+const handleFormSubmit = async (form: {
+  external_system_id: number | null
+  interface_code: string
+  name: string
+  protocol: 'http' | 'https'
+  http_method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  relative_path: string
+  credential_id: number | null
+  retry_policy_id: number | null
+  timeout_seconds: number
+  response_limit: number
+  description: string
+}) => {
   if (currentEditData.value) {
-    const request: InterfaceDefinitionUpdateRequest = { name: form.name, protocol: form.protocol, http_method: form.http_method, relative_path: form.relative_path, timeout_seconds: form.timeout_seconds, response_limit: form.response_limit, description: form.description, revision: currentEditData.value.revision }
+    const request: InterfaceDefinitionUpdateRequest = {
+      name: form.name,
+      protocol: form.protocol,
+      http_method: form.http_method,
+      relative_path: form.relative_path,
+      timeout_seconds: form.timeout_seconds,
+      response_limit: form.response_limit,
+      description: form.description,
+      revision: currentEditData.value.revision,
+    }
     if (form.credential_id) request.credential_id = form.credential_id
     else request.clear_credential = true
     if (form.retry_policy_id) request.retry_policy_id = form.retry_policy_id
     else request.clear_retry_policy = true
-    if ((await api.updateInterfaceDefinition(currentEditData.value.id, request)).success) showFormDialog.value = false
+    if ((await api.updateInterfaceDefinition(currentEditData.value.id, request)).success)
+      showFormDialog.value = false
   } else {
-    const request: InterfaceDefinitionCreateRequest = { external_system_id: form.external_system_id!, interface_code: form.interface_code, name: form.name, protocol: form.protocol, http_method: form.http_method, relative_path: form.relative_path, timeout_seconds: form.timeout_seconds, response_limit: form.response_limit, description: form.description }
+    const request: InterfaceDefinitionCreateRequest = {
+      external_system_id: form.external_system_id!,
+      interface_code: form.interface_code,
+      name: form.name,
+      protocol: form.protocol,
+      http_method: form.http_method,
+      relative_path: form.relative_path,
+      timeout_seconds: form.timeout_seconds,
+      response_limit: form.response_limit,
+      description: form.description,
+    }
     if (form.credential_id) request.credential_id = form.credential_id
     if (form.retry_policy_id) request.retry_policy_id = form.retry_policy_id
     if ((await api.createInterfaceDefinition(request)).success) showFormDialog.value = false
@@ -188,12 +536,30 @@ const handleFormSubmit = async (form: { external_system_id: number | null; inter
   await fetchData()
 }
 onMounted(async () => {
-  const requests = [fetchMetadata(), fetchSystems(), fetchCredentials(), fetchData()]
+  const requests = [fetchMetadata(), fetchSystems(), fetchCredentials()]
   if (hasGrantedCapability('integration_retry_policy_query')) requests.push(fetchRetryPolicies())
   await Promise.all(requests)
+  await initializeQuerySchemes()
+  await fetchData()
   initialized.value = true
 })
-watch(() => [query.value.page, query.value.num] as const, ([page]) => { if (!initialized.value) return; pagination.value.page = page; void fetchData() })
-watch(() => [pagination.value.sortBy, pagination.value.descending] as const, ([sortBy, descending], previous) => { if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return; if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return; resetAndFetch() })
-watch(showAdvancedQuery, (open) => { if (open) queryState.beginAdvancedEdit() })
+watch(
+  () => [query.value.page, query.value.num] as const,
+  ([page]) => {
+    if (!initialized.value) return
+    pagination.value.page = page
+    void fetchData()
+  },
+)
+watch(
+  () => [pagination.value.sortBy, pagination.value.descending] as const,
+  ([sortBy, descending], previous) => {
+    if (!initialized.value || (sortBy === previous[0] && descending === previous[1])) return
+    if (!queryState.applySorting(sortBy || '', descending, sortableFields.value)) return
+    resetAndFetch()
+  },
+)
+watch(showAdvancedQuery, (open) => {
+  if (open) queryState.beginAdvancedEdit()
+})
 </script>

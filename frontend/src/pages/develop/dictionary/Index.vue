@@ -13,6 +13,55 @@
       >
         <template #master-actions>
           <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+            <template #scheme-selector>
+              <query-scheme-selector
+                :schemes="querySchemes.schemes.value"
+                :current-label="querySchemes.currentLabel.value"
+                :loading="querySchemes.loading.value"
+                :dirty="queryState.dirty.value"
+                :load-error="querySchemes.error.value"
+                @select="applySelectedScheme"
+                @restore-current="restoreSchemeQuery"
+                @reset-default="resetDefaultQuery"
+                @retry="querySchemes.loadAvailable"
+                @manage="openSchemeManager"
+              />
+            </template>
+            <template #quick-presets>
+              <query-quick-presets
+                :config="querySchemes.scope.config.value"
+                @apply="applyQuickPreset"
+              />
+            </template>
+            <template #advanced-trigger>
+              <q-btn
+                outline
+                icon="tune"
+                color="primary"
+                :aria-label="
+                  activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+                "
+                @click="showAdvancedQuery = true"
+              >
+                <q-badge v-if="activeFilterCount" floating color="red">
+                  {{ activeFilterCount }}
+                </q-badge>
+                <q-tooltip>
+                  {{
+                    activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+                  }}
+                </q-tooltip>
+              </q-btn>
+            </template>
+            <template #save-scheme>
+              <q-btn
+                outline
+                color="primary"
+                icon="bookmark_add"
+                label="保存方案"
+                @click="showSchemeSave = true"
+              />
+            </template>
             <template #right-actions>
               <q-btn
                 v-for="btn in masterTopButtons"
@@ -44,12 +93,7 @@
                   <q-icon name="search" />
                 </template>
               </q-input>
-              <q-btn
-                color="primary"
-                label="搜索"
-                :disable="loading"
-                @click="handleBasicSearch"
-              />
+              <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
             </div>
           </div>
         </template>
@@ -91,7 +135,9 @@
             </q-item>
 
             <q-item v-if="rows.length === 0 && !loading">
-              <q-item-section class="text-center text-grey"> {{ listEmptyMessage }} </q-item-section>
+              <q-item-section class="text-center text-grey">
+                {{ listEmptyMessage }}
+              </q-item-section>
             </q-item>
 
             <q-item v-if="loading">
@@ -230,6 +276,23 @@
       :submit-btn-text="currentEditDictItem && currentEditDictItem.id ? '保存' : '创建'"
       @submit="handleDictItemFormSubmit"
     />
+
+    <advanced-query
+      v-model="showAdvancedQuery"
+      v-model:query-model="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
+      :fields="dictAdvancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
+      @search="handleAdvancedSearch"
+    />
+
+    <query-scheme-save-dialog
+      v-model="showSchemeSave"
+      :source="queryState.schemeSource.value"
+      :loading="schemeSaving"
+      @save="saveScheme"
+    />
   </base-content>
 </template>
 
@@ -239,6 +302,10 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
+import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import {
@@ -251,6 +318,7 @@ import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import cloneDeep from 'lodash/cloneDeep'
 import { useDictCache } from 'src/composables/dictCache'
 import { useDictStore } from 'src/stores/dict'
@@ -261,9 +329,11 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 
 const loading = ref(false)
 const loadError = ref('')
+const showAdvancedQuery = ref(false)
 const dictStore = useDictStore()
 
 const $q = useQuasar()
@@ -377,9 +447,20 @@ const currentEditDictItem = ref<DictItemUpdateReq | null>(null)
 const itemColumns = ref<QTableProps['columns']>([])
 const rawDictItemColumns = ref<QTableProps['columns']>([])
 
-const { fields: dictMetadataFields, formFields: dictFields, loadMetadata: loadDictMetadata } = useRuntimeTableMetadata('sys_dict')
-const { fields: dictItemMetadataFields, formFields: runtimeDictItemFields, loadMetadata: loadDictItemMetadata } = useRuntimeTableMetadata('sys_dict_item')
-const dictItemFields = computed(() => runtimeDictItemFields.value.filter((field) => field.field_code !== 'dict_id'))
+const {
+  fields: dictMetadataFields,
+  advancedSearchFields: dictAdvancedFields,
+  formFields: dictFields,
+  loadMetadata: loadDictMetadata,
+} = useRuntimeTableMetadata('sys_dict')
+const {
+  fields: dictItemMetadataFields,
+  formFields: runtimeDictItemFields,
+  loadMetadata: loadDictItemMetadata,
+} = useRuntimeTableMetadata('sys_dict_item')
+const dictItemFields = computed(() =>
+  runtimeDictItemFields.value.filter((field) => field.field_code !== 'dict_id'),
+)
 
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
@@ -394,9 +475,33 @@ const emptyAdvancedQuery = (): Query => ({
 })
 
 // 查询参数
-const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, table_code: 'sys_dict', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
-const { query, keyword } = queryState
-const listEmptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value }))
+const queryState = useTableQueryState<Query>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: '', is_asc: false },
+    table_code: 'sys_dict',
+    expressions: emptyAdvancedQuery().expressions,
+    quick_query: { keyword: '' },
+    include_deleted: false,
+  }),
+  createEmptyExpressions: () => emptyAdvancedQuery().expressions,
+})
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
+const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
+const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
+const listEmptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value,
+  }),
+)
 
 // 获取字典列表数据
 const fetchData = async () => {
@@ -435,17 +540,35 @@ const syncCurrentDictAfterFetch = async () => {
 }
 
 const resetToFirstPageOrFetch = () => {
+  clearCurrentSelection()
   if (query.value.page !== 1) {
     query.value.page = 1
     return
   }
-  fetchData()
+  void fetchData()
 }
 
+const {
+  runtime: querySchemes,
+  showSaveDialog: showSchemeSave,
+  saving: schemeSaving,
+  initialize: initializeQuerySchemes,
+  runQueryChange,
+  selectScheme: applySelectedScheme,
+  applyPreset: applyQuickPreset,
+  restoreCurrent: restoreSchemeQuery,
+  resetDefault: resetDefaultQuery,
+  openManager: openSchemeManager,
+  savePersonal: saveScheme,
+} = useQuerySchemePage('develop_dictionary', queryState, resetToFirstPageOrFetch)
+
 const handleBasicSearch = () => {
-  queryState.submitQuickSearch()
-  clearCurrentSelection()
-  resetToFirstPageOrFetch()
+  runQueryChange(queryState.submitQuickSearch)
+}
+
+const handleAdvancedSearch = () => {
+  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
+  showAdvancedQuery.value = false
 }
 
 const clearCurrentSelection = () => {
@@ -642,7 +765,6 @@ const fetchTableFields = async () => {
       rawDictItemColumns.value = itemCols
       refreshDictItemColumns()
     }
-    await fetchData()
   } catch (error) {
     console.error('获取表结构信息失败', error)
   }
@@ -652,6 +774,8 @@ const initialized = ref(false)
 
 onMounted(async () => {
   await fetchTableFields()
+  await initializeQuerySchemes()
+  await fetchData()
   initialized.value = true
 })
 
@@ -669,6 +793,10 @@ watch(
   () => detailLineButtons.value.length,
   () => refreshDictItemColumns(),
 )
+
+watch(showAdvancedQuery, (open) => {
+  if (open) queryState.beginAdvancedEdit()
+})
 </script>
 
 <style scoped lang="scss">
@@ -688,7 +816,11 @@ watch(
   --dictionary-border: var(--app-dark-border);
   --dictionary-text: var(--app-dark-heading);
   --dictionary-muted: var(--app-dark-muted);
-  --dictionary-selected: linear-gradient(90deg, var(--app-primary-soft-strong), var(--app-dark-surface) 72%);
+  --dictionary-selected: linear-gradient(
+    90deg,
+    var(--app-primary-soft-strong),
+    var(--app-dark-surface) 72%
+  );
 }
 
 .dictionary-workspace {

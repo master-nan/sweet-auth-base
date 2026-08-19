@@ -123,6 +123,40 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("resolved public scheme remains ANDed with each data scope", func(t *testing.T) {
+		resolvedSchemeQuery := &request.Basic{
+			Page: 1, Num: 10, Order: request.Order{Field: "id", IsAsc: true},
+			Expressions: []request.ExpressionGroup{{
+				Logic: enum.And,
+				Rules: []request.QueryRule{{
+					Field: "amount", ExpressionType: enum.Gte, Value: 2000, Type: enum.FloatFieldType,
+				}},
+			}},
+		}
+		cases := []struct {
+			name       string
+			userID     int
+			wantOrders []string
+		}{
+			{name: "administrator keeps the scheme filter over all-data scope", userID: 1000, wantOrders: []string{"ORD002", "ORD003"}},
+			{name: "limited east manager keeps the same filter within assigned scope", userID: 1001, wantOrders: []string{"ORD002"}},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				result, err := service.QueryWithDataPermission(
+					demoAcceptanceContext(tc.userID), resolvedSchemeQuery, table,
+					model.DataPermissionOperationQuery,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := demoAcceptanceOrderNumbers(result.Data); !reflect.DeepEqual(got, tc.wantOrders) {
+					t.Fatalf("scheme + data scope rows = %v, want %v", got, tc.wantOrders)
+				}
+			})
+		}
+	})
 }
 
 func demoAcceptanceContext(userID int) context.Context {
@@ -203,14 +237,16 @@ func newDataPermissionDemoAcceptanceService(
 	)
 	subjectBuilder := newSubjectContextBuilder(
 		func(userId int) (model.SysUser, error) {
-			if userId < 1001 || userId > 1003 {
+			if userId < 1000 || userId > 1003 {
 				return model.SysUser{}, gorm.ErrRecordNotFound
 			}
 			return model.SysUser{Basic: model.Basic{Id: userId, State: true}}, nil
 		},
 		func(userId int) ([]model.SysRole, error) {
 			roleId := 700
-			if userId == 1003 {
+			if userId == 1000 {
+				roleId = 699
+			} else if userId == 1003 {
 				roleId = 701
 			}
 			return []model.SysRole{{Basic: model.Basic{Id: roleId, State: true}}}, nil
@@ -259,7 +295,7 @@ func demoAcceptanceTable() model.SysTable {
 			{Basic: model.Basic{Id: 9201, State: true}, TableId: tableId, FieldName: "主键ID", FieldCode: "id", FieldType: enum.BigIntFieldType, IsPrimaryKey: true, IsListShow: true},
 			{Basic: model.Basic{Id: 9202, State: true}, TableId: tableId, FieldName: "运单号", FieldCode: "order_no", FieldType: enum.VarcharFieldType, IsListShow: true},
 			{Basic: model.Basic{Id: 9203, State: true}, TableId: tableId, FieldName: "所属管理组织", FieldCode: "owner_org_id", FieldType: enum.BigIntFieldType, FieldCategory: enum.NormalField, IsAdvancedSearch: true, IsListShow: true},
-			{Basic: model.Basic{Id: 9204, State: true}, TableId: tableId, FieldName: "金额", FieldCode: "amount", FieldType: enum.FloatFieldType, IsListShow: true},
+			{Basic: model.Basic{Id: 9204, State: true}, TableId: tableId, FieldName: "金额", FieldCode: "amount", FieldType: enum.FloatFieldType, IsAdvancedSearch: true, IsListShow: true},
 			{Basic: model.Basic{Id: 9205, State: true}, TableId: tableId, FieldName: "删除时间", FieldCode: "gmt_delete", FieldType: enum.DatetimeFieldType},
 		},
 	}
@@ -289,6 +325,10 @@ func demoAcceptancePermissionConfig(t *testing.T, db *gorm.DB, table model.SysTa
 		Basic: model.Basic{Id: 9303, State: true}, Code: "own_org_and_descendants",
 		Name: "本组织及下级组织", PolicyType: model.DataPolicyTypeRuleSet,
 	}
+	allPolicy := model.DataPolicy{
+		Basic: model.Basic{Id: 9305, State: true}, Code: "all_transport_orders",
+		Name: "全部运输订单", PolicyType: model.DataPolicyTypeAll,
+	}
 	rule := model.DataPolicyRule{
 		Basic: model.Basic{Id: 9304, State: true}, PolicyId: policy.Id, Sequence: 1,
 		DimensionId: dimension.Id, OwnershipCode: ownership.OwnershipCode,
@@ -300,6 +340,7 @@ func demoAcceptancePermissionConfig(t *testing.T, db *gorm.DB, table model.SysTa
 	testutil.MustCreate(t, db, &dimension)
 	testutil.MustCreate(t, db, &ownership)
 	testutil.MustCreate(t, db, &policy)
+	testutil.MustCreate(t, db, &allPolicy)
 	testutil.MustCreate(t, db, &rule)
 	for index, operation := range []string{model.DataPermissionOperationQuery, model.DataPermissionOperationDetail} {
 		testutil.MustCreate(t, db, &model.DataResourceOperation{
@@ -310,6 +351,11 @@ func demoAcceptancePermissionConfig(t *testing.T, db *gorm.DB, table model.SysTa
 			Basic:       model.Basic{Id: 9320 + index, State: true},
 			SubjectType: model.DataGrantSubjectTypeRole, SubjectId: 700,
 			ResourceId: resource.Id, Operation: operation, PolicyId: policy.Id,
+		})
+		testutil.MustCreate(t, db, &model.DataGrant{
+			Basic:       model.Basic{Id: 9330 + index, State: true},
+			SubjectType: model.DataGrantSubjectTypeRole, SubjectId: 699,
+			ResourceId: resource.Id, Operation: operation, PolicyId: allPolicy.Id,
 		})
 	}
 }

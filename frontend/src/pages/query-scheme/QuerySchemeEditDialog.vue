@@ -146,6 +146,8 @@ const submit = async () => {
     }
     visible.value = false
     emit('saved')
+  } catch {
+    // The shared HTTP interceptor owns the safe user-facing error message.
   } finally {
     loading.value = false
   }

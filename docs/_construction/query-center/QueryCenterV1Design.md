@@ -11,6 +11,8 @@
 > Audit Baseline: `291f22e231883dfab66ac32db4b40b9444fd3d66`
 >
 > Review Status: `DESIGN_APPROVED_FOR_QC-002A`
+>
+> Implementation Status: `QUERY_CENTER_V1_FROZEN`
 
 ## 1. 结论摘要
 
@@ -782,3 +784,18 @@ AdvancedQuery Simple/Preview、Toolbar slots、Query State dirty/source、Select
 6. **字段说明/条件树：APPROVED_DEFERRED**。V1 延期；条件预览保留为 REQUIRED。
 
 QC-001 Gate 状态：**`DESIGN_APPROVED_FOR_QC-002A`**。以上六项已完成产品、架构和代码边界 Review，可直接进入 QC-002A。
+
+## 28. V1 最终实现收口
+
+QC-002A 至 QC-002C 按本设计完成后端核心、前端运行与管理能力，以及固定页面接入。最终实现保持以下边界：
+
+1. `sys_menu.query_scope_code` 仍是唯一 Scope Identity；前端没有 route name、Vue path 或常量到 scope 的第二映射。
+2. 后端固定 Registry 共 18 个 scope；18 个 scope 均对应真实活动菜单和标准实体列表，并在 QC-002C 全部启用。
+3. 页面接入统一通过 `useQuerySchemePage` 组合 `useQueryScope`、`useQuerySchemes` 和现有 `useTableQueryState`。该 composable 只收口初始化、应用、保存和一次刷新边界，不代理业务列表 API。
+4. Scheme Selector、Save Dialog、Advanced Query、Quick Presets 和 Toolbar 均继续使用平台公共组件；业务按钮、Data Permission、业务 Query DTO 和 Repository 查询协议未改变。
+5. Query Scheme Manager 的“使用方案”采用明确文字动作；共享方案启停仍是独立 Business Action，revision 只用于乐观锁且不向普通用户展示。
+6. 18 个固定 scope 当前没有 relation/linkage 高级查询字段。Preview 已覆盖 Metadata label、operator、dictionary label 和 binding label；未来 scope 出现 relation 字段时，必须接入受控 Runtime display resolver 后才可启用该字段的方案预览，不能显示内部 ID。
+7. 固定 18 个 scope 中没有 Data Permission 演示业务页。最终验收通过真实 Generalization 查询链证明同一 Scheme 条件与 Admin/Limited User 的 Data Scope 做 AND；未为验收新增生产 scope 或 Query Scheme Service 页面特例。
+8. Report 仍为 `REPORT_DEFERRED`，仅做公共组件构建回归；Query Center V1 不接 Report。
+
+最终验收证据见 [QueryCenterV1AcceptanceReport.md](QueryCenterV1AcceptanceReport.md)，冻结结论见 [QueryCenterV1FreezeReview.md](QueryCenterV1FreezeReview.md)。

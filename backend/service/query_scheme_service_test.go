@@ -131,6 +131,13 @@ func TestQuerySchemeSharedCapabilityRoleVisibilityAndCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ordinaryRoleScheme, err := service.CreateShared(managerCtx, request.QuerySchemeSharedCreateReq{
+		Name: "普通角色可见", ScopeCode: "system.user.list", SchemeType: model.QuerySchemeTypeRole,
+		Payload: querySchemePayloadJSON(t), Enabled: true, RoleIDs: []int{22},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := service.CopyToPersonal(managerCtx, roleScheme.ID, request.QuerySchemeCopyReq{
 		ScopeCode: "system.role.list", Name: "跨范围副本",
 	}); !errors.Is(err, myerrors.ErrQuerySchemeNotFound) {
@@ -144,6 +151,21 @@ func TestQuerySchemeSharedCapabilityRoleVisibilityAndCopy(t *testing.T) {
 		if item.ID == roleScheme.ID {
 			t.Fatal("role scheme leaked to a user without the target role")
 		}
+	}
+	if !querySchemeSummaryContains(available, ordinaryRoleScheme.ID) {
+		t.Fatal("role scheme was not visible to a user with the target role")
+	}
+	testutil.MustCreate(t, db, &model.SysRole{Basic: model.Basic{Id: 23, State: true}, Name: "scope-viewer"})
+	testutil.MustCreate(t, db, &model.SysUserRole{UserId: 202, RoleId: 23})
+	for _, menuID := range []int{31, 32} {
+		testutil.MustCreate(t, db, &model.SysRoleMenu{RoleId: 23, MenuId: menuID})
+	}
+	if err := db.Where("user_id = ? AND role_id = ?", 202, 22).Delete(&model.SysUserRole{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	availableAfterRoleRemoval, err := service.Available(ordinaryCtx, "system.user.list")
+	if err != nil || querySchemeSummaryContains(availableAfterRoleRemoval, ordinaryRoleScheme.ID) {
+		t.Fatalf("role visibility did not follow current role membership: schemes=%+v err=%v", availableAfterRoleRemoval, err)
 	}
 	copyResult, err := service.CopyToPersonal(managerCtx, roleScheme.ID, request.QuerySchemeCopyReq{
 		ScopeCode: "system.user.list", Name: "独立副本",
@@ -193,6 +215,17 @@ func TestQuerySchemeResolveCurrentIdentityAndDegradedMetadata(t *testing.T) {
 	degraded, err := service.Resolve(ctx, created.ID, request.QuerySchemeResolveReq{ScopeCode: "system.user.list"})
 	if err != nil || degraded.ValidationStatus != queryscheme.ValidationDegraded || degraded.ResolvedQuery != nil {
 		t.Fatalf("degraded resolve: result=%+v err=%v", degraded, err)
+	}
+	if err := db.Model(&model.QueryScheme{}).Where("id = ?", created.ID).
+		Update("query_payload", json.RawMessage(`{"expressions":`)).Error; err != nil {
+		t.Fatal(err)
+	}
+	invalid, err := service.Resolve(ctx, created.ID, request.QuerySchemeResolveReq{ScopeCode: "system.user.list"})
+	if err != nil || invalid.ValidationStatus != queryscheme.ValidationInvalid || invalid.ResolvedQuery != nil {
+		t.Fatalf("invalid resolve: result=%+v err=%v", invalid, err)
+	}
+	if len(invalid.Issues) != 1 || invalid.Issues[0].Message != "查询方案结构不合法" {
+		t.Fatalf("invalid issue must remain safe: %+v", invalid.Issues)
 	}
 }
 
@@ -402,4 +435,13 @@ func querySchemePayloadJSON(t *testing.T) json.RawMessage {
 		t.Fatal(err)
 	}
 	return raw
+}
+
+func querySchemeSummaryContains(values []response.QuerySchemeSummaryRes, id int) bool {
+	for _, value := range values {
+		if value.ID == id {
+			return true
+		}
+	}
+	return false
 }

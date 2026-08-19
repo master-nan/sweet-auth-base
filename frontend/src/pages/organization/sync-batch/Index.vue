@@ -14,6 +14,26 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector
+              :schemes="schemePage.runtime.schemes.value"
+              :current-label="schemePage.runtime.currentLabel.value"
+              :loading="schemePage.runtime.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="schemePage.runtime.error.value"
+              @select="schemePage.selectScheme"
+              @restore-current="schemePage.restoreCurrent"
+              @reset-default="schemePage.resetDefault"
+              @retry="schemePage.runtime.loadAvailable"
+              @manage="schemePage.openManager"
+            />
+          </template>
+          <template #quick-presets>
+            <query-quick-presets
+              :config="schemePage.runtime.scope.config.value"
+              @apply="schemePage.applyPreset"
+            />
+          </template>
           <template #quick-search>
             <q-input
               v-model="keyword"
@@ -28,9 +48,24 @@
             <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
           </template>
           <template #advanced-trigger>
-            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn
+              outline
+              color="primary"
+              icon="tune"
+              aria-label="高级查询"
+              @click="openAdvancedQuery"
+            >
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
+          </template>
+          <template #save-scheme>
+            <q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="schemePage.showSaveDialog.value = true"
+            />
           </template>
         </standard-table-toolbar>
       </template>
@@ -40,7 +75,10 @@
       </template>
       <template #body-cell-status="props">
         <q-td :props="props">
-          <status-chip :color="organizationStatusColor(props.row.status)" :label="dictLabel('org_sync_record_status', props.row.status)" />
+          <status-chip
+            :color="organizationStatusColor(props.row.status)"
+            :label="dictLabel('org_sync_record_status', props.row.status)"
+          />
         </q-td>
       </template>
       <template #body-cell-started_at="props">
@@ -90,9 +128,18 @@
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:queryModel="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       title="同步批次高级查询"
       @search="applyAdvancedQuery"
+    />
+    <query-scheme-save-dialog
+      v-model="schemePage.showSaveDialog.value"
+      :source="queryState.schemeSource.value"
+      :loading="schemePage.saving.value"
+      @save="schemePage.savePersonal"
     />
 
     <organization-record-detail-dialog
@@ -120,6 +167,9 @@ import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import {
   getSyncBatchError,
   querySyncBatches,
@@ -129,6 +179,7 @@ import {
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
 import {
@@ -152,12 +203,26 @@ const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
-const queryState = useTableQueryState<SyncBatchQueryRequest>({ createInitialQuery: () => createOrganizationQuery('org_sync_batch') })
+const queryState = useTableQueryState<SyncBatchQueryRequest>({
+  createInitialQuery: () => createOrganizationQuery('org_sync_batch'),
+})
 const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
+const resetAndFetch = () => {
+  if (query.value.page !== 1) query.value.page = 1
+  else void fetchData()
+}
+const schemePage = useQuerySchemePage('organization_sync_batch', queryState, resetAndFetch)
+const initialized = ref(false)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const showAdvancedQuery = ref(false)
 const canQueryBatches = computed(() => hasGrantedCapability('organization_sync_batch_query'))
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryBatches.value, error: loadError.value, hasQuery: !!keyword.value }))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: canQueryBatches.value,
+    error: loadError.value,
+    hasQuery: !!keyword.value,
+  }),
+)
 
 const currentBatch = ref<SyncBatchListItem | null>(null)
 
@@ -213,9 +278,7 @@ const formatDuration = (startedAt?: string | null, completedAt?: string | null) 
 }
 
 const search = () => {
-  queryState.submitQuickSearch()
-  if (query.value.page !== 1) query.value.page = 1
-  else void fetchData()
+  schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
 const openAdvancedQuery = () => {
@@ -224,9 +287,8 @@ const openAdvancedQuery = () => {
 }
 
 const applyAdvancedQuery = () => {
-  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
+  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
   showAdvancedQuery.value = false
-  search()
 }
 
 const fetchData = async () => {
@@ -273,23 +335,25 @@ const handleRowAction = (button: MenuButton, row: SyncBatchListItem) => {
 
 watch(
   () => [query.value.page, query.value.num],
-  () => void fetchData(),
+  () => {
+    if (initialized.value) void fetchData()
+  },
 )
 
 watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([field, descending]) => {
-    if (!queryState.applySorting(field || '', descending, new Set(['batch_no', 'started_at']))) return
+    if (!initialized.value) return
+    if (!queryState.applySorting(field || '', descending, new Set(['batch_no', 'started_at'])))
+      return
     void fetchData()
   },
 )
 
 onMounted(async () => {
-  await dictStore.loadDicts([
-    'org_sync_type',
-    'org_sync_action',
-    'org_sync_record_status',
-  ])
+  await dictStore.loadDicts(['org_sync_type', 'org_sync_action', 'org_sync_record_status'])
+  await schemePage.initialize()
   await fetchData()
+  initialized.value = true
 })
 </script>

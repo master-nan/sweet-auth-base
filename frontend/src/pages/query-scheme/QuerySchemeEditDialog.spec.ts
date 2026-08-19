@@ -205,4 +205,63 @@ describe('QuerySchemeEditDialog', () => {
     await nextTick()
     expect(preview.props('payload').quick_query.keyword).toBe('confirmed')
   })
+
+  it('absorbs a revision conflict after the shared interceptor reports it', async () => {
+    api.updateShared.mockRejectedValueOnce(
+      new Error('方案已被其他操作更新，请刷新后重试'),
+    )
+    const wrapper = mount(QuerySchemeEditDialog, {
+      props: {
+        modelValue: false,
+        schemeType: QuerySchemeType.PUBLIC,
+        scopeOptions: [{ label: '用户管理', value: 'system.user.list' }],
+        detail: {
+          id: 9,
+          name: '并发查询方案',
+          scope_code: 'system.user.list',
+          scope_label: '用户管理',
+          type: QuerySchemeType.PUBLIC,
+          is_default: false,
+          enabled: true,
+          revision: 4,
+          status: QuerySchemeValidationStatus.VALID,
+          updated_at: '2026-08-19 10:00:00',
+          query_payload: {
+            expressions: [],
+            quick_query: { keyword: '' },
+            order: { field: '', is_asc: false },
+            bindings: [],
+          },
+          issues: [],
+        },
+      },
+      global: {
+        directives: { closePopup: () => undefined },
+        stubs: {
+          QDialog: SlotStub,
+          QCard: SlotStub,
+          QCardSection: SlotStub,
+          QCardActions: SlotStub,
+          QBtn: ButtonStub,
+          QSpace: true,
+          QSeparator: true,
+          QSelect: true,
+          QInput: true,
+          QCheckbox: true,
+          QBanner: true,
+          QTooltip: true,
+          RoleSelect: true,
+        },
+      },
+    })
+    await wrapper.setProps({ modelValue: true })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === '保存')!.trigger('click')
+    await flushPromises()
+
+    expect(api.updateShared).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
 })

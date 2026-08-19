@@ -38,7 +38,8 @@
               :loading="loading"
               @click="refresh"
               aria-label="刷新执行状态"
-            ><q-tooltip>刷新执行状态</q-tooltip></q-btn>
+              ><q-tooltip>刷新执行状态</q-tooltip></q-btn
+            >
           </q-card-section>
         </q-card>
       </div>
@@ -58,39 +59,81 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="refresh">
+          <template #scheme-selector
+            ><query-scheme-selector
+              :schemes="querySchemes.schemes.value"
+              :current-label="querySchemes.currentLabel.value"
+              :loading="querySchemes.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="querySchemes.error.value"
+              @select="applySelectedScheme"
+              @restore-current="restoreSchemeQuery"
+              @reset-default="resetDefaultQuery"
+              @retry="querySchemes.loadAvailable"
+              @manage="openSchemeManager"
+          /></template>
+          <template #quick-presets
+            ><query-quick-presets
+              :config="querySchemes.scope.config.value"
+              @apply="applyQuickPreset"
+          /></template>
           <template #quick-search>
-          <q-input
-            v-model="keyword"
-            dense
-            outlined
-            debounce="300"
-            placeholder="搜索执行编号、系统或接口"
-            @keyup.enter="search"
-          >
-            <template #append><q-icon name="search" /></template>
-          </q-input>
-          <q-select
-            v-model="query.status"
-            dense
-            outlined
-            clearable
-            emit-value
-            map-options
-            :options="statusOptions"
-            label="状态"
-            style="min-width: 150px"
-          />
-          <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
+            <q-input
+              v-model="keyword"
+              dense
+              outlined
+              debounce="300"
+              placeholder="搜索执行编号、系统或接口"
+              @keyup.enter="search"
+            >
+              <template #append><q-icon name="search" /></template>
+            </q-input>
+            <q-select
+              v-model="query.status"
+              dense
+              outlined
+              clearable
+              emit-value
+              map-options
+              :options="statusOptions"
+              label="状态"
+              style="min-width: 150px"
+            />
+            <q-btn color="primary" icon="search" label="查询" :disable="loading" @click="search" />
           </template>
+          <template #advanced-trigger>
+            <q-btn
+              v-if="advancedFields.length"
+              outline
+              icon="tune"
+              color="primary"
+              :aria-label="
+                activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+              "
+              @click="showAdvancedQuery = true"
+              ><q-badge v-if="activeFilterCount" floating color="red">{{
+                activeFilterCount
+              }}</q-badge
+              ><q-tooltip>高级查询</q-tooltip></q-btn
+            >
+          </template>
+          <template #save-scheme
+            ><q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="showSchemeSave = true"
+          /></template>
           <template #right-actions>
-          <q-btn
-            v-for="button in top_buttons"
-            :key="button.id"
-            v-bind="menuButtonDisplayProps(button)"
-            :color="button.color || 'primary'"
-            :disable="loading"
-            @click="handleButton(button)"
-          />
+            <q-btn
+              v-for="button in top_buttons"
+              :key="button.id"
+              v-bind="menuButtonDisplayProps(button)"
+              :color="button.color || 'primary'"
+              :disable="loading"
+              @click="handleButton(button)"
+            />
           </template>
         </standard-table-toolbar>
       </template>
@@ -164,8 +207,28 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
-      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
+      <template #no-data
+        ><div class="full-width row flex-center q-pa-xl text-grey-7">
+          {{ emptyMessage }}
+        </div></template
+      >
     </q-table>
+    <advanced-query
+      v-if="advancedFields.length"
+      v-model="showAdvancedQuery"
+      v-model:query-model="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
+      :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
+      @search="handleAdvancedSearch"
+    />
+    <query-scheme-save-dialog
+      v-model="showSchemeSave"
+      :source="queryState.schemeSource.value"
+      :loading="schemeSaving"
+      @save="saveScheme"
+    />
   </base-content>
 </template>
 
@@ -179,6 +242,10 @@ import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
+import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import {
   useIntegrationApi,
   type IntegrationExecutionListItem,
@@ -188,11 +255,14 @@ import {
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import { countEffectiveQueryRules } from 'src/utils/query-state'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -207,10 +277,35 @@ const canViewDetail = computed(() => hasGrantedCapability('integration_execution
 const rows = ref<IntegrationExecutionListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
+const showAdvancedQuery = ref(false)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const queryState = useTableQueryState<IntegrationExecutionQuery>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: 'gmt_create', is_asc: false }, quick_query: { keyword: '' }, expressions: [] }) })
-const { query, keyword } = queryState
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryExecutions.value, error: loadError.value, hasQuery: !!keyword.value || !!query.value.status }))
+const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
+const queryState = useTableQueryState<IntegrationExecutionQuery>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: 'gmt_create', is_asc: false },
+    quick_query: { keyword: '' },
+    expressions: emptyExpressions(),
+  }),
+  createEmptyExpressions: emptyExpressions,
+})
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
+const { advancedSearchFields: advancedFields, loadMetadata } =
+  useRuntimeTableMetadata('integration_execution')
+const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: canQueryExecutions.value,
+    error: loadError.value,
+    hasQuery: !!keyword.value || !!query.value.status || activeFilterCount.value > 0,
+  }),
+)
 const workerStatus = ref<IntegrationWorkerStatus>({
   enabled: false,
   running: false,
@@ -249,7 +344,12 @@ const columns: QTableProps['columns'] = [
   { name: 'status', label: '状态', field: 'status', align: 'center' },
   { name: 'current_attempt', label: 'Attempt', field: 'current_attempt', align: 'center' },
   { name: 'next_run_at', label: '下次重试', field: 'next_run_at', align: 'left' },
-  { name: 'retry_reason_code', label: '重试原因', field: (row) => formatRetryReason(row.retry_reason_code), align: 'left' },
+  {
+    name: 'retry_reason_code',
+    label: '重试原因',
+    field: (row) => formatRetryReason(row.retry_reason_code),
+    align: 'left',
+  },
   { name: 'started_at', label: '开始时间', field: 'started_at', align: 'left' },
   { name: 'completed_at', label: '结束时间', field: 'completed_at', align: 'left' },
   { name: 'actions', label: '操作', field: 'actions', align: 'center' },
@@ -281,9 +381,29 @@ const refresh = async () => {
   await fetchData()
   await fetchWorker().catch(() => undefined)
 }
+const resetAndFetch = () => {
+  if (query.value.page !== 1) query.value.page = 1
+  else void fetchData()
+}
+const {
+  runtime: querySchemes,
+  showSaveDialog: showSchemeSave,
+  saving: schemeSaving,
+  initialize: initializeQuerySchemes,
+  runQueryChange,
+  selectScheme: applySelectedScheme,
+  applyPreset: applyQuickPreset,
+  restoreCurrent: restoreSchemeQuery,
+  resetDefault: resetDefaultQuery,
+  openManager: openSchemeManager,
+  savePersonal: saveScheme,
+} = useQuerySchemePage('integration_execution', queryState, resetAndFetch)
 const search = () => {
-  queryState.submitQuickSearch()
-  void fetchData()
+  runQueryChange(queryState.submitQuickSearch)
+}
+const handleAdvancedSearch = () => {
+  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
+  showAdvancedQuery.value = false
 }
 const openDetail = (row: IntegrationExecutionListItem) => {
   void router.push({ name: 'integration_execution_detail_page', params: { id: row.id } })
@@ -307,9 +427,16 @@ const cancel = (row: IntegrationExecutionListItem) => {
     })()
   })
 }
-const handlers: PageActionHandlers<IntegrationExecutionListItem> = { detail: (row) => row && openDetail(row), cancel: (row) => row && cancel(row) }
-const handleButton = (button: MenuButton, row?: IntegrationExecutionListItem) => { dispatchPageAction(button, handlers, row) }
+const handlers: PageActionHandlers<IntegrationExecutionListItem> = {
+  detail: (row) => row && openDetail(row),
+  cancel: (row) => row && cancel(row),
+}
+const handleButton = (button: MenuButton, row?: IntegrationExecutionListItem) => {
+  dispatchPageAction(button, handlers, row)
+}
 onMounted(async () => {
+  await loadMetadata()
+  await initializeQuerySchemes()
   await refresh()
   initialized.value = true
 })
@@ -322,10 +449,17 @@ watch(
 watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([field, descending]) => {
-    if (!initialized.value || !queryState.applySorting(field || '', descending, new Set(['execution_no']))) return
+    if (
+      !initialized.value ||
+      !queryState.applySorting(field || '', descending, new Set(['execution_no']))
+    )
+      return
     void fetchData()
   },
 )
+watch(showAdvancedQuery, (open) => {
+  if (open) queryState.beginAdvancedEdit()
+})
 </script>
 
 <style scoped>

@@ -18,6 +18,26 @@
     >
       <template v-slot:top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector
+              :schemes="schemePage.runtime.schemes.value"
+              :current-label="schemePage.runtime.currentLabel.value"
+              :loading="schemePage.runtime.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="schemePage.runtime.error.value"
+              @select="schemePage.selectScheme"
+              @restore-current="schemePage.restoreCurrent"
+              @reset-default="schemePage.resetDefault"
+              @retry="schemePage.runtime.loadAvailable"
+              @manage="schemePage.openManager"
+            />
+          </template>
+          <template #quick-presets>
+            <query-quick-presets
+              :config="schemePage.runtime.scope.config.value"
+              @apply="schemePage.applyPreset"
+            />
+          </template>
           <template #quick-search>
             <q-input
               dense
@@ -70,6 +90,15 @@
               }}</q-tooltip>
             </q-btn>
           </template>
+          <template #save-scheme>
+            <q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="schemePage.showSaveDialog.value = true"
+            />
+          </template>
           <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
@@ -103,15 +132,29 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
+      <template #no-data
+        ><div class="full-width row flex-center q-pa-xl text-grey-7">
+          {{ emptyMessage }}
+        </div></template
+      >
     </q-table>
 
     <!-- 高级查询对话框 -->
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:queryModel="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="table_fields_advanced"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       @search="handleAdvancedSearch"
+    />
+
+    <query-scheme-save-dialog
+      v-model="schemePage.showSaveDialog.value"
+      :source="queryState.schemeSource.value"
+      :loading="schemePage.saving.value"
+      @save="schemePage.savePersonal"
     />
 
     <!-- 通用表单对话框 - 用于新增和编辑角色 -->
@@ -145,11 +188,15 @@ import { useRoleApi, type Role } from 'src/api/services/sys-role'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
@@ -216,7 +263,12 @@ const currentRole = ref<Role>({
 
 // 表格列定义
 const columns = ref<QTableProps['columns']>([])
-const { fields: metadataFields, advancedSearchFields: table_fields_advanced, formFields: tableFields, loadMetadata } = useRuntimeTableMetadata('sys_role')
+const {
+  fields: metadataFields,
+  advancedSearchFields: table_fields_advanced,
+  formFields: tableFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('sys_role')
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
 
@@ -233,8 +285,23 @@ const emptyAdvancedQuery = (): Query => ({
 })
 
 // 查询参数
-const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 15, order: { field: '', is_asc: false }, table_code: 'sys_role', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
-const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
+const queryState = useTableQueryState<Query>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: '', is_asc: false },
+    table_code: 'sys_role',
+    expressions: emptyAdvancedQuery().expressions,
+    quick_query: { keyword: '' },
+    include_deleted: false,
+  }),
+})
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
 
 // 判断是否存在已应用的高级查询条件
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
@@ -250,7 +317,7 @@ const pagination = ref({
   descending: true,
 })
 
-const resetToFirstPageOrFetch = () => {
+const resetAndFetch = () => {
   if (query.value.page !== 1) {
     query.value.page = 1
     return
@@ -258,15 +325,15 @@ const resetToFirstPageOrFetch = () => {
   fetchData()
 }
 
+const schemePage = useQuerySchemePage('system_role', queryState, resetAndFetch)
+
 const handleBasicSearch = () => {
-  queryState.submitQuickSearch()
-  resetToFirstPageOrFetch()
+  schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
 // 高级查询处理
 const handleAdvancedSearch = () => {
-  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
-  resetToFirstPageOrFetch()
+  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
   showAdvancedQuery.value = false
 }
 
@@ -286,7 +353,13 @@ const fetchData = async () => {
     loading.value = false
   }
 }
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value }))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value,
+  }),
+)
 
 // 获取表结构信息
 const fetchTableFields = async () => {
@@ -304,11 +377,12 @@ const fetchTableFields = async () => {
     })
     columns.value = cols
     visibleColumns.value = cols.map((c) => c.name)
-    sortableFields.value = new Set(metadataFields.value.filter((field) => field.is_sort).map((field) => field.field_code))
+    sortableFields.value = new Set(
+      metadataFields.value.filter((field) => field.is_sort).map((field) => field.field_code),
+    )
     if (!has_line_buttons.value) {
       visibleColumns.value = visibleColumns.value.filter((c) => c !== 'actions')
     }
-    await fetchData()
   }
 }
 
@@ -316,6 +390,8 @@ const initialized = ref(false)
 
 onMounted(async () => {
   await fetchTableFields()
+  await schemePage.initialize()
+  await fetchData()
   initialized.value = true
 })
 

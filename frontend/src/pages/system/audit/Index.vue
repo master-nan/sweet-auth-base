@@ -17,6 +17,26 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector
+              :schemes="schemePage.runtime.schemes.value"
+              :current-label="schemePage.runtime.currentLabel.value"
+              :loading="schemePage.runtime.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="schemePage.runtime.error.value"
+              @select="schemePage.selectScheme"
+              @restore-current="schemePage.restoreCurrent"
+              @reset-default="schemePage.resetDefault"
+              @retry="schemePage.runtime.loadAvailable"
+              @manage="schemePage.openManager"
+            />
+          </template>
+          <template #quick-presets>
+            <query-quick-presets
+              :config="schemePage.runtime.scope.config.value"
+              @apply="schemePage.applyPreset"
+            />
+          </template>
           <template #quick-search>
             <q-input
               v-model="keyword"
@@ -53,7 +73,9 @@
               icon="tune"
               color="primary"
               :aria-label="
-                hasAppliedAdvancedFilters ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+                hasAppliedAdvancedFilters
+                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
+                  : '高级查询'
               "
               @click="showAdvancedQuery = true"
             >
@@ -66,6 +88,15 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
+          </template>
+          <template #save-scheme>
+            <q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="schemePage.showSaveDialog.value = true"
+            />
           </template>
         </standard-table-toolbar>
       </template>
@@ -106,18 +137,31 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-      <template #no-data><div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div></template>
+      <template #no-data
+        ><div class="full-width row flex-center q-pa-xl text-grey-7">
+          {{ emptyMessage }}
+        </div></template
+      >
     </q-table>
 
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:queryModel="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="auditAdvancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       :enable-nested="false"
       title="审计日志查询"
       @search="handleAdvancedSearch"
     />
 
+    <query-scheme-save-dialog
+      v-model="schemePage.showSaveDialog.value"
+      :source="queryState.schemeSource.value"
+      :loading="schemePage.saving.value"
+      @save="schemePage.savePersonal"
+    />
   </base-content>
 </template>
 
@@ -129,6 +173,9 @@ import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
@@ -143,6 +190,7 @@ import { metadataDictDefault } from 'src/utils/field-metadata'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { executeButtonAction, type ButtonActionContext } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
@@ -169,8 +217,23 @@ const emptyAdvancedQuery = (): Query => ({
   ],
 })
 
-const queryState = useTableQueryState<Query>({ createInitialQuery: () => ({ page: 1, num: 20, order: { field: 'gmt_create', is_asc: false }, table_code: 'access_log', expressions: emptyAdvancedQuery().expressions, quick_query: { keyword: '' }, include_deleted: false }) })
-const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
+const queryState = useTableQueryState<Query>({
+  createInitialQuery: () => ({
+    page: 1,
+    num: 20,
+    order: { field: 'gmt_create', is_asc: false },
+    table_code: 'access_log',
+    expressions: emptyAdvancedQuery().expressions,
+    quick_query: { keyword: '' },
+    include_deleted: false,
+  }),
+})
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
 
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 
@@ -280,7 +343,7 @@ function buildAuditField(
   }
 }
 
-const resetToFirstPageOrFetch = () => {
+const resetAndFetch = () => {
   if (query.value.page !== 1) {
     query.value.page = 1
     return
@@ -288,14 +351,14 @@ const resetToFirstPageOrFetch = () => {
   void fetchData()
 }
 
+const schemePage = useQuerySchemePage('system_audit', queryState, resetAndFetch)
+
 const handleBasicSearch = () => {
-  queryState.submitQuickSearch()
-  resetToFirstPageOrFetch()
+  schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
 const handleAdvancedSearch = () => {
-  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
-  resetToFirstPageOrFetch()
+  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
   showAdvancedQuery.value = false
 }
 
@@ -314,7 +377,13 @@ const fetchData = async () => {
     loading.value = false
   }
 }
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: true, error: loadError.value, hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value }))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: true,
+    error: loadError.value,
+    hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value,
+  }),
+)
 
 const openDetail = async (row: AccessLog) => {
   await router.push({
@@ -349,8 +418,24 @@ watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([sortBy, descending], [prevSortBy, prevDescending]) => {
     if (sortBy === prevSortBy && descending === prevDescending) return
-    if (!queryState.applySorting(sortBy || 'gmt_create', descending, new Set(['gmt_create', 'user_name', 'action', 'resource_code', 'method', 'status_code', 'success', 'duration_ms']))) return
-    resetToFirstPageOrFetch()
+    if (
+      !queryState.applySorting(
+        sortBy || 'gmt_create',
+        descending,
+        new Set([
+          'gmt_create',
+          'user_name',
+          'action',
+          'resource_code',
+          'method',
+          'status_code',
+          'success',
+          'duration_ms',
+        ]),
+      )
+    )
+      return
+    resetAndFetch()
   },
 )
 
@@ -363,5 +448,8 @@ watch(
   },
 )
 
-onMounted(fetchData)
+onMounted(async () => {
+  await schemePage.initialize()
+  await fetchData()
+})
 </script>

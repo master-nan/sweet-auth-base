@@ -38,6 +38,8 @@ import { useRouterStore } from 'src/stores/permission'
 import { useAppStore } from 'src/stores/app'
 import type { Route } from 'src/types/index'
 import BaseMenuItem from './BaseMenuItem.vue'
+import { resolveRouteTitle } from 'src/utils/route-title'
+import { primitiveText } from 'src/utils/primitive-text'
 
 defineOptions({ name: 'BaseMenu' })
 
@@ -57,13 +59,13 @@ const menuKeyword = ref('')
 const router = computed(() => store.getPermissionRoutes[0]?.children || [])
 const hasMenuKeyword = computed(() => menuKeyword.value.trim().length > 0)
 
-const normalizeKeyword = (value: unknown) => String(value || '').trim().toLowerCase()
+const normalizeKeyword = (value: unknown) => primitiveText(value).trim().toLowerCase()
 
 const routeMatches = (route: Route, keyword: string) => {
   const title = String(route.meta?.title || '')
   const candidates = [
     title,
-    t(title),
+    resolveRouteTitle(title, t),
     route.name,
     route.path,
     route.meta?.tableCode,
@@ -86,7 +88,9 @@ const filterRoutes = (routes: Route[], keyword: string): Route[] => {
   }, [])
 }
 
-const filteredRouter = computed(() => filterRoutes(router.value, normalizeKeyword(menuKeyword.value)))
+const filteredRouter = computed(() =>
+  filterRoutes(router.value, normalizeKeyword(menuKeyword.value)),
+)
 
 watch(is_drawer_mini, (mini) => {
   if (mini) menuKeyword.value = ''

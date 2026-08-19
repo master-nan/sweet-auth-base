@@ -23,13 +23,13 @@
           <q-icon :name="item.meta?.icon as string" />
         </q-item-section>
         <q-item-section v-if="!isMiniMode">
-          {{ item.meta ? t(item.meta?.title as string) : '' }}
+          {{ item.meta ? displayTitle(item.meta?.title) : '' }}
         </q-item-section>
         <q-item-section v-if="!isMiniMode && handleLink(basePath as string, item) === '#'" side>
           <q-icon name="fa-solid fa-up-right-from-square" size="10px" />
         </q-item-section>
         <q-tooltip v-if="isMiniMode" anchor="center right" self="center left" :offset="[10, 0]">
-          {{ item.meta ? t(item.meta?.title as string) : item.name }}
+          {{ item.meta ? displayTitle(item.meta?.title) : item.name }}
         </q-tooltip>
       </q-item>
       <!-- has children -->
@@ -45,7 +45,7 @@
           :header-style="expansionHeaderStyle(basePath as string, item)"
           :header-inset-level="menuInsetLevel"
           :icon="item.meta?.icon as string"
-          :label="item.meta ? t(item.meta?.title as string) : ''"
+          :label="item.meta ? displayTitle(item.meta?.title) : ''"
           :model-value="expansionItemOpen(basePath as string, item)"
         >
           <!-- MenuItem initlevl + 0.2 ; concat parent path if router is existed -->
@@ -59,23 +59,18 @@
           />
         </q-expansion-item>
         <!-- mini mode -->
-        <q-item
-          v-else
-          :style="expansionHeaderStyle(basePath as string, item)"
-          clickable
-          v-ripple
-        >
+        <q-item v-else :style="expansionHeaderStyle(basePath as string, item)" clickable v-ripple>
           <q-item-section avatar>
             <q-icon :name="item.meta?.icon as string" />
           </q-item-section>
           <q-item-section v-if="!isMiniMode">
-            {{ item.meta ? t(item.meta?.title as string) : '' }}
+            {{ item.meta ? displayTitle(item.meta?.title) : '' }}
           </q-item-section>
           <q-item-section v-if="!isMiniMode && handleLink(basePath as string, item) === '#'" side>
             <q-icon name="fa-solid fa-up-right-from-square" size="10px" />
           </q-item-section>
           <q-tooltip anchor="center right" self="center left" :offset="[10, 0]">
-            {{ item.meta ? t(item.meta?.title as string) : item.name }}
+            {{ item.meta ? displayTitle(item.meta?.title) : item.name }}
           </q-tooltip>
           <q-menu
             class="base-menu-popup base-menu-popup--mini"
@@ -111,6 +106,7 @@ import { useAppStore } from 'src/stores/app'
 import { useUserStore } from 'src/stores/user'
 import { findMenuPathByTableCode } from 'src/utils/menu-context'
 import { storeToRefs } from 'pinia'
+import { resolveRouteTitle } from 'src/utils/route-title'
 
 defineOptions({ name: 'BaseMenuItem' })
 
@@ -134,6 +130,7 @@ const props = withDefaults(defineProps<Props>(), {
   forceExpand: false,
 })
 const { t } = useI18n()
+const displayTitle = (title: unknown) => resolveRouteTitle(title, t)
 const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -164,14 +161,18 @@ const currentRoutePath = computed(() => {
     const tableCode = String(route.params.table_code || '')
     if (tableCode) {
       const menuPath = findMenuPathByTableCode(userStore.menus, tableCode)
-      return menuPath ? normalizeMenuPath(menuPath) : normalizeMenuPath(`/admin/develop/generalization/${tableCode}`)
+      return menuPath
+        ? normalizeMenuPath(menuPath)
+        : normalizeMenuPath(`/admin/develop/generalization/${tableCode}`)
     }
   }
   if (route.name === 'record_form') {
     const tableCode = String(route.params.table_code || '')
     if (tableCode) {
       const menuPath = findMenuPathByTableCode(userStore.menus, tableCode)
-      return menuPath ? normalizeMenuPath(menuPath) : normalizeMenuPath(`/admin/develop/generalization/${tableCode}`)
+      return menuPath
+        ? normalizeMenuPath(menuPath)
+        : normalizeMenuPath(`/admin/develop/generalization/${tableCode}`)
     }
   }
   return normalizeMenuPath(route.path)
@@ -255,11 +256,7 @@ const expansionItemOpen = (basePath: string, item: Route) => {
 }
 
 :global(
-  .body--dark
-    .app-drawer
-    .base-menu-expansion--active
-    > .q-expansion-item__container
-    > .q-item
+  .body--dark .app-drawer .base-menu-expansion--active > .q-expansion-item__container > .q-item
 ) {
   color: #c7d2fe !important;
   background: transparent !important;
@@ -385,5 +382,4 @@ const expansionItemOpen = (basePath: string, item: Route) => {
   color: var(--app-dark-text);
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
 }
-
 </style>

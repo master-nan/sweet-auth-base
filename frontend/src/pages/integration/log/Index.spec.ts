@@ -6,8 +6,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const apiMocks = vi.hoisted(() => ({ queryLogs: vi.fn(), getLog: vi.fn() }))
 const detailButtons = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 const permissionCodes = vi.hoisted(() => [] as string[])
+const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
+const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
 
+vi.mock('boot/axios', () => ({ instance: {} }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
+vi.mock('src/composables/query-scheme-page', async () => {
+  const { ref } = await import('vue')
+  return {
+    useQuerySchemePage: () => ({
+      runtime: {
+        schemes: ref([]),
+        currentLabel: ref('查询方案'),
+        loading: ref(false),
+        error: ref(''),
+        scope: { config: ref(null) },
+        loadAvailable: vi.fn(),
+      },
+      showSaveDialog: ref(false),
+      saving: ref(false),
+      initialize: schemeMocks.initialize,
+      selectScheme: vi.fn(),
+      applyPreset: vi.fn(),
+      restoreCurrent: vi.fn(),
+      resetDefault: vi.fn(),
+      openManager: vi.fn(),
+      savePersonal: vi.fn(),
+    }),
+  }
+})
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: { execution_no: 'INT-51', log_id: '91' } }),
 }))
@@ -40,6 +68,23 @@ describe('integration log detail permission', () => {
     permissionCodes.splice(0)
     apiMocks.queryLogs.mockReset()
     apiMocks.getLog.mockReset()
+    schemeMocks.initialize.mockReset()
+    schemeMocks.initialize.mockResolvedValue(false)
+    tableApiMocks.queryRuntimeTableByCode.mockReset()
+    tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({
+      success: true,
+      data: {
+        table_fields: [
+          {
+            field_code: 'attempt_no',
+            field_name: 'Attempt',
+            field_type: 'int',
+            is_advanced_search: true,
+            sequence: 1,
+          },
+        ],
+      },
+    })
     apiMocks.queryLogs.mockResolvedValue({ data: [], total: 0 })
     apiMocks.getLog.mockResolvedValue({
       data: {
@@ -66,11 +111,17 @@ describe('integration log detail permission', () => {
 
   it('queries logs but does not request routed detail without detail permission', async () => {
     permissionCodes.push('integration_log_query')
-    mountPage()
+    const wrapper = mountPage()
     await flushPromises()
 
     expect(apiMocks.queryLogs).toHaveBeenCalled()
     expect(apiMocks.getLog).not.toHaveBeenCalled()
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_log')
+    expect(wrapper.find('advanced-query-stub').exists()).toBe(true)
+    expect(schemeMocks.initialize).toHaveBeenCalledOnce()
+    expect(schemeMocks.initialize.mock.invocationCallOrder[0]).toBeLessThan(
+      apiMocks.queryLogs.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('loads routed log detail when the detail permission is present', async () => {
@@ -86,5 +137,7 @@ describe('integration log detail permission', () => {
     expect(wrapper.text()).toContain('Retry-After 秒数')
     expect(wrapper.text()).not.toContain('Authorization')
     expect(wrapper.text()).not.toContain('Payload')
+    await (wrapper.vm as unknown as { fetchData: () => Promise<void> }).fetchData()
+    expect(schemeMocks.initialize).toHaveBeenCalledOnce()
   })
 })

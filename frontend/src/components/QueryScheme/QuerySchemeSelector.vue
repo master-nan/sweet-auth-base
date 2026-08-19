@@ -1,10 +1,12 @@
 <template>
   <q-btn-dropdown
+    class="query-scheme-selector"
     flat
     dense
     color="primary"
     icon="bookmark_border"
     :label="currentLabel"
+    :title="currentLabel"
     :loading="loading"
     :disable="disabled"
     no-caps
@@ -30,9 +32,15 @@
               v-if="scheme.status !== QuerySchemeValidationStatus.VALID"
               name="warning_amber"
               size="17px"
-              :color="scheme.status === QuerySchemeValidationStatus.INVALID ? 'negative' : 'warning'"
+              :color="
+                scheme.status === QuerySchemeValidationStatus.INVALID ? 'negative' : 'warning'
+              "
             >
-              <q-tooltip>{{ scheme.status === QuerySchemeValidationStatus.INVALID ? '方案不可用' : '方案需要修复' }}</q-tooltip>
+              <q-tooltip>{{
+                scheme.status === QuerySchemeValidationStatus.INVALID
+                  ? '方案不可用'
+                  : '方案需要修复'
+              }}</q-tooltip>
             </q-icon>
           </q-item-section>
         </q-item>
@@ -143,3 +151,20 @@ const groupedSchemes = computed(() =>
     .filter((group) => group.items.length > 0),
 )
 </script>
+
+<style scoped>
+.query-scheme-selector {
+  max-width: 240px;
+}
+
+.query-scheme-selector :deep(.q-btn__content) {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.query-scheme-selector :deep(.q-btn__content .block) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

@@ -16,6 +16,26 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #scheme-selector>
+            <query-scheme-selector
+              :schemes="schemePage.runtime.schemes.value"
+              :current-label="schemePage.runtime.currentLabel.value"
+              :loading="schemePage.runtime.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="schemePage.runtime.error.value"
+              @select="schemePage.selectScheme"
+              @restore-current="schemePage.restoreCurrent"
+              @reset-default="schemePage.resetDefault"
+              @retry="schemePage.runtime.loadAvailable"
+              @manage="schemePage.openManager"
+            />
+          </template>
+          <template #quick-presets>
+            <query-quick-presets
+              :config="schemePage.runtime.scope.config.value"
+              @apply="schemePage.applyPreset"
+            />
+          </template>
           <template #quick-search>
             <q-input
               v-model="keyword"
@@ -30,11 +50,39 @@
             <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
           </template>
           <template #advanced-trigger>
-            <q-btn outline color="primary" icon="tune" @click="openAdvancedQuery">
+            <q-btn
+              outline
+              color="primary"
+              icon="tune"
+              aria-label="高级查询"
+              @click="openAdvancedQuery"
+            >
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </template>
-          <template #column-selector><q-select v-model="visibleColumns" multiple outlined dense options-dense emit-value map-options :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')" :options="columns" option-value="name" options-cover /></template>
+          <template #save-scheme>
+            <q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="schemePage.showSaveDialog.value = true"
+            />
+          </template>
+          <template #column-selector
+            ><q-select
+              v-model="visibleColumns"
+              multiple
+              outlined
+              dense
+              options-dense
+              emit-value
+              map-options
+              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
+              :options="columns"
+              option-value="name"
+              options-cover
+          /></template>
         </standard-table-toolbar>
       </template>
 
@@ -95,9 +143,18 @@
     <advanced-query
       v-model="showAdvancedQuery"
       v-model:queryModel="tempAdvancedQuery"
+      v-model:bindings="queryState.bindings.value"
       :fields="advancedFields"
+      :source-name="queryState.schemeSource.value?.name || ''"
+      :dirty="queryState.dirty.value"
       title="人员高级查询"
       @search="applyAdvancedQuery"
+    />
+    <query-scheme-save-dialog
+      v-model="schemePage.showSaveDialog.value"
+      :source="queryState.schemeSource.value"
+      :loading="schemePage.saving.value"
+      @save="schemePage.savePersonal"
     />
 
     <organization-record-detail-dialog
@@ -108,9 +165,7 @@
       icon="badge"
       :avatar-label="employeeDetail?.name?.slice(0, 1) || ''"
       :status-label="
-        employeeDetail
-          ? dictLabel('org_employment_status', employeeDetail.employment_status)
-          : ''
+        employeeDetail ? dictLabel('org_employment_status', employeeDetail.employment_status) : ''
       "
       :status-color="
         employeeDetail ? organizationStatusColor(employeeDetail.employment_status) : 'positive'
@@ -157,9 +212,7 @@
               </q-td>
             </template>
             <template #no-data>
-              <div class="full-width text-center text-grey-7 q-pa-lg">
-                当前范围暂无任职记录
-              </div>
+              <div class="full-width text-center text-grey-7 q-pa-lg">当前范围暂无任职记录</div>
             </template>
           </q-table>
         </template>
@@ -224,6 +277,9 @@ import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
+import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
+import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import {
   bindEmployeeUser,
   getEmployeeDetail,
@@ -243,6 +299,7 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import { useDictStore } from 'src/stores/dict'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
@@ -280,8 +337,20 @@ const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
 const showAdvancedQuery = ref(false)
-const queryState = useTableQueryState<EmployeeQueryRequest>({ createInitialQuery: () => ({ ...createOrganizationQuery('org_employee'), only_effective: true, bound_status: 'all' }) })
+const queryState = useTableQueryState<EmployeeQueryRequest>({
+  createInitialQuery: () => ({
+    ...createOrganizationQuery('org_employee'),
+    only_effective: true,
+    bound_status: 'all',
+  }),
+})
 const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
+const resetAndFetch = () => {
+  if (query.value.page !== 1) query.value.page = 1
+  else void fetchData()
+}
+const schemePage = useQuerySchemePage('organization_employee', queryState, resetAndFetch)
+const initialized = ref(false)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 
 const showDetailDialog = ref(false)
@@ -306,7 +375,11 @@ let bindingUserRequestId = 0
 const columns = ref<TableColumn<EmployeeListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
-const { fields: metadataFields, advancedSearchFields: advancedFields, loadMetadata } = useRuntimeTableMetadata('org_employee')
+const {
+  fields: metadataFields,
+  advancedSearchFields: advancedFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('org_employee')
 
 const assignmentColumns: QTableProps['columns'] = [
   {
@@ -331,7 +404,13 @@ const assignmentColumns: QTableProps['columns'] = [
   { name: 'validity', field: 'validity', label: '有效期', align: 'left' },
 ]
 
-const emptyMessage = computed(() => resolveTableEmptyMessage({ canRead: canQueryEmployees.value, error: loadError.value, hasQuery: !!keyword.value || query.value.expressions.length > 0 }))
+const emptyMessage = computed(() =>
+  resolveTableEmptyMessage({
+    canRead: canQueryEmployees.value,
+    error: loadError.value,
+    hasQuery: !!keyword.value || query.value.expressions.length > 0,
+  }),
+)
 
 const fetchMetadata = async () => {
   if (!(await loadMetadata())) return
@@ -346,10 +425,28 @@ const fetchMetadata = async () => {
       { fieldCode: 'valid_to', visible: false },
     ],
     virtualColumns: [
-      { name: 'binding_status', field: 'binding_status', label: '账号绑定', align: 'center', order: 4 },
-      { name: 'bound_account', field: (row) => row.bound_account?.user_name || '-', label: '平台账号', order: 5 },
+      {
+        name: 'binding_status',
+        field: 'binding_status',
+        label: '账号绑定',
+        align: 'center',
+        order: 4,
+      },
+      {
+        name: 'bound_account',
+        field: (row) => row.bound_account?.user_name || '-',
+        label: '平台账号',
+        order: 5,
+      },
       { name: 'validity', field: 'validity', label: '有效期', order: 6 },
-      { name: 'actions', field: 'actions', label: '操作', align: 'center', order: 100, defaultVisible: has_line_buttons.value },
+      {
+        name: 'actions',
+        field: 'actions',
+        label: '操作',
+        align: 'center',
+        order: 100,
+        defaultVisible: has_line_buttons.value,
+      },
     ],
   })
   columns.value = resolution.columns
@@ -437,9 +534,7 @@ const visibleRowButtons = (row?: EmployeeListItem) => {
 }
 
 const search = () => {
-  queryState.submitQuickSearch()
-  if (query.value.page !== 1) query.value.page = 1
-  else void fetchData()
+  schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
 const openAdvancedQuery = () => {
@@ -448,9 +543,8 @@ const openAdvancedQuery = () => {
 }
 
 const applyAdvancedQuery = () => {
-  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
+  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
   showAdvancedQuery.value = false
-  search()
 }
 
 const fetchData = async () => {
@@ -594,7 +688,8 @@ const submitBinding = async () => {
     showBindDialog.value = false
     $q.notify({ type: 'positive', position: 'top-right', message: '账号绑定成功' })
     await fetchData()
-    if (showDetailDialog.value) employeeDetail.value = await getEmployeeDetail(currentEmployee.value.id)
+    if (showDetailDialog.value)
+      employeeDetail.value = await getEmployeeDetail(currentEmployee.value.id)
   } finally {
     bindingLoading.value = false
   }
@@ -648,12 +743,15 @@ const handleRowAction = (button: MenuButton, row: EmployeeListItem) => {
 
 watch(
   () => [query.value.page, query.value.num],
-  () => void fetchData(),
+  () => {
+    if (initialized.value) void fetchData()
+  },
 )
 
 watch(
   () => [pagination.value.sortBy, pagination.value.descending] as const,
   ([field, descending]) => {
+    if (!initialized.value) return
     if (!queryState.applySorting(field || '', descending, sortableFields.value)) return
     void fetchData()
   },
@@ -665,7 +763,10 @@ onMounted(async () => {
     'org_user_binding_status',
     'org_assignment_type',
   ])
-  await Promise.all([fetchMetadata(), fetchData()])
+  await fetchMetadata()
+  await schemePage.initialize()
+  await fetchData()
+  initialized.value = true
 })
 </script>
 

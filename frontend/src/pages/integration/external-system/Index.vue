@@ -17,10 +17,24 @@
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
           <template #scheme-selector>
-            <query-scheme-selector :schemes="querySchemes.schemes.value" :current-label="querySchemes.currentLabel.value" :loading="querySchemes.loading.value" :dirty="queryState.dirty.value" :load-error="querySchemes.error.value" @select="applySelectedScheme" @restore-current="restoreSchemeQuery" @reset-default="resetDefaultQuery" @retry="querySchemes.loadAvailable" @manage="openSchemeManager" />
+            <query-scheme-selector
+              :schemes="querySchemes.schemes.value"
+              :current-label="querySchemes.currentLabel.value"
+              :loading="querySchemes.loading.value"
+              :dirty="queryState.dirty.value"
+              :load-error="querySchemes.error.value"
+              @select="applySelectedScheme"
+              @restore-current="restoreSchemeQuery"
+              @reset-default="resetDefaultQuery"
+              @retry="querySchemes.loadAvailable"
+              @manage="openSchemeManager"
+            />
           </template>
           <template #quick-presets>
-            <query-quick-presets :config="querySchemes.scope.config.value" @apply="applyQuickPreset" />
+            <query-quick-presets
+              :config="querySchemes.scope.config.value"
+              @apply="applyQuickPreset"
+            />
           </template>
           <template #quick-search>
             <q-input
@@ -55,15 +69,25 @@
               outline
               icon="tune"
               color="primary"
-              :aria-label="activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'"
+              :aria-label="
+                activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
+              "
               @click="showAdvancedQuery = true"
             >
-              <q-badge v-if="activeFilterCount" floating color="red">{{ activeFilterCount }}</q-badge>
+              <q-badge v-if="activeFilterCount" floating color="red">{{
+                activeFilterCount
+              }}</q-badge>
               <q-tooltip>高级查询</q-tooltip>
             </q-btn>
           </template>
           <template #save-scheme>
-            <q-btn outline color="primary" icon="bookmark_add" label="保存方案" @click="showSchemeSave = true" />
+            <q-btn
+              outline
+              color="primary"
+              icon="bookmark_add"
+              label="保存方案"
+              @click="showSchemeSave = true"
+            />
           </template>
           <template #right-actions>
             <q-btn
@@ -141,7 +165,12 @@
       @search="handleAdvancedSearch"
     />
 
-    <query-scheme-save-dialog v-model="showSchemeSave" :source="queryState.schemeSource.value" :loading="schemeSaving" @save="saveScheme" />
+    <query-scheme-save-dialog
+      v-model="showSchemeSave"
+      :source="queryState.schemeSource.value"
+      :loading="schemeSaving"
+      @save="saveScheme"
+    />
 
     <dynamic-form-dialog
       v-model="showFormDialog"
@@ -189,8 +218,7 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemes } from 'src/composables/query-schemes'
-import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
+import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { TableColumn } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
@@ -206,7 +234,9 @@ const api = useIntegrationApi()
 const loading = ref(false)
 const loadError = ref('')
 const { confirmAction } = useConfirmDialog($q)
-const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('integration_external_system')
+const { line_buttons, top_buttons, has_line_buttons } = usePageButtons(
+  'integration_external_system',
+)
 
 const rows = ref<ExternalSystemListItem[]>([])
 const total = ref(0)
@@ -214,8 +244,6 @@ const initialized = ref(false)
 const showAdvancedQuery = ref(false)
 const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
-const showSchemeSave = ref(false)
-const schemeSaving = ref(false)
 const currentDetailId = ref(0)
 const currentEditData = ref<ExternalSystemDetail | null>(null)
 const {
@@ -242,9 +270,7 @@ const columns = ref<TableColumn<ExternalSystemListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
 
-const emptyExpressions = () => [
-  { rules: [{ field: '', value: null }], nested: [] },
-]
+const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const queryState = useTableQueryState<ExternalSystemQuery>({
   createInitialQuery: () => ({
     page: 1,
@@ -255,8 +281,12 @@ const queryState = useTableQueryState<ExternalSystemQuery>({
   }),
   createEmptyExpressions: emptyExpressions,
 })
-const { query, keyword, draftAdvanced: tempAdvancedQuery, appliedAdvanced: appliedAdvancedQuery } = queryState
-const querySchemes = useQuerySchemes('integration_external_system', queryState)
+const {
+  query,
+  keyword,
+  draftAdvanced: tempAdvancedQuery,
+  appliedAdvanced: appliedAdvancedQuery,
+} = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const emptyMessage = computed(() =>
@@ -316,29 +346,27 @@ const resetAndFetch = () => {
   else void fetchData()
 }
 
+const {
+  runtime: querySchemes,
+  showSaveDialog: showSchemeSave,
+  saving: schemeSaving,
+  initialize: initializeQuerySchemes,
+  runQueryChange,
+  selectScheme: applySelectedScheme,
+  applyPreset: applyQuickPreset,
+  restoreCurrent: restoreSchemeQuery,
+  resetDefault: resetDefaultQuery,
+  openManager: openSchemeManager,
+  savePersonal: saveScheme,
+} = useQuerySchemePage('integration_external_system', queryState, resetAndFetch)
+
 const handleBasicSearch = () => {
-  queryState.submitQuickSearch()
-  resetAndFetch()
+  runQueryChange(queryState.submitQuickSearch)
 }
 
 const handleAdvancedSearch = () => {
-  queryState.applyAdvancedQuery(tempAdvancedQuery.value)
+  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
   showAdvancedQuery.value = false
-  resetAndFetch()
-}
-
-const applySelectedScheme = async (scheme: QuerySchemeSummary) => {
-  if (await querySchemes.applyScheme(scheme)) resetAndFetch()
-  else $q.notify({ type: 'warning', message: querySchemes.issues.value[0]?.message || querySchemes.error.value || '该方案当前不可用' })
-}
-const applyQuickPreset = (payload: QuerySchemePayloadV1) => { querySchemes.applyPreset(payload); resetAndFetch() }
-const openSchemeManager = () => { void router.push({ name: 'query_scheme_manager' }) }
-const restoreSchemeQuery = () => { if (querySchemes.restoreCurrentScheme()) resetAndFetch() }
-const resetDefaultQuery = async () => { if (await querySchemes.resetToDefault()) resetAndFetch() }
-const saveScheme = async (value: { name: string; isDefault: boolean; saveAs: boolean }) => {
-  schemeSaving.value = true
-  try { await querySchemes.savePersonal(value.name, value.isDefault, value.saveAs); showSchemeSave.value = false }
-  finally { schemeSaving.value = false }
 }
 
 const availableLineButtons = (row: ExternalSystemListItem) =>
@@ -354,7 +382,10 @@ const openDetail = (row: ExternalSystemListItem) => {
 }
 const openRelatedInterfaces = (id: number) => {
   showDetailDialog.value = false
-  void router.push({ name: 'integration_interface_definition', query: { external_system_id: String(id) } })
+  void router.push({
+    name: 'integration_interface_definition',
+    query: { external_system_id: String(id) },
+  })
 }
 const openRelatedCredentials = (id: number) => {
   showDetailDialog.value = false
@@ -433,7 +464,7 @@ const handleFormSubmit = async (payload: {
 
 onMounted(async () => {
   await fetchMetadata()
-  await querySchemes.initialize(Number(router.currentRoute?.value?.query?.query_scheme_id) || undefined)
+  await initializeQuerySchemes()
   await fetchData()
   initialized.value = true
 })

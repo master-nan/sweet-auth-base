@@ -12,15 +12,14 @@ const apiMocks = vi.hoisted(() => ({
   disableExternalSystem: vi.fn(),
 }))
 const routerPush = vi.hoisted(() => vi.fn())
+const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
 
 const tableApiMocks = vi.hoisted(() => ({
   queryRuntimeTableByCode: vi.fn(),
 }))
 
 const permissionButtons = vi.hoisted(() => ({
-  top: [
-    { id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' },
-  ],
+  top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
   line: [
     { id: 2, name: '详情', event_action: 'detail', icon: 'visibility', color: 'primary' },
     { id: 3, name: '编辑', event_action: 'update', icon: 'edit', color: 'primary' },
@@ -40,6 +39,31 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 vi.mock('src/api/services/integration', () => ({
   useIntegrationApi: () => apiMocks,
 }))
+
+vi.mock('src/composables/query-scheme-page', async () => {
+  const { ref } = await import('vue')
+  return {
+    useQuerySchemePage: () => ({
+      runtime: {
+        schemes: ref([]),
+        currentLabel: ref('查询方案'),
+        loading: ref(false),
+        error: ref(''),
+        scope: { config: ref(null) },
+        loadAvailable: vi.fn(),
+      },
+      showSaveDialog: ref(false),
+      saving: ref(false),
+      initialize: schemeMocks.initialize,
+      selectScheme: vi.fn(),
+      applyPreset: vi.fn(),
+      restoreCurrent: vi.fn(),
+      resetDefault: vi.fn(),
+      openManager: vi.fn(),
+      savePersonal: vi.fn(),
+    }),
+  }
+})
 
 vi.mock('src/api/services/sys-table', () => ({
   useTableApi: () => tableApiMocks,
@@ -90,7 +114,11 @@ const SlotStub = defineComponent({
 const ToolbarStub = defineComponent({
   emits: ['refresh'],
   setup(_, { slots }) {
-    return () => h('div', Object.values(slots).flatMap((slot) => slot?.() || []))
+    return () =>
+      h(
+        'div',
+        Object.values(slots).flatMap((slot) => slot?.() || []),
+      )
   },
 })
 
@@ -181,6 +209,8 @@ describe('external system management page', () => {
     setActivePinia(createPinia())
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     routerPush.mockReset()
+    schemeMocks.initialize.mockReset()
+    schemeMocks.initialize.mockResolvedValue(false)
     tableApiMocks.queryRuntimeTableByCode.mockReset()
     apiMocks.queryExternalSystems.mockResolvedValue({ data: [row], total: 1 })
     apiMocks.getExternalSystem.mockResolvedValue({
@@ -191,7 +221,17 @@ describe('external system management page', () => {
     apiMocks.updateExternalSystem.mockResolvedValue({ success: true })
     tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({
       success: true,
-      data: { table_fields: [{ field_code: 'system_code', field_name: '系统编码', is_list_show: true, is_sort: true, sequence: 1 }] },
+      data: {
+        table_fields: [
+          {
+            field_code: 'system_code',
+            field_name: '系统编码',
+            is_list_show: true,
+            is_sort: true,
+            sequence: 1,
+          },
+        ],
+      },
     })
   })
 
@@ -199,12 +239,21 @@ describe('external system management page', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_external_system')
+    expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith(
+      'integration_external_system',
+    )
+    expect(schemeMocks.initialize).toHaveBeenCalledOnce()
+    expect(schemeMocks.initialize.mock.invocationCallOrder[0]).toBeLessThan(
+      apiMocks.queryExternalSystems.mock.invocationCallOrder[0]!,
+    )
     expect(apiMocks.queryExternalSystems).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, num: 15, quick_query: { keyword: '' } }),
     )
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).toContain('新增')
+
+    await (wrapper.vm as unknown as { fetchData: () => Promise<void> }).fetchData()
+    expect(schemeMocks.initialize).toHaveBeenCalledOnce()
   })
 
   it('opens the create dialog only through the configured dynamic button', async () => {
@@ -214,7 +263,9 @@ describe('external system management page', () => {
     const createButton = wrapper.findAll('button').find((button) => button.text() === '新增')
     await createButton?.trigger('click')
 
-    expect(wrapper.find('[data-testid="form-dialog"]').attributes('data-title')).toBe('新增外部系统')
+    expect(wrapper.find('[data-testid="form-dialog"]').attributes('data-title')).toBe(
+      '新增外部系统',
+    )
   })
 
   it('filters enable and disable actions by the current status', async () => {
@@ -243,8 +294,14 @@ describe('external system management page', () => {
     }
     vm.openRelatedInterfaces(12)
     vm.openRelatedCredentials(12)
-    expect(routerPush).toHaveBeenNthCalledWith(1, { name: 'integration_interface_definition', query: { external_system_id: '12' } })
-    expect(routerPush).toHaveBeenNthCalledWith(2, { name: 'integration_credential', query: { external_system_id: '12' } })
+    expect(routerPush).toHaveBeenNthCalledWith(1, {
+      name: 'integration_interface_definition',
+      query: { external_system_id: '12' },
+    })
+    expect(routerPush).toHaveBeenNthCalledWith(2, {
+      name: 'integration_credential',
+      query: { external_system_id: '12' },
+    })
   })
 
   it('submits an edit with the server revision and without the immutable code', async () => {

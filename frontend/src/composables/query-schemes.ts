@@ -13,7 +13,7 @@ import {
 import type { Query } from 'src/types/global'
 import { subscribeQuerySchemeDeleted } from 'src/modules/query-scheme/events'
 
-type SchemeAwareQueryState<TQuery extends Query> = {
+export type SchemeAwareQueryState<TQuery extends Query> = {
   query: { value: TQuery }
   schemeSource: { value: QuerySchemeResolveResult['scheme'] | null }
   bindings: { value: QuerySchemePayloadV1['bindings'] }
@@ -56,9 +56,7 @@ export function useQuerySchemes<TQuery extends Query>(
   })
 
   const personalDefault = computed(() =>
-    schemes.value.find(
-      (scheme) => scheme.type === QuerySchemeType.PERSONAL && scheme.is_default,
-    ),
+    schemes.value.find((scheme) => scheme.type === QuerySchemeType.PERSONAL && scheme.is_default),
   )
   const pageDefault = computed(() =>
     schemes.value.find(
