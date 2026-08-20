@@ -329,7 +329,3 @@ func passwordChangedAt(user model.SysUser) time.Time {
 	}
 	return time.Time(user.GmtModify)
 }
-
-func boolPtr(value bool) *bool {
-	return &value
-}

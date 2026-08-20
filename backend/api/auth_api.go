@@ -187,7 +187,7 @@ func (a *AuthApi) SendSms(ctx *gin.Context) {
 			return
 		}
 	}
-	resp.SetData(smsSendResponse())
+	resp.SetData(map[string]interface{}{"sent": true})
 }
 
 func smsVerificationCodeFromParams(params map[string]interface{}) (string, bool) {
@@ -203,10 +203,6 @@ func smsVerificationCodeFromParams(params map[string]interface{}) (string, bool)
 		return "", false
 	}
 	return code, true
-}
-
-func smsSendResponse() map[string]interface{} {
-	return map[string]interface{}{"sent": true}
 }
 
 func smsSendIntervalSeconds(serverConfig *config.Server) int64 {

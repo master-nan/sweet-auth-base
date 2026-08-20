@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
+import { SysTableFieldInputType, SysTableFieldType, SysTableFieldTypeMap } from 'src/types/enum'
 import {
   getFieldControlType,
   coerceFieldValue,
@@ -12,6 +12,12 @@ import {
 import type { OrganizationSelectorType } from 'src/types/organization-selector'
 
 describe('organization selector metadata resolver', () => {
+  it('exposes only canonical storage type ids', () => {
+    expect(SysTableFieldType.SMALLINT).toBe(12)
+    expect(SysTableFieldType.DECIMAL).toBe(13)
+    expect(SysTableFieldTypeMap).not.toHaveProperty('2')
+    expect(SysTableFieldTypeMap).not.toHaveProperty('9')
+  })
 
   it('keeps Decimal values as text and recognizes canonical SmallInt', () => {
     expect(coerceFieldValue('12345678901234567890.123400', SysTableFieldType.DECIMAL)).toBe(

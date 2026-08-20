@@ -1,10 +1,7 @@
 import { ExpressionType, SysTableFieldType } from 'src/types/enum'
 import type { ExpressionGroup, Query, QueryRule } from 'src/types/global'
 import { ExpressionLogic } from 'src/types/enum'
-import type {
-  QuerySchemeBinding,
-  QuerySchemePayloadV1,
-} from 'src/modules/query-scheme/types'
+import type { QuerySchemeBinding, QuerySchemePayloadV1 } from 'src/modules/query-scheme/types'
 
 const nullExpressionTypes = new Set<ExpressionType>([
   ExpressionType.IS_NULL,
@@ -98,7 +95,6 @@ export type QueryRuleFieldTypeResolver = (rule: QueryRule) => SysTableFieldType 
 const integerFieldTypes = new Set<SysTableFieldType>([
   SysTableFieldType.BIGINT,
   SysTableFieldType.INT,
-  SysTableFieldType.TINYINT,
   SysTableFieldType.SMALLINT,
 ])
 
@@ -139,12 +135,9 @@ const normalizeBooleanQueryValue = (value: unknown) => {
   }
 }
 
-export const normalizeQueryValueByFieldType = (
-  value: unknown,
-  fieldType?: SysTableFieldType,
-) => {
+export const normalizeQueryValueByFieldType = (value: unknown, fieldType?: SysTableFieldType) => {
   if (value === null || value === undefined || value === '') return value
-  if (fieldType === SysTableFieldType.FLOAT || fieldType === SysTableFieldType.DECIMAL) {
+  if (fieldType === SysTableFieldType.DECIMAL) {
     if (typeof value === 'string') return value.trim()
     if (typeof value === 'number' && Number.isSafeInteger(value)) return `${value}`
     return value
@@ -178,9 +171,7 @@ export const normalizeQueryRuleValue = (
   }
   if (!isMultiValueExpressionType(rule.expression_type)) return normalizeItem(rule.value)
   if (Array.isArray(rule.value)) {
-    return rule.value
-      .map(normalizeItem)
-      .filter((item) => hasQueryRuleValue(item))
+    return rule.value.map(normalizeItem).filter((item) => hasQueryRuleValue(item))
   }
   if (typeof rule.value === 'string') return splitMultiValueText(rule.value).map(normalizeItem)
   if (!hasQueryRuleValue(rule.value)) return []

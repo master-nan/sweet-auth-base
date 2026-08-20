@@ -143,7 +143,7 @@ func parseSourceLocalDate(value string, location *time.Location) (time.Time, err
 	}
 	// The source field is a LocalDate, not an instant. UTC midnight is the
 	// canonical storage carrier and must not be shifted through source timezone.
-	parsed, err := time.Parse("2006-01-02", value)
+	parsed, err := time.Parse(time.DateOnly, value)
 	if err != nil || parsed.Year() < 1900 || parsed.Year() > 9998 {
 		return time.Time{}, ErrSourceDateInvalid
 	}

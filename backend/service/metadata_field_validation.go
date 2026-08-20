@@ -22,10 +22,10 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 	if field == nil {
 		return myerrors.ErrParamInvalid
 	}
-	if !validStorageType(field.FieldType) {
+	if _, valid := platformmetadata.DescribeStorage(field.FieldType); !valid {
 		return myerrors.NewValidationError("字段存储类型不合法")
 	}
-	if !validUIComponent(field.InputType) {
+	if field.InputType < enum.InputType || field.InputType > enum.RichTextInputType {
 		return myerrors.NewValidationError("字段组件类型不合法")
 	}
 	if sequence <= 0 || sequence > 255 {
@@ -109,20 +109,12 @@ func validMetadataIdentifier(value string) bool {
 	return err == nil && normalized == value
 }
 
-func validStorageType(value enum.SysTableFieldType) bool {
-	return value >= enum.BigIntFieldType && value <= enum.DecimalFieldType
-}
-
-func validUIComponent(value enum.SysTableFieldInputType) bool {
-	return value >= enum.InputType && value <= enum.RichTextInputType
-}
-
 func validateMetadataDefaultValue(field model.SysTableField, value string) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return nil
 	}
-	switch platformmetadata.CanonicalStorageType(field.FieldType) {
+	switch field.FieldType {
 	case enum.BigIntFieldType, enum.IntFieldType:
 		if _, err := strconv.ParseInt(value, 10, 64); err != nil {
 			return myerrors.NewValidationError("整数默认值不合法")
@@ -149,8 +141,7 @@ func validateMetadataDefaultValue(field model.SysTableField, value string) error
 }
 
 func validateNumericMetadata(field *model.SysTableField) error {
-	canonical := platformmetadata.CanonicalStorageType(field.FieldType)
-	if canonical != enum.DecimalFieldType {
+	if field.FieldType != enum.DecimalFieldType {
 		if field.NumericPrecision != 0 || field.NumericScale != 0 {
 			return myerrors.NewValidationError("只有Decimal字段允许配置precision和scale")
 		}
@@ -158,10 +149,6 @@ func validateNumericMetadata(field *model.SysTableField) error {
 	}
 	if field.NumericPrecision == 0 {
 		field.NumericPrecision = field.FieldLength
-		if field.NumericPrecision == 0 && field.FieldType == enum.FloatFieldType {
-			field.NumericPrecision = platformmetadata.DefaultNumericPrecision
-			field.NumericScale = platformmetadata.LegacyNumericScale
-		}
 	}
 	if field.NumericScale == 0 && field.FieldDecimalLength > 0 {
 		field.NumericScale = field.FieldDecimalLength
@@ -174,7 +161,7 @@ func validateNumericMetadata(field *model.SysTableField) error {
 }
 
 func validateLogicalAndDisplayCompatibility(field *model.SysTableField) error {
-	canonical := platformmetadata.CanonicalStorageType(field.FieldType)
+	canonical := field.FieldType
 	logical := field.LogicalType
 	if logical != "" {
 		valid := false

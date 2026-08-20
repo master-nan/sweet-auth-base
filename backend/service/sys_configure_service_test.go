@@ -14,6 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+func boolPtr(value bool) *bool {
+	return &value
+}
+
 func TestSysConfigureQueryReturnsRepositoryDataOnCacheMiss(t *testing.T) {
 	db := testutil.OpenSQLite(t, &model.SysConfigure{})
 	if err := db.Create(&model.SysConfigure{

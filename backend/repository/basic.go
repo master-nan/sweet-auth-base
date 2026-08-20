@@ -25,7 +25,6 @@ var (
 // 业务规则、权限决策和 Service 调用不属于 Repository 职责。
 // 方法将校验或数据库错误返回 Service 层，不在此处转换为 API 错误。
 type BasicRepository[T any] interface {
-	ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error
 	DBWithContext(context.Context) *gorm.DB
 	Count(*gorm.DB) (int64, error)
 	CountByField(*gorm.DB, string, interface{}) (int64, error)

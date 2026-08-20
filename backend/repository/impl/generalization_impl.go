@@ -10,7 +10,6 @@ import (
 	"backend/enum"
 	"backend/internal/database"
 	myerrors "backend/internal/errors"
-	platformmetadata "backend/internal/metadata"
 	"backend/internal/security"
 	"backend/model"
 	"backend/repository"
@@ -259,7 +258,7 @@ func detailSelectParts(table model.SysTable) []string {
 			continue
 		}
 		expression := util.QuoteIdentifier(fieldCode)
-		if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		if field.FieldType == enum.DecimalFieldType {
 			expression = "CAST(" + expression + " AS text) AS " + util.QuoteIdentifier(fieldCode)
 		}
 		result = append(result, expression)

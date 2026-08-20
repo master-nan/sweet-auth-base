@@ -37,10 +37,6 @@ func NewBasicRepositoryImpl[T any](db *gorm.DB, model *T) *BasicRepositoryImpl[T
 	}
 }
 
-func (b *BasicRepositoryImpl[T]) ExecuteTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
-	return b.db.WithContext(ctx).Transaction(fn)
-}
-
 func (b *BasicRepositoryImpl[T]) DBWithContext(ctx context.Context) *gorm.DB {
 	if isNilRepositoryContext(ctx) {
 		return b.db

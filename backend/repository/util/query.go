@@ -35,12 +35,12 @@ func parseValue(value interface{}, valueType enum.SysTableFieldType) interface{}
 		return nil
 	}
 	switch valueType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
 		if v, ok := parseQueryInt(value); ok {
 			return v
 		}
 		return invalidQueryValue{}
-	case enum.FloatFieldType, enum.DecimalFieldType:
+	case enum.DecimalFieldType:
 		if v, err := platformmetadata.NormalizeDecimalValue(value); err == nil {
 			return v
 		}
@@ -121,36 +121,6 @@ func parseQueryInt(value interface{}) (int, bool) {
 		}
 		i, err := strconv.Atoi(raw)
 		return i, err == nil
-	}
-	return 0, false
-}
-
-func parseQueryFloat(value interface{}) (float64, bool) {
-	switch v := value.(type) {
-	case float64:
-		return v, isFiniteQueryFloat(v)
-	case float32:
-		f := float64(v)
-		return f, isFiniteQueryFloat(f)
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	case uint:
-		return float64(v), true
-	case uint64:
-		return float64(v), true
-	case uint32:
-		return float64(v), true
-	case string:
-		raw := strings.TrimSpace(v)
-		if raw == "" {
-			return 0, false
-		}
-		f, err := strconv.ParseFloat(raw, 64)
-		return f, err == nil && isFiniteQueryFloat(f)
 	}
 	return 0, false
 }
@@ -842,7 +812,7 @@ func dynamicQuery(
 			continue
 		}
 		expression := qualifyField(fieldCode, table.TableCode)
-		if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		if field.FieldType == enum.DecimalFieldType {
 			expression = fmt.Sprintf("CAST(%s AS text)", expression)
 		}
 		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", expression, QuoteIdentifier(fieldCode)))
@@ -872,7 +842,7 @@ func dynamicQuery(
 			fieldValue := val.FieldByName(toCamelCaseGo(field.FieldCode))
 			if fieldValue.IsValid() {
 				v := fieldValue.Interface()
-				// 时间类型统一格式化为 "2006-01-02 15:04:05"，与 CustomTime 序列化保持一致
+				// 时间类型统一使用 time.DateTime，与 CustomTime 序列化保持一致。
 				if t, ok := v.(time.Time); ok {
 					if t.IsZero() {
 						record[field.FieldCode] = ""
@@ -1104,7 +1074,7 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 	switch fieldType {
 	case enum.BigIntFieldType, enum.IntFieldType:
 		return reflect.TypeOf(0) // 或 reflect.TypeOf(int64(0)) 根据需要选择
-	case enum.FloatFieldType, enum.DecimalFieldType:
+	case enum.DecimalFieldType:
 		return reflect.TypeOf("")
 	case enum.VarcharFieldType, enum.TextFieldType:
 		return reflect.TypeOf("") // 字符串类型
@@ -1114,7 +1084,7 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 		return reflect.TypeOf(time.Time{})
 	case enum.TimeFieldType:
 		return reflect.TypeOf("")
-	case enum.TinyintFieldType, enum.SmallIntFieldType:
+	case enum.SmallIntFieldType:
 		return reflect.TypeOf(int16(0))
 	case enum.JsonFieldType:
 		return reflect.TypeOf(map[string]interface{}{}) // JSON 类型
@@ -1127,7 +1097,7 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 func BuildTag(field model.SysTableField) string {
 	gormParts := []string{
 		fmt.Sprintf(`column:%s`, field.FieldCode),
-		fmt.Sprintf(`type:%s`, getSQLType(field.FieldType, field.FieldLength, field.FieldDecimalLength)),
+		fmt.Sprintf(`type:%s`, getSQLType(field)),
 	}
 	if field.FieldLength > 0 {
 		gormParts = append(gormParts, fmt.Sprintf(`size:%d`, field.FieldLength))
@@ -1159,10 +1129,10 @@ func BuildTag(field model.SysTableField) string {
 
 func getDefaultValue(defaultValue string, fieldType enum.SysTableFieldType) string {
 	switch fieldType {
-	case enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType, enum.IntFieldType:
+	case enum.BigIntFieldType, enum.SmallIntFieldType, enum.IntFieldType:
 		d, _ := strconv.Atoi(defaultValue)
 		return fmt.Sprintf(`default:%d`, d)
-	case enum.FloatFieldType, enum.DecimalFieldType:
+	case enum.DecimalFieldType:
 		return fmt.Sprintf(`default:%s`, defaultValue)
 	case enum.BooleanFieldType:
 		return fmt.Sprintf(`default:%v`, defaultValue)
@@ -1174,38 +1144,22 @@ func getDefaultValue(defaultValue string, fieldType enum.SysTableFieldType) stri
 }
 
 // getSQLType 返回类型和长度
-func getSQLType(fieldType enum.SysTableFieldType, length int, decimal int) string {
-	switch fieldType {
-	case enum.BigIntFieldType:
-		return "bigint"
-	case enum.IntFieldType:
-		return "integer"
-	case enum.FloatFieldType, enum.DecimalFieldType:
-		if length > 0 && decimal > 0 {
-			return fmt.Sprintf("numeric(%d,%d)", length, decimal)
-		}
-		return "numeric"
+func getSQLType(field model.SysTableField) string {
+	descriptor, ok := platformmetadata.DescribeStorage(field.FieldType)
+	if !ok {
+		return ""
+	}
+	switch field.FieldType {
+	case enum.DecimalFieldType:
+		return fmt.Sprintf("numeric(%d,%d)", field.NumericPrecision, field.NumericScale)
 	case enum.VarcharFieldType:
+		length := field.FieldLength
 		if length <= 0 {
 			length = 255
 		}
 		return fmt.Sprintf("varchar(%d)", length)
-	case enum.TextFieldType:
-		return "text"
-	case enum.BooleanFieldType:
-		return "boolean"
-	case enum.DateFieldType:
-		return "date"
-	case enum.DatetimeFieldType:
-		return "timestamp"
-	case enum.TimeFieldType:
-		return "time"
-	case enum.TinyintFieldType, enum.SmallIntFieldType:
-		return "smallint"
-	case enum.JsonFieldType:
-		return "jsonb"
 	default:
-		return "text"
+		return descriptor.SQLType
 	}
 }
 

@@ -173,7 +173,7 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 }
 
 func (s *SysTableService) GetTableListResponse(basic *request.Basic) (response.ListResult[response.SysTableListRes], error) {
-	result, err := s.GetTableList(basic)
+	result, err := s.metadataRuntime.listConfigTables(context.Background(), basic)
 	if err != nil {
 		return response.ListResult[response.SysTableListRes]{}, err
 	}
@@ -201,7 +201,7 @@ func (s *SysTableService) GetTableFieldsByTableIdResponse(tableId int) ([]respon
 }
 
 func (s *SysTableService) GetTableRelationsByTableIdResponse(tableId int) ([]response.SysTableRelationRes, error) {
-	data, err := s.GetTableRelationsByTableId(tableId)
+	data, err := s.sysTableRelationRepo.GetTableRelationsByTableId(context.Background(), tableId)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,7 @@ func (s *SysTableService) GetTableIndexByIdResponse(id int) (response.SysTableIn
 }
 
 func (s *SysTableService) GetTableIndexesByTableIdResponse(tableId int) ([]response.SysTableIndexRes, error) {
-	data, err := s.GetTableIndexesByTableId(tableId)
+	data, err := s.sysTableIndexRepo.GetTableIndexesByTableId(context.Background(), tableId)
 	if err != nil {
 		return nil, err
 	}

@@ -231,7 +231,6 @@ Repository 接口位于 `backend/repository`，GORM 实现位于 `backend/reposi
 - `UpdateFields` 和 `UpdateFieldsByRevision`；
 - `PaginateAndCountAsync`、`PaginateAndCountQuery`；
 - `WithPreload`、`WithSelect`、`WithUnscoped`；
-- `ExecuteTx` 这一基础事务能力。
 
 普通 CRUD 和读取选项应复用 BasicRepository。以下场景值得增加领域 Repository 方法：
 
@@ -338,7 +337,7 @@ validate and external preparation (outside transaction)
 - Cache 失效发生在数据库成功提交之后；
 - 数据库与 Casbin/Storage 不是同一事务资源，必须使用明确执行顺序和补偿，不能假装 DB rollback 会回滚外部状态。
 
-受控例外包括：SysTable 的 metadata + DDL `ExecuteTx` 路径、Integration Execution/Attempt 原子持久化、Migration/Seed。例外的理由是数据库专属操作或基础设施原子性，不代表新业务可以随意调用 `ExecuteTx` 或直接 `db.Transaction`。
+受控例外包括：Integration Execution/Attempt 的锁定型原子 Repository 方法，以及 Migration/Seed。这些边界可以在明确命名的方法内部直接使用数据库事务；普通 Application Service（包括 SysTable metadata + DDL）统一使用 `RunInTransaction`。
 
 ## 12. Cache
 

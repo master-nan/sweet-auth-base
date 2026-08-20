@@ -40,6 +40,18 @@ func TestValidateMetadataFieldDefinitionRejectsProtectedAndExecutableMetadata(t 
 				field.DefaultValue = metadataStringPointer("0; drop table sys_user")
 			},
 		},
+		{
+			name: "removed approximate numeric type",
+			mutate: func(field *model.SysTableField) {
+				field.FieldType = enum.SysTableFieldType(2)
+			},
+		},
+		{
+			name: "removed narrow integer type",
+			mutate: func(field *model.SysTableField) {
+				field.FieldType = enum.SysTableFieldType(9)
+			},
+		},
 	}
 
 	for _, test := range tests {

@@ -8,7 +8,6 @@ package service
 import (
 	"backend/config"
 	"backend/dto/request"
-	"backend/dto/response"
 	"backend/enum"
 	myerrors "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
@@ -86,10 +85,6 @@ func (s *SysTableService) GetTableById(id int) (model.SysTable, error) {
 	return s.metadataRuntime.configTableByID(context.Background(), id)
 }
 
-func (s *SysTableService) GetTableList(basic *request.Basic) (response.ListResult[model.SysTable], error) {
-	return s.metadataRuntime.listConfigTables(context.Background(), basic)
-}
-
 func (s *SysTableService) GetTableByTableCode(code string) (model.SysTable, error) {
 	return s.metadataRuntime.configTableByCode(context.Background(), code)
 }
@@ -160,7 +155,10 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 			if e != nil {
 				return e
 			}
-			fields := convertColumnsToSysTableFields(req.TableCode, columns)
+			fields, e := convertColumnsToSysTableFields(req.TableCode, columns)
+			if e != nil {
+				return e
+			}
 			for i := range fields {
 				fieldId, err := s.sf.GenerateUniqueID()
 				if err != nil {
@@ -574,7 +572,7 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 				req.NumericPrecision != data.NumericPrecision || req.NumericScale != data.NumericScale {
 				columnNeedsAlter = true
 			}
-			if !metadataStringEqual(optionalMetadataString(req.DefaultValue), data.DefaultValue) {
+			if !cmp.Equal(optionalMetadataString(req.DefaultValue), data.DefaultValue) {
 				columnNeedsAlter = true
 			}
 			if req.IsNull != data.IsNull {
@@ -626,13 +624,6 @@ func optionalMetadataString(value string) *string {
 	return &value
 }
 
-func metadataStringEqual(left, right *string) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
-}
-
 const maxDBIdentifierLength = 63
 
 func validateMetadataTableType(tableType enum.SysTableType) error {
@@ -663,7 +654,8 @@ func normalizeDBIdentifier(name, value string) (string, error) {
 	}
 	for i := 0; i < len(trimmed); i++ {
 		ch := trimmed[i]
-		if !isDBIdentifierChar(ch) {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_') {
 			return "", myerrors.NewValidationError(fmt.Sprintf("%s只能包含字母、数字、下划线", name))
 		}
 		if i == 0 && ch >= '0' && ch <= '9' {
@@ -679,13 +671,6 @@ func normalizeOptionalDBIdentifier(name, value string) (string, error) {
 		return "", nil
 	}
 	return normalizeDBIdentifier(name, trimmed)
-}
-
-func isDBIdentifierChar(ch byte) bool {
-	return (ch >= 'a' && ch <= 'z') ||
-		(ch >= 'A' && ch <= 'Z') ||
-		(ch >= '0' && ch <= '9') ||
-		ch == '_'
 }
 
 func validateTableIndexFields(table model.SysTable, indexFields []request.TableIndexFieldReq) ([]request.TableIndexFieldReq, []string, error) {
@@ -754,18 +739,8 @@ func (s *SysTableService) normalizeTableFieldLinkageConfig(raw string, currentTa
 	return normalizeTableFieldLinkageConfig(raw, currentTable, currentFieldCode, s.resolveLinkageRelatedTable)
 }
 
-func (s *SysTableService) validateTableFieldLinkageConfig(raw string, currentTable model.SysTable, currentFieldCode string) error {
-	_, err := s.normalizeTableFieldLinkageConfig(raw, currentTable, currentFieldCode)
-	return err
-}
-
 func (s *SysTableService) resolveLinkageRelatedTable(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 	return s.GetTableByTableCode(strings.TrimSpace(cfg.TableCode))
-}
-
-func validateTableFieldLinkageConfig(raw string, currentTable model.SysTable, currentFieldCode string, resolveTable func(tableFieldLinkageConfig) (model.SysTable, error)) error {
-	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, currentFieldCode, resolveTable)
-	return err
 }
 
 func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, currentFieldCode string, resolveTable func(tableFieldLinkageConfig) (model.SysTable, error)) (string, error) {
@@ -799,9 +774,9 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	if relatedTable.Id == 0 {
 		return "", myerrors.NewValidationError("联动配置关联表不存在")
 	}
-	currentFields := tableFieldCodeSet(currentTable.TableFields)
+	currentFields := tableFieldByCode(currentTable.TableFields)
 	if strings.TrimSpace(currentFieldCode) != "" {
-		currentFields[currentFieldCode] = struct{}{}
+		currentFields[currentFieldCode] = model.SysTableField{FieldCode: currentFieldCode}
 	}
 	relatedFields := tableFieldByCode(relatedTable.TableFields)
 	if strings.TrimSpace(currentFieldCode) != "" &&
@@ -870,14 +845,6 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	return string(normalized), nil
 }
 
-func tableFieldCodeSet(fields []model.SysTableField) map[string]struct{} {
-	result := make(map[string]struct{}, len(fields))
-	for _, field := range fields {
-		result[field.FieldCode] = struct{}{}
-	}
-	return result
-}
-
 func validateOptionalLinkageField(name, fieldCode string, fields map[string]model.SysTableField) error {
 	fieldCode = strings.TrimSpace(fieldCode)
 	if fieldCode == "" {
@@ -935,7 +902,7 @@ func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableFiel
 	fieldType := req.FieldType
 	length := req.FieldLength
 	decimalLength := req.FieldDecimalLength
-	if platformmetadata.CanonicalStorageType(fieldType) == enum.DecimalFieldType {
+	if fieldType == enum.DecimalFieldType {
 		length, decimalLength = req.NumericPrecision, req.NumericScale
 		if length == 0 {
 			length, decimalLength = data.NumericPrecision, data.NumericScale
@@ -948,9 +915,10 @@ func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableFiel
 		decimalLength = data.FieldDecimalLength
 	}
 	defaultValue := req.DefaultValue
-	sqlType := utils.SqlTypeFromFieldType(fieldType)
+	descriptor, _ := platformmetadata.DescribeStorage(fieldType)
+	sqlType := descriptor.SQLType
 	// 拼接长度（仅对需要长度的类型，BOOLEAN/TEXT/JSON/DATE/DATETIME/TIME 不接受长度参数）
-	if length > 0 && typeAcceptsLength(fieldType) {
+	if length > 0 && descriptor.AcceptsLength {
 		if decimalLength > 0 {
 			sqlType += fmt.Sprintf("(%d,%d)", length, decimalLength)
 		} else {
@@ -970,13 +938,14 @@ func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableFiel
 }
 
 func buildColumnSQLTypeFromField(field model.SysTableField) string {
-	sqlType := utils.SqlTypeFromFieldType(field.FieldType)
+	descriptor, _ := platformmetadata.DescribeStorage(field.FieldType)
+	sqlType := descriptor.SQLType
 	length, decimalLength := field.FieldLength, field.FieldDecimalLength
-	if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+	if field.FieldType == enum.DecimalFieldType {
 		length, decimalLength = field.NumericPrecision, field.NumericScale
 	}
-	if length > 0 && typeAcceptsLength(field.FieldType) {
-		if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+	if length > 0 && descriptor.AcceptsLength {
+		if field.FieldType == enum.DecimalFieldType {
 			sqlType += fmt.Sprintf("(%d,%d)", length, decimalLength)
 		} else {
 			sqlType += fmt.Sprintf("(%d)", length)
@@ -991,16 +960,6 @@ func buildColumnSQLTypeFromField(field model.SysTableField) string {
 		sqlType += " NOT NULL"
 	}
 	return sqlType
-}
-
-// typeAcceptsLength 判断字段类型是否接受长度参数
-func typeAcceptsLength(ft enum.SysTableFieldType) bool {
-	switch ft {
-	case enum.VarcharFieldType, enum.FloatFieldType, enum.DecimalFieldType:
-		return true
-	default:
-		return false
-	}
 }
 
 func buildDefaultSQL(fieldType enum.SysTableFieldType, defaultValue string) string {
@@ -1018,8 +977,7 @@ func buildDefaultSQL(fieldType enum.SysTableFieldType, defaultValue string) stri
 			return " DEFAULT false"
 		}
 		return fmt.Sprintf(" DEFAULT '%s'", escapePostgresLiteral(defaultValue))
-	case enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
-		enum.FloatFieldType, enum.DecimalFieldType, enum.IntFieldType:
+	case enum.BigIntFieldType, enum.SmallIntFieldType, enum.DecimalFieldType, enum.IntFieldType:
 		return fmt.Sprintf(" DEFAULT %s", defaultValue)
 	case enum.JsonFieldType:
 		return fmt.Sprintf(" DEFAULT '%s'::jsonb", escapePostgresLiteral(defaultValue))
@@ -1064,10 +1022,6 @@ func (s *SysTableService) DeleteTableFieldById(ctx context.Context, id int) erro
 		}
 	}
 	return myerrors.ErrDataNotFound
-}
-
-func (s *SysTableService) GetTableRelationsByTableId(tableId int) ([]model.SysTableRelation, error) {
-	return s.sysTableRelationRepo.GetTableRelationsByTableId(context.Background(), tableId)
 }
 
 func (s *SysTableService) GetTableRelationById(id int) (model.SysTableRelation, error) {
@@ -1287,10 +1241,6 @@ func (s *SysTableService) GetTableIndexById(id int) (model.SysTableIndex, error)
 	return data, nil
 }
 
-func (s *SysTableService) GetTableIndexesByTableId(tableId int) ([]model.SysTableIndex, error) {
-	return s.sysTableIndexRepo.GetTableIndexesByTableId(context.Background(), tableId)
-}
-
 func (s *SysTableService) CreateTableIndex(ctx context.Context, req request.TableIndexCreateReq) error {
 	var err error
 	if req.IndexName, err = normalizeDBIdentifier("索引名称", req.IndexName); err != nil {
@@ -1459,7 +1409,10 @@ func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error
 	if err != nil {
 		return err
 	}
-	fields := convertColumnsToSysTableFields(tableCode, columns)
+	fields, err := convertColumnsToSysTableFields(tableCode, columns)
+	if err != nil {
+		return err
+	}
 	id, err := s.sf.GenerateUniqueID()
 	if err != nil {
 		return err
@@ -1559,7 +1512,10 @@ func (s *SysTableService) SyncTableFields(ctx context.Context, tableCode string)
 		fieldMap[field.FieldCode] = field
 	}
 
-	fields := convertColumnsToSysTableFields(table.TableCode, columns)
+	fields, err := convertColumnsToSysTableFields(table.TableCode, columns)
+	if err != nil {
+		return err
+	}
 	var missing []model.SysTableField
 	var toUpdate []struct {
 		Id    int
@@ -2178,13 +2134,6 @@ func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID in
 	return nil
 }
 
-// SyncViewTableFields 视图字段元数据全量对齐（增删改）
-func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.SysTable) error {
-	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		return s.syncViewTableFields(ctx, tx, table)
-	})
-}
-
 func (s *SysTableService) syncViewTableFields(ctx context.Context, tx *gorm.DB, table model.SysTable) error {
 	columns, err := s.sysTableRepo.FetchTableMetadata(ctx, tx, "public", table.TableCode)
 	if err != nil {
@@ -2196,7 +2145,10 @@ func (s *SysTableService) syncViewTableFields(ctx context.Context, tx *gorm.DB, 
 		return err
 	}
 
-	newFields := convertColumnsToSysTableFields(table.TableCode, columns)
+	newFields, err := convertColumnsToSysTableFields(table.TableCode, columns)
+	if err != nil {
+		return err
+	}
 	newFieldMap := make(map[string]model.SysTableField)
 	for i := range newFields {
 		newFields[i].TableId = table.Id
@@ -2349,7 +2301,7 @@ func cleanColumnDisplayName(name string) string {
 	return text
 }
 
-func convertColumnsToSysTableFields(tableCode string, columns []model.TableColumnMate) []model.SysTableField {
+func convertColumnsToSysTableFields(tableCode string, columns []model.TableColumnMate) ([]model.SysTableField, error) {
 	var fields []model.SysTableField
 	for _, column := range columns {
 		field := model.SysTableField{
@@ -2420,9 +2372,7 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 			field.NumericPrecision = int(column.NumericPrecision.Int64)
 			field.NumericScale = int(column.NumericScale.Int64)
 		case "double precision", "float", "float4", "float8", "real":
-			field.FieldType = enum.FloatFieldType
-			field.InputType = enum.InputNumberInputType
-			field.FieldLength = int(column.NumericPrecision.Int64)
+			return nil, myerrors.NewValidationError("近似浮点列不能导入Metadata，请先通过显式Migration转换为numeric")
 		case "json", "jsonb":
 			field.FieldType = enum.JsonFieldType
 			field.InputType = enum.JsonInputType
@@ -2443,7 +2393,7 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 		applyManagedFieldDefaults(&field)
 		fields = append(fields, field)
 	}
-	return fields
+	return fields, nil
 }
 
 func applySystemFieldDefaults(tableCode string, field *model.SysTableField) {

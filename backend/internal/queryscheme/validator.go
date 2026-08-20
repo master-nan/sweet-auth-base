@@ -232,7 +232,7 @@ func bindingMatchesRule(binding Binding, elementIndex *int, rule request.QueryRu
 	}
 	if binding.Kind == BindingCurrentUser || binding.Kind == BindingCurrentEmployee {
 		switch field.StorageType {
-		case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+		case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
 			if rule.ExpressionType == enum.Eq || rule.ExpressionType == enum.Ne {
 				return elementIndex == nil
 			}
@@ -303,11 +303,11 @@ func scalarCompatible(value any, fieldType enum.SysTableFieldType) bool {
 			_, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
 			return err == nil
 		}
-	case enum.TinyintFieldType, enum.SmallIntFieldType:
+	case enum.SmallIntFieldType:
 		text := fmt.Sprintf("%v", value)
 		parsed, err := strconv.ParseInt(strings.TrimSpace(text), 10, 16)
 		return err == nil && parsed >= metadata.SmallIntMin && parsed <= metadata.SmallIntMax
-	case enum.FloatFieldType, enum.DecimalFieldType:
+	case enum.DecimalFieldType:
 		_, err := metadata.NormalizeDecimalValue(value)
 		return err == nil
 	case enum.BooleanFieldType:
@@ -319,11 +319,11 @@ func scalarCompatible(value any, fieldType enum.SysTableFieldType) bool {
 			return err == nil
 		}
 	case enum.DateFieldType:
-		return validTimeString(value, "2006-01-02")
+		return validTimeString(value, time.DateOnly)
 	case enum.DatetimeFieldType:
-		return validTimeString(value, "2006-01-02 15:04:05") || validRFC3339(value)
+		return validTimeString(value, time.DateTime) || validRFC3339(value)
 	case enum.TimeFieldType:
-		return validTimeString(value, "15:04:05")
+		return validTimeString(value, time.TimeOnly)
 	case enum.VarcharFieldType, enum.TextFieldType:
 		_, ok := value.(string)
 		return ok

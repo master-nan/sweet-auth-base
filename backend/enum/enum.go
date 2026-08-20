@@ -286,19 +286,17 @@ const (
 type SysTableFieldType uint8
 
 const (
-	BigIntFieldType SysTableFieldType = iota + 1 //
-	FloatFieldType
-	VarcharFieldType
-	TextFieldType
-	BooleanFieldType
-	DateFieldType
-	DatetimeFieldType
-	TimeFieldType
-	TinyintFieldType
-	JsonFieldType
-	IntFieldType
-	SmallIntFieldType
-	DecimalFieldType
+	BigIntFieldType   SysTableFieldType = 1
+	VarcharFieldType  SysTableFieldType = 3
+	TextFieldType     SysTableFieldType = 4
+	BooleanFieldType  SysTableFieldType = 5
+	DateFieldType     SysTableFieldType = 6
+	DatetimeFieldType SysTableFieldType = 7
+	TimeFieldType     SysTableFieldType = 8
+	JsonFieldType     SysTableFieldType = 10
+	IntFieldType      SysTableFieldType = 11
+	SmallIntFieldType SysTableFieldType = 12
+	DecimalFieldType  SysTableFieldType = 13
 )
 
 // SysTableFieldLogicalType describes business value semantics independently

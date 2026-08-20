@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"backend/enum"
 	"backend/model"
 	"crypto/md5"
 	"crypto/rand"
@@ -160,39 +159,6 @@ func IsSuperAdmin(user model.SysUser) bool {
 		}
 	}
 	return false
-}
-
-func SqlTypeFromFieldType(fieldType enum.SysTableFieldType) string {
-	switch fieldType {
-	case enum.BigIntFieldType:
-		return "bigint"
-	case enum.IntFieldType:
-		return "integer"
-	case enum.VarcharFieldType:
-		return "varchar" // 长度将在外部指定
-	case enum.DatetimeFieldType:
-		return "timestamp"
-	case enum.BooleanFieldType:
-		return "boolean"
-	case enum.TextFieldType:
-		return "text"
-	case enum.DateFieldType:
-		return "date"
-	case enum.TimeFieldType:
-		return "time"
-	case enum.JsonFieldType:
-		return "jsonb"
-	case enum.FloatFieldType:
-		return "numeric"
-	case enum.TinyintFieldType:
-		return "smallint"
-	case enum.SmallIntFieldType:
-		return "smallint"
-	case enum.DecimalFieldType:
-		return "numeric"
-	default:
-		return "text"
-	}
 }
 
 // UpdateAccessTokens 替换当前token字符串

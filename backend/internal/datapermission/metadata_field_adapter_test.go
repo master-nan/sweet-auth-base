@@ -146,7 +146,7 @@ func TestMetadataFieldAdapterResolvesAndValidatesMetadata(t *testing.T) {
 			name: "unsupported field type",
 			configure: func(reader *metadataAdapterTestReader) {
 				field := reader.fields[501]
-				field.FieldType = enum.FloatFieldType
+				field.FieldType = enum.DecimalFieldType
 				reader.fields[501] = field
 			},
 			wantCode: myerrors.ErrorCodeMetadataAdapterFieldTypeUnsupported,
@@ -250,7 +250,7 @@ func TestMetadataFieldAdapterMapsSupportedFieldTypes(t *testing.T) {
 	}{
 		{name: "bigint", fieldType: enum.BigIntFieldType, valueType: DataScopeValueTypeBigint, values: []any{int64(1)}},
 		{name: "int", fieldType: enum.IntFieldType, valueType: DataScopeValueTypeBigint, values: []any{int64(1)}},
-		{name: "tinyint", fieldType: enum.TinyintFieldType, valueType: DataScopeValueTypeBigint, values: []any{int64(1)}},
+		{name: "smallint", fieldType: enum.SmallIntFieldType, valueType: DataScopeValueTypeBigint, values: []any{int64(1)}},
 		{name: "varchar", fieldType: enum.VarcharFieldType, valueType: DataScopeValueTypeString, values: []any{"ORG-A"}},
 		{name: "text", fieldType: enum.TextFieldType, valueType: DataScopeValueTypeString, values: []any{"ORG-A"}},
 	}

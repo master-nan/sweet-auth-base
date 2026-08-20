@@ -349,14 +349,12 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			code: "sys_table_field_type",
 			items: []systemDictItemSeed{
 				{name: "大数字", code: "sys_table_field_type_bigint", value: "1"},
-				{name: "浮点（兼容）", code: "sys_table_field_type_float", value: "2"},
 				{name: "字符串", code: "sys_table_field_type_varchar", value: "3"},
 				{name: "文本", code: "sys_table_field_type_text", value: "4"},
 				{name: "布尔", code: "sys_table_field_type_boolean", value: "5"},
 				{name: "日期", code: "sys_table_field_type_date", value: "6"},
 				{name: "日期时间", code: "sys_table_field_type_datetime", value: "7"},
 				{name: "时间", code: "sys_table_field_type_time", value: "8"},
-				{name: "TinyInt（兼容）", code: "sys_table_field_type_tinyint", value: "9"},
 				{name: "JSON", code: "sys_table_field_type_json", value: "10"},
 				{name: "数字", code: "sys_table_field_type_int", value: "11"},
 				{name: "SmallInt", code: "sys_table_field_type_smallint", value: "12"},
@@ -2213,7 +2211,10 @@ func seedSystemTableFields(db *gorm.DB, sf *utils.Snowflake, table model.SysTabl
 		return err
 	}
 	for index, column := range columns {
-		field := systemColumnToTableField(table.TableCode, column, index+1)
+		field, err := systemColumnToTableField(table.TableCode, column, index+1)
+		if err != nil {
+			return err
+		}
 		if err := seedSystemTableField(db, sf, table, field); err != nil {
 			return err
 		}
@@ -2275,18 +2276,22 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, table model.SysTable
 	return db.Model(&model.SysTableField{}).Create(migrationTableFieldCreateMap(field)).Error
 }
 
-func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence int) model.SysTableField {
+func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence int) (model.SysTableField, error) {
 	length, hasLength := column.Length()
 	precision, scale, hasDecimal := column.DecimalSize()
 	nullable, hasNullable := column.Nullable()
 	if !hasNullable {
 		nullable = true
 	}
+	fieldType := systemFieldType(column.DatabaseTypeName())
+	if fieldType == 0 {
+		return model.SysTableField{}, fmt.Errorf("system metadata does not support approximate numeric column %s.%s (%s)", tableCode, column.Name(), column.DatabaseTypeName())
+	}
 	field := model.SysTableField{
 		Basic:              model.Basic{State: true},
 		FieldName:          systemFieldDisplayName(tableCode, column.Name()),
 		FieldCode:          column.Name(),
-		FieldType:          systemFieldType(column.DatabaseTypeName()),
+		FieldType:          fieldType,
 		InputType:          enum.InputType,
 		IsPrimaryKey:       column.Name() == "id",
 		IsIndex:            false,
@@ -2315,8 +2320,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 		field.DefaultValue = utils.StringPtr(normalizeSystemColumnDefault(field.FieldType, defaultValue))
 	}
 	switch field.FieldType {
-	case enum.IntFieldType, enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
-		enum.FloatFieldType, enum.DecimalFieldType:
+	case enum.IntFieldType, enum.BigIntFieldType, enum.SmallIntFieldType, enum.DecimalFieldType:
 		field.InputType = enum.InputNumberInputType
 	case enum.TextFieldType:
 		field.InputType = enum.TextareaInputType
@@ -2353,7 +2357,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyIntegrationExecutionFieldDefaults(tableCode, &field)
 	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
-	return field
+	return field, nil
 }
 
 func normalizeSystemColumnDefault(fieldType enum.SysTableFieldType, defaultValue string) string {
@@ -2408,7 +2412,7 @@ func systemFieldType(databaseType string) enum.SysTableFieldType {
 	case normalized == "numeric" || normalized == "decimal":
 		return enum.DecimalFieldType
 	case normalized == "double precision" || normalized == "float" || normalized == "float4" || normalized == "float8" || normalized == "real":
-		return enum.FloatFieldType
+		return 0
 	case normalized == "boolean" || normalized == "bool":
 		return enum.BooleanFieldType
 	case normalized == "date":

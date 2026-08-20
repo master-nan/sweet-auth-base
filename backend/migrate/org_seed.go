@@ -267,7 +267,10 @@ func seedOrganizationTableMetadata(db *gorm.DB, sf *utils.Snowflake) error {
 			return err
 		}
 		for index, column := range columns {
-			field := systemColumnToTableField(seed.code, column, index+1)
+			field, err := systemColumnToTableField(seed.code, column, index+1)
+			if err != nil {
+				return err
+			}
 			applyOrganizationFieldRule(seed.code, &field)
 			if err := seedSystemTableField(db, sf, table, field); err != nil {
 				return err

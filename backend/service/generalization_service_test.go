@@ -351,7 +351,7 @@ func validationTypeTable() model.SysTable {
 		TableCode: "smk_validation",
 		TableFields: []model.SysTableField{
 			{FieldName: "数量", FieldCode: "count", FieldType: enum.IntFieldType, IsNull: true, IsInsertShow: true, IsUpdateShow: true},
-			{FieldName: "价格", FieldCode: "price", FieldType: enum.FloatFieldType, IsNull: true, IsInsertShow: true, IsUpdateShow: true},
+			{FieldName: "价格", FieldCode: "price", FieldType: enum.DecimalFieldType, NumericPrecision: 18, NumericScale: 2, IsNull: true, IsInsertShow: true, IsUpdateShow: true},
 			{FieldName: "启用", FieldCode: "enabled", FieldType: enum.BooleanFieldType, IsNull: true, IsInsertShow: true, IsUpdateShow: true},
 			{FieldName: "业务日期", FieldCode: "biz_date", FieldType: enum.DateFieldType, IsNull: true, IsInsertShow: true, IsUpdateShow: true},
 			{FieldName: "开始时间", FieldCode: "started_at", FieldType: enum.DatetimeFieldType, IsNull: true, IsInsertShow: true, IsUpdateShow: true},

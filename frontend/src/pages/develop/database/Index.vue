@@ -102,12 +102,7 @@
 
       <template v-slot:body-cell-publish_status="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
-            :color="publishStatusColor(props.row)"
-            text-color="white"
-          >
+          <q-chip dense square :color="publishStatusColor(props.row)" text-color="white">
             {{ props.row.publish_status }}
           </q-chip>
         </q-td>
@@ -190,12 +185,12 @@
           >
             <template #footer>
               <div class="structure-nav-meta">
-              <q-chip dense square color="deep-purple-1" text-color="primary">
-                {{ currentTable?.table_code || '-' }}
-              </q-chip>
-              <q-chip dense square color="grey-2" text-color="grey-8">
-                {{ tableKindLabel }}
-              </q-chip>
+                <q-chip dense square color="deep-purple-1" text-color="primary">
+                  {{ currentTable?.table_code || '-' }}
+                </q-chip>
+                <q-chip dense square color="grey-2" text-color="grey-8">
+                  {{ tableKindLabel }}
+                </q-chip>
               </div>
             </template>
           </detail-section-navigation>
@@ -1190,7 +1185,7 @@ const enumLabel = (map: Record<string, string>, value: unknown, fallback = '-') 
 
 const fieldTypeLabel = (field: TableField) => {
   const base = enumLabel(SysTableFieldTypeMap as Record<string, string>, field.field_type)
-  if (field.field_type === SysTableFieldType.DECIMAL || field.field_type === SysTableFieldType.FLOAT) {
+  if (field.field_type === SysTableFieldType.DECIMAL) {
     const precision = Number(field.numeric_precision || 0)
     const scale = Number(field.numeric_scale || 0)
     if (precision > 0) return `${base}(${precision},${scale})`

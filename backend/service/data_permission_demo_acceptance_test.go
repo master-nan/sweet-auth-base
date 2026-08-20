@@ -130,7 +130,7 @@ func TestDataPermissionDemoAcceptanceEndToEnd(t *testing.T) {
 			Expressions: []request.ExpressionGroup{{
 				Logic: enum.And,
 				Rules: []request.QueryRule{{
-					Field: "amount", ExpressionType: enum.Gte, Value: 2000, Type: enum.FloatFieldType,
+					Field: "amount", ExpressionType: enum.Gte, Value: "2000", Type: enum.DecimalFieldType,
 				}},
 			}},
 		}
@@ -295,7 +295,7 @@ func demoAcceptanceTable() model.SysTable {
 			{Basic: model.Basic{Id: 9201, State: true}, TableId: tableId, FieldName: "主键ID", FieldCode: "id", FieldType: enum.BigIntFieldType, IsPrimaryKey: true, IsListShow: true},
 			{Basic: model.Basic{Id: 9202, State: true}, TableId: tableId, FieldName: "运单号", FieldCode: "order_no", FieldType: enum.VarcharFieldType, IsListShow: true},
 			{Basic: model.Basic{Id: 9203, State: true}, TableId: tableId, FieldName: "所属管理组织", FieldCode: "owner_org_id", FieldType: enum.BigIntFieldType, FieldCategory: enum.NormalField, IsAdvancedSearch: true, IsListShow: true},
-			{Basic: model.Basic{Id: 9204, State: true}, TableId: tableId, FieldName: "金额", FieldCode: "amount", FieldType: enum.FloatFieldType, IsAdvancedSearch: true, IsListShow: true},
+			{Basic: model.Basic{Id: 9204, State: true}, TableId: tableId, FieldName: "金额", FieldCode: "amount", FieldType: enum.DecimalFieldType, NumericPrecision: 18, NumericScale: 2, IsAdvancedSearch: true, IsListShow: true},
 			{Basic: model.Basic{Id: 9205, State: true}, TableId: tableId, FieldName: "删除时间", FieldCode: "gmt_delete", FieldType: enum.DatetimeFieldType},
 		},
 	}

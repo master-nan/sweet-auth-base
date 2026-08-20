@@ -741,7 +741,7 @@ func TestSeedSystemTableRelations(t *testing.T) {
 }
 
 func TestSystemColumnToTableFieldKeepsUnboundedTextLengthEmpty(t *testing.T) {
-	field := systemColumnToTableField("access_log", migrationTestColumn{
+	field, err := systemColumnToTableField("access_log", migrationTestColumn{
 		name:         "response",
 		databaseType: "text",
 		length:       9223372036854775807,
@@ -749,6 +749,9 @@ func TestSystemColumnToTableFieldKeepsUnboundedTextLengthEmpty(t *testing.T) {
 		nullable:     true,
 		hasNullable:  true,
 	}, 1)
+	if err != nil {
+		t.Fatalf("convert text column: %v", err)
+	}
 
 	if field.FieldType != enum.TextFieldType {
 		t.Fatalf("expected text field type, got %v", field.FieldType)
@@ -762,7 +765,7 @@ func TestSystemColumnToTableFieldKeepsUnboundedTextLengthEmpty(t *testing.T) {
 }
 
 func TestSystemColumnToTableFieldKeepsVarcharLength(t *testing.T) {
-	field := systemColumnToTableField("application", migrationTestColumn{
+	field, err := systemColumnToTableField("application", migrationTestColumn{
 		name:         "name",
 		databaseType: "varchar",
 		length:       255,
@@ -770,12 +773,27 @@ func TestSystemColumnToTableFieldKeepsVarcharLength(t *testing.T) {
 		nullable:     false,
 		hasNullable:  true,
 	}, 1)
+	if err != nil {
+		t.Fatalf("convert varchar column: %v", err)
+	}
 
 	if field.FieldType != enum.VarcharFieldType || field.FieldLength != 255 {
 		t.Fatalf("unexpected varchar metadata: type=%v length=%d", field.FieldType, field.FieldLength)
 	}
 	if field.Binding != "required" {
 		t.Fatalf("not-null varchar should be required, got %q", field.Binding)
+	}
+}
+
+func TestSystemColumnToTableFieldRejectsApproximateNumeric(t *testing.T) {
+	_, err := systemColumnToTableField("application", migrationTestColumn{
+		name:         "ratio",
+		databaseType: "double precision",
+		nullable:     true,
+		hasNullable:  true,
+	}, 1)
+	if err == nil {
+		t.Fatal("approximate numeric columns must not enter exact Decimal metadata")
 	}
 }
 

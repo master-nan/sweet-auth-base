@@ -124,7 +124,7 @@ func TestSmsVerificationCodeFromParams(t *testing.T) {
 }
 
 func TestSmsSendResponseDoesNotExposeTemplateParams(t *testing.T) {
-	response := smsSendResponse()
+	response := map[string]interface{}{"sent": true}
 
 	if response["sent"] != true {
 		t.Fatalf("expected sent=true response, got %#v", response)

@@ -142,20 +142,13 @@ export const resolveOrganizationSelectorConfig = (
 
 export const numericFieldTypes = new Set<SysTableFieldType>([
   SysTableFieldType.BIGINT,
-  SysTableFieldType.FLOAT,
-  SysTableFieldType.TINYINT,
   SysTableFieldType.INT,
   SysTableFieldType.SMALLINT,
   SysTableFieldType.DECIMAL,
 ])
 
-export const exactDecimalFieldTypes = new Set<SysTableFieldType>([
-  SysTableFieldType.FLOAT,
-  SysTableFieldType.DECIMAL,
-])
-
 export const isExactDecimalFieldType = (fieldType?: SysTableFieldType) => {
-  return fieldType !== undefined && exactDecimalFieldTypes.has(fieldType)
+  return fieldType === SysTableFieldType.DECIMAL
 }
 
 export const isNumericFieldType = (fieldType?: SysTableFieldType) => {
@@ -227,8 +220,6 @@ export const metadataDictDefault = (
 export const defaultInputTypeForFieldType = (fieldType: SysTableFieldType) => {
   switch (fieldType) {
     case SysTableFieldType.BIGINT:
-    case SysTableFieldType.FLOAT:
-    case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
     case SysTableFieldType.SMALLINT:
     case SysTableFieldType.DECIMAL:
@@ -306,8 +297,6 @@ export const fieldHtmlInputType = (inputType?: SysTableFieldInputType): HtmlInpu
 export const queryValueHtmlInputType = (field?: Partial<TableField>): HtmlInputType => {
   switch (field?.field_type) {
     case SysTableFieldType.BIGINT:
-    case SysTableFieldType.FLOAT:
-    case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
     case SysTableFieldType.SMALLINT:
     case SysTableFieldType.DECIMAL:
@@ -385,8 +374,6 @@ export const getFieldControlType = (field: TableField): FieldControlType => {
 export const getFieldControlTypeByFieldType = (fieldType: SysTableFieldType): FieldControlType => {
   switch (fieldType) {
     case SysTableFieldType.BIGINT:
-    case SysTableFieldType.FLOAT:
-    case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
     case SysTableFieldType.SMALLINT:
     case SysTableFieldType.DECIMAL:
@@ -486,10 +473,8 @@ export const defaultValueForField = (field: TableField) => {
   switch (field.field_type) {
     case SysTableFieldType.BIGINT:
     case SysTableFieldType.INT:
-    case SysTableFieldType.TINYINT:
     case SysTableFieldType.SMALLINT:
       return 0
-    case SysTableFieldType.FLOAT:
     case SysTableFieldType.DECIMAL:
       return '0'
     case SysTableFieldType.BOOLEAN:

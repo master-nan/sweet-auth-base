@@ -152,7 +152,7 @@ func (s *OrgService) QueryLegalEntityOptions(
 	if err != nil {
 		return result, err
 	}
-	selectedIds, err := normalizeLegalEntitySelectedIds(req.SelectedIds)
+	selectedIds, err := normalizeOrganizationSelectedIds(req.SelectedIds)
 	if err != nil {
 		return result, err
 	}
@@ -2087,10 +2087,6 @@ func sortLegalEntityIds(ids []int, entities map[int]model.OrgLegalEntity) {
 			return a.Id < b.Id
 		}
 	})
-}
-
-func normalizeLegalEntitySelectedIds(ids []int) ([]int, error) {
-	return normalizeOrganizationSelectedIds(ids)
 }
 
 func normalizeOrganizationSelectedIds(ids []int) ([]int, error) {

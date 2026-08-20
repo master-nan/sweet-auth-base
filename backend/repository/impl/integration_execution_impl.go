@@ -116,7 +116,7 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 		return nil, repository.ErrIntegrationExecutionClaimUnavailable
 	}
 	claimed := make([]repository.ClaimedIntegrationExecution, 0, len(request.AttemptIDs))
-	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := r.DBWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		databaseNow, err := integrationDatabaseNow(tx)
 		if err != nil {
 			return err
@@ -285,7 +285,7 @@ func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 		completion.ExpectedRevision <= 0 || strings.TrimSpace(completion.WorkerID) == "" || completion.CompletedAt.IsZero() {
 		return completed, repository.ErrIntegrationExecutionLeaseLost
 	}
-	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := r.DBWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		databaseNow, err := integrationDatabaseNow(tx)
 		if err != nil {
 			return err
@@ -428,7 +428,7 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 		return false, repository.ErrIntegrationExecutionLeaseLost
 	}
 	recovered := false
-	err := r.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := r.DBWithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		databaseNow, err := integrationDatabaseNow(tx)
 		if err != nil {
 			return err

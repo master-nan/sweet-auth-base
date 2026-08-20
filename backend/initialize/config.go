@@ -57,10 +57,10 @@ func validateSecureConfig(environment string, cfg *config.Server) error {
 	}
 
 	var problems []string
-	if insecureSecret(cfg.Session.Secret) {
+	if insecureSecureConfigValue(cfg.Session.Secret) {
 		problems = append(problems, "session.secret must be set with APP_SESSION_SECRET to a non-default value with at least 32 characters")
 	}
-	if insecureSalt(cfg.Conf.Salt) {
+	if insecureSecureConfigValue(cfg.Conf.Salt) {
 		problems = append(problems, "conf.salt must be set with APP_CONF_SALT to a non-default value with at least 32 characters")
 	}
 
@@ -328,14 +328,6 @@ func dangerousUploadMimeType(mimeType string) bool {
 	default:
 		return false
 	}
-}
-
-func insecureSecret(value string) bool {
-	return insecureSecureConfigValue(value)
-}
-
-func insecureSalt(value string) bool {
-	return insecureSecureConfigValue(value)
 }
 
 func insecureSecureConfigValue(value string) bool {

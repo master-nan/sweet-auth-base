@@ -5,12 +5,15 @@ import (
 	"testing"
 )
 
-func TestCanonicalStorageTypeKeepsLegacyNumericCompatibility(t *testing.T) {
-	if got := CanonicalStorageType(enum.TinyintFieldType); got != enum.SmallIntFieldType {
-		t.Fatalf("TinyInt canonical type=%d, want SmallInt", got)
+func TestStorageDescriptorsRejectRemovedTypeIDs(t *testing.T) {
+	for _, removed := range []enum.SysTableFieldType{2, 9} {
+		if _, ok := DescribeStorage(removed); ok {
+			t.Fatalf("removed storage type %d must not be accepted", removed)
+		}
 	}
-	if got := CanonicalStorageType(enum.FloatFieldType); got != enum.DecimalFieldType {
-		t.Fatalf("Float canonical type=%d, want Decimal", got)
+	decimal, ok := DescribeStorage(enum.DecimalFieldType)
+	if !ok || decimal.SQLType != "numeric" || !decimal.Ordered {
+		t.Fatalf("unexpected Decimal descriptor: %+v", decimal)
 	}
 }
 

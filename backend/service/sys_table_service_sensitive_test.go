@@ -11,7 +11,7 @@ import (
 )
 
 func TestConvertColumnsToSysTableFieldsHidesSensitiveFields(t *testing.T) {
-	fields := convertColumnsToSysTableFields("sys_user", []model.TableColumnMate{
+	fields, err := convertColumnsToSysTableFields("sys_user", []model.TableColumnMate{
 		{
 			ColumnName:             "api_key",
 			OrdinalPosition:        1,
@@ -27,6 +27,9 @@ func TestConvertColumnsToSysTableFieldsHidesSensitiveFields(t *testing.T) {
 			CharacterMaximumLength: sql.NullInt64{Int64: 64, Valid: true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("convert columns: %v", err)
+	}
 
 	if len(fields) != 2 {
 		t.Fatalf("expected 2 fields, got %d", len(fields))
@@ -64,7 +67,7 @@ func TestNewBaseTableFieldsHideManagedListWriteAndSearch(t *testing.T) {
 }
 
 func TestConvertColumnsToSysTableFieldsHidesManagedListWriteAndSearch(t *testing.T) {
-	fields := convertColumnsToSysTableFields("sys_user", []model.TableColumnMate{
+	fields, err := convertColumnsToSysTableFields("sys_user", []model.TableColumnMate{
 		{
 			ColumnName:       "create_user",
 			OrdinalPosition:  1,
@@ -73,6 +76,9 @@ func TestConvertColumnsToSysTableFieldsHidesManagedListWriteAndSearch(t *testing
 			NumericPrecision: sql.NullInt64{Int64: 20, Valid: true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("convert columns: %v", err)
+	}
 
 	if len(fields) != 1 {
 		t.Fatalf("expected 1 field, got %d", len(fields))
@@ -118,7 +124,7 @@ func TestFieldVisibilityPatchPreservesBusinessFields(t *testing.T) {
 }
 
 func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
-	fields := convertColumnsToSysTableFields("sys_table_field", []model.TableColumnMate{
+	fields, err := convertColumnsToSysTableFields("sys_table_field", []model.TableColumnMate{
 		{
 			ColumnName:      "field_type",
 			OrdinalPosition: 1,
@@ -164,6 +170,9 @@ func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
 			CharacterMaximumLength: sql.NullInt64{Int64: 16, Valid: true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("convert columns: %v", err)
+	}
 
 	assertFieldDict(t, fields[0], "sys_table_field_type")
 	assertFieldDict(t, fields[1], "sys_table_field_input_type")
@@ -171,7 +180,7 @@ func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
 	assertFieldDict(t, fields[3], "whether")
 	assertFieldDict(t, fields[4], "http_method")
 
-	buttonFields := convertColumnsToSysTableFields("sys_menu_button", []model.TableColumnMate{
+	buttonFields, err := convertColumnsToSysTableFields("sys_menu_button", []model.TableColumnMate{
 		{
 			ColumnName:             "event_action",
 			OrdinalPosition:        1,
@@ -180,9 +189,12 @@ func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
 			CharacterMaximumLength: sql.NullInt64{Int64: 256, Valid: true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("convert button columns: %v", err)
+	}
 	assertFieldDict(t, buttonFields[0], "sys_menu_button_event_action")
 
-	tableFields := convertColumnsToSysTableFields("sys_table", []model.TableColumnMate{
+	tableFields, err := convertColumnsToSysTableFields("sys_table", []model.TableColumnMate{
 		{
 			ColumnName:             "master_detail_mode",
 			OrdinalPosition:        1,
@@ -205,13 +217,16 @@ func TestConvertColumnsToSysTableFieldsAppliesSystemDictionaries(t *testing.T) {
 			CharacterMaximumLength: sql.NullInt64{Int64: 16, Valid: true},
 		},
 	})
+	if err != nil {
+		t.Fatalf("convert table columns: %v", err)
+	}
 	assertFieldDict(t, tableFields[0], "sys_master_detail_mode")
 	assertFieldDict(t, tableFields[1], "sys_form_open_mode")
 	assertFieldDict(t, tableFields[2], "sys_detail_open_mode")
 }
 
 func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
-	fields := convertColumnsToSysTableFields("demo_pg", []model.TableColumnMate{
+	fields, err := convertColumnsToSysTableFields("demo_pg", []model.TableColumnMate{
 		{ColumnName: "id", OrdinalPosition: 1, IsNullable: "NO", DataType: "bigint"},
 		{ColumnName: "count", OrdinalPosition: 2, IsNullable: "YES", DataType: "integer"},
 		{ColumnName: "flag", OrdinalPosition: 3, IsNullable: "YES", DataType: "boolean"},
@@ -222,6 +237,9 @@ func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
 		{ColumnName: "created_at", OrdinalPosition: 8, IsNullable: "YES", DataType: "timestamp without time zone"},
 		{ColumnName: "clock", OrdinalPosition: 9, IsNullable: "YES", DataType: "time without time zone"},
 	})
+	if err != nil {
+		t.Fatalf("convert columns: %v", err)
+	}
 	if len(fields) != 9 {
 		t.Fatalf("expected 9 fields, got %d", len(fields))
 	}
@@ -254,6 +272,16 @@ func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
 	}
 }
 
+func TestConvertColumnsToSysTableFieldsRejectsApproximateNumeric(t *testing.T) {
+	_, err := convertColumnsToSysTableFields("demo_pg", []model.TableColumnMate{{
+		ColumnName: "ratio",
+		DataType:   "double precision",
+	}})
+	if err == nil {
+		t.Fatal("approximate numeric columns must not enter exact Decimal metadata")
+	}
+}
+
 func TestValidateTableFieldLinkageConfigAllowsValidRelation(t *testing.T) {
 	currentTable := model.SysTable{
 		Basic:     model.Basic{Id: 1},
@@ -274,7 +302,7 @@ func TestValidateTableFieldLinkageConfigAllowsValidRelation(t *testing.T) {
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id","filterMapping":{"tenant_id":"tenant_id"}}}`
 
-	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
 	})
 	if err != nil {
@@ -343,7 +371,7 @@ func TestValidateTableFieldLinkageConfigAllowsCurrentSelfCascaderField(t *testin
 	relatedTable := currentTable
 	raw := `{"linkage":{"enabled":true,"mode":"cascader","tableCode":"companies","labelKey":"company_name","valueKey":"id","parentKey":"parent_id"}}`
 
-	err := validateTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
 	})
 	if err != nil {
@@ -352,7 +380,7 @@ func TestValidateTableFieldLinkageConfigAllowsCurrentSelfCascaderField(t *testin
 }
 
 func TestValidateTableFieldLinkageConfigRejectsInvalidJSON(t *testing.T) {
-	err := validateTableFieldLinkageConfig(`{"linkage":`, model.SysTable{}, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(`{"linkage":`, model.SysTable{}, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return model.SysTable{}, nil
 	})
 	if err == nil {
@@ -363,7 +391,7 @@ func TestValidateTableFieldLinkageConfigRejectsInvalidJSON(t *testing.T) {
 func TestValidateTableFieldLinkageConfigRejectsInvalidMode(t *testing.T) {
 	raw := `{"linkage":{"enabled":true,"mode":"popup","tableCode":"customers"}}`
 
-	err := validateTableFieldLinkageConfig(raw, model.SysTable{}, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, model.SysTable{}, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return model.SysTable{Basic: model.Basic{Id: 2}}, nil
 	})
 	if err == nil {
@@ -384,7 +412,7 @@ func TestValidateTableFieldLinkageConfigRejectsMissingRelatedField(t *testing.T)
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id"}}`
 
-	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
 	})
 	if err == nil {
@@ -405,7 +433,7 @@ func TestValidateTableFieldLinkageConfigRejectsMissingFilterSourceField(t *testi
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","valueKey":"id","filterMapping":{"tenant_id":"project_id"}}}`
 
-	err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
 	})
 	if err == nil {
@@ -430,7 +458,7 @@ func TestValidateTableFieldLinkageConfigRejectsCascaderParentSameAsValue(t *test
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"cascader","tableCode":"companies","labelKey":"company_name","valueKey":"id","parentKey":"id"}}`
 
-	err := validateTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
+	_, err := normalizeTableFieldLinkageConfig(raw, currentTable, "parent_id", func(cfg tableFieldLinkageConfig) (model.SysTable, error) {
 		return relatedTable, nil
 	})
 	if err == nil {
@@ -445,7 +473,7 @@ func TestValidateTableFieldLinkageConfigRequiresUniqueValueField(t *testing.T) {
 		TableFields: []model.SysTableField{{FieldCode: "external_code"}, {FieldCode: "name"}},
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"external_code"}}`
-	if err := validateTableFieldLinkageConfig(raw, currentTable, "customer_code", func(tableFieldLinkageConfig) (model.SysTable, error) {
+	if _, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_code", func(tableFieldLinkageConfig) (model.SysTable, error) {
 		return target, nil
 	}); err == nil {
 		t.Fatal("expected non-unique relation value field to be rejected")
@@ -466,7 +494,7 @@ func TestValidateTableFieldLinkageConfigRejectsSensitiveRelationFields(t *testin
 		},
 	}
 	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id","filterMapping":{"password":"tenant_id"}}}`
-	if err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(tableFieldLinkageConfig) (model.SysTable, error) {
+	if _, err := normalizeTableFieldLinkageConfig(raw, currentTable, "customer_id", func(tableFieldLinkageConfig) (model.SysTable, error) {
 		return target, nil
 	}); err == nil {
 		t.Fatal("expected sensitive relation filter field to be rejected")

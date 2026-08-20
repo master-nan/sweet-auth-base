@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/config"
+	"backend/enum"
 	"backend/initialize"
 	"context"
 	"database/sql"
@@ -649,30 +650,30 @@ func metadataFieldTypeCompatible(fieldType int, dataType string, columnType stri
 	dataType = strings.ToLower(strings.TrimSpace(dataType))
 	columnType = strings.ToLower(strings.TrimSpace(columnType))
 	switch fieldType {
-	case 1: // bigint
+	case int(enum.BigIntFieldType):
 		return dataType == "bigint"
-	case 2: // float
-		return inStringSet(dataType, "real", "double precision", "numeric", "decimal")
-	case 3: // varchar
+	case int(enum.VarcharFieldType):
 		return inStringSet(dataType, "character varying", "character", "varchar", "char")
-	case 4: // text
+	case int(enum.TextFieldType):
 		return strings.Contains(dataType, "text")
-	case 5: // boolean
+	case int(enum.BooleanFieldType):
 		return dataType == "tinyint" || dataType == "boolean" || strings.Contains(columnType, "tinyint(1)")
-	case 6: // date
+	case int(enum.DateFieldType):
 		return dataType == "date"
-	case 7: // datetime
+	case int(enum.DatetimeFieldType):
 		return dataType == "timestamp without time zone" || dataType == "timestamp with time zone" || dataType == "timestamp"
-	case 8: // time
+	case int(enum.TimeFieldType):
 		return dataType == "time"
-	case 9: // tinyint
-		return dataType == "smallint" || dataType == "integer"
-	case 10: // json
+	case int(enum.JsonFieldType):
 		return dataType == "json" || dataType == "jsonb"
-	case 11: // int
+	case int(enum.IntFieldType):
 		return inStringSet(dataType, "int", "integer", "mediumint", "smallint")
+	case int(enum.SmallIntFieldType):
+		return dataType == "smallint"
+	case int(enum.DecimalFieldType):
+		return inStringSet(dataType, "numeric", "decimal")
 	default:
-		return true
+		return false
 	}
 }
 

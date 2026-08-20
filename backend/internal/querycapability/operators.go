@@ -13,16 +13,17 @@ func Supports(fieldType enum.SysTableFieldType, operator enum.ExpressionType, op
 	if optionBacked || fieldType == enum.BooleanFieldType || fieldType == enum.JsonFieldType {
 		return equalityOperator(operator)
 	}
-	switch fieldType {
-	case enum.VarcharFieldType, enum.TextFieldType:
-		return textOperator(operator)
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
-		enum.FloatFieldType, enum.DecimalFieldType,
-		enum.DateFieldType, enum.DatetimeFieldType, enum.TimeFieldType:
-		return orderedOperator(operator)
-	default:
-		return equalityOperator(operator)
+	descriptor, ok := metadata.DescribeStorage(fieldType)
+	if !ok {
+		return false
 	}
+	if descriptor.TextSearch {
+		return textOperator(operator)
+	}
+	if descriptor.Ordered {
+		return orderedOperator(operator)
+	}
+	return equalityOperator(operator)
 }
 
 func AllowedMetadataOperators(field metadata.FieldMetadata) []enum.ExpressionType {

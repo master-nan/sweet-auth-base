@@ -140,7 +140,7 @@ func (s *OrderService) Update(ctx context.Context, input dto.OrderEditRequest) (
 - Controller 不开启业务事务，Repository 不决定跨 Repository 事务。
 - 不显式嵌套事务。
 - HTTP、短信、对象存储和长时间文件 IO 必须在数据库事务外。
-- `ExecuteTx` 只保留给 SysTable DDL、Integration 原子执行等已有特殊基础设施语义；新业务不要自行选用。
+- `BasicRepository` 不提供通用事务入口。SysTable 等 Application Service 使用 `RunInTransaction`；Integration 锁定型原子 Repository 方法只在其明确命名的方法内部开启短事务。
 - Cache 不是业务真值。写入提交成功后再失效；缓存失败不能伪装成数据库回滚。
 - 写操作沿用 `internal/audit.AuditSubject` 与 `RequestMetadata`，保留 `request_id`、`trace_id`，不记录密码、Token、Credential、完整 Payload、物理路径或 HR 敏感信息。
 

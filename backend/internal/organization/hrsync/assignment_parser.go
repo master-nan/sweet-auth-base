@@ -175,7 +175,7 @@ func NormalizeAssignmentPeriod(source HRAssignmentSourceDTO, location *time.Loca
 
 func parseAssignmentDateTime(value string, location *time.Location) (time.Time, error) {
 	value = strings.TrimSpace(value)
-	for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02"} {
+	for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04", time.DateOnly} {
 		if parsed, err := time.ParseInLocation(layout, value, location); err == nil {
 			if parsed.Year() >= 1900 && parsed.Year() <= 9998 {
 				return parsed.UTC(), nil

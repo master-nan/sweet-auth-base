@@ -47,15 +47,16 @@ func TestGetSQLTypeUsesPostgresTypes(t *testing.T) {
 	}{
 		{name: "datetime", fieldType: enum.DatetimeFieldType, want: "timestamp"},
 		{name: "json", fieldType: enum.JsonFieldType, want: "jsonb"},
-		{name: "tinyint", fieldType: enum.TinyintFieldType, want: "smallint"},
+		{name: "smallint", fieldType: enum.SmallIntFieldType, want: "smallint"},
 		{name: "int", fieldType: enum.IntFieldType, want: "integer"},
-		{name: "decimal", fieldType: enum.FloatFieldType, length: 12, decimal: 2, want: "numeric(12,2)"},
+		{name: "decimal", fieldType: enum.DecimalFieldType, length: 12, decimal: 2, want: "numeric(12,2)"},
 		{name: "varchar default length", fieldType: enum.VarcharFieldType, want: "varchar(255)"},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getSQLType(tt.fieldType, tt.length, tt.decimal); got != tt.want {
+			field := model.SysTableField{FieldType: tt.fieldType, FieldLength: tt.length, NumericPrecision: tt.length, NumericScale: tt.decimal}
+			if got := getSQLType(field); got != tt.want {
 				t.Fatalf("getSQLType() = %q, want %q", got, tt.want)
 			}
 		})
@@ -514,7 +515,7 @@ func TestExecuteQueryBuildsNestedOrExpression(t *testing.T) {
 						Field:          "status",
 						ExpressionType: enum.Eq,
 						Value:          2,
-						Type:           enum.TinyintFieldType,
+						Type:           enum.SmallIntFieldType,
 					},
 				},
 				Nested: []request.ExpressionGroup{
@@ -820,7 +821,7 @@ func queryTestTable() model.SysTable {
 			{FieldCode: "enabled", FieldType: enum.BooleanFieldType, IsListShow: true},
 			{FieldCode: "biz_date", FieldType: enum.DateFieldType, IsListShow: true},
 			{FieldCode: "start_time", FieldType: enum.TimeFieldType, IsListShow: true},
-			{FieldCode: "status", FieldType: enum.TinyintFieldType, IsListShow: true},
+			{FieldCode: "status", FieldType: enum.SmallIntFieldType, IsListShow: true},
 		},
 	}
 }

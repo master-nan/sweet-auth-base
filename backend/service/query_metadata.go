@@ -5,16 +5,20 @@ import (
 	"backend/model"
 )
 
-func integrationQueryTable(tableCode string, fields ...model.SysTableField) model.SysTable {
+func queryMetadataTable(tableCode string, fields ...model.SysTableField) model.SysTable {
 	return model.SysTable{Basic: model.Basic{State: true}, TableCode: tableCode, TableFields: fields}
 }
 
 func integrationQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
+	return queryMetadataField(code, fieldType, quick, false)
+}
+
+func queryMetadataField(code string, fieldType enum.SysTableFieldType, quick, listVisible bool) model.SysTableField {
+	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsListShow: listVisible, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 }
 
 func externalSystemQueryTable() model.SysTable {
-	return integrationQueryTable("integration_external_system",
+	return queryMetadataTable("integration_external_system",
 		integrationQueryField("system_code", enum.VarcharFieldType, true), integrationQueryField("name", enum.VarcharFieldType, true),
 		integrationQueryField("system_type", enum.VarcharFieldType, false), integrationQueryField("owner_identifier", enum.VarcharFieldType, true),
 		integrationQueryField("owner_name", enum.VarcharFieldType, true), integrationQueryField("status", enum.VarcharFieldType, false),
@@ -22,7 +26,7 @@ func externalSystemQueryTable() model.SysTable {
 }
 
 func credentialQueryTable() model.SysTable {
-	return integrationQueryTable("integration_credential",
+	return queryMetadataTable("integration_credential",
 		integrationQueryField("credential_code", enum.VarcharFieldType, true), integrationQueryField("name", enum.VarcharFieldType, true),
 		integrationQueryField("external_system_id", enum.BigIntFieldType, false),
 		integrationQueryField("credential_type", enum.VarcharFieldType, false), integrationQueryField("status", enum.VarcharFieldType, false),
@@ -31,7 +35,7 @@ func credentialQueryTable() model.SysTable {
 }
 
 func interfaceDefinitionQueryTable() model.SysTable {
-	return integrationQueryTable("integration_interface_definition",
+	return queryMetadataTable("integration_interface_definition",
 		integrationQueryField("interface_code", enum.VarcharFieldType, true), integrationQueryField("name", enum.VarcharFieldType, true),
 		integrationQueryField("external_system_id", enum.BigIntFieldType, false),
 		integrationQueryField("version", enum.IntFieldType, false), integrationQueryField("protocol", enum.VarcharFieldType, false),
@@ -40,7 +44,7 @@ func interfaceDefinitionQueryTable() model.SysTable {
 }
 
 func retryPolicyQueryTable() model.SysTable {
-	return integrationQueryTable("integration_retry_policy",
+	return queryMetadataTable("integration_retry_policy",
 		integrationQueryField("policy_code", enum.VarcharFieldType, true), integrationQueryField("policy_name", enum.VarcharFieldType, true),
 		integrationQueryField("version", enum.IntFieldType, false), integrationQueryField("status", enum.VarcharFieldType, false),
 		integrationQueryField("max_attempts", enum.IntFieldType, false), integrationQueryField("backoff_type", enum.VarcharFieldType, false),
@@ -49,7 +53,7 @@ func retryPolicyQueryTable() model.SysTable {
 }
 
 func syncTaskQueryTable() model.SysTable {
-	return integrationQueryTable("integration_sync_task",
+	return queryMetadataTable("integration_sync_task",
 		integrationQueryField("task_code", enum.VarcharFieldType, true), integrationQueryField("task_name", enum.VarcharFieldType, true),
 		integrationQueryField("version", enum.IntFieldType, false), integrationQueryField("status", enum.VarcharFieldType, false),
 		integrationQueryField("external_system_id", enum.BigIntFieldType, false), integrationQueryField("interface_definition_id", enum.BigIntFieldType, false),
@@ -59,11 +63,39 @@ func syncTaskQueryTable() model.SysTable {
 }
 
 func syncBatchQueryTable() model.SysTable {
-	return integrationQueryTable("integration_sync_batch",
+	return queryMetadataTable("integration_sync_batch",
 		integrationQueryField("batch_no", enum.VarcharFieldType, true), integrationQueryField("sync_task_id", enum.BigIntFieldType, false),
 		integrationQueryField("task_code", enum.VarcharFieldType, true), integrationQueryField("task_name", enum.VarcharFieldType, true),
 		integrationQueryField("task_version", enum.IntFieldType, false), integrationQueryField("trigger_type", enum.VarcharFieldType, false),
 		integrationQueryField("status", enum.VarcharFieldType, false), integrationQueryField("window_start", enum.DatetimeFieldType, false),
 		integrationQueryField("window_end", enum.DatetimeFieldType, false), integrationQueryField("gmt_create", enum.DatetimeFieldType, false),
 		integrationQueryField("started_at", enum.DatetimeFieldType, false), integrationQueryField("completed_at", enum.DatetimeFieldType, false))
+}
+
+func dataPermissionQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
+	return queryMetadataField(code, fieldType, quick, true)
+}
+
+func dataResourceQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_resource", dataPermissionQueryField("resource_code", enum.VarcharFieldType, true), dataPermissionQueryField("name", enum.VarcharFieldType, true), dataPermissionQueryField("resource_type", enum.VarcharFieldType, false))
+}
+
+func dataDimensionQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_dimension_definition", dataPermissionQueryField("code", enum.VarcharFieldType, true), dataPermissionQueryField("name", enum.VarcharFieldType, true), dataPermissionQueryField("category", enum.VarcharFieldType, false), dataPermissionQueryField("value_type", enum.VarcharFieldType, false))
+}
+
+func dataOwnershipQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_ownership_field", dataPermissionQueryField("resource_id", enum.BigIntFieldType, false), dataPermissionQueryField("ownership_code", enum.VarcharFieldType, true), dataPermissionQueryField("dimension_id", enum.BigIntFieldType, false), dataPermissionQueryField("binding_type", enum.VarcharFieldType, false), dataPermissionQueryField("value_type", enum.VarcharFieldType, false))
+}
+
+func dataPolicyQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_policy", dataPermissionQueryField("code", enum.VarcharFieldType, true), dataPermissionQueryField("name", enum.VarcharFieldType, true), dataPermissionQueryField("policy_type", enum.VarcharFieldType, false))
+}
+
+func dataPolicyRuleQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_policy_rule", dataPermissionQueryField("policy_id", enum.BigIntFieldType, false), dataPermissionQueryField("ownership_code", enum.VarcharFieldType, true), dataPermissionQueryField("sequence", enum.IntFieldType, false))
+}
+
+func dataGrantQueryTable() model.SysTable {
+	return queryMetadataTable("sys_data_grant", dataPermissionQueryField("subject_type", enum.VarcharFieldType, true), dataPermissionQueryField("subject_id", enum.BigIntFieldType, false), dataPermissionQueryField("resource_id", enum.BigIntFieldType, false), dataPermissionQueryField("operation", enum.VarcharFieldType, false), dataPermissionQueryField("policy_id", enum.BigIntFieldType, false))
 }

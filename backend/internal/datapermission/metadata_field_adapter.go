@@ -262,7 +262,7 @@ func validateMetadataExecutionComplexity(execution AdapterExecution) error {
 
 func metadataFieldValueType(fieldType enum.SysTableFieldType) (DataScopeValueType, bool) {
 	switch fieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
 		return DataScopeValueTypeBigint, true
 	case enum.VarcharFieldType, enum.TextFieldType:
 		return DataScopeValueTypeString, true

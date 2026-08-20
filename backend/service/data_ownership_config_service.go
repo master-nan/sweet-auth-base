@@ -521,7 +521,7 @@ func metadataFieldMatchesOwnershipValueType(
 	case model.DataDimensionValueTypeBigint:
 		return fieldType == enum.BigIntFieldType ||
 			fieldType == enum.IntFieldType ||
-			fieldType == enum.TinyintFieldType
+			fieldType == enum.SmallIntFieldType
 	case model.DataDimensionValueTypeString:
 		return fieldType == enum.VarcharFieldType || fieldType == enum.TextFieldType
 	default:

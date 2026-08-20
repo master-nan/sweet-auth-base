@@ -14,38 +14,55 @@ const (
 	SmallIntMax             = 32767
 	MaxNumericPrecision     = 1000
 	DefaultNumericPrecision = 38
-	LegacyNumericScale      = 18
 )
 
-// CanonicalStorageType keeps legacy persisted values readable while exposing
-// the storage semantics used by new runtime consumers.
-func CanonicalStorageType(fieldType enum.SysTableFieldType) enum.SysTableFieldType {
+type StorageDescriptor struct {
+	SQLType       string
+	LogicalType   enum.SysTableFieldLogicalType
+	DisplayFormat enum.SysTableFieldDisplayFormat
+	Integer       bool
+	Ordered       bool
+	TextSearch    bool
+	AcceptsLength bool
+}
+
+func DescribeStorage(fieldType enum.SysTableFieldType) (StorageDescriptor, bool) {
 	switch fieldType {
-	case enum.TinyintFieldType:
-		return enum.SmallIntFieldType
-	case enum.FloatFieldType:
-		return enum.DecimalFieldType
+	case enum.BigIntFieldType:
+		return StorageDescriptor{SQLType: "bigint", LogicalType: enum.LogicalTypeInteger, DisplayFormat: enum.DisplayFormatInteger, Integer: true, Ordered: true}, true
+	case enum.IntFieldType:
+		return StorageDescriptor{SQLType: "integer", LogicalType: enum.LogicalTypeInteger, DisplayFormat: enum.DisplayFormatInteger, Integer: true, Ordered: true}, true
+	case enum.SmallIntFieldType:
+		return StorageDescriptor{SQLType: "smallint", LogicalType: enum.LogicalTypeInteger, DisplayFormat: enum.DisplayFormatInteger, Integer: true, Ordered: true}, true
+	case enum.DecimalFieldType:
+		return StorageDescriptor{SQLType: "numeric", LogicalType: enum.LogicalTypeDecimal, DisplayFormat: enum.DisplayFormatDecimal, Ordered: true, AcceptsLength: true}, true
+	case enum.VarcharFieldType:
+		return StorageDescriptor{SQLType: "varchar", LogicalType: enum.LogicalTypePlain, DisplayFormat: enum.DisplayFormatPlain, TextSearch: true, AcceptsLength: true}, true
+	case enum.TextFieldType:
+		return StorageDescriptor{SQLType: "text", LogicalType: enum.LogicalTypePlain, DisplayFormat: enum.DisplayFormatPlain, TextSearch: true}, true
+	case enum.BooleanFieldType:
+		return StorageDescriptor{SQLType: "boolean", LogicalType: enum.LogicalTypeBoolean, DisplayFormat: enum.DisplayFormatPlain}, true
+	case enum.DateFieldType:
+		return StorageDescriptor{SQLType: "date", LogicalType: enum.LogicalTypeDate, DisplayFormat: enum.DisplayFormatDate, Ordered: true}, true
+	case enum.DatetimeFieldType:
+		return StorageDescriptor{SQLType: "timestamp", LogicalType: enum.LogicalTypeDateTime, DisplayFormat: enum.DisplayFormatDateTime, Ordered: true}, true
+	case enum.TimeFieldType:
+		return StorageDescriptor{SQLType: "time", LogicalType: enum.LogicalTypePlain, DisplayFormat: enum.DisplayFormatPlain, Ordered: true}, true
+	case enum.JsonFieldType:
+		return StorageDescriptor{SQLType: "jsonb", LogicalType: enum.LogicalTypePlain, DisplayFormat: enum.DisplayFormatPlain}, true
 	default:
-		return fieldType
+		return StorageDescriptor{}, false
 	}
 }
 
 func StorageTypesCompatible(left, right enum.SysTableFieldType) bool {
-	left = CanonicalStorageType(left)
-	right = CanonicalStorageType(right)
 	if left == right {
-		return true
+		_, valid := DescribeStorage(left)
+		return valid
 	}
-	return isIntegerStorage(left) && isIntegerStorage(right)
-}
-
-func isIntegerStorage(fieldType enum.SysTableFieldType) bool {
-	switch fieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
-		return true
-	default:
-		return false
-	}
+	leftDescriptor, leftValid := DescribeStorage(left)
+	rightDescriptor, rightValid := DescribeStorage(right)
+	return leftValid && rightValid && leftDescriptor.Integer && rightDescriptor.Integer
 }
 
 // NormalizeDecimal validates an exact base-10 value without converting it to

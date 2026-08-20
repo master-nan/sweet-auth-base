@@ -273,7 +273,7 @@ func seedReportV1ATable(t *testing.T, db *gorm.DB) {
 	fields := []model.SysTableField{
 		{Basic: model.Basic{Id: 101, State: true}, TableId: table.Id, FieldName: "ID", FieldCode: "id", FieldType: enum.BigIntFieldType, IsPrimaryKey: true, IsListShow: true, Sequence: 1},
 		{Basic: model.Basic{Id: 102, State: true}, TableId: table.Id, FieldName: "名称", FieldCode: "name", FieldType: enum.VarcharFieldType, IsListShow: true, Sequence: 2},
-		{Basic: model.Basic{Id: 103, State: true}, TableId: table.Id, FieldName: "金额", FieldCode: "amount", FieldType: enum.FloatFieldType, IsListShow: true, Sequence: 3},
+		{Basic: model.Basic{Id: 103, State: true}, TableId: table.Id, FieldName: "金额", FieldCode: "amount", FieldType: enum.DecimalFieldType, NumericPrecision: 18, NumericScale: 2, IsListShow: true, Sequence: 3},
 	}
 	if err := db.Create(&fields).Error; err != nil {
 		t.Fatalf("seed sys table fields: %v", err)

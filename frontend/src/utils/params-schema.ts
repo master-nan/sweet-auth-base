@@ -1,5 +1,6 @@
 import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
+import { primitiveText } from 'src/utils/primitive-text'
 
 type ParamOption = {
   label: string
@@ -51,6 +52,10 @@ type ParamFieldSchema = {
   input_type?: SysTableFieldInputType | string | number
   default_value?: unknown
   defaultValue?: unknown
+  numeric_precision?: number
+  numericPrecision?: number
+  numeric_scale?: number
+  numericScale?: number
   placeholder?: string
   options?: Array<ParamOption | string | number | boolean>
   dict_code?: string
@@ -105,8 +110,7 @@ const fieldTypeMap: Record<string, SysTableFieldType> = {
   bigint: SysTableFieldType.BIGINT,
   integer: SysTableFieldType.INT,
   int: SysTableFieldType.INT,
-  number: SysTableFieldType.FLOAT,
-  float: SysTableFieldType.FLOAT,
+  number: SysTableFieldType.DECIMAL,
   smallint: SysTableFieldType.SMALLINT,
   decimal: SysTableFieldType.DECIMAL,
   numeric: SysTableFieldType.DECIMAL,
@@ -119,7 +123,6 @@ const fieldTypeMap: Record<string, SysTableFieldType> = {
   date: SysTableFieldType.DATE,
   datetime: SysTableFieldType.DATETIME,
   time: SysTableFieldType.TIME,
-  tinyint: SysTableFieldType.TINYINT,
   json: SysTableFieldType.JSON,
   object: SysTableFieldType.JSON,
   array: SysTableFieldType.JSON,
@@ -172,7 +175,10 @@ const resolveInputTypeValue = (value: ParamFieldSchema['input_type']) => {
 }
 
 const resolveExplicitFieldType = (value: ParamFieldSchema['field_type']) => {
-  const numeric = toEnumNumber(value, Object.values(SysTableFieldType).filter(Number.isInteger) as SysTableFieldType[])
+  const numeric = toEnumNumber(
+    value,
+    Object.values(SysTableFieldType).filter(Number.isInteger) as SysTableFieldType[],
+  )
   if (numeric) return numeric
   if (typeof value === 'string') {
     return fieldTypeMap[normalizeKey(value)]
@@ -246,8 +252,6 @@ const resolveInputType = (
   switch (fieldType) {
     case SysTableFieldType.INT:
     case SysTableFieldType.BIGINT:
-    case SysTableFieldType.FLOAT:
-    case SysTableFieldType.TINYINT:
     case SysTableFieldType.SMALLINT:
     case SysTableFieldType.DECIMAL:
       return SysTableFieldInputType.INPUT_NUMBER
@@ -334,7 +338,9 @@ const normalizeDataSource = (item: ParamFieldSchema): ParamDataSourceResult => {
     return result
   }
 
-  const sourceType = normalizeKey(String(source.type || source.mode || (item.cascader ? 'cascader' : 'relation')))
+  const sourceType = normalizeKey(
+    String(source.type || source.mode || (item.cascader ? 'cascader' : 'relation')),
+  )
   if (sourceType === 'dict' || sourceType === 'dictionary') {
     result.dictCode = readString(source, ['dict_code', 'dictCode', 'code'])
     return result
@@ -394,6 +400,8 @@ const buildParamField = (item: ParamFieldSchema): TableField | null => {
     !!dataSource.dictCode,
     dataSource.linkageMode,
   )
+  const isDecimal = fieldType === SysTableFieldType.DECIMAL
+  const defaultValue = item.default_value ?? item.defaultValue ?? ''
   const field: TableField = {
     id: 0,
     table_id: 0,
@@ -403,7 +411,9 @@ const buildParamField = (item: ParamFieldSchema): TableField | null => {
     field_length: 255,
     field_decimal_length: 0,
     input_type: inputType,
-    default_value: (item.default_value ?? item.defaultValue ?? '') as string,
+    numeric_precision: isDecimal ? (item.numeric_precision ?? item.numericPrecision ?? 38) : 0,
+    numeric_scale: isDecimal ? (item.numeric_scale ?? item.numericScale ?? 18) : 0,
+    default_value: isDecimal ? primitiveText(defaultValue) : (defaultValue as string),
     dict_code: dataSource.dictCode,
     is_primary_key: false,
     is_index: false,
@@ -463,6 +473,9 @@ const buildJsonSchemaField = (
     field_type: prop?.type,
     input_type: Array.isArray(enumValues) ? 'select' : prop?.input_type || prop?.['x-input-type'],
     default_value: prop?.default,
+    numeric_precision:
+      prop?.numeric_precision ?? prop?.numericPrecision ?? prop?.['x-numeric-precision'],
+    numeric_scale: prop?.numeric_scale ?? prop?.numericScale ?? prop?.['x-numeric-scale'],
     placeholder: prop?.placeholder,
     dict_code: prop?.dict_code || prop?.dictCode || prop?.['x-dict-code'],
     linkage_config: prop?.linkage_config || prop?.linkageConfig || prop?.['x-linkage-config'],

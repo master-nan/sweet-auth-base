@@ -183,7 +183,7 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		TableID:            source.TableId,
 		Code:               source.FieldCode,
 		DisplayName:        source.FieldName,
-		StorageType:        CanonicalStorageType(source.FieldType),
+		StorageType:        source.FieldType,
 		LogicalType:        resolveLogicalType(source),
 		DisplayFormat:      resolveDisplayFormat(source),
 		UIComponent:        source.InputType,
@@ -306,27 +306,10 @@ func (table TableMetadata) QueryModel() model.SysTable {
 }
 
 func logicalFieldType(fieldType enum.SysTableFieldType) LogicalFieldType {
-	fieldType = CanonicalStorageType(fieldType)
-	switch fieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
-		return LogicalFieldTypeInteger
-	case enum.DecimalFieldType:
-		return LogicalFieldTypeDecimal
-	case enum.TextFieldType:
-		return LogicalFieldTypeText
-	case enum.BooleanFieldType:
-		return LogicalFieldTypeBoolean
-	case enum.DateFieldType:
-		return LogicalFieldTypeDate
-	case enum.DatetimeFieldType:
-		return LogicalFieldTypeDateTime
-	case enum.TimeFieldType:
-		return LogicalFieldTypeTime
-	case enum.JsonFieldType:
-		return LogicalFieldTypeJSON
-	default:
-		return LogicalFieldTypeString
+	if descriptor, ok := DescribeStorage(fieldType); ok {
+		return descriptor.LogicalType
 	}
+	return LogicalFieldTypeString
 }
 
 func resolveLogicalType(field model.SysTableField) LogicalFieldType {
@@ -347,32 +330,24 @@ func resolveDisplayFormat(field model.SysTableField) enum.SysTableFieldDisplayFo
 		return normalized
 	}
 	switch resolveLogicalType(field) {
-	case enum.LogicalTypeInteger:
-		return enum.DisplayFormatInteger
-	case enum.LogicalTypeDecimal:
-		return enum.DisplayFormatDecimal
 	case enum.LogicalTypeMoney:
 		return enum.DisplayFormatMoney
 	case enum.LogicalTypePercent:
 		return enum.DisplayFormatPercent
-	case enum.LogicalTypeDate:
-		return enum.DisplayFormatDate
-	case enum.LogicalTypeDateTime:
-		return enum.DisplayFormatDateTime
 	case enum.LogicalTypeEnum:
 		return enum.DisplayFormatDictionary
 	case enum.LogicalTypeRelation:
 		return enum.DisplayFormatRelation
-	default:
-		return enum.DisplayFormatPlain
 	}
+	descriptor, _ := DescribeStorage(field.FieldType)
+	return descriptor.DisplayFormat
 }
 
 func numericPrecision(field model.SysTableField) int {
 	if field.NumericPrecision > 0 {
 		return field.NumericPrecision
 	}
-	if CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+	if field.FieldType == enum.DecimalFieldType {
 		if field.FieldLength > 0 {
 			return field.FieldLength
 		}
@@ -385,10 +360,7 @@ func numericScale(field model.SysTableField) int {
 	if field.NumericScale > 0 {
 		return field.NumericScale
 	}
-	if CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
-		if field.FieldType == enum.FloatFieldType && field.FieldDecimalLength == 0 && field.NumericPrecision == 0 {
-			return LegacyNumericScale
-		}
+	if field.FieldType == enum.DecimalFieldType {
 		return field.FieldDecimalLength
 	}
 	return 0

@@ -94,7 +94,7 @@ func TestProjectTableSeparatesRuntimeConcernsAndFiltersUnsafeFields(t *testing.T
 }
 
 func TestProjectFieldMapsStorageLogicalAndUITypeSeparately(t *testing.T) {
-	field := metadataTestField(21, "amount", 1, enum.FloatFieldType)
+	field := metadataTestField(21, "amount", 1, enum.DecimalFieldType)
 	field.InputType = enum.InputNumberInputType
 	field.IsQuickSearch = true
 	field.IsAdvancedSearch = true

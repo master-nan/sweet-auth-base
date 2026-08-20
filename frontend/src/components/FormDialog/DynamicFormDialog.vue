@@ -886,7 +886,7 @@ const displayFields = computed(() => {
 /**
  * 获取字典选项并将 value 转换为与字段数据库类型一致的类型
  * 字典 item_value 在数据库中是 VARCHAR，始终为字符串；
- * 如果字段是数值类型（TINYINT/INT/BIGINT/FLOAT），需要把 value 转为数字，
+ * 整数转为 number；Decimal 保持字符串，避免 JavaScript Number 丢失精度。
  * 这样 q-select 的 emit-value + map-options 严格相等才能匹配上。
  */
 const getTypedDictOptions = (field: TableField) => {
@@ -1500,17 +1500,6 @@ const getNumberInputMode = (field: TableField) => {
   return isExactDecimalFieldType(field.field_type) ? 'decimal' : 'numeric'
 }
 
-const getNumberDecimals = (field: TableField) => {
-  if (field.field_type !== SysTableFieldType.FLOAT) return 0
-  const decimalLength = Number(field.field_decimal_length || 0)
-  return Number.isFinite(decimalLength) && decimalLength > 0 ? Math.min(decimalLength, 8) : 2
-}
-
-const getNumberStep = (field: TableField) => {
-  const decimals = getNumberDecimals(field)
-  return decimals > 0 ? Number((1 / Math.pow(10, decimals)).toFixed(decimals)) : 1
-}
-
 const getNumberBindingValue = (field: TableField, name: string) => {
   const binding = String(field.binding || '')
     .split(/[|,]/)
@@ -1586,17 +1575,10 @@ const adjustNumberField = (field: TableField, direction: 1 | -1) => {
   const code = field.field_code
   const currentValue = Number(formData.value[code])
   const current = Number.isFinite(currentValue) ? currentValue : 0
-  const step = getNumberStep(field)
-  const decimals = getNumberDecimals(field)
   const min = getNumberBindingValue(field, 'min')
   const max = getNumberBindingValue(field, 'max')
 
-  let next = current + direction * step
-  if (field.field_type !== SysTableFieldType.FLOAT) {
-    next = Math.trunc(next)
-  } else {
-    next = Number(next.toFixed(decimals))
-  }
+  let next = Math.trunc(current + direction)
   if (min !== null) next = Math.max(min, next)
   if (max !== null) next = Math.min(max, next)
 
@@ -1666,7 +1648,6 @@ const buildFieldRules = (field: TableField) => {
   const isIntegerField =
     field.field_type === SysTableFieldType.BIGINT ||
     field.field_type === SysTableFieldType.INT ||
-    field.field_type === SysTableFieldType.TINYINT ||
     field.field_type === SysTableFieldType.SMALLINT
   const isNumberField = isIntegerField || isExactDecimalFieldType(field.field_type)
 
@@ -1703,11 +1684,7 @@ const buildFieldRules = (field: TableField) => {
     })
   }
 
-  if (
-    !isSelectLike &&
-    (field.field_type === SysTableFieldType.SMALLINT ||
-      field.field_type === SysTableFieldType.TINYINT)
-  ) {
+  if (!isSelectLike && field.field_type === SysTableFieldType.SMALLINT) {
     rules.push((val) => {
       if (shouldSkip() || isValueEmpty(val)) return true
       const value = Number(val)
