@@ -233,9 +233,9 @@ func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
 		{0, enum.BigIntFieldType, enum.InputNumberInputType},
 		{1, enum.IntFieldType, enum.InputNumberInputType},
 		{2, enum.BooleanFieldType, enum.SelectInputType},
-		{3, enum.TinyintFieldType, enum.InputNumberInputType},
+		{3, enum.SmallIntFieldType, enum.InputNumberInputType},
 		{4, enum.VarcharFieldType, enum.InputType},
-		{5, enum.FloatFieldType, enum.InputNumberInputType},
+		{5, enum.DecimalFieldType, enum.InputNumberInputType},
 		{6, enum.JsonFieldType, enum.JsonInputType},
 		{7, enum.DatetimeFieldType, enum.DatetimePickerInputType},
 		{8, enum.TimeFieldType, enum.TimePickerInputType},
@@ -249,8 +249,8 @@ func TestConvertColumnsToSysTableFieldsRecognizesPostgresTypes(t *testing.T) {
 	if fields[4].FieldLength != 128 {
 		t.Fatalf("expected varchar length 128, got %d", fields[4].FieldLength)
 	}
-	if fields[5].FieldLength != 12 || fields[5].FieldDecimalLength != 2 {
-		t.Fatalf("expected numeric(12,2), got length=%d decimal=%d", fields[5].FieldLength, fields[5].FieldDecimalLength)
+	if fields[5].NumericPrecision != 12 || fields[5].NumericScale != 2 {
+		t.Fatalf("expected numeric(12,2), got precision=%d scale=%d", fields[5].NumericPrecision, fields[5].NumericScale)
 	}
 }
 
@@ -435,6 +435,41 @@ func TestValidateTableFieldLinkageConfigRejectsCascaderParentSameAsValue(t *test
 	})
 	if err == nil {
 		t.Fatal("expected cascader parentKey equal valueKey to fail")
+	}
+}
+
+func TestValidateTableFieldLinkageConfigRequiresUniqueValueField(t *testing.T) {
+	currentTable := model.SysTable{Basic: model.Basic{Id: 1}, TableCode: "orders"}
+	target := model.SysTable{
+		Basic: model.Basic{Id: 2}, TableCode: "customers",
+		TableFields: []model.SysTableField{{FieldCode: "external_code"}, {FieldCode: "name"}},
+	}
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"external_code"}}`
+	if err := validateTableFieldLinkageConfig(raw, currentTable, "customer_code", func(tableFieldLinkageConfig) (model.SysTable, error) {
+		return target, nil
+	}); err == nil {
+		t.Fatal("expected non-unique relation value field to be rejected")
+	}
+}
+
+func TestValidateTableFieldLinkageConfigRejectsSensitiveRelationFields(t *testing.T) {
+	currentTable := model.SysTable{
+		Basic: model.Basic{Id: 1}, TableCode: "orders",
+		TableFields: []model.SysTableField{{FieldCode: "customer_id"}, {FieldCode: "tenant_id"}},
+	}
+	target := model.SysTable{
+		Basic: model.Basic{Id: 2}, TableCode: "customers",
+		TableFields: []model.SysTableField{
+			{FieldCode: "id", IsPrimaryKey: true},
+			{FieldCode: "name"},
+			{FieldCode: "password"},
+		},
+	}
+	raw := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"customers","labelKey":"name","valueKey":"id","filterMapping":{"password":"tenant_id"}}}`
+	if err := validateTableFieldLinkageConfig(raw, currentTable, "customer_id", func(tableFieldLinkageConfig) (model.SysTable, error) {
+		return target, nil
+	}); err == nil {
+		t.Fatal("expected sensitive relation filter field to be rejected")
 	}
 }
 

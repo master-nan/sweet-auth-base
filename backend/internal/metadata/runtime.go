@@ -5,6 +5,7 @@ import (
 	"backend/internal/security"
 	"backend/model"
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 )
@@ -12,18 +13,18 @@ import (
 // LogicalFieldType is the source-independent value type exposed to runtime
 // metadata consumers. It deliberately does not describe the physical SQL
 // column or the frontend component used to edit the value.
-type LogicalFieldType string
+type LogicalFieldType = enum.SysTableFieldLogicalType
 
 const (
-	LogicalFieldTypeInteger  LogicalFieldType = "integer"
-	LogicalFieldTypeDecimal  LogicalFieldType = "decimal"
-	LogicalFieldTypeString   LogicalFieldType = "string"
-	LogicalFieldTypeText     LogicalFieldType = "text"
-	LogicalFieldTypeBoolean  LogicalFieldType = "boolean"
-	LogicalFieldTypeDate     LogicalFieldType = "date"
-	LogicalFieldTypeDateTime LogicalFieldType = "datetime"
-	LogicalFieldTypeTime     LogicalFieldType = "time"
-	LogicalFieldTypeJSON     LogicalFieldType = "json"
+	LogicalFieldTypeInteger  = enum.LogicalTypeInteger
+	LogicalFieldTypeDecimal  = enum.LogicalTypeDecimal
+	LogicalFieldTypeString   = enum.LogicalTypePlain
+	LogicalFieldTypeText     = enum.LogicalTypePlain
+	LogicalFieldTypeBoolean  = enum.LogicalTypeBoolean
+	LogicalFieldTypeDate     = enum.LogicalTypeDate
+	LogicalFieldTypeDateTime = enum.LogicalTypeDateTime
+	LogicalFieldTypeTime     = enum.LogicalTypePlain
+	LogicalFieldTypeJSON     = enum.LogicalTypePlain
 )
 
 // TableMetadata is the stable runtime projection. Administration-only facts
@@ -52,6 +53,10 @@ type FieldMetadata struct {
 	UIComponent        enum.SysTableFieldInputType
 	Length             int
 	DecimalLength      int
+	NumericPrecision   int
+	NumericScale       int
+	DisplayFormat      enum.SysTableFieldDisplayFormat
+	ListWidth          *int
 	FormSpan           uint8
 	DetailSpan         uint8
 	DefaultValue       *string
@@ -72,6 +77,15 @@ type FieldMetadata struct {
 	RelationExpression string
 	LinkageConfig      *string
 	SystemManaged      bool
+	Relation           *RelationDisplayMetadata
+}
+
+type RelationDisplayMetadata struct {
+	TargetTableCode string
+	ValueField      string
+	DisplayField    string
+	ParentField     string
+	FilterMapping   map[string]string
 }
 
 type RelationMetadata struct {
@@ -169,11 +183,15 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		TableID:            source.TableId,
 		Code:               source.FieldCode,
 		DisplayName:        source.FieldName,
-		StorageType:        source.FieldType,
-		LogicalType:        logicalFieldType(source.FieldType),
+		StorageType:        CanonicalStorageType(source.FieldType),
+		LogicalType:        resolveLogicalType(source),
+		DisplayFormat:      resolveDisplayFormat(source),
 		UIComponent:        source.InputType,
 		Length:             source.FieldLength,
 		DecimalLength:      source.FieldDecimalLength,
+		NumericPrecision:   numericPrecision(source),
+		NumericScale:       numericScale(source),
+		ListWidth:          cloneInt(source.ListWidth),
 		FormSpan:           source.FormSpan,
 		DetailSpan:         source.DetailSpan,
 		DefaultValue:       cloneString(source.DefaultValue),
@@ -194,6 +212,7 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		RelationExpression: expression,
 		LinkageConfig:      cloneString(source.LinkageConfig),
 		SystemManaged:      managed,
+		Relation:           relationDisplayMetadata(source.LinkageConfig),
 	}, true
 }
 
@@ -245,6 +264,11 @@ func (table TableMetadata) QueryModel() model.SysTable {
 			FieldType:          field.StorageType,
 			FieldLength:        field.Length,
 			FieldDecimalLength: field.DecimalLength,
+			NumericPrecision:   field.NumericPrecision,
+			NumericScale:       field.NumericScale,
+			LogicalType:        field.LogicalType,
+			DisplayFormat:      field.DisplayFormat,
+			ListWidth:          cloneInt(field.ListWidth),
 			InputType:          field.UIComponent,
 			FormSpan:           field.FormSpan,
 			DetailSpan:         field.DetailSpan,
@@ -282,10 +306,11 @@ func (table TableMetadata) QueryModel() model.SysTable {
 }
 
 func logicalFieldType(fieldType enum.SysTableFieldType) LogicalFieldType {
+	fieldType = CanonicalStorageType(fieldType)
 	switch fieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType:
 		return LogicalFieldTypeInteger
-	case enum.FloatFieldType:
+	case enum.DecimalFieldType:
 		return LogicalFieldTypeDecimal
 	case enum.TextFieldType:
 		return LogicalFieldTypeText
@@ -302,6 +327,102 @@ func logicalFieldType(fieldType enum.SysTableFieldType) LogicalFieldType {
 	default:
 		return LogicalFieldTypeString
 	}
+}
+
+func resolveLogicalType(field model.SysTableField) LogicalFieldType {
+	if normalized, ok := enum.NormalizeSysTableFieldLogicalType(string(field.LogicalType)); ok && normalized != "" {
+		return normalized
+	}
+	if field.LinkageConfig != nil {
+		return enum.LogicalTypeRelation
+	}
+	if field.DictCode != nil {
+		return enum.LogicalTypeEnum
+	}
+	return logicalFieldType(field.FieldType)
+}
+
+func resolveDisplayFormat(field model.SysTableField) enum.SysTableFieldDisplayFormat {
+	if normalized, ok := enum.NormalizeSysTableFieldDisplayFormat(string(field.DisplayFormat)); ok && normalized != "" {
+		return normalized
+	}
+	switch resolveLogicalType(field) {
+	case enum.LogicalTypeInteger:
+		return enum.DisplayFormatInteger
+	case enum.LogicalTypeDecimal:
+		return enum.DisplayFormatDecimal
+	case enum.LogicalTypeMoney:
+		return enum.DisplayFormatMoney
+	case enum.LogicalTypePercent:
+		return enum.DisplayFormatPercent
+	case enum.LogicalTypeDate:
+		return enum.DisplayFormatDate
+	case enum.LogicalTypeDateTime:
+		return enum.DisplayFormatDateTime
+	case enum.LogicalTypeEnum:
+		return enum.DisplayFormatDictionary
+	case enum.LogicalTypeRelation:
+		return enum.DisplayFormatRelation
+	default:
+		return enum.DisplayFormatPlain
+	}
+}
+
+func numericPrecision(field model.SysTableField) int {
+	if field.NumericPrecision > 0 {
+		return field.NumericPrecision
+	}
+	if CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		if field.FieldLength > 0 {
+			return field.FieldLength
+		}
+		return DefaultNumericPrecision
+	}
+	return 0
+}
+
+func numericScale(field model.SysTableField) int {
+	if field.NumericScale > 0 {
+		return field.NumericScale
+	}
+	if CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		if field.FieldType == enum.FloatFieldType && field.FieldDecimalLength == 0 && field.NumericPrecision == 0 {
+			return LegacyNumericScale
+		}
+		return field.FieldDecimalLength
+	}
+	return 0
+}
+
+func relationDisplayMetadata(raw *string) *RelationDisplayMetadata {
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil
+	}
+	var envelope struct {
+		Linkage struct {
+			Enabled       bool              `json:"enabled"`
+			TableCode     string            `json:"tableCode"`
+			ValueKey      string            `json:"valueKey"`
+			LabelKey      string            `json:"labelKey"`
+			ParentKey     string            `json:"parentKey"`
+			FilterMapping map[string]string `json:"filterMapping"`
+		} `json:"linkage"`
+	}
+	if json.Unmarshal([]byte(*raw), &envelope) != nil || !envelope.Linkage.Enabled ||
+		envelope.Linkage.TableCode == "" || envelope.Linkage.ValueKey == "" || envelope.Linkage.LabelKey == "" {
+		return nil
+	}
+	return &RelationDisplayMetadata{TargetTableCode: envelope.Linkage.TableCode, ValueField: envelope.Linkage.ValueKey,
+		DisplayField: envelope.Linkage.LabelKey, ParentField: envelope.Linkage.ParentKey,
+		FilterMapping: envelope.Linkage.FilterMapping}
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	copyValue := *value
+	return &copyValue
 }
 
 func isStructuredRelationExpression(value string) bool {

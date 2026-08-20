@@ -187,6 +187,7 @@ type OrgEmployeeListRes struct {
 	Name                 string                  `json:"name"`
 	EmploymentStatus     string                  `json:"employment_status"`
 	PrimaryLegalEntityId *int                    `json:"primary_legal_entity_id"`
+	PrimaryLegalEntity   *OrgReferenceSummaryRes `json:"primary_legal_entity,omitempty"`
 	BoundUserId          *int                    `json:"user_id"`
 	BindingStatus        string                  `json:"binding_status"`
 	BoundAccount         *OrgBoundUserSummaryRes `json:"bound_account,omitempty"`

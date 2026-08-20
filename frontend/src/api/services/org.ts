@@ -86,6 +86,7 @@ export interface StructureOptionsRequest extends OrganizationReadScopeRequest {
 export interface StructureQueryRequest extends OrganizationReadScopeRequest {
   page: number
   num: number
+  structure_type?: 'management' | 'legal'
 }
 
 export interface OrganizationStructure extends OrganizationBaseRecord {
@@ -174,7 +175,8 @@ export interface EmployeeListItem extends OrganizationBaseRecord {
   employee_no: string
   name: string
   employment_status: string
-  primary_legal_entity_id?: number | null
+	primary_legal_entity_id?: number | null
+	primary_legal_entity?: OrganizationReferenceSummary | null
   user_id?: number | null
   binding_status: string
   bound_account?: BoundUserSummary | null

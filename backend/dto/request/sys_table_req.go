@@ -37,63 +37,82 @@ type TablePublishReq struct {
 }
 
 type TableFieldCreateReq struct {
-	TableId            int                         `json:"table_id" binding:"required"`
-	FieldName          string                      `json:"field_name" binding:"required"` // 列名
-	FieldCode          string                      `json:"field_code" binding:"required"` // 数据库中字段名
-	FieldType          enum.SysTableFieldType      `json:"type" binding:"required"`       // 字段类型
-	FieldLength        int                         `json:"field_length"`                  // 字段长度
-	FieldDecimalLength int                         `json:"field_decimal_length"`          // 小数位数
-	InputType          enum.SysTableFieldInputType `json:"input_type" binding:"required"` // 输入类型
-	FormSpan           uint8                       `json:"form_span"`                     // 表单占位列数，0为自动
-	DetailSpan         uint8                       `json:"detail_span"`                   // 详情占位列数，0为自动
-	DefaultValue       string                      `json:"default_value"`                 // 默认值
-	DictCode           string                      `json:"dict_code"`                     // 所用字典
-	IsPrimaryKey       bool                        `json:"is_primary_key"`                // 是否主键
-	IsIndex            bool                        `json:"is_index"`                      // 是否索引
-	IsQuickSearch      bool                        `json:"is_quick_search"`               // 是否快捷搜索
-	IsAdvancedSearch   bool                        `json:"is_advanced_search"`            // 是否高级搜索
-	IsSort             bool                        `json:"is_sort"`                       // 是否可排序
-	IsNull             bool                        `json:"is_null"`                       // 是否可空
-	IsListShow         bool                        `json:"is_list_show"`                  // 是否列表显示
-	IsInsertShow       bool                        `json:"is_insert_show"`                // 是否新增显示
-	IsUpdateShow       bool                        `json:"is_update_show"`                // 是否更新显示
-	Sequence           int                         `json:"sequence" binding:"required"`   // 排序
-	Binding            string                      `json:"binding"`                       // 校验规则
-	OriginalFieldId    int                         `json:"original_field_id"`             // 原字段Id
-	FieldCategory      enum.SysTableFieldCategory  `json:"field_category"`                // 字段类别
-	Expression         string                      `json:"expression"`                    // 计算字段表达式
-	LinkageConfig      string                      `json:"linkage_config"`                // 联动配置
+	TableId            int                             `json:"table_id" binding:"required"`
+	FieldName          string                          `json:"field_name" binding:"required"` // 列名
+	FieldCode          string                          `json:"field_code" binding:"required"` // 数据库中字段名
+	FieldType          enum.SysTableFieldType          `json:"type" binding:"required"`       // 字段类型
+	FieldLength        int                             `json:"field_length"`                  // 字段长度
+	FieldDecimalLength int                             `json:"field_decimal_length"`          // 小数位数
+	NumericPrecision   int                             `json:"numeric_precision"`
+	NumericScale       int                             `json:"numeric_scale"`
+	LogicalType        enum.SysTableFieldLogicalType   `json:"logical_type"`
+	DisplayFormat      enum.SysTableFieldDisplayFormat `json:"display_format"`
+	ListWidth          *int                            `json:"list_width"`
+	InputType          enum.SysTableFieldInputType     `json:"input_type" binding:"required"` // 输入类型
+	FormSpan           uint8                           `json:"form_span"`                     // 表单占位列数，0为自动
+	DetailSpan         uint8                           `json:"detail_span"`                   // 详情占位列数，0为自动
+	DefaultValue       string                          `json:"default_value"`                 // 默认值
+	DictCode           string                          `json:"dict_code"`                     // 所用字典
+	IsPrimaryKey       bool                            `json:"is_primary_key"`                // 是否主键
+	IsIndex            bool                            `json:"is_index"`                      // 是否索引
+	IsQuickSearch      bool                            `json:"is_quick_search"`               // 是否快捷搜索
+	IsAdvancedSearch   bool                            `json:"is_advanced_search"`            // 是否高级搜索
+	IsSort             bool                            `json:"is_sort"`                       // 是否可排序
+	IsNull             bool                            `json:"is_null"`                       // 是否可空
+	IsListShow         bool                            `json:"is_list_show"`                  // 是否列表显示
+	IsInsertShow       bool                            `json:"is_insert_show"`                // 是否新增显示
+	IsUpdateShow       bool                            `json:"is_update_show"`                // 是否更新显示
+	Sequence           int                             `json:"sequence" binding:"required"`   // 排序
+	Binding            string                          `json:"binding"`                       // 校验规则
+	OriginalFieldId    int                             `json:"original_field_id"`             // 原字段Id
+	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`                // 字段类别
+	Expression         string                          `json:"expression"`                    // 计算字段表达式
+	LinkageConfig      string                          `json:"linkage_config"`                // 联动配置
 
 }
 
 type TableFieldUpdateReq struct {
-	Id                 int                         `json:"id" binding:"required"`
-	TableId            int                         `json:"table_id" binding:"required"`
-	FieldName          string                      `json:"field_name" binding:"required"` // 列名
-	FieldCode          string                      `json:"field_code" binding:"required"` // 数据库中字段名
-	FieldType          enum.SysTableFieldType      `json:"type" binding:"required"`       // 字段类型
-	FieldLength        int                         `json:"field_length"`                  // 字段长度
-	FieldDecimalLength int                         `json:"field_decimal_length"`          // 小数位数
-	InputType          enum.SysTableFieldInputType `json:"input_type" binding:"required"` // 输入类型
-	FormSpan           uint8                       `json:"form_span"`                     // 表单占位列数，0为自动
-	DetailSpan         uint8                       `json:"detail_span"`                   // 详情占位列数，0为自动
-	DefaultValue       string                      `json:"default_value"`                 // 默认值
-	DictCode           string                      `json:"dict_code"`                     // 所用字典
-	IsPrimaryKey       bool                        `json:"is_primary_key"`                // 是否主键
-	IsIndex            bool                        `json:"is_index"`                      // 是否索引
-	IsQuickSearch      bool                        `json:"is_quick_search"`               // 是否快捷搜索
-	IsAdvancedSearch   bool                        `json:"is_advanced_search"`            // 是否高级搜索
-	IsSort             bool                        `json:"is_sort"`                       // 是否可排序
-	IsNull             bool                        `json:"is_null"`                       // 是否可空
-	IsListShow         bool                        `json:"is_list_show"`                  // 是否列表显示
-	IsInsertShow       bool                        `json:"is_insert_show"`                // 是否新增显示
-	IsUpdateShow       bool                        `json:"is_update_show"`                // 是否更新显示
-	Sequence           int                         `json:"sequence"`                      // 排序
-	Binding            string                      `json:"binding"`                       // 校验规则
-	OriginalFieldId    int                         `json:"original_field_id"`             // 原字段Id
-	FieldCategory      enum.SysTableFieldCategory  `json:"field_category"`                // 字段类别
-	Expression         string                      `json:"expression"`                    // 计算字段表达式
-	LinkageConfig      string                      `json:"linkage_config"`                // 联动配置
+	Id                 int                             `json:"id" binding:"required"`
+	TableId            int                             `json:"table_id" binding:"required"`
+	FieldName          string                          `json:"field_name" binding:"required"` // 列名
+	FieldCode          string                          `json:"field_code" binding:"required"` // 数据库中字段名
+	FieldType          enum.SysTableFieldType          `json:"type" binding:"required"`       // 字段类型
+	FieldLength        int                             `json:"field_length"`                  // 字段长度
+	FieldDecimalLength int                             `json:"field_decimal_length"`          // 小数位数
+	NumericPrecision   int                             `json:"numeric_precision"`
+	NumericScale       int                             `json:"numeric_scale"`
+	LogicalType        enum.SysTableFieldLogicalType   `json:"logical_type"`
+	DisplayFormat      enum.SysTableFieldDisplayFormat `json:"display_format"`
+	ListWidth          *int                            `json:"list_width"`
+	InputType          enum.SysTableFieldInputType     `json:"input_type" binding:"required"` // 输入类型
+	FormSpan           uint8                           `json:"form_span"`                     // 表单占位列数，0为自动
+	DetailSpan         uint8                           `json:"detail_span"`                   // 详情占位列数，0为自动
+	DefaultValue       string                          `json:"default_value"`                 // 默认值
+	DictCode           string                          `json:"dict_code"`                     // 所用字典
+	IsPrimaryKey       bool                            `json:"is_primary_key"`                // 是否主键
+	IsIndex            bool                            `json:"is_index"`                      // 是否索引
+	IsQuickSearch      bool                            `json:"is_quick_search"`               // 是否快捷搜索
+	IsAdvancedSearch   bool                            `json:"is_advanced_search"`            // 是否高级搜索
+	IsSort             bool                            `json:"is_sort"`                       // 是否可排序
+	IsNull             bool                            `json:"is_null"`                       // 是否可空
+	IsListShow         bool                            `json:"is_list_show"`                  // 是否列表显示
+	IsInsertShow       bool                            `json:"is_insert_show"`                // 是否新增显示
+	IsUpdateShow       bool                            `json:"is_update_show"`                // 是否更新显示
+	Sequence           int                             `json:"sequence"`                      // 排序
+	Binding            string                          `json:"binding"`                       // 校验规则
+	OriginalFieldId    int                             `json:"original_field_id"`             // 原字段Id
+	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`                // 字段类别
+	Expression         string                          `json:"expression"`                    // 计算字段表达式
+	LinkageConfig      string                          `json:"linkage_config"`                // 联动配置
+}
+
+type RuntimeRelationOptionsReq struct {
+	MenuId         int                    `json:"menu_id" binding:"required"`
+	Keyword        string                 `json:"keyword"`
+	Page           int                    `json:"page"`
+	Num            int                    `json:"num"`
+	SelectedValues []string               `json:"selected_values"`
+	SourceValues   map[string]interface{} `json:"source_values"`
 }
 
 type TableRelationCreateReq struct {

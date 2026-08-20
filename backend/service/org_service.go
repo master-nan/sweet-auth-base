@@ -222,6 +222,7 @@ func (s *OrgService) QueryStructures(
 	if err != nil {
 		return result, err
 	}
+	req.StructureType = model.OrgStructureTypeManagement
 	table.TableCode = "org_structure"
 	rows, err := s.structureRepo.QueryForRead(ctx, &req, table, scope)
 	if err != nil {
@@ -257,6 +258,9 @@ func (s *OrgService) GetStructureDetail(
 	if !orgStructureVisible(structure, scope) {
 		return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureInactive
 	}
+	if structure.StructureType != model.OrgStructureTypeManagement {
+		return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureNotFound
+	}
 	return response.NewOrgStructureDetailRes(structure), nil
 }
 
@@ -286,6 +290,7 @@ func (s *OrgService) QueryStructureOptions(
 		},
 		OrgReadScopeReq: req.OrgReadScopeReq,
 		LegalEntityId:   req.LegalEntityId,
+		StructureType:   model.OrgStructureTypeManagement,
 	}
 	table.TableCode = "org_structure"
 	rows, err := s.structureRepo.QueryForRead(ctx, &queryReq, table, scope)
@@ -312,6 +317,9 @@ func (s *OrgService) QueryStructureOptions(
 	}
 	selectedById := make(map[int]model.OrgStructure, len(selected))
 	for _, structure := range selected {
+		if structure.StructureType != model.OrgStructureTypeManagement {
+			continue
+		}
 		selectedById[structure.Id] = structure
 	}
 	for _, id := range selectedIds {
@@ -519,6 +527,9 @@ func (s *OrgService) QueryEmployees(
 	if err = s.attachEmployeeAccountSummaries(ctx, result.Data); err != nil {
 		return response.ListResult[response.OrgEmployeeListRes]{}, err
 	}
+	if err = s.attachEmployeeLegalEntitySummaries(ctx, result.Data); err != nil {
+		return response.ListResult[response.OrgEmployeeListRes]{}, err
+	}
 	return result, nil
 }
 
@@ -548,6 +559,9 @@ func (s *OrgService) GetEmployeeDetail(
 	result := response.NewOrgEmployeeDetailRes(employee)
 	list := []response.OrgEmployeeListRes{result.OrgEmployeeListRes}
 	if err = s.attachEmployeeAccountSummaries(ctx, list); err != nil {
+		return response.OrgEmployeeDetailRes{}, err
+	}
+	if err = s.attachEmployeeLegalEntitySummaries(ctx, list); err != nil {
 		return response.OrgEmployeeDetailRes{}, err
 	}
 	result.OrgEmployeeListRes = list[0]
@@ -1202,6 +1216,9 @@ func (s *OrgService) getStructureOrgTreeForRead(
 	if !orgStructureVisible(structure, scope) {
 		return nil, myerrors.ErrOrgStructureInactive
 	}
+	if structure.StructureType != model.OrgStructureTypeManagement {
+		return nil, myerrors.ErrOrgStructureNotFound
+	}
 
 	nodes, err := s.structureNodeRepo.ListByStructureForRead(
 		ctx,
@@ -1664,6 +1681,47 @@ func (s *OrgService) attachEmployeeAccountSummaries(
 		employees[index].SetBoundAccount(
 			response.NewOrgBoundUserSummaryRes(user.UserId, user.UserName),
 		)
+	}
+	return nil
+}
+
+func (s *OrgService) attachEmployeeLegalEntitySummaries(
+	ctx context.Context,
+	employees []response.OrgEmployeeListRes,
+) error {
+	entityIds := make([]int, 0, len(employees))
+	seen := make(map[int]struct{}, len(employees))
+	for _, employee := range employees {
+		if employee.PrimaryLegalEntityId == nil {
+			continue
+		}
+		if _, exists := seen[*employee.PrimaryLegalEntityId]; exists {
+			continue
+		}
+		seen[*employee.PrimaryLegalEntityId] = struct{}{}
+		entityIds = append(entityIds, *employee.PrimaryLegalEntityId)
+	}
+	if len(entityIds) == 0 {
+		return nil
+	}
+	entities, err := s.legalEntityRepo.FindByIdsForDisplay(ctx, entityIds)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	entitiesById := make(map[int]model.OrgLegalEntity, len(entities))
+	for _, entity := range entities {
+		entitiesById[entity.Id] = entity
+	}
+	for index := range employees {
+		if employees[index].PrimaryLegalEntityId == nil {
+			continue
+		}
+		entity, exists := entitiesById[*employees[index].PrimaryLegalEntityId]
+		if !exists {
+			continue
+		}
+		summary := response.NewOrgReferenceSummaryRes(entity.Id, entity.Code, entity.Name)
+		employees[index].PrimaryLegalEntity = &summary
 	}
 	return nil
 }

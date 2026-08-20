@@ -572,12 +572,13 @@ func fieldValueExists(data map[string]interface{}, fieldCode string) bool {
 func parseDefaultValue(field model.SysTableField, raw string) interface{} {
 	raw = strings.TrimSpace(raw)
 	switch field.FieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType:
 		if val, err := parseInt(raw); err == nil {
 			return val
 		}
-	case enum.FloatFieldType:
-		if val, err := parseFloat(raw); err == nil {
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		precision, scale := generalizationDecimalShape(field)
+		if val, err := platformmetadata.NormalizeDecimal(raw, precision, scale); err == nil {
 			return val
 		}
 	case enum.BooleanFieldType:
@@ -616,12 +617,18 @@ func normalizeFieldValue(field model.SysTableField, value interface{}) (interfac
 	switch field.FieldType {
 	case enum.BigIntFieldType:
 		return toInt(value)
-	case enum.IntFieldType, enum.TinyintFieldType:
+	case enum.IntFieldType:
 		if val, ok := toInt(value); ok {
 			return int(val), true
 		}
-	case enum.FloatFieldType:
-		return toFloat(value)
+	case enum.TinyintFieldType, enum.SmallIntFieldType:
+		if val, ok := toInt(value); ok && val >= platformmetadata.SmallIntMin && val <= platformmetadata.SmallIntMax {
+			return int16(val), true
+		}
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		precision, scale := generalizationDecimalShape(field)
+		val, err := platformmetadata.NormalizeDecimal(value, precision, scale)
+		return val, err == nil
 	case enum.BooleanFieldType:
 		return toBool(value)
 	case enum.DateFieldType:
@@ -681,12 +688,18 @@ func validateDataByBindings(table model.SysTable, data map[string]interface{}, i
 
 func validateValueType(field model.SysTableField, value interface{}) error {
 	switch field.FieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType:
 		if _, ok := toInt(value); !ok {
 			return error2.NewValidationError(fmt.Sprintf("%s必须是整数", field.FieldName))
 		}
-	case enum.FloatFieldType:
-		if _, ok := toFloat(value); !ok {
+	case enum.TinyintFieldType, enum.SmallIntFieldType:
+		val, ok := toInt(value)
+		if !ok || val < platformmetadata.SmallIntMin || val > platformmetadata.SmallIntMax {
+			return error2.NewValidationError(fmt.Sprintf("%s必须在-32768到32767之间", field.FieldName))
+		}
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		precision, scale := generalizationDecimalShape(field)
+		if _, err := platformmetadata.NormalizeDecimal(value, precision, scale); err != nil {
 			return error2.NewValidationError(fmt.Sprintf("%s必须是数字", field.FieldName))
 		}
 	case enum.BooleanFieldType:
@@ -795,6 +808,18 @@ func isEmptyValue(value interface{}, exists bool) bool {
 }
 
 func validateMin(field model.SysTableField, value interface{}, minStr string) error {
+	if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		precision, scale := generalizationDecimalShape(field)
+		current, currentErr := platformmetadata.NormalizeDecimal(value, precision, scale)
+		minimum, minimumErr := platformmetadata.NormalizeDecimal(minStr, precision, scale)
+		if currentErr == nil && minimumErr == nil {
+			comparison, _ := platformmetadata.CompareDecimal(current, minimum)
+			if comparison < 0 {
+				return error2.NewValidationError(fmt.Sprintf("%s不能小于%s", field.FieldName, minimum))
+			}
+		}
+		return nil
+	}
 	if isNumberField(field) {
 		minVal, err := parseFloat(minStr)
 		if err == nil {
@@ -816,6 +841,18 @@ func validateMin(field model.SysTableField, value interface{}, minStr string) er
 }
 
 func validateMax(field model.SysTableField, value interface{}, maxStr string) error {
+	if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		precision, scale := generalizationDecimalShape(field)
+		current, currentErr := platformmetadata.NormalizeDecimal(value, precision, scale)
+		maximum, maximumErr := platformmetadata.NormalizeDecimal(maxStr, precision, scale)
+		if currentErr == nil && maximumErr == nil {
+			comparison, _ := platformmetadata.CompareDecimal(current, maximum)
+			if comparison > 0 {
+				return error2.NewValidationError(fmt.Sprintf("%s不能大于%s", field.FieldName, maximum))
+			}
+		}
+		return nil
+	}
 	if isNumberField(field) {
 		maxVal, err := parseFloat(maxStr)
 		if err == nil {
@@ -840,7 +877,23 @@ func isNumberField(field model.SysTableField) bool {
 	return field.FieldType == enum.BigIntFieldType ||
 		field.FieldType == enum.FloatFieldType ||
 		field.FieldType == enum.TinyintFieldType ||
+		field.FieldType == enum.SmallIntFieldType ||
+		field.FieldType == enum.DecimalFieldType ||
 		field.FieldType == enum.IntFieldType
+}
+
+func generalizationDecimalShape(field model.SysTableField) (int, int) {
+	precision, scale := field.NumericPrecision, field.NumericScale
+	if precision == 0 {
+		precision, scale = field.FieldLength, field.FieldDecimalLength
+	}
+	if precision == 0 {
+		precision = platformmetadata.DefaultNumericPrecision
+		if field.FieldType == enum.FloatFieldType {
+			scale = platformmetadata.LegacyNumericScale
+		}
+	}
+	return precision, scale
 }
 
 func toFloat(value interface{}) (float64, bool) {

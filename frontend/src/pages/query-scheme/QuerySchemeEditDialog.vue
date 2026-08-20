@@ -23,7 +23,7 @@
         />
         <q-banner v-if="scopeError" class="bg-warning text-dark rounded-borders">{{ scopeError }}</q-banner>
         <q-btn outline color="primary" icon="tune" label="编辑查询条件" :disable="!scopeConfig" @click="openConditionEditor" />
-        <query-scheme-preview v-if="scopeConfig" :payload="payload" :fields="fields" />
+        <query-scheme-preview v-if="scopeConfig" :payload="payload" :fields="fields" :menu-id="scopeConfig.menu_id" />
       </q-card-section>
       <q-card-actions align="right" class="q-pa-md">
         <q-btn v-close-popup flat label="取消" />
@@ -37,6 +37,7 @@
     v-model:query-model="conditionDraft"
     v-model:bindings="conditionBindingDraft"
     :fields="fields"
+    :menu-id="scopeConfig?.menu_id || 0"
     title="编辑查询条件"
     usage="scheme-condition-editor"
     @confirm="confirmConditionEdit"

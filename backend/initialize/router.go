@@ -121,6 +121,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.GET("/table/id/:id", app.TableController.GetTableByID)
 		adminGroup.GET("/table/code/:code", app.TableController.GetTableByCode)
 		adminGroup.GET("/runtime/table/:code", app.TableController.GetRuntimeTableByCode)
+		adminGroup.POST("/runtime/relation-fields/:fieldId/options", app.TableController.QueryRuntimeRelationOptions)
 		adminGroup.POST("/table/query", app.TableController.QueryTable)
 		adminGroup.POST("/table", app.TableController.CreateTable)
 		adminGroup.PUT("/table/:id", app.TableController.UpdateTable)

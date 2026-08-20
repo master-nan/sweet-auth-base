@@ -297,7 +297,72 @@ const (
 	TinyintFieldType
 	JsonFieldType
 	IntFieldType
+	SmallIntFieldType
+	DecimalFieldType
 )
+
+// SysTableFieldLogicalType describes business value semantics independently
+// from physical storage and frontend input components.
+type SysTableFieldLogicalType string
+
+const (
+	LogicalTypePlain    SysTableFieldLogicalType = "plain"
+	LogicalTypeInteger  SysTableFieldLogicalType = "integer"
+	LogicalTypeDecimal  SysTableFieldLogicalType = "decimal"
+	LogicalTypeMoney    SysTableFieldLogicalType = "money"
+	LogicalTypePercent  SysTableFieldLogicalType = "percent"
+	LogicalTypeBoolean  SysTableFieldLogicalType = "boolean"
+	LogicalTypeEnum     SysTableFieldLogicalType = "enum"
+	LogicalTypeDate     SysTableFieldLogicalType = "date"
+	LogicalTypeDateTime SysTableFieldLogicalType = "datetime"
+	LogicalTypeRelation SysTableFieldLogicalType = "relation"
+)
+
+func NormalizeSysTableFieldLogicalType(value string) (SysTableFieldLogicalType, bool) {
+	logicalType := SysTableFieldLogicalType(strings.ToLower(strings.TrimSpace(value)))
+	if logicalType == "" {
+		return "", true
+	}
+	switch logicalType {
+	case LogicalTypePlain, LogicalTypeInteger, LogicalTypeDecimal, LogicalTypeMoney,
+		LogicalTypePercent, LogicalTypeBoolean, LogicalTypeEnum, LogicalTypeDate,
+		LogicalTypeDateTime, LogicalTypeRelation:
+		return logicalType, true
+	default:
+		return "", false
+	}
+}
+
+// SysTableFieldDisplayFormat is a controlled presentation hint. It never
+// contains executable code, CSS, templates or formatter names.
+type SysTableFieldDisplayFormat string
+
+const (
+	DisplayFormatPlain      SysTableFieldDisplayFormat = "plain"
+	DisplayFormatInteger    SysTableFieldDisplayFormat = "integer"
+	DisplayFormatDecimal    SysTableFieldDisplayFormat = "decimal"
+	DisplayFormatMoney      SysTableFieldDisplayFormat = "money"
+	DisplayFormatPercent    SysTableFieldDisplayFormat = "percent"
+	DisplayFormatDate       SysTableFieldDisplayFormat = "date"
+	DisplayFormatDateTime   SysTableFieldDisplayFormat = "datetime"
+	DisplayFormatDictionary SysTableFieldDisplayFormat = "dictionary"
+	DisplayFormatRelation   SysTableFieldDisplayFormat = "relation"
+)
+
+func NormalizeSysTableFieldDisplayFormat(value string) (SysTableFieldDisplayFormat, bool) {
+	format := SysTableFieldDisplayFormat(strings.ToLower(strings.TrimSpace(value)))
+	if format == "" {
+		return "", true
+	}
+	switch format {
+	case DisplayFormatPlain, DisplayFormatInteger, DisplayFormatDecimal, DisplayFormatMoney,
+		DisplayFormatPercent, DisplayFormatDate, DisplayFormatDateTime,
+		DisplayFormatDictionary, DisplayFormatRelation:
+		return format, true
+	default:
+		return "", false
+	}
+}
 
 // SysTableFieldInputType 字段
 // 页面输入类型

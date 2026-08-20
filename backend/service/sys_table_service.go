@@ -445,6 +445,9 @@ func (s *SysTableService) CreateTableField(ctx context.Context, req request.Tabl
 	if err = validateMetadataFieldDefinition(&data, req.Sequence); err != nil {
 		return err
 	}
+	if err = s.validateRelationDisplayContract(data, table); err != nil {
+		return err
+	}
 	data.Id = int(id)
 	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		// 构建SQL类型字符串，包括长度、默认值、是否可为空和备注
@@ -477,6 +480,11 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 		FieldType:          req.FieldType,
 		FieldLength:        req.FieldLength,
 		FieldDecimalLength: req.FieldDecimalLength,
+		NumericPrecision:   req.NumericPrecision,
+		NumericScale:       req.NumericScale,
+		LogicalType:        req.LogicalType,
+		DisplayFormat:      req.DisplayFormat,
+		ListWidth:          req.ListWidth,
 		InputType:          req.InputType,
 		FormSpan:           req.FormSpan,
 		DetailSpan:         req.DetailSpan,
@@ -501,6 +509,10 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 	if err = validateMetadataFieldDefinition(&candidate, req.Sequence); err != nil {
 		return err
 	}
+	req.NumericPrecision = candidate.NumericPrecision
+	req.NumericScale = candidate.NumericScale
+	req.LogicalType = candidate.LogicalType
+	req.DisplayFormat = candidate.DisplayFormat
 	table, err := s.GetTableById(req.TableId)
 	if err != nil {
 		return err
@@ -511,6 +523,10 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			return err
 		}
 		req.LinkageConfig = linkageConfig
+		candidate.LinkageConfig = optionalMetadataString(linkageConfig)
+		if err = s.validateRelationDisplayContract(candidate, table); err != nil {
+			return err
+		}
 		fields, e := s.GetTableFieldsByTableId(req.TableId)
 		if e != nil {
 			return e
@@ -536,6 +552,8 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 				req.FieldType != data.FieldType ||
 				req.FieldLength != data.FieldLength ||
 				req.FieldDecimalLength != data.FieldDecimalLength ||
+				req.NumericPrecision != data.NumericPrecision ||
+				req.NumericScale != data.NumericScale ||
 				req.DefaultValue != existingDefault ||
 				req.IsNull != data.IsNull {
 				return myerrors.ErrTableViewFieldNoAdd
@@ -552,7 +570,8 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			if req.FieldType != data.FieldType {
 				columnNeedsAlter = true
 			}
-			if req.FieldLength != data.FieldLength || req.FieldDecimalLength != data.FieldDecimalLength {
+			if req.FieldLength != data.FieldLength || req.FieldDecimalLength != data.FieldDecimalLength ||
+				req.NumericPrecision != data.NumericPrecision || req.NumericScale != data.NumericScale {
 				columnNeedsAlter = true
 			}
 			if !metadataStringEqual(optionalMetadataString(req.DefaultValue), data.DefaultValue) {
@@ -784,11 +803,14 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	if strings.TrimSpace(currentFieldCode) != "" {
 		currentFields[currentFieldCode] = struct{}{}
 	}
-	relatedFields := tableFieldCodeSet(relatedTable.TableFields)
+	relatedFields := tableFieldByCode(relatedTable.TableFields)
 	if strings.TrimSpace(currentFieldCode) != "" &&
 		((relatedTable.Id != 0 && relatedTable.Id == currentTable.Id) ||
 			(strings.TrimSpace(relatedTable.TableCode) != "" && relatedTable.TableCode == currentTable.TableCode)) {
-		relatedFields[currentFieldCode] = struct{}{}
+		relatedFields[currentFieldCode] = model.SysTableField{FieldCode: currentFieldCode}
+	}
+	if strings.TrimSpace(cfg.LabelKey) == "" || strings.TrimSpace(cfg.ValueKey) == "" {
+		return "", myerrors.NewValidationError("关系展示必须配置labelKey和valueKey")
 	}
 	if err := validateOptionalLinkageField("labelKey", cfg.LabelKey, relatedFields); err != nil {
 		return "", err
@@ -798,6 +820,17 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 	}
 	if err := validateOptionalLinkageField("parentKey", cfg.ParentKey, relatedFields); err != nil {
 		return "", err
+	}
+	valueField := relatedFields[strings.TrimSpace(cfg.ValueKey)]
+	labelField := relatedFields[strings.TrimSpace(cfg.LabelKey)]
+	if security.IsSensitiveFieldName(valueField.FieldCode) || security.IsSensitiveFieldName(labelField.FieldCode) {
+		return "", myerrors.NewValidationError("关系展示不允许使用敏感字段")
+	}
+	if parentKey := strings.TrimSpace(cfg.ParentKey); parentKey != "" && security.IsSensitiveFieldName(parentKey) {
+		return "", myerrors.NewValidationError("关系展示不允许使用敏感父级字段")
+	}
+	if !relationValueFieldUnique(relatedTable, valueField) {
+		return "", myerrors.NewValidationError("关系取值字段必须是主键或单字段唯一索引")
 	}
 	if cfg.Mode == "cascader" && strings.TrimSpace(cfg.ParentKey) == strings.TrimSpace(cfg.ValueKey) {
 		return "", myerrors.NewValidationError("级联配置父级字段不能和取值字段相同")
@@ -810,6 +843,9 @@ func normalizeTableFieldLinkageConfig(raw string, currentTable model.SysTable, c
 		}
 		if _, ok := relatedFields[targetField]; !ok {
 			return "", myerrors.NewValidationError(fmt.Sprintf("联动配置filterMapping目标字段%s不存在", targetField))
+		}
+		if security.IsSensitiveFieldName(targetField) {
+			return "", myerrors.NewValidationError("关系展示不允许使用敏感过滤字段")
 		}
 		if _, ok := currentFields[sourceField]; !ok {
 			return "", myerrors.NewValidationError(fmt.Sprintf("联动配置filterMapping源字段%s不存在", sourceField))
@@ -842,7 +878,7 @@ func tableFieldCodeSet(fields []model.SysTableField) map[string]struct{} {
 	return result
 }
 
-func validateOptionalLinkageField(name, fieldCode string, fields map[string]struct{}) error {
+func validateOptionalLinkageField(name, fieldCode string, fields map[string]model.SysTableField) error {
 	fieldCode = strings.TrimSpace(fieldCode)
 	if fieldCode == "" {
 		return nil
@@ -853,10 +889,58 @@ func validateOptionalLinkageField(name, fieldCode string, fields map[string]stru
 	return nil
 }
 
+func tableFieldByCode(fields []model.SysTableField) map[string]model.SysTableField {
+	result := make(map[string]model.SysTableField, len(fields))
+	for _, field := range fields {
+		result[field.FieldCode] = field
+	}
+	return result
+}
+
+func relationValueFieldUnique(table model.SysTable, field model.SysTableField) bool {
+	if field.IsPrimaryKey || field.FieldCode == "id" {
+		return true
+	}
+	for _, index := range table.TableIndexes {
+		if index.IsUnique && len(index.IndexFields) == 1 && index.IndexFields[0].FieldCode == field.FieldCode {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SysTableService) validateRelationDisplayContract(field model.SysTableField, currentTable model.SysTable) error {
+	if field.LinkageConfig == nil || strings.TrimSpace(*field.LinkageConfig) == "" {
+		return nil
+	}
+	var envelope tableFieldLinkageEnvelope
+	if err := json.Unmarshal([]byte(*field.LinkageConfig), &envelope); err != nil || envelope.Linkage == nil || !envelope.Linkage.Enabled {
+		return nil
+	}
+	target, err := s.resolveLinkageRelatedTable(*envelope.Linkage)
+	if err != nil {
+		return err
+	}
+	targetField, ok := tableFieldByCode(target.TableFields)[strings.TrimSpace(envelope.Linkage.ValueKey)]
+	if !ok {
+		return myerrors.NewValidationError("关系取值字段不存在")
+	}
+	if !platformmetadata.StorageTypesCompatible(field.FieldType, targetField.FieldType) {
+		return myerrors.NewValidationError("关系源字段与目标取值字段类型不兼容")
+	}
+	return nil
+}
+
 func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableField) string {
 	fieldType := req.FieldType
 	length := req.FieldLength
 	decimalLength := req.FieldDecimalLength
+	if platformmetadata.CanonicalStorageType(fieldType) == enum.DecimalFieldType {
+		length, decimalLength = req.NumericPrecision, req.NumericScale
+		if length == 0 {
+			length, decimalLength = data.NumericPrecision, data.NumericScale
+		}
+	}
 	if length == 0 {
 		length = data.FieldLength
 	}
@@ -887,11 +971,15 @@ func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableFiel
 
 func buildColumnSQLTypeFromField(field model.SysTableField) string {
 	sqlType := utils.SqlTypeFromFieldType(field.FieldType)
-	if field.FieldLength > 0 && typeAcceptsLength(field.FieldType) {
-		if field.FieldDecimalLength > 0 {
-			sqlType += fmt.Sprintf("(%d,%d)", field.FieldLength, field.FieldDecimalLength)
+	length, decimalLength := field.FieldLength, field.FieldDecimalLength
+	if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+		length, decimalLength = field.NumericPrecision, field.NumericScale
+	}
+	if length > 0 && typeAcceptsLength(field.FieldType) {
+		if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+			sqlType += fmt.Sprintf("(%d,%d)", length, decimalLength)
 		} else {
-			sqlType += fmt.Sprintf("(%d)", field.FieldLength)
+			sqlType += fmt.Sprintf("(%d)", length)
 		}
 	}
 	if field.DefaultValue != nil {
@@ -908,7 +996,7 @@ func buildColumnSQLTypeFromField(field model.SysTableField) string {
 // typeAcceptsLength 判断字段类型是否接受长度参数
 func typeAcceptsLength(ft enum.SysTableFieldType) bool {
 	switch ft {
-	case enum.VarcharFieldType, enum.FloatFieldType:
+	case enum.VarcharFieldType, enum.FloatFieldType, enum.DecimalFieldType:
 		return true
 	default:
 		return false
@@ -930,7 +1018,8 @@ func buildDefaultSQL(fieldType enum.SysTableFieldType, defaultValue string) stri
 			return " DEFAULT false"
 		}
 		return fmt.Sprintf(" DEFAULT '%s'", escapePostgresLiteral(defaultValue))
-	case enum.BigIntFieldType, enum.TinyintFieldType, enum.FloatFieldType, enum.IntFieldType:
+	case enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
+		enum.FloatFieldType, enum.DecimalFieldType, enum.IntFieldType:
 		return fmt.Sprintf(" DEFAULT %s", defaultValue)
 	case enum.JsonFieldType:
 		return fmt.Sprintf(" DEFAULT '%s'::jsonb", escapePostgresLiteral(defaultValue))
@@ -1004,6 +1093,9 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 		return err
 	}
 	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
+		return err
+	}
+	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey); err != nil {
 		return err
 	}
 	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
@@ -1094,6 +1186,9 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
 		return err
 	}
+	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey); err != nil {
+		return err
+	}
 
 	if relationPhysicalSignatureChanged(oldRelation, req) &&
 		(oldRelation.RelationType == enum.ManyToMany || req.RelationType == enum.ManyToMany) {
@@ -1128,6 +1223,30 @@ func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableC
 	}
 	if relationType != enum.ManyToMany && manyTableCode != "" {
 		return myerrors.NewValidationError("非多对多关系不允许配置中间表")
+	}
+	return nil
+}
+
+func (s *SysTableService) validatePhysicalRelationFields(
+	ctx context.Context,
+	tableID, relatedTableID int,
+	referenceKey, foreignKey string,
+) error {
+	mainTable, err := s.sysTableRepo.GetTableById(ctx, tableID)
+	if err != nil {
+		return err
+	}
+	relatedTable, err := s.sysTableRepo.GetTableById(ctx, relatedTableID)
+	if err != nil {
+		return err
+	}
+	referenceField, referenceOK := tableFieldByCode(mainTable.TableFields)[referenceKey]
+	foreignField, foreignOK := tableFieldByCode(relatedTable.TableFields)[foreignKey]
+	if !referenceOK || !foreignOK {
+		return myerrors.NewValidationError("关系两端字段必须存在")
+	}
+	if !platformmetadata.StorageTypesCompatible(referenceField.FieldType, foreignField.FieldType) {
+		return myerrors.NewValidationError("关系两端字段类型不兼容")
 	}
 	return nil
 }
@@ -2236,6 +2355,8 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 		field := model.SysTableField{
 			FieldCode:          column.ColumnName,              // 通常 FieldCode 会是数据库的真实列名
 			FieldDecimalLength: int(column.NumericScale.Int64), // 根据需要设置
+			NumericPrecision:   int(column.NumericPrecision.Int64),
+			NumericScale:       int(column.NumericScale.Int64),
 			IsNull:             column.IsNullable == "YES",
 			IsPrimaryKey:       column.ColumnKey == "PRI",
 			IsQuickSearch:      false,
@@ -2270,7 +2391,7 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 				field.FieldType = enum.BooleanFieldType
 				field.InputType = enum.BooleanInputType
 			} else {
-				field.FieldType = enum.TinyintFieldType
+				field.FieldType = enum.SmallIntFieldType
 				field.InputType = enum.InputNumberInputType
 				field.FieldLength = int(column.NumericPrecision.Int64)
 			}
@@ -2293,7 +2414,12 @@ func convertColumnsToSysTableFields(tableCode string, columns []model.TableColum
 		case "time", "time without time zone", "time with time zone", "timetz":
 			field.FieldType = enum.TimeFieldType
 			field.InputType = enum.TimePickerInputType
-		case "numeric", "decimal", "double precision", "float", "float4", "float8", "real":
+		case "numeric", "decimal":
+			field.FieldType = enum.DecimalFieldType
+			field.InputType = enum.InputNumberInputType
+			field.NumericPrecision = int(column.NumericPrecision.Int64)
+			field.NumericScale = int(column.NumericScale.Int64)
+		case "double precision", "float", "float4", "float8", "real":
 			field.FieldType = enum.FloatFieldType
 			field.InputType = enum.InputNumberInputType
 			field.FieldLength = int(column.NumericPrecision.Int64)
@@ -2347,6 +2473,10 @@ func systemFieldDictCode(tableCode, fieldCode string, fieldType enum.SysTableFie
 		return "sys_table_type"
 	case "field_type":
 		return "sys_table_field_type"
+	case "logical_type":
+		return "sys_table_field_logical_type"
+	case "display_format":
+		return "sys_table_field_display_format"
 	case "input_type":
 		return "sys_table_field_input_type"
 	case "field_category":

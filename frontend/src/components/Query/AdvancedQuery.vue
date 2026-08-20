@@ -237,12 +237,14 @@
           v-else
           :payload="previewPayload"
           :fields="previewFields"
+          :menu-id="currentMenuId"
         />
         <q-separator v-if="!readOnlyDepth" class="q-my-md" />
         <query-scheme-preview
           v-if="!readOnlyDepth"
           :payload="previewPayload"
           :fields="previewFields"
+          :menu-id="currentMenuId"
         />
       </q-card-section>
 
@@ -281,7 +283,7 @@ import {
 import type { Query, QueryRule } from 'src/types/global'
 import { useDictStore } from 'src/stores/dict'
 import { useUserStore } from 'src/stores/user'
-import { useGeneralizationApi } from 'src/api/services/generalization'
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
 import {
   coerceFieldValue,
   isBooleanFieldMetadata,
@@ -304,15 +306,15 @@ import {
   QUERY_SCHEME_BINDING_LABELS,
   type QuerySchemeBinding,
 } from 'src/modules/query-scheme/types'
-import { resolveRelationMenuId } from 'src/utils/menu-context'
+import { findMenuByName, toPositiveMenuId } from 'src/utils/menu-context'
 import AdvancedQueryRuleRow from './AdvancedQueryRuleRow.vue'
 import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
+import { Router } from 'src/router'
 
 const $q = useQuasar()
 const form = ref<QForm>()
 const dictStore = useDictStore()
 const userStore = useUserStore()
-const generalizationApi = useGeneralizationApi()
 
 type FieldRecord = Record<string, any> & Partial<TableField>
 type RelationOption = {
@@ -393,6 +395,12 @@ const props = defineProps({
     type: String as PropType<AdvancedQueryUsage>,
     default: 'business-query',
   },
+})
+
+const currentMenuId = computed(() => {
+  const explicit = toPositiveMenuId(props.menuId)
+  if (explicit > 0) return explicit
+  return findMenuByName(userStore.menus, String(Router?.currentRoute.value.name || ''))?.id || 0
 })
 
 const emit = defineEmits([
@@ -495,29 +503,6 @@ const equalityExpressionTypes = [
   ExpressionType.NOT_IN,
   ...nullableExpressionTypes,
 ]
-const textExpressionTypes = [
-  ExpressionType.LIKE,
-  ExpressionType.NOT_LIKE,
-  ExpressionType.EQ,
-  ExpressionType.NE,
-  ExpressionType.IN,
-  ExpressionType.NOT_IN,
-  ...nullableExpressionTypes,
-]
-const orderedExpressionTypes = [
-  ExpressionType.GT,
-  ExpressionType.LT,
-  ExpressionType.GTE,
-  ExpressionType.LTE,
-  ExpressionType.BETWEEN,
-  ExpressionType.NOT_BETWEEN,
-  ExpressionType.EQ,
-  ExpressionType.NE,
-  ExpressionType.IN,
-  ExpressionType.NOT_IN,
-  ...nullableExpressionTypes,
-]
-
 const expressionTypeOptionMap = computed(() => {
   return new Map(expressionTypeOptions.value.map((option) => [option.value, option]))
 })
@@ -650,24 +635,7 @@ const recommendedExpressionTypeForField = (field?: FieldRecord) => {
 const expressionTypesForField = (field?: FieldRecord) => {
   if (!field) return Object.values(ExpressionType).filter((value) => typeof value === 'number')
   if (organizationSelectorConfigForField(field)) return organizationSelectorExpressionTypes
-  if (field.dict_code || isBooleanFieldMetadata(field) || parseLinkageConfig(field as TableField)) {
-    return equalityExpressionTypes
-  }
-  switch (field.field_type) {
-    case SysTableFieldType.VARCHAR:
-    case SysTableFieldType.TEXT:
-      return textExpressionTypes
-    case SysTableFieldType.BIGINT:
-    case SysTableFieldType.FLOAT:
-    case SysTableFieldType.TINYINT:
-    case SysTableFieldType.INT:
-    case SysTableFieldType.DATE:
-    case SysTableFieldType.DATETIME:
-    case SysTableFieldType.TIME:
-      return orderedExpressionTypes
-    default:
-      return equalityExpressionTypes
-  }
+  return field.allowed_operators?.length ? field.allowed_operators : equalityExpressionTypes
 }
 
 const expressionTypeOptionsForRule = (rule: QueryRule) => {
@@ -757,59 +725,17 @@ const hasMoreRelationOptions = (rule: QueryRule) => {
   return !!relationOptionsStateMap.value[rule.field]?.hasMore
 }
 
-const optionLabel = (row: Record<string, any>, labelKey: string) => {
-  return (
-    row[labelKey] ??
-    row.label ??
-    row.name ??
-    row.title ??
-    row.menu_name ??
-    row.dict_name ??
-    row.user_name ??
-    ''
-  )
-}
-
-const optionValue = (row: Record<string, any>, valueKey: string) => {
-  return row[valueKey] ?? row.value ?? row.id
-}
-
 const relationPageSizeForLinkage = (linkage: ReturnType<typeof parseLinkageConfig>) => {
   const configuredSize = Number(linkage?.searchPageSize || linkage?.pageSize || 50)
   if (!Number.isFinite(configuredSize) || configuredSize <= 0) return 50
   return Math.min(Math.max(configuredSize, 20), 200)
 }
 
-const relationLabelKeyForOption = (linkage: ReturnType<typeof parseLinkageConfig>) => {
-  return String(linkage?.labelKey || 'label').trim() || 'label'
-}
-
-const relationValueKeyForFilter = (linkage: ReturnType<typeof parseLinkageConfig>) => {
-  return String(linkage?.valueKey || 'id').trim() || 'id'
-}
-
-const rowsFromRelationResponse = (response: any): Array<Record<string, any>> => {
-  const rawRows = response?.data
-  return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
-}
-
-const buildRelationOptionsFromRows = (
-  rows: Array<Record<string, any>>,
-  field: FieldRecord,
-  linkage: ReturnType<typeof parseLinkageConfig>,
-) => {
-  const labelKey = relationLabelKeyForOption(linkage)
-  const valueKey = relationValueKeyForFilter(linkage)
-  const optionMap = new Map<string, RelationOption>()
-  rows.forEach((row) => {
-    const rawValue = optionValue(row, valueKey)
-    if (rawValue === null || rawValue === undefined) return
-    const value = coerceFieldValue(rawValue, field.field_type)
-    const label = optionLabel(row, labelKey) || String(rawValue)
-    optionMap.set(String(value), { label: String(label), value })
-  })
-  return Array.from(optionMap.values())
-}
+const buildRelationOptions = (items: Array<{ value: string; label: string }>, field: FieldRecord) =>
+  items.map((item) => ({
+    value: coerceFieldValue(item.value, field.field_type),
+    label: item.label || item.value,
+  }))
 
 const mergeRelationOptions = (base: RelationOption[], incoming: RelationOption[]) => {
   const optionMap = new Map<string, RelationOption>()
@@ -864,39 +790,22 @@ const selectedRawValuesForField = (field: FieldRecord) => {
 
 const loadSelectedRelationOptionsForField = async (
   field: FieldRecord,
-  linkage: ReturnType<typeof parseLinkageConfig>,
   knownOptions: RelationOption[],
 ) => {
-  const tableCode = linkage?.tableCode
-  if (!tableCode) return []
-
   const knownValues = new Set(knownOptions.map((option) => String(option.value)))
   const missingValues = selectedRawValuesForField(field).filter(
     (value) => !knownValues.has(String(value)),
   )
   if (missingValues.length === 0) return []
 
-  const valueKey = relationValueKeyForFilter(linkage)
-  if (!valueKey) return []
-
-  const query: Query = {
+  if (!field.id || currentMenuId.value <= 0) return []
+  const result = await queryRuntimeRelationOptions(field.id, {
+    menu_id: currentMenuId.value,
     page: 1,
     num: Math.max(missingValues.length, 20),
-    table_code: tableCode,
-    expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-    quick_query: { keyword: '' },
-    include_deleted: false,
-    filters: {
-      [valueKey]: missingValues,
-    },
-  }
-  const menuId = resolveRelationMenuId(userStore.menus, linkage, props.menuId)
-  if (menuId > 0) {
-    query.menu_id = menuId
-  }
-
-  const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
-  return buildRelationOptionsFromRows(rowsFromRelationResponse(res), field, linkage)
+    selected_values: missingValues.map(String),
+  })
+  return buildRelationOptions(result.items, field)
 }
 
 const loadRelationOptionsForField = async (
@@ -933,21 +842,15 @@ const loadRelationOptionsForField = async (
   relationOptionsLoading.value = { ...relationOptionsLoading.value, [fieldCode]: true }
   try {
     const pageSize = relationPageSizeForLinkage(linkage)
-    const query: Query = {
+    if (!field.id || currentMenuId.value <= 0) return
+    const result = await queryRuntimeRelationOptions(field.id, {
+      menu_id: currentMenuId.value,
       page,
       num: pageSize,
-      table_code: tableCode,
-      expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-      quick_query: { keyword },
-      include_deleted: false,
-    }
-    const menuId = resolveRelationMenuId(userStore.menus, linkage, props.menuId)
-    if (menuId > 0) {
-      query.menu_id = menuId
-    }
-    const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
-    const rows = rowsFromRelationResponse(res)
-    const incomingOptions = buildRelationOptionsFromRows(rows, field, linkage)
+      keyword,
+      selected_values: append ? [] : selectedRawValuesForField(field).map(String),
+    })
+    const incomingOptions = buildRelationOptions(result.items, field)
     const cachedSelectedOptions = append
       ? (relationOptionsMap.value[fieldCode] ?? [])
       : selectedOptionsForField(fieldCode)
@@ -955,7 +858,6 @@ const loadRelationOptionsForField = async (
       ? []
       : await loadSelectedRelationOptionsForField(
           field,
-          linkage,
           mergeRelationOptions(cachedSelectedOptions, incomingOptions),
         )
     const baseOptions = mergeRelationOptions(cachedSelectedOptions, hydratedSelectedOptions)
@@ -968,7 +870,7 @@ const loadRelationOptionsForField = async (
         page,
         pageSize,
         keyword,
-        hasMore: rows.length >= pageSize,
+        hasMore: page * pageSize < result.total,
       },
     }
   } catch (error) {

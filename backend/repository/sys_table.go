@@ -20,6 +20,7 @@ type SysTableRepository interface {
 	FindMetadataIdentity(*gorm.DB, int) (model.SysTable, error)
 	GetTableList(context.Context, *request.Basic, model.SysTable) (response.ListResult[model.SysTable], error)
 	ListRuntimeTables(context.Context) ([]model.SysTable, error)
+	QueryRuntimeRelationOptions(context.Context, RuntimeRelationOptionQuery) ([]RuntimeRelationOption, int, error)
 	HasPhysicalTable(*gorm.DB, string) bool
 	HasTableColumn(*gorm.DB, string, string) bool
 
@@ -38,4 +39,24 @@ type SysTableRepository interface {
 	CreateTable(*gorm.DB, string, any) error
 	CreateView(*gorm.DB, string, string) error
 	CreateTableIndex(*gorm.DB, bool, string, string, string) error
+}
+
+type RuntimeRelationOptionQuery struct {
+	TableCode      string
+	ValueField     string
+	DisplayField   string
+	ParentField    string
+	Keyword        string
+	Page           int
+	Num            int
+	SelectedValues []string
+	Filters        map[string]interface{}
+	HasState       bool
+	HasDeletedAt   bool
+}
+
+type RuntimeRelationOption struct {
+	Value       string
+	Label       string
+	ParentValue string
 }

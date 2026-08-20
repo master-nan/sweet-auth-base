@@ -2787,6 +2787,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/runtime/relation-fields/{fieldId}/options": {
+            "post": {
+                "description": "按源字段元数据中受控的关系展示配置查询选项",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "运行时元数据"
+                ],
+                "summary": "查询运行时关系字段选项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "源字段ID",
+                        "name": "fieldId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RuntimeRelationOptionsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/sms/template": {
             "post": {
                 "description": "创建短信模板",
@@ -5320,6 +5365,31 @@ const docTemplate = `{
                 "CalculatedField"
             ]
         },
+        "enum.SysTableFieldDisplayFormat": {
+            "type": "string",
+            "enum": [
+                "plain",
+                "integer",
+                "decimal",
+                "money",
+                "percent",
+                "date",
+                "datetime",
+                "dictionary",
+                "relation"
+            ],
+            "x-enum-varnames": [
+                "DisplayFormatPlain",
+                "DisplayFormatInteger",
+                "DisplayFormatDecimal",
+                "DisplayFormatMoney",
+                "DisplayFormatPercent",
+                "DisplayFormatDate",
+                "DisplayFormatDateTime",
+                "DisplayFormatDictionary",
+                "DisplayFormatRelation"
+            ]
+        },
         "enum.SysTableFieldInputType": {
             "type": "integer",
             "enum": [
@@ -5359,6 +5429,33 @@ const docTemplate = `{
                 "RichTextInputType"
             ]
         },
+        "enum.SysTableFieldLogicalType": {
+            "type": "string",
+            "enum": [
+                "plain",
+                "integer",
+                "decimal",
+                "money",
+                "percent",
+                "boolean",
+                "enum",
+                "date",
+                "datetime",
+                "relation"
+            ],
+            "x-enum-varnames": [
+                "LogicalTypePlain",
+                "LogicalTypeInteger",
+                "LogicalTypeDecimal",
+                "LogicalTypeMoney",
+                "LogicalTypePercent",
+                "LogicalTypeBoolean",
+                "LogicalTypeEnum",
+                "LogicalTypeDate",
+                "LogicalTypeDateTime",
+                "LogicalTypeRelation"
+            ]
+        },
         "enum.SysTableFieldType": {
             "type": "integer",
             "enum": [
@@ -5372,7 +5469,9 @@ const docTemplate = `{
                 8,
                 9,
                 10,
-                11
+                11,
+                12,
+                13
             ],
             "x-enum-varnames": [
                 "BigIntFieldType",
@@ -5385,7 +5484,9 @@ const docTemplate = `{
                 "TimeFieldType",
                 "TinyintFieldType",
                 "JsonFieldType",
-                "IntFieldType"
+                "IntFieldType",
+                "SmallIntFieldType",
+                "DecimalFieldType"
             ]
         },
         "enum.SysTableRelationType": {
@@ -7002,58 +7103,10 @@ const docTemplate = `{
             }
         },
         "request.QuerySchemePersonalCreateReq": {
-            "type": "object",
-            "required": [
-                "name",
-                "query_payload",
-                "scope_code"
-            ],
-            "properties": {
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 64
-                },
-                "query_payload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "scope_code": {
-                    "type": "string",
-                    "maxLength": 128
-                }
-            }
+            "type": "object"
         },
         "request.QuerySchemePersonalUpdateReq": {
-            "type": "object",
-            "required": [
-                "name",
-                "query_payload",
-                "revision"
-            ],
-            "properties": {
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 64
-                },
-                "query_payload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "revision": {
-                    "type": "integer",
-                    "minimum": 1
-                }
-            }
+            "type": "object"
         },
         "request.QuerySchemeResolveReq": {
             "type": "object",
@@ -7072,79 +7125,10 @@ const docTemplate = `{
             }
         },
         "request.QuerySchemeSharedCreateReq": {
-            "type": "object",
-            "required": [
-                "name",
-                "query_payload",
-                "scheme_type",
-                "scope_code"
-            ],
-            "properties": {
-                "enabled": {
-                    "type": "boolean"
-                },
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 64
-                },
-                "query_payload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "role_ids": {
-                    "type": "array",
-                    "maxItems": 32,
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "scheme_type": {
-                    "$ref": "#/definitions/model.QuerySchemeType"
-                },
-                "scope_code": {
-                    "type": "string",
-                    "maxLength": 128
-                }
-            }
+            "type": "object"
         },
         "request.QuerySchemeSharedUpdateReq": {
-            "type": "object",
-            "required": [
-                "name",
-                "query_payload",
-                "revision"
-            ],
-            "properties": {
-                "is_default": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 64
-                },
-                "query_payload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "revision": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "role_ids": {
-                    "type": "array",
-                    "maxItems": 32,
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
+            "type": "object"
         },
         "request.QuickQuery": {
             "type": "object",
@@ -7210,6 +7194,36 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "request.RuntimeRelationOptionsReq": {
+            "type": "object",
+            "required": [
+                "menu_id"
+            ],
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "menu_id": {
+                    "type": "integer"
+                },
+                "num": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "selected_values": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "source_values": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             }
         },
@@ -7377,6 +7391,9 @@ const docTemplate = `{
                     "description": "所用字典",
                     "type": "string"
                 },
+                "display_format": {
+                    "$ref": "#/definitions/enum.SysTableFieldDisplayFormat"
+                },
                 "expression": {
                     "description": "计算字段表达式",
                     "type": "string"
@@ -7457,6 +7474,18 @@ const docTemplate = `{
                     "description": "联动配置",
                     "type": "string"
                 },
+                "list_width": {
+                    "type": "integer"
+                },
+                "logical_type": {
+                    "$ref": "#/definitions/enum.SysTableFieldLogicalType"
+                },
+                "numeric_precision": {
+                    "type": "integer"
+                },
+                "numeric_scale": {
+                    "type": "integer"
+                },
                 "original_field_id": {
                     "description": "原字段Id",
                     "type": "integer"
@@ -7504,6 +7533,9 @@ const docTemplate = `{
                 "dict_code": {
                     "description": "所用字典",
                     "type": "string"
+                },
+                "display_format": {
+                    "$ref": "#/definitions/enum.SysTableFieldDisplayFormat"
                 },
                 "expression": {
                     "description": "计算字段表达式",
@@ -7587,6 +7619,18 @@ const docTemplate = `{
                 "linkage_config": {
                     "description": "联动配置",
                     "type": "string"
+                },
+                "list_width": {
+                    "type": "integer"
+                },
+                "logical_type": {
+                    "$ref": "#/definitions/enum.SysTableFieldLogicalType"
+                },
+                "numeric_precision": {
+                    "type": "integer"
+                },
+                "numeric_scale": {
+                    "type": "integer"
                 },
                 "original_field_id": {
                     "description": "原字段Id",

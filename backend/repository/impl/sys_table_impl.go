@@ -12,6 +12,7 @@ import (
 	error2 "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
 	"backend/model"
+	"backend/repository"
 	"backend/repository/util"
 	"context"
 	"errors"
@@ -81,6 +82,58 @@ func (s *SysTableRepositoryImpl) ListRuntimeTables(ctx context.Context) ([]model
 		Order("table_code").
 		Find(&tables).Error
 	return tables, err
+}
+
+func (s *SysTableRepositoryImpl) QueryRuntimeRelationOptions(
+	ctx context.Context,
+	input repository.RuntimeRelationOptionQuery,
+) ([]repository.RuntimeRelationOption, int, error) {
+	valueExpr := "CAST(" + util.QuoteIdentifier(input.ValueField) + " AS text)"
+	displayExpr := "CAST(" + util.QuoteIdentifier(input.DisplayField) + " AS text)"
+	parentExpr := "''"
+	if input.ParentField != "" {
+		parentExpr = "COALESCE(CAST(" + util.QuoteIdentifier(input.ParentField) + " AS text), '')"
+	}
+	query := s.db.WithContext(ctx).Table(util.QuoteIdentifier(input.TableCode))
+	if input.HasState {
+		query = query.Where(util.QuoteIdentifier("state")+" = ?", true)
+	}
+	if input.HasDeletedAt {
+		query = query.Where(util.QuoteIdentifier("gmt_delete") + " IS NULL")
+	}
+	for field, value := range input.Filters {
+		query = query.Where(util.QuoteIdentifier(field)+" = ?", value)
+	}
+	if input.Keyword != "" {
+		keywordCondition := displayExpr + " ILIKE ?"
+		arguments := []interface{}{"%" + input.Keyword + "%"}
+		if len(input.SelectedValues) > 0 {
+			keywordCondition += " OR " + valueExpr + " IN ?"
+			arguments = append(arguments, input.SelectedValues)
+		}
+		query = query.Where("("+keywordCondition+")", arguments...)
+	} else if len(input.SelectedValues) > 0 {
+		query = query.Where(valueExpr+" IN ?", input.SelectedValues)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []struct {
+		Value       string `gorm:"column:value"`
+		Label       string `gorm:"column:label"`
+		ParentValue string `gorm:"column:parent_value"`
+	}
+	offset := (input.Page - 1) * input.Num
+	if err := query.Select(valueExpr + " AS value, " + displayExpr + " AS label, " + parentExpr + " AS parent_value").
+		Order(displayExpr).Offset(offset).Limit(input.Num).Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	result := make([]repository.RuntimeRelationOption, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, repository.RuntimeRelationOption{Value: row.Value, Label: row.Label, ParentValue: row.ParentValue})
+	}
+	return result, int(total), nil
 }
 
 func (s *SysTableRepositoryImpl) HasTableColumn(db *gorm.DB, tableCode, fieldCode string) bool {

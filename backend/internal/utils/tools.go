@@ -186,6 +186,10 @@ func SqlTypeFromFieldType(fieldType enum.SysTableFieldType) string {
 		return "numeric"
 	case enum.TinyintFieldType:
 		return "smallint"
+	case enum.SmallIntFieldType:
+		return "smallint"
+	case enum.DecimalFieldType:
+		return "numeric"
 	default:
 		return "text"
 	}

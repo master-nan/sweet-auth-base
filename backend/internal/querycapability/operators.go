@@ -16,12 +16,23 @@ func Supports(fieldType enum.SysTableFieldType, operator enum.ExpressionType, op
 	switch fieldType {
 	case enum.VarcharFieldType, enum.TextFieldType:
 		return textOperator(operator)
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.FloatFieldType,
+	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
+		enum.FloatFieldType, enum.DecimalFieldType,
 		enum.DateFieldType, enum.DatetimeFieldType, enum.TimeFieldType:
 		return orderedOperator(operator)
 	default:
 		return equalityOperator(operator)
 	}
+}
+
+func AllowedMetadataOperators(field metadata.FieldMetadata) []enum.ExpressionType {
+	operators := make([]enum.ExpressionType, 0, int(enum.NotBetween))
+	for operator := enum.Gt; operator <= enum.NotBetween; operator++ {
+		if SupportsMetadata(field, operator) {
+			operators = append(operators, operator)
+		}
+	}
+	return operators
 }
 
 // SupportsExecution preserves the historical query engine contract. The
@@ -32,7 +43,7 @@ func SupportsExecution(operator enum.ExpressionType) bool {
 }
 
 func SupportsMetadata(field metadata.FieldMetadata, operator enum.ExpressionType) bool {
-	optionBacked := field.DictionaryCode != nil || field.LinkageConfig != nil || field.RelationExpression != ""
+	optionBacked := field.DictionaryCode != nil || field.LinkageConfig != nil || field.Relation != nil || field.RelationExpression != ""
 	return Supports(field.StorageType, operator, optionBacked)
 }
 

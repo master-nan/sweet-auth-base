@@ -25,7 +25,7 @@ func (service *QuerySchemeService) GetScopeConfig(
 	if err != nil {
 		return response.QueryScopeConfigRes{}, err
 	}
-	return scopeConfigResponse(strings.TrimSpace(scopeCode), menu.Title, config), nil
+	return scopeConfigResponse(menu.Id, strings.TrimSpace(scopeCode), menu.Title, config), nil
 }
 
 func (service *QuerySchemeService) Available(
@@ -364,11 +364,11 @@ func (service *QuerySchemeService) isVisible(ctx context.Context, actor querysch
 	return false, nil
 }
 
-func scopeConfigResponse(scopeCode, scopeLabel string, config queryscheme.ScopeConfig) response.QueryScopeConfigRes {
+func scopeConfigResponse(menuID int, scopeCode, scopeLabel string, config queryscheme.ScopeConfig) response.QueryScopeConfigRes {
 	bindings := append([]queryscheme.BindingKind(nil), config.AllowedDynamicBindings...)
 	sort.Slice(bindings, func(i, j int) bool { return bindings[i] < bindings[j] })
 	return response.QueryScopeConfigRes{
-		ScopeCode: scopeCode, ScopeLabel: scopeLabel, TableCode: config.TableCode, QuickDateField: config.QuickDateField,
+		MenuID: menuID, ScopeCode: scopeCode, ScopeLabel: scopeLabel, TableCode: config.TableCode, QuickDateField: config.QuickDateField,
 		QuickPresets: config.QuickPresets, VirtualSortFields: config.AllowedVirtualSortFields,
 		DynamicBindingKinds: bindings,
 	}

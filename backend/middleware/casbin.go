@@ -157,6 +157,8 @@ func allowControllerScopedPermissionRoute(obj, act string) bool {
 	switch obj {
 	case "/admin/generalization/query/code/:code":
 		return act == "POST"
+	case "/admin/runtime/relation-fields/:fieldId/options":
+		return act == "POST"
 	case "/admin/generalization/detail/code/:code/:id":
 		return act == "GET"
 	case "/admin/generalization/create":

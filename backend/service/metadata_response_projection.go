@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	platformmetadata "backend/internal/metadata"
+	"backend/internal/querycapability"
 	"backend/model"
 	"context"
 )
@@ -17,6 +18,11 @@ func tableFieldListResponse(data model.SysTableField) response.SysTableFieldList
 		FieldType:          data.FieldType,
 		FieldLength:        data.FieldLength,
 		FieldDecimalLength: data.FieldDecimalLength,
+		NumericPrecision:   data.NumericPrecision,
+		NumericScale:       data.NumericScale,
+		LogicalType:        data.LogicalType,
+		DisplayFormat:      data.DisplayFormat,
+		ListWidth:          data.ListWidth,
 		InputType:          data.InputType,
 		FormSpan:           data.FormSpan,
 		DetailSpan:         data.DetailSpan,
@@ -128,9 +134,12 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 	for _, field := range data.Fields {
 		fields = append(fields, response.RuntimeFieldMetadataRes{
 			Id: field.ID, TableId: field.TableID, FieldName: field.DisplayName, FieldCode: field.Code,
-			FieldType: field.StorageType, LogicalType: string(field.LogicalType), InputType: field.UIComponent,
-			FieldLength: field.Length, FieldDecimalLength: field.DecimalLength,
-			FormSpan: field.FormSpan, DetailSpan: field.DetailSpan,
+			FieldType: field.StorageType, LogicalType: field.LogicalType, InputType: field.UIComponent,
+			DisplayFormat: field.DisplayFormat,
+			FieldLength:   field.Length, FieldDecimalLength: field.DecimalLength,
+			NumericPrecision: field.NumericPrecision, NumericScale: field.NumericScale, ListWidth: field.ListWidth,
+			AllowedOperators: querycapability.AllowedMetadataOperators(field),
+			FormSpan:         field.FormSpan, DetailSpan: field.DetailSpan,
 			DefaultValue: field.DefaultValue, DictCode: field.DictionaryCode,
 			IsPrimaryKey: field.PrimaryKey, IsIndex: field.Indexed,
 			IsQuickSearch: field.QuickQuery, IsAdvancedSearch: field.AdvancedQuery, IsSort: field.Sortable,
@@ -141,6 +150,12 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 			Expression: field.RelationExpression, LinkageConfig: field.LinkageConfig,
 			SystemManaged: field.SystemManaged,
 		})
+		if field.Relation != nil {
+			fields[len(fields)-1].Relation = &response.RuntimeRelationDisplayRes{
+				TargetTableCode: field.Relation.TargetTableCode, ValueField: field.Relation.ValueField,
+				DisplayField: field.Relation.DisplayField, ParentField: field.Relation.ParentField,
+			}
+		}
 	}
 	relations := make([]response.RuntimeRelationRes, 0, len(data.Relations))
 	for _, relation := range data.Relations {

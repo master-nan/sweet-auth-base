@@ -330,8 +330,8 @@ func TestGeneralizationServiceNormalizesTypedStringValuesBeforeCreate(t *testing
 	if _, ok := repo.created["count"].(int); !ok {
 		t.Fatalf("expected count to be int, got %T", repo.created["count"])
 	}
-	if _, ok := repo.created["price"].(float64); !ok {
-		t.Fatalf("expected price to be float64, got %T", repo.created["price"])
+	if price, ok := repo.created["price"].(string); !ok || price != "12.5" {
+		t.Fatalf("expected price to preserve exact decimal text, got %#v (%T)", repo.created["price"], repo.created["price"])
 	}
 	if _, ok := repo.created["enabled"].(bool); !ok {
 		t.Fatalf("expected enabled to be bool, got %T", repo.created["enabled"])

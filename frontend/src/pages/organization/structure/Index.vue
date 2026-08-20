@@ -331,6 +331,7 @@ const loadStructures = async () => {
       page: 1,
       num: 100,
       only_effective: true,
+      structure_type: 'management',
     })
     structures.value = result.items
 

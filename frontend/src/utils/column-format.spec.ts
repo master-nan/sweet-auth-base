@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { resolveRuntimeColumns } from 'src/utils/column-format'
+import { buildColumnFormat, resolveRuntimeColumns } from 'src/utils/column-format'
 
-vi.mock('src/api/services/generalization', () => ({
-  useGeneralizationApi: () => ({ queryGeneralizationByCode: vi.fn() }),
-}))
+vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
 vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [] }) }))
+vi.mock('src/router', () => ({ Router: { currentRoute: { value: { name: '' } } } }))
 
 const field = (overrides: Partial<TableField>): TableField =>
   ({
@@ -84,5 +83,33 @@ describe('resolveRuntimeColumns', () => {
     expect(result.columns[0]?.sortable).toBe(false)
     expect(result.columns[1]?.sortable).toBe(true)
     expect(result.sortableFields).toEqual(new Set(['total_amount']))
+  })
+
+  it('applies list_width as a bounded default column width', () => {
+    const result = resolveRuntimeColumns([field({ list_width: 180 })], {
+      context: { getDictLabel: () => '' },
+    })
+    expect(result.columns[0]?.style).toBe('width: 180px; max-width: 180px')
+    expect(result.columns[0]?.headerStyle).toBe('width: 180px; max-width: 180px')
+  })
+
+  it('does not expose a raw foreign key when a relation label is unavailable', () => {
+    const relationField = field({
+      field_code: 'customer_id',
+      linkage_config: JSON.stringify({
+        linkage: {
+          enabled: true,
+          mode: 'relation',
+          tableCode: 'customer',
+          valueKey: 'id',
+          labelKey: 'name',
+        },
+      }),
+    })
+    const format = buildColumnFormat(relationField, {
+      getDictLabel: () => '',
+      relationLookups: { customer_id: {} },
+    })
+    expect(format?.(9527)).toBe('关联值未解析')
   })
 })

@@ -4,11 +4,12 @@
  */
 import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
 import type { TableField } from 'src/api/services/sys-table'
-import { useGeneralizationApi } from 'src/api/services/generalization'
-import type { Query, TableColumn } from 'src/types/global'
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+import type { TableColumn } from 'src/types/global'
 import { parseLinkageConfig } from 'src/utils/field-metadata'
 import { useUserStore } from 'src/stores/user'
-import { resolveRelationMenuId } from 'src/utils/menu-context'
+import { findMenuByName, toPositiveMenuId } from 'src/utils/menu-context'
+import { Router } from 'src/router'
 
 export { parseLinkageConfig } from 'src/utils/field-metadata'
 
@@ -78,26 +79,22 @@ export const formatTime = (val: any): string => {
 
 export type LookupMap = Record<string, string>
 
-const rowsFromRelationResponse = (response: any): Array<Record<string, any>> => {
-  const rawRows = response?.data
-  return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
-}
-
-const relationValueKeyForFilter = (cfg: any) => String(cfg?.valueKey || 'id').trim()
-
-const mergeRowsIntoLookup = (lookup: LookupMap, rows: Array<Record<string, any>>, cfg: any) => {
-  const labelKey = cfg?.labelKey || 'label'
-  const valueKey = cfg?.valueKey || 'value'
-  rows.forEach((row) => {
-    const rawLabel = row[labelKey]
-    const rawValue = row[valueKey]
-    const label =
-      rawLabel ?? row.label ?? row.name ?? row.title ?? row.menu_name ?? row.dict_name ?? ''
-    const value = rawValue ?? row.value ?? row.id
-    if (value != null) {
-      lookup[String(value)] = String(label)
+const mergeOptionsIntoLookup = (
+  lookup: LookupMap,
+  options: Array<{ value: string; label: string }>,
+) => {
+  options.forEach((option) => {
+    if (option.value !== '') {
+      lookup[option.value] = option.label
     }
   })
+}
+
+const currentRelationMenuId = (fallbackMenuId = 0) => {
+  const fallback = toPositiveMenuId(fallbackMenuId)
+  if (fallback > 0) return fallback
+  const userStore = useUserStore()
+  return findMenuByName(userStore.menus, String(Router?.currentRoute.value.name || ''))?.id || 0
 }
 
 const relationLookupFields = (fields: TableField[]) => {
@@ -118,9 +115,8 @@ const relationLookupFields = (fields: TableField[]) => {
  */
 export const buildRelationLookups = async (
   fields: TableField[],
+  fallbackMenuId = 0,
 ): Promise<Record<string, LookupMap>> => {
-  const userStore = useUserStore()
-  const generalizationApi = useGeneralizationApi()
   const lookups: Record<string, LookupMap> = {}
   const tasks = relationLookupFields(fields).map(({ field, linkage }) => ({
     fieldCode: field.field_code,
@@ -128,28 +124,16 @@ export const buildRelationLookups = async (
   }))
 
   if (tasks.length === 0) return lookups
+  const menuId = currentRelationMenuId(fallbackMenuId)
+  if (menuId <= 0) return lookups
 
-  const promises = tasks.map(async ({ fieldCode, cfg }) => {
+  const promises = tasks.map(async ({ fieldCode }) => {
     try {
-      const tableCode = cfg.tableCode
-      if (!tableCode) return
-
-      const query: Query = {
-        page: 1,
-        num: cfg.pageSize || 500,
-        table_code: tableCode,
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-      }
-      const menuId = resolveRelationMenuId(userStore.menus, cfg)
-      if (menuId > 0) {
-        query.menu_id = menuId
-      }
-
+      const field = fields.find((item) => item.field_code === fieldCode)
+      if (!field?.id) return
       const map: LookupMap = {}
-      const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
-      mergeRowsIntoLookup(map, rowsFromRelationResponse(res), cfg)
+      const result = await queryRuntimeRelationOptions(field.id, { menu_id: menuId, page: 1, num: 50 })
+      mergeOptionsIntoLookup(map, result.items)
       lookups[fieldCode] = map
     } catch (error) {
       console.warn(`加载关联字段 ${fieldCode} 查找表失败`, error)
@@ -168,12 +152,12 @@ export const hydrateRelationLookups = async (
 ): Promise<Record<string, LookupMap>> => {
   if (rows.length === 0) return existingLookups
 
-  const userStore = useUserStore()
-  const generalizationApi = useGeneralizationApi()
   const tasks = relationLookupFields(fields)
+  const menuId = currentRelationMenuId(fallbackMenuId)
+  if (menuId <= 0) return existingLookups
 
   await Promise.all(
-    tasks.map(async ({ field, linkage }) => {
+    tasks.map(async ({ field }) => {
       const fieldCode = field.field_code
       const lookup = existingLookups[fieldCode] || {}
       existingLookups[fieldCode] = lookup
@@ -189,31 +173,15 @@ export const hydrateRelationLookups = async (
       })
       if (missingValues.size === 0) return
 
-      const tableCode = linkage.tableCode
-      if (!tableCode) return
-
-      const valueKey = relationValueKeyForFilter(linkage)
-      if (!valueKey) return
-
-      const query: Query = {
-        page: 1,
-        num: Math.max(missingValues.size, 20),
-        table_code: tableCode,
-        expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-        quick_query: { keyword: '' },
-        include_deleted: false,
-        filters: {
-          [valueKey]: Array.from(missingValues.values()),
-        },
-      }
-      const menuId = resolveRelationMenuId(userStore.menus, linkage, fallbackMenuId)
-      if (menuId > 0) {
-        query.menu_id = menuId
-      }
-
       try {
-        const res = await generalizationApi.queryGeneralizationByCode(tableCode, query)
-        mergeRowsIntoLookup(lookup, rowsFromRelationResponse(res), linkage)
+        if (!field.id) return
+        const result = await queryRuntimeRelationOptions(field.id, {
+          menu_id: menuId,
+          page: 1,
+          num: Math.max(missingValues.size, 20),
+          selected_values: Array.from(missingValues.keys()),
+        })
+        mergeOptionsIntoLookup(lookup, result.items)
       } catch (error) {
         console.warn(`补齐关联字段 ${fieldCode} 当前页查找表失败`, error)
       }
@@ -267,7 +235,7 @@ export const buildColumnFormat = (
     return (val: any) => {
       if (val == null || val === '') return ''
       const lookup = ctx.relationLookups?.[field.field_code]
-      return lookup?.[String(val)] || String(val)
+      return lookup?.[String(val)] || '关联值未解析'
     }
   }
 
@@ -382,6 +350,10 @@ export const resolveRuntimeColumns = <Row extends object>(
         sortable: field.is_sort,
         order: override?.order ?? field.sequence ?? index,
         defaultVisible: override?.visible !== false,
+      }
+      if (field.list_width && field.list_width > 0) {
+        column.style = `width: ${field.list_width}px; max-width: ${field.list_width}px`
+        column.headerStyle = `width: ${field.list_width}px; max-width: ${field.list_width}px`
       }
       const format = override?.format || buildColumnFormat(field, options.context)
       if (format) column.format = format

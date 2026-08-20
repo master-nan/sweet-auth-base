@@ -17,11 +17,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ExpressionLogic, ExpressionLogicMap, ExpressionTypeMap } from 'src/types/enum'
 import { useDictStore } from 'src/stores/dict'
 import type { ExpressionGroup, QueryRule } from 'src/types/global'
 import type { TableField } from 'src/api/services/sys-table'
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
 import {
   QUERY_SCHEME_BINDING_LABELS,
   type QuerySchemeBinding,
@@ -31,11 +32,13 @@ import {
 const props = defineProps<{
   payload: QuerySchemePayloadV1
   fields?: TableField[]
+  menuId?: number
 }>()
 
 const dictStore = useDictStore()
 const fieldMap = computed(() => new Map((props.fields || []).map((field) => [field.field_code, field])))
 const bindingMap = computed(() => new Map((props.payload.bindings || []).map((binding) => [binding.pointer, binding])))
+const relationLabels = ref<Record<string, Record<string, string>>>({})
 const fieldLabel = (code: string) => fieldMap.value.get(code)?.field_name || '已失效字段'
 
 const bindingLabel = (binding: QuerySchemeBinding) => {
@@ -44,20 +47,71 @@ const bindingLabel = (binding: QuerySchemeBinding) => {
   return offset ? `${base}（偏移 ${offset}）` : base
 }
 
-const valueLabel = (rule: QueryRule, pointer: string) => {
-  if (Array.isArray(rule.value)) {
-    return rule.value.map((value, index) => {
-      const binding = bindingMap.value.get(`${pointer}/${index}`)
-      return binding ? bindingLabel(binding) : String(value ?? '-')
-    }).join(' 至 ')
-  }
+const singleValueLabel = (rule: QueryRule, value: unknown, pointer: string) => {
   const binding = bindingMap.value.get(pointer)
   if (binding) return bindingLabel(binding)
   const field = fieldMap.value.get(rule.field)
-  if (field?.dict_code) return dictStore.getDictLabel(field.dict_code, rule.value) || String(rule.value ?? '-')
-  if (rule.value === null || rule.value === undefined || rule.value === '') return '无需填写'
-  return String(rule.value)
+  if (field?.dict_code) return dictStore.getDictLabel(field.dict_code, value) || String(value ?? '-')
+  if (field?.relation) return relationLabels.value[rule.field]?.[String(value)] || '关联值未解析'
+  if (value === null || value === undefined || value === '') return '无需填写'
+  return String(value)
 }
+
+const valueLabel = (rule: QueryRule, pointer: string) => {
+  if (Array.isArray(rule.value)) {
+    return rule.value
+      .map((value, index) => singleValueLabel(rule, value, `${pointer}/${index}`))
+      .join(' 至 ')
+  }
+  return singleValueLabel(rule, rule.value, pointer)
+}
+
+let relationLoadSequence = 0
+watch(
+  () => [props.payload, props.fields, props.menuId] as const,
+  async () => {
+    const sequence = ++relationLoadSequence
+    const valuesByField = new Map<string, Set<string>>()
+    const collect = (group: ExpressionGroup) => {
+      group.rules.forEach((rule) => {
+        const field = fieldMap.value.get(rule.field)
+        if (!field?.relation || !field.id) return
+        const values = Array.isArray(rule.value) ? rule.value : [rule.value]
+        const selected = valuesByField.get(rule.field) || new Set<string>()
+        values.forEach((value) => {
+          if (value !== null && value !== undefined && value !== '') selected.add(String(value))
+        })
+        valuesByField.set(rule.field, selected)
+      })
+      group.nested?.forEach(collect)
+    }
+    ;(props.payload.expressions || []).forEach(collect)
+    if (!props.menuId || valuesByField.size === 0) {
+      relationLabels.value = {}
+      return
+    }
+    const next: Record<string, Record<string, string>> = {}
+    await Promise.all(
+      Array.from(valuesByField.entries()).map(async ([fieldCode, values]) => {
+        const field = fieldMap.value.get(fieldCode)
+        if (!field?.id || values.size === 0) return
+        try {
+          const result = await queryRuntimeRelationOptions(field.id, {
+            menu_id: props.menuId!,
+            selected_values: Array.from(values),
+            page: 1,
+            num: Math.max(values.size, 20),
+          })
+          next[fieldCode] = Object.fromEntries(result.items.map((item) => [item.value, item.label]))
+        } catch {
+          next[fieldCode] = {}
+        }
+      }),
+    )
+    if (sequence === relationLoadSequence) relationLabels.value = next
+  },
+  { deep: true, immediate: true },
+)
 
 type PreviewLine = { key: string; logic: string; text: string; depth: number }
 const collectLines = (group: ExpressionGroup, path: string, depth: number): PreviewLine[] => {

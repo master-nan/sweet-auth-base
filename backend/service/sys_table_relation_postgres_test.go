@@ -69,6 +69,59 @@ func TestSysTableManyToManyMetadataChangesPreservePostgreSQLData(t *testing.T) {
 	assertJoinTableRow(t, db, "pfcr_order_product", 11, 22)
 }
 
+func TestSysTableRelationRejectsMissingAndIncompatibleFields(t *testing.T) {
+	db := openSysTableRelationPostgreSQL(t)
+	svc := newSysTableRelationPostgreSQLService(t, db)
+	mainTable := model.SysTable{Basic: model.Basic{Id: 501, State: true}, TableName: "Orders", TableCode: "pfcr_relation_orders", TableType: enum.System}
+	relatedTable := model.SysTable{Basic: model.Basic{Id: 502, State: true}, TableName: "Customers", TableCode: "pfcr_relation_customers", TableType: enum.System}
+	testutil.MustCreate(t, db, &mainTable)
+	testutil.MustCreate(t, db, &relatedTable)
+	testutil.MustCreate(t, db, &model.SysTableField{Basic: model.Basic{Id: 503, State: true}, TableId: mainTable.Id, FieldName: "Customer ID", FieldCode: "customer_id", FieldType: enum.BigIntFieldType})
+	testutil.MustCreate(t, db, &model.SysTableField{Basic: model.Basic{Id: 504, State: true}, TableId: relatedTable.Id, FieldName: "Customer Code", FieldCode: "customer_code", FieldType: enum.VarcharFieldType})
+
+	base := request.TableRelationCreateReq{
+		TableId: mainTable.Id, RelatedTableId: relatedTable.Id,
+		ReferenceKey: "customer_id", ForeignKey: "customer_code", RelationType: enum.ManyToOne,
+	}
+	if err := svc.CreateTableRelation(context.Background(), base); err == nil {
+		t.Fatal("expected incompatible relation fields to be rejected")
+	}
+	base.ForeignKey = "missing_id"
+	if err := svc.CreateTableRelation(context.Background(), base); err == nil {
+		t.Fatal("expected missing relation field to be rejected")
+	}
+}
+
+func TestRuntimeRelationOptionsReturnDisplayValues(t *testing.T) {
+	db := openSysTableRelationPostgreSQL(t)
+	svc := newSysTableRelationPostgreSQLService(t, db)
+	source := model.SysTable{Basic: model.Basic{Id: 601, State: true}, TableName: "Orders", TableCode: "pfcr_runtime_orders", TableType: enum.System}
+	target := model.SysTable{Basic: model.Basic{Id: 602, State: true}, TableName: "Customers", TableCode: "pfcr_runtime_customers", TableType: enum.System}
+	testutil.MustCreate(t, db, &source)
+	testutil.MustCreate(t, db, &target)
+	linkage := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"pfcr_runtime_customers","labelKey":"customer_name","valueKey":"id"}}`
+	testutil.MustCreate(t, db, &model.SysTableField{
+		Basic: model.Basic{Id: 603, State: true}, TableId: source.Id, FieldName: "Customer", FieldCode: "customer_id",
+		FieldType: enum.BigIntFieldType, LogicalType: enum.LogicalTypeRelation, LinkageConfig: &linkage,
+	})
+	testutil.MustCreate(t, db, &model.SysTableField{Basic: model.Basic{Id: 604, State: true}, TableId: target.Id, FieldName: "ID", FieldCode: "id", FieldType: enum.BigIntFieldType, IsPrimaryKey: true})
+	testutil.MustCreate(t, db, &model.SysTableField{Basic: model.Basic{Id: 605, State: true}, TableId: target.Id, FieldName: "Name", FieldCode: "customer_name", FieldType: enum.VarcharFieldType})
+	if err := db.Exec(`CREATE TABLE pfcr_runtime_customers (id bigint PRIMARY KEY, customer_name varchar(64) NOT NULL)`).Error; err != nil {
+		t.Fatalf("create relation target: %v", err)
+	}
+	if err := db.Exec(`INSERT INTO pfcr_runtime_customers (id, customer_name) VALUES (7001, '华东客户')`).Error; err != nil {
+		t.Fatalf("seed relation target: %v", err)
+	}
+
+	result, err := svc.metadataRuntime.QueryRelationOptions(context.Background(), 603, request.RuntimeRelationOptionsReq{Page: 1, Num: 20})
+	if err != nil {
+		t.Fatalf("query runtime relation options: %v", err)
+	}
+	if result.Total != 1 || len(result.Data) != 1 || result.Data[0].Value != "7001" || result.Data[0].Label != "华东客户" {
+		t.Fatalf("unexpected runtime relation result: %+v", result)
+	}
+}
+
 func TestSysTablePostgreSQLDefaultClearAndCompositeIndexOrder(t *testing.T) {
 	db := openSysTableRelationPostgreSQL(t)
 	svc := newSysTableRelationPostgreSQLService(t, db)

@@ -30,7 +30,9 @@ func TestOrgServiceStructureQueriesRespectMetadataScopeAndLegalEntity(t *testing
 	expired := managementStructureFixture(13, "MGMT-H", "历史架构", "enabled")
 	expiredAt := model.Now().AddDate(0, 0, -1)
 	expired.ValidTo = &expiredAt
-	testutil.MustCreate(t, db, &[]model.OrgStructure{current, other, disabled, expired})
+	legalStructure := managementStructureFixture(14, "LEGAL-A", "法人架构", "enabled")
+	legalStructure.StructureType = model.OrgStructureTypeLegal
+	testutil.MustCreate(t, db, &[]model.OrgStructure{current, other, disabled, expired, legalStructure})
 
 	unitA := managementUnitFixture(20, "OU-A", "甲组织", "department", "enabled", &legalA.Id)
 	unitB := managementUnitFixture(21, "OU-B", "乙组织", "department", "enabled", &legalB.Id)
@@ -57,6 +59,12 @@ func TestOrgServiceStructureQueriesRespectMetadataScopeAndLegalEntity(t *testing
 	}
 	if result.Total != 1 || len(result.Data) != 1 || result.Data[0].Id != current.Id {
 		t.Fatalf("unexpected structure query result: %+v", result)
+	}
+	if _, err := orgService.QueryStructures(nil, request.OrgStructureQueryReq{StructureType: "legal"}, managementStructureTable()); err != nil {
+		t.Fatalf("management query should ignore a legal structure request hint: %v", err)
+	}
+	if _, err := orgService.GetStructureDetail(nil, legalStructure.Id, request.OrgStructureDetailReq{}); err == nil {
+		t.Fatal("management structure detail must reject legal structure records")
 	}
 
 	advanced, err := orgService.QueryStructures(nil, request.OrgStructureQueryReq{

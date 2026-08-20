@@ -103,8 +103,29 @@ func TestProjectFieldMapsStorageLogicalAndUITypeSeparately(t *testing.T) {
 	if !ok {
 		t.Fatal("expected field projection")
 	}
-	if projected.StorageType != enum.FloatFieldType || projected.LogicalType != LogicalFieldTypeDecimal || projected.UIComponent != enum.InputNumberInputType {
+	if projected.StorageType != enum.DecimalFieldType || projected.LogicalType != LogicalFieldTypeDecimal || projected.UIComponent != enum.InputNumberInputType {
 		t.Fatalf("field type boundaries collapsed: %+v", projected)
+	}
+}
+
+func TestProjectFieldHonorsExplicitLogicalDisplayWidthAndRelationContract(t *testing.T) {
+	width := 180
+	linkage := `{"linkage":{"enabled":true,"mode":"relation","tableCode":"org_legal_entity","valueKey":"id","labelKey":"name"}}`
+	field := metadataTestField(22, "primary_legal_entity_id", 1, enum.BigIntFieldType)
+	field.LogicalType = enum.LogicalTypeRelation
+	field.DisplayFormat = enum.DisplayFormatRelation
+	field.ListWidth = &width
+	field.LinkageConfig = &linkage
+
+	projected, ok := ProjectField(field)
+	if !ok || projected.LogicalType != enum.LogicalTypeRelation || projected.DisplayFormat != enum.DisplayFormatRelation {
+		t.Fatalf("explicit runtime contract=%+v ok=%v", projected, ok)
+	}
+	if projected.ListWidth == nil || *projected.ListWidth != width || projected.Relation == nil {
+		t.Fatalf("relation display projection=%+v", projected)
+	}
+	if projected.Relation.TargetTableCode != "org_legal_entity" || projected.Relation.ValueField != "id" || projected.Relation.DisplayField != "name" {
+		t.Fatalf("relation display contract=%+v", projected.Relation)
 	}
 }
 

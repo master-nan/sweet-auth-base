@@ -5,6 +5,7 @@ import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/en
 import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
 
 vi.mock('src/stores/dict', () => ({ useDictStore: () => ({ getDictLabel: () => '异常' }) }))
+vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
 import QuerySchemePreview from './QuerySchemePreview.vue'
 
 const BadgeStub = defineComponent({ props: { label: String }, setup(props) { return () => h('span', props.label) } })

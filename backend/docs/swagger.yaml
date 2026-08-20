@@ -140,6 +140,28 @@ definitions:
     - NormalField
     - VirtualField
     - CalculatedField
+  enum.SysTableFieldDisplayFormat:
+    enum:
+    - plain
+    - integer
+    - decimal
+    - money
+    - percent
+    - date
+    - datetime
+    - dictionary
+    - relation
+    type: string
+    x-enum-varnames:
+    - DisplayFormatPlain
+    - DisplayFormatInteger
+    - DisplayFormatDecimal
+    - DisplayFormatMoney
+    - DisplayFormatPercent
+    - DisplayFormatDate
+    - DisplayFormatDateTime
+    - DisplayFormatDictionary
+    - DisplayFormatRelation
   enum.SysTableFieldInputType:
     enum:
     - 1
@@ -176,6 +198,30 @@ definitions:
     - KeyValueInputType
     - CascaderInputType
     - RichTextInputType
+  enum.SysTableFieldLogicalType:
+    enum:
+    - plain
+    - integer
+    - decimal
+    - money
+    - percent
+    - boolean
+    - enum
+    - date
+    - datetime
+    - relation
+    type: string
+    x-enum-varnames:
+    - LogicalTypePlain
+    - LogicalTypeInteger
+    - LogicalTypeDecimal
+    - LogicalTypeMoney
+    - LogicalTypePercent
+    - LogicalTypeBoolean
+    - LogicalTypeEnum
+    - LogicalTypeDate
+    - LogicalTypeDateTime
+    - LogicalTypeRelation
   enum.SysTableFieldType:
     enum:
     - 1
@@ -189,6 +235,8 @@ definitions:
     - 9
     - 10
     - 11
+    - 12
+    - 13
     type: integer
     x-enum-varnames:
     - BigIntFieldType
@@ -202,6 +250,8 @@ definitions:
     - TinyintFieldType
     - JsonFieldType
     - IntFieldType
+    - SmallIntFieldType
+    - DecimalFieldType
   enum.SysTableRelationType:
     enum:
     - 1
@@ -1323,42 +1373,8 @@ definitions:
         type: string
     type: object
   request.QuerySchemePersonalCreateReq:
-    properties:
-      is_default:
-        type: boolean
-      name:
-        maxLength: 64
-        type: string
-      query_payload:
-        items:
-          type: integer
-        type: array
-      scope_code:
-        maxLength: 128
-        type: string
-    required:
-    - name
-    - query_payload
-    - scope_code
     type: object
   request.QuerySchemePersonalUpdateReq:
-    properties:
-      is_default:
-        type: boolean
-      name:
-        maxLength: 64
-        type: string
-      query_payload:
-        items:
-          type: integer
-        type: array
-      revision:
-        minimum: 1
-        type: integer
-    required:
-    - name
-    - query_payload
-    - revision
     type: object
   request.QuerySchemeResolveReq:
     properties:
@@ -1372,57 +1388,8 @@ definitions:
     - scope_code
     type: object
   request.QuerySchemeSharedCreateReq:
-    properties:
-      enabled:
-        type: boolean
-      is_default:
-        type: boolean
-      name:
-        maxLength: 64
-        type: string
-      query_payload:
-        items:
-          type: integer
-        type: array
-      role_ids:
-        items:
-          type: integer
-        maxItems: 32
-        type: array
-      scheme_type:
-        $ref: '#/definitions/model.QuerySchemeType'
-      scope_code:
-        maxLength: 128
-        type: string
-    required:
-    - name
-    - query_payload
-    - scheme_type
-    - scope_code
     type: object
   request.QuerySchemeSharedUpdateReq:
-    properties:
-      is_default:
-        type: boolean
-      name:
-        maxLength: 64
-        type: string
-      query_payload:
-        items:
-          type: integer
-        type: array
-      revision:
-        minimum: 1
-        type: integer
-      role_ids:
-        items:
-          type: integer
-        maxItems: 32
-        type: array
-    required:
-    - name
-    - query_payload
-    - revision
     type: object
   request.QuickQuery:
     properties:
@@ -1468,6 +1435,26 @@ definitions:
     - id
     - memo
     - name
+    type: object
+  request.RuntimeRelationOptionsReq:
+    properties:
+      keyword:
+        type: string
+      menu_id:
+        type: integer
+      num:
+        type: integer
+      page:
+        type: integer
+      selected_values:
+        items:
+          type: string
+        type: array
+      source_values:
+        additionalProperties: true
+        type: object
+    required:
+    - menu_id
     type: object
   request.SignInReq:
     properties:
@@ -1576,6 +1563,8 @@ definitions:
       dict_code:
         description: 所用字典
         type: string
+      display_format:
+        $ref: '#/definitions/enum.SysTableFieldDisplayFormat'
       expression:
         description: 计算字段表达式
         type: string
@@ -1632,6 +1621,14 @@ definitions:
       linkage_config:
         description: 联动配置
         type: string
+      list_width:
+        type: integer
+      logical_type:
+        $ref: '#/definitions/enum.SysTableFieldLogicalType'
+      numeric_precision:
+        type: integer
+      numeric_scale:
+        type: integer
       original_field_id:
         description: 原字段Id
         type: integer
@@ -1666,6 +1663,8 @@ definitions:
       dict_code:
         description: 所用字典
         type: string
+      display_format:
+        $ref: '#/definitions/enum.SysTableFieldDisplayFormat'
       expression:
         description: 计算字段表达式
         type: string
@@ -1724,6 +1723,14 @@ definitions:
       linkage_config:
         description: 联动配置
         type: string
+      list_width:
+        type: integer
+      logical_type:
+        $ref: '#/definitions/enum.SysTableFieldLogicalType'
+      numeric_precision:
+        type: integer
+      numeric_scale:
+        type: integer
       original_field_id:
         description: 原字段Id
         type: integer
@@ -3724,6 +3731,36 @@ paths:
       summary: 获取查询范围运行配置
       tags:
       - 查询方案中心
+  /admin/runtime/relation-fields/{fieldId}/options:
+    post:
+      description: 按源字段元数据中受控的关系展示配置查询选项
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 源字段ID
+        in: path
+        name: fieldId
+        required: true
+        type: integer
+      - description: 查询参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.RuntimeRelationOptionsReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 查询运行时关系字段选项
+      tags:
+      - 运行时元数据
   /admin/sms/template:
     post:
       description: 创建短信模板

@@ -6,6 +6,7 @@ import (
 )
 
 type QueryScopeConfigRes struct {
+	MenuID              int                       `json:"menu_id"`
 	ScopeCode           string                    `json:"scope_code"`
 	ScopeLabel          string                    `json:"scope_label"`
 	TableCode           string                    `json:"table_code"`

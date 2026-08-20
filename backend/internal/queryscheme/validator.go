@@ -290,7 +290,7 @@ func scalarCompatible(value any, fieldType enum.SysTableFieldType) bool {
 		return false
 	}
 	switch fieldType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType:
 		switch typed := value.(type) {
 		case int, int32, int64, uint, uint32, uint64:
 			return true
@@ -303,19 +303,13 @@ func scalarCompatible(value any, fieldType enum.SysTableFieldType) bool {
 			_, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
 			return err == nil
 		}
-	case enum.FloatFieldType:
-		switch typed := value.(type) {
-		case int, int32, int64, uint, uint32, uint64:
-			return true
-		case float64:
-			return !math.IsNaN(typed) && !math.IsInf(typed, 0)
-		case json.Number:
-			_, err := typed.Float64()
-			return err == nil
-		case string:
-			_, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
-			return err == nil
-		}
+	case enum.TinyintFieldType, enum.SmallIntFieldType:
+		text := fmt.Sprintf("%v", value)
+		parsed, err := strconv.ParseInt(strings.TrimSpace(text), 10, 16)
+		return err == nil && parsed >= metadata.SmallIntMin && parsed <= metadata.SmallIntMax
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		_, err := metadata.NormalizeDecimalValue(value)
+		return err == nil
 	case enum.BooleanFieldType:
 		if _, ok := value.(bool); ok {
 			return true

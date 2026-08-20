@@ -3,12 +3,28 @@ import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import {
   getFieldControlType,
+  coerceFieldValue,
+  compareExactDecimal,
+  isNumericFieldType,
   parseLinkageConfig,
   resolveOrganizationSelectorConfig,
 } from 'src/utils/field-metadata'
 import type { OrganizationSelectorType } from 'src/types/organization-selector'
 
 describe('organization selector metadata resolver', () => {
+
+  it('keeps Decimal values as text and recognizes canonical SmallInt', () => {
+    expect(coerceFieldValue('12345678901234567890.123400', SysTableFieldType.DECIMAL)).toBe(
+      '12345678901234567890.123400',
+    )
+    expect(isNumericFieldType(SysTableFieldType.SMALLINT)).toBe(true)
+  })
+
+  it('compares large Decimal values without JavaScript Number conversion', () => {
+    expect(compareExactDecimal('99999999999999999999.99', '99999999999999999999.98')).toBe(1)
+    expect(compareExactDecimal('-12345678901234567890.1', '-12345678901234567890.01')).toBe(-1)
+    expect(compareExactDecimal('1.2300', '1.23')).toBe(0)
+  })
   it.each<[OrganizationSelectorType, OrganizationSelectorType]>([
     ['legal_entity', 'legal_entity'],
     ['org_unit', 'org_unit'],

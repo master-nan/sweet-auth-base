@@ -140,20 +140,24 @@ export enum SysTableFieldType {
   TINYINT,
   JSON,
   INT,
+  SMALLINT,
+  DECIMAL,
 }
 
 export const SysTableFieldTypeMap = {
   [SysTableFieldType.BIGINT]: '大数字',
-  [SysTableFieldType.FLOAT]: '浮点',
+  [SysTableFieldType.FLOAT]: '浮点（兼容）',
   [SysTableFieldType.VARCHAR]: '字符串',
   [SysTableFieldType.TEXT]: '文本',
   [SysTableFieldType.BOOLEAN]: '布尔',
   [SysTableFieldType.DATE]: '日期',
   [SysTableFieldType.DATETIME]: '日期时间',
   [SysTableFieldType.TIME]: '时间',
-  [SysTableFieldType.TINYINT]: '微型整数',
+  [SysTableFieldType.TINYINT]: 'TinyInt（兼容）',
   [SysTableFieldType.JSON]: 'JSON',
   [SysTableFieldType.INT]: '数字',
+  [SysTableFieldType.SMALLINT]: '小整数',
+  [SysTableFieldType.DECIMAL]: '精确小数',
 }
 
 export enum SysMenuButtonPosition {

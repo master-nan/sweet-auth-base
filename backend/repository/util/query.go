@@ -10,6 +10,7 @@ import (
 	"backend/enum"
 	"backend/internal/datapermission"
 	myerrors "backend/internal/errors"
+	platformmetadata "backend/internal/metadata"
 	"backend/internal/querycapability"
 	"backend/internal/security"
 	"backend/model"
@@ -34,13 +35,13 @@ func parseValue(value interface{}, valueType enum.SysTableFieldType) interface{}
 		return nil
 	}
 	switch valueType {
-	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType:
+	case enum.BigIntFieldType, enum.IntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType:
 		if v, ok := parseQueryInt(value); ok {
 			return v
 		}
 		return invalidQueryValue{}
-	case enum.FloatFieldType:
-		if v, ok := parseQueryFloat(value); ok {
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		if v, err := platformmetadata.NormalizeDecimalValue(value); err == nil {
 			return v
 		}
 		return invalidQueryValue{}
@@ -840,7 +841,11 @@ func dynamicQuery(
 			}
 			continue
 		}
-		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", qualifyField(fieldCode, table.TableCode), QuoteIdentifier(fieldCode)))
+		expression := qualifyField(fieldCode, table.TableCode)
+		if platformmetadata.CanonicalStorageType(field.FieldType) == enum.DecimalFieldType {
+			expression = fmt.Sprintf("CAST(%s AS text)", expression)
+		}
+		selectParts = append(selectParts, fmt.Sprintf("%s AS %s", expression, QuoteIdentifier(fieldCode)))
 	}
 	if len(selectParts) > 0 {
 		query = query.Select(strings.Join(selectParts, ","))
@@ -1099,8 +1104,8 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 	switch fieldType {
 	case enum.BigIntFieldType, enum.IntFieldType:
 		return reflect.TypeOf(0) // 或 reflect.TypeOf(int64(0)) 根据需要选择
-	case enum.FloatFieldType:
-		return reflect.TypeOf(0.0) // 使用 float64 是 Go 中最常用的浮点类型
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		return reflect.TypeOf("")
 	case enum.VarcharFieldType, enum.TextFieldType:
 		return reflect.TypeOf("") // 字符串类型
 	case enum.BooleanFieldType:
@@ -1109,8 +1114,8 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 		return reflect.TypeOf(time.Time{})
 	case enum.TimeFieldType:
 		return reflect.TypeOf("")
-	case enum.TinyintFieldType:
-		return reflect.TypeOf(int8(0)) // tinyint 类型
+	case enum.TinyintFieldType, enum.SmallIntFieldType:
+		return reflect.TypeOf(int16(0))
 	case enum.JsonFieldType:
 		return reflect.TypeOf(map[string]interface{}{}) // JSON 类型
 	default:
@@ -1154,12 +1159,11 @@ func BuildTag(field model.SysTableField) string {
 
 func getDefaultValue(defaultValue string, fieldType enum.SysTableFieldType) string {
 	switch fieldType {
-	case enum.BigIntFieldType, enum.TinyintFieldType, enum.IntFieldType:
+	case enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType, enum.IntFieldType:
 		d, _ := strconv.Atoi(defaultValue)
 		return fmt.Sprintf(`default:%d`, d)
-	case enum.FloatFieldType:
-		f, _ := strconv.ParseFloat(defaultValue, 64)
-		return fmt.Sprintf(`default:%f`, f)
+	case enum.FloatFieldType, enum.DecimalFieldType:
+		return fmt.Sprintf(`default:%s`, defaultValue)
 	case enum.BooleanFieldType:
 		return fmt.Sprintf(`default:%v`, defaultValue)
 	case enum.VarcharFieldType, enum.TextFieldType:
@@ -1176,7 +1180,7 @@ func getSQLType(fieldType enum.SysTableFieldType, length int, decimal int) strin
 		return "bigint"
 	case enum.IntFieldType:
 		return "integer"
-	case enum.FloatFieldType:
+	case enum.FloatFieldType, enum.DecimalFieldType:
 		if length > 0 && decimal > 0 {
 			return fmt.Sprintf("numeric(%d,%d)", length, decimal)
 		}
@@ -1196,7 +1200,7 @@ func getSQLType(fieldType enum.SysTableFieldType, length int, decimal int) strin
 		return "timestamp"
 	case enum.TimeFieldType:
 		return "time"
-	case enum.TinyintFieldType:
+	case enum.TinyintFieldType, enum.SmallIntFieldType:
 		return "smallint"
 	case enum.JsonFieldType:
 		return "jsonb"

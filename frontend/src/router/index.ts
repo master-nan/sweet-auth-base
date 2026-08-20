@@ -17,7 +17,7 @@ import constantRoutes from './constantRoutes'
  * async/await or return a Promise which resolves
  * with the Router instance.
  */
-let Router
+let Router: ReturnType<typeof createRouter>
 const chunkReloadFlag = 'sweet-admin:chunk-reload'
 
 function isDynamicImportError(error: unknown): boolean {

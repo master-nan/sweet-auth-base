@@ -34,6 +34,10 @@ vi.mock('src/stores/user', () => ({
   }),
 }))
 
+vi.mock('src/router', () => ({
+  Router: { currentRoute: { value: { name: '' } } },
+}))
+
 vi.mock('boot/axios', () => ({
   instance: {
     post: postMock,
@@ -110,6 +114,9 @@ const makeField = (selectorType?: OrganizationSelectorType) => ({
   selector_type: selectorType,
   dict_code: '',
   linkage_config: '',
+  allowed_operators: selectorType
+    ? undefined
+    : [ExpressionType.LIKE, ExpressionType.EQ, ExpressionType.IS_NULL],
 })
 
 const makeQuery = (fieldCode: string, expressionType = ExpressionType.EQ): Query => ({

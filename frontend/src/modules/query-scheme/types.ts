@@ -57,6 +57,7 @@ export interface QueryScopeQuickPreset {
 }
 
 export interface QueryScopeConfig {
+  menu_id: number
   scope_code: string
   scope_label: string
   table_code: string

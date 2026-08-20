@@ -11,6 +11,7 @@ import (
 	"backend/repository"
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -128,6 +129,70 @@ func (s *MetadataRuntimeService) ListTables(
 	}
 	sort.SliceStable(result, func(i, j int) bool { return result[i].Code < result[j].Code })
 	return result, nil
+}
+
+func (s *MetadataRuntimeService) QueryRelationOptions(
+	ctx context.Context,
+	fieldID int,
+	req request.RuntimeRelationOptionsReq,
+) (response.ListResult[response.RuntimeRelationOptionRes], error) {
+	field, err := s.GetField(ctx, fieldID)
+	if err != nil {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, err
+	}
+	if field.Relation == nil {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.NewValidationError("字段未配置运行时关系展示")
+	}
+	target, err := s.GetTable(ctx, field.Relation.TargetTableCode)
+	if err != nil {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, err
+	}
+	fieldCodes := make(map[string]platformmetadata.FieldMetadata, len(target.Fields))
+	for _, targetField := range target.Fields {
+		fieldCodes[targetField.Code] = targetField
+	}
+	if _, ok := fieldCodes[field.Relation.ValueField]; !ok {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.NewValidationError("关系取值字段不可用")
+	}
+	if _, ok := fieldCodes[field.Relation.DisplayField]; !ok {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.NewValidationError("关系展示字段不可用")
+	}
+	page, num := req.Page, req.Num
+	if page <= 0 {
+		page = 1
+	}
+	if num <= 0 {
+		num = 50
+	}
+	if num > 200 || len(req.SelectedValues) > 100 || len(strings.TrimSpace(req.Keyword)) > 128 {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.ErrParamInvalid
+	}
+	filters := make(map[string]interface{}, len(field.Relation.FilterMapping))
+	for targetField, sourceField := range field.Relation.FilterMapping {
+		value, exists := req.SourceValues[sourceField]
+		if !exists || value == nil || strings.TrimSpace(fmt.Sprint(value)) == "" {
+			continue
+		}
+		if _, ok := fieldCodes[targetField]; !ok {
+			return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.NewValidationError("关系过滤字段不可用")
+		}
+		filters[targetField] = value
+	}
+	_, hasState := fieldCodes["state"]
+	_, hasDeletedAt := fieldCodes["gmt_delete"]
+	items, total, err := s.tables.QueryRuntimeRelationOptions(ctx, repository.RuntimeRelationOptionQuery{
+		TableCode: target.Code, ValueField: field.Relation.ValueField, DisplayField: field.Relation.DisplayField,
+		ParentField: field.Relation.ParentField, Keyword: strings.TrimSpace(req.Keyword), Page: page, Num: num,
+		SelectedValues: req.SelectedValues, Filters: filters, HasState: hasState, HasDeletedAt: hasDeletedAt,
+	})
+	if err != nil {
+		return response.ListResult[response.RuntimeRelationOptionRes]{}, myerrors.WrapDatabaseError(err)
+	}
+	result := make([]response.RuntimeRelationOptionRes, 0, len(items))
+	for _, item := range items {
+		result = append(result, response.RuntimeRelationOptionRes{Value: item.Value, Label: item.Label, ParentValue: item.ParentValue})
+	}
+	return response.ListResult[response.RuntimeRelationOptionRes]{Data: result, Total: total}, nil
 }
 
 // listConfigTables supports the metadata administration page. It intentionally

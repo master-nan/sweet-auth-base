@@ -99,6 +99,7 @@ const integerFieldTypes = new Set<SysTableFieldType>([
   SysTableFieldType.BIGINT,
   SysTableFieldType.INT,
   SysTableFieldType.TINYINT,
+  SysTableFieldType.SMALLINT,
 ])
 
 const normalizeNumericQueryValue = (value: unknown, requireInteger: boolean) => {
@@ -143,8 +144,10 @@ export const normalizeQueryValueByFieldType = (
   fieldType?: SysTableFieldType,
 ) => {
   if (value === null || value === undefined || value === '') return value
-  if (fieldType === SysTableFieldType.FLOAT) {
-    return normalizeNumericQueryValue(value, false)
+  if (fieldType === SysTableFieldType.FLOAT || fieldType === SysTableFieldType.DECIMAL) {
+    if (typeof value === 'string') return value.trim()
+    if (typeof value === 'number' && Number.isSafeInteger(value)) return `${value}`
+    return value
   }
   if (fieldType !== undefined && integerFieldTypes.has(fieldType)) {
     return normalizeNumericQueryValue(value, true)

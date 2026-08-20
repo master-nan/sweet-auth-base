@@ -169,34 +169,39 @@ type SysTable struct {
 
 type SysTableField struct {
 	Basic
-	TableId            int                         `gorm:"comment:table_id;uniqueIndex:union_uni_table_id_field_code_index" json:"table_id" binding:"required"`
-	FieldName          string                      `gorm:"size:128;comment:列名" json:"field_name"`
-	FieldCode          string                      `gorm:"size:128;uniqueIndex:union_uni_table_id_field_code_index;comment:表字段名" json:"field_code"`
-	FieldType          enum.SysTableFieldType      `gorm:"type:smallint;default:1;comment:字段类型" json:"field_type"`
-	FieldLength        int                         `gorm:"default:0;comment:字段长度" json:"field_length"`
-	FieldDecimalLength int                         `gorm:"default:0;comment:小数位数" json:"field_decimal_length"`
-	InputType          enum.SysTableFieldInputType `gorm:"type:smallint;default:1;comment:输入类型" json:"input_type"`
-	FormSpan           uint8                       `gorm:"type:smallint;default:0;comment:表单占位列数，0为自动" json:"form_span"`
-	DetailSpan         uint8                       `gorm:"type:smallint;default:0;comment:详情占位列数，0为自动" json:"detail_span"`
-	DefaultValue       *string                     `gorm:"size:128;comment:默认值" json:"default_value,omitempty"`
-	DictCode           *string                     `gorm:"size:128;comment:所用字典" json:"dict_code"`
-	Dict               SysDict                     `gorm:"foreignKey:DictCode;references:DictCode" json:"dict,omitempty"`
-	IsPrimaryKey       bool                        `gorm:"default:false;comment:是否主键" json:"is_primary_key"`
-	IsIndex            bool                        `gorm:"default:false;comment:是否索引" json:"is_index"`
-	IsQuickSearch      bool                        `gorm:"default:false;comment:是否快捷搜索" json:"is_quick_search"`
-	IsAdvancedSearch   bool                        `gorm:"default:false;comment:是否高级搜索" json:"is_advanced_search"`
-	IsSort             bool                        `gorm:"default:false;comment:是否可排序" json:"is_sort"`
-	IsNull             bool                        `gorm:"default:true;comment:是否可空" json:"is_null"`
-	IsListShow         bool                        `gorm:"default:true;comment:是否列表显示" json:"is_list_show"`
-	IsInsertShow       bool                        `gorm:"default:true;comment:是否新增显示" json:"is_insert_show"`
-	IsUpdateShow       bool                        `gorm:"default:true;comment:是否更新显示" json:"is_update_show"`
-	Sequence           uint8                       `gorm:"comment:排序;type:smallint" binding:"required" json:"sequence"`
-	OriginalFieldId    int                         `gorm:"comment:原字段Id" json:"original_field_id"`
-	Binding            string                      `gorm:"size:256;comment:验证器" json:"binding"`        // 用于存储绑定规则
-	FieldCategory      enum.SysTableFieldCategory  `gorm:"size:64;comment:字段类别" json:"field_category"` // 字段类别（普通字段、虚拟列、计算字段）
-	Expression         *string                     `gorm:"size:256;comment:计算字段表达式" json:"expression"` // 计算字段表达式或虚拟列表达式
-	Tag                *string                     `gorm:"size:256;comment:标签" json:"tag"`
-	LinkageConfig      *string                     `gorm:"type:text;comment:联动配置" json:"linkage_config"`
+	TableId            int                             `gorm:"comment:table_id;uniqueIndex:union_uni_table_id_field_code_index" json:"table_id" binding:"required"`
+	FieldName          string                          `gorm:"size:128;comment:列名" json:"field_name"`
+	FieldCode          string                          `gorm:"size:128;uniqueIndex:union_uni_table_id_field_code_index;comment:表字段名" json:"field_code"`
+	FieldType          enum.SysTableFieldType          `gorm:"type:smallint;default:1;comment:字段类型" json:"field_type"`
+	FieldLength        int                             `gorm:"default:0;comment:字段长度" json:"field_length"`
+	FieldDecimalLength int                             `gorm:"default:0;comment:小数位数" json:"field_decimal_length"`
+	NumericPrecision   int                             `gorm:"default:0;comment:Numeric有效数字位数" json:"numeric_precision"`
+	NumericScale       int                             `gorm:"default:0;comment:Numeric小数位数" json:"numeric_scale"`
+	LogicalType        enum.SysTableFieldLogicalType   `gorm:"size:32;comment:逻辑类型" json:"logical_type"`
+	DisplayFormat      enum.SysTableFieldDisplayFormat `gorm:"size:32;comment:受控展示格式" json:"display_format"`
+	ListWidth          *int                            `gorm:"comment:列表默认宽度" json:"list_width,omitempty"`
+	InputType          enum.SysTableFieldInputType     `gorm:"type:smallint;default:1;comment:输入类型" json:"input_type"`
+	FormSpan           uint8                           `gorm:"type:smallint;default:0;comment:表单占位列数，0为自动" json:"form_span"`
+	DetailSpan         uint8                           `gorm:"type:smallint;default:0;comment:详情占位列数，0为自动" json:"detail_span"`
+	DefaultValue       *string                         `gorm:"size:128;comment:默认值" json:"default_value,omitempty"`
+	DictCode           *string                         `gorm:"size:128;comment:所用字典" json:"dict_code"`
+	Dict               SysDict                         `gorm:"foreignKey:DictCode;references:DictCode" json:"dict,omitempty"`
+	IsPrimaryKey       bool                            `gorm:"default:false;comment:是否主键" json:"is_primary_key"`
+	IsIndex            bool                            `gorm:"default:false;comment:是否索引" json:"is_index"`
+	IsQuickSearch      bool                            `gorm:"default:false;comment:是否快捷搜索" json:"is_quick_search"`
+	IsAdvancedSearch   bool                            `gorm:"default:false;comment:是否高级搜索" json:"is_advanced_search"`
+	IsSort             bool                            `gorm:"default:false;comment:是否可排序" json:"is_sort"`
+	IsNull             bool                            `gorm:"default:true;comment:是否可空" json:"is_null"`
+	IsListShow         bool                            `gorm:"default:true;comment:是否列表显示" json:"is_list_show"`
+	IsInsertShow       bool                            `gorm:"default:true;comment:是否新增显示" json:"is_insert_show"`
+	IsUpdateShow       bool                            `gorm:"default:true;comment:是否更新显示" json:"is_update_show"`
+	Sequence           uint8                           `gorm:"comment:排序;type:smallint" binding:"required" json:"sequence"`
+	OriginalFieldId    int                             `gorm:"comment:原字段Id" json:"original_field_id"`
+	Binding            string                          `gorm:"size:256;comment:验证器" json:"binding"`        // 用于存储绑定规则
+	FieldCategory      enum.SysTableFieldCategory      `gorm:"size:64;comment:字段类别" json:"field_category"` // 字段类别（普通字段、虚拟列、计算字段）
+	Expression         *string                         `gorm:"size:256;comment:计算字段表达式" json:"expression"` // 计算字段表达式或虚拟列表达式
+	Tag                *string                         `gorm:"size:256;comment:标签" json:"tag"`
+	LinkageConfig      *string                         `gorm:"type:text;comment:联动配置" json:"linkage_config"`
 }
 
 type SysTableIndex struct {

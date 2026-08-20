@@ -88,6 +88,24 @@ func TestOrgServiceEmployeeQueryKeepsAssignmentFiltersOnOneRow(t *testing.T) {
 	}
 }
 
+func TestOrgServiceEmployeeProjectsPrimaryLegalEntityName(t *testing.T) {
+	orgService, db := newOrgServiceTestSubject(t)
+	legal := orgServiceLegalEntity(701, "LE-701", "华东法人", "", "enabled", nil, nil)
+	testutil.MustCreate(t, db, &legal)
+	employee := orgServiceEmployeeFixture(702, "EMP-702", "展示人员", "active")
+	employee.PrimaryLegalEntityId = &legal.Id
+	testutil.MustCreate(t, db, &employee)
+
+	result, err := orgService.QueryEmployees(nil, request.OrgEmployeeQueryReq{Basic: request.Basic{Page: 1, Num: 10}}, orgEmployeePositionServiceTable("org_employee"))
+	if err != nil || len(result.Data) != 1 {
+		t.Fatalf("query employee projection=%+v err=%v", result, err)
+	}
+	projection := result.Data[0].PrimaryLegalEntity
+	if projection == nil || projection.Id != legal.Id || projection.Name != legal.Name {
+		t.Fatalf("primary legal entity projection=%+v", projection)
+	}
+}
+
 func TestOrgServiceEmployeeScopeBindingDetailAndOptions(t *testing.T) {
 	orgService, db := newOrgServiceTestSubject(t)
 	user := model.SysUser{

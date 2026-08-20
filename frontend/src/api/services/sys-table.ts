@@ -3,6 +3,7 @@ import { localLoadingRequestConfig } from 'src/api/request-config'
 // import qs from 'qs'
 import type { Basic, Query, ResponseData } from 'src/types/global'
 import type {
+  ExpressionType,
   SysTableFieldType,
   SysTableType,
   SysTableFieldInputType,
@@ -12,6 +13,36 @@ import type {
   SysDetailOpenMode,
 } from 'src/types/enum'
 
+export type TableFieldLogicalType =
+  | 'plain'
+  | 'integer'
+  | 'decimal'
+  | 'money'
+  | 'percent'
+  | 'boolean'
+  | 'enum'
+  | 'date'
+  | 'datetime'
+  | 'relation'
+
+export type TableFieldDisplayFormat =
+  | 'plain'
+  | 'integer'
+  | 'decimal'
+  | 'money'
+  | 'percent'
+  | 'date'
+  | 'datetime'
+  | 'dictionary'
+  | 'relation'
+
+export interface RuntimeRelationDisplay {
+  target_table_code: string
+  value_field: string
+  display_field: string
+  parent_field?: string
+}
+
 export interface TableField extends Basic {
   table_id: number
   field_name: string
@@ -19,6 +50,13 @@ export interface TableField extends Basic {
   field_type: SysTableFieldType
   field_length: number
   field_decimal_length: number
+  numeric_precision?: number
+  numeric_scale?: number
+  logical_type?: TableFieldLogicalType
+  display_format?: TableFieldDisplayFormat
+  list_width?: number | null
+  allowed_operators?: ExpressionType[]
+  relation?: RuntimeRelationDisplay
   input_type: SysTableFieldInputType
   form_span?: number
   detail_span?: number
@@ -147,6 +185,11 @@ export interface TableFieldCreateReq {
   type: SysTableFieldType
   field_length: number
   field_decimal_length: number
+  numeric_precision: number
+  numeric_scale: number
+  logical_type: TableFieldLogicalType | ''
+  display_format: TableFieldDisplayFormat | ''
+  list_width?: number | null
   input_type: SysTableFieldInputType
   form_span?: number
   detail_span?: number
@@ -176,6 +219,11 @@ export interface TableFieldUpdateReq {
   type: SysTableFieldType
   field_length: number
   field_decimal_length: number
+  numeric_precision: number
+  numeric_scale: number
+  logical_type: TableFieldLogicalType | ''
+  display_format: TableFieldDisplayFormat | ''
+  list_width?: number | null
   input_type: SysTableFieldInputType
   form_span?: number
   detail_span?: number

@@ -145,7 +145,18 @@ export const numericFieldTypes = new Set<SysTableFieldType>([
   SysTableFieldType.FLOAT,
   SysTableFieldType.TINYINT,
   SysTableFieldType.INT,
+  SysTableFieldType.SMALLINT,
+  SysTableFieldType.DECIMAL,
 ])
+
+export const exactDecimalFieldTypes = new Set<SysTableFieldType>([
+  SysTableFieldType.FLOAT,
+  SysTableFieldType.DECIMAL,
+])
+
+export const isExactDecimalFieldType = (fieldType?: SysTableFieldType) => {
+  return fieldType !== undefined && exactDecimalFieldTypes.has(fieldType)
+}
 
 export const isNumericFieldType = (fieldType?: SysTableFieldType) => {
   return fieldType !== undefined && numericFieldTypes.has(fieldType)
@@ -219,6 +230,8 @@ export const defaultInputTypeForFieldType = (fieldType: SysTableFieldType) => {
     case SysTableFieldType.FLOAT:
     case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
+    case SysTableFieldType.SMALLINT:
+    case SysTableFieldType.DECIMAL:
       return SysTableFieldInputType.INPUT_NUMBER
     case SysTableFieldType.TEXT:
       return SysTableFieldInputType.TEXTAREA
@@ -249,6 +262,11 @@ export const inputTypesAllowingDictionary = new Set<SysTableFieldInputType>([
 ])
 
 export const coerceFieldValue = (value: unknown, fieldType?: SysTableFieldType) => {
+  if (isExactDecimalFieldType(fieldType)) {
+    if (typeof value === 'string') return value.trim()
+    if (typeof value === 'number' && Number.isSafeInteger(value)) return `${value}`
+    return value
+  }
   if (isNumericFieldType(fieldType)) {
     return Number(value)
   }
@@ -291,6 +309,8 @@ export const queryValueHtmlInputType = (field?: Partial<TableField>): HtmlInputT
     case SysTableFieldType.FLOAT:
     case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
+    case SysTableFieldType.SMALLINT:
+    case SysTableFieldType.DECIMAL:
       return 'number'
     case SysTableFieldType.DATE:
       return 'date'
@@ -368,6 +388,8 @@ export const getFieldControlTypeByFieldType = (fieldType: SysTableFieldType): Fi
     case SysTableFieldType.FLOAT:
     case SysTableFieldType.TINYINT:
     case SysTableFieldType.INT:
+    case SysTableFieldType.SMALLINT:
+    case SysTableFieldType.DECIMAL:
       return 'number'
     case SysTableFieldType.TEXT:
       return 'textarea'
@@ -399,6 +421,10 @@ const configuredDefaultValueForField = (field: TableField) => {
     return normalized === 'true' || normalized === '1' || normalized === '是' || normalized === 'yes'
   }
 
+  if (isExactDecimalFieldType(field.field_type)) {
+    return typeof value === 'string' ? value.trim() : value
+  }
+
   if (isNumericFieldType(field.field_type)) {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric : value
@@ -420,6 +446,37 @@ const configuredDefaultValueForField = (field: TableField) => {
   return value
 }
 
+export const compareExactDecimal = (left: unknown, right: unknown): number | null => {
+  const normalize = (value: unknown) => {
+    if (typeof value !== 'string' && typeof value !== 'number') return null
+    const match = String(value)
+      .trim()
+      .match(/^([+-]?)(\d+)(?:\.(\d+))?$/)
+    if (!match) return null
+    const integer = match[2]!.replace(/^0+/, '') || '0'
+    const fraction = (match[3] || '').replace(/0+$/, '')
+    const negative = match[1] === '-' && (integer !== '0' || fraction !== '')
+    return { negative, integer, fraction }
+  }
+  const leftValue = normalize(left)
+  const rightValue = normalize(right)
+  if (!leftValue || !rightValue) return null
+  if (leftValue.negative !== rightValue.negative) return leftValue.negative ? -1 : 1
+
+  let result = leftValue.integer.length - rightValue.integer.length
+  if (result === 0 && leftValue.integer !== rightValue.integer) {
+    result = leftValue.integer < rightValue.integer ? -1 : 1
+  }
+  if (result === 0) {
+    const width = Math.max(leftValue.fraction.length, rightValue.fraction.length)
+    const leftFraction = leftValue.fraction.padEnd(width, '0')
+    const rightFraction = rightValue.fraction.padEnd(width, '0')
+    if (leftFraction !== rightFraction) result = leftFraction < rightFraction ? -1 : 1
+  }
+  const normalized = result === 0 ? 0 : result < 0 ? -1 : 1
+  return leftValue.negative ? -normalized : normalized
+}
+
 export const defaultValueForField = (field: TableField) => {
   const configuredDefault = configuredDefaultValueForField(field)
   if (configuredDefault !== undefined) return configuredDefault
@@ -430,9 +487,11 @@ export const defaultValueForField = (field: TableField) => {
     case SysTableFieldType.BIGINT:
     case SysTableFieldType.INT:
     case SysTableFieldType.TINYINT:
+    case SysTableFieldType.SMALLINT:
       return 0
     case SysTableFieldType.FLOAT:
-      return 0.0
+    case SysTableFieldType.DECIMAL:
+      return '0'
     case SysTableFieldType.BOOLEAN:
       return false
     default:

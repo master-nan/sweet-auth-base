@@ -1190,6 +1190,11 @@ const enumLabel = (map: Record<string, string>, value: unknown, fallback = '-') 
 
 const fieldTypeLabel = (field: TableField) => {
   const base = enumLabel(SysTableFieldTypeMap as Record<string, string>, field.field_type)
+  if (field.field_type === SysTableFieldType.DECIMAL || field.field_type === SysTableFieldType.FLOAT) {
+    const precision = Number(field.numeric_precision || 0)
+    const scale = Number(field.numeric_scale || 0)
+    if (precision > 0) return `${base}(${precision},${scale})`
+  }
   const length = Number(field.field_length || 0)
   const decimal = Number(field.field_decimal_length || 0)
   if (length > 0 && decimal > 0) return `${base}(${length},${decimal})`
@@ -2071,6 +2076,11 @@ const handleFieldFormSubmit = async (formPayload: {
       type: fieldType,
       field_length: toNumber(formPayload.data.field_length, 0),
       field_decimal_length: toNumber(formPayload.data.field_decimal_length, 0),
+      numeric_precision: toNumber(formPayload.data.numeric_precision, 0),
+      numeric_scale: toNumber(formPayload.data.numeric_scale, 0),
+      logical_type: formPayload.data.logical_type || '',
+      display_format: formPayload.data.display_format || '',
+      list_width: toNumber(formPayload.data.list_width, 0) || null,
       input_type: formPayload.data.input_type,
       form_span: toNumber((formPayload.data as any).form_span, 0),
       detail_span: toNumber((formPayload.data as any).detail_span, 0),
@@ -2105,6 +2115,11 @@ const handleFieldFormSubmit = async (formPayload: {
       type: fieldType,
       field_length: toNumber(formPayload.data.field_length, 0),
       field_decimal_length: toNumber(formPayload.data.field_decimal_length, 0),
+      numeric_precision: toNumber(formPayload.data.numeric_precision, 0),
+      numeric_scale: toNumber(formPayload.data.numeric_scale, 0),
+      logical_type: formPayload.data.logical_type || '',
+      display_format: formPayload.data.display_format || '',
+      list_width: toNumber(formPayload.data.list_width, 0) || null,
       input_type: formPayload.data.input_type,
       form_span: toNumber((formPayload.data as any).form_span, 0),
       detail_span: toNumber((formPayload.data as any).detail_span, 0),
@@ -2328,7 +2343,10 @@ const confirmDeleteRelation = (row: TableRelation) => {
   })
 }
 
-const buildFieldUpdateReq = (field: TableField, overrides: Partial<TableFieldUpdateReq>) => {
+const buildFieldUpdateReq = (
+  field: TableField,
+  overrides: Partial<TableFieldUpdateReq>,
+): TableFieldUpdateReq => {
   const toNumber = (val: any, fallback = 0) => {
     if (val === '' || val === null || val === undefined) return fallback
     const num = Number(val)
@@ -2342,6 +2360,11 @@ const buildFieldUpdateReq = (field: TableField, overrides: Partial<TableFieldUpd
     type: (field as any).type ?? field.field_type,
     field_length: toNumber(field.field_length, 0),
     field_decimal_length: toNumber(field.field_decimal_length, 0),
+    numeric_precision: toNumber(field.numeric_precision, 0),
+    numeric_scale: toNumber(field.numeric_scale, 0),
+    logical_type: field.logical_type || '',
+    display_format: field.display_format || '',
+    list_width: toNumber(field.list_width, 0) || null,
     input_type: field.input_type,
     default_value: field.default_value ?? '',
     dict_code: field.dict_code ?? '',

@@ -172,7 +172,7 @@
                   <!-- 数字输入框 -->
                   <q-input
                     v-else-if="getFieldInputType(field) === 'number'"
-                    v-model.number="formData[field.field_code]"
+                    :model-value="formData[field.field_code]"
                     class="number-input-field"
                     :label="field.field_name"
                     :placeholder="getFieldPlaceholder(field)"
@@ -187,11 +187,11 @@
                     :ref="setFieldRef(field.field_code)"
                     @focus="markTouched(field.field_code)"
                     @blur="markTouched(field.field_code)"
-                    @keydown.up.prevent="adjustNumberField(field, 1)"
-                    @keydown.down.prevent="adjustNumberField(field, -1)"
-                    @update:model-value="handleFieldInput(field.field_code)"
+                    @keydown.up="handleNumberArrow(field, 1, $event)"
+                    @keydown.down="handleNumberArrow(field, -1, $event)"
+                    @update:model-value="updateNumberFieldValue(field, $event)"
                   >
-                    <template v-slot:append>
+                    <template v-if="!isExactDecimalFieldType(field.field_type)" v-slot:append>
                       <div class="number-input-field__actions">
                         <q-btn
                           flat
@@ -509,12 +509,10 @@ import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import { type TableField } from 'src/api/services/sys-table'
 import { type MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
-import type { Query } from 'src/types/global'
 import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
 import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
 import { useDictApi } from 'src/api/services/sys-dict'
-import { useGeneralizationApi } from 'src/api/services/generalization'
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
 
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
@@ -527,19 +525,21 @@ import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.v
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import {
+  coerceFieldValue,
   coerceDictOptions,
+  compareExactDecimal,
   decodeHtmlEntities,
   defaultInputTypeForFieldType,
   defaultValueForField,
   getFieldControlType,
   inputTypesAllowingDictionary,
+  isExactDecimalFieldType,
   isBooleanFieldMetadata,
   metadataDictDefault,
   parseLinkageConfig,
   resolveOrganizationSelectorConfig,
   selectLikeInputTypes,
 } from 'src/utils/field-metadata'
-import { resolveRelationMenuId } from 'src/utils/menu-context'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { getFieldFormGridClass } from 'src/utils/field-layout'
 
@@ -615,8 +615,6 @@ const formBottomButtons = computed(() =>
 
 // 使用Pinia字典存储
 const dictStore = useDictStore()
-const userStore = useUserStore()
-const generalizationApi = useGeneralizationApi()
 const dictApi = useDictApi()
 
 const loadingStore = useLoadingStore()
@@ -1055,27 +1053,15 @@ const formCompletionText = computed(() => {
   return `已填写 ${filledFieldCount.value}/${displayFields.value.length}`
 })
 
-const buildOptionsFromRows = (rows: Array<Record<string, any>>, cfg: any) => {
-  const labelKey = cfg?.labelKey || 'label'
-  const valueKey = cfg?.valueKey || 'value'
-  return rows.map((row) => {
-    const rawLabel = row[labelKey]
-    const rawValue = row[valueKey]
-    const labelFallback =
-      rawLabel ?? row.label ?? row.name ?? row.title ?? row.menu_name ?? row.dict_name
-    const valueFallback = rawValue ?? row.value ?? row.id
-    return {
-      ...row,
-      label: labelFallback,
-      value: valueFallback,
-    }
-  })
-}
-
-const rowsFromRelationResponse = (res: any): Array<Record<string, any>> => {
-  const rawRows = res?.data
-  return Array.isArray(rawRows) ? rawRows : rawRows?.data || []
-}
+const buildRuntimeRelationOptions = (
+  field: TableField,
+  items: Array<{ value: string; label: string; parent_value?: string }>,
+) =>
+  items.map((item) => ({
+    value: coerceFieldValue(item.value, field.field_type),
+    label: item.label || item.value,
+    ...(item.parent_value ? { parent_value: item.parent_value } : {}),
+  }))
 
 const relationPageSizeForLinkage = (cfg: any) => {
   const configuredSize = Number(cfg?.searchPageSize || cfg?.pageSize || 50)
@@ -1185,62 +1171,22 @@ const buildTreeFromFlat = (
   return tree
 }
 
-const extractFilters = (form: Record<string, any>, cfg: any) => {
-  const mapping = cfg?.filterMapping || {}
-  const filters: Record<string, any> = {}
-  Object.entries(mapping).forEach(([targetField, sourceField]) => {
-    if (typeof sourceField !== 'string') return
-    const value = form[sourceField]
-    if (value !== undefined && value !== null && value !== '') {
-      filters[targetField] = value
-    }
-  })
-  return filters
-}
-
-const buildRelationQuery = (
-  pageSize: number,
-  cfg: Record<string, any>,
-  relatedTableCode?: string,
-  page = 1,
-  keyword = '',
-): Query => {
-  const query: Query = {
-    page,
-    num: pageSize,
-    expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
-    quick_query: { keyword },
-    include_deleted: false,
-  }
-  if (relatedTableCode) {
-    query.table_code = relatedTableCode
-  }
-  const menuId = resolveRelationMenuId(userStore.menus, cfg, props.menuId)
-  if (menuId > 0) {
-    query.menu_id = menuId
-  }
-  return query
-}
-
 const fetchRelationOptions = async (
   field: TableField,
   cfg: any,
   page: number,
   keyword: string,
 ) => {
-  const relatedTableCode = cfg?.tableCode
-  if (!relatedTableCode) return []
+  if (!field.id || props.menuId <= 0) return { options: [], total: 0 }
   const pageSize = relationPageSizeForLinkage(cfg)
-  const query = buildRelationQuery(pageSize, cfg, relatedTableCode, page, keyword)
-
-  const filters = extractFilters(formData.value, cfg)
-  if (Object.keys(filters).length > 0) {
-    query.filters = filters
-  }
-
-  const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
-  const rows = rowsFromRelationResponse(res)
-  return buildOptionsFromRows(rows, cfg)
+  const result = await queryRuntimeRelationOptions(field.id, {
+    menu_id: props.menuId,
+    page,
+    num: pageSize,
+    keyword,
+    source_values: formData.value,
+  })
+  return { options: buildRuntimeRelationOptions(field, result.items), total: result.total }
 }
 
 const loadSelectedRelationOptions = async (field: TableField, cfg: any, knownOptions: any[]) => {
@@ -1251,24 +1197,15 @@ const loadSelectedRelationOptions = async (field: TableField, cfg: any, knownOpt
   const missingValues = selectedValues.filter((value) => !knownValues.has(String(value)))
   if (missingValues.length === 0) return []
 
-  const relatedTableCode = cfg?.tableCode
-  const valueKey = cfg?.valueKey || 'value'
-  if (!relatedTableCode || !valueKey) return []
-
-  const query = buildRelationQuery(
-    Math.max(missingValues.length, 20),
-    cfg,
-    relatedTableCode,
-    1,
-    '',
-  )
-  query.filters = {
-    ...(query.filters || {}),
-    [valueKey]: missingValues,
-  }
-
-  const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
-  return buildOptionsFromRows(rowsFromRelationResponse(res), cfg)
+  if (!field.id || props.menuId <= 0) return []
+  const result = await queryRuntimeRelationOptions(field.id, {
+    menu_id: props.menuId,
+    page: 1,
+    num: Math.max(missingValues.length, 20),
+    selected_values: missingValues.map(String),
+    source_values: formData.value,
+  })
+  return buildRuntimeRelationOptions(field, result.items)
 }
 
 const loadRelationOptions = async (
@@ -1294,7 +1231,8 @@ const loadRelationOptions = async (
   })
 
   try {
-    const incomingOptions = await fetchRelationOptions(field, cfg, page, keyword)
+    const result = await fetchRelationOptions(field, cfg, page, keyword)
+    const incomingOptions = result.options
     const cachedSelectedOptions = append ? fieldOptionsMap.value[fieldCode] || [] : []
     const selectedOptions = append
       ? []
@@ -1310,7 +1248,7 @@ const loadRelationOptions = async (
     updateRelationSelectState(fieldCode, {
       page,
       keyword,
-      hasMore: incomingOptions.length >= relationPageSizeForLinkage(cfg),
+      hasMore: page * relationPageSizeForLinkage(cfg) < result.total,
       loading: false,
     })
     return optionsData
@@ -1334,20 +1272,28 @@ const loadRelationOptions = async (
 
 // 加载级联树形选项
 const loadCascaderOptions = async (field: TableField, cfg: any) => {
-  const relatedTableCode = cfg?.tableCode
-  if (!relatedTableCode) return []
-  const query = buildRelationQuery(cfg?.pageSize || 1000, cfg, relatedTableCode)
-
-  const filters = extractFilters(formData.value, cfg)
-  if (Object.keys(filters).length > 0) {
-    query.filters = filters
-  }
-
+  if (!field.id || props.menuId <= 0) return []
   try {
-    const res = await generalizationApi.queryGeneralizationByCode(relatedTableCode, query)
-    const rawRows = res?.data
-    const rows = Array.isArray(rawRows) ? rawRows : []
-    return buildTreeFromFlat(rows, cfg)
+    const rows: Array<{ value: unknown; label: string; parent_value?: string }> = []
+    let page = 1
+    let total = 0
+    do {
+      const result = await queryRuntimeRelationOptions(field.id, {
+        menu_id: props.menuId,
+        page,
+        num: 200,
+        source_values: formData.value,
+      })
+      rows.push(...buildRuntimeRelationOptions(field, result.items))
+      total = result.total
+      page += 1
+    } while (rows.length < total)
+    return buildTreeFromFlat(rows, {
+      ...cfg,
+      labelKey: 'label',
+      valueKey: 'value',
+      parentKey: 'parent_value',
+    })
   } catch (error) {
     console.warn('级联选项加载失败', error)
     return []
@@ -1551,7 +1497,7 @@ const getMaxLength = (field: TableField) => {
 }
 
 const getNumberInputMode = (field: TableField) => {
-  return field.field_type === SysTableFieldType.FLOAT ? 'decimal' : 'numeric'
+  return isExactDecimalFieldType(field.field_type) ? 'decimal' : 'numeric'
 }
 
 const getNumberDecimals = (field: TableField) => {
@@ -1635,7 +1581,7 @@ const getFileUploadConfig = (field: TableField): FileUploadFieldConfig => {
 }
 
 const adjustNumberField = (field: TableField, direction: 1 | -1) => {
-  if (isReadonly.value) return
+  if (isReadonly.value || isExactDecimalFieldType(field.field_type)) return
 
   const code = field.field_code
   const currentValue = Number(formData.value[code])
@@ -1657,6 +1603,24 @@ const adjustNumberField = (field: TableField, direction: 1 | -1) => {
   formData.value[code] = next
   markTouched(code)
   handleFieldInput(code)
+}
+
+const handleNumberArrow = (field: TableField, direction: 1 | -1, event: KeyboardEvent) => {
+  if (isExactDecimalFieldType(field.field_type)) return
+  event.preventDefault()
+  adjustNumberField(field, direction)
+}
+
+const updateNumberFieldValue = (field: TableField, value: string | number | null) => {
+  if (value === null || value === '') {
+    formData.value[field.field_code] = value
+  } else if (isExactDecimalFieldType(field.field_type)) {
+    formData.value[field.field_code] = String(value)
+  } else {
+    const numeric = Number(value)
+    formData.value[field.field_code] = Number.isFinite(numeric) ? numeric : value
+  }
+  handleFieldInput(field.field_code)
 }
 
 // 判断值是否为空
@@ -1702,8 +1666,9 @@ const buildFieldRules = (field: TableField) => {
   const isIntegerField =
     field.field_type === SysTableFieldType.BIGINT ||
     field.field_type === SysTableFieldType.INT ||
-    field.field_type === SysTableFieldType.TINYINT
-  const isNumberField = isIntegerField || field.field_type === SysTableFieldType.FLOAT
+    field.field_type === SysTableFieldType.TINYINT ||
+    field.field_type === SysTableFieldType.SMALLINT
+  const isNumberField = isIntegerField || isExactDecimalFieldType(field.field_type)
 
   // 根据字段类型添加验证（select/cascader 跳过格式校验）
   if (!isSelectLike && isIntegerField) {
@@ -1711,10 +1676,21 @@ const buildFieldRules = (field: TableField) => {
       if (shouldSkip()) return true
       return isValueEmpty(val) || /^-?\d+$/.test(String(val)) || `${field.field_name}必须是整数`
     })
-  } else if (!isSelectLike && field.field_type === SysTableFieldType.FLOAT) {
+  } else if (!isSelectLike && isExactDecimalFieldType(field.field_type)) {
     rules.push((val) => {
       if (shouldSkip()) return true
-      return isValueEmpty(val) || !Number.isNaN(Number(val)) || `${field.field_name}必须是数字`
+      if (isValueEmpty(val)) return true
+      const match = String(val).trim().match(/^-?(\d+)(?:\.(\d+))?$/)
+      if (!match) return `${field.field_name}必须是十进制数字`
+      const integerDigits = match[1]!.replace(/^0+(?=\d)/, '').length
+      const fractionalDigits = (match[2] || '').length
+      const precision = Number(field.numeric_precision || 0)
+      const scale = Number(field.numeric_scale || 0)
+      if (fractionalDigits > scale) return `${field.field_name}小数位不能超过${scale}位`
+      if (precision > 0 && integerDigits + fractionalDigits > precision) {
+        return `${field.field_name}总位数不能超过${precision}位`
+      }
+      return true
     })
   } else if (field.field_type === SysTableFieldType.VARCHAR) {
     rules.push((val) => {
@@ -1727,9 +1703,28 @@ const buildFieldRules = (field: TableField) => {
     })
   }
 
+  if (
+    !isSelectLike &&
+    (field.field_type === SysTableFieldType.SMALLINT ||
+      field.field_type === SysTableFieldType.TINYINT)
+  ) {
+    rules.push((val) => {
+      if (shouldSkip() || isValueEmpty(val)) return true
+      const value = Number(val)
+      return (value >= -32768 && value <= 32767) || `${field.field_name}必须在-32768到32767之间`
+    })
+  }
+
   if (hasBinding('min')) {
-    const minVal = Number(getBindingValue('min'))
-    if (!Number.isNaN(minVal)) {
+    const minText = getBindingValue('min')
+    const minVal = Number(minText)
+    if (isExactDecimalFieldType(field.field_type)) {
+      rules.push((val) => {
+        if (shouldSkip() || isValueEmpty(val)) return true
+        const comparison = compareExactDecimal(val, minText)
+        return comparison === null || comparison >= 0 || `${field.field_name}不能小于${minText}`
+      })
+    } else if (!Number.isNaN(minVal)) {
       rules.push((val) => {
         if (shouldSkip()) return true
         if (isValueEmpty(val)) return true
@@ -1741,8 +1736,15 @@ const buildFieldRules = (field: TableField) => {
   }
 
   if (hasBinding('max')) {
-    const maxVal = Number(getBindingValue('max'))
-    if (!Number.isNaN(maxVal)) {
+    const maxText = getBindingValue('max')
+    const maxVal = Number(maxText)
+    if (isExactDecimalFieldType(field.field_type)) {
+      rules.push((val) => {
+        if (shouldSkip() || isValueEmpty(val)) return true
+        const comparison = compareExactDecimal(val, maxText)
+        return comparison === null || comparison <= 0 || `${field.field_name}不能大于${maxText}`
+      })
+    } else if (!Number.isNaN(maxVal)) {
       rules.push((val) => {
         if (shouldSkip()) return true
         if (isValueEmpty(val)) return true
@@ -1826,9 +1828,6 @@ const getFieldHint = (field: TableField) => {
   }
   if (field.field_code === 'linkage_config') {
     return 'JSON示例：{"linkage":{"enabled":true,"mode":"relation","tableCode":"sys_user","labelKey":"user_name","valueKey":"id","filterMapping":{"foreign_key":"main_field"}}}'
-  }
-  if (field.field_code === 'expression') {
-    return '示例：salary * 12 或 rel:dept.name（虚拟列）'
   }
   if (field.field_code === 'tag') {
     return '示例：gorm:"size:128;comment:发件人密码" json:"sender_password"'

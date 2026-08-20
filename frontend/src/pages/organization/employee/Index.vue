@@ -421,24 +421,31 @@ const fetchMetadata = async () => {
       { fieldCode: 'name', order: 2 },
       { fieldCode: 'employment_status', align: 'center', order: 3 },
       { fieldCode: 'user_id', visible: false },
+      { fieldCode: 'primary_legal_entity_id', visible: false },
       { fieldCode: 'valid_from', visible: false },
       { fieldCode: 'valid_to', visible: false },
     ],
     virtualColumns: [
       {
+        name: 'primary_legal_entity',
+        field: (row) => row.primary_legal_entity?.name || '-',
+        label: '主法人',
+        order: 4,
+      },
+      {
         name: 'binding_status',
         field: 'binding_status',
         label: '账号绑定',
         align: 'center',
-        order: 4,
+        order: 5,
       },
       {
         name: 'bound_account',
         field: (row) => row.bound_account?.user_name || '-',
         label: '平台账号',
-        order: 5,
+        order: 6,
       },
-      { name: 'validity', field: 'validity', label: '有效期', order: 6 },
+      { name: 'validity', field: 'validity', label: '有效期', order: 7 },
       {
         name: 'actions',
         field: 'actions',
@@ -465,6 +472,7 @@ const employeeDetailSections = computed<OrganizationDetailSection[]>(() => {
         { label: '姓名', value: detail.name },
         { label: '手机号', value: detail.mobile_masked ?? null },
         { label: '邮箱', value: detail.email_masked ?? null },
+        { label: '主法人', value: detail.primary_legal_entity?.name || '-' },
         {
           label: '人员状态',
           value: dictLabel('org_employment_status', detail.employment_status),

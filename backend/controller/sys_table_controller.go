@@ -8,6 +8,7 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/model"
@@ -85,6 +86,68 @@ func (t *TableController) GetTableByCode(ctx *gin.Context) {
 // GetRuntimeTableByCode exposes safe metadata independently from SysTable administration.
 func (t *TableController) GetRuntimeTableByCode(ctx *gin.Context) {
 	t.GetTableByCode(ctx)
+}
+
+// QueryRuntimeRelationOptions resolves a configured relation by source field.
+// The client cannot select an arbitrary target table or display column.
+// @Summary 查询运行时关系字段选项
+// @Description 按源字段元数据中受控的关系展示配置查询选项
+// @Tags 运行时元数据
+// @Produce application/json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param fieldId path int true "源字段ID"
+// @Param data body request.RuntimeRelationOptionsReq true "查询参数"
+// @Success 200 {object} response.Response
+// @Router /admin/runtime/relation-fields/{fieldId}/options [post]
+func (t *TableController) QueryRuntimeRelationOptions(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	fieldID, err := strconv.Atoi(ctx.Param("fieldId"))
+	if err != nil || fieldID <= 0 {
+		_ = ctx.Error(myerrors.ErrParamInvalid)
+		return
+	}
+	var data request.RuntimeRelationOptionsReq
+	if err = utils.ValidatorBody[request.RuntimeRelationOptionsReq](ctx, &data, t.translators["zh"]); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	user := ctx.MustGet("user").(model.SysUser)
+	hasMenu, err := t.sysMenuService.HasUserMenuPermission(user.Id, data.MenuId)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	hasQuery, err := t.sysMenuService.HasUserMenuButtonAction(user.Id, data.MenuId, string(enum.ButtonActionQuery))
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	if !hasMenu || !hasQuery {
+		_ = ctx.Error(myerrors.ErrPermissionDenied)
+		return
+	}
+	menu, err := t.sysMenuService.GetMenuById(data.MenuId)
+	if err != nil || !menu.State {
+		_ = ctx.Error(myerrors.ErrPermissionDenied)
+		return
+	}
+	field, err := t.metadataRuntime.GetField(ctx.Request.Context(), fieldID)
+	if err != nil {
+		_ = ctx.Error(myerrors.ErrPermissionDenied)
+		return
+	}
+	sourceTable, err := t.metadataRuntime.GetTableByID(ctx.Request.Context(), field.TableID)
+	if err != nil || !utils.MenuAllowsTableCode(menu, sourceTable.Code) {
+		_ = ctx.Error(myerrors.ErrPermissionDenied)
+		return
+	}
+	result, err := t.metadataRuntime.QueryRelationOptions(ctx.Request.Context(), fieldID, data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result.Data).SetTotal(result.Total)
 }
 
 // QueryTable 查询表列表

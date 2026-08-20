@@ -349,16 +349,49 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			code: "sys_table_field_type",
 			items: []systemDictItemSeed{
 				{name: "大数字", code: "sys_table_field_type_bigint", value: "1"},
-				{name: "浮点", code: "sys_table_field_type_float", value: "2"},
+				{name: "浮点（兼容）", code: "sys_table_field_type_float", value: "2"},
 				{name: "字符串", code: "sys_table_field_type_varchar", value: "3"},
 				{name: "文本", code: "sys_table_field_type_text", value: "4"},
 				{name: "布尔", code: "sys_table_field_type_boolean", value: "5"},
 				{name: "日期", code: "sys_table_field_type_date", value: "6"},
 				{name: "日期时间", code: "sys_table_field_type_datetime", value: "7"},
 				{name: "时间", code: "sys_table_field_type_time", value: "8"},
-				{name: "微型整数", code: "sys_table_field_type_tinyint", value: "9"},
+				{name: "TinyInt（兼容）", code: "sys_table_field_type_tinyint", value: "9"},
 				{name: "JSON", code: "sys_table_field_type_json", value: "10"},
 				{name: "数字", code: "sys_table_field_type_int", value: "11"},
+				{name: "SmallInt", code: "sys_table_field_type_smallint", value: "12"},
+				{name: "Decimal / Numeric", code: "sys_table_field_type_decimal", value: "13"},
+			},
+		},
+		{
+			name: "字段逻辑类型",
+			code: "sys_table_field_logical_type",
+			items: []systemDictItemSeed{
+				{name: "普通", code: "sys_table_field_logical_plain", value: "plain"},
+				{name: "整数", code: "sys_table_field_logical_integer", value: "integer"},
+				{name: "精确小数", code: "sys_table_field_logical_decimal", value: "decimal"},
+				{name: "金额", code: "sys_table_field_logical_money", value: "money"},
+				{name: "百分比", code: "sys_table_field_logical_percent", value: "percent"},
+				{name: "布尔", code: "sys_table_field_logical_boolean", value: "boolean"},
+				{name: "枚举", code: "sys_table_field_logical_enum", value: "enum"},
+				{name: "日期", code: "sys_table_field_logical_date", value: "date"},
+				{name: "日期时间", code: "sys_table_field_logical_datetime", value: "datetime"},
+				{name: "关系", code: "sys_table_field_logical_relation", value: "relation"},
+			},
+		},
+		{
+			name: "字段展示格式",
+			code: "sys_table_field_display_format",
+			items: []systemDictItemSeed{
+				{name: "普通", code: "sys_table_field_display_plain", value: "plain"},
+				{name: "整数", code: "sys_table_field_display_integer", value: "integer"},
+				{name: "精确小数", code: "sys_table_field_display_decimal", value: "decimal"},
+				{name: "金额", code: "sys_table_field_display_money", value: "money"},
+				{name: "百分比", code: "sys_table_field_display_percent", value: "percent"},
+				{name: "日期", code: "sys_table_field_display_date", value: "date"},
+				{name: "日期时间", code: "sys_table_field_display_datetime", value: "datetime"},
+				{name: "字典", code: "sys_table_field_display_dictionary", value: "dictionary"},
+				{name: "关系", code: "sys_table_field_display_relation", value: "relation"},
 			},
 		},
 		{
@@ -1435,6 +1468,11 @@ func migrationTableFieldCreateMap(field model.SysTableField) map[string]interfac
 		"field_type":           field.FieldType,
 		"field_length":         field.FieldLength,
 		"field_decimal_length": field.FieldDecimalLength,
+		"numeric_precision":    field.NumericPrecision,
+		"numeric_scale":        field.NumericScale,
+		"logical_type":         field.LogicalType,
+		"display_format":       field.DisplayFormat,
+		"list_width":           field.ListWidth,
 		"input_type":           field.InputType,
 		"form_span":            field.FormSpan,
 		"detail_span":          field.DetailSpan,
@@ -2191,6 +2229,11 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, table model.SysTable
 			"field_type":           field.FieldType,
 			"field_length":         field.FieldLength,
 			"field_decimal_length": field.FieldDecimalLength,
+			"numeric_precision":    field.NumericPrecision,
+			"numeric_scale":        field.NumericScale,
+			"logical_type":         field.LogicalType,
+			"display_format":       field.DisplayFormat,
+			"list_width":           field.ListWidth,
 			"input_type":           field.InputType,
 			"is_primary_key":       field.IsPrimaryKey,
 			"is_index":             field.IsIndex,
@@ -2264,15 +2307,16 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	if hasLength && length > 0 && field.FieldType == enum.VarcharFieldType {
 		field.FieldLength = int(length)
 	}
-	if hasDecimal && field.FieldType == enum.FloatFieldType {
-		field.FieldLength = int(precision)
-		field.FieldDecimalLength = int(scale)
+	if hasDecimal && field.FieldType == enum.DecimalFieldType {
+		field.NumericPrecision = int(precision)
+		field.NumericScale = int(scale)
 	}
 	if defaultValue, ok := column.DefaultValue(); ok {
 		field.DefaultValue = utils.StringPtr(normalizeSystemColumnDefault(field.FieldType, defaultValue))
 	}
 	switch field.FieldType {
-	case enum.IntFieldType, enum.BigIntFieldType, enum.TinyintFieldType, enum.FloatFieldType:
+	case enum.IntFieldType, enum.BigIntFieldType, enum.TinyintFieldType, enum.SmallIntFieldType,
+		enum.FloatFieldType, enum.DecimalFieldType:
 		field.InputType = enum.InputNumberInputType
 	case enum.TextFieldType:
 		field.InputType = enum.TextareaInputType
@@ -2360,8 +2404,10 @@ func systemFieldType(databaseType string) enum.SysTableFieldType {
 	case normalized == "integer" || normalized == "int" || normalized == "int4":
 		return enum.IntFieldType
 	case normalized == "smallint" || normalized == "int2" || normalized == "tinyint":
-		return enum.TinyintFieldType
-	case normalized == "numeric" || normalized == "decimal" || normalized == "double precision" || normalized == "float" || normalized == "float4" || normalized == "float8" || normalized == "real":
+		return enum.SmallIntFieldType
+	case normalized == "numeric" || normalized == "decimal":
+		return enum.DecimalFieldType
+	case normalized == "double precision" || normalized == "float" || normalized == "float4" || normalized == "float8" || normalized == "real":
 		return enum.FloatFieldType
 	case normalized == "boolean" || normalized == "bool":
 		return enum.BooleanFieldType
@@ -2410,6 +2456,10 @@ func systemMetadataDictCode(tableCode, fieldCode string, fieldType enum.SysTable
 		return "sys_table_type"
 	case "field_type":
 		return "sys_table_field_type"
+	case "logical_type":
+		return "sys_table_field_logical_type"
+	case "display_format":
+		return "sys_table_field_display_format"
 	case "input_type":
 		return "sys_table_field_input_type"
 	case "field_category":
@@ -3237,6 +3287,11 @@ var systemFieldDisplayNameMap = map[string]string{
 	"field_type":            "字段类型",
 	"field_length":          "字段长度",
 	"field_decimal_length":  "小数位数",
+	"numeric_precision":     "数值精度",
+	"numeric_scale":         "数值小数位",
+	"logical_type":          "逻辑类型",
+	"display_format":        "展示格式",
+	"list_width":            "列表默认宽度",
 	"input_type":            "输入类型",
 	"form_span":             "表单列宽",
 	"detail_span":           "详情列宽",

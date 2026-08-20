@@ -107,6 +107,9 @@ const fieldTypeMap: Record<string, SysTableFieldType> = {
   int: SysTableFieldType.INT,
   number: SysTableFieldType.FLOAT,
   float: SysTableFieldType.FLOAT,
+  smallint: SysTableFieldType.SMALLINT,
+  decimal: SysTableFieldType.DECIMAL,
+  numeric: SysTableFieldType.DECIMAL,
   varchar: SysTableFieldType.VARCHAR,
   string: SysTableFieldType.VARCHAR,
   text: SysTableFieldType.TEXT,
@@ -245,6 +248,8 @@ const resolveInputType = (
     case SysTableFieldType.BIGINT:
     case SysTableFieldType.FLOAT:
     case SysTableFieldType.TINYINT:
+    case SysTableFieldType.SMALLINT:
+    case SysTableFieldType.DECIMAL:
       return SysTableFieldInputType.INPUT_NUMBER
     case SysTableFieldType.TEXT:
       return SysTableFieldInputType.TEXTAREA
