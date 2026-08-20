@@ -160,7 +160,6 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/menu/query", app.MenuController.QueryMenus)
 		adminGroup.POST("/menu", app.MenuController.CreateMenu)
 		adminGroup.PUT("/menu/order", app.MenuController.UpdateMenuOrder)
-		adminGroup.POST("/menu/refresh-cache", app.MenuController.RefreshMenuCache)
 		adminGroup.PUT("/menu/:id", app.MenuController.UpdateMenu)
 		adminGroup.DELETE("/menu/:id", app.MenuController.DeleteMenuById)
 		adminGroup.GET("/menu/my", app.MenuController.GetMyMenus)

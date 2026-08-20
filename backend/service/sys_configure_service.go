@@ -7,6 +7,7 @@ package service
 
 import (
 	"backend/dto/request"
+	"backend/dto/response"
 	"backend/internal/cache"
 	myerrors "backend/internal/errors"
 	"backend/model"
@@ -213,4 +214,35 @@ func sendMailWithImplicitTLS(addr, host string, auth smtp.Auth, from string, to 
 		return err
 	}
 	return client.Quit()
+}
+
+func publicConfigureResponse(data model.SysConfigure) response.PublicConfigureRes {
+	return response.PublicConfigureRes{
+		EnableCaptcha: data.EnableCaptcha, PasswordLength: data.PasswordLength,
+		PasswordComplexity: data.PasswordComplexity, PasswordExpireTime: data.PasswordExpireTime,
+		PasswordErrorCount: data.PasswordErrorCount, PasswordLockMinutes: data.PasswordLockMinutes,
+		PasswordPolicy: data.PasswordPolicy, SystemName: data.SystemName,
+		SystemVersion: data.SystemVersion, SystemLogo: data.SystemLogo,
+		SystemDescription: data.SystemDescription,
+	}
+}
+
+func configureResponse(data model.SysConfigure) response.ConfigureRes {
+	return response.ConfigureRes{
+		PublicConfigureRes: publicConfigureResponse(data), Id: data.Id,
+		GmtCreate: data.GmtCreate, CreateName: data.CreateName,
+		GmtModify: data.GmtModify, ModifyName: data.ModifyName, State: data.State,
+		EnableEmail: data.EnableEmail, SmtpServer: data.SmtpServer,
+		SmtpPort: data.SmtpPort, SenderEmail: data.SenderEmail,
+	}
+}
+
+func (s *SysConfigureService) QueryPublicResponse() (response.PublicConfigureRes, error) {
+	data, err := s.Query()
+	return publicConfigureResponse(data), err
+}
+
+func (s *SysConfigureService) QueryDetailResponse() (response.ConfigureRes, error) {
+	data, err := s.Query()
+	return configureResponse(data), err
 }

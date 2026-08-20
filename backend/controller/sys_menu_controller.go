@@ -139,24 +139,6 @@ func (m *MenuController) UpdateMenuOrder(ctx *gin.Context) {
 	resp.SetData(true)
 }
 
-// RefreshMenuCache 刷新菜单缓存
-// @Summary 刷新菜单缓存
-// @Description 当前菜单读取为实时数据库查询，此接口用于前端统一触发菜单刷新
-// @Tags 菜单
-// @Produce application/json
-// @Param Authorization header string true "Bearer 用户令牌"
-// @Success 200 {object} response.Response
-// @Router /admin/menu/refresh-cache [post]
-func (m *MenuController) RefreshMenuCache(ctx *gin.Context) {
-	resp := response.NewResponse()
-	ctx.Set("response", resp)
-	if err := m.sysMenuService.RefreshMenuCache(ctx.Request.Context()); err != nil {
-		_ = ctx.Error(err)
-		return
-	}
-	resp.SetData(true)
-}
-
 // DeleteMenuById 根据ID删除菜单
 // @Summary 根据ID删除菜单
 // @Description 根据ID删除菜单

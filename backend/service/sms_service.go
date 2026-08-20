@@ -27,18 +27,12 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrSmsLogContextWriterRequired = errors.New("sms log context writer is required")
-
 type SmsService struct {
 	smsLogRepo      repository.SmsLogRepository
 	smsTemplateRepo repository.SmsTemplateRepository
 	sf              *utils.Snowflake
 	smsTempCache    *cache.SmsTemplateCache
 	serverConfig    *config.Server
-}
-
-type smsLogContextWriter interface {
-	CreateSmsLogContext(context.Context, *model.SmsLog) error
 }
 
 func NewSmsService(smsLogRepo repository.SmsLogRepository, smsTemplateRepo repository.SmsTemplateRepository,
@@ -138,12 +132,7 @@ func (s *SmsService) SendSms(
 
 func (s *SmsService) createSmsLogAsync(taskContext asynctask.Context, smsLog model.SmsLog) {
 	asynctask.Run(taskContext, func(ctx context.Context) {
-		writer, ok := s.smsLogRepo.(smsLogContextWriter)
-		if !ok {
-			logAsyncSmsError(ctx, ErrSmsLogContextWriterRequired)
-			return
-		}
-		if err := writer.CreateSmsLogContext(ctx, &smsLog); err != nil {
+		if err := s.smsLogRepo.CreateSmsLogContext(ctx, &smsLog); err != nil {
 			logAsyncSmsError(ctx, err)
 		}
 	})
@@ -228,8 +217,8 @@ func smsStatusLogOwnedBy(log model.SmsLog, applicationID int, mobile string) boo
 	return applicationID > 0 && log.ApplicationId == applicationID && log.Mobile == mobile
 }
 
-// GetSmsTemplateList 获取短信模板列表
-func (s *SmsService) GetSmsTemplateList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SmsTemplate], error) {
+// getSmsTemplateList 获取短信模板列表
+func (s *SmsService) getSmsTemplateList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SmsTemplate], error) {
 	result, err := s.smsTemplateRepo.GetSmsTemplateList(basic, table)
 	return result, err
 }
@@ -268,8 +257,35 @@ func (s *SmsService) UpdateSmsTemplate(ctx context.Context, req request.SmsTempl
 	return nil
 }
 
-// GetSmsTemplateById 根据ID获取短信模板
-func (s *SmsService) GetSmsTemplateById(id int) (model.SmsTemplate, error) {
+func smsTemplateResponse(data model.SmsTemplate) response.SmsTemplateRes {
+	return response.SmsTemplateRes{
+		BasicRes:       response.NewBasicRes(data.Basic),
+		SignName:       data.SignName,
+		TemplateCode:   data.TemplateCode,
+		TemplateName:   data.TemplateName,
+		TemplateParams: json.RawMessage(data.TemplateParams),
+	}
+}
+
+func (s *SmsService) GetSmsTemplateListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SmsTemplateRes], error) {
+	data, err := s.getSmsTemplateList(basic, table)
+	if err != nil {
+		return response.ListResult[response.SmsTemplateRes]{}, err
+	}
+	items := make([]response.SmsTemplateRes, 0, len(data.Data))
+	for _, item := range data.Data {
+		items = append(items, smsTemplateResponse(item))
+	}
+	return response.ListResult[response.SmsTemplateRes]{Data: items, Total: data.Total}, nil
+}
+
+func (s *SmsService) GetSmsTemplateByIdResponse(id int) (response.SmsTemplateRes, error) {
+	data, err := s.getSmsTemplateByID(id)
+	return smsTemplateResponse(data), err
+}
+
+// getSmsTemplateByID 根据ID获取短信模板
+func (s *SmsService) getSmsTemplateByID(id int) (model.SmsTemplate, error) {
 	smsTemp, err := s.smsTemplateRepo.FindById(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

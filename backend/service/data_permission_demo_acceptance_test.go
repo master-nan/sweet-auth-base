@@ -282,7 +282,7 @@ func newDataPermissionDemoAcceptanceService(
 		metadataAdapter.Apply,
 	)
 	generalizationRepo := impl.NewGeneralizationRepositoryImpl(primaryDB)
-	return NewGeneralizationServiceWithDataPermission(generalizationRepo, nil, runtime), table
+	return newGeneralizationService(generalizationRepo, nil, runtime), table
 }
 
 func demoAcceptanceTable() model.SysTable {

@@ -963,35 +963,6 @@
                 }
             }
         },
-        "/admin/menu/refresh-cache": {
-            "post": {
-                "description": "当前菜单读取为实时数据库查询，此接口用于前端统一触发菜单刷新",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "菜单"
-                ],
-                "summary": "刷新菜单缓存",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer 用户令牌",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/response.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/menu/user/{id}": {
             "get": {
                 "description": "获取用户菜单",

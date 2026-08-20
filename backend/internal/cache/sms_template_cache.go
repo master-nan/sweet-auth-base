@@ -19,13 +19,6 @@ func NewSmsTemplateCache(cacher Cacher) *SmsTemplateCache {
 	return &SmsTemplateCache{BasicCache: NewBasicCache[model.SmsTemplate](cacher, SmsTemplateCacheKey)}
 }
 
-// SetSmsTemplateList 传入短信模版列表缓存短信模版
-func (s *SmsTemplateCache) SetSmsTemplateList(smsTemplateList []model.SmsTemplate) {
-	for _, temp := range smsTemplateList {
-		s.SetExpiration(temp.TemplateCode, temp, 60*60*24*30) // 缓存时间为30天
-	}
-}
-
 // Set 传入短信模版缓存短信模版30天
 func (s *SmsTemplateCache) Set(key string, smsTemplate model.SmsTemplate) error {
 	err := s.SetExpiration(key, smsTemplate, 60*60*24*30) // 缓存时间为30天

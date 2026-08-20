@@ -11,7 +11,7 @@ import (
 
 func tableFieldListResponse(data model.SysTableField) response.SysTableFieldListRes {
 	return response.SysTableFieldListRes{
-		BasicRes:           basicResponse(data.Basic),
+		BasicRes:           response.NewBasicRes(data.Basic),
 		TableId:            data.TableId,
 		FieldName:          data.FieldName,
 		FieldCode:          data.FieldCode,
@@ -57,7 +57,7 @@ func tableFieldListResponses(items []model.SysTableField) []response.SysTableFie
 
 func tableListResponse(data model.SysTable) response.SysTableListRes {
 	return response.SysTableListRes{
-		BasicRes:         basicResponse(data.Basic),
+		BasicRes:         response.NewBasicRes(data.Basic),
 		TableName:        data.TableName,
 		TableCode:        data.TableCode,
 		TableType:        data.TableType,
@@ -70,7 +70,7 @@ func tableListResponse(data model.SysTable) response.SysTableListRes {
 
 func tableRelationResponse(data model.SysTableRelation) response.SysTableRelationRes {
 	return response.SysTableRelationRes{
-		BasicRes:       basicResponse(data.Basic),
+		BasicRes:       response.NewBasicRes(data.Basic),
 		TableId:        data.TableId,
 		RelatedTableId: data.RelatedTableId,
 		ReferenceKey:   data.ReferenceKey,
@@ -84,7 +84,7 @@ func tableRelationResponse(data model.SysTableRelation) response.SysTableRelatio
 
 func tableIndexResponse(data model.SysTableIndex) response.SysTableIndexRes {
 	return response.SysTableIndexRes{
-		BasicRes:    basicResponse(data.Basic),
+		BasicRes:    response.NewBasicRes(data.Basic),
 		TableId:     data.TableId,
 		IndexName:   data.IndexName,
 		IsUnique:    data.IsUnique,
@@ -172,8 +172,8 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 	}
 }
 
-func (s *SysTableService) GetTableListResponse(basic *request.Basic) (response.ListResult[response.SysTableListRes], error) {
-	result, err := s.metadataRuntime.listConfigTables(context.Background(), basic)
+func (s *SysTableService) GetTableListResponse(ctx context.Context, basic *request.Basic) (response.ListResult[response.SysTableListRes], error) {
+	result, err := s.metadataRuntime.listConfigTables(ctx, basic)
 	if err != nil {
 		return response.ListResult[response.SysTableListRes]{}, err
 	}
@@ -200,8 +200,8 @@ func (s *SysTableService) GetTableFieldsByTableIdResponse(tableId int) ([]respon
 	return tableFieldListResponses(data), nil
 }
 
-func (s *SysTableService) GetTableRelationsByTableIdResponse(tableId int) ([]response.SysTableRelationRes, error) {
-	data, err := s.sysTableRelationRepo.GetTableRelationsByTableId(context.Background(), tableId)
+func (s *SysTableService) GetTableRelationsByTableIdResponse(ctx context.Context, tableId int) ([]response.SysTableRelationRes, error) {
+	data, err := s.sysTableRelationRepo.GetTableRelationsByTableId(ctx, tableId)
 	if err != nil {
 		return nil, err
 	}
@@ -228,8 +228,8 @@ func (s *SysTableService) GetTableIndexByIdResponse(id int) (response.SysTableIn
 	return tableIndexResponse(data), nil
 }
 
-func (s *SysTableService) GetTableIndexesByTableIdResponse(tableId int) ([]response.SysTableIndexRes, error) {
-	data, err := s.sysTableIndexRepo.GetTableIndexesByTableId(context.Background(), tableId)
+func (s *SysTableService) GetTableIndexesByTableIdResponse(ctx context.Context, tableId int) ([]response.SysTableIndexRes, error) {
+	data, err := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, tableId)
 	if err != nil {
 		return nil, err
 	}

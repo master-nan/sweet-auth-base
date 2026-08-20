@@ -31,7 +31,7 @@ func TestLowCodeDefaultMenuButtonsUseTemplateData(t *testing.T) {
 		}{
 			method:      button.Method,
 			path:        button.Path,
-			isButton:    button.IsPageButton(),
+			isButton:    button.IsButton,
 			isHidden:    button.IsHidden,
 			displayMode: button.DisplayMode,
 		}
@@ -307,9 +307,9 @@ func TestCleanupLegacyLowCodeMenuButtonsRemovesSystemButtonsOnly(t *testing.T) {
 	}
 }
 
-func newSysTablePublishTestService(db *gorm.DB) *SysTableService {
+func newSysTablePublishTestService(db *gorm.DB) *LowCodePublicationService {
 	primaryDB := &database.PrimaryDB{DB: db}
-	return &SysTableService{
+	return &LowCodePublicationService{
 		sysMenuRepo:           impl.NewSysMenuRepositoryImpl(primaryDB),
 		sysMenuButtonRepo:     impl.NewSysMenuButtonRepositoryImpl(primaryDB),
 		sysMenuButtonTplRepo:  impl.NewSysMenuButtonTemplateRepositoryImpl(primaryDB),

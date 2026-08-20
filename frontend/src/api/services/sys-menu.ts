@@ -192,12 +192,6 @@ export const useMenuApi = () => {
     })
   }
 
-  const refreshMenuCache = async () => {
-    return instance.post<ResponseData<boolean>>('/admin/menu/refresh-cache').then((res) => {
-      return res.data
-    })
-  }
-
   return {
     queryMenu,
     queryMenuById,
@@ -211,6 +205,5 @@ export const useMenuApi = () => {
     updateMenuButton,
     deleteMenuButton,
     updateMenuOrder,
-    refreshMenuCache,
   }
 }

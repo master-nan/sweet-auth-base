@@ -85,10 +85,6 @@ type SysMenuButton struct {
 	Menus        []SysMenu                     `gorm:"many2many:sys_role_menu_button;foreignKey:Id;joinForeignKey:ButtonId;References:Id;joinReferences:MenuId" json:"menus"`
 }
 
-func (b SysMenuButton) IsPageButton() bool {
-	return b.IsButton
-}
-
 type SysMenuButtonTemplate struct {
 	Basic
 	Scene        string                        `gorm:"size:64;uniqueIndex:uni_button_template_scene_code_suffix;comment:模板场景" json:"scene"`

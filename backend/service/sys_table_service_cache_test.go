@@ -1,7 +1,6 @@
 package service
 
 import (
-	"backend/config"
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/cache"
@@ -165,14 +164,7 @@ func newSysTableCacheTestService(db *gorm.DB) (*SysTableService, *cache.SysTable
 		nil,
 		nil,
 		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
 		metadataRuntime,
-		&config.Server{},
 	), tableCache, fieldCache
 }
 

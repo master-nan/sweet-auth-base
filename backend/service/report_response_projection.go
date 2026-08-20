@@ -9,7 +9,7 @@ import (
 
 func reportDefinitionListResponse(data model.ReportDefinition) response.ReportDefinitionListRes {
 	return response.ReportDefinitionListRes{
-		BasicRes:            basicResponse(data.Basic),
+		BasicRes:            response.NewBasicRes(data.Basic),
 		Code:                data.Code,
 		Name:                data.Name,
 		Description:         data.Description,

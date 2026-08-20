@@ -71,7 +71,6 @@ type App struct {
 	SubjectContextBuilder          *service.SubjectContextBuilder
 	DimensionProviderRuntime       *service.DimensionProviderRuntime
 	DataPermissionResolver         datapermission.Resolver
-	BlackCache                     *cache.BlackUserCache
 	TokenBlackCache                *cache.TokenBlackCache
 	ApplicationCache               *cache.ApplicationCache
 	IntegrationWorker              *integration.IntegrationWorkerRunner
@@ -195,24 +194,15 @@ var RepositoryProvider = wire.NewSet(
 // Cache 提供者
 var CacheProvider = wire.NewSet(
 	cache.NewSysConfigureCache,
-	cache.NewSysUserRoleCache,
 	cache.NewSysUserCache,
-	cache.NewSysMenuButtonCache,
 	cache.NewSysDictCache,
-	cache.NewSysMenuCache,
-	cache.NewSysRoleCache,
-	cache.NewSysRoleMenuButtonCache,
-	cache.NewSysRoleMenuCache,
 	cache.NewSysTableCache,
 	cache.NewSysTableFieldCache,
-	cache.NewGeneralizationCache,
-	cache.NewBlackCache,
 	cache.NewTokenBlackCache,
 	cache.NewLoginAttemptCache,
 	cache.NewApplicationCache,
 	cache.NewDingTalkCache,
 	cache.NewSmsTemplateCache,
-	cache.NewSmsLogCache,
 	cache.NewSendCodeCache,
 	cache.NewDingTalkUserIDCache,
 )
@@ -240,6 +230,7 @@ var ServiceProvider = wire.NewSet(
 	wire.Bind(new(service.MetadataSecurityReader), new(*service.MetadataRuntimeService)),
 	wire.Bind(new(metadata.RuntimeReader), new(*service.MetadataRuntimeService)),
 	service.NewSysTableService,
+	service.NewLowCodePublicationService,
 	service.NewSysUserService,
 	service.NewGeneralizationServiceWithRuntimeAndDataPermission,
 	service.NewDataResourceConfigService,
@@ -266,7 +257,6 @@ var ServiceProvider = wire.NewSet(
 	service.NewReportService,
 	service.NewOrgService,
 	wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)),
-	service.NewCasbinRuleService,
 	service.NewApplicationService,
 	service.NewExternalSystemService,
 	service.NewInterfaceDefinitionService,

@@ -43,7 +43,7 @@ func NewGeneralizationServiceWithRuntimeAndDataPermission(
 	metadataRuntime platformmetadata.RuntimeReader,
 	permissionRuntime *LowCodeDataPermissionRuntime,
 ) *GeneralizationService {
-	service := NewGeneralizationServiceWithDataPermission(generalizationRepo, sf, permissionRuntime)
+	service := newGeneralizationService(generalizationRepo, sf, permissionRuntime)
 	service.metadataRuntime = metadataRuntime
 	return service
 }
@@ -68,16 +68,7 @@ func (gs *GeneralizationService) ResolveRuntimeTable(
 	return metadata.QueryModel(), nil
 }
 
-func NewGeneralizationService(generalizationRepo repository.GeneralizationRepository, sf *utils.Snowflake) *GeneralizationService {
-	permissionRepo, _ := generalizationRepo.(repository.GeneralizationPermissionRepository)
-	return &GeneralizationService{
-		generalizationRepo: generalizationRepo,
-		permissionRepo:     permissionRepo,
-		sf:                 sf,
-	}
-}
-
-func NewGeneralizationServiceWithDataPermission(
+func newGeneralizationService(
 	generalizationRepo repository.GeneralizationRepository,
 	sf *utils.Snowflake,
 	permissionRuntime *LowCodeDataPermissionRuntime,
@@ -91,7 +82,7 @@ func NewGeneralizationServiceWithDataPermission(
 	}
 }
 
-func (gs *GeneralizationService) Query(ctx context.Context, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
+func (gs *GeneralizationService) query(ctx context.Context, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
 	if err := validateGeneralizationQuery(basic, table); err != nil {
 		return repository.GeneralizationListResult{}, err
 	}
@@ -148,7 +139,7 @@ func (gs *GeneralizationService) ResolveDataPermission(
 	return resolution.permission, nil
 }
 
-func (gs *GeneralizationService) GetById(ctx context.Context, table model.SysTable, id int) (map[string]interface{}, error) {
+func (gs *GeneralizationService) getByID(ctx context.Context, table model.SysTable, id int) (map[string]interface{}, error) {
 	return gs.generalizationRepo.GetById(ctx, table, id)
 }
 
@@ -197,29 +188,6 @@ func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTabl
 	setIfFieldExists(table, filtered, "gmt_create_user", userID)
 	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
 	return gs.generalizationRepo.Create(ctx, table, filtered)
-}
-
-func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTable, id int, data map[string]interface{}) error {
-	if isProtectedTable(table.TableCode) {
-		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
-	}
-	filtered := filterDataByFields(table, data, false)
-	delete(filtered, "id")
-	if err := validateDataByBindings(table, filtered, false); err != nil {
-		return err
-	}
-	if err := gs.ensureWritableRowExists(ctx, table, id); err != nil {
-		return err
-	}
-	normalizeDataByFieldTypes(table, filtered)
-	// 填充审计字段
-	setIfFieldExists(table, filtered, "gmt_modify", model.Now())
-	userID, err := generalizationActorID(ctx)
-	if err != nil {
-		return err
-	}
-	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
-	return gs.generalizationRepo.Update(ctx, table, id, filtered)
 }
 
 func (gs *GeneralizationService) UpdateWithDataPermission(
@@ -271,28 +239,6 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 		return permissionMissError(resolution.permission)
 	}
 	return nil
-}
-
-func (gs *GeneralizationService) Delete(ctx context.Context, table model.SysTable, id int) error {
-	if isProtectedTable(table.TableCode) {
-		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
-	}
-	if err := gs.ensureWritableRowExists(ctx, table, id); err != nil {
-		return err
-	}
-	if !utils.HasTableField(table, "gmt_delete") {
-		// 表没有软删除字段，执行硬删除
-		return gs.generalizationRepo.HardDelete(ctx, table, id)
-	}
-	deleteData := map[string]interface{}{
-		"gmt_delete": model.Now(),
-	}
-	userID, err := generalizationActorID(ctx)
-	if err != nil {
-		return err
-	}
-	setIfFieldExists(table, deleteData, "gmt_delete_user", userID)
-	return gs.generalizationRepo.SoftDelete(ctx, table, id, deleteData)
 }
 
 func (gs *GeneralizationService) DeleteWithDataPermission(
@@ -481,22 +427,8 @@ func validateGeneralizationQuery(basic *request.Basic, table model.SysTable) err
 	return validateGroups(basic.Expressions)
 }
 
-func (gs *GeneralizationService) ensureWritableRowExists(ctx context.Context, table model.SysTable, id int) error {
-	if id <= 0 {
-		return error2.ErrDataNotFound
-	}
-	exists, err := gs.generalizationRepo.RowExists(ctx, table, id)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return error2.ErrDataNotFound
-	}
-	return nil
-}
-
-// IsProtectedGeneralizationTable 判断表是否为禁止通过通用低代码写入 API 修改的平台核心数据。
-func IsProtectedGeneralizationTable(tableCode string) bool {
+// isProtectedTable 判断表是否为禁止通过通用低代码写入 API 修改的平台核心数据。
+func isProtectedTable(tableCode string) bool {
 	code := strings.ToLower(tableCode)
 	protectedPrefixes := []string{"sys_", "casbin_"}
 	for _, prefix := range protectedPrefixes {
@@ -518,11 +450,6 @@ func setIfFieldExists(table model.SysTable, data map[string]interface{}, fieldCo
 	if utils.HasTableField(table, fieldCode) {
 		data[fieldCode] = value
 	}
-}
-
-// isProtectedTable 检查是否为受保护的系统表，防止通过通用接口操作核心数据
-func isProtectedTable(tableCode string) bool {
-	return IsProtectedGeneralizationTable(tableCode)
 }
 
 func filterDataByFields(table model.SysTable, data map[string]interface{}, isCreate bool) map[string]interface{} {

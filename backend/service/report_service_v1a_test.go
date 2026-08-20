@@ -220,7 +220,7 @@ func newReportV1ATestEnv(t *testing.T, user model.SysUser) *reportV1ATestEnv {
 			return datapermission.BuildAdapterExecution(input)
 		},
 	)
-	generalizationService := NewGeneralizationServiceWithDataPermission(
+	generalizationService := newGeneralizationService(
 		impl.NewGeneralizationRepositoryImpl(primaryDB),
 		sf,
 		permissionRuntime,

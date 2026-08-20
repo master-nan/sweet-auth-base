@@ -88,13 +88,13 @@ func TestGeneralizationServiceRejectsProtectedTableWrites(t *testing.T) {
 		{
 			name: "update",
 			run: func(service *GeneralizationService) error {
-				return service.Update(nil, protected, 1, map[string]interface{}{"table_name": "bad"})
+				return service.UpdateWithDataPermission(nil, protected, 1, map[string]interface{}{"table_name": "bad"})
 			},
 		},
 		{
 			name: "delete",
 			run: func(service *GeneralizationService) error {
-				return service.Delete(nil, protected, 1)
+				return service.DeleteWithDataPermission(nil, protected, 1)
 			},
 		},
 	}
@@ -102,7 +102,7 @@ func TestGeneralizationServiceRejectsProtectedTableWrites(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &generalizationRepoSpy{}
-			service := NewGeneralizationService(repo, nil)
+			service := newGeneralizationService(repo, nil, nil)
 
 			err := tt.run(service)
 			if err == nil {
@@ -128,14 +128,14 @@ func TestGeneralizationQueryUsesCapabilityValidatorAndPropagatesContext(t *testi
 		IsAdvancedSearch: true,
 	}}}
 	repo := &generalizationRepoSpy{}
-	service := NewGeneralizationService(repo, nil)
+	service := newGeneralizationService(repo, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	valid := &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{
 		Field: "amount", Type: enum.IntFieldType, ExpressionType: enum.Gte, Value: 10,
 	}}}}}
-	if _, err := service.Query(ctx, valid, table); err != nil {
+	if _, err := service.query(ctx, valid, table); err != nil {
 		t.Fatalf("valid query failed: %v", err)
 	}
 	if repo.queryContext != ctx || !errors.Is(repo.queryContext.Err(), context.Canceled) {
@@ -145,37 +145,11 @@ func TestGeneralizationQueryUsesCapabilityValidatorAndPropagatesContext(t *testi
 	invalid := &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{
 		Field: "amount", Type: enum.IntFieldType, ExpressionType: enum.Like, Value: "1",
 	}}}}}
-	if _, err := service.Query(context.Background(), invalid, table); !errors.Is(err, error2.ErrParamInvalid) {
+	if _, err := service.query(context.Background(), invalid, table); !errors.Is(err, error2.ErrParamInvalid) {
 		t.Fatalf("incompatible operator error = %v", err)
 	}
-	if _, err := service.Query(context.Background(), &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{ExpressionType: enum.Eq}}}}}, table); !errors.Is(err, error2.ErrParamInvalid) {
+	if _, err := service.query(context.Background(), &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{ExpressionType: enum.Eq}}}}}, table); !errors.Is(err, error2.ErrParamInvalid) {
 		t.Fatalf("empty field error = %v", err)
-	}
-}
-
-func TestGeneralizationServiceUpdateRejectsMissingRow(t *testing.T) {
-	repo := &generalizationRepoSpy{rowExists: false}
-	service := NewGeneralizationService(repo, nil)
-
-	err := service.Update(nil, validationTypeTable(), 404, map[string]interface{}{"count": 1})
-	if err != error2.ErrDataNotFound {
-		t.Fatalf("expected data not found, got %v", err)
-	}
-	if repo.called {
-		t.Fatal("missing row update reached repository update")
-	}
-}
-
-func TestGeneralizationServiceDeleteRejectsMissingRow(t *testing.T) {
-	repo := &generalizationRepoSpy{rowExists: false}
-	service := NewGeneralizationService(repo, nil)
-
-	err := service.Delete(nil, validationTypeTable(), 404)
-	if err != error2.ErrDataNotFound {
-		t.Fatalf("expected data not found, got %v", err)
-	}
-	if repo.called {
-		t.Fatal("missing row delete reached repository delete")
 	}
 }
 
@@ -313,7 +287,7 @@ func TestNormalizeDataByFieldTypesConvertsEmptyNullableTypedValuesToNil(t *testi
 
 func TestGeneralizationServiceNormalizesTypedStringValuesBeforeCreate(t *testing.T) {
 	repo := &generalizationRepoSpy{}
-	service := NewGeneralizationService(repo, nil)
+	service := newGeneralizationService(repo, nil, nil)
 	data := map[string]interface{}{
 		"count":      "12",
 		"price":      "12.5",

@@ -15,3 +15,18 @@ type BasicRes struct {
 	ModifyName string           `json:"modify_name"`
 	State      bool             `json:"state"`
 }
+
+func NewBasicRes(data model.Basic) BasicRes {
+	createName := ""
+	if data.CreateName != nil {
+		createName = *data.CreateName
+	}
+	modifyName := ""
+	if data.ModifyName != nil {
+		modifyName = *data.ModifyName
+	}
+	return BasicRes{
+		Id: data.Id, GmtCreate: data.GmtCreate, CreateName: createName,
+		GmtModify: data.GmtModify, ModifyName: modifyName, State: data.State,
+	}
+}

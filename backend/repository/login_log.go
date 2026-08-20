@@ -5,8 +5,11 @@
 
 package repository
 
-import "backend/model"
+import (
+	"backend/model"
+	"context"
+)
 
 type LoginLogRepository interface {
-	BasicRepository[model.LoginLog]
+	CreateLoginLogContext(context.Context, *model.LoginLog) error
 }

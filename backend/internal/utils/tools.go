@@ -10,9 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin/binding"
 	ut "github.com/go-playground/universal-translator"
 
@@ -21,113 +19,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetStructSqlSelect(data interface{}) []string {
-	var arr []string
-	refData := reflect.ValueOf(data)
-	for i := 0; i < refData.NumField(); i++ {
-		tag := refData.Type().Field(i).Tag
-		value := refData.Field(i).Interface() //获取属性的值
-		refValue := reflect.ValueOf(value)    //获取值的类型
-		if refValue.Kind() == reflect.Ptr {   //是否为指针  判断是否为nil
-			if !refValue.IsNil() {
-				arr = append(arr, tag.Get("json"))
-			}
-		} else {
-			if value != "" {
-				arr = append(arr, tag.Get("json"))
-			}
-		}
-	}
-	return arr
-}
-
-func IsStructEmpty(source interface{}, target interface{}) bool {
-	return reflect.DeepEqual(source, target)
-}
-
-func SaveSession(ctx *gin.Context, key string, value interface{}) {
-	session := sessions.Default(ctx)
-	option := sessions.Options{Path: "/", MaxAge: 3600}
-	session.Options(option)
-	session.Set(key, value)
-	session.Save()
-}
-
-func DeleteSession(ctx *gin.Context, key string) {
-	session := sessions.Default(ctx)
-	session.Delete(key)
-	session.Save()
-}
-
-func GetSessionString(ctx *gin.Context, key string) string {
-	session := sessions.Default(ctx)
-	value := session.Get(key)
-	if value == nil {
-		return ""
-	}
-	return value.(string)
-}
-
-func ClearSession(ctx *gin.Context) {
-	session := sessions.Default(ctx)
-	session.Clear()
-}
-
-// RandString 生成随机大写字符串
-func RandString(len int) string {
-	bytes := make([]byte, len)
-	for i := 0; i < len; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(26))
-		if err != nil {
-			panic(err)
-		}
-		bytes[i] = byte(num.Int64() + 65)
-	}
-	return string(bytes)
-}
-
 func Encryption(password string, salt string) string {
 	str := fmt.Sprintf("%s%s", password, salt)
 	h := md5.New()
 	h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-func IsEmpty(s interface{}) bool {
-	v := reflect.ValueOf(s)
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return true
-	}
-	return isZero(v)
-}
-
-func isZero(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Func, reflect.Map, reflect.Slice, reflect.Interface, reflect.Ptr, reflect.Chan:
-		return v.IsNil()
-	case reflect.Array, reflect.String:
-		return v.Len() == 0
-	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			if !isZero(v.Field(i)) {
-				return false
-			}
-		}
-		return true
-	case reflect.Bool:
-		return !v.Bool()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return v.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return v.Float() == 0
-	case reflect.Complex64, reflect.Complex128:
-		return v.Complex() == 0
-	default:
-		// 未处理的类型
-		return false
-	}
 }
 
 // BoolPtr 辅助函数用于创建各种类型的指针
@@ -337,21 +233,6 @@ func stripDangerousTags(input string) string {
 	reEvent := regexp.MustCompile(`(?i)\s+on\w+\s*=`)
 	input = reEvent.ReplaceAllString(input, " ")
 	return input
-}
-
-func CustomTimeDecodeHook(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
-	if from.Kind() == reflect.String && to == reflect.TypeOf(model.CustomTime{}) {
-		parsedTime, err := time.Parse(time.RFC3339, data.(string))
-		if err != nil {
-			return nil, err
-		}
-		return model.CustomTime(parsedTime), nil
-	}
-	return data, nil
-}
-
-func EscapeString(value string) string {
-	return strings.ReplaceAll(value, "'", "''")
 }
 
 // GenerateSecretKey 生成指定长度的随机密钥

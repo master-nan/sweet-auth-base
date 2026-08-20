@@ -5,6 +5,7 @@ import (
 	myerrors "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
 	"backend/internal/security"
+	"backend/internal/utils"
 	"backend/model"
 	"fmt"
 	"strconv"
@@ -54,7 +55,7 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 	if err := validateLogicalAndDisplayCompatibility(field); err != nil {
 		return err
 	}
-	if len(strings.TrimSpace(stringValue(field.Tag))) > maxMetadataTagLength {
+	if len(strings.TrimSpace(utils.StringValue(field.Tag))) > maxMetadataTagLength {
 		return myerrors.NewValidationError(fmt.Sprintf("字段标签长度不能超过%d", maxMetadataTagLength))
 	}
 
@@ -63,7 +64,7 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 		category = enum.NormalField
 		field.FieldCategory = category
 	}
-	expression := strings.TrimSpace(stringValue(field.Expression))
+	expression := strings.TrimSpace(utils.StringValue(field.Expression))
 	switch category {
 	case enum.NormalField:
 		if expression != "" {
@@ -89,7 +90,7 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 			return myerrors.NewValidationError("该字段不能注册为查询字段")
 		}
 	}
-	if err := validateMetadataDefaultValue(*field, stringValue(field.DefaultValue)); err != nil {
+	if err := validateMetadataDefaultValue(*field, utils.StringValue(field.DefaultValue)); err != nil {
 		return err
 	}
 	return nil

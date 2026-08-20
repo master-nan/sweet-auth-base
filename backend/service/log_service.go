@@ -57,10 +57,6 @@ type LogService struct {
 	sf                  *utils.Snowflake
 }
 
-type loginLogContextWriter interface {
-	CreateLoginLogContext(context.Context, *model.LoginLog) error
-}
-
 func NewLogServer(loginLogRepository repository.LoginLogRepository, accessLogRepository repository.AccessLogRepository, sf *utils.Snowflake) *LogService {
 	return &LogService{
 		loginLogRepository,
@@ -76,16 +72,12 @@ func (ls *LogService) CreateLoginLog(ctx context.Context, log model.LoginLog) er
 	if ls.sf == nil {
 		return ErrTransactionalAuditGeneratorRequired
 	}
-	writer, ok := ls.loginLogRepository.(loginLogContextWriter)
-	if !ok {
-		return ErrLoginLogContextWriterRequired
-	}
 	id, err := ls.sf.GenerateUniqueID()
 	if err != nil {
 		return err
 	}
 	log.Id = int(id)
-	return writer.CreateLoginLogContext(ctx, &log)
+	return ls.loginLogRepository.CreateLoginLogContext(ctx, &log)
 }
 
 func (ls *LogService) CreateAccessLog(ctx context.Context, log model.AccessLog) error {
@@ -172,7 +164,7 @@ func (ls *LogService) recordTransactionalAudit(
 	})
 }
 
-func (ls *LogService) QueryAccessLogs(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {
+func (ls *LogService) queryAccessLogs(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {
 	basic, err := buildAccessLogQueryBasic(req)
 	if err != nil {
 		return response.ListResult[model.AccessLog]{}, err
@@ -263,6 +255,46 @@ func parseAccessLogQueryTime(value string) (*time.Time, error) {
 	return nil, error2.NewValidationError("时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss")
 }
 
-func (ls *LogService) GetAccessLogById(ctx context.Context, id int) (model.AccessLog, error) {
+func (ls *LogService) getAccessLogByID(ctx context.Context, id int) (model.AccessLog, error) {
 	return ls.accessLogRepository.WithContext(ctx).FindById(id)
+}
+
+func accessLogResponse(data model.AccessLog) response.AccessLogRes {
+	return response.AccessLogRes{
+		BasicRes:     response.NewBasicRes(data.Basic),
+		UserName:     data.UserName,
+		RequestId:    data.RequestId,
+		TraceId:      data.TraceId,
+		Method:       data.Method,
+		Ip:           data.Ip,
+		Locality:     data.Locality,
+		Url:          data.Url,
+		Action:       data.Action,
+		ResourceType: data.ResourceType,
+		ResourceCode: data.ResourceCode,
+		ResourceId:   data.ResourceId,
+		StatusCode:   data.StatusCode,
+		Success:      data.Success,
+		Result:       data.Result,
+		ErrorCode:    data.ErrorCode,
+		ErrorMessage: data.ErrorMessage,
+		DurationMs:   data.DurationMs,
+	}
+}
+
+func (ls *LogService) QueryAccessLogsResponse(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[response.AccessLogRes], error) {
+	data, err := ls.queryAccessLogs(ctx, req)
+	if err != nil {
+		return response.ListResult[response.AccessLogRes]{}, err
+	}
+	items := make([]response.AccessLogRes, 0, len(data.Data))
+	for _, item := range data.Data {
+		items = append(items, accessLogResponse(item))
+	}
+	return response.ListResult[response.AccessLogRes]{Data: items, Total: data.Total}, nil
+}
+
+func (ls *LogService) GetAccessLogByIdResponse(ctx context.Context, id int) (response.AccessLogRes, error) {
+	data, err := ls.getAccessLogByID(ctx, id)
+	return accessLogResponse(data), err
 }

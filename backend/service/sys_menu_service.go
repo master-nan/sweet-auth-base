@@ -126,10 +126,6 @@ func (s *SysMenuService) UpdateMenuOrder(ctx context.Context, data request.MenuO
 	})
 }
 
-func (s *SysMenuService) RefreshMenuCache(ctx context.Context) error {
-	return nil
-}
-
 // DeleteMenuById 删除菜单
 func (s *SysMenuService) DeleteMenuById(ctx context.Context, id int) error {
 	_, err := s.sysMenuRepo.WithContext(ctx).FindById(id)

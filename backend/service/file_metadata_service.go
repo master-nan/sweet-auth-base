@@ -65,10 +65,7 @@ func (s *FileMetadataService) Delete(ctx context.Context, resource FileAccessRes
 
 func fileDetailResponse(data model.File) response.FileDetailRes {
 	return response.FileDetailRes{
-		BasicRes: response.BasicRes{
-			Id: data.Id, GmtCreate: data.GmtCreate, CreateName: stringValue(data.CreateName),
-			GmtModify: data.GmtModify, ModifyName: stringValue(data.ModifyName), State: data.State,
-		},
+		BasicRes: response.NewBasicRes(data.Basic),
 		FileName: data.FileName, FileType: data.FileType, FileUrl: data.FileUrl,
 		FileSize: data.FileSize, FileExt: data.FileExt, FileUuid: data.FileUuid,
 	}

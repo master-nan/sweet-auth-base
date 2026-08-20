@@ -207,3 +207,451 @@ func removeDeprecatedIntegrationExecutionCommands(db *gorm.DB, menuID int) error
 		return tx.Where("ptype = ? AND v1 IN ? AND v2 = ?", "p", paths, "PUT").Delete(&model.CasbinRule{}).Error
 	})
 }
+
+func applyExternalSystemFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != externalSystemTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+
+	switch field.FieldCode {
+	case "system_code":
+		field.FieldName = "系统编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 1
+	case "name":
+		field.FieldName = "系统名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 2
+	case "system_type":
+		field.FieldName = "系统类型"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_external_system_type")
+		field.Sequence = 3
+	case "base_url":
+		field.FieldName = "基础地址"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 4
+	case "owner_identifier":
+		field.FieldName = "负责人标识"
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 5
+	case "owner_name":
+		field.FieldName = "负责人"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 6
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_external_system_status")
+		field.Sequence = 7
+	case "description":
+		field.FieldName = "描述"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.TextareaInputType
+		field.Sequence = 8
+	case "revision":
+		field.FieldName = "版本"
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 9
+	}
+}
+
+func applyInterfaceDefinitionFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != interfaceDefinitionTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "external_system_id":
+		field.FieldName = "所属系统"
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 1
+	case "interface_code":
+		field.FieldName = "接口编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.Sequence = 2
+	case "name":
+		field.FieldName = "接口名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 3
+	case "version":
+		field.FieldName = "版本"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 4
+	case "protocol":
+		field.FieldName = "协议"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_interface_protocol")
+		field.Sequence = 5
+	case "http_method":
+		field.FieldName = "HTTP Method"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("http_method")
+		field.Sequence = 6
+	case "relative_path":
+		field.FieldName = "相对路径"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 7
+	case "credential_id":
+		field.FieldName = "凭证引用"
+	case "timeout_seconds":
+		field.FieldName = "超时（秒）"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 8
+	case "response_limit":
+		field.FieldName = "响应大小限制（字节）"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.Sequence = 9
+	case "retry_policy_id":
+		field.FieldName = "重试策略引用"
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_interface_definition_status")
+		field.Sequence = 10
+	case "description":
+		field.FieldName = "描述"
+		field.IsInsertShow = true
+		field.IsUpdateShow = true
+		field.InputType = enum.TextareaInputType
+		field.Sequence = 11
+	case "revision":
+		field.FieldName = "修订号"
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 12
+	}
+}
+
+func applyCredentialFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != credentialTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "external_system_id":
+		field.FieldName = "所属系统"
+		field.IsAdvancedSearch = true
+		field.Sequence = 1
+	case "credential_code":
+		field.FieldName = "凭证编码"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 2
+	case "name":
+		field.FieldName = "凭证名称"
+		field.IsListShow = true
+		field.IsQuickSearch = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 3
+	case "credential_type":
+		field.FieldName = "凭证类型"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_credential_type")
+		field.Sequence = 4
+	case "status":
+		field.FieldName = "状态"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.DictCode = utils.StringPtr("integration_credential_status")
+		field.Sequence = 5
+	case "expires_at":
+		field.FieldName = "有效期"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 6
+	case "version":
+		field.FieldName = "秘密版本"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.Sequence = 7
+	case "rotated_at":
+		field.FieldName = "轮换时间"
+		field.IsListShow = true
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 8
+	case "description":
+		field.FieldName = "描述"
+		field.Sequence = 9
+	case "gmt_modify":
+		field.FieldName = "更新时间"
+		field.IsAdvancedSearch = true
+		field.InputType = enum.DatetimePickerInputType
+		field.Sequence = 10
+	case "secret_storage_ref", "secret_ciphertext", "secret_nonce", "secret_fingerprint":
+		field.IsSort = false
+	}
+}
+
+func applyRetryPolicyFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != retryPolicyTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "policy_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "策略编码", true, true, true, 1
+	case "policy_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "策略名称", true, true, true, 2
+	case "version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "版本", true, true, 3
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_retry_policy_status"), 4
+	case "max_attempts":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "最大尝试次数", true, true, 5
+	case "backoff_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "退避方式", true, true, enum.SelectInputType, utils.StringPtr("integration_retry_backoff_type"), 6
+	case "initial_delay_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "初始延迟（毫秒）", true, 7
+	case "max_delay_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "最大延迟（毫秒）", true, 8
+	case "retry_window_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "重试窗口（毫秒）", true, 9
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "更新时间", true, true, enum.DatetimePickerInputType, 10
+	case "retryable_error_categories", "retryable_http_statuses", "description", "respect_retry_after", "backoff_multiplier", "jitter_type", "jitter_ratio":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationSyncTaskFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationSyncTaskTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "task_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务编码", true, true, true, 1
+	case "task_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务名称", true, true, true, 2
+	case "version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "版本", true, true, 3
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_task_status"), 4
+	case "external_system_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 5
+	case "interface_definition_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 6
+	case "consumer_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "Consumer", true, true, 7
+	case "schedule_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "调度方式", true, true, 8
+	case "checkpoint_mode":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Checkpoint模式", true, true, 9
+	case "checkpoint_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "当前Checkpoint", true, enum.DatetimePickerInputType, 10
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "更新时间", true, true, enum.DatetimePickerInputType, 11
+	case "input_plan", "description", "cron_expression", "timezone", "next_scheduled_at", "last_scheduled_at", "initial_checkpoint_at":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationSyncBatchFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationSyncBatchTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "batch_no":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "批次编号", true, true, true, 1
+	case "task_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "任务编码", true, true, true, 2
+	case "task_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "任务名称", true, true, 3
+	case "task_version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "任务版本", true, true, 4
+	case "trigger_type":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "触发类型", true, true, 5
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_batch_status"), 6
+	case "window_start":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "窗口开始", true, enum.DatetimePickerInputType, 7
+	case "window_end":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "窗口结束", true, enum.DatetimePickerInputType, 8
+	case "current_slice_no":
+		field.FieldName, field.IsListShow, field.Sequence = "当前切片", true, 9
+	case "planned_slice_count":
+		field.FieldName, field.IsListShow, field.Sequence = "计划切片", true, 10
+	case "execution_count":
+		field.FieldName, field.IsListShow, field.Sequence = "执行数", true, 11
+	case "started_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "开始时间", true, enum.DatetimePickerInputType, 12
+	case "completed_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "结束时间", true, enum.DatetimePickerInputType, 13
+	case "result_summary", "trigger_key", "triggered_by_user_name":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationExecutionFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationExecutionTableCode {
+		return
+	}
+	field.IsListShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "execution_no":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "执行编号", true, true, true, 1
+	case "external_system_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 2
+	case "external_system_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "系统编码", true, true, true, 3
+	case "external_system_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "系统名称", true, true, 4
+	case "interface_definition_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 5
+	case "interface_code":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "接口编码", true, true, true, 6
+	case "interface_name":
+		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "接口名称", true, true, 7
+	case "interface_version":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "接口版本", true, true, 8
+	case "trigger_source":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "触发来源", true, true, enum.SelectInputType, utils.StringPtr("integration_trigger_source"), 9
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_execution_status"), 10
+	case "current_attempt":
+		field.FieldName, field.IsListShow, field.Sequence = "当前尝试", true, 11
+	case "error_category":
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "错误分类", true, enum.SelectInputType, utils.StringPtr("integration_error_category"), 12
+	case "gmt_create":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "创建时间", true, true, enum.DatetimePickerInputType, 13
+	case "gmt_modify":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "更新时间", true, enum.DatetimePickerInputType, 14
+	case "started_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "开始时间", true, enum.DatetimePickerInputType, 15
+	case "completed_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "完成时间", true, enum.DatetimePickerInputType, 16
+	case "idempotency_scope", "idempotency_key", "input_hash", "result_hash", "result_summary":
+		field.IsSort = false
+	}
+}
+
+func applyIntegrationLogFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != integrationLogTableCode {
+		return
+	}
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
+	field.IsQuickSearch = false
+	field.IsAdvancedSearch = false
+	field.IsSort = true
+	switch field.FieldCode {
+	case "execution_id":
+		field.FieldName, field.IsAdvancedSearch, field.Sequence = "执行记录", true, 1
+	case "attempt_no":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Attempt", true, true, 2
+	case "status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_log_status"), 3
+	case "http_status":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "HTTP状态", true, true, 4
+	case "error_category":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "错误分类", true, true, enum.SelectInputType, utils.StringPtr("integration_error_category"), 5
+	case "result_certainty":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "结果确定性", true, true, enum.SelectInputType, utils.StringPtr("integration_result_certainty"), 6
+	case "started_at":
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.Sequence = "开始时间", true, true, enum.DatetimePickerInputType, 7
+	case "ended_at":
+		field.FieldName, field.IsListShow, field.InputType, field.Sequence = "结束时间", true, enum.DatetimePickerInputType, 8
+	case "duration_ms":
+		field.FieldName, field.IsListShow, field.Sequence = "耗时（毫秒）", true, 9
+	case "result_summary", "result_hash", "request_id", "trace_id", "worker_id", "response_content_type", "credential_code", "credential_version", "credential_fingerprint_summary":
+		field.IsSort = false
+	}
+}

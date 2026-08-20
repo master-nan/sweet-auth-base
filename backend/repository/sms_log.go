@@ -5,8 +5,12 @@
 
 package repository
 
-import "backend/model"
+import (
+	"backend/model"
+	"context"
+)
 
 type SmsLogRepository interface {
 	BasicRepository[model.SmsLog]
+	CreateSmsLogContext(context.Context, *model.SmsLog) error
 }

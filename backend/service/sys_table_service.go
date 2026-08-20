@@ -6,7 +6,6 @@
 package service
 
 import (
-	"backend/config"
 	"backend/dto/request"
 	"backend/enum"
 	myerrors "backend/internal/errors"
@@ -19,7 +18,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,18 +32,9 @@ type SysTableService struct {
 	sysTableIndexRepo      repository.SysTableIndexRepository
 	sysTableIndexFieldRepo repository.SysTableIndexFieldRepository
 	sysTableRelationRepo   repository.SysTableRelationRepository
-	sysMenuRepo            repository.SysMenuRepository
-	sysMenuButtonRepo      repository.SysMenuButtonRepository
-	sysMenuButtonTplRepo   repository.SysMenuButtonTemplateRepository
-	sysRoleRepo            repository.SysRoleRepository
-	sysRoleMenuRepo        repository.SysRoleMenuRepository
-	sysRoleMenuButtonRepo  repository.SysRoleMenuButtonRepository
 	sf                     *utils.Snowflake
 	metadataRuntime        *MetadataRuntimeService
-	serverConfig           *config.Server
 }
-
-const lowCodeCrudButtonTemplateScene = "lowcode_crud"
 
 func NewSysTableService(
 	sysTableRepo repository.SysTableRepository,
@@ -53,15 +42,8 @@ func NewSysTableService(
 	sysTableIndexRepo repository.SysTableIndexRepository,
 	sysTableIndexFieldRepo repository.SysTableIndexFieldRepository,
 	sysTableRelationRepo repository.SysTableRelationRepository,
-	sysMenuRepo repository.SysMenuRepository,
-	sysMenuButtonRepo repository.SysMenuButtonRepository,
-	sysMenuButtonTplRepo repository.SysMenuButtonTemplateRepository,
-	sysRoleRepo repository.SysRoleRepository,
-	sysRoleMenuRepo repository.SysRoleMenuRepository,
-	sysRoleMenuButtonRepo repository.SysRoleMenuButtonRepository,
 	sf *utils.Snowflake,
 	metadataRuntime *MetadataRuntimeService,
-	serverConfig *config.Server,
 ) *SysTableService {
 	return &SysTableService{
 		sysTableRepo,
@@ -69,15 +51,8 @@ func NewSysTableService(
 		sysTableIndexRepo,
 		sysTableIndexFieldRepo,
 		sysTableRelationRepo,
-		sysMenuRepo,
-		sysMenuButtonRepo,
-		sysMenuButtonTplRepo,
-		sysRoleRepo,
-		sysRoleMenuRepo,
-		sysRoleMenuButtonRepo,
 		sf,
 		metadataRuntime,
-		serverConfig,
 	}
 }
 
@@ -1717,421 +1692,6 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		s.RefreshCache(table.Id)
 	}
 	return err
-}
-
-// PublishTableAsMenu 将元数据表发布成一个侧边栏菜单。
-// 这个方法只做业务编排：确认开发管理父菜单、创建或恢复低代码菜单、
-// 补齐默认按钮/接口权限，并把权限默认授给 super_admin。具体增删改查
-// 放在 repository 层，避免 service 直接拼数据库语句。
-func (s *SysTableService) PublishTableAsMenu(ctx context.Context, tableCode string, parentID int) error {
-	table, err := s.GetTableByTableCode(tableCode)
-	if err != nil {
-		return err
-	}
-	if table.Id == 0 {
-		return myerrors.ErrTableNotFound
-	}
-	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		if err := s.ensureTableCanPublishLowCode(tx, table); err != nil {
-			return err
-		}
-		targetParentID, err := s.resolvePublishParentMenu(tx, parentID)
-		if err != nil {
-			return err
-		}
-		menuID, err := s.ensureLowCodeMenu(tx, table, targetParentID)
-		if err != nil {
-			return err
-		}
-		if err := s.cleanupLegacyLowCodeMenuButtons(tx, menuID); err != nil {
-			return err
-		}
-		if err := s.hideDuplicateLowCodeMenus(tx, table.TableCode, menuID); err != nil {
-			return err
-		}
-		buttonIDs, err := s.ensureDefaultCrudButtons(tx, table.TableCode, menuID)
-		if err != nil {
-			return err
-		}
-		return s.ensureSuperAdminMenuPermissions(tx, menuID, buttonIDs)
-	})
-}
-
-// ensureTableCanPublishLowCode 判断当前表是否允许发布成低代码菜单。
-// 判断依据来自菜单数据本身：如果同一 table_code 已经被系统固定页面绑定，
-// 说明这个表由定制页面负责交互，不应该再发布一份通用 CRUD 页面。
-func (s *SysTableService) ensureTableCanPublishLowCode(tx *gorm.DB, table model.SysTable) error {
-	menus, err := s.sysMenuRepo.FindFixedMenusByTableCode(tx, table.TableCode)
-	if err != nil {
-		return err
-	}
-	if len(menus) == 0 {
-		return nil
-	}
-	menu := menus[0]
-	title := strings.TrimSpace(menu.Title)
-	if title == "" {
-		title = menu.Name
-	}
-	return myerrors.NewValidationError(fmt.Sprintf("表 %s 已绑定固定菜单 %s，不能发布成低代码页面", table.TableCode, title))
-}
-
-// resolvePublishParentMenu 解析低代码页面发布目录。
-// 前端传 parent_id 时按用户选择的菜单挂载；不传时才使用“开发管理”作为默认目录。
-func (s *SysTableService) resolvePublishParentMenu(tx *gorm.DB, parentID int) (int, error) {
-	if parentID <= 0 {
-		return s.ensureDevelopMenu(tx)
-	}
-	menu, err := s.sysMenuRepo.FindByIdWithDB(tx, parentID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, myerrors.NewValidationError("发布目录不存在")
-		}
-		return 0, err
-	}
-	if menu.IsHidden || !menu.State {
-		return 0, myerrors.NewValidationError("发布目录不可用")
-	}
-	if !isLowCodePublishParentMenu(menu) {
-		return 0, myerrors.NewValidationError("低代码页面只能发布到目录菜单下")
-	}
-	return menu.Id, nil
-}
-
-// isLowCodePublishParentMenu 判断菜单是否能作为低代码发布父级。
-// 低代码发布只能挂在目录菜单下，不能挂到固定功能页或另一个低代码页面下面。
-// 老数据如果还没有 page_type，但本身没有绑定数据表，也按历史目录菜单兼容处理。
-func isLowCodePublishParentMenu(menu model.SysMenu) bool {
-	if menu.IsHidden || !menu.State || strings.TrimSpace(menu.TableCode) != "" {
-		return false
-	}
-	if menu.PageType == "" {
-		return true
-	}
-	return menu.PageType == enum.MenuPageTypeDirectory
-}
-
-// UnpublishTableMenu 取消发布低代码菜单。
-// 取消发布不会物理删除菜单，而是隐藏并停用菜单，同时清理菜单、按钮和数据权限授权，
-// 防止旧页签继续拿这个菜单上下文访问通用页面。
-func (s *SysTableService) UnpublishTableMenu(ctx context.Context, tableCode string) error {
-	tableCode = strings.TrimSpace(tableCode)
-	if tableCode == "" {
-		return myerrors.ErrParamInvalid
-	}
-	table, err := s.GetTableByTableCode(tableCode)
-	if err != nil {
-		return err
-	}
-	if table.Id == 0 {
-		return myerrors.ErrTableNotFound
-	}
-	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		menus, err := s.findPublishedLowCodeMenus(tx, table.TableCode)
-		if err != nil {
-			return err
-		}
-		if len(menus) == 0 {
-			return nil
-		}
-		menuIDs := make([]int, 0, len(menus))
-		for _, menu := range menus {
-			menuIDs = append(menuIDs, menu.Id)
-		}
-		if err := s.sysMenuRepo.HideMenusByIds(tx, menuIDs); err != nil {
-			return err
-		}
-		if err := s.sysRoleMenuRepo.DeleteByMenuIds(tx, menuIDs); err != nil {
-			return err
-		}
-		if err := s.sysRoleMenuButtonRepo.DeleteByMenuIds(tx, menuIDs); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// ensureDevelopMenu 确保“开发管理”父菜单存在。
-// 发布低代码页面时需要把生成菜单挂在开发管理下面；如果老库没有这条菜单，
-// 这里按系统固定菜单补一条，避免发布流程中断。
-func (s *SysTableService) ensureDevelopMenu(tx *gorm.DB) (int, error) {
-	menu, err := s.sysMenuRepo.FindByFieldWithDB(tx, "name", "develop")
-	if err == nil {
-		return menu.Id, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, err
-	}
-	menu = model.SysMenu{
-		Basic:     model.Basic{Id: 300, State: true},
-		Pid:       0,
-		Name:      "develop",
-		Path:      "develop",
-		Component: "src/components/Layout/Layout.vue",
-		Title:     "router.develop.default",
-		Sequence:  3,
-		PageType:  enum.MenuPageTypeDirectory,
-		Icon:      utils.StringPtr("developer_mode"),
-	}
-	return menu.Id, s.sysMenuRepo.Create(tx, &menu)
-}
-
-// ensureLowCodeMenu 创建或恢复指定表对应的低代码菜单。
-// 如果菜单已经存在，只恢复发布所需的路由、父级、状态等字段，保留用户在菜单管理中
-// 调整过的标题、图标和排序；如果不存在，生成新菜单 id 并创建默认菜单。
-// 这里不会处理按钮权限，按钮由 ensureDefaultCrudButtons 负责。
-func (s *SysTableService) ensureLowCodeMenu(tx *gorm.DB, table model.SysTable, parentID int) (int, error) {
-	name := lowCodeMenuName(table.TableCode)
-	menu, err := s.findPublishedLowCodeMenu(tx, table.TableCode)
-	if err == nil {
-		update := map[string]any{
-			"pid":        parentID,
-			"name":       name,
-			"path":       "generalization/" + table.TableCode,
-			"component":  "pages/develop/generalization/Index.vue",
-			"page_type":  enum.MenuPageTypeLowCode,
-			"table_code": table.TableCode,
-			"option":     "",
-			"is_hidden":  false,
-			"state":      true,
-			"gmt_delete": nil,
-		}
-		return menu.Id, s.sysMenuRepo.UpdateMenuFields(tx, menu.Id, update)
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return 0, err
-	}
-	id, err := s.sf.GenerateUniqueID()
-	if err != nil {
-		return 0, err
-	}
-	menu = model.SysMenu{
-		Basic:     model.Basic{Id: int(id), State: true},
-		Pid:       parentID,
-		Name:      name,
-		Path:      "generalization/" + table.TableCode,
-		Component: "pages/develop/generalization/Index.vue",
-		Title:     table.TableName,
-		Sequence:  uint8(30 + (table.Id % 100)),
-		Icon:      utils.StringPtr("dynamic_form"),
-		PageType:  enum.MenuPageTypeLowCode,
-		TableCode: table.TableCode,
-		IsHidden:  false,
-	}
-	return menu.Id, s.sysMenuRepo.Create(tx, &menu)
-}
-
-// cleanupLegacyLowCodeMenuButtons 清理早期自动生成的 system_ 前缀按钮。
-// 老版本低代码发布用 system_ 前缀生成按钮，后续改成按表编码生成。
-// 重新发布时先移除旧按钮和对应授权，避免权限分配页出现两套重复按钮。
-func (s *SysTableService) cleanupLegacyLowCodeMenuButtons(tx *gorm.DB, menuID int) error {
-	legacyButtons, err := s.sysMenuButtonRepo.FindLegacyLowCodeButtons(tx, menuID)
-	if err != nil {
-		return err
-	}
-	if len(legacyButtons) == 0 {
-		return nil
-	}
-	buttonIDs := make([]int, 0, len(legacyButtons))
-	for _, button := range legacyButtons {
-		buttonIDs = append(buttonIDs, button.Id)
-	}
-	if err := s.sysRoleMenuButtonRepo.DeleteByButtonIds(tx, buttonIDs); err != nil {
-		return err
-	}
-	return s.sysMenuButtonRepo.DeleteByIds(tx, buttonIDs)
-}
-
-// hideDuplicateLowCodeMenus 隐藏同一张表历史上发布出的重复菜单。
-// 发布入口多次迭代后可能存在“同一 table_code 多个菜单”的历史数据；
-// 这里只保留当前菜单，其余全部停用，并清掉旧菜单的菜单授权和按钮授权。
-func (s *SysTableService) hideDuplicateLowCodeMenus(tx *gorm.DB, tableCode string, keepMenuID int) error {
-	menus, err := s.findPublishedLowCodeMenus(tx, tableCode)
-	if err != nil {
-		return err
-	}
-	duplicateIDs := make([]int, 0, len(menus))
-	for _, menu := range menus {
-		if menu.Id != keepMenuID {
-			duplicateIDs = append(duplicateIDs, menu.Id)
-		}
-	}
-	if len(duplicateIDs) == 0 {
-		return nil
-	}
-	if err := s.sysMenuRepo.HideMenusByIds(tx, duplicateIDs); err != nil {
-		return err
-	}
-	if err := s.sysRoleMenuRepo.DeleteByMenuIds(tx, duplicateIDs); err != nil {
-		return err
-	}
-	if err := s.sysRoleMenuButtonRepo.DeleteByMenuIds(tx, duplicateIDs); err != nil {
-		return err
-	}
-	return nil
-}
-
-// findPublishedLowCodeMenu 获取指定表当前可用的低代码菜单。
-// 查询范围只认真正的低代码通用页面菜单，不会把绑定同一 table_code 的系统菜单误认为发布菜单。
-func (s *SysTableService) findPublishedLowCodeMenu(tx *gorm.DB, tableCode string) (model.SysMenu, error) {
-	menus, err := s.findPublishedLowCodeMenus(tx, tableCode)
-	if err != nil {
-		return model.SysMenu{}, err
-	}
-	if len(menus) == 0 {
-		return model.SysMenu{}, gorm.ErrRecordNotFound
-	}
-	return menus[0], nil
-}
-
-// findPublishedLowCodeMenus 获取指定表历史发布过的低代码菜单。
-// 查询只依赖 page_type 和 table_code，避免固定页面和低代码页面互相误判。
-func (s *SysTableService) findPublishedLowCodeMenus(tx *gorm.DB, tableCode string) ([]model.SysMenu, error) {
-	tableCode = strings.TrimSpace(tableCode)
-	if tableCode == "" {
-		return nil, nil
-	}
-	return s.sysMenuRepo.FindPublishedLowCodeMenus(tx, tableCode)
-}
-
-func lowCodeMenuName(tableCode string) string {
-	raw := strings.TrimSpace(tableCode)
-	name := "lowcode_" + raw
-	if len(name) <= 32 {
-		return name
-	}
-	hasher := fnv.New32a()
-	_, _ = hasher.Write([]byte(raw))
-	hash := fmt.Sprintf("%08x", hasher.Sum32())
-	prefixLen := 32 - len("lowcode_") - len("_") - len(hash)
-	if prefixLen < 1 {
-		prefixLen = 1
-	}
-	prefix := raw
-	if len(prefix) > prefixLen {
-		prefix = prefix[:prefixLen]
-	}
-	return "lowcode_" + prefix + "_" + hash
-}
-
-// ensureDefaultCrudButtons 补齐低代码通用页面的默认按钮和接口权限。
-// 发布低代码菜单时，页面至少需要查询、新增、详情、编辑、删除、刷新以及文件上传/预览相关接口权限。
-// 这个方法只负责“按模板保证存在并更新基础属性”，不负责判断业务按钮应该有哪些；
-// 标记完成、审核、调整状态这类业务动作应该由菜单按钮配置维护，不应该继续塞进默认模板。
-// 所有数据库写入都委托给 SysMenuButtonRepository，service 层只做模板编排和事务流程控制。
-func (s *SysTableService) ensureDefaultCrudButtons(tx *gorm.DB, tableCode string, menuID int) ([]int, error) {
-	templates, err := s.sysMenuButtonTplRepo.FindEnabledBySceneWithDB(tx, lowCodeCrudButtonTemplateScene)
-	if err != nil {
-		return nil, err
-	}
-	if len(templates) == 0 {
-		return nil, myerrors.NewValidationError("低代码默认按钮模板未初始化")
-	}
-	defaults := lowCodeDefaultMenuButtons(tableCode, templates)
-	buttonIDs := make([]int, 0, len(defaults))
-	for _, item := range defaults {
-		button, err := s.sysMenuButtonRepo.FindByMenuIdAndCode(tx, menuID, item.Code)
-		if err == nil {
-			updates := map[string]any{
-				"name":          item.Name,
-				"memo":          item.Memo,
-				"position":      item.Position,
-				"event_type":    item.EventType,
-				"event_action":  item.EventAction,
-				"icon":          item.Icon,
-				"color":         item.Color,
-				"display_mode":  item.DisplayMode,
-				"sequence":      item.Sequence,
-				"path":          item.Path,
-				"method":        strings.ToUpper(item.Method),
-				"params_schema": item.ParamsSchema,
-				"confirm_text":  item.ConfirmText,
-				"disable_when":  item.DisableWhen,
-				"before_hooks":  item.BeforeHooks,
-				"after_hooks":   item.AfterHooks,
-				"is_button":     item.IsButton,
-				"is_hidden":     item.IsHidden,
-				"is_disabled":   item.IsDisabled,
-				"state":         true,
-			}
-			if err := s.sysMenuButtonRepo.UpdateMenuButtonFields(tx, button.Id, updates); err != nil {
-				return nil, err
-			}
-			buttonIDs = append(buttonIDs, button.Id)
-			continue
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		id, err := s.sf.GenerateUniqueID()
-		if err != nil {
-			return nil, err
-		}
-		item.Basic = model.Basic{Id: int(id), State: true}
-		item.MenuId = menuID
-		if err := s.sysMenuButtonRepo.Create(tx, &item); err != nil {
-			return nil, err
-		}
-		buttonIDs = append(buttonIDs, item.Id)
-	}
-	return buttonIDs, nil
-}
-
-// lowCodeDefaultMenuButtons 把数据库里的低代码按钮模板套到当前 tableCode。
-// 模板只描述“这类低代码页面默认需要哪些按钮或接口权限”，实际按钮编码仍按当前表编码生成。
-func lowCodeDefaultMenuButtons(tableCode string, templates []model.SysMenuButtonTemplate) []model.SysMenuButton {
-	buttons := make([]model.SysMenuButton, 0, len(templates))
-	for _, template := range templates {
-		displayMode, ok := enum.NormalizeSysMenuButtonDisplayMode(string(template.DisplayMode))
-		if !ok {
-			displayMode = enum.ButtonDisplayAuto
-		}
-		buttons = append(buttons, model.SysMenuButton{
-			Name:         template.Name,
-			Code:         tableCode + template.CodeSuffix,
-			Memo:         template.Memo,
-			Position:     template.Position,
-			EventType:    template.EventType,
-			EventAction:  template.EventAction,
-			Icon:         template.Icon,
-			Color:        template.Color,
-			DisplayMode:  displayMode,
-			Sequence:     template.Sequence,
-			Path:         template.Path,
-			Method:       strings.ToUpper(template.Method),
-			ParamsSchema: template.ParamsSchema,
-			ConfirmText:  template.ConfirmText,
-			DisableWhen:  template.DisableWhen,
-			IsButton:     template.IsButton,
-			IsHidden:     false,
-			IsDisabled:   template.IsDisabled,
-			BeforeHooks:  template.BeforeHooks,
-			AfterHooks:   template.AfterHooks,
-		})
-	}
-	return buttons
-}
-
-// ensureSuperAdminMenuPermissions 给 super_admin 补齐新发布菜单和默认按钮权限。
-// 如果库里没有 super_admin 角色，直接跳过；有这个角色时用忽略冲突插入，
-// 避免重复发布同一张表时报唯一键冲突。
-func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID int, buttonIDs []int) error {
-	role, err := s.sysRoleRepo.FindByFieldWithDB(tx, "name", "super_admin")
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-	if err := s.sysRoleMenuRepo.CreateIfNotExists(tx, model.SysRoleMenu{RoleId: role.Id, MenuId: menuID}); err != nil {
-		return err
-	}
-	for _, buttonID := range buttonIDs {
-		if err := s.sysRoleMenuButtonRepo.CreateIfNotExists(tx, model.SysRoleMenuButton{RoleId: role.Id, MenuId: menuID, ButtonId: buttonID}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *SysTableService) syncViewTableFields(ctx context.Context, tx *gorm.DB, table model.SysTable) error {

@@ -23,14 +23,16 @@ import (
 
 type TableController struct {
 	sysTableService *service.SysTableService
+	publication     *service.LowCodePublicationService
 	metadataRuntime *service.MetadataRuntimeService
 	sysMenuService  *service.SysMenuService
 	translators     map[string]ut.Translator
 }
 
-func NewTableController(sysTableService *service.SysTableService, metadataRuntime *service.MetadataRuntimeService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
+func NewTableController(sysTableService *service.SysTableService, publication *service.LowCodePublicationService, metadataRuntime *service.MetadataRuntimeService, sysMenuService *service.SysMenuService, translators map[string]ut.Translator) *TableController {
 	return &TableController{
 		sysTableService,
+		publication,
 		metadataRuntime,
 		sysMenuService,
 		translators,
@@ -169,7 +171,7 @@ func (t *TableController) QueryTable(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := t.sysTableService.GetTableListResponse(&data)
+	result, err := t.sysTableService.GetTableListResponse(ctx.Request.Context(), &data)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -471,7 +473,7 @@ func (t *TableController) GetTableRelationsByTableId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableRelationsByTableIdResponse(id)
+	data, err := t.sysTableService.GetTableRelationsByTableIdResponse(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -660,7 +662,7 @@ func (t *TableController) GetTableIndexesByTableId(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := t.sysTableService.GetTableIndexesByTableIdResponse(id)
+	data, err := t.sysTableService.GetTableIndexesByTableIdResponse(ctx.Request.Context(), id)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -904,7 +906,7 @@ func (t *TableController) PublishTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.PublishTableAsMenu(ctx.Request.Context(), code, data.ParentId)
+	err = t.publication.PublishTableAsMenu(ctx.Request.Context(), code, data.ParentId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -934,7 +936,7 @@ func (t *TableController) UnpublishTable(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrPermissionDenied)
 		return
 	}
-	err = t.sysTableService.UnpublishTableMenu(ctx.Request.Context(), code)
+	err = t.publication.UnpublishTableMenu(ctx.Request.Context(), code)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

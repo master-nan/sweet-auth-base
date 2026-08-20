@@ -70,11 +70,6 @@ func NewResponse() *Response {
 	}
 }
 
-func (r *Response) SetSuccess(success bool) *Response {
-	r.Success = success
-	return r
-}
-
 func (r *Response) SetData(data interface{}) *Response {
 	r.Data = data
 	return r
@@ -82,16 +77,6 @@ func (r *Response) SetData(data interface{}) *Response {
 
 func (r *Response) SetTotal(total int) *Response {
 	r.Total = total
-	return r
-}
-
-func (r *Response) SetMessage(msg string) *Response {
-	r.Message = msg
-	return r
-}
-
-func (r *Response) SetCode(code int) *Response {
-	r.Code = code
 	return r
 }
 

@@ -18,3 +18,18 @@ const DingTalkCacheKey = "DING_TALK_CACHE_KEY_"
 func NewDingTalkCache(cacher Cacher) *DingTalkCache {
 	return &DingTalkCache{BasicCache: NewBasicCache[dingtalk.AccessToken](cacher, DingTalkCacheKey)}
 }
+
+type DingTalkUserIDCache struct {
+	*BasicCache[string]
+}
+
+const DingTalkUserIDCacheKey = "DING_TALK_USER_ID_CACHE_KEY_"
+
+func NewDingTalkUserIDCache(cacher Cacher) *DingTalkUserIDCache {
+	return &DingTalkUserIDCache{BasicCache: NewBasicCache[string](cacher, DingTalkUserIDCacheKey)}
+}
+
+// Set caches a DingTalk user ID for seven days.
+func (d *DingTalkUserIDCache) Set(key string, code string) error {
+	return d.SetExpiration(key, code, 60*60*24*7)
+}

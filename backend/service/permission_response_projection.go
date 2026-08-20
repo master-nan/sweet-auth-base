@@ -8,7 +8,7 @@ import (
 
 func menuButtonResponse(data model.SysMenuButton) response.SysMenuButtonRes {
 	return response.SysMenuButtonRes{
-		BasicRes:     basicResponse(data.Basic),
+		BasicRes:     response.NewBasicRes(data.Basic),
 		MenuId:       data.MenuId,
 		Name:         data.Name,
 		Code:         data.Code,
@@ -47,7 +47,7 @@ func menuListResponse(data model.SysMenu) response.SysMenuListRes {
 		children = append(children, menuListResponse(child))
 	}
 	return response.SysMenuListRes{
-		BasicRes:       basicResponse(data.Basic),
+		BasicRes:       response.NewBasicRes(data.Basic),
 		Pid:            data.Pid,
 		Name:           data.Name,
 		Path:           data.Path,
@@ -110,7 +110,7 @@ func (s *SysMenuService) GetMenuButtonsByMenuIdResponse(menuId int) ([]response.
 
 func roleListResponse(data model.SysRole) response.SysRoleListRes {
 	return response.SysRoleListRes{
-		BasicRes: basicResponse(data.Basic),
+		BasicRes: response.NewBasicRes(data.Basic),
 		Name:     data.Name,
 		Memo:     data.Memo,
 	}

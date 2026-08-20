@@ -329,3 +329,36 @@ func passwordChangedAt(user model.SysUser) time.Time {
 	}
 	return time.Time(user.GmtModify)
 }
+
+func SysUserResponse(data model.SysUser) response.SysUserRes {
+	roles := make([]response.RoleSimpleRes, 0, len(data.Roles))
+	for _, role := range data.Roles {
+		roles = append(roles, response.RoleSimpleRes{Id: role.Id, Name: role.Name, Memo: role.Memo})
+	}
+	lastLogin := model.CustomTime{}
+	if data.GmtLastLogin != nil {
+		lastLogin = *data.GmtLastLogin
+	}
+	return response.SysUserRes{
+		BasicRes: response.NewBasicRes(data.Basic), UserName: data.UserName,
+		Email: data.Email, PhoneNumber: data.PhoneNumber, GmtLastLogin: lastLogin,
+		Language: data.Language, IsReset: data.IsReset, Roles: roles,
+	}
+}
+
+func (s *SysUserService) GetByIdResponse(id int) (response.SysUserRes, error) {
+	data, err := s.GetById(id)
+	return SysUserResponse(data), err
+}
+
+func (s *SysUserService) GetUserListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SysUserRes], error) {
+	data, err := s.GetUserList(basic, table)
+	if err != nil {
+		return response.ListResult[response.SysUserRes]{}, err
+	}
+	items := make([]response.SysUserRes, 0, len(data.Data))
+	for _, item := range data.Data {
+		items = append(items, SysUserResponse(item))
+	}
+	return response.ListResult[response.SysUserRes]{Data: items, Total: data.Total}, nil
+}

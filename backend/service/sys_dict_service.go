@@ -37,7 +37,7 @@ func NewSysDictService(sysDictRepo repository.SysDictRepository, sysDictItemRepo
 	}
 }
 
-func (s *SysDictService) GetSysDictById(id int) (model.SysDict, error) {
+func (s *SysDictService) getSysDictByID(id int) (model.SysDict, error) {
 	data, err := s.sysDictCache.Get(strconv.Itoa(id))
 	if err == nil {
 		return data, nil
@@ -58,12 +58,12 @@ func (s *SysDictService) GetSysDictById(id int) (model.SysDict, error) {
 	return dict, nil
 }
 
-func (s *SysDictService) GetSysDictList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SysDict], error) {
+func (s *SysDictService) getSysDictList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SysDict], error) {
 	result, err := s.sysDictRepo.GetSysDictList(basic, table)
 	return result, err
 }
 
-func (s *SysDictService) GetSysDictByCode(code string) (model.SysDict, error) {
+func (s *SysDictService) getSysDictByCode(code string) (model.SysDict, error) {
 	data, err := s.sysDictCache.Get(code)
 	if err == nil {
 		return data, nil
@@ -86,7 +86,7 @@ func (s *SysDictService) GetSysDictByCode(code string) (model.SysDict, error) {
 
 func (s *SysDictService) CreateSysDict(ctx context.Context, req request.DictCreateReq) (int64, error) {
 	var data model.SysDict
-	dict, e := s.GetSysDictByCode(req.DictCode)
+	dict, e := s.getSysDictByCode(req.DictCode)
 	if e != nil {
 		return 0, e
 	}
@@ -108,37 +108,32 @@ func (s *SysDictService) CreateSysDict(ctx context.Context, req request.DictCrea
 }
 
 func (s *SysDictService) UpdateSysDict(ctx context.Context, req request.DictUpdateReq) error {
+	data, err := s.getSysDictByID(req.Id)
+	if err != nil {
+		return err
+	}
 	tx := s.sysDictRepo.DBWithContext(ctx)
-	err := s.sysDictRepo.Update(tx, req, req.Id)
-	if err != nil {
+	if err := s.sysDictRepo.Update(tx, req, req.Id); err != nil {
 		return err
 	}
-	data, err := s.GetSysDictById(req.Id)
-	if err != nil {
-		return err
-	}
-	if data.Id != 0 {
-		s.sysDictCache.Delete(strconv.Itoa(data.Id))
-		s.sysDictCache.Delete(data.DictCode)
-	}
+	s.invalidateDictCache(data)
 	return nil
 }
 
 func (s *SysDictService) DeleteSysDictById(ctx context.Context, id int) error {
-	tx := s.sysDictRepo.DBWithContext(ctx)
-	err := s.sysDictRepo.DeleteById(tx, id)
-	data, err := s.GetSysDictById(id)
+	data, err := s.getSysDictByID(id)
 	if err != nil {
 		return err
 	}
-	if data.Id != 0 {
-		s.sysDictCache.Delete(strconv.Itoa(data.Id))
-		s.sysDictCache.Delete(data.DictCode)
+	tx := s.sysDictRepo.DBWithContext(ctx)
+	if err := s.sysDictRepo.DeleteById(tx, id); err != nil {
+		return err
 	}
-	return err
+	s.invalidateDictCache(data)
+	return nil
 }
 
-func (s *SysDictService) GetSysDictItemById(id int) (model.SysDictItem, error) {
+func (s *SysDictService) getSysDictItemByID(id int) (model.SysDictItem, error) {
 	data, err := s.sysDictItemRepo.FindById(id)
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.SysDictItem{}, nil
@@ -146,14 +141,18 @@ func (s *SysDictService) GetSysDictItemById(id int) (model.SysDictItem, error) {
 	return data, err
 }
 
-func (s *SysDictService) GetSysDictItemsByDictId(id int) ([]model.SysDictItem, error) {
+func (s *SysDictService) getSysDictItemsByDictID(id int) ([]model.SysDictItem, error) {
 	result, err := s.sysDictItemRepo.GetSysDictItemsByDictId(id)
 	return result, err
 }
 
 func (s *SysDictService) CreateSysDictItem(ctx context.Context, req request.DictItemCreateReq) error {
+	dict, err := s.getSysDictByID(req.DictId)
+	if err != nil {
+		return err
+	}
 	var data model.SysDictItem
-	err := copier.Copy(&data, &req)
+	err = copier.Copy(&data, &req)
 	if err != nil {
 		zap.L().Error("Error during struct mapping:", zap.Error(err))
 		return err
@@ -169,62 +168,134 @@ func (s *SysDictService) CreateSysDictItem(ctx context.Context, req request.Dict
 		zap.L().Error("CreateSysDictItem err:", zap.Error(err))
 		return err
 	}
-	dict, err := s.GetSysDictById(req.DictId)
-	if err != nil {
-		zap.L().Error("CreateSysDictItem err:", zap.Error(err))
-		return err
-	}
-	if dict.Id != 0 {
-		s.sysDictCache.Delete(strconv.Itoa(dict.Id))
-		s.sysDictCache.Delete(dict.DictCode)
-	}
+	s.invalidateDictCache(dict)
 	return nil
 }
 
 func (s *SysDictService) UpdateSysDictItem(ctx context.Context, req request.DictItemUpdateReq) error {
+	dictItem, err := s.getSysDictItemByID(req.Id)
+	if err != nil {
+		return err
+	}
+	dict, err := s.getSysDictByID(dictItem.DictId)
+	if err != nil {
+		return err
+	}
 	tx := s.sysDictRepo.DBWithContext(ctx)
-	err := s.sysDictItemRepo.Update(tx, &req, req.Id)
+	err = s.sysDictItemRepo.Update(tx, &req, req.Id)
 	if err != nil {
 		zap.L().Error("UpdateSysDictItem err:", zap.Error(err))
 		return err
 	}
-	dictItem, err := s.GetSysDictItemById(req.Id)
-	if err != nil {
-		zap.L().Error("UpdateSysDictItem err:", zap.Error(err))
-		return err
-	}
-	dict, err := s.GetSysDictById(dictItem.DictId)
-	if err != nil {
-		zap.L().Error("UpdateSysDictItem err:", zap.Error(err))
-		return err
-	}
-	if dict.Id != 0 {
-		s.sysDictCache.Delete(strconv.Itoa(dict.Id))
-		s.sysDictCache.Delete(dict.DictCode)
-	}
+	s.invalidateDictCache(dict)
 	return nil
 }
 
 func (s *SysDictService) DeleteSysDictItemById(ctx context.Context, id int) error {
+	dictItem, err := s.getSysDictItemByID(id)
+	if err != nil {
+		return err
+	}
+	dict, err := s.getSysDictByID(dictItem.DictId)
+	if err != nil {
+		return err
+	}
 	tx := s.sysDictRepo.DBWithContext(ctx)
-	err := s.sysDictItemRepo.DeleteById(tx, id)
+	err = s.sysDictItemRepo.DeleteById(tx, id)
 	if err != nil {
 		zap.L().Error("DeleteSysDictItemById err:", zap.Error(err))
 		return err
 	}
-	dictItem, err := s.GetSysDictItemById(id)
-	if err != nil {
-		zap.L().Error("DeleteSysDictItemById err:", zap.Error(err))
-		return err
-	}
-	dict, err := s.GetSysDictById(dictItem.DictId)
-	if err != nil {
-		zap.L().Error("DeleteSysDictItemById err:", zap.Error(err))
-		return err
-	}
-	if dict.Id != 0 {
-		s.sysDictCache.Delete(strconv.Itoa(dict.Id))
-		s.sysDictCache.Delete(dict.DictCode)
-	}
+	s.invalidateDictCache(dict)
 	return nil
+}
+
+func (s *SysDictService) invalidateDictCache(dict model.SysDict) {
+	if dict.Id == 0 {
+		return
+	}
+	_ = s.sysDictCache.Delete(strconv.Itoa(dict.Id))
+	_ = s.sysDictCache.Delete(dict.DictCode)
+}
+
+func sysDictItemResponse(data model.SysDictItem) response.SysDictItemRes {
+	return response.SysDictItemRes{
+		BasicRes:  response.NewBasicRes(data.Basic),
+		DictId:    data.DictId,
+		ItemName:  data.ItemName,
+		ItemCode:  data.ItemCode,
+		ItemValue: data.ItemValue,
+	}
+}
+
+func sysDictItemResponses(items []model.SysDictItem) []response.SysDictItemRes {
+	result := make([]response.SysDictItemRes, 0, len(items))
+	for _, item := range items {
+		result = append(result, sysDictItemResponse(item))
+	}
+	return result
+}
+
+func sysDictResponse(data model.SysDict) response.SysDictRes {
+	return response.SysDictRes{
+		BasicRes:  response.NewBasicRes(data.Basic),
+		DictName:  data.DictName,
+		DictCode:  data.DictCode,
+		DictItems: sysDictItemResponses(data.DictItems),
+	}
+}
+
+func (s *SysDictService) GetSysDictByIdResponse(id int) (response.SysDictRes, error) {
+	data, err := s.getSysDictByID(id)
+	return sysDictResponse(data), err
+}
+
+func (s *SysDictService) GetSysDictByCodeResponse(code string) (response.SysDictRes, error) {
+	data, err := s.getSysDictByCode(code)
+	return sysDictResponse(data), err
+}
+
+func (s *SysDictService) GetRuntimeDictByCodeResponse(code string) (response.RuntimeDictRes, error) {
+	data, err := s.getSysDictByCode(code)
+	if err != nil {
+		return response.RuntimeDictRes{}, err
+	}
+	return runtimeDictResponse(data), nil
+}
+
+func runtimeDictResponse(data model.SysDict) response.RuntimeDictRes {
+	items := make([]response.RuntimeDictItemRes, 0, len(data.DictItems))
+	for _, item := range data.DictItems {
+		if !item.State {
+			continue
+		}
+		items = append(items, response.RuntimeDictItemRes{
+			ItemName:  item.ItemName,
+			ItemCode:  item.ItemCode,
+			ItemValue: item.ItemValue,
+		})
+	}
+	return response.RuntimeDictRes{DictName: data.DictName, DictCode: data.DictCode, DictItems: items}
+}
+
+func (s *SysDictService) GetSysDictListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SysDictRes], error) {
+	data, err := s.getSysDictList(basic, table)
+	if err != nil {
+		return response.ListResult[response.SysDictRes]{}, err
+	}
+	items := make([]response.SysDictRes, 0, len(data.Data))
+	for _, item := range data.Data {
+		items = append(items, sysDictResponse(item))
+	}
+	return response.ListResult[response.SysDictRes]{Data: items, Total: data.Total}, nil
+}
+
+func (s *SysDictService) GetSysDictItemByIdResponse(id int) (response.SysDictItemRes, error) {
+	data, err := s.getSysDictItemByID(id)
+	return sysDictItemResponse(data), err
+}
+
+func (s *SysDictService) GetSysDictItemsByDictIdResponse(id int) ([]response.SysDictItemRes, error) {
+	data, err := s.getSysDictItemsByDictID(id)
+	return sysDictItemResponses(data), err
 }

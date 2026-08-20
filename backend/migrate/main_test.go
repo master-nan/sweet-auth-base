@@ -478,6 +478,42 @@ func TestRemoveLowCodeViewRefreshConfigurationIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestRemoveMenuRefreshCacheArtifactsIsIdempotent(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.CasbinRule{}); err != nil {
+		t.Fatalf("migrate menu refresh cache fixtures: %v", err)
+	}
+	button := model.SysMenuButton{
+		Basic: model.Basic{Id: 31, State: true}, MenuId: 200,
+		Name: "刷新缓存", Code: "system_menu_refresh_cache",
+		EventAction: "refresh_cache", Path: "/admin/menu/refresh-cache", Method: "POST",
+	}
+	if err := db.Create(&button).Error; err != nil {
+		t.Fatalf("seed refresh cache button: %v", err)
+	}
+	if err := db.Create(&model.SysRoleMenuButton{RoleId: 1, MenuId: 200, ButtonId: button.Id}).Error; err != nil {
+		t.Fatalf("seed refresh cache grant: %v", err)
+	}
+	if err := db.Create(&model.CasbinRule{PType: "p", V0: "super_admin", V1: button.Path, V2: button.Method}).Error; err != nil {
+		t.Fatalf("seed refresh cache policy: %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := removeMenuRefreshCacheArtifacts(db, 200); err != nil {
+			t.Fatalf("remove refresh cache artifacts pass %d: %v", i+1, err)
+		}
+	}
+	if got := countWhere(t, db, &model.SysMenuButton{}, "code = ?", button.Code); got != 0 {
+		t.Fatalf("refresh cache button count = %d, want 0", got)
+	}
+	if got := countWhere(t, db, &model.SysRoleMenuButton{}, "button_id = ?", button.Id); got != 0 {
+		t.Fatalf("refresh cache grant count = %d, want 0", got)
+	}
+	if got := countWhere(t, db, &model.CasbinRule{}, "v1 = ? AND v2 = ?", button.Path, button.Method); got != 0 {
+		t.Fatalf("refresh cache policy count = %d, want 0", got)
+	}
+}
+
 func TestSeedMenuButtonPersistsAPIPermissionAsNonPageButton(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.CasbinRule{}); err != nil {

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"backend/config"
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/cache"
@@ -212,7 +211,7 @@ func newSysTableRelationPostgreSQLService(t *testing.T, db *gorm.DB) *SysTableSe
 	return NewSysTableService(
 		tableRepo, fieldRepo, impl.NewSysTableIndexRepositoryImpl(primaryDB),
 		impl.NewSysTableIndexFieldRepositoryImpl(primaryDB), impl.NewSysTableRelationRepositoryImpl(primaryDB),
-		nil, nil, nil, nil, nil, nil, sf, metadataRuntime, &config.Server{},
+		sf, metadataRuntime,
 	)
 }
 

@@ -13,14 +13,12 @@ import (
 func TestNewResponseUsesStableSuccessContract(t *testing.T) {
 	resp := NewResponse().
 		SetData(map[string]string{"name": "baseline"}).
-		SetTotal(1).
-		SetMessage("完成").
-		SetCode(http.StatusCreated)
+		SetTotal(1)
 
 	if !resp.Success {
 		t.Fatal("expected success response")
 	}
-	if resp.Code != http.StatusCreated || resp.Message != "完成" || resp.Total != 1 {
+	if resp.Code != http.StatusOK || resp.Message != "操作成功" || resp.Total != 1 {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
 	data, ok := resp.Data.(map[string]string)
