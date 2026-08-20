@@ -251,14 +251,16 @@ func (s *SysTableRepositoryImpl) FetchTableIndexMetadata(ctx context.Context, db
 SELECT
 	a.attname AS "COLUMN_NAME",
 	i.relname AS "INDEX_NAME",
-	(NOT ix.indisunique) AS "NON_UNIQUE"
+	(NOT ix.indisunique) AS "NON_UNIQUE",
+	key.ordinal_position AS "ORDINAL_POSITION"
 FROM pg_class t
 JOIN pg_namespace n ON n.oid = t.relnamespace
 JOIN pg_index ix ON ix.indrelid = t.oid
 JOIN pg_class i ON i.oid = ix.indexrelid
-JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+CROSS JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS key(attnum, ordinal_position)
+JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = key.attnum
 WHERE n.nspname = ? AND t.relname = ? AND ix.indisprimary = false
-ORDER BY i.relname, a.attnum;`
+ORDER BY i.relname, key.ordinal_position;`
 	err := db.WithContext(ctx).Raw(query, normalizePostgresSchema(tableSchema), tableName).Scan(&indexes).Error
 	if err != nil {
 		return []model.TableIndexMate{}, err
@@ -268,10 +270,10 @@ ORDER BY i.relname, a.attnum;`
 
 func normalizePostgresSchema(schema string) string {
 	schema = strings.TrimSpace(schema)
-	if schema == "public" {
-		return schema
+	if schema == "" {
+		return "public"
 	}
-	return "public"
+	return schema
 }
 
 func alterPostgresColumn(tx *gorm.DB, tableName string, fieldCode string, sqlType string) error {

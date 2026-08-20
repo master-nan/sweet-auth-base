@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/enum"
 	"backend/internal/database"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -131,7 +130,7 @@ func TestRetryPolicyServiceReferenceProtectionAndPage(t *testing.T) {
 	if _, err := svc.DisableRetryPolicy(context.Background(), enabled.Id, enabled.Revision); !errors.Is(err, apperrors.ErrRetryPolicyReferenced) {
 		t.Fatalf("referenced disable error=%v", err)
 	}
-	page, err := svc.PageRetryPolicy(context.Background(), request.RetryPolicyQueryReq{Page: 1, Num: 10, QuickQuery: &request.QuickQuery{Keyword: "order"}, Status: model.RetryPolicyStatusEnabled}, retryPolicyQueryTableForTest())
+	page, err := svc.PageRetryPolicy(context.Background(), request.RetryPolicyQueryReq{Page: 1, Num: 10, QuickQuery: &request.QuickQuery{Keyword: "order"}, Status: model.RetryPolicyStatusEnabled})
 	if err != nil || page.Total != 1 || len(page.Data) != 1 || page.Data[0].PolicyCode != "order_retry" {
 		t.Fatalf("page=%+v err=%v", page, err)
 	}
@@ -145,13 +144,4 @@ func newRetryPolicyTestSubject(t *testing.T, writer StandardContextAuditWriter) 
 		t.Fatalf("create snowflake: %v", err)
 	}
 	return NewRetryPolicyService(impl.NewRetryPolicyRepositoryImpl(&database.PrimaryDB{DB: db}), sf, writer), db
-}
-
-func retryPolicyQueryTableForTest() model.SysTable {
-	return model.SysTable{TableCode: "integration_retry_policy", TableFields: []model.SysTableField{
-		{Basic: model.Basic{State: true}, FieldCode: "policy_code", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-		{Basic: model.Basic{State: true}, FieldCode: "policy_name", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-		{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
-		{Basic: model.Basic{State: true}, FieldCode: "backoff_type", FieldType: enum.VarcharFieldType},
-	}}
 }

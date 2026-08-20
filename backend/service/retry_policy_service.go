@@ -103,10 +103,10 @@ func (s *RetryPolicyService) CreateRetryPolicy(ctx context.Context, req request.
 	return response.NewRetryPolicyDetailRes(value), nil
 }
 
-func (s *RetryPolicyService) PageRetryPolicy(ctx context.Context, req request.RetryPolicyQueryReq, table model.SysTable) (response.ListResult[response.RetryPolicyListRes], error) {
+func (s *RetryPolicyService) PageRetryPolicy(ctx context.Context, req request.RetryPolicyQueryReq) (response.ListResult[response.RetryPolicyListRes], error) {
 	basic := req.ToBasic()
 	var values []model.RetryPolicy
-	total, err := s.repository.WithContext(ctx).PaginateAndCountAsync(&basic, &values, table)
+	total, err := s.repository.WithContext(ctx).PaginateAndCountAsync(&basic, &values, retryPolicyQueryTable())
 	if err != nil {
 		return response.ListResult[response.RetryPolicyListRes]{}, myerrors.WrapDatabaseError(err)
 	}

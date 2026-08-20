@@ -23,6 +23,7 @@ type seedStep struct {
 func migrationSteps() []migrationStep {
 	return []migrationStep{
 		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
+		{name: "backfill_sys_table_index_field_sequence", run: backfillSysTableIndexFieldSequence},
 		{name: "query_scheme_schema", run: migrateQuerySchemeSchema},
 		{name: "integration_configuration_schema", run: migrateIntegrationConfigurationSchema},
 		{name: "integration_runtime_schema", run: migrateIntegrationRuntimeSchema},

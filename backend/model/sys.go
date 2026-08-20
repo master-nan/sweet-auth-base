@@ -208,8 +208,9 @@ type SysTableIndex struct {
 }
 
 type SysTableIndexField struct {
-	IndexId int `gorm:"primaryKey;autoIncrement:false" json:"index_id"`
-	FieldId int `gorm:"primaryKey;autoIncrement:false" json:"field_id"`
+	IndexId  int   `gorm:"primaryKey;autoIncrement:false" json:"index_id"`
+	FieldId  int   `gorm:"primaryKey;autoIncrement:false" json:"field_id"`
+	Sequence uint8 `gorm:"type:smallint;not null;default:0" json:"sequence"`
 }
 
 type SysTableRelation struct {
@@ -257,7 +258,8 @@ type TableColumnMate struct {
 }
 
 type TableIndexMate struct {
-	ColumnName string `gorm:"column:COLUMN_NAME" json:"column_name"` // 列名
-	IndexName  string `gorm:"column:INDEX_NAME" json:"index_name"`   // 索引名称
-	NonUnique  bool   `gorm:"column:NON_UNIQUE" json:"non_unique"`   // 是否唯一索引
+	ColumnName      string `gorm:"column:COLUMN_NAME" json:"column_name"`           // 列名
+	IndexName       string `gorm:"column:INDEX_NAME" json:"index_name"`             // 索引名称
+	NonUnique       bool   `gorm:"column:NON_UNIQUE" json:"non_unique"`             // 是否唯一索引
+	OrdinalPosition int    `gorm:"column:ORDINAL_POSITION" json:"ordinal_position"` // 复合索引字段顺序
 }

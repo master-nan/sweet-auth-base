@@ -330,6 +330,15 @@ func (r *DataOwnershipFieldRepositoryImpl) CountPolicyRuleReferencesForConfig(
 	return count, err
 }
 
+func (r *DataOwnershipFieldRepositoryImpl) ListActiveByOwnershipCodesForConfigDB(db *gorm.DB, codes []string) ([]model.DataOwnershipField, error) {
+	if len(codes) == 0 {
+		return []model.DataOwnershipField{}, nil
+	}
+	var ownerships []model.DataOwnershipField
+	err := db.Where("ownership_code IN ? AND state = ?", codes, true).Find(&ownerships).Error
+	return ownerships, err
+}
+
 func (r *DataPolicyRepositoryImpl) GetDataPolicyList(
 	ctx context.Context,
 	basic *request.Basic,
@@ -547,6 +556,23 @@ func (r *DataGrantRepositoryImpl) UserExistsForConfig(db *gorm.DB, userId int) (
 		Where("id = ? AND state = ?", userId, true).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *DataGrantRepositoryImpl) FindActiveSubjectIDsForConfigDB(db *gorm.DB, subjectType string, ids []int) ([]int, error) {
+	if len(ids) == 0 {
+		return []int{}, nil
+	}
+	var active []int
+	switch subjectType {
+	case model.DataGrantSubjectTypeRole:
+		err := db.Model(&model.SysRole{}).Where("id IN ? AND state = ?", ids, true).Pluck("id", &active).Error
+		return active, err
+	case model.DataGrantSubjectTypeUser:
+		err := db.Model(&model.SysUser{}).Where("id IN ? AND state = ?", ids, true).Pluck("id", &active).Error
+		return active, err
+	default:
+		return []int{}, nil
+	}
 }
 
 func (r *DataGrantRepositoryImpl) CountByResourceForConfig(db *gorm.DB, resourceId int) (int64, error) {

@@ -26,22 +26,22 @@ type GeneralizationPermission struct {
 }
 
 type GeneralizationRepository interface {
-	Query(*request.Basic, model.SysTable) (GeneralizationListResult, error)
-	GetById(table model.SysTable, id int) (map[string]interface{}, error)
-	Create(table model.SysTable, data map[string]interface{}) error
-	RowExists(table model.SysTable, id int) (bool, error)
-	Update(table model.SysTable, id int, data map[string]interface{}) error
-	SoftDelete(table model.SysTable, id int, deleteData map[string]interface{}) error
-	HardDelete(table model.SysTable, id int) error
+	Query(context.Context, *request.Basic, model.SysTable) (GeneralizationListResult, error)
+	GetById(context.Context, model.SysTable, int) (map[string]interface{}, error)
+	Create(context.Context, model.SysTable, map[string]interface{}) error
+	RowExists(context.Context, model.SysTable, int) (bool, error)
+	Update(context.Context, model.SysTable, int, map[string]interface{}) error
+	SoftDelete(context.Context, model.SysTable, int, map[string]interface{}) error
+	HardDelete(context.Context, model.SysTable, int) error
 }
 
 type GeneralizationPermissionRepository interface {
 	DBWithContext(context.Context) *gorm.DB
-	QueryWithPermission(*request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)
-	GetByIdWithPermission(model.SysTable, int, GeneralizationPermission) (map[string]interface{}, error)
-	UpdateWithPermission(model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
-	SoftDeleteWithPermission(model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
-	HardDeleteWithPermission(model.SysTable, int, GeneralizationPermission) (bool, error)
+	QueryWithPermission(context.Context, *request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)
+	GetByIdWithPermission(context.Context, model.SysTable, int, GeneralizationPermission) (map[string]interface{}, error)
+	UpdateWithPermission(context.Context, model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
+	SoftDeleteWithPermission(context.Context, model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
+	HardDeleteWithPermission(context.Context, model.SysTable, int, GeneralizationPermission) (bool, error)
 	BatchSoftDeleteWithPermission(*gorm.DB, model.SysTable, []int, map[string]interface{}, GeneralizationPermission) (bool, error)
 	BatchHardDeleteWithPermission(*gorm.DB, model.SysTable, []int, GeneralizationPermission) (bool, error)
 }

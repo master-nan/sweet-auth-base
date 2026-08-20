@@ -3,11 +3,9 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/middleware"
-	"backend/model"
 	"backend/service"
 	"context"
 	"strconv"
@@ -16,14 +14,9 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-const (
-	syncTaskTableCode  = "integration_sync_task"
-	syncBatchTableCode = "integration_sync_batch"
-)
-
 type syncTaskApplication interface {
 	CreateSyncTask(context.Context, request.SyncTaskCreateReq) (response.SyncTaskDetailRes, error)
-	PageSyncTask(context.Context, request.SyncTaskQueryReq, model.SysTable) (response.ListResult[response.SyncTaskListRes], error)
+	PageSyncTask(context.Context, request.SyncTaskQueryReq) (response.ListResult[response.SyncTaskListRes], error)
 	GetSyncTask(context.Context, int) (response.SyncTaskDetailRes, error)
 	GetSyncTaskForEdit(context.Context, int) (response.SyncTaskEditRes, error)
 	UpdateDraftSyncTask(context.Context, int, request.SyncTaskUpdateReq) (response.SyncTaskDetailRes, error)
@@ -35,7 +28,7 @@ type syncTaskApplication interface {
 }
 
 type syncBatchApplication interface {
-	PageSyncBatch(context.Context, request.SyncBatchQueryReq, model.SysTable) (response.ListResult[response.SyncBatchListRes], error)
+	PageSyncBatch(context.Context, request.SyncBatchQueryReq) (response.ListResult[response.SyncBatchListRes], error)
 	GetSyncBatch(context.Context, int) (response.SyncBatchDetailRes, error)
 }
 
@@ -54,7 +47,7 @@ func (c *IntegrationSyncController) QueryTasks(ctx *gin.Context) {
 	if !bindIntegrationSync(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.tasks.PageSyncTask(ctx.Request.Context(), req, syncTaskQueryTable())
+	result, err := c.tasks.PageSyncTask(ctx.Request.Context(), req)
 	c.setList(ctx, result.Data, result.Total, err)
 }
 
@@ -155,7 +148,7 @@ func (c *IntegrationSyncController) QueryBatches(ctx *gin.Context) {
 	if !bindIntegrationSync(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.batches.PageSyncBatch(ctx.Request.Context(), req, syncBatchQueryTable())
+	result, err := c.batches.PageSyncBatch(ctx.Request.Context(), req)
 	c.setList(ctx, result.Data, result.Total, err)
 }
 
@@ -210,26 +203,4 @@ func (c *IntegrationSyncController) setList(ctx *gin.Context, data any, total in
 		return
 	}
 	resp.SetData(data).SetTotal(total)
-}
-
-func syncTaskQueryTable() model.SysTable {
-	return model.SysTable{Basic: model.Basic{State: true}, TableCode: syncTaskTableCode, TableFields: []model.SysTableField{
-		syncQueryField("task_code", enum.VarcharFieldType, true), syncQueryField("task_name", enum.VarcharFieldType, true), syncQueryField("version", enum.IntFieldType, false),
-		syncQueryField("status", enum.VarcharFieldType, false), syncQueryField("external_system_id", enum.BigIntFieldType, false), syncQueryField("interface_definition_id", enum.BigIntFieldType, false),
-		syncQueryField("consumer_code", enum.VarcharFieldType, true), syncQueryField("schedule_type", enum.VarcharFieldType, false), syncQueryField("checkpoint_mode", enum.VarcharFieldType, false),
-		syncQueryField("checkpoint_at", enum.DatetimeFieldType, false), syncQueryField("gmt_modify", enum.DatetimeFieldType, false),
-	}}
-}
-
-func syncBatchQueryTable() model.SysTable {
-	return model.SysTable{Basic: model.Basic{State: true}, TableCode: syncBatchTableCode, TableFields: []model.SysTableField{
-		syncQueryField("batch_no", enum.VarcharFieldType, true), syncQueryField("sync_task_id", enum.BigIntFieldType, false), syncQueryField("task_code", enum.VarcharFieldType, true),
-		syncQueryField("task_name", enum.VarcharFieldType, true), syncQueryField("task_version", enum.IntFieldType, false), syncQueryField("trigger_type", enum.VarcharFieldType, false),
-		syncQueryField("status", enum.VarcharFieldType, false), syncQueryField("window_start", enum.DatetimeFieldType, false), syncQueryField("window_end", enum.DatetimeFieldType, false),
-		syncQueryField("gmt_create", enum.DatetimeFieldType, false), syncQueryField("started_at", enum.DatetimeFieldType, false), syncQueryField("completed_at", enum.DatetimeFieldType, false),
-	}}
-}
-
-func syncQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"backend/config"
 	"backend/dto/request"
-	"backend/enum"
 	"backend/internal/audit"
 	"backend/internal/database"
 	myerrors "backend/internal/errors"
@@ -104,7 +103,7 @@ func TestSyncTaskServiceValidationEditDTOAndBatchQuery(t *testing.T) {
 	batch := syncBatchFixture(9911, created.ID, created.TaskCode)
 	batch.Status = model.IntegrationSyncBatchStatusSucceeded
 	testutil.MustCreate(t, db, &batch)
-	page, err := batchSvc.PageSyncBatch(context.Background(), request.SyncBatchQueryReq{Page: 1, Num: 10, Status: model.IntegrationSyncBatchStatusSucceeded}, syncBatchQueryTableForTest())
+	page, err := batchSvc.PageSyncBatch(context.Background(), request.SyncBatchQueryReq{Page: 1, Num: 10, Status: model.IntegrationSyncBatchStatusSucceeded})
 	if err != nil || page.Total != 1 || len(page.Data) != 1 || page.Data[0].BatchNo != batch.BatchNo {
 		t.Fatalf("batch page=%+v err=%v", page, err)
 	}
@@ -242,8 +241,4 @@ func syncBatchFixture(id, taskID int, taskCode string) model.IntegrationSyncBatc
 func timePointer(value time.Time) *time.Time { return &value }
 func stringContainsFold(value, expected string) bool {
 	return strings.Contains(strings.ToLower(value), strings.ToLower(expected))
-}
-
-func syncBatchQueryTableForTest() model.SysTable {
-	return model.SysTable{TableCode: "integration_sync_batch", TableFields: []model.SysTableField{{Basic: model.Basic{State: true}, FieldCode: "batch_no", FieldType: enum.VarcharFieldType, IsQuickSearch: true}, {Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType}}}
 }

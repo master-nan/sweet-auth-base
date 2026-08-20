@@ -66,7 +66,6 @@ func TestDataGrantConfigServiceCreateRoleAndUserGrant(t *testing.T) {
 			},
 			ResourceId: &fixtures.resource.Id,
 		},
-		dataGrantConfigTable(),
 	)
 	if err != nil || page.Total != 2 || len(page.Data) != 2 {
 		t.Fatalf("page grants = %+v, err=%v", page, err)

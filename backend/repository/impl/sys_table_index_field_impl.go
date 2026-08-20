@@ -22,3 +22,9 @@ func NewSysTableIndexFieldRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysTabl
 		NewBasicRepositoryImpl(PrimaryDB.DB, &model.SysTableIndexField{}),
 	}
 }
+
+func (s *SysTableIndexFieldRepositoryImpl) UpdateSequence(db *gorm.DB, indexID, fieldID int, sequence uint8) error {
+	return db.Model(&model.SysTableIndexField{}).
+		Where("index_id = ? AND field_id = ?", indexID, fieldID).
+		Update("sequence", sequence).Error
+}

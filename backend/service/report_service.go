@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/audit"
 	myerrors "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
 	"backend/internal/reportconfig"
@@ -462,13 +463,18 @@ func (s *ReportService) PublishReportAsMenu(ctx *gin.Context, reportId int, req 
 		if err != nil {
 			return err
 		}
+		for _, policy := range policies {
+			if err := s.casbinRuleRepo.UpsertPolicyWithDB(tx, policy.RoleName, policy.Path, policy.Method); err != nil {
+				return err
+			}
+		}
 		result = reportMenuResponse(report, menu, true)
 		return nil
 	})
 	if err != nil {
 		return response.ReportPublishMenuRes{}, err
 	}
-	if err := s.addReportMenuPolicies(policies); err != nil {
+	if err := s.casbinRuleRepo.ReloadPolicy(); err != nil {
 		return response.ReportPublishMenuRes{}, err
 	}
 	return result, nil
@@ -479,37 +485,11 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 		return response.ReportPublishMenuRes{}, myerrors.ErrParamInvalid
 	}
 	db := s.reportRepo.DBWithContext(ctx)
-	var preflightReport model.ReportDefinition
-	if err := db.First(&preflightReport, reportId).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.ReportPublishMenuRes{}, myerrors.ErrDataNotFound
-		}
-		return response.ReportPublishMenuRes{}, err
-	}
-	var snapshots []casbinPolicySnapshot
-	if preflightReport.PermissionMenuId > 0 {
-		buttons, err := s.reportMenuButtons(db, preflightReport.PermissionMenuId)
-		if err != nil {
-			return response.ReportPublishMenuRes{}, err
-		}
-		candidates, err := s.reportButtonPolicyCandidates(db, buttons)
-		if err != nil {
-			return response.ReportPublishMenuRes{}, err
-		}
-		identities, err := s.reportPolicyIdentities(candidates)
-		if err != nil {
-			return response.ReportPublishMenuRes{}, err
-		}
-		snapshots, err = quiesceCasbinPolicies(s.casbinRuleRepo, identities)
-		if err != nil {
-			return response.ReportPublishMenuRes{}, err
-		}
-	}
 	var result response.ReportPublishMenuRes
 	var cleanups []reportMenuPolicy
 	err := RunInTransaction(reportRequestContext(ctx), db, func(tx *gorm.DB) error {
 		var report model.ReportDefinition
-		if err := tx.First(&report, reportId).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&report, reportId).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return myerrors.ErrDataNotFound
 			}
@@ -564,18 +544,20 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 		if err != nil {
 			return err
 		}
+		for _, cleanup := range cleanups {
+			if err := s.casbinRuleRepo.RemovePolicyWithDB(tx, cleanup.RoleName, cleanup.Path, cleanup.Method); err != nil {
+				return err
+			}
+		}
 		result = reportMenuResponse(report, menu, false)
 		result.Visible = false
 		result.PublishedToMenu = false
 		return nil
 	})
 	if err != nil {
-		if restoreErr := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, nil); restoreErr != nil {
-			return response.ReportPublishMenuRes{}, fmt.Errorf("报表菜单撤销失败且casbin恢复失败: %v: %w", restoreErr, err)
-		}
 		return response.ReportPublishMenuRes{}, err
 	}
-	if err := restoreCasbinPolicies(s.casbinRuleRepo, snapshots, reportCleanupPolicySet(cleanups)); err != nil {
+	if err := s.casbinRuleRepo.ReloadPolicy(); err != nil {
 		return response.ReportPublishMenuRes{}, err
 	}
 	return result, nil
@@ -586,18 +568,18 @@ func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req reques
 	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeDesignPreview}
 	report, err := s.GetReportDefinitionById(reportId)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	if report.Id == 0 {
 		err = myerrors.ErrDataNotFound
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	snapshot = reportSnapshotFromDefinition(report, reportRuntimeDesignPreview)
 	if !report.State || normalizeReportStatus(report.Status) == reportStatusDisabled {
 		err = myerrors.NewValidationError("报表已停用")
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	return s.executeReportSnapshot(ctx, snapshot, req, start)
@@ -607,7 +589,7 @@ func (s *ReportService) RunReport(ctx *gin.Context, reportId int, req request.Re
 	start := time.Now()
 	snapshot, err := s.loadPublishedReportSnapshot(ctx, reportId, reportRuntimeRun)
 	if err != nil {
-		_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
 	return s.executeReportSnapshot(ctx, snapshot, req, start)
@@ -618,7 +600,7 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 	previewReq := reportExportPreviewReq(req)
 	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeExport}
 	fail := func(err error) (response.ReportExportFile, error) {
-		_ = s.writeExecutionLog(ctx, snapshot, previewReq, false, 0, start, err)
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportExportFile{}, err
 	}
 	format := strings.ToLower(strings.TrimSpace(req.Format))
@@ -659,7 +641,7 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 	if err != nil {
 		return fail(err)
 	}
-	if err := s.writeExecutionLog(ctx, snapshot, previewReq, true, len(preview.Rows), start, nil); err != nil {
+	if err := s.writeExecutionLog(reportRequestContext(ctx), snapshot, true, len(preview.Rows), start, nil); err != nil {
 		return response.ReportExportFile{}, err
 	}
 	return response.ReportExportFile{
@@ -721,12 +703,12 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 	options = normalizeReportExecutionOptions(options)
 	writeFailure := func(err error) {
 		if options.WriteLog {
-			_ = s.writeExecutionLog(ctx, snapshot, req, false, 0, start, err)
+			_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		}
 	}
 	writeSuccess := func(rowCount int) {
 		if options.WriteLog {
-			_ = s.writeExecutionLog(ctx, snapshot, req, true, rowCount, start, nil)
+			_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, true, rowCount, start, nil)
 		}
 	}
 	config, err := reportconfig.Parse(snapshot.QueryConfig, snapshot.LayoutConfig)
@@ -796,7 +778,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
-	result, err := s.generalizationService.QueryWithResolvedDataPermission(&query, sourceTable, permission)
+	result, err := s.generalizationService.QueryWithResolvedDataPermission(reportRequestContext(ctx), &query, sourceTable, permission)
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
@@ -807,7 +789,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
-		if err := s.completeReportTableExportRows(query, sourceTable, permission, &result, options.MaxRows); err != nil {
+		if err := s.completeReportTableExportRows(reportRequestContext(ctx), query, sourceTable, permission, &result, options.MaxRows); err != nil {
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
@@ -1864,7 +1846,7 @@ func normalizeReportPageSize(raw int, options ReportExecutionOptions) int {
 	return raw
 }
 
-func (s *ReportService) completeReportTableExportRows(query request.Basic, table model.SysTable, permission repository.GeneralizationPermission, result *repository.GeneralizationListResult, maxRows int) error {
+func (s *ReportService) completeReportTableExportRows(ctx context.Context, query request.Basic, table model.SysTable, permission repository.GeneralizationPermission, result *repository.GeneralizationListResult, maxRows int) error {
 	if result == nil || maxRows <= 0 || result.Total <= len(result.Data) || result.Total > maxRows {
 		return nil
 	}
@@ -1876,7 +1858,7 @@ func (s *ReportService) completeReportTableExportRows(query request.Basic, table
 		nextQuery := query
 		nextQuery.Page = len(result.Data)/pageSize + 1
 		nextQuery.Num = pageSize
-		nextResult, err := s.generalizationService.QueryWithResolvedDataPermission(&nextQuery, table, permission)
+		nextResult, err := s.generalizationService.QueryWithResolvedDataPermission(ctx, &nextQuery, table, permission)
 		if err != nil {
 			return err
 		}
@@ -2014,18 +1996,19 @@ func reportExportFileName(snapshot ReportExecutionSnapshot) string {
 	return code + ".csv"
 }
 
-func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecutionSnapshot, req request.ReportPreviewReq, success bool, rowCount int, start time.Time, runErr error) error {
+func (s *ReportService) writeExecutionLog(requestCtx context.Context, snapshot ReportExecutionSnapshot, success bool, rowCount int, start time.Time, runErr error) error {
+	logCtx, cancel := context.WithTimeout(context.WithoutCancel(requestCtx), 2*time.Second)
+	defer cancel()
 	id, err := s.sf.GenerateUniqueID()
 	if err != nil {
 		return err
 	}
-	user := reportUserFromContext(ctx)
+	subject, _ := audit.GetAuditSubject(logCtx)
 	action := snapshot.RuntimeType
 	if action == "" {
 		action = reportRuntimeDesignPreview
 	}
 	params, _ := json.Marshal(map[string]any{
-		"request": req,
 		"runtime": map[string]any{
 			"runtime_type": action,
 			"version_id":   snapshot.VersionId,
@@ -2036,8 +2019,8 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecu
 		Basic:        model.Basic{Id: int(id), State: true},
 		ReportId:     snapshot.ReportId,
 		ReportCode:   snapshot.Code,
-		UserId:       user.Id,
-		UserName:     user.UserName,
+		UserId:       subject.UserID,
+		UserName:     subject.UserName,
 		Action:       action,
 		Params:       datatypes.JSON(params),
 		Success:      success,
@@ -2048,7 +2031,7 @@ func (s *ReportService) writeExecutionLog(ctx *gin.Context, snapshot ReportExecu
 	if runErr != nil {
 		log.ErrorMessage = myerrors.SafeMessageOf(runErr)
 	}
-	db := s.reportLogRepo.DBWithContext(ctx)
+	db := s.reportLogRepo.DBWithContext(logCtx)
 	if err := db.Create(&log).Error; err != nil {
 		return err
 	}
@@ -2837,15 +2820,6 @@ func uniqueReportMenuPolicies(policies []reportMenuPolicy) []reportMenuPolicy {
 	return result
 }
 
-func (s *ReportService) addReportMenuPolicies(policies []reportMenuPolicy) error {
-	for _, policy := range uniqueReportMenuPolicies(policies) {
-		if _, err := s.casbinRuleRepo.AddPolicy(policy.RoleName, policy.Path, policy.Method); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *ReportService) reportMenuButtons(tx *gorm.DB, menuID int) ([]model.SysMenuButton, error) {
 	var buttons []model.SysMenuButton
 	if err := tx.Where("menu_id = ?", menuID).Find(&buttons).Error; err != nil {
@@ -2893,29 +2867,6 @@ func (s *ReportService) reportOrphanRolePolicyCleanups(tx *gorm.DB, candidates m
 		cleanups = append(cleanups, reportMenuPolicy{RoleID: role.Id, RoleName: role.Name, Path: candidate.Path, Method: candidate.Method})
 	}
 	return cleanups, nil
-}
-
-func (s *ReportService) reportPolicyIdentities(candidates map[buttonPolicyKey]struct{}) ([]casbinPolicyIdentity, error) {
-	identities := make([]casbinPolicyIdentity, 0, len(candidates))
-	for candidate := range candidates {
-		role, err := s.sysRoleRepo.FindById(candidate.RoleID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			return nil, err
-		}
-		identities = append(identities, casbinPolicyIdentity{Subject: role.Name, Path: candidate.Path, Method: candidate.Method})
-	}
-	return identities, nil
-}
-
-func reportCleanupPolicySet(cleanups []reportMenuPolicy) map[casbinPolicyIdentity]struct{} {
-	result := make(map[casbinPolicyIdentity]struct{}, len(cleanups))
-	for _, cleanup := range cleanups {
-		result[casbinPolicyIdentity{Subject: cleanup.RoleName, Path: cleanup.Path, Method: cleanup.Method}] = struct{}{}
-	}
-	return result
 }
 
 func reportMenuResponse(report model.ReportDefinition, menu model.SysMenu, published bool) response.ReportPublishMenuRes {

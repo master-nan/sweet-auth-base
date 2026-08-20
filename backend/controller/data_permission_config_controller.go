@@ -6,23 +6,12 @@ import (
 
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
-	"backend/model"
 	"backend/service"
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
-)
-
-const (
-	dataDimensionConfigTableCode  = "sys_data_dimension_definition"
-	dataResourceConfigTableCode   = "sys_data_resource"
-	dataOwnershipConfigTableCode  = "sys_data_ownership_field"
-	dataPolicyConfigTableCode     = "sys_data_policy"
-	dataPolicyRuleConfigTableCode = "sys_data_policy_rule"
-	dataGrantConfigTableCode      = "sys_data_grant"
 )
 
 type dataResourceConfigReader interface {
@@ -32,7 +21,6 @@ type dataResourceConfigReader interface {
 	PageResources(
 		context.Context,
 		request.DataResourceQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataResourceListRes], error)
 	ListResourceOperations(context.Context, int) ([]response.DataResourceOperationListRes, error)
 	ReplaceResourceOperations(
@@ -45,7 +33,6 @@ type dataOwnershipConfigReader interface {
 	PageDimensions(
 		context.Context,
 		request.DataDimensionDefinitionQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataDimensionDefinitionListRes], error)
 	CreateOwnership(
 		context.Context,
@@ -59,7 +46,6 @@ type dataOwnershipConfigReader interface {
 	PageOwnerships(
 		context.Context,
 		request.DataOwnershipFieldQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataOwnershipFieldListRes], error)
 	ListOwnershipsByResource(context.Context, int) ([]response.DataOwnershipFieldListRes, error)
 }
@@ -71,12 +57,10 @@ type dataPolicyConfigReader interface {
 	PagePolicies(
 		context.Context,
 		request.DataPolicyQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataPolicyListRes], error)
 	PagePolicyRules(
 		context.Context,
 		request.DataPolicyRuleQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataPolicyRuleListRes], error)
 	ReplacePolicyRules(
 		context.Context,
@@ -90,7 +74,6 @@ type dataGrantConfigReader interface {
 	PageGrants(
 		context.Context,
 		request.DataGrantQueryReq,
-		model.SysTable,
 	) (response.ListResult[response.DataGrantListRes], error)
 }
 
@@ -158,7 +141,7 @@ func (d *DataPermissionConfigController) QueryDimensions(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.ownershipService.PageDimensions(ctx.Request.Context(), req, dataDimensionConfigTable())
+	result, err := d.ownershipService.PageDimensions(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -176,7 +159,7 @@ func (d *DataPermissionConfigController) QueryResources(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.resourceService.PageResources(ctx.Request.Context(), req, dataResourceConfigTable())
+	result, err := d.resourceService.PageResources(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -252,7 +235,7 @@ func (d *DataPermissionConfigController) QueryOwnerships(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.ownershipService.PageOwnerships(ctx.Request.Context(), req, dataOwnershipConfigTable())
+	result, err := d.ownershipService.PageOwnerships(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -311,7 +294,7 @@ func (d *DataPermissionConfigController) QueryPolicies(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.policyService.PagePolicies(ctx.Request.Context(), req, dataPolicyConfigTable())
+	result, err := d.policyService.PagePolicies(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -343,7 +326,7 @@ func (d *DataPermissionConfigController) QueryPolicyRules(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.policyService.PagePolicyRules(ctx.Request.Context(), req, dataPolicyRuleConfigTable())
+	result, err := d.policyService.PagePolicyRules(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -396,7 +379,7 @@ func (d *DataPermissionConfigController) QueryGrants(ctx *gin.Context) {
 	if !dataPermissionConfigBindBody(d, ctx, &req) {
 		return
 	}
-	result, err := d.grantService.PageGrants(ctx.Request.Context(), req, dataGrantConfigTable())
+	result, err := d.grantService.PageGrants(ctx.Request.Context(), req)
 	d.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -509,84 +492,4 @@ func dataPermissionConfigPathID(ctx *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func dataResourceConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataResourceConfigTableCode,
-		dataPermissionConfigField("resource_code", enum.VarcharFieldType, true),
-		dataPermissionConfigField("name", enum.VarcharFieldType, true),
-		dataPermissionConfigField("resource_type", enum.VarcharFieldType, false),
-	)
-}
-
-func dataDimensionConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataDimensionConfigTableCode,
-		dataPermissionConfigField("code", enum.VarcharFieldType, true),
-		dataPermissionConfigField("name", enum.VarcharFieldType, true),
-		dataPermissionConfigField("category", enum.VarcharFieldType, false),
-		dataPermissionConfigField("value_type", enum.VarcharFieldType, false),
-	)
-}
-
-func dataOwnershipConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataOwnershipConfigTableCode,
-		dataPermissionConfigField("resource_id", enum.BigIntFieldType, false),
-		dataPermissionConfigField("ownership_code", enum.VarcharFieldType, true),
-		dataPermissionConfigField("dimension_id", enum.BigIntFieldType, false),
-		dataPermissionConfigField("binding_type", enum.VarcharFieldType, false),
-		dataPermissionConfigField("value_type", enum.VarcharFieldType, false),
-	)
-}
-
-func dataPolicyConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataPolicyConfigTableCode,
-		dataPermissionConfigField("code", enum.VarcharFieldType, true),
-		dataPermissionConfigField("name", enum.VarcharFieldType, true),
-		dataPermissionConfigField("policy_type", enum.VarcharFieldType, false),
-	)
-}
-
-func dataPolicyRuleConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataPolicyRuleConfigTableCode,
-		dataPermissionConfigField("policy_id", enum.BigIntFieldType, false),
-		dataPermissionConfigField("ownership_code", enum.VarcharFieldType, true),
-		dataPermissionConfigField("sequence", enum.IntFieldType, false),
-	)
-}
-
-func dataGrantConfigTable() model.SysTable {
-	return dataPermissionConfigTable(dataGrantConfigTableCode,
-		dataPermissionConfigField("subject_type", enum.VarcharFieldType, true),
-		dataPermissionConfigField("subject_id", enum.BigIntFieldType, false),
-		dataPermissionConfigField("resource_id", enum.BigIntFieldType, false),
-		dataPermissionConfigField("operation", enum.VarcharFieldType, false),
-		dataPermissionConfigField("policy_id", enum.BigIntFieldType, false),
-	)
-}
-
-func dataPermissionConfigTable(
-	tableCode string,
-	fields ...model.SysTableField,
-) model.SysTable {
-	return model.SysTable{
-		Basic:       model.Basic{State: true},
-		TableCode:   tableCode,
-		TableFields: fields,
-	}
-}
-
-func dataPermissionConfigField(
-	code string,
-	fieldType enum.SysTableFieldType,
-	quickSearch bool,
-) model.SysTableField {
-	return model.SysTableField{
-		Basic:            model.Basic{State: true},
-		FieldCode:        code,
-		FieldType:        fieldType,
-		IsListShow:       true,
-		IsQuickSearch:    quickSearch,
-		IsAdvancedSearch: true,
-		IsSort:           true,
-	}
 }

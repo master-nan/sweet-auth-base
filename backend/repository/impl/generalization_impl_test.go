@@ -4,6 +4,7 @@ import (
 	"backend/internal/database"
 	testutil "backend/internal/test"
 	"backend/model"
+	"context"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestGeneralizationRepositoryRowExistsIgnoresSoftDeletedRows(t *testing.T) {
 		t.Fatalf("seed rows: %v", err)
 	}
 
-	active, err := repo.RowExists(table, 1)
+	active, err := repo.RowExists(context.Background(), table, 1)
 	if err != nil {
 		t.Fatalf("row exists active: %v", err)
 	}
@@ -26,7 +27,7 @@ func TestGeneralizationRepositoryRowExistsIgnoresSoftDeletedRows(t *testing.T) {
 		t.Fatal("expected active row to exist")
 	}
 
-	deleted, err := repo.RowExists(table, 2)
+	deleted, err := repo.RowExists(context.Background(), table, 2)
 	if err != nil {
 		t.Fatalf("row exists deleted: %v", err)
 	}
@@ -42,7 +43,7 @@ func TestGeneralizationRepositoryUpdateDoesNotTouchSoftDeletedRows(t *testing.T)
 	if err := db.Exec("INSERT INTO smk_generalization_repo (id, name, gmt_delete) VALUES (1, 'deleted', ?)", time.Now()).Error; err != nil {
 		t.Fatalf("seed row: %v", err)
 	}
-	if err := repo.Update(table, 1, map[string]interface{}{"name": "updated"}); err != nil {
+	if err := repo.Update(context.Background(), table, 1, map[string]interface{}{"name": "updated"}); err != nil {
 		t.Fatalf("update soft-deleted row: %v", err)
 	}
 

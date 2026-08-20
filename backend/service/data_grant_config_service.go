@@ -111,14 +111,13 @@ func (s *DataGrantConfigService) GetGrant(
 func (s *DataGrantConfigService) PageGrants(
 	ctx context.Context,
 	req request.DataGrantQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataGrantListRes], error) {
 	var result response.ListResult[response.DataGrantListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.grantRepo.GetDataGrantList(ctx, &basic, table)
+	rows, err := s.grantRepo.GetDataGrantList(ctx, &basic, dataGrantQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -336,7 +335,12 @@ func (s *DataGrantConfigService) validateGrantContext(
 	tx *gorm.DB,
 	grant model.DataGrant,
 ) error {
-	result, err := s.preflightValidator().validateGrantRecord(tx, grant, false)
+	validator := s.preflightValidator()
+	snapshot, err := validator.loadPreflightSnapshotForGrant(tx, grant)
+	if err != nil {
+		return myerrors.WrapDatabaseError(err)
+	}
+	result, err := validator.validateGrantRecord(snapshot, grant, false)
 	if err != nil {
 		return err
 	}

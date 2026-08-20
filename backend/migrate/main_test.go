@@ -79,6 +79,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 	got := migrationStepNames(migrationSteps())
 	want := []string{
 		"auto_migrate_core_schema",
+		"backfill_sys_table_index_field_sequence",
 		"query_scheme_schema",
 		"integration_configuration_schema",
 		"integration_runtime_schema",

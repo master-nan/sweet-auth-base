@@ -149,7 +149,7 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		data.TableType = enum.View
 		data.SQL = req.SQL
 		data.ParentId = req.ParentId
-		if err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		if err := RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 			if s.sysTableRepo.HasPhysicalTable(tx, req.TableCode) {
 				return myerrors.ErrTableExist
 			}
@@ -193,7 +193,7 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		}
 		fields[i].Id = int(fieldId)
 	}
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if s.sysTableRepo.HasPhysicalTable(tx, data.TableCode) {
 			return myerrors.ErrTableExist
 		}
@@ -304,7 +304,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 		}
 		updateReq.SQL = validatedSQL
 		sqlChanged := strings.TrimSpace(current.SQL) != validatedSQL
-		err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 			if sqlChanged {
 				if e := s.sysTableRepo.CreateView(tx, updateReq.TableCode, updateReq.SQL); e != nil {
 					return e
@@ -341,7 +341,7 @@ func (s *SysTableService) UpdateTable(ctx context.Context, req request.TableUpda
 }
 
 func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
-	err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if e := s.sysTableRepo.DeleteById(tx, id); e != nil {
 			return e
 		}
@@ -350,7 +350,7 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 			return e
 		}
 		// 查询表所有索引
-		tableIndexes, e := s.sysTableIndexRepo.GetTableIndexesByTableId(ctx, id)
+		tableIndexes, e := s.sysTableIndexRepo.FindListByFieldWithDB(tx, "table_id", id)
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
@@ -370,7 +370,7 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 			}
 		}
 		// 查询关联表数据
-		relations, e := s.sysTableRelationRepo.GetTableRelationsByTableId(ctx, id)
+		relations, e := s.sysTableRelationRepo.FindListByFieldWithDB(tx, "table_id", id)
 		if e != nil && !errors.Is(e, gorm.ErrRecordNotFound) {
 			return e
 		}
@@ -378,12 +378,6 @@ func (s *SysTableService) DeleteTableById(ctx context.Context, id int) error {
 			// 删除关联关系表
 			if e := s.sysTableRelationRepo.DeleteById(tx, relation.Id); e != nil {
 				return e
-			}
-			if relation.RelationType == enum.ManyToMany {
-				// 删除多对多中间表
-				if e := s.sysTableRepo.DropTable(tx, relation.ManyTableCode); e != nil {
-					return e
-				}
 			}
 		}
 		return nil
@@ -452,7 +446,7 @@ func (s *SysTableService) CreateTableField(ctx context.Context, req request.Tabl
 		return err
 	}
 	data.Id = int(id)
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		// 构建SQL类型字符串，包括长度、默认值、是否可为空和备注
 		sqlType := buildColumnSQLTypeFromField(data)
 		if e := s.sysTableRepo.CreateTableColumn(tx, table.TableCode, data.FieldCode, sqlType); e != nil {
@@ -552,7 +546,7 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			s.RefreshCache(table.Id)
 			return nil
 		}
-		err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+		err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 			// 构建完整的字段SQL类型，避免缺少类型导致SQL错误
 			columnNeedsAlter := false
 			if req.FieldType != data.FieldType {
@@ -561,10 +555,8 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			if req.FieldLength != data.FieldLength || req.FieldDecimalLength != data.FieldDecimalLength {
 				columnNeedsAlter = true
 			}
-			if req.DefaultValue != "" {
-				if data.DefaultValue == nil || req.DefaultValue != *data.DefaultValue {
-					columnNeedsAlter = true
-				}
+			if !metadataStringEqual(optionalMetadataString(req.DefaultValue), data.DefaultValue) {
+				columnNeedsAlter = true
 			}
 			if req.IsNull != data.IsNull {
 				columnNeedsAlter = true
@@ -591,6 +583,11 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			if e := s.sysTableFieldRepo.Update(tx, &req, req.Id); e != nil {
 				return e
 			}
+			if _, e := s.sysTableFieldRepo.UpdateFields(tx, req.Id, map[string]any{
+				"default_value": optionalMetadataString(req.DefaultValue),
+			}); e != nil {
+				return e
+			}
 			return nil
 		})
 		if err != nil {
@@ -608,6 +605,13 @@ func optionalMetadataString(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func metadataStringEqual(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 const maxDBIdentifierLength = 63
@@ -860,9 +864,6 @@ func buildColumnSQLType(req request.TableFieldUpdateReq, data model.SysTableFiel
 		decimalLength = data.FieldDecimalLength
 	}
 	defaultValue := req.DefaultValue
-	if defaultValue == "" && data.DefaultValue != nil {
-		defaultValue = *data.DefaultValue
-	}
 	sqlType := utils.SqlTypeFromFieldType(fieldType)
 	// 拼接长度（仅对需要长度的类型，BOOLEAN/TEXT/JSON/DATE/DATETIME/TIME 不接受长度参数）
 	if length > 0 && typeAcceptsLength(fieldType) {
@@ -956,7 +957,7 @@ func (s *SysTableService) DeleteTableFieldById(ctx context.Context, id int) erro
 			return myerrors.ErrTableViewFieldNoDelete
 		}
 		if table.Id != 0 {
-			err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+			err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 				if e := s.sysTableFieldRepo.DeleteById(tx, field.Id); e != nil {
 					return e
 				}
@@ -1005,7 +1006,7 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
 		return err
 	}
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if req.RelationType == enum.ManyToMany && s.sysTableRepo.HasPhysicalTable(tx, req.ManyTableCode) {
 			return myerrors.ErrTableExist
 		}
@@ -1025,11 +1026,19 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 		}
 		// 如果是多对多 创建对应的表
 		if data.RelationType == enum.ManyToMany {
-			mainTable, e := s.GetTableById(data.TableId)
+			mainTable, e := s.sysTableRepo.FindByIdWithDB(tx, data.TableId)
 			if e != nil {
 				return e
 			}
-			relatedTable, e := s.GetTableById(data.RelatedTableId)
+			mainTable.TableFields, e = s.sysTableFieldRepo.FindListByFieldWithDB(tx, "table_id", data.TableId)
+			if e != nil {
+				return e
+			}
+			relatedTable, e := s.sysTableRepo.FindByIdWithDB(tx, data.RelatedTableId)
+			if e != nil {
+				return e
+			}
+			relatedTable.TableFields, e = s.sysTableFieldRepo.FindListByFieldWithDB(tx, "table_id", data.RelatedTableId)
 			if e != nil {
 				return e
 			}
@@ -1054,10 +1063,6 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 			var relationFields []model.SysTableField
 			relationFields = append(relationFields, referenceKeyField, foreignKeyField)
 			relationModel := s.sysTableRepo.Model(relationFields)
-			// 先删除再创建
-			if e := s.sysTableRepo.DropTable(tx, data.ManyTableCode); e != nil {
-				return e
-			}
 			return s.sysTableRepo.CreateTable(tx, data.ManyTableCode, relationModel)
 		}
 		return nil
@@ -1070,7 +1075,7 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 }
 
 func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.TableRelationUpdateReq) error {
-	oldRelation, err := s.sysTableRelationRepo.FindById(req.Id)
+	oldRelation, err := s.sysTableRelationRepo.FindByIdWithDB(s.sysTableRelationRepo.DBWithContext(ctx), req.Id)
 	if err != nil {
 		return err
 	}
@@ -1090,65 +1095,28 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 		return err
 	}
 
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
-		newJoinTable := req.RelationType == enum.ManyToMany &&
-			(oldRelation.RelationType != enum.ManyToMany || oldRelation.ManyTableCode != req.ManyTableCode)
-		if newJoinTable && s.sysTableRepo.HasPhysicalTable(tx, req.ManyTableCode) {
-			return myerrors.ErrTableExist
-		}
-		if e := s.sysTableRelationRepo.Update(tx, &req, req.Id); e != nil {
-			return e
-		}
-		// 如果旧关系是多对多且中间表存在，而新关系不再是多对多，则删除中间表
-		if oldRelation.RelationType == enum.ManyToMany && oldRelation.ManyTableCode != "" {
-			if req.RelationType != enum.ManyToMany || oldRelation.ManyTableCode != req.ManyTableCode {
-				if e := s.sysTableRepo.DropTable(tx, oldRelation.ManyTableCode); e != nil {
-					return e
-				}
-			}
-		}
-		// 如果新关系是多对多，重建中间表
-		if req.RelationType == enum.ManyToMany && req.ManyTableCode != "" {
-			mainTable, e := s.GetTableById(req.TableId)
-			if e != nil {
-				return e
-			}
-			relatedTable, e := s.GetTableById(req.RelatedTableId)
-			if e != nil {
-				return e
-			}
-			var referenceKeyField model.SysTableField
-			for _, field := range mainTable.TableFields {
-				if field.FieldCode == req.ReferenceKey {
-					referenceKeyField = field
-					referenceKeyField.Tag = utils.StringPtr(`gorm:"primaryKey;autoIncrement:false"`)
-				}
-			}
-			var foreignKeyField model.SysTableField
-			for _, field := range relatedTable.TableFields {
-				if field.FieldCode == req.ForeignKey {
-					foreignKeyField = field
-					foreignKeyField.Tag = utils.StringPtr(`gorm:"primaryKey;autoIncrement:false"`)
-				}
-			}
-			if referenceKeyField.Id == 0 || foreignKeyField.Id == 0 {
-				return myerrors.ErrDataNotFound
-			}
-			var relationFields []model.SysTableField
-			relationFields = append(relationFields, referenceKeyField, foreignKeyField)
-			relationModel := s.sysTableRepo.Model(relationFields)
-			if e := s.sysTableRepo.DropTable(tx, req.ManyTableCode); e != nil {
-				return e
-			}
-			return s.sysTableRepo.CreateTable(tx, req.ManyTableCode, relationModel)
-		}
-		return nil
+	if relationPhysicalSignatureChanged(oldRelation, req) &&
+		(oldRelation.RelationType == enum.ManyToMany || req.RelationType == enum.ManyToMany) {
+		return myerrors.ErrTableRelationMigration
+	}
+
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
+		return s.sysTableRelationRepo.Update(tx, &req, req.Id)
 	})
 	if err != nil {
 		return err
 	}
 	s.RefreshCache(req.TableId)
 	return nil
+}
+
+func relationPhysicalSignatureChanged(old model.SysTableRelation, next request.TableRelationUpdateReq) bool {
+	return old.TableId != next.TableId ||
+		old.RelatedTableId != next.RelatedTableId ||
+		old.RelationType != next.RelationType ||
+		old.ReferenceKey != next.ReferenceKey ||
+		old.ForeignKey != next.ForeignKey ||
+		old.ManyTableCode != next.ManyTableCode
 }
 
 func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableCode string) error {
@@ -1165,7 +1133,7 @@ func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableC
 }
 
 func (s *SysTableService) DeleteTableRelationById(ctx context.Context, id int) error {
-	relation, err := s.sysTableRelationRepo.FindById(id)
+	relation, err := s.sysTableRelationRepo.FindByIdWithDB(s.sysTableRelationRepo.DBWithContext(ctx), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return myerrors.ErrDataNotFound
@@ -1175,7 +1143,7 @@ func (s *SysTableService) DeleteTableRelationById(ctx context.Context, id int) e
 	if relation.Id == 0 {
 		return myerrors.ErrDataNotFound
 	}
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if e := s.sysTableRelationRepo.DeleteById(tx, id); e != nil {
 			return e
 		}
@@ -1221,7 +1189,7 @@ func (s *SysTableService) CreateTableIndex(ctx context.Context, req request.Tabl
 	if err != nil {
 		return err
 	}
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		var data model.SysTableIndex
 		e := copier.Copy(&data, &req)
 		if e != nil {
@@ -1237,10 +1205,11 @@ func (s *SysTableService) CreateTableIndex(ctx context.Context, req request.Tabl
 			return e
 		}
 		var indexFields []model.SysTableIndexField
-		for _, field := range req.IndexFields {
+		for position, field := range req.IndexFields {
 			indexField := model.SysTableIndexField{
-				IndexId: data.Id,
-				FieldId: field.FieldId,
+				IndexId:  data.Id,
+				FieldId:  field.FieldId,
+				Sequence: uint8(position + 1),
 			}
 			indexFields = append(indexFields, indexField)
 		}
@@ -1289,7 +1258,7 @@ func (s *SysTableService) UpdateTableIndex(ctx context.Context, req request.Tabl
 	if err != nil {
 		return err
 	}
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		// 删除中间表数据
 		if e := s.sysTableIndexFieldRepo.DeleteByField(tx, "index_id", req.Id); e != nil {
 			return e
@@ -1302,10 +1271,11 @@ func (s *SysTableService) UpdateTableIndex(ctx context.Context, req request.Tabl
 			return e
 		}
 		var indexFields []model.SysTableIndexField
-		for _, field := range req.IndexFields {
+		for position, field := range req.IndexFields {
 			indexField := model.SysTableIndexField{
-				IndexId: req.Id,
-				FieldId: field.FieldId,
+				IndexId:  req.Id,
+				FieldId:  field.FieldId,
+				Sequence: uint8(position + 1),
 			}
 			indexFields = append(indexFields, indexField)
 		}
@@ -1336,7 +1306,7 @@ func (s *SysTableService) DeleteTableIndexById(ctx context.Context, id int) erro
 	if e != nil {
 		return e
 	}
-	err := s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err := RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if e := s.sysTableIndexRepo.DeleteById(tx, id); e != nil {
 			return e
 		}
@@ -1391,6 +1361,7 @@ func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error
 		TableType: enum.System,
 	}
 	indexesMap := make(map[string]model.SysTableIndex)
+	fieldIDs := make(map[string]int, len(fields))
 	var indexes []model.SysTableIndex
 	var indexFields []model.SysTableIndexField
 	for i := range fields {
@@ -1400,35 +1371,33 @@ func (s *SysTableService) InitTable(ctx context.Context, tableCode string) error
 			return err
 		}
 		fields[i].Id = int(fieldId)
-		for j := range tableIndexes {
-			if tableIndexes[j].ColumnName == fields[i].FieldCode {
-				indexId, err := s.sf.GenerateUniqueID()
-				if err != nil {
-					return err
-				}
-				if _, exists := indexesMap[tableIndexes[j].IndexName]; !exists {
-					indexesMap[tableIndexes[j].IndexName] = model.SysTableIndex{
-						Basic: model.Basic{
-							Id: int(indexId),
-						},
-						TableId:   table.Id,
-						IndexName: tableIndexes[j].IndexName,
-						IsUnique:  !tableIndexes[j].NonUnique,
-					}
-					indexes = append(indexes, indexesMap[tableIndexes[j].IndexName])
-				} else {
-					indexId = int64(indexesMap[tableIndexes[j].IndexName].Id)
-				}
-				indexFields = append(indexFields, model.SysTableIndexField{
-					IndexId: int(indexId),
-					FieldId: fields[i].Id,
-				})
-			}
+		fieldIDs[fields[i].FieldCode] = fields[i].Id
+	}
+	for _, physicalIndex := range tableIndexes {
+		fieldID, exists := fieldIDs[physicalIndex.ColumnName]
+		if !exists {
+			continue
 		}
+		index, exists := indexesMap[physicalIndex.IndexName]
+		if !exists {
+			indexID, err := s.sf.GenerateUniqueID()
+			if err != nil {
+				return err
+			}
+			index = model.SysTableIndex{
+				Basic:   model.Basic{Id: int(indexID)},
+				TableId: table.Id, IndexName: physicalIndex.IndexName, IsUnique: !physicalIndex.NonUnique,
+			}
+			indexesMap[physicalIndex.IndexName] = index
+			indexes = append(indexes, index)
+		}
+		indexFields = append(indexFields, model.SysTableIndexField{
+			IndexId: index.Id, FieldId: fieldID, Sequence: uint8(physicalIndex.OrdinalPosition),
+		})
 	}
 	table.TableFields = fields
 	table.TableIndexes = indexes
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if e := s.sysTableRepo.Create(tx, &table); e != nil {
 			return e
 		}
@@ -1507,7 +1476,7 @@ func (s *SysTableService) SyncTableFields(ctx context.Context, tableCode string)
 		"is_quick_search",
 		"is_advanced_search",
 	)
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if len(missing) > 0 {
 			if e := s.sysTableFieldRepo.Create(tx, &missing); e != nil {
 				return e
@@ -1589,7 +1558,7 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		indexIds = append(indexIds, index.Id)
 	}
 
-	existingIndexFieldSet := make(map[string]bool)
+	existingIndexFieldsByKey := make(map[string]model.SysTableIndexField)
 	if len(indexIds) > 0 {
 		var existingIndexFields []model.SysTableIndexField
 		err = s.sysTableIndexFieldRepo.DBWithContext(ctx).
@@ -1600,12 +1569,13 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		}
 		for _, item := range existingIndexFields {
 			key := fmt.Sprintf("%d:%d", item.IndexId, item.FieldId)
-			existingIndexFieldSet[key] = true
+			existingIndexFieldsByKey[key] = item
 		}
 	}
 
 	newIndexes := make([]model.SysTableIndex, 0)
 	newIndexFields := make([]model.SysTableIndexField, 0)
+	sequenceUpdates := make([]model.SysTableIndexField, 0)
 
 	for _, idx := range indexes {
 		fieldId, exists := fieldMap[idx.ColumnName]
@@ -1632,21 +1602,25 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		}
 
 		key := fmt.Sprintf("%d:%d", indexId, fieldId)
-		if existingIndexFieldSet[key] {
+		sequence := uint8(idx.OrdinalPosition)
+		if existing, exists := existingIndexFieldsByKey[key]; exists {
+			if existing.Sequence != sequence {
+				existing.Sequence = sequence
+				sequenceUpdates = append(sequenceUpdates, existing)
+			}
 			continue
 		}
-		existingIndexFieldSet[key] = true
+		existingIndexFieldsByKey[key] = model.SysTableIndexField{}
 		newIndexFields = append(newIndexFields, model.SysTableIndexField{
-			IndexId: indexId,
-			FieldId: fieldId,
+			IndexId: indexId, FieldId: fieldId, Sequence: sequence,
 		})
 	}
 
-	if len(newIndexes) == 0 && len(newIndexFields) == 0 {
+	if len(newIndexes) == 0 && len(newIndexFields) == 0 && len(sequenceUpdates) == 0 {
 		return nil
 	}
 
-	err = s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if len(newIndexes) > 0 {
 			if e := s.sysTableIndexRepo.Create(tx, &newIndexes); e != nil {
 				return e
@@ -1654,6 +1628,11 @@ func (s *SysTableService) SyncTableIndexes(ctx context.Context, tableCode string
 		}
 		if len(newIndexFields) > 0 {
 			if e := s.sysTableIndexFieldRepo.Create(tx, &newIndexFields); e != nil {
+				return e
+			}
+		}
+		for _, item := range sequenceUpdates {
+			if e := s.sysTableIndexFieldRepo.UpdateSequence(tx, item.IndexId, item.FieldId, item.Sequence); e != nil {
 				return e
 			}
 		}
@@ -1677,7 +1656,7 @@ func (s *SysTableService) PublishTableAsMenu(ctx context.Context, tableCode stri
 	if table.Id == 0 {
 		return myerrors.ErrTableNotFound
 	}
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		if err := s.ensureTableCanPublishLowCode(tx, table); err != nil {
 			return err
 		}
@@ -1728,7 +1707,7 @@ func (s *SysTableService) resolvePublishParentMenu(tx *gorm.DB, parentID int) (i
 	if parentID <= 0 {
 		return s.ensureDevelopMenu(tx)
 	}
-	menu, err := s.sysMenuRepo.FindById(parentID)
+	menu, err := s.sysMenuRepo.FindByIdWithDB(tx, parentID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, myerrors.NewValidationError("发布目录不存在")
@@ -1772,7 +1751,7 @@ func (s *SysTableService) UnpublishTableMenu(ctx context.Context, tableCode stri
 	if table.Id == 0 {
 		return myerrors.ErrTableNotFound
 	}
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		menus, err := s.findPublishedLowCodeMenus(tx, table.TableCode)
 		if err != nil {
 			return err
@@ -1801,7 +1780,7 @@ func (s *SysTableService) UnpublishTableMenu(ctx context.Context, tableCode stri
 // 发布低代码页面时需要把生成菜单挂在开发管理下面；如果老库没有这条菜单，
 // 这里按系统固定菜单补一条，避免发布流程中断。
 func (s *SysTableService) ensureDevelopMenu(tx *gorm.DB) (int, error) {
-	menu, err := s.sysMenuRepo.FindByField("name", "develop")
+	menu, err := s.sysMenuRepo.FindByFieldWithDB(tx, "name", "develop")
 	if err == nil {
 		return menu.Id, nil
 	}
@@ -1966,7 +1945,7 @@ func lowCodeMenuName(tableCode string) string {
 // 标记完成、审核、调整状态这类业务动作应该由菜单按钮配置维护，不应该继续塞进默认模板。
 // 所有数据库写入都委托给 SysMenuButtonRepository，service 层只做模板编排和事务流程控制。
 func (s *SysTableService) ensureDefaultCrudButtons(tx *gorm.DB, tableCode string, menuID int) ([]int, error) {
-	templates, err := s.sysMenuButtonTplRepo.FindEnabledByScene(lowCodeCrudButtonTemplateScene)
+	templates, err := s.sysMenuButtonTplRepo.FindEnabledBySceneWithDB(tx, lowCodeCrudButtonTemplateScene)
 	if err != nil {
 		return nil, err
 	}
@@ -2062,7 +2041,7 @@ func lowCodeDefaultMenuButtons(tableCode string, templates []model.SysMenuButton
 // 如果库里没有 super_admin 角色，直接跳过；有这个角色时用忽略冲突插入，
 // 避免重复发布同一张表时报唯一键冲突。
 func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID int, buttonIDs []int) error {
-	role, err := s.sysRoleRepo.FindByField("name", "super_admin")
+	role, err := s.sysRoleRepo.FindByFieldWithDB(tx, "name", "super_admin")
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -2082,7 +2061,7 @@ func (s *SysTableService) ensureSuperAdminMenuPermissions(tx *gorm.DB, menuID in
 
 // SyncViewTableFields 视图字段元数据全量对齐（增删改）
 func (s *SysTableService) SyncViewTableFields(ctx context.Context, table model.SysTable) error {
-	return s.sysTableRepo.ExecuteTx(ctx, func(tx *gorm.DB) error {
+	return RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		return s.syncViewTableFields(ctx, tx, table)
 	})
 }

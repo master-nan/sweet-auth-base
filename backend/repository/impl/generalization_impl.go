@@ -38,8 +38,8 @@ func (g *GeneralizationRepositoryImpl) DBWithContext(ctx context.Context) *gorm.
 	return g.db.WithContext(ctx)
 }
 
-func (g *GeneralizationRepositoryImpl) Query(basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
-	result, err := util.DynamicQuery(g.db, basic, table)
+func (g *GeneralizationRepositoryImpl) Query(ctx context.Context, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
+	result, err := util.DynamicQuery(g.db.WithContext(ctx), basic, table)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
 	}
@@ -47,28 +47,30 @@ func (g *GeneralizationRepositoryImpl) Query(basic *request.Basic, table model.S
 }
 
 func (g *GeneralizationRepositoryImpl) QueryWithPermission(
+	ctx context.Context,
 	basic *request.Basic,
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
 ) (repository.GeneralizationListResult, error) {
-	result, err := util.DynamicQueryWithPermission(g.db, basic, table, permission)
+	result, err := util.DynamicQueryWithPermission(g.db.WithContext(ctx), basic, table, permission)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
 	}
 	return result, nil
 }
 
-func (g *GeneralizationRepositoryImpl) GetById(table model.SysTable, id int) (map[string]interface{}, error) {
-	return g.getByIdWithQuery(activeRowQuery(g.db.Table(table.TableCode), table), table, id)
+func (g *GeneralizationRepositoryImpl) GetById(ctx context.Context, table model.SysTable, id int) (map[string]interface{}, error) {
+	return g.getByIdWithQuery(activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table), table, id)
 }
 
 func (g *GeneralizationRepositoryImpl) GetByIdWithPermission(
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	permission repository.GeneralizationPermission,
 ) (map[string]interface{}, error) {
 	query, err := util.ApplyGeneralizationPermission(
-		activeRowQuery(g.db.Table(table.TableCode), table),
+		activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table),
 		permission,
 		table,
 	)
@@ -104,13 +106,13 @@ func (g *GeneralizationRepositoryImpl) getByIdWithQuery(
 	return normalizeGeneralizationRecord(result), nil
 }
 
-func (g *GeneralizationRepositoryImpl) Create(table model.SysTable, data map[string]interface{}) error {
-	return g.db.Table(table.TableCode).Create(data).Error
+func (g *GeneralizationRepositoryImpl) Create(ctx context.Context, table model.SysTable, data map[string]interface{}) error {
+	return g.db.WithContext(ctx).Table(table.TableCode).Create(data).Error
 }
 
-func (g *GeneralizationRepositoryImpl) RowExists(table model.SysTable, id int) (bool, error) {
+func (g *GeneralizationRepositoryImpl) RowExists(ctx context.Context, table model.SysTable, id int) (bool, error) {
 	var exists int
-	query := activeRowQuery(g.db.Table(table.TableCode), table).Select("1").Where("id = ?", id).Limit(1)
+	query := activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table).Select("1").Where("id = ?", id).Limit(1)
 	err := query.Scan(&exists).Error
 	if err != nil {
 		return false, err
@@ -118,18 +120,19 @@ func (g *GeneralizationRepositoryImpl) RowExists(table model.SysTable, id int) (
 	return exists == 1, nil
 }
 
-func (g *GeneralizationRepositoryImpl) Update(table model.SysTable, id int, data map[string]interface{}) error {
-	return activeRowQuery(g.db.Table(table.TableCode), table).Where("id = ?", id).Updates(data).Error
+func (g *GeneralizationRepositoryImpl) Update(ctx context.Context, table model.SysTable, id int, data map[string]interface{}) error {
+	return activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table).Where("id = ?", id).Updates(data).Error
 }
 
 func (g *GeneralizationRepositoryImpl) UpdateWithPermission(
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	data map[string]interface{},
 	permission repository.GeneralizationPermission,
 ) (bool, error) {
 	query, err := util.ApplyGeneralizationPermission(
-		activeRowQuery(g.db.Table(table.TableCode), table),
+		activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table),
 		permission,
 		table,
 	)
@@ -140,18 +143,19 @@ func (g *GeneralizationRepositoryImpl) UpdateWithPermission(
 	return result.RowsAffected > 0, result.Error
 }
 
-func (g *GeneralizationRepositoryImpl) SoftDelete(table model.SysTable, id int, deleteData map[string]interface{}) error {
-	return activeRowQuery(g.db.Table(table.TableCode), table).Where("id = ?", id).Updates(deleteData).Error
+func (g *GeneralizationRepositoryImpl) SoftDelete(ctx context.Context, table model.SysTable, id int, deleteData map[string]interface{}) error {
+	return activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table).Where("id = ?", id).Updates(deleteData).Error
 }
 
 func (g *GeneralizationRepositoryImpl) SoftDeleteWithPermission(
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	deleteData map[string]interface{},
 	permission repository.GeneralizationPermission,
 ) (bool, error) {
 	query, err := util.ApplyGeneralizationPermission(
-		activeRowQuery(g.db.Table(table.TableCode), table),
+		activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table),
 		permission,
 		table,
 	)
@@ -162,16 +166,17 @@ func (g *GeneralizationRepositoryImpl) SoftDeleteWithPermission(
 	return result.RowsAffected > 0, result.Error
 }
 
-func (g *GeneralizationRepositoryImpl) HardDelete(table model.SysTable, id int) error {
-	return g.db.Table(table.TableCode).Where("id = ?", id).Delete(nil).Error
+func (g *GeneralizationRepositoryImpl) HardDelete(ctx context.Context, table model.SysTable, id int) error {
+	return g.db.WithContext(ctx).Table(table.TableCode).Where("id = ?", id).Delete(nil).Error
 }
 
 func (g *GeneralizationRepositoryImpl) HardDeleteWithPermission(
+	ctx context.Context,
 	table model.SysTable,
 	id int,
 	permission repository.GeneralizationPermission,
 ) (bool, error) {
-	query, err := util.ApplyGeneralizationPermission(g.db.Table(table.TableCode), permission, table)
+	query, err := util.ApplyGeneralizationPermission(g.db.WithContext(ctx).Table(table.TableCode), permission, table)
 	if err != nil {
 		return false, err
 	}

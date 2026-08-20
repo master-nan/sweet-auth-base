@@ -128,9 +128,9 @@ func (s *CredentialService) Get(ctx context.Context, id int) (response.Credentia
 	return response.NewCredentialDetailRes(value, system, s.now()), nil
 }
 
-func (s *CredentialService) Page(ctx context.Context, req request.CredentialQueryReq, table model.SysTable) (response.ListResult[response.CredentialListRes], error) {
+func (s *CredentialService) Page(ctx context.Context, req request.CredentialQueryReq) (response.ListResult[response.CredentialListRes], error) {
 	basic := req.ToBasic()
-	result, err := s.repository.GetCredentialList(ctx, &basic, table)
+	result, err := s.repository.GetCredentialList(ctx, &basic, credentialQueryTable())
 	if err != nil {
 		return response.ListResult[response.CredentialListRes]{}, myerrors.WrapDatabaseError(err)
 	}

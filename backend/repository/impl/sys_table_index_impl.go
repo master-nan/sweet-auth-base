@@ -27,6 +27,11 @@ func NewSysTableIndexRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysTableInde
 
 func (s *SysTableIndexRepositoryImpl) GetTableIndexesByTableId(ctx context.Context, id int) ([]model.SysTableIndex, error) {
 	var indexes []model.SysTableIndex
-	err := s.db.WithContext(ctx).Preload("IndexFields").Where("table_id = ?", id).Find(&indexes).Error
+	err := s.db.WithContext(ctx).
+		Preload("IndexFields", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sys_table_index_field.sequence ASC")
+		}).
+		Where("table_id = ?", id).
+		Find(&indexes).Error
 	return indexes, err
 }

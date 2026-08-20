@@ -5,7 +5,11 @@
 
 package repository
 
-import "backend/model"
+import (
+	"backend/model"
+
+	"gorm.io/gorm"
+)
 
 type CasbinPolicyEnforcer interface {
 	AddPolicy(params ...interface{}) (bool, error)
@@ -13,6 +17,7 @@ type CasbinPolicyEnforcer interface {
 	RemoveFilteredPolicy(fieldIndex int, fieldValues ...string) (bool, error)
 	GetFilteredPolicy(fieldIndex int, fieldValues ...string) ([][]string, error)
 	UpdateFilteredPolicies(newPolicies [][]string, fieldIndex int, fieldValues ...string) (bool, error)
+	LoadPolicy() error
 }
 
 type CasbinRuleRepository interface {
@@ -22,4 +27,7 @@ type CasbinRuleRepository interface {
 	RemoveFilteredPolicy(fieldIndex int, fieldValues ...string) (bool, error)
 	GetFilteredPolicy(fieldIndex int, fieldValues ...string) ([][]string, error)
 	ReplaceSubjectPolicies(subject string, policies [][]string) error
+	UpsertPolicyWithDB(*gorm.DB, string, string, string) error
+	RemovePolicyWithDB(*gorm.DB, string, string, string) error
+	ReloadPolicy() error
 }

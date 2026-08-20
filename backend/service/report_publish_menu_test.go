@@ -3,14 +3,20 @@ package service
 import (
 	"backend/dto/request"
 	"backend/enum"
+	"backend/internal/audit"
 	"backend/internal/database"
 	"backend/model"
 	"backend/repository/impl"
+	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/casbin/casbin/v2"
+	gormadapter "github.com/casbin/gorm-adapter/v3"
+	"gorm.io/gorm"
 )
 
 type reportMenuTestEnv struct {
@@ -28,7 +34,11 @@ func newReportMenuTestEnv(t *testing.T) *reportMenuTestEnv {
 	); err != nil {
 		t.Fatalf("migrate report menu test schema: %v", err)
 	}
-	enforcer, err := casbin.NewEnforcer("../casbin_model.conf")
+	adapter, err := gormadapter.NewAdapterByDB(env.db)
+	if err != nil {
+		t.Fatalf("create casbin adapter: %v", err)
+	}
+	enforcer, err := casbin.NewEnforcer("../casbin_model.conf", adapter)
 	if err != nil {
 		t.Fatalf("create casbin enforcer: %v", err)
 	}
@@ -285,6 +295,99 @@ func TestReportUnpublishMenuHidesMenuAndCleansPermissions(t *testing.T) {
 	}
 	if ok, err := env.enforcer.Enforce(reportSuperAdminRoleName, "/admin/report/:id/run", "POST"); err != nil || ok {
 		t.Fatalf("run policy should be removed after unpublish, ok=%v err=%v", ok, err)
+	}
+}
+
+func TestReportPublishMenuRollsBackWhenPolicyProjectionFails(t *testing.T) {
+	env := newReportMenuTestEnv(t)
+	report := env.createPublishedMenuReport(t, "publish_policy_failure")
+	callback := "test:fail-report-policy-create"
+	if err := env.db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement != nil && tx.Statement.Table == "casbin_rule" {
+			tx.AddError(errors.New("policy projection failed"))
+		}
+	}); err != nil {
+		t.Fatalf("register create failure: %v", err)
+	}
+	t.Cleanup(func() { _ = env.db.Callback().Create().Remove(callback) })
+
+	if _, err := env.svc.PublishReportAsMenu(env.ctx, report.Id, request.ReportPublishMenuReq{
+		ParentMenuId: 700, Visible: reportMenuBoolPtr(true),
+	}); err == nil {
+		t.Fatal("expected policy projection failure")
+	}
+	var menuCount int64
+	if err := env.db.Model(&model.SysMenu{}).Where("page_type = ?", enum.MenuPageTypeReport).Count(&menuCount).Error; err != nil {
+		t.Fatalf("count report menus: %v", err)
+	}
+	if menuCount != 0 {
+		t.Fatalf("report menu count = %d, want transaction rollback", menuCount)
+	}
+	var stored model.ReportDefinition
+	if err := env.db.First(&stored, report.Id).Error; err != nil {
+		t.Fatalf("reload report: %v", err)
+	}
+	if stored.PermissionMenuId != 0 {
+		t.Fatalf("permission_menu_id = %d after rollback", stored.PermissionMenuId)
+	}
+}
+
+func TestReportUnpublishMenuRollsBackWhenPolicyProjectionFails(t *testing.T) {
+	env := newReportMenuTestEnv(t)
+	report := env.createPublishedMenuReport(t, "unpublish_policy_failure")
+	published, err := env.svc.PublishReportAsMenu(env.ctx, report.Id, request.ReportPublishMenuReq{
+		ParentMenuId: 700, Visible: reportMenuBoolPtr(true),
+	})
+	if err != nil {
+		t.Fatalf("publish fixture: %v", err)
+	}
+	callback := "test:fail-report-policy-delete"
+	if err := env.db.Callback().Delete().Before("gorm:delete").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement != nil && tx.Statement.Table == "casbin_rule" {
+			tx.AddError(errors.New("policy projection failed"))
+		}
+	}); err != nil {
+		t.Fatalf("register delete failure: %v", err)
+	}
+	t.Cleanup(func() { _ = env.db.Callback().Delete().Remove(callback) })
+
+	if _, err := env.svc.UnpublishReportMenu(env.ctx, report.Id); err == nil {
+		t.Fatal("expected policy projection failure")
+	}
+	var menu model.SysMenu
+	if err := env.db.First(&menu, published.MenuId).Error; err != nil {
+		t.Fatalf("reload menu: %v", err)
+	}
+	if menu.IsHidden || !menu.State {
+		t.Fatalf("menu changed despite rollback: hidden=%v state=%v", menu.IsHidden, menu.State)
+	}
+	var roleMenuCount int64
+	if err := env.db.Model(&model.SysRoleMenu{}).Where("menu_id = ?", menu.Id).Count(&roleMenuCount).Error; err != nil {
+		t.Fatalf("count role menu: %v", err)
+	}
+	if roleMenuCount != 1 {
+		t.Fatalf("role menu count = %d after rollback", roleMenuCount)
+	}
+}
+
+func TestReportTerminalFailureLogSurvivesRequestCancellation(t *testing.T) {
+	env := newReportMenuTestEnv(t)
+	requestCtx := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(88, "cancelled-user"))
+	requestCtx, cancel := context.WithCancel(requestCtx)
+	cancel()
+	snapshot := ReportExecutionSnapshot{ReportId: 901, Code: "cancelled_report", RuntimeType: reportRuntimeRun}
+	if err := env.svc.writeExecutionLog(requestCtx, snapshot, false, 0, time.Now(), context.Canceled); err != nil {
+		t.Fatalf("write detached terminal log: %v", err)
+	}
+	var log model.ReportExecutionLog
+	if err := env.db.Where("report_id = ?", snapshot.ReportId).First(&log).Error; err != nil {
+		t.Fatalf("query terminal log: %v", err)
+	}
+	if log.Success || log.UserId != 88 || log.ErrorMessage == "" {
+		t.Fatalf("unexpected terminal log: %+v", log)
+	}
+	if strings.Contains(string(log.Params), "payload") || strings.Contains(string(log.Params), "query") {
+		t.Fatalf("terminal log persisted request payload: %s", log.Params)
 	}
 }
 

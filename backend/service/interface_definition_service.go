@@ -143,9 +143,9 @@ func (s *InterfaceDefinitionService) Get(ctx context.Context, id int) (response.
 	return response.NewInterfaceDefinitionDetailRes(value, system, credential, s.now(), policy), nil
 }
 
-func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq, table model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error) {
+func (s *InterfaceDefinitionService) Page(ctx context.Context, req request.InterfaceDefinitionQueryReq) (response.ListResult[response.InterfaceDefinitionListRes], error) {
 	basic := req.ToBasic()
-	result, err := s.repository.GetInterfaceDefinitionList(ctx, &basic, table)
+	result, err := s.repository.GetInterfaceDefinitionList(ctx, &basic, interfaceDefinitionQueryTable())
 	if err != nil {
 		return response.ListResult[response.InterfaceDefinitionListRes]{}, myerrors.WrapDatabaseError(err)
 	}

@@ -66,11 +66,7 @@ func (gc *GeneralizationController) checkMenuPermission(ctx *gin.Context, menuId
 }
 
 func (gc *GeneralizationController) resolveQueryMenuId(ctx *gin.Context, requestedMenuId int, tableCode string) (int, error) {
-	return gc.resolveLowCodeMenuId(ctx, requestedMenuId, tableCode, enum.ButtonActionQuery, allowQueryWithoutPublishedMenu(tableCode))
-}
-
-func allowQueryWithoutPublishedMenu(tableCode string) bool {
-	return !service.IsProtectedGeneralizationTable(tableCode)
+	return gc.resolveLowCodeMenuId(ctx, requestedMenuId, tableCode, enum.ButtonActionQuery)
 }
 
 func (gc *GeneralizationController) checkButtonActionPermission(ctx *gin.Context, menuId int, tableCode, action string) error {
@@ -91,7 +87,7 @@ func (gc *GeneralizationController) checkButtonActionPermission(ctx *gin.Context
 	return nil
 }
 
-func (gc *GeneralizationController) resolveLowCodeMenuId(ctx *gin.Context, requestedMenuId int, tableCode string, action enum.SysMenuButtonEventAction, allowNoPublishedMenu bool) (int, error) {
+func (gc *GeneralizationController) resolveLowCodeMenuId(ctx *gin.Context, requestedMenuId int, tableCode string, action enum.SysMenuButtonEventAction) (int, error) {
 	if requestedMenuId > 0 {
 		if err := gc.checkButtonActionPermission(ctx, requestedMenuId, tableCode, string(action)); err != nil {
 			return 0, err
@@ -106,15 +102,12 @@ func (gc *GeneralizationController) resolveLowCodeMenuId(ctx *gin.Context, reque
 	if hasPublishedMenu {
 		return menuId, nil
 	}
-	if allowNoPublishedMenu {
-		return 0, nil
-	}
 	return 0, myerrors.ErrPermissionDenied
 }
 
 func (gc *GeneralizationController) resolveLowCodeMenuIdByActions(ctx *gin.Context, tableCode string, actions ...enum.SysMenuButtonEventAction) (int, error) {
 	for _, action := range actions {
-		menuId, err := gc.resolveLowCodeMenuId(ctx, 0, tableCode, action, false)
+		menuId, err := gc.resolveLowCodeMenuId(ctx, 0, tableCode, action)
 		if err == nil {
 			return menuId, nil
 		}
@@ -199,9 +192,9 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 			return
 		}
 	}
-	_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionDetail, false)
+	_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionDetail)
 	if err != nil {
-		_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionUpdate, false)
+		_, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionUpdate)
 	}
 	if err != nil {
 		_ = ctx.Error(err)
@@ -239,7 +232,7 @@ func (gc *GeneralizationController) Create(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionCreate, false)
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionCreate)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -270,7 +263,7 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionUpdate, false)
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionUpdate)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -306,7 +299,7 @@ func (gc *GeneralizationController) Delete(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionDelete, false)
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionDelete)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -340,7 +333,7 @@ func (gc *GeneralizationController) BatchDelete(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	_, err = gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionBatchDelete, false)
+	_, err = gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionBatchDelete)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -380,7 +373,7 @@ func (gc *GeneralizationController) Export(ctx *gin.Context) {
 		_ = ctx.Error(myerrors.ErrParamInvalid)
 		return
 	}
-	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionExport, false)
+	menuId, err := gc.resolveLowCodeMenuId(ctx, data.MenuId, table.TableCode, enum.ButtonActionExport)
 	if err != nil {
 		_ = ctx.Error(err)
 		return

@@ -3,6 +3,7 @@ package querycapability
 import (
 	"backend/enum"
 	"backend/internal/metadata"
+	"backend/model"
 )
 
 // Supports is the backend truth for persisted Query Scheme authoring. The
@@ -33,6 +34,11 @@ func SupportsExecution(operator enum.ExpressionType) bool {
 func SupportsMetadata(field metadata.FieldMetadata, operator enum.ExpressionType) bool {
 	optionBacked := field.DictionaryCode != nil || field.LinkageConfig != nil || field.RelationExpression != ""
 	return Supports(field.StorageType, operator, optionBacked)
+}
+
+func SupportsTableField(field model.SysTableField, operator enum.ExpressionType) bool {
+	optionBacked := field.DictCode != nil || field.LinkageConfig != nil || field.Expression != nil
+	return Supports(field.FieldType, operator, optionBacked)
 }
 
 func equalityOperator(operator enum.ExpressionType) bool {

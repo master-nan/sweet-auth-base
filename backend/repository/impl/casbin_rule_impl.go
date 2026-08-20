@@ -47,3 +47,25 @@ func (c CasbinRuleRepositoryImpl) ReplaceSubjectPolicies(subject string, policie
 	_, err := c.enforcer.UpdateFilteredPolicies(policies, 0, subject)
 	return err
 }
+
+func (c CasbinRuleRepositoryImpl) UpsertPolicyWithDB(db *gorm.DB, subject, path, method string) error {
+	var count int64
+	if err := db.Model(&model.CasbinRule{}).
+		Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "p", subject, path, method).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&model.CasbinRule{PType: "p", V0: subject, V1: path, V2: method}).Error
+}
+
+func (c CasbinRuleRepositoryImpl) RemovePolicyWithDB(db *gorm.DB, subject, path, method string) error {
+	return db.Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "p", subject, path, method).
+		Delete(&model.CasbinRule{}).Error
+}
+
+func (c CasbinRuleRepositoryImpl) ReloadPolicy() error {
+	return c.enforcer.LoadPolicy()
+}

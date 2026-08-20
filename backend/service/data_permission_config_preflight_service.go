@@ -114,7 +114,12 @@ func (s *DataPermissionConfigPreflightService) PreflightResource(
 			"resource_id必须大于0",
 		)
 	}
-	return s.validator.validateResource(s.validator.resourceRepo.DBWithContext(ctx), resourceId)
+	tx := s.validator.resourceRepo.DBWithContext(ctx)
+	snapshot, err := s.validator.loadPreflightSnapshot(tx, []int{resourceId}, nil, nil, true, false)
+	if err != nil {
+		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return s.validator.validateResource(snapshot, resourceId)
 }
 
 func (s *DataPermissionConfigPreflightService) PreflightPolicy(
@@ -126,7 +131,12 @@ func (s *DataPermissionConfigPreflightService) PreflightPolicy(
 			"policy_id必须大于0",
 		)
 	}
-	return s.validator.validatePolicy(s.validator.policyRepo.DBWithContext(ctx), policyId)
+	tx := s.validator.policyRepo.DBWithContext(ctx)
+	snapshot, err := s.validator.loadPreflightSnapshot(tx, nil, []int{policyId}, nil, false, true)
+	if err != nil {
+		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return s.validator.validatePolicy(snapshot, policyId)
 }
 
 func (s *DataPermissionConfigPreflightService) PreflightGrant(
@@ -138,7 +148,12 @@ func (s *DataPermissionConfigPreflightService) PreflightGrant(
 			"grant_id必须大于0",
 		)
 	}
-	return s.validator.validateGrant(s.validator.grantRepo.DBWithContext(ctx), grantId)
+	tx := s.validator.grantRepo.DBWithContext(ctx)
+	snapshot, err := s.validator.loadPreflightSnapshot(tx, nil, nil, []int{grantId}, false, false)
+	if err != nil {
+		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
+	}
+	return s.validator.validateGrant(snapshot, grantId)
 }
 
 func (s *DataPermissionConfigPreflightService) EnableResource(
@@ -166,17 +181,19 @@ func (s *DataPermissionConfigPreflightService) EnableResources(
 	err = RunInTransaction(ctx, s.validator.resourceRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
 		collector := newDataPermissionValidationCollector()
 		resources := make([]model.DataResource, 0, len(resourceIds))
+		snapshot, loadErr := s.validator.loadPreflightSnapshot(tx, resourceIds, nil, nil, true, false)
+		if loadErr != nil {
+			return myerrors.WrapDatabaseError(loadErr)
+		}
 		for _, resourceId := range resourceIds {
-			validation, validationErr := s.validator.validateResource(tx, resourceId)
+			validation, validationErr := s.validator.validateResource(snapshot, resourceId)
 			if validationErr != nil {
 				return validationErr
 			}
 			collector.merge(validation)
-			resource, findErr := s.validator.resourceRepo.FindByIdWithDB(tx, resourceId)
-			if findErr == nil {
+			resource, found := snapshot.resources[resourceId]
+			if found {
 				resources = append(resources, resource)
-			} else if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return myerrors.WrapDatabaseError(findErr)
 			}
 		}
 		result = collector.result()
@@ -316,7 +333,11 @@ func (s *DataPermissionConfigPreflightService) setPolicyState(
 			return mapDataPolicyReadError(findErr)
 		}
 		if state {
-			result, findErr = s.validator.validatePolicy(tx, policyId)
+			snapshot, loadErr := s.validator.loadPreflightSnapshot(tx, nil, []int{policyId}, nil, false, true)
+			if loadErr != nil {
+				return myerrors.WrapDatabaseError(loadErr)
+			}
+			result, findErr = s.validator.validatePolicy(snapshot, policyId)
 			if findErr != nil {
 				return findErr
 			}
@@ -379,7 +400,11 @@ func (s *DataPermissionConfigPreflightService) setGrantState(
 			return mapDataGrantReadError(findErr)
 		}
 		if state {
-			result, findErr = s.validator.validateGrantRecord(tx, grant, false)
+			snapshot, loadErr := s.validator.loadPreflightSnapshot(tx, nil, nil, []int{grantId}, false, false)
+			if loadErr != nil {
+				return myerrors.WrapDatabaseError(loadErr)
+			}
+			result, findErr = s.validator.validateGrantRecord(snapshot, grant, false)
 			if findErr != nil {
 				return findErr
 			}
@@ -449,12 +474,12 @@ func (s *DataPermissionConfigPreflightService) recordStateAudit(
 }
 
 func (v dataPermissionConfigValidator) validateResource(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	resourceId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	collector := newDataPermissionValidationCollector()
-	resource, err := v.resourceRepo.FindByIdWithDB(tx, resourceId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	resource, found := snapshot.resources[resourceId]
+	if !found {
 		collector.add(
 			diagnosticResourceNotFound,
 			"数据资源不存在",
@@ -462,9 +487,6 @@ func (v dataPermissionConfigValidator) validateResource(
 			resourceId,
 		)
 		return collector.result(), nil
-	}
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
 	}
 	if !resource.State {
 		collector.add(
@@ -475,12 +497,12 @@ func (v dataPermissionConfigValidator) validateResource(
 		)
 	}
 
-	ownerships, err := v.ownershipRepo.ListByResourceForConfigDB(tx, resource.Id)
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
-	}
 	activeOwnershipCount := 0
-	for _, ownership := range ownerships {
+	for key, ownership := range snapshot.ownerships {
+		_ = key
+		if ownership.ResourceId != resource.Id {
+			continue
+		}
 		if ownership.State {
 			activeOwnershipCount++
 		}
@@ -494,15 +516,11 @@ func (v dataPermissionConfigValidator) validateResource(
 		)
 	}
 
-	grants, err := v.grantRepo.ListByResourceForConfigDB(tx, resource.Id)
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
-	}
-	for _, grant := range grants {
+	for _, grant := range snapshot.grantsByResource[resource.Id] {
 		if !grant.State {
 			continue
 		}
-		validation, validationErr := v.validateGrantRecord(tx, grant, false)
+		validation, validationErr := v.validateGrantRecord(snapshot, grant, false)
 		if validationErr != nil {
 			return response.DataPermissionValidationResultRes{}, validationErr
 		}
@@ -512,12 +530,12 @@ func (v dataPermissionConfigValidator) validateResource(
 }
 
 func (v dataPermissionConfigValidator) validatePolicy(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	policyId int,
 ) (response.DataPermissionValidationResultRes, error) {
 	collector := newDataPermissionValidationCollector()
-	policy, err := v.policyRepo.FindByIdWithDB(tx, policyId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	policy, found := snapshot.policies[policyId]
+	if !found {
 		collector.add(
 			diagnosticPolicyNotFound,
 			"数据权限策略不存在",
@@ -526,24 +544,16 @@ func (v dataPermissionConfigValidator) validatePolicy(
 		)
 		return collector.result(), nil
 	}
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
-	}
-
-	rules, err := v.validatePolicyRules(tx, policy, collector)
+	rules, err := v.validatePolicyRules(snapshot, policy, collector)
 	if err != nil {
 		return response.DataPermissionValidationResultRes{}, err
 	}
-	grants, err := v.grantRepo.ListByPolicyForConfigDB(tx, policy.Id)
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
-	}
-	for _, grant := range grants {
+	for _, grant := range snapshot.grantsByPolicy[policy.Id] {
 		if !grant.State {
 			continue
 		}
-		resource, findErr := v.resourceRepo.FindByIdWithDB(tx, grant.ResourceId)
-		if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		resource, found := snapshot.resources[grant.ResourceId]
+		if !found {
 			collector.add(
 				diagnosticResourceNotFound,
 				"授权引用的数据资源不存在",
@@ -551,9 +561,6 @@ func (v dataPermissionConfigValidator) validatePolicy(
 				grant.Id,
 			)
 			continue
-		}
-		if findErr != nil {
-			return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(findErr)
 		}
 		if !resource.State {
 			collector.add(
@@ -563,7 +570,7 @@ func (v dataPermissionConfigValidator) validatePolicy(
 				grant.Id,
 			)
 		}
-		if err = v.validateRulesForResource(tx, resource, grant.Operation, rules, collector); err != nil {
+		if err = v.validateRulesForResource(snapshot, resource, grant.Operation, rules, collector); err != nil {
 			return response.DataPermissionValidationResultRes{}, err
 		}
 	}
@@ -571,11 +578,11 @@ func (v dataPermissionConfigValidator) validatePolicy(
 }
 
 func (v dataPermissionConfigValidator) validateGrant(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	grantId int,
 ) (response.DataPermissionValidationResultRes, error) {
-	grant, err := v.grantRepo.FindByIdWithDB(tx, grantId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	grant, found := snapshot.grants[grantId]
+	if !found {
 		collector := newDataPermissionValidationCollector()
 		collector.add(
 			diagnosticGrantNotFound,
@@ -585,14 +592,11 @@ func (v dataPermissionConfigValidator) validateGrant(
 		)
 		return collector.result(), nil
 	}
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
-	}
-	return v.validateGrantRecord(tx, grant, false)
+	return v.validateGrantRecord(snapshot, grant, false)
 }
 
 func (v dataPermissionConfigValidator) validateGrantRecord(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	grant model.DataGrant,
 	allowInactivePolicy bool,
 ) (response.DataPermissionValidationResultRes, error) {
@@ -605,10 +609,7 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 			grant.Id,
 		)
 	} else {
-		exists, err := v.grantSubjectExists(tx, grant.SubjectType, grant.SubjectId)
-		if err != nil {
-			return response.DataPermissionValidationResultRes{}, err
-		}
+		_, exists := snapshot.activeSubjects[grant.SubjectType][grant.SubjectId]
 		if !exists {
 			collector.add(
 				diagnosticGrantSubjectNotFound,
@@ -627,8 +628,8 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 		)
 	}
 
-	resource, err := v.resourceRepo.FindByIdWithDB(tx, grant.ResourceId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	resource, found := snapshot.resources[grant.ResourceId]
+	if !found {
 		collector.add(
 			diagnosticResourceNotFound,
 			"授权引用的数据资源不存在",
@@ -636,9 +637,6 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 			grant.Id,
 		)
 		return collector.result(), nil
-	}
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
 	}
 	if !resource.State {
 		collector.add(
@@ -649,20 +647,14 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 		)
 	}
 
-	operation, err := v.operationRepo.FindByStableKeyForConfigDB(
-		tx,
-		resource.Id,
-		grant.Operation,
-	)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	operation, found := snapshot.operations[resourceOperationKey(resource.Id, grant.Operation)]
+	if !found {
 		collector.add(
 			diagnosticOperationNotFound,
 			"授权引用的资源操作不存在",
 			dataPermissionObjectGrant,
 			grant.Id,
 		)
-	} else if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
 	} else if !operation.State {
 		collector.add(
 			diagnosticOperationInactive,
@@ -672,8 +664,8 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 		)
 	}
 
-	policy, err := v.policyRepo.FindByIdWithDB(tx, grant.PolicyId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	policy, found := snapshot.policies[grant.PolicyId]
+	if !found {
 		collector.add(
 			diagnosticPolicyNotFound,
 			"授权引用的数据权限策略不存在",
@@ -681,9 +673,6 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 			grant.Id,
 		)
 		return collector.result(), nil
-	}
-	if err != nil {
-		return response.DataPermissionValidationResultRes{}, myerrors.WrapDatabaseError(err)
 	}
 	if !policy.State && !allowInactivePolicy {
 		collector.add(
@@ -693,25 +682,22 @@ func (v dataPermissionConfigValidator) validateGrantRecord(
 			policy.Id,
 		)
 	}
-	rules, err := v.validatePolicyRules(tx, policy, collector)
+	rules, err := v.validatePolicyRules(snapshot, policy, collector)
 	if err != nil {
 		return response.DataPermissionValidationResultRes{}, err
 	}
-	if err = v.validateRulesForResource(tx, resource, grant.Operation, rules, collector); err != nil {
+	if err = v.validateRulesForResource(snapshot, resource, grant.Operation, rules, collector); err != nil {
 		return response.DataPermissionValidationResultRes{}, err
 	}
 	return collector.result(), nil
 }
 
 func (v dataPermissionConfigValidator) validatePolicyRules(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	policy model.DataPolicy,
 	collector *dataPermissionValidationCollector,
 ) ([]model.DataPolicyRule, error) {
-	rules, err := v.ruleRepo.ListByPolicyForConfigDB(tx, policy.Id)
-	if err != nil {
-		return nil, myerrors.WrapDatabaseError(err)
-	}
+	rules := snapshot.rulesByPolicy[policy.Id]
 	activeRules := make([]model.DataPolicyRule, 0, len(rules))
 	for _, rule := range rules {
 		if rule.State {
@@ -755,7 +741,7 @@ func (v dataPermissionConfigValidator) validatePolicyRules(
 	}
 
 	for _, rule := range activeRules {
-		if err = v.validateRuleDeclaration(tx, rule, collector); err != nil {
+		if err := v.validateRuleDeclaration(snapshot, rule, collector); err != nil {
 			return nil, err
 		}
 	}
@@ -763,7 +749,7 @@ func (v dataPermissionConfigValidator) validatePolicyRules(
 }
 
 func (v dataPermissionConfigValidator) validateRuleDeclaration(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	rule model.DataPolicyRule,
 	collector *dataPermissionValidationCollector,
 ) error {
@@ -800,8 +786,8 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 		)
 	}
 
-	dimension, err := v.dimensionRepo.FindByIdWithDB(tx, rule.DimensionId)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	dimension, found := snapshot.dimensions[rule.DimensionId]
+	if !found {
 		collector.add(
 			diagnosticDimensionNotFound,
 			"策略规则引用的维度不存在",
@@ -809,9 +795,6 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 			rule.DimensionId,
 		)
 		return nil
-	}
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
 	}
 	if !dimension.State {
 		collector.add(
@@ -860,16 +843,8 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 		)
 	}
 
-	codeCount, err := v.ownershipRepo.CountByIdentityForConfig(
-		tx,
-		rule.OwnershipCode,
-		nil,
-		true,
-	)
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if codeCount == 0 {
+	dimensions := snapshot.activeOwnershipCodes[rule.OwnershipCode]
+	if len(dimensions) == 0 {
 		collector.add(
 			diagnosticOwnershipNotFound,
 			"策略规则未匹配到有效归属定义",
@@ -878,16 +853,7 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 		)
 		return nil
 	}
-	exactCount, err := v.ownershipRepo.CountByIdentityForConfig(
-		tx,
-		rule.OwnershipCode,
-		&rule.DimensionId,
-		true,
-	)
-	if err != nil {
-		return myerrors.WrapDatabaseError(err)
-	}
-	if exactCount == 0 {
+	if _, exact := dimensions[rule.DimensionId]; !exact {
 		collector.add(
 			diagnosticOwnershipDimension,
 			"策略规则归属编码与维度不匹配",
@@ -899,19 +865,15 @@ func (v dataPermissionConfigValidator) validateRuleDeclaration(
 }
 
 func (v dataPermissionConfigValidator) validateRulesForResource(
-	tx *gorm.DB,
+	snapshot *dataPermissionPreflightSnapshot,
 	resource model.DataResource,
 	operation string,
 	rules []model.DataPolicyRule,
 	collector *dataPermissionValidationCollector,
 ) error {
 	for _, rule := range rules {
-		ownership, err := v.ownershipRepo.FindByStableKeyForConfigDB(
-			tx,
-			resource.Id,
-			rule.OwnershipCode,
-		)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		ownership, found := snapshot.ownerships[resourceOwnershipKey(resource.Id, rule.OwnershipCode)]
+		if !found {
 			collector.add(
 				diagnosticOwnershipNotFound,
 				"目标资源缺少策略规则要求的归属定义",
@@ -919,9 +881,6 @@ func (v dataPermissionConfigValidator) validateRulesForResource(
 				rule.Id,
 			)
 			continue
-		}
-		if err != nil {
-			return myerrors.WrapDatabaseError(err)
 		}
 		if !ownership.State {
 			collector.add(
@@ -940,12 +899,9 @@ func (v dataPermissionConfigValidator) validateRulesForResource(
 			)
 			continue
 		}
-		dimension, err := v.dimensionRepo.FindByIdWithDB(tx, rule.DimensionId)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			return myerrors.WrapDatabaseError(err)
+		dimension, found := snapshot.dimensions[rule.DimensionId]
+		if !found {
+			continue
 		}
 		if ownership.ValueType != dimension.ValueType {
 			collector.add(
@@ -975,7 +931,7 @@ func (v dataPermissionConfigValidator) validateRulesForResource(
 				)
 				continue
 			}
-			if err = v.registeredFieldChecker.ValidateOperation(
+			if err := v.registeredFieldChecker.ValidateOperation(
 				datapermission.OwnershipFieldOperationValidation{
 					ResourceCode:  resource.ResourceCode,
 					OwnershipCode: ownership.OwnershipCode,
@@ -999,29 +955,6 @@ func (v dataPermissionConfigValidator) validateRulesForResource(
 		}
 	}
 	return nil
-}
-
-func (v dataPermissionConfigValidator) grantSubjectExists(
-	tx *gorm.DB,
-	subjectType string,
-	subjectId int,
-) (bool, error) {
-	var (
-		exists bool
-		err    error
-	)
-	switch subjectType {
-	case model.DataGrantSubjectTypeRole:
-		exists, err = v.grantRepo.RoleExistsForConfig(tx, subjectId)
-	case model.DataGrantSubjectTypeUser:
-		exists, err = v.grantRepo.UserExistsForConfig(tx, subjectId)
-	default:
-		return false, nil
-	}
-	if err != nil {
-		return false, myerrors.WrapDatabaseError(err)
-	}
-	return exists, nil
 }
 
 func newDataPermissionValidationCollector() *dataPermissionValidationCollector {

@@ -106,10 +106,9 @@ func (s *ExternalSystemService) Get(
 func (s *ExternalSystemService) Page(
 	ctx context.Context,
 	req request.ExternalSystemQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.ExternalSystemListRes], error) {
 	basic := req.ToBasic()
-	result, err := s.repository.GetExternalSystemList(ctx, &basic, table)
+	result, err := s.repository.GetExternalSystemList(ctx, &basic, externalSystemQueryTable())
 	if err != nil {
 		return response.ListResult[response.ExternalSystemListRes]{}, myerrors.WrapDatabaseError(err)
 	}

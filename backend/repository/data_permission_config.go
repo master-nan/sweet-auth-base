@@ -42,6 +42,7 @@ type DataOwnershipFieldRepository interface {
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)
 	CountByIdentityForConfig(*gorm.DB, string, *int, bool) (int64, error)
 	CountPolicyRuleReferencesForConfig(*gorm.DB, int, string, int, bool, time.Time) (int64, error)
+	ListActiveByOwnershipCodesForConfigDB(*gorm.DB, []string) ([]model.DataOwnershipField, error)
 }
 
 type DataPolicyRepository interface {
@@ -68,6 +69,7 @@ type DataGrantRepository interface {
 	ListByPolicyForConfigDB(*gorm.DB, int) ([]model.DataGrant, error)
 	RoleExistsForConfig(*gorm.DB, int) (bool, error)
 	UserExistsForConfig(*gorm.DB, int) (bool, error)
+	FindActiveSubjectIDsForConfigDB(*gorm.DB, string, []int) ([]int, error)
 	CountByResourceForConfig(*gorm.DB, int) (int64, error)
 	CountByResourceOperationForConfig(*gorm.DB, int, string) (int64, error)
 }

@@ -5,8 +5,13 @@
 
 package repository
 
-import "backend/model"
+import (
+	"backend/model"
+
+	"gorm.io/gorm"
+)
 
 type SysTableIndexFieldRepository interface {
 	BasicRepository[model.SysTableIndexField]
+	UpdateSequence(*gorm.DB, int, int, uint8) error
 }

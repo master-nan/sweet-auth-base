@@ -85,7 +85,6 @@ func TestDataOwnershipConfigServiceCreateAndQuery(t *testing.T) {
 			},
 			ResourceId: &resource.Id,
 		},
-		dataOwnershipConfigTable(),
 	)
 	if err != nil {
 		t.Fatalf("page ownerships: %v", err)

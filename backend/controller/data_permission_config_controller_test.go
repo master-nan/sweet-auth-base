@@ -30,7 +30,6 @@ type dataPermissionConfigResourceStub struct {
 	updateReq      request.DataResourceUpdateReq
 	replaceReq     request.DataResourceOperationBatchReq
 	pageReq        request.DataResourceQueryReq
-	pageTable      model.SysTable
 	pageResult     response.ListResult[response.DataResourceListRes]
 	detail         response.DataResourceDetailRes
 	operations     []response.DataResourceOperationListRes
@@ -69,10 +68,8 @@ func (s *dataPermissionConfigResourceStub) GetResource(
 func (s *dataPermissionConfigResourceStub) PageResources(
 	_ context.Context,
 	req request.DataResourceQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataResourceListRes], error) {
 	s.pageReq = req
-	s.pageTable = table
 	return s.pageResult, s.err
 }
 
@@ -94,23 +91,19 @@ func (s *dataPermissionConfigResourceStub) ReplaceResourceOperations(
 }
 
 type dataPermissionConfigOwnershipStub struct {
-	dimensionPage      response.ListResult[response.DataDimensionDefinitionListRes]
-	ownershipPage      response.ListResult[response.DataOwnershipFieldListRes]
-	createReq          request.DataOwnershipFieldCreateReq
-	updateReq          request.DataOwnershipFieldUpdateReq
-	dimensionPageTable model.SysTable
-	ownershipPageTable model.SysTable
-	list               []response.DataOwnershipFieldListRes
-	detail             response.DataOwnershipFieldDetailRes
-	err                error
+	dimensionPage response.ListResult[response.DataDimensionDefinitionListRes]
+	ownershipPage response.ListResult[response.DataOwnershipFieldListRes]
+	createReq     request.DataOwnershipFieldCreateReq
+	updateReq     request.DataOwnershipFieldUpdateReq
+	list          []response.DataOwnershipFieldListRes
+	detail        response.DataOwnershipFieldDetailRes
+	err           error
 }
 
 func (s *dataPermissionConfigOwnershipStub) PageDimensions(
 	_ context.Context,
 	_ request.DataDimensionDefinitionQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
-	s.dimensionPageTable = table
 	return s.dimensionPage, s.err
 }
 
@@ -147,9 +140,7 @@ func (s *dataPermissionConfigOwnershipStub) ListOwnershipsByResource(
 func (s *dataPermissionConfigOwnershipStub) PageOwnerships(
 	_ context.Context,
 	_ request.DataOwnershipFieldQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataOwnershipFieldListRes], error) {
-	s.ownershipPageTable = table
 	return s.ownershipPage, s.err
 }
 
@@ -189,7 +180,6 @@ func (s *dataPermissionConfigPolicyStub) GetPolicy(
 func (s *dataPermissionConfigPolicyStub) PagePolicies(
 	context.Context,
 	request.DataPolicyQueryReq,
-	model.SysTable,
 ) (response.ListResult[response.DataPolicyListRes], error) {
 	return s.pageResult, s.err
 }
@@ -197,7 +187,6 @@ func (s *dataPermissionConfigPolicyStub) PagePolicies(
 func (s *dataPermissionConfigPolicyStub) PagePolicyRules(
 	context.Context,
 	request.DataPolicyRuleQueryReq,
-	model.SysTable,
 ) (response.ListResult[response.DataPolicyRuleListRes], error) {
 	return s.rulePageResult, s.err
 }
@@ -235,7 +224,6 @@ func (s *dataPermissionConfigGrantStub) GetGrant(
 func (s *dataPermissionConfigGrantStub) PageGrants(
 	context.Context,
 	request.DataGrantQueryReq,
-	model.SysTable,
 ) (response.ListResult[response.DataGrantListRes], error) {
 	return s.pageResult, s.err
 }
@@ -557,15 +545,6 @@ func TestDataPermissionConfigControllerQueriesUseDTOsAndUnifiedResponse(t *testi
 
 	if resourceStub.pageReq.Page != 1 || resourceStub.pageReq.Num != 20 {
 		t.Fatalf("resource query request = %#v", resourceStub.pageReq)
-	}
-	if resourceStub.pageTable.TableCode != dataResourceConfigTableCode {
-		t.Fatalf("resource table code = %q", resourceStub.pageTable.TableCode)
-	}
-	if ownershipStub.dimensionPageTable.TableCode != dataDimensionConfigTableCode {
-		t.Fatalf("dimension table code = %q", ownershipStub.dimensionPageTable.TableCode)
-	}
-	if ownershipStub.ownershipPageTable.TableCode != dataOwnershipConfigTableCode {
-		t.Fatalf("ownership table code = %q", ownershipStub.ownershipPageTable.TableCode)
 	}
 }
 

@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -22,22 +23,22 @@ func TestGeneralizationPermissionRepositoryAppliesIdAndPermissionAtomically(t *t
 	repo := NewGeneralizationRepositoryImpl(&database.PrimaryDB{DB: db})
 
 	detailPermission := generalizationRepositoryPermission(t, model.DataPermissionOperationDetail, []int64{11})
-	allowed, err := repo.GetByIdWithPermission(table, 1, detailPermission)
+	allowed, err := repo.GetByIdWithPermission(context.Background(), table, 1, detailPermission)
 	if err != nil || allowed["name"] != "allowed" {
 		t.Fatalf("allowed detail = %+v, err=%v", allowed, err)
 	}
-	_, deniedErr := repo.GetByIdWithPermission(table, 2, detailPermission)
-	_, missingErr := repo.GetByIdWithPermission(table, 999, detailPermission)
+	_, deniedErr := repo.GetByIdWithPermission(context.Background(), table, 2, detailPermission)
+	_, missingErr := repo.GetByIdWithPermission(context.Background(), table, 999, detailPermission)
 	if !errors.Is(deniedErr, myerrors.ErrDataNotFound) || !errors.Is(missingErr, myerrors.ErrDataNotFound) {
 		t.Fatalf("denied and missing details must share not-found semantics: denied=%v missing=%v", deniedErr, missingErr)
 	}
 
 	updatePermission := generalizationRepositoryPermission(t, model.DataPermissionOperationUpdate, []int64{11})
-	updated, err := repo.UpdateWithPermission(table, 1, map[string]interface{}{"name": "changed"}, updatePermission)
+	updated, err := repo.UpdateWithPermission(context.Background(), table, 1, map[string]interface{}{"name": "changed"}, updatePermission)
 	if err != nil || !updated {
 		t.Fatalf("allowed update failed: updated=%v err=%v", updated, err)
 	}
-	updated, err = repo.UpdateWithPermission(table, 2, map[string]interface{}{"name": "leaked"}, updatePermission)
+	updated, err = repo.UpdateWithPermission(context.Background(), table, 2, map[string]interface{}{"name": "leaked"}, updatePermission)
 	if err != nil || updated {
 		t.Fatalf("denied update executed: updated=%v err=%v", updated, err)
 	}
@@ -46,6 +47,7 @@ func TestGeneralizationPermissionRepositoryAppliesIdAndPermissionAtomically(t *t
 
 	deletePermission := generalizationRepositoryPermission(t, model.DataPermissionOperationDelete, []int64{11})
 	deleted, err := repo.SoftDeleteWithPermission(
+		context.Background(),
 		table,
 		1,
 		map[string]interface{}{"gmt_delete": model.Now()},
@@ -55,6 +57,7 @@ func TestGeneralizationPermissionRepositoryAppliesIdAndPermissionAtomically(t *t
 		t.Fatalf("allowed delete failed: deleted=%v err=%v", deleted, err)
 	}
 	deleted, err = repo.SoftDeleteWithPermission(
+		context.Background(),
 		table,
 		2,
 		map[string]interface{}{"gmt_delete": model.Now()},
@@ -74,6 +77,7 @@ func TestGeneralizationPermissionRepositoryDoesNotExecuteInvalidOrDenyAllFilters
 
 	denyExecution := generalizationRepositoryExecution(t, model.DataPermissionOperationUpdate, datapermission.DataScopeDecisionNone, nil)
 	updated, err := repo.UpdateWithPermission(
+		context.Background(),
 		table,
 		1,
 		map[string]interface{}{"name": "leaked"},
@@ -88,6 +92,7 @@ func TestGeneralizationPermissionRepositoryDoesNotExecuteInvalidOrDenyAllFilters
 
 	notApplicable := generalizationRepositoryExecution(t, model.DataPermissionOperationDetail, datapermission.DataScopeDecisionNotApplicable, nil)
 	if _, err = repo.GetByIdWithPermission(
+		context.Background(),
 		table,
 		1,
 		repository.GeneralizationPermission{

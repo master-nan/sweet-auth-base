@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/enum"
 	"backend/internal/audit"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -152,7 +151,7 @@ func TestExternalSystemServiceQueryAndDTOWhitelist(t *testing.T) {
 		Page:       1,
 		Num:        10,
 		QuickQuery: &request.QuickQuery{Keyword: "demo"},
-	}, externalSystemQueryTableForTest())
+	})
 	if err != nil {
 		t.Fatalf("page external systems: %v", err)
 	}
@@ -197,19 +196,5 @@ func externalSystemCreateRequest(code string) request.ExternalSystemCreateReq {
 		OwnerIdentifier: "owner-001",
 		OwnerName:       "实施负责人",
 		Description:     "用于集成配置测试",
-	}
-}
-
-func externalSystemQueryTableForTest() model.SysTable {
-	return model.SysTable{
-		TableCode: "integration_external_system",
-		TableFields: []model.SysTableField{
-			{Basic: model.Basic{State: true}, FieldCode: "system_code", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-			{Basic: model.Basic{State: true}, FieldCode: "name", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-			{Basic: model.Basic{State: true}, FieldCode: "system_type", FieldType: enum.VarcharFieldType},
-			{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
-			{Basic: model.Basic{State: true}, FieldCode: "owner_identifier", FieldType: enum.VarcharFieldType},
-			{Basic: model.Basic{State: true}, FieldCode: "owner_name", FieldType: enum.VarcharFieldType},
-		},
 	}
 }

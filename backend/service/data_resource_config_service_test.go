@@ -89,7 +89,6 @@ func TestDataResourceConfigServiceCreateAndQuery(t *testing.T) {
 				},
 				ResourceType: model.DataResourceTypeBusinessService,
 			},
-			dataResourceConfigTable(),
 		)
 		if err != nil {
 			t.Fatalf("page resources: %v", err)

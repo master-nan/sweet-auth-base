@@ -79,7 +79,6 @@ func TestDataPolicyConfigServiceCreateQueryAndUpdate(t *testing.T) {
 			},
 			PolicyType: model.DataPolicyTypeRuleSet,
 		},
-		dataPolicyConfigTable(),
 	)
 	if err != nil || page.Total != 1 || len(page.Data) != 1 {
 		t.Fatalf("page policies = %+v, err=%v", page, err)
@@ -396,7 +395,6 @@ func TestDataPolicyConfigServiceRuleLifecycle(t *testing.T) {
 			PolicyId:      &policy.Id,
 			OwnershipCode: "owner_org",
 		},
-		dataPolicyRuleConfigTable(),
 	)
 	if err != nil || page.Total != 1 || len(page.Data) != 1 {
 		t.Fatalf("page policy rules = %+v, err=%v", page, err)

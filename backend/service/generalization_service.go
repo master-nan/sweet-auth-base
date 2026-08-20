@@ -11,6 +11,7 @@ import (
 	"backend/internal/audit"
 	error2 "backend/internal/errors"
 	platformmetadata "backend/internal/metadata"
+	"backend/internal/querycapability"
 	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
@@ -90,8 +91,11 @@ func NewGeneralizationServiceWithDataPermission(
 	}
 }
 
-func (gs *GeneralizationService) Query(basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
-	result, err := gs.generalizationRepo.Query(basic, table)
+func (gs *GeneralizationService) Query(ctx context.Context, basic *request.Basic, table model.SysTable) (repository.GeneralizationListResult, error) {
+	if err := validateGeneralizationQuery(basic, table); err != nil {
+		return repository.GeneralizationListResult{}, err
+	}
+	result, err := gs.generalizationRepo.Query(ctx, basic, table)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
 	}
@@ -104,6 +108,9 @@ func (gs *GeneralizationService) QueryWithDataPermission(
 	table model.SysTable,
 	operation string,
 ) (repository.GeneralizationListResult, error) {
+	if err := validateGeneralizationQuery(basic, table); err != nil {
+		return repository.GeneralizationListResult{}, err
+	}
 	resolution, err := gs.resolveLowCodePermission(ctx, table, operation)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
@@ -111,18 +118,22 @@ func (gs *GeneralizationService) QueryWithDataPermission(
 	if gs.permissionRepo == nil {
 		return repository.GeneralizationListResult{}, error2.ErrDataPermissionRuntimeFailed
 	}
-	return gs.permissionRepo.QueryWithPermission(basic, table, resolution.permission)
+	return gs.permissionRepo.QueryWithPermission(ctx, basic, table, resolution.permission)
 }
 
 func (gs *GeneralizationService) QueryWithResolvedDataPermission(
+	ctx context.Context,
 	basic *request.Basic,
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
 ) (repository.GeneralizationListResult, error) {
+	if err := validateGeneralizationQuery(basic, table); err != nil {
+		return repository.GeneralizationListResult{}, err
+	}
 	if gs.permissionRepo == nil {
 		return repository.GeneralizationListResult{}, error2.ErrDataPermissionRuntimeFailed
 	}
-	return gs.permissionRepo.QueryWithPermission(basic, table, permission)
+	return gs.permissionRepo.QueryWithPermission(ctx, basic, table, permission)
 }
 
 func (gs *GeneralizationService) ResolveDataPermission(
@@ -137,8 +148,8 @@ func (gs *GeneralizationService) ResolveDataPermission(
 	return resolution.permission, nil
 }
 
-func (gs *GeneralizationService) GetById(table model.SysTable, id int) (map[string]interface{}, error) {
-	return gs.generalizationRepo.GetById(table, id)
+func (gs *GeneralizationService) GetById(ctx context.Context, table model.SysTable, id int) (map[string]interface{}, error) {
+	return gs.generalizationRepo.GetById(ctx, table, id)
 }
 
 func (gs *GeneralizationService) GetByIdWithDataPermission(
@@ -154,7 +165,7 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 	if gs.permissionRepo == nil {
 		return nil, error2.ErrDataPermissionRuntimeFailed
 	}
-	return gs.permissionRepo.GetByIdWithPermission(table, id, resolution.permission)
+	return gs.permissionRepo.GetByIdWithPermission(ctx, table, id, resolution.permission)
 }
 
 func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTable, data map[string]interface{}) error {
@@ -185,7 +196,7 @@ func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTabl
 	}
 	setIfFieldExists(table, filtered, "gmt_create_user", userID)
 	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
-	return gs.generalizationRepo.Create(table, filtered)
+	return gs.generalizationRepo.Create(ctx, table, filtered)
 }
 
 func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTable, id int, data map[string]interface{}) error {
@@ -197,7 +208,7 @@ func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTabl
 	if err := validateDataByBindings(table, filtered, false); err != nil {
 		return err
 	}
-	if err := gs.ensureWritableRowExists(table, id); err != nil {
+	if err := gs.ensureWritableRowExists(ctx, table, id); err != nil {
 		return err
 	}
 	normalizeDataByFieldTypes(table, filtered)
@@ -208,7 +219,7 @@ func (gs *GeneralizationService) Update(ctx context.Context, table model.SysTabl
 		return err
 	}
 	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
-	return gs.generalizationRepo.Update(table, id, filtered)
+	return gs.generalizationRepo.Update(ctx, table, id, filtered)
 }
 
 func (gs *GeneralizationService) UpdateWithDataPermission(
@@ -247,6 +258,7 @@ func (gs *GeneralizationService) UpdateWithDataPermission(
 		return error2.ErrDataPermissionRuntimeFailed
 	}
 	updated, err := gs.permissionRepo.UpdateWithPermission(
+		ctx,
 		table,
 		id,
 		filtered,
@@ -265,12 +277,12 @@ func (gs *GeneralizationService) Delete(ctx context.Context, table model.SysTabl
 	if isProtectedTable(table.TableCode) {
 		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
-	if err := gs.ensureWritableRowExists(table, id); err != nil {
+	if err := gs.ensureWritableRowExists(ctx, table, id); err != nil {
 		return err
 	}
 	if !utils.HasTableField(table, "gmt_delete") {
 		// 表没有软删除字段，执行硬删除
-		return gs.generalizationRepo.HardDelete(table, id)
+		return gs.generalizationRepo.HardDelete(ctx, table, id)
 	}
 	deleteData := map[string]interface{}{
 		"gmt_delete": model.Now(),
@@ -280,7 +292,7 @@ func (gs *GeneralizationService) Delete(ctx context.Context, table model.SysTabl
 		return err
 	}
 	setIfFieldExists(table, deleteData, "gmt_delete_user", userID)
-	return gs.generalizationRepo.SoftDelete(table, id, deleteData)
+	return gs.generalizationRepo.SoftDelete(ctx, table, id, deleteData)
 }
 
 func (gs *GeneralizationService) DeleteWithDataPermission(
@@ -303,7 +315,7 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 		if gs.permissionRepo == nil {
 			return error2.ErrDataPermissionRuntimeFailed
 		}
-		deleted, deleteErr := gs.permissionRepo.HardDeleteWithPermission(table, id, resolution.permission)
+		deleted, deleteErr := gs.permissionRepo.HardDeleteWithPermission(ctx, table, id, resolution.permission)
 		if deleteErr != nil {
 			return deleteErr
 		}
@@ -322,6 +334,7 @@ func (gs *GeneralizationService) DeleteWithDataPermission(
 		return error2.ErrDataPermissionRuntimeFailed
 	}
 	deleted, err := gs.permissionRepo.SoftDeleteWithPermission(
+		ctx,
 		table,
 		id,
 		deleteData,
@@ -432,11 +445,47 @@ func permissionMissError(repository.GeneralizationPermission) error {
 	return error2.ErrPermissionDenied
 }
 
-func (gs *GeneralizationService) ensureWritableRowExists(table model.SysTable, id int) error {
+func validateGeneralizationQuery(basic *request.Basic, table model.SysTable) error {
+	if basic == nil || len(basic.Expressions) == 0 {
+		return nil
+	}
+	fields := make(map[string]model.SysTableField, len(table.TableFields))
+	for _, field := range table.TableFields {
+		fields[field.FieldCode] = field
+	}
+	var validateGroups func([]request.ExpressionGroup) error
+	validateGroups = func(groups []request.ExpressionGroup) error {
+		for _, group := range groups {
+			for _, rule := range group.Rules {
+				fieldCode := strings.TrimSpace(rule.Field)
+				if fieldCode == "" {
+					return error2.ErrParamInvalid
+				}
+				field, ok := fields[fieldCode]
+				if !ok || !field.State || !field.IsAdvancedSearch || security.IsSensitiveFieldName(fieldCode) {
+					return error2.ErrParamInvalid
+				}
+				if rule.Type != 0 && rule.Type != field.FieldType {
+					return error2.ErrParamInvalid
+				}
+				if !querycapability.SupportsTableField(field, rule.ExpressionType) {
+					return error2.ErrParamInvalid
+				}
+			}
+			if err := validateGroups(group.Nested); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return validateGroups(basic.Expressions)
+}
+
+func (gs *GeneralizationService) ensureWritableRowExists(ctx context.Context, table model.SysTable, id int) error {
 	if id <= 0 {
 		return error2.ErrDataNotFound
 	}
-	exists, err := gs.generalizationRepo.RowExists(table, id)
+	exists, err := gs.generalizationRepo.RowExists(ctx, table, id)
 	if err != nil {
 		return err
 	}

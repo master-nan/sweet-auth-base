@@ -16,45 +16,47 @@ import (
 
 type generalizationRepoSpy struct {
 	called       bool
+	queryContext context.Context
 	created      map[string]interface{}
 	updated      map[string]interface{}
 	rowExists    bool
 	rowExistsErr error
 }
 
-func (r *generalizationRepoSpy) Query(*request.Basic, model.SysTable) (repository.GeneralizationListResult, error) {
+func (r *generalizationRepoSpy) Query(ctx context.Context, _ *request.Basic, _ model.SysTable) (repository.GeneralizationListResult, error) {
+	r.queryContext = ctx
 	return repository.GeneralizationListResult{}, nil
 }
 
-func (r *generalizationRepoSpy) GetById(model.SysTable, int) (map[string]interface{}, error) {
+func (r *generalizationRepoSpy) GetById(context.Context, model.SysTable, int) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func (r *generalizationRepoSpy) Create(_ model.SysTable, data map[string]interface{}) error {
+func (r *generalizationRepoSpy) Create(_ context.Context, _ model.SysTable, data map[string]interface{}) error {
 	r.called = true
 	r.created = copyMap(data)
 	return nil
 }
 
-func (r *generalizationRepoSpy) RowExists(model.SysTable, int) (bool, error) {
+func (r *generalizationRepoSpy) RowExists(context.Context, model.SysTable, int) (bool, error) {
 	if r.rowExistsErr != nil {
 		return false, r.rowExistsErr
 	}
 	return r.rowExists, nil
 }
 
-func (r *generalizationRepoSpy) Update(_ model.SysTable, _ int, data map[string]interface{}) error {
+func (r *generalizationRepoSpy) Update(_ context.Context, _ model.SysTable, _ int, data map[string]interface{}) error {
 	r.called = true
 	r.updated = copyMap(data)
 	return nil
 }
 
-func (r *generalizationRepoSpy) SoftDelete(model.SysTable, int, map[string]interface{}) error {
+func (r *generalizationRepoSpy) SoftDelete(context.Context, model.SysTable, int, map[string]interface{}) error {
 	r.called = true
 	return nil
 }
 
-func (r *generalizationRepoSpy) HardDelete(model.SysTable, int) error {
+func (r *generalizationRepoSpy) HardDelete(context.Context, model.SysTable, int) error {
 	r.called = true
 	return nil
 }
@@ -117,6 +119,37 @@ func TestGeneralizationServiceRejectsProtectedTableWrites(t *testing.T) {
 				t.Fatal("protected table write reached repository")
 			}
 		})
+	}
+}
+
+func TestGeneralizationQueryUsesCapabilityValidatorAndPropagatesContext(t *testing.T) {
+	table := model.SysTable{TableCode: "orders", TableFields: []model.SysTableField{{
+		Basic: model.Basic{State: true}, FieldCode: "amount", FieldType: enum.IntFieldType,
+		IsAdvancedSearch: true,
+	}}}
+	repo := &generalizationRepoSpy{}
+	service := NewGeneralizationService(repo, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	valid := &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{
+		Field: "amount", Type: enum.IntFieldType, ExpressionType: enum.Gte, Value: 10,
+	}}}}}
+	if _, err := service.Query(ctx, valid, table); err != nil {
+		t.Fatalf("valid query failed: %v", err)
+	}
+	if repo.queryContext != ctx || !errors.Is(repo.queryContext.Err(), context.Canceled) {
+		t.Fatal("request cancellation was not propagated to repository")
+	}
+
+	invalid := &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{
+		Field: "amount", Type: enum.IntFieldType, ExpressionType: enum.Like, Value: "1",
+	}}}}}
+	if _, err := service.Query(context.Background(), invalid, table); !errors.Is(err, error2.ErrParamInvalid) {
+		t.Fatalf("incompatible operator error = %v", err)
+	}
+	if _, err := service.Query(context.Background(), &request.Basic{Expressions: []request.ExpressionGroup{{Rules: []request.QueryRule{{ExpressionType: enum.Eq}}}}}, table); !errors.Is(err, error2.ErrParamInvalid) {
+		t.Fatalf("empty field error = %v", err)
 	}
 }
 

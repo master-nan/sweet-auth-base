@@ -9,6 +9,7 @@ import (
 	"backend/model"
 	"backend/repository/impl"
 	"errors"
+	"strconv"
 	"testing"
 
 	"gorm.io/gorm"
@@ -48,6 +49,36 @@ func TestDataPermissionConfigPreflightNormalConfiguration(t *testing.T) {
 	assertDataPermissionResourceEnabled(t, db, fixtures.resource.Id, false)
 	if len(auditWriter.snapshot()) != 2 {
 		t.Fatalf("audit count = %d, want 2", len(auditWriter.snapshot()))
+	}
+}
+
+func TestDataPermissionConfigPreflightBatchesRelatedReads(t *testing.T) {
+	service, db := newDataPermissionPreflightTestSubject(t, &testTransactionalAuditWriter{})
+	fixtures := createDataGrantConfigFixtures(t, db)
+	for i := 0; i < 12; i++ {
+		role := model.SysRole{Basic: model.Basic{Id: 700 + i, State: true}, Name: "preflight-role-" + strconv.Itoa(i)}
+		testutil.MustCreate(t, db, &role)
+		grant := model.DataGrant{
+			Basic: model.Basic{Id: 800 + i, State: true}, SubjectType: model.DataGrantSubjectTypeRole,
+			SubjectId: role.Id, ResourceId: fixtures.resource.Id,
+			Operation: fixtures.operation.Operation, PolicyId: fixtures.policy.Id,
+		}
+		testutil.MustCreate(t, db, &grant)
+	}
+
+	queryCount := 0
+	callbackName := "test:preflight-query-count"
+	if err := db.Callback().Query().Before("gorm:query").Register(callbackName, func(*gorm.DB) {
+		queryCount++
+	}); err != nil {
+		t.Fatalf("register query counter: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Callback().Query().Remove(callbackName) })
+
+	result, err := service.PreflightResource(dataResourceConfigContext(), fixtures.resource.Id)
+	assertDataPermissionPreflightValid(t, result, err)
+	if queryCount > 10 {
+		t.Fatalf("preflight query count = %d, want at most 10 for batched related reads", queryCount)
 	}
 }
 

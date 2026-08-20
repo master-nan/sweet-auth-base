@@ -101,10 +101,10 @@ func (s *SyncTaskService) CreateSyncTask(ctx context.Context, req request.SyncTa
 	return s.taskDetail(ctx, value)
 }
 
-func (s *SyncTaskService) PageSyncTask(ctx context.Context, req request.SyncTaskQueryReq, table model.SysTable) (response.ListResult[response.SyncTaskListRes], error) {
+func (s *SyncTaskService) PageSyncTask(ctx context.Context, req request.SyncTaskQueryReq) (response.ListResult[response.SyncTaskListRes], error) {
 	basic := req.ToBasic()
 	var values []model.IntegrationSyncTask
-	total, err := s.tasks.WithContext(ctx).PaginateAndCountAsync(&basic, &values, table)
+	total, err := s.tasks.WithContext(ctx).PaginateAndCountAsync(&basic, &values, syncTaskQueryTable())
 	if err != nil {
 		return response.ListResult[response.SyncTaskListRes]{}, myerrors.WrapDatabaseError(err)
 	}
@@ -475,10 +475,10 @@ func NewSyncBatchService(repository repository.IntegrationSyncBatchRepository) *
 	return &SyncBatchService{repository: repository}
 }
 
-func (s *SyncBatchService) PageSyncBatch(ctx context.Context, req request.SyncBatchQueryReq, table model.SysTable) (response.ListResult[response.SyncBatchListRes], error) {
+func (s *SyncBatchService) PageSyncBatch(ctx context.Context, req request.SyncBatchQueryReq) (response.ListResult[response.SyncBatchListRes], error) {
 	basic := req.ToBasic()
 	var values []model.IntegrationSyncBatch
-	total, err := s.repository.WithContext(ctx).PaginateAndCountAsync(&basic, &values, table)
+	total, err := s.repository.WithContext(ctx).PaginateAndCountAsync(&basic, &values, syncBatchQueryTable())
 	if err != nil {
 		return response.ListResult[response.SyncBatchListRes]{}, myerrors.WrapDatabaseError(err)
 	}

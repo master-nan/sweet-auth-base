@@ -8,6 +8,8 @@ package impl
 import (
 	"backend/internal/database"
 	"backend/model"
+
+	"gorm.io/gorm"
 )
 
 type SysMenuButtonTemplateRepositoryImpl struct {
@@ -21,8 +23,12 @@ func NewSysMenuButtonTemplateRepositoryImpl(PrimaryDB *database.PrimaryDB) *SysM
 }
 
 func (s *SysMenuButtonTemplateRepositoryImpl) FindEnabledByScene(scene string) ([]model.SysMenuButtonTemplate, error) {
+	return s.FindEnabledBySceneWithDB(s.db, scene)
+}
+
+func (s *SysMenuButtonTemplateRepositoryImpl) FindEnabledBySceneWithDB(db *gorm.DB, scene string) ([]model.SysMenuButtonTemplate, error) {
 	var templates []model.SysMenuButtonTemplate
-	err := s.db.Where("scene = ? AND state = ?", scene, true).
+	err := db.Where("scene = ? AND state = ?", scene, true).
 		Order("sequence ASC, id ASC").
 		Find(&templates).Error
 	return templates, err

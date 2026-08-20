@@ -180,14 +180,13 @@ func (s *DataPolicyConfigService) GetPolicy(
 func (s *DataPolicyConfigService) PagePolicies(
 	ctx context.Context,
 	req request.DataPolicyQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataPolicyListRes], error) {
 	var result response.ListResult[response.DataPolicyListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.policyRepo.GetDataPolicyList(ctx, &basic, table)
+	rows, err := s.policyRepo.GetDataPolicyList(ctx, &basic, dataPolicyQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -388,14 +387,13 @@ func (s *DataPolicyConfigService) ReplacePolicyRules(
 func (s *DataPolicyConfigService) PagePolicyRules(
 	ctx context.Context,
 	req request.DataPolicyRuleQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataPolicyRuleListRes], error) {
 	var result response.ListResult[response.DataPolicyRuleListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.ruleRepo.GetDataPolicyRuleList(ctx, &basic, table)
+	rows, err := s.ruleRepo.GetDataPolicyRuleList(ctx, &basic, dataPolicyRuleQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}

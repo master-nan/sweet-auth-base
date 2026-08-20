@@ -261,6 +261,10 @@ func (b *BasicRepositoryImpl[T]) FindListByFieldWithDB(db *gorm.DB, field string
 }
 
 func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interface{}) ([]T, error) {
+	return b.FindListByFieldInWithDB(b.baseQuery(), field, values)
+}
+
+func (b *BasicRepositoryImpl[T]) FindListByFieldInWithDB(db *gorm.DB, field string, values interface{}) ([]T, error) {
 	var entities []T
 	if err := validateRepositoryField(field); err != nil {
 		return nil, err
@@ -275,7 +279,7 @@ func (b *BasicRepositoryImpl[T]) FindListByFieldIn(field string, values interfac
 	for i := 0; i < val.Len(); i++ {
 		valueSlice[i] = val.Index(i).Interface()
 	}
-	query := b.applyReadOptions(b.baseQuery())
+	query := b.applyReadOptions(db)
 	err := query.Model(b.model).Where(fmt.Sprintf("%s IN ?", field), valueSlice).Find(&entities).Error
 	return entities, err
 }

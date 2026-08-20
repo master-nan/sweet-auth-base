@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/enum"
 	"backend/internal/audit"
 	myerrors "backend/internal/errors"
 	"backend/internal/security"
@@ -124,7 +123,7 @@ func TestCredentialServiceValidationUniquenessAndExpiry(t *testing.T) {
 	if _, err := svc.Enable(ctx, created.Id, updated.Revision); !errors.Is(err, myerrors.ErrCredentialExpired) {
 		t.Fatalf("expired enable error = %v", err)
 	}
-	page, err := svc.Page(ctx, request.CredentialQueryReq{Page: 1, Num: 10, Status: "expired"}, credentialQueryTableForTest())
+	page, err := svc.Page(ctx, request.CredentialQueryReq{Page: 1, Num: 10, Status: "expired"})
 	if err != nil || page.Total != 1 || page.Data[0].EffectiveStatus != "expired" {
 		t.Fatalf("expired page = %+v err=%v", page, err)
 	}
@@ -152,11 +151,4 @@ func newCredentialTestSubject(t *testing.T) (*CredentialService, *gorm.DB, *cred
 
 func credentialCreateRequest(systemID int, code string) request.CredentialCreateReq {
 	return request.CredentialCreateReq{ExternalSystemID: systemID, CredentialCode: code, Name: "ERP API Key", CredentialType: model.CredentialTypeAPIKey, Secret: map[string]string{"api_key": "secret-api-key"}, Description: "测试凭证"}
-}
-
-func credentialQueryTableForTest() model.SysTable {
-	field := func(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-		return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
-	}
-	return model.SysTable{TableCode: "integration_credential", TableFields: []model.SysTableField{field("credential_code", enum.VarcharFieldType, true), field("name", enum.VarcharFieldType, true), field("external_system_id", enum.BigIntFieldType, false), field("credential_type", enum.VarcharFieldType, false), field("status", enum.VarcharFieldType, false), field("expires_at", enum.DatetimeFieldType, false)}}
 }

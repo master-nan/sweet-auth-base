@@ -3430,14 +3430,16 @@ func seedSystemTableIndexes(db *gorm.DB, sf *utils.Snowflake, table model.SysTab
 		if err != nil {
 			return err
 		}
-		for _, column := range index.Columns() {
+		for position, column := range index.Columns() {
 			fieldID, ok := fieldIDs[column]
 			if !ok {
 				continue
 			}
-			if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.SysTableIndexField{
-				IndexId: indexID,
-				FieldId: fieldID,
+			if err := db.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "index_id"}, {Name: "field_id"}},
+				DoUpdates: clause.Assignments(map[string]any{"sequence": uint8(position + 1)}),
+			}).Create(&model.SysTableIndexField{
+				IndexId: indexID, FieldId: fieldID, Sequence: uint8(position + 1),
 			}).Error; err != nil {
 				return err
 			}

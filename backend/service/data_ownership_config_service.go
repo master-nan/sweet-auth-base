@@ -64,14 +64,13 @@ func NewDataOwnershipConfigService(
 func (s *DataOwnershipConfigService) PageDimensions(
 	ctx context.Context,
 	req request.DataDimensionDefinitionQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataDimensionDefinitionListRes], error) {
 	var result response.ListResult[response.DataDimensionDefinitionListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.dimensionRepo.GetDataDimensionDefinitionList(ctx, &basic, table)
+	rows, err := s.dimensionRepo.GetDataDimensionDefinitionList(ctx, &basic, dataDimensionQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}
@@ -172,14 +171,13 @@ func (s *DataOwnershipConfigService) GetOwnership(
 func (s *DataOwnershipConfigService) PageOwnerships(
 	ctx context.Context,
 	req request.DataOwnershipFieldQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataOwnershipFieldListRes], error) {
 	var result response.ListResult[response.DataOwnershipFieldListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.ownershipRepo.GetDataOwnershipFieldList(ctx, &basic, table)
+	rows, err := s.ownershipRepo.GetDataOwnershipFieldList(ctx, &basic, dataOwnershipQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}

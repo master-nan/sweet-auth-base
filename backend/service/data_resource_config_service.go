@@ -222,14 +222,13 @@ func (s *DataResourceConfigService) GetResource(
 func (s *DataResourceConfigService) PageResources(
 	ctx context.Context,
 	req request.DataResourceQueryReq,
-	table model.SysTable,
 ) (response.ListResult[response.DataResourceListRes], error) {
 	var result response.ListResult[response.DataResourceListRes]
 	if err := utils.ValidatePagination(req.Page, req.Num); err != nil {
 		return result, err
 	}
 	basic := req.ToBasic()
-	rows, err := s.resourceRepo.GetDataResourceList(ctx, &basic, table)
+	rows, err := s.resourceRepo.GetDataResourceList(ctx, &basic, dataResourceQueryTable())
 	if err != nil {
 		return result, myerrors.WrapDatabaseError(err)
 	}

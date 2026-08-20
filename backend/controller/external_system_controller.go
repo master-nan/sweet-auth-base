@@ -3,11 +3,9 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/middleware"
-	"backend/model"
 	"backend/service"
 	"context"
 	"strconv"
@@ -16,12 +14,10 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-const externalSystemTableCode = "integration_external_system"
-
 type externalSystemApplication interface {
 	Create(context.Context, request.ExternalSystemCreateReq) (response.ExternalSystemDetailRes, error)
 	Get(context.Context, int) (response.ExternalSystemDetailRes, error)
-	Page(context.Context, request.ExternalSystemQueryReq, model.SysTable) (response.ListResult[response.ExternalSystemListRes], error)
+	Page(context.Context, request.ExternalSystemQueryReq) (response.ListResult[response.ExternalSystemListRes], error)
 	Update(context.Context, int, request.ExternalSystemUpdateReq) (response.ExternalSystemDetailRes, error)
 	Enable(context.Context, int, int) (response.ExternalSystemDetailRes, error)
 	Disable(context.Context, int, int) (response.ExternalSystemDetailRes, error)
@@ -51,7 +47,7 @@ func (c *ExternalSystemController) Query(ctx *gin.Context) {
 	if !bindExternalSystem(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.service.Page(ctx.Request.Context(), req, externalSystemQueryTable())
+	result, err := c.service.Page(ctx.Request.Context(), req)
 	c.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -157,31 +153,4 @@ func externalSystemPathID(ctx *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func externalSystemQueryTable() model.SysTable {
-	return model.SysTable{
-		Basic:     model.Basic{State: true},
-		TableCode: externalSystemTableCode,
-		TableFields: []model.SysTableField{
-			externalSystemQueryField("system_code", enum.VarcharFieldType, true),
-			externalSystemQueryField("name", enum.VarcharFieldType, true),
-			externalSystemQueryField("system_type", enum.VarcharFieldType, false),
-			externalSystemQueryField("owner_identifier", enum.VarcharFieldType, true),
-			externalSystemQueryField("owner_name", enum.VarcharFieldType, true),
-			externalSystemQueryField("status", enum.VarcharFieldType, false),
-			externalSystemQueryField("gmt_modify", enum.DatetimeFieldType, false),
-		},
-	}
-}
-
-func externalSystemQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{
-		Basic:            model.Basic{State: true},
-		FieldCode:        code,
-		FieldType:        fieldType,
-		IsQuickSearch:    quick,
-		IsAdvancedSearch: true,
-		IsSort:           true,
-	}
 }

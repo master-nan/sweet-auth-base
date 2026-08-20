@@ -3,11 +3,9 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/middleware"
-	"backend/model"
 	"backend/service"
 	"context"
 	"strconv"
@@ -16,12 +14,10 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-const interfaceDefinitionTableCode = "integration_interface_definition"
-
 type interfaceDefinitionApplication interface {
 	Create(context.Context, request.InterfaceDefinitionCreateReq) (response.InterfaceDefinitionDetailRes, error)
 	Get(context.Context, int) (response.InterfaceDefinitionDetailRes, error)
-	Page(context.Context, request.InterfaceDefinitionQueryReq, model.SysTable) (response.ListResult[response.InterfaceDefinitionListRes], error)
+	Page(context.Context, request.InterfaceDefinitionQueryReq) (response.ListResult[response.InterfaceDefinitionListRes], error)
 	Update(context.Context, int, request.InterfaceDefinitionUpdateReq) (response.InterfaceDefinitionDetailRes, error)
 	CreateVersion(context.Context, int, int) (response.InterfaceDefinitionDetailRes, error)
 	Enable(context.Context, int, int) (response.InterfaceDefinitionDetailRes, error)
@@ -46,7 +42,7 @@ func (c *InterfaceDefinitionController) Query(ctx *gin.Context) {
 	if !bindInterfaceDefinition(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.service.Page(ctx.Request.Context(), req, interfaceDefinitionQueryTable())
+	result, err := c.service.Page(ctx.Request.Context(), req)
 	c.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -158,21 +154,4 @@ func interfaceDefinitionPathID(ctx *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func interfaceDefinitionQueryTable() model.SysTable {
-	return model.SysTable{Basic: model.Basic{State: true}, TableCode: interfaceDefinitionTableCode, TableFields: []model.SysTableField{
-		interfaceDefinitionQueryField("interface_code", enum.VarcharFieldType, true),
-		interfaceDefinitionQueryField("name", enum.VarcharFieldType, true),
-		interfaceDefinitionQueryField("version", enum.IntFieldType, false),
-		interfaceDefinitionQueryField("protocol", enum.VarcharFieldType, false),
-		interfaceDefinitionQueryField("http_method", enum.VarcharFieldType, false),
-		interfaceDefinitionQueryField("relative_path", enum.VarcharFieldType, true),
-		interfaceDefinitionQueryField("status", enum.VarcharFieldType, false),
-		interfaceDefinitionQueryField("gmt_modify", enum.DatetimeFieldType, false),
-	}}
-}
-
-func interfaceDefinitionQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 }

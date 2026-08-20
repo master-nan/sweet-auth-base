@@ -2,7 +2,6 @@ package service
 
 import (
 	"backend/dto/request"
-	"backend/enum"
 	"backend/internal/database"
 	apperrors "backend/internal/errors"
 	testutil "backend/internal/test"
@@ -292,7 +291,7 @@ func TestInterfaceDefinitionServicePageIncludesSystemSummary(t *testing.T) {
 	}
 	page, err := svc.Page(context.Background(), request.InterfaceDefinitionQueryReq{
 		Page: 1, Num: 10, QuickQuery: &request.QuickQuery{Keyword: "shipment"}, ExternalSystemID: system.Id,
-	}, interfaceDefinitionQueryTableForTest())
+	})
 	if err != nil || page.Total != 1 || len(page.Data) != 1 {
 		t.Fatalf("page = %+v err=%v", page, err)
 	}
@@ -363,14 +362,4 @@ func interfaceDefinitionCreateRequest(systemID int, code string) request.Interfa
 		HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/orders", TimeoutSeconds: 30,
 		ResponseLimit: 10 * 1024 * 1024, Description: "集成接口定义测试",
 	}
-}
-
-func interfaceDefinitionQueryTableForTest() model.SysTable {
-	return model.SysTable{TableCode: "integration_interface_definition", TableFields: []model.SysTableField{
-		{Basic: model.Basic{State: true}, FieldCode: "interface_code", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-		{Basic: model.Basic{State: true}, FieldCode: "name", FieldType: enum.VarcharFieldType, IsQuickSearch: true},
-		{Basic: model.Basic{State: true}, FieldCode: "external_system_id", FieldType: enum.BigIntFieldType},
-		{Basic: model.Basic{State: true}, FieldCode: "http_method", FieldType: enum.VarcharFieldType},
-		{Basic: model.Basic{State: true}, FieldCode: "status", FieldType: enum.VarcharFieldType},
-	}}
 }

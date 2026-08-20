@@ -45,6 +45,7 @@ type BasicRepository[T any] interface {
 	FindListByField(field string, value interface{}) ([]T, error)
 	FindListByFieldWithDB(*gorm.DB, string, interface{}) ([]T, error)
 	FindListByFieldIn(field string, value interface{}) ([]T, error)
+	FindListByFieldInWithDB(*gorm.DB, string, interface{}) ([]T, error)
 	UpdateFields(*gorm.DB, int, map[string]any) (bool, error)
 	UpdateFieldsByRevision(*gorm.DB, int, int, map[string]any) (bool, error)
 	WithPreload(...string) BasicRepository[T]

@@ -3,11 +3,9 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/middleware"
-	"backend/model"
 	"backend/service"
 	"context"
 	"strconv"
@@ -16,11 +14,9 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-const retryPolicyTableCode = "integration_retry_policy"
-
 type retryPolicyApplication interface {
 	CreateRetryPolicy(context.Context, request.RetryPolicyCreateReq) (response.RetryPolicyDetailRes, error)
-	PageRetryPolicy(context.Context, request.RetryPolicyQueryReq, model.SysTable) (response.ListResult[response.RetryPolicyListRes], error)
+	PageRetryPolicy(context.Context, request.RetryPolicyQueryReq) (response.ListResult[response.RetryPolicyListRes], error)
 	GetRetryPolicy(context.Context, int) (response.RetryPolicyDetailRes, error)
 	UpdateDraftRetryPolicy(context.Context, int, request.RetryPolicyUpdateReq) (response.RetryPolicyDetailRes, error)
 	CreateRetryPolicyVersion(context.Context, int, int) (response.RetryPolicyDetailRes, error)
@@ -42,7 +38,7 @@ func (c *RetryPolicyController) Query(ctx *gin.Context) {
 	if !bindRetryPolicy(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.service.PageRetryPolicy(ctx.Request.Context(), req, retryPolicyQueryTable())
+	result, err := c.service.PageRetryPolicy(ctx.Request.Context(), req)
 	c.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -159,23 +155,4 @@ func retryPolicyPathID(ctx *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func retryPolicyQueryTable() model.SysTable {
-	return model.SysTable{Basic: model.Basic{State: true}, TableCode: retryPolicyTableCode, TableFields: []model.SysTableField{
-		retryPolicyQueryField("policy_code", enum.VarcharFieldType, true),
-		retryPolicyQueryField("policy_name", enum.VarcharFieldType, true),
-		retryPolicyQueryField("version", enum.IntFieldType, false),
-		retryPolicyQueryField("status", enum.VarcharFieldType, false),
-		retryPolicyQueryField("max_attempts", enum.IntFieldType, false),
-		retryPolicyQueryField("backoff_type", enum.VarcharFieldType, false),
-		retryPolicyQueryField("initial_delay_ms", enum.BigIntFieldType, false),
-		retryPolicyQueryField("max_delay_ms", enum.BigIntFieldType, false),
-		retryPolicyQueryField("retry_window_ms", enum.BigIntFieldType, false),
-		retryPolicyQueryField("gmt_modify", enum.DatetimeFieldType, false),
-	}}
-}
-
-func retryPolicyQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 }

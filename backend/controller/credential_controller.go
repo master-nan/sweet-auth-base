@@ -3,7 +3,6 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
-	"backend/enum"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/middleware"
@@ -16,12 +15,10 @@ import (
 	ut "github.com/go-playground/universal-translator"
 )
 
-const credentialTableCode = "integration_credential"
-
 type credentialApplication interface {
 	Create(context.Context, request.CredentialCreateReq) (response.CredentialDetailRes, error)
 	Get(context.Context, int) (response.CredentialDetailRes, error)
-	Page(context.Context, request.CredentialQueryReq, model.SysTable) (response.ListResult[response.CredentialListRes], error)
+	Page(context.Context, request.CredentialQueryReq) (response.ListResult[response.CredentialListRes], error)
 	Update(context.Context, int, request.CredentialUpdateReq) (response.CredentialDetailRes, error)
 	Rotate(context.Context, int, request.CredentialRotateReq) (response.CredentialDetailRes, error)
 	Enable(context.Context, int, int) (response.CredentialDetailRes, error)
@@ -43,7 +40,7 @@ func (c *CredentialController) Query(ctx *gin.Context) {
 	if !bindCredential(ctx, &req, c.translators) {
 		return
 	}
-	result, err := c.service.Page(ctx.Request.Context(), req, credentialQueryTable())
+	result, err := c.service.Page(ctx.Request.Context(), req)
 	c.setListResult(ctx, result.Data, result.Total, err)
 }
 
@@ -165,21 +162,4 @@ func credentialPathID(ctx *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func credentialQueryTable() model.SysTable {
-	return model.SysTable{Basic: model.Basic{State: true}, TableCode: credentialTableCode, TableFields: []model.SysTableField{
-		credentialQueryField("credential_code", enum.VarcharFieldType, true),
-		credentialQueryField("name", enum.VarcharFieldType, true),
-		credentialQueryField("credential_type", enum.VarcharFieldType, false),
-		credentialQueryField("status", enum.VarcharFieldType, false),
-		credentialQueryField("expires_at", enum.DatetimeFieldType, false),
-		credentialQueryField("version", enum.IntFieldType, false),
-		credentialQueryField("rotated_at", enum.DatetimeFieldType, false),
-		credentialQueryField("gmt_modify", enum.DatetimeFieldType, false),
-	}}
-}
-
-func credentialQueryField(code string, fieldType enum.SysTableFieldType, quick bool) model.SysTableField {
-	return model.SysTableField{Basic: model.Basic{State: true}, FieldCode: code, FieldType: fieldType, IsQuickSearch: quick, IsAdvancedSearch: true, IsSort: true}
 }
