@@ -53,383 +53,29 @@
             </div>
 
             <div class="row q-col-gutter-md">
-              <template v-for="field in group.fields" :key="field.field_code">
-                <div :class="getFieldColClass(field)">
-                  <!-- 字段元数据：联动配置 -->
-                  <linkage-config-editor
-                    v-if="isLinkageConfigField(field)"
-                    v-model="formData[field.field_code]"
-                    :disable="isReadonly"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 组织主数据选择器 -->
-                  <organization-select
-                    v-else-if="organizationSelectorConfigMap[field.field_code]"
-                    :model-value="formData[field.field_code]"
-                    :selector-type="requireOrganizationSelectorConfig(field).selectorType"
-                    :multiple="requireOrganizationSelectorConfig(field).multiple"
-                    :include-history="requireOrganizationSelectorConfig(field).includeHistory"
-                    :disabled="isReadonly || requireOrganizationSelectorConfig(field).disabled"
-                    :label="field.field_name"
-                    :clearable="!!field.is_null"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :ref="setFieldRef(field.field_code)"
-                    @update:model-value="updateOrganizationSelectorValue(field, $event)"
-                  />
-
-                  <!-- JSON 编辑器 -->
-                  <json-editor
-                    v-else-if="getFieldInputType(field) === 'json-editor'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :rules="getFieldRules(field)"
-                  />
-
-                  <!-- 数组输入 -->
-                  <array-input
-                    v-else-if="getFieldInputType(field) === 'array-input'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                  />
-
-                  <!-- 键值对编辑器 -->
-                  <key-value-editor
-                    v-else-if="getFieldInputType(field) === 'key-value-editor'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                  />
-
-                  <!-- 级联选择 -->
-                  <cascader-select
-                    v-else-if="getFieldInputType(field) === 'cascader'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :options="fieldOptionsMap[field.field_code] || []"
-                    :rules="getFieldRules(field)"
-                    :disable="isReadonly"
-                    :ref="setFieldRef(field.field_code)"
-                    value-mode="value"
-                    :clearable="!!field.is_null"
-                    :selectable="getCascaderSelectable(field)"
-                    :show-path="getCascaderShowPath(field)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 字段元数据：字典编码 -->
-                  <q-select
-                    v-else-if="isDictCodeField(field)"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    outlined
-                    dense
-                    clearable
-                    clear-icon="close"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    :options="filteredDictCodeOptions"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :disable="isReadonly"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @filter="filterDictCodeOptions"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  />
-                  <!-- 文本输入框 -->
-                  <q-input
-                    v-else-if="getFieldInputType(field) === 'input'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :placeholder="getFieldPlaceholder(field)"
-                    outlined
-                    dense
-                    :disable="isReadonly || field.field_code === 'id'"
-                    :maxlength="getMaxLength(field)"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                    :type="hidePassword[field.field_code] ? 'password' : 'text'"
-                  >
-                    <template v-slot:append v-if="shouldHideContent(field)">
-                      <q-icon
-                        :name="hidePassword[field.field_code] ? 'visibility_off' : 'visibility'"
-                        class="cursor-pointer"
-                        @click="togglePasswordVisibility(field.field_code)"
-                      />
-                    </template>
-                  </q-input>
-
-                  <!-- 数字输入框 -->
-                  <q-input
-                    v-else-if="getFieldInputType(field) === 'number'"
-                    :model-value="formData[field.field_code]"
-                    class="number-input-field"
-                    :label="field.field_name"
-                    :placeholder="getFieldPlaceholder(field)"
-                    outlined
-                    dense
-                    type="text"
-                    :inputmode="getNumberInputMode(field)"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @keydown.up="handleNumberArrow(field, 1, $event)"
-                    @keydown.down="handleNumberArrow(field, -1, $event)"
-                    @update:model-value="updateNumberFieldValue(field, $event)"
-                  >
-                    <template v-if="!isExactDecimalFieldType(field.field_type)" v-slot:append>
-                      <div class="number-input-field__actions">
-                        <q-btn
-                          flat
-                          dense
-                          unelevated
-                          icon="remove"
-                          aria-label="减少"
-                          class="number-input-field__step"
-                          :tabindex="-1"
-                          :disable="isReadonly"
-                          @mousedown.prevent
-                          @click.stop="adjustNumberField(field, -1)"
-                        />
-                        <q-btn
-                          flat
-                          dense
-                          unelevated
-                          icon="add"
-                          aria-label="增加"
-                          class="number-input-field__step"
-                          :tabindex="-1"
-                          :disable="isReadonly"
-                          @mousedown.prevent
-                          @click.stop="adjustNumberField(field, 1)"
-                        />
-                      </div>
-                    </template>
-                  </q-input>
-
-                  <!-- 文本区域 -->
-                  <q-input
-                    v-else-if="getFieldInputType(field) === 'textarea'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :placeholder="getFieldPlaceholder(field)"
-                    outlined
-                    type="textarea"
-                    autogrow
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 下拉选择框 -->
-                  <q-select
-                    v-else-if="getFieldInputType(field) === 'select'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :placeholder="getFieldPlaceholder(field)"
-                    outlined
-                    dense
-                    :clearable="!!field.is_null"
-                    clear-icon="close"
-                    emit-value
-                    map-options
-                    :disable="isReadonly"
-                    :options="getSelectOptions(field)"
-                    :use-input="isRelationSelectField(field)"
-                    input-debounce="250"
-                    :loading="isRelationOptionsLoading(field)"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @filter="(val, update, abort) => filterRelationSelect(field, val, update, abort)"
-                    @popup-show="() => preloadRelationSelect(field)"
-                    @virtual-scroll="(details) => loadMoreRelationSelect(field, details)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  >
-                    <template #no-option>
-                      <q-item>
-                        <q-item-section class="text-grey-6">
-                          {{
-                            isRelationSelectField(field)
-                              ? isRelationOptionsLoading(field)
-                                ? '正在加载选项...'
-                                : '暂无选项，可输入关键字搜索'
-                              : '暂无选项'
-                          }}
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                    <template #after-options>
-                      <q-item v-if="hasMoreRelationOptions(field)" dense>
-                        <q-item-section class="text-grey-6 text-caption">
-                          向下滚动加载更多
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
-
-                  <!-- 布尔值选择 -->
-                  <div
-                    v-else-if="getFieldInputType(field) === 'boolean'"
-                    class="boolean-toggle-field"
-                  >
-                    <div class="boolean-toggle-field__label">{{ field.field_name }}</div>
-                    <q-btn-toggle
-                      v-model="formData[field.field_code]"
-                      :options="booleanToggleOptions"
-                      dense
-                      unelevated
-                      no-caps
-                      toggle-color="primary"
-                      color="grey-2"
-                      text-color="grey-8"
-                      :disable="isReadonly || field.field_code === 'id'"
-                      @update:model-value="handleFieldInput(field.field_code)"
-                    />
-                  </div>
-
-                  <!-- 日期选择器 -->
-                  <sweet-date-time-picker
-                    v-else-if="getFieldInputType(field) === 'date'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    type="date"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 日期时间选择器 -->
-                  <sweet-date-time-picker
-                    v-else-if="getFieldInputType(field) === 'datetime'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    type="datetime"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 时间选择器 -->
-                  <sweet-date-time-picker
-                    v-else-if="getFieldInputType(field) === 'time'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    type="time"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 年份选择器 -->
-                  <sweet-date-time-picker
-                    v-else-if="getFieldInputType(field) === 'year'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    type="year"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 年月选择器 -->
-                  <sweet-date-time-picker
-                    v-else-if="getFieldInputType(field) === 'year-month'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    type="year-month"
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @change="handleFieldInput(field.field_code)"
-                  />
-
-                  <!-- 文件上传 -->
-                  <file-upload
-                    v-else-if="getFieldInputType(field) === 'file'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :rules="getFieldRules(field)"
-                    :table-code="tableCode"
-                    :menu-id="menuId"
-                    :row-id="currentRecordId"
-                    :field-code="field.field_code"
-                    :readonly="isReadonly"
-                    :multiple="getFileUploadConfig(field).multiple"
-                    :accept="getFileUploadConfig(field).accept"
-                    :max-size="getFileUploadConfig(field).maxSize"
-                    :chunk-threshold="getFileUploadConfig(field).chunkThreshold"
-                    :concurrency="getFileUploadConfig(field).concurrency"
-                  />
-
-                  <!-- 富文本编辑器 -->
-                  <rich-text-editor
-                    v-else-if="getFieldInputType(field) === 'rich-text'"
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :rules="getFieldRules(field)"
-                    :disabled="field.field_code === 'id'"
-                    :table-code="tableCode"
-                    :menu-id="menuId"
-                    :row-id="currentRecordId"
-                    :field-code="field.field_code"
-                  />
-
-                  <!-- 默认输入框 (如果没有匹配的输入类型) -->
-                  <q-input
-                    v-else
-                    v-model="formData[field.field_code]"
-                    :label="field.field_name"
-                    :placeholder="getFieldPlaceholder(field)"
-                    outlined
-                    dense
-                    :disable="isReadonly"
-                    :rules="getFieldRules(field)"
-                    :hint="getFieldHint(field)"
-                    :lazy-rules="lazyRulesValue"
-                    :ref="setFieldRef(field.field_code)"
-                    @focus="markTouched(field.field_code)"
-                    @blur="markTouched(field.field_code)"
-                    @update:model-value="handleFieldInput(field.field_code)"
-                  />
-                </div>
-              </template>
+              <div
+                v-for="field in group.fields"
+                :key="field.field_code"
+                :class="getFieldColClass(field)"
+              >
+                <dynamic-field-control
+                  v-model="formData[field.field_code]"
+                  :field="field"
+                  :context="getFieldControlContext(field)"
+                  @field-input="handleFieldInput(field.field_code)"
+                  @touched="markTouched(field.field_code)"
+                  @organization-change="updateOrganizationSelectorValue(field, $event)"
+                  @number-change="updateNumberFieldValue(field, $event)"
+                  @number-step="adjustNumberField(field, $event)"
+                  @number-keydown="(direction, event) => handleNumberArrow(field, direction, event)"
+                  @dict-filter="filterDictCodeOptions"
+                  @relation-filter="
+                    (text, update, abort) => filterRelationSelect(field, text, update, abort)
+                  "
+                  @relation-preload="preloadRelationSelect(field)"
+                  @relation-load-more="loadMoreRelationSelect(field, $event)"
+                />
+              </div>
             </div>
           </section>
         </div>
@@ -495,17 +141,8 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  onMounted,
-  nextTick,
-  defineAsyncComponent,
-  type PropType,
-} from 'vue'
+import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
 import { QForm } from 'quasar'
-import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import { type TableField } from 'src/api/services/sys-table'
 import { type MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
@@ -516,14 +153,10 @@ import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
 
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
-import ArrayInput from 'src/components/JsonEditor/ArrayInput.vue'
-import KeyValueEditor from 'src/components/JsonEditor/KeyValueEditor.vue'
-import JsonEditor from 'src/components/JsonEditor/JsonEditor.vue'
-import CascaderSelect from 'src/components/Cascader/CascaderSelect.vue'
-import FileUpload from 'src/components/FileUpload/FileUpload.vue'
-import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.vue'
+import DynamicFieldControl, {
+  type DynamicFieldControlContext,
+} from 'src/components/FormDialog/DynamicFieldControl.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import {
   coerceFieldValue,
   coerceDictOptions,
@@ -555,10 +188,6 @@ type FieldGroup = {
   description: string
   fields: TableField[]
 }
-
-const RichTextEditor = defineAsyncComponent(
-  () => import('src/components/RichTextEditor/RichTextEditor.vue'),
-)
 
 const props = defineProps({
   modelValue: {
@@ -625,12 +254,12 @@ const show = computed({
   set: (val) => emit('update:modelValue', val),
 })
 const loadingData = ref(false)
+const controlResetVersion = ref(0)
 const isEdit = computed(() => !!props.editData?.id)
 const isReadonly = computed(() => props.readonly)
 const currentRecordId = computed(() => Number(formData.value.id || props.editData?.id || 0))
 const formRef = ref<QForm>()
 const formData = ref<Record<string, any>>({})
-const hidePassword = ref<Record<string, boolean>>({})
 const validationActive = ref(false)
 const isInitializing = ref(false)
 const lazyRulesValue = computed(() => (validationActive.value ? false : 'ondemand'))
@@ -658,9 +287,7 @@ const booleanToggleOptions = [
   { label: '是', value: true },
 ]
 
-type OrganizationSelectorConfig = NonNullable<
-  ReturnType<typeof resolveOrganizationSelectorConfig>
->
+type OrganizationSelectorConfig = NonNullable<ReturnType<typeof resolveOrganizationSelectorConfig>>
 
 const organizationSelectorConfigMap = computed<Record<string, OrganizationSelectorConfig>>(() => {
   const configs: Record<string, OrganizationSelectorConfig> = {}
@@ -675,10 +302,6 @@ const getOrganizationSelectorConfig = (field: TableField) => {
   return organizationSelectorConfigMap.value[field.field_code] || null
 }
 
-const requireOrganizationSelectorConfig = (field: TableField): OrganizationSelectorConfig => {
-  return organizationSelectorConfigMap.value[field.field_code] as OrganizationSelectorConfig
-}
-
 const normalizeOrganizationSelectorId = (value: unknown): number | null => {
   const numericValue =
     typeof value === 'number'
@@ -689,10 +312,7 @@ const normalizeOrganizationSelectorId = (value: unknown): number | null => {
   return Number.isSafeInteger(numericValue) && numericValue > 0 ? numericValue : null
 }
 
-const normalizeOrganizationSelectorValue = (
-  value: unknown,
-  config: OrganizationSelectorConfig,
-) => {
+const normalizeOrganizationSelectorValue = (value: unknown, config: OrganizationSelectorConfig) => {
   if (!config.multiple) return normalizeOrganizationSelectorId(value)
   if (!Array.isArray(value)) return []
 
@@ -1084,7 +704,10 @@ const currentFieldValues = (field: TableField) => {
   return values.filter((item) => item !== undefined && item !== null && item !== '')
 }
 
-const updateRelationSelectState = (fieldCode: string, state: Partial<(typeof relationSelectStateMap.value)[string]>) => {
+const updateRelationSelectState = (
+  fieldCode: string,
+  state: Partial<(typeof relationSelectStateMap.value)[string]>,
+) => {
   relationSelectStateMap.value = {
     ...relationSelectStateMap.value,
     [fieldCode]: {
@@ -1171,12 +794,7 @@ const buildTreeFromFlat = (
   return tree
 }
 
-const fetchRelationOptions = async (
-  field: TableField,
-  cfg: any,
-  page: number,
-  keyword: string,
-) => {
+const fetchRelationOptions = async (field: TableField, cfg: any, page: number, keyword: string) => {
   if (!field.id || props.menuId <= 0) return { options: [], total: 0 }
   const pageSize = relationPageSizeForLinkage(cfg)
   const result = await queryRuntimeRelationOptions(field.id, {
@@ -1218,7 +836,12 @@ const loadRelationOptions = async (
   const keyword = options.keyword || ''
   const append = !!options.append
   const state = relationSelectStateMap.value[fieldCode]
-  if (!options.force && page === 1 && state?.keyword === keyword && fieldOptionsMap.value[fieldCode]) {
+  if (
+    !options.force &&
+    page === 1 &&
+    state?.keyword === keyword &&
+    fieldOptionsMap.value[fieldCode]
+  ) {
     return fieldOptionsMap.value[fieldCode]
   }
   if (state?.loading) return fieldOptionsMap.value[fieldCode] || []
@@ -1435,11 +1058,6 @@ const debouncedRefreshLinkage = () => {
   linkageDebounceTimer = setTimeout(() => smartRefreshLinkage(), 300)
 }
 
-// 切换密码可见性
-const togglePasswordVisibility = (fieldCode: string) => {
-  hidePassword.value[fieldCode] = !hidePassword.value[fieldCode]
-}
-
 // 判断是否应该隐藏内容（密码字段）
 const shouldHideContent = (field: TableField) => {
   return (
@@ -1452,6 +1070,7 @@ const shouldHideContent = (field: TableField) => {
 
 // 初始化表单数据
 const initFormData = () => {
+  controlResetVersion.value += 1
   loadingData.value = true
   if (isEdit.value && props.editData) {
     // 编辑模式：使用现有数据
@@ -1460,13 +1079,6 @@ const initFormData = () => {
     if (typeof formData.value.linkage_config === 'string') {
       formData.value.linkage_config = decodeHtmlEntities(formData.value.linkage_config)
     }
-
-    // 设置所有密码字段为隐藏状态
-    props.fields.forEach((field) => {
-      if (shouldHideContent(field)) {
-        hidePassword.value[field.field_code] = true
-      }
-    })
   } else {
     // 新增模式：使用默认空对象
     formData.value = props.editData ? { ...props.editData } : {}
@@ -1661,7 +1273,9 @@ const buildFieldRules = (field: TableField) => {
     rules.push((val) => {
       if (shouldSkip()) return true
       if (isValueEmpty(val)) return true
-      const match = String(val).trim().match(/^-?(\d+)(?:\.(\d+))?$/)
+      const match = String(val)
+        .trim()
+        .match(/^-?(\d+)(?:\.(\d+))?$/)
       if (!match) return `${field.field_name}必须是十进制数字`
       const integerDigits = match[1]!.replace(/^0+(?=\d)/, '').length
       const fractionalDigits = (match[2] || '').length
@@ -1882,6 +1496,42 @@ const getCascaderShowPath = (field: TableField): boolean => {
   return parseLinkageConfig(field)?.showPath !== false
 }
 
+const getFieldControlContext = (field: TableField): DynamicFieldControlContext => ({
+  role: isLinkageConfigField(field)
+    ? 'linkage-config'
+    : isDictCodeField(field)
+      ? 'dict-code'
+      : 'standard',
+  controlType: getFieldInputType(field),
+  readonly: isReadonly.value,
+  tableCode: props.tableCode,
+  menuId: props.menuId,
+  rowId: currentRecordId.value,
+  lazyRules: lazyRulesValue.value,
+  organization: getOrganizationSelectorConfig(field),
+  rules: getFieldRules(field),
+  hint: getFieldHint(field),
+  placeholder: getFieldPlaceholder(field),
+  options:
+    getFieldInputType(field) === 'cascader'
+      ? fieldOptionsMap.value[field.field_code] || []
+      : getSelectOptions(field),
+  dictCodeOptions: filteredDictCodeOptions.value,
+  cascaderSelectable: getCascaderSelectable(field),
+  cascaderShowPath: getCascaderShowPath(field),
+  maxLength: getMaxLength(field),
+  numberInputMode: getNumberInputMode(field),
+  exactDecimal: isExactDecimalFieldType(field.field_type),
+  hideContent: shouldHideContent(field),
+  visibilityResetToken: controlResetVersion.value,
+  relationSelect: isRelationSelectField(field),
+  relationLoading: isRelationOptionsLoading(field),
+  relationHasMore: hasMoreRelationOptions(field),
+  booleanOptions: booleanToggleOptions,
+  file: getFileUploadConfig(field),
+  fieldRef: setFieldRef(field.field_code),
+})
+
 // 提交表单
 const submitForm = async () => {
   if (isReadonly.value) {
@@ -1957,7 +1607,9 @@ watch(
 watch(
   () =>
     props.fields.map((field) =>
-      [field.id, field.field_code, field.input_type, field.dict_code, field.linkage_config].join(':'),
+      [field.id, field.field_code, field.input_type, field.dict_code, field.linkage_config].join(
+        ':',
+      ),
     ),
   async () => {
     if (!show.value || props.fields.length === 0) return
@@ -2007,8 +1659,8 @@ onMounted(() => {
 .dynamic-form-section {
   padding: 16px;
   border-radius: 8px;
-  border: 1px solid #e4ebf7;
-  background: #fff;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
 
 .dynamic-form-sections.is-simple .dynamic-form-section {
@@ -2030,119 +1682,13 @@ onMounted(() => {
   font-size: 15px;
   line-height: 1.3;
   font-weight: 800;
-  color: #172033;
+  color: var(--app-text-strong);
 }
 
 .dynamic-form-section__desc {
   margin-top: 4px;
   font-size: 12px;
-  color: #8290a6;
-}
-
-.boolean-toggle-field {
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 7px 4px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.24);
-  border-radius: 4px;
-  background: transparent;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.boolean-toggle-field:hover {
-  border-color: rgba(0, 0, 0, 0.54);
-}
-
-.boolean-toggle-field:focus-within {
-  border-color: $primary;
-  box-shadow: inset 0 0 0 1px $primary;
-}
-
-.boolean-toggle-field__label {
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.87);
-  white-space: nowrap;
-  word-break: keep-all;
-}
-
-.boolean-toggle-field :deep(.q-btn-toggle) {
-  flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: 4px;
-  background: transparent;
-}
-
-.boolean-toggle-field :deep(.q-btn) {
-  min-width: 34px;
-  min-height: 30px;
-  padding: 4px 10px;
-  font-size: 13px;
-  line-height: 1.2;
-  border-radius: 4px;
-}
-
-.boolean-toggle-field :deep(.q-btn.bg-grey-2) {
-  color: #606a7c !important;
-  background: transparent !important;
-}
-
-.boolean-toggle-field :deep(.q-btn.bg-primary) {
-  color: #fff !important;
-  background: $primary !important;
-}
-
-.boolean-toggle-field :deep(.q-btn::before) {
-  box-shadow: none;
-}
-
-.number-input-field :deep(.q-field__native) {
-  font-variant-numeric: tabular-nums;
-}
-
-.number-input-field :deep(input[type='text']) {
-  appearance: textfield;
-}
-
-.number-input-field :deep(.q-field__append) {
-  padding-left: 4px;
-}
-
-.number-input-field__actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-right: -3px;
-}
-
-.number-input-field__step {
-  width: 24px;
-  min-width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
-  border-radius: 6px;
-  color: #717d92;
-}
-
-.number-input-field__step :deep(.q-focus-helper) {
-  display: none;
-}
-
-.number-input-field__step :deep(.q-icon) {
-  font-size: 16px;
-}
-
-.number-input-field__step:not(.disabled):hover,
-.number-input-field__step:not(.disabled):focus-visible {
-  color: $primary;
-  background: rgba($primary, 0.08);
+  color: var(--app-text-muted);
 }
 
 .form-preview {
@@ -2153,7 +1699,7 @@ onMounted(() => {
 .form-preview__title {
   font-size: 15px;
   font-weight: 800;
-  color: #172033;
+  color: var(--app-text-strong);
 }
 
 .form-preview__metrics {
@@ -2166,15 +1712,15 @@ onMounted(() => {
   min-width: 0;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #e4ebf7;
-  background: #f8faff;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
 }
 
 .form-preview__metrics strong {
   display: block;
   font-size: 20px;
   line-height: 1.1;
-  color: #172033;
+  color: var(--app-text-strong);
 }
 
 .form-preview__metrics span {
@@ -2187,8 +1733,8 @@ onMounted(() => {
 .form-preview__panel {
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid #e4ebf7;
-  background: #fff;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
 
 .form-preview__panel-title {
@@ -2218,7 +1764,7 @@ onMounted(() => {
 .form-preview__row strong {
   min-width: 0;
   font-size: 12px;
-  color: #172033;
+  color: var(--app-text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2236,9 +1782,5 @@ onMounted(() => {
 .form-preview__empty {
   font-size: 12px;
   color: #8a96a9;
-}
-
-.cursor-pointer {
-  cursor: pointer;
 }
 </style>

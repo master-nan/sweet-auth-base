@@ -73,7 +73,6 @@ vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./InterfaceDefinitionFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./InterfaceDefinitionDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 
@@ -130,7 +129,6 @@ const mountPage = () =>
         QChip: true,
         QTd: SlotStub,
         TablePagination: true,
-        AdvancedQuery: true,
         StandardTableToolbar: ToolbarStub,
         InterfaceDefinitionFormDialog: true,
         InterfaceDefinitionDetailDialog: true,

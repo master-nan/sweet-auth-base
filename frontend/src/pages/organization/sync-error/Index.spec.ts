@@ -8,21 +8,6 @@ const source = readFileSync(
 )
 
 describe('organization sync error query scheme integration', () => {
-  it('uses the shared page composable and unified query scheme bindings', () => {
-    expect(source).toContain(
-      "useQuerySchemePage('organization_sync_error', queryState, resetAndFetch)",
-    )
-    expect(source).toContain('<query-scheme-selector')
-    expect(source).toContain('<query-quick-presets')
-    expect(source).toContain('<query-scheme-save-dialog')
-    expect(source).toContain(':schemes="schemePage.runtime.schemes.value"')
-    expect(source).toContain(':config="schemePage.runtime.scope.config.value"')
-    expect(source).toContain('v-model="schemePage.showSaveDialog.value"')
-    expect(source).toContain('v-model:bindings="queryState.bindings.value"')
-    expect(source).toContain(':source-name="queryState.schemeSource.value?.name || \'\'"')
-    expect(source).toContain(':dirty="queryState.dirty.value"')
-  })
-
   it('applies contextual diagnostics after scheme initialization and before fetching', () => {
     const mounted = source.slice(source.indexOf('onMounted(async () => {'))
     const initializeIndex = mounted.indexOf('await schemePage.initialize()')

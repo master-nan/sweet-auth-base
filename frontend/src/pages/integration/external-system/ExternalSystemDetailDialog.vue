@@ -137,7 +137,7 @@ watch(
 .external-system-detail__item {
   min-width: 0;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .external-system-detail__item--wide {
@@ -146,13 +146,13 @@ watch(
 
 .external-system-detail__label {
   margin-bottom: 7px;
-  color: #8290a8;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
 .external-system-detail__value {
   overflow-wrap: anywhere;
-  color: #172033;
+  color: var(--app-text-strong);
   font-weight: 600;
 }
 
@@ -160,16 +160,6 @@ watch(
   min-height: 260px;
   display: grid;
   place-items: center;
-}
-
-.body--dark {
-  .external-system-detail__item {
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .external-system-detail__value {
-    color: #e7ebf5;
-  }
 }
 
 @media (max-width: 700px) {

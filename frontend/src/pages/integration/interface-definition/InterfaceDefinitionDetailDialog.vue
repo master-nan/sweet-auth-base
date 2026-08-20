@@ -81,12 +81,10 @@ watch(() => [props.modelValue, props.id] as const, ([open]) => { if (open) void 
 .interface-detail { display: grid; gap: 24px; padding: 4px 6px 20px; }
 .interface-detail__title { margin-bottom: 16px; font-size: 16px; font-weight: 700; }
 .interface-detail__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 36px; }
-.interface-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid rgba(15, 23, 42, 0.08); }
+.interface-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid var(--app-border); }
 .interface-detail__wide { grid-column: 1 / -1; }
-.interface-detail__label { margin-bottom: 7px; color: #8290a8; font-size: 12px; }
-.interface-detail__value { overflow-wrap: anywhere; color: #172033; font-weight: 600; }
+.interface-detail__label { margin-bottom: 7px; color: var(--app-text-muted); font-size: 12px; }
+.interface-detail__value { overflow-wrap: anywhere; color: var(--app-text-strong); font-weight: 600; }
 .interface-detail__loading { min-height: 260px; display: grid; place-items: center; }
-.body--dark .interface-detail__item { border-color: rgba(255, 255, 255, 0.1); }
-.body--dark .interface-detail__value { color: #e7ebf5; }
 @media (max-width: 700px) { .interface-detail__grid { grid-template-columns: 1fr; } .interface-detail__wide { grid-column: auto; } }
 </style>

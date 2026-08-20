@@ -17,41 +17,32 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector>
-            <query-scheme-selector
-              :schemes="schemePage.runtime.schemes.value"
-              :current-label="schemePage.runtime.currentLabel.value"
-              :loading="schemePage.runtime.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="schemePage.runtime.error.value"
-              @select="schemePage.selectScheme"
-              @restore-current="schemePage.restoreCurrent"
-              @reset-default="schemePage.resetDefault"
-              @retry="schemePage.runtime.loadAvailable"
-              @manage="schemePage.openManager"
-            />
-          </template>
-          <template #quick-presets>
-            <query-quick-presets
-              :config="schemePage.runtime.scope.config.value"
-              @apply="schemePage.applyPreset"
-            />
-          </template>
-          <template #quick-search>
-            <q-input
-              v-model="keyword"
-              dense
-              outlined
-              debounce="300"
-              placeholder="搜索用户、动作、资源、路径、IP"
-              @keyup.enter="handleBasicSearch"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="auditAdvancedFields"
+              advanced-title="审计日志查询"
+              :enable-nested="false"
             >
-              <template #append>
-                <q-icon name="search" />
+              <template #quick-search>
+                <q-input
+                  v-model="keyword"
+                  dense
+                  outlined
+                  debounce="300"
+                  placeholder="搜索用户、动作、资源、路径、IP"
+                  @keyup.enter="handleBasicSearch"
+                >
+                  <template #append>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
-            </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+            </query-scheme-controls>
           </template>
+
           <template #column-selector>
             <q-select
               v-model="visibleColumns"
@@ -65,37 +56,6 @@
               :options="columns"
               option-value="name"
               options-cover
-            />
-          </template>
-          <template #advanced-trigger>
-            <q-btn
-              outline
-              icon="tune"
-              color="primary"
-              :aria-label="
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              "
-              @click="showAdvancedQuery = true"
-            >
-              <q-badge v-if="activeFilterCount > 0" floating color="red">{{
-                activeFilterCount
-              }}</q-badge>
-              <q-tooltip>{{
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              }}</q-tooltip>
-            </q-btn>
-          </template>
-          <template #save-scheme>
-            <q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="schemePage.showSaveDialog.value = true"
             />
           </template>
         </standard-table-toolbar>
@@ -143,25 +103,6 @@
         </div></template
       >
     </q-table>
-
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:queryModel="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="auditAdvancedFields"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      :enable-nested="false"
-      title="审计日志查询"
-      @search="handleAdvancedSearch"
-    />
-
-    <query-scheme-save-dialog
-      v-model="schemePage.showSaveDialog.value"
-      :source="queryState.schemeSource.value"
-      :loading="schemePage.saving.value"
-      @save="schemePage.savePersonal"
-    />
   </base-content>
 </template>
 
@@ -170,12 +111,9 @@ defineOptions({ name: 'system_audit' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
@@ -185,7 +123,7 @@ import type { TableField } from 'src/api/services/sys-table'
 import type { Query } from 'src/types/global'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
+import { hasEffectiveQueryRules } from 'src/utils/query-state'
 import { metadataDictDefault } from 'src/utils/field-metadata'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { usePageButtons } from 'src/composables/page-buttons'
@@ -204,7 +142,6 @@ const { line_buttons: lineButtons } = usePageButtons('system_audit')
 
 const rows = ref<AccessLog[]>([])
 const total = ref(0)
-const showAdvancedQuery = ref(false)
 
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
@@ -228,16 +165,9 @@ const queryState = useTableQueryState<Query>({
     include_deleted: false,
   }),
 })
-const {
-  query,
-  keyword,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
+const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
-
-const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 
 const columns = computed<QTableProps['columns']>(() => [
   { name: 'gmt_create', field: 'gmt_create', label: '时间', align: 'left', sortable: true },
@@ -357,11 +287,6 @@ const handleBasicSearch = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
-const handleAdvancedSearch = () => {
-  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
-}
-
 const fetchData = async () => {
   loading.value = true
   loadError.value = ''
@@ -436,15 +361,6 @@ watch(
     )
       return
     resetAndFetch()
-  },
-)
-
-watch(
-  () => showAdvancedQuery.value,
-  (isOpen) => {
-    if (isOpen) {
-      queryState.beginAdvancedEdit()
-    }
   },
 )
 

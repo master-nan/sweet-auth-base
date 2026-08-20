@@ -124,36 +124,3 @@ const normalizeMenuPath = (value: string) => {
 const menuMatchesTableCode = (menu: Menu, tableCode: string) => {
   return String(menu.table_code || '').trim() === tableCode
 }
-
-const relationMenuIdKeys = [
-  'menuId',
-  'menuID',
-  'menu_id',
-  'targetMenuId',
-  'target_menu_id',
-  'relationMenuId',
-  'relation_menu_id',
-]
-
-export const resolveRelationMenuId = (
-  menus: Menu[],
-  linkage: Record<string, any> | null | undefined,
-  fallbackMenuId = 0,
-) => {
-  if (!linkage) return 0
-  for (const key of relationMenuIdKeys) {
-    const id = toPositiveMenuId(linkage[key])
-    if (id > 0) return id
-  }
-
-  const tableCode = String(linkage.tableCode || linkage.table_code || '').trim()
-  const targetMenu = findMenuByTableCode(menus, tableCode)
-  if (targetMenu?.id) return targetMenu.id
-
-  const useCurrentMenu =
-    linkage.useCurrentMenu === true ||
-    linkage.useCurrentMenuId === true ||
-    linkage.use_current_menu === true ||
-    linkage.use_current_menu_id === true
-  return useCurrentMenu ? toPositiveMenuId(fallbackMenuId) : 0
-}

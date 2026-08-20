@@ -42,15 +42,18 @@ const metadataEntityPages = [
 ]
 
 describe('formal page consistency freeze', () => {
-  it.each(standardListPages)('%s uses the shared toolbar and query state', (page) => {
-    const source = pageSource(page)
-
-    expect(source).toContain('StandardTableToolbar')
-    expect(source).toContain('useTableQueryState')
+  it('keeps standard list pages on the shared toolbar and query state', () => {
+    for (const page of standardListPages) {
+      const source = pageSource(page)
+      expect(source, page).toContain('StandardTableToolbar')
+      expect(source, page).toContain('useTableQueryState')
+    }
   })
 
-  it.each(metadataEntityPages)('%s reads safe runtime metadata', (page) => {
-    expect(pageSource(page)).toContain('useRuntimeTableMetadata')
+  it('keeps metadata entity pages on the runtime metadata boundary', () => {
+    for (const page of metadataEntityPages) {
+      expect(pageSource(page), page).toContain('useRuntimeTableMetadata')
+    }
   })
 
   it('keeps production pages behind API services', () => {
@@ -64,7 +67,7 @@ describe('formal page consistency freeze', () => {
   it('does not provide an ungranted audit detail fallback', () => {
     const source = pageSource('./system/audit/Index.vue')
 
-    expect(source).not.toContain("lineButtons.length === 0")
+    expect(source).not.toContain('lineButtons.length === 0')
     expect(source).toContain('v-for="btn in lineButtons"')
   })
 })

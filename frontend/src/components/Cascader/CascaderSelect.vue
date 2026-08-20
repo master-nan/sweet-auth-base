@@ -379,14 +379,14 @@ defineExpose({
   display: flex;
   min-width: 360px;
   max-width: 720px;
-  background: white;
+  background: var(--app-surface);
 }
 
 .cascader-column {
   min-width: 180px;
   max-height: 320px;
   overflow-y: auto;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid var(--app-border);
 }
 
 .cascader-column:last-child {

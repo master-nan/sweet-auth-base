@@ -134,7 +134,6 @@ describe('sync batch query page', () => {
     expect(schemeMocks.initialize.mock.invocationCallOrder[0]).toBeLessThan(
       api.querySyncBatches.mock.invocationCallOrder[0]!,
     )
-    expect(wrapper.find('advanced-query-stub').exists()).toBe(true)
     expect(wrapper.text()).not.toMatch(/取消批次|修改 Checkpoint|补数|Dry Run|重新运行/)
     const vm = wrapper.vm as unknown as { openDetail: (id: number) => Promise<void> }
     api.getSyncBatch.mockResolvedValue({

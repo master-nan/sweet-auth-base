@@ -84,7 +84,6 @@ vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./SyncTaskFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./SyncTaskDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 import Page from './Index.vue'
@@ -164,7 +163,6 @@ describe('sync task page permissions', () => {
           QTooltip: true,
           QSpace: true,
           TablePagination: true,
-          AdvancedQuery: true,
           SyncTaskFormDialog: true,
           SyncTaskDetailDialog: true,
         },
@@ -212,7 +210,6 @@ describe('sync task page permissions', () => {
           QTooltip: true,
           QSpace: true,
           TablePagination: true,
-          AdvancedQuery: true,
           SyncTaskFormDialog: true,
           SyncTaskDetailDialog: true,
         },
@@ -247,7 +244,6 @@ describe('sync task page permissions', () => {
           QTooltip: true,
           QSpace: true,
           TablePagination: true,
-          AdvancedQuery: true,
           SyncTaskFormDialog: true,
           SyncTaskDetailDialog: true,
         },
@@ -278,7 +274,6 @@ describe('sync task page permissions', () => {
           QTooltip: true,
           QSpace: true,
           TablePagination: true,
-          AdvancedQuery: true,
           SyncTaskFormDialog: true,
           SyncTaskDetailDialog: true,
         },

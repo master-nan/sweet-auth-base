@@ -1,7 +1,7 @@
 import { defineBoot } from '#q-app/wrappers'
 import { useRouterStore } from 'stores/permission'
 import { useUserStore } from 'stores/user'
-import { deepClone } from 'src/utils'
+import cloneDeep from 'lodash/cloneDeep'
 import { asyncRoutesChildren, asyncRootRoute } from 'src/router/routes'
 import constructionRouters from 'src/router/utils'
 import type { RouteRecordRaw } from 'vue-router'
@@ -91,7 +91,7 @@ export default defineBoot(({ router }) => {
             }
           }
           // 根据权限构建动态路由
-          const accessRoutes = deepClone(asyncRoutesChildren)
+          const accessRoutes = cloneDeep(asyncRoutesChildren)
           asyncRootRoute[0]!.children = constructionRouters(accessRoutes)
           routerStore.setRoutes(asyncRootRoute)
 

@@ -30,7 +30,7 @@ watch(() => [props.modelValue, props.id] as const, async ([open, id]) => { if (!
 </script>
 <style scoped lang="scss">
 .sync-task-detail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; padding: 8px 4px 20px; }
-.sync-task-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid var(--app-border-color); }
+.sync-task-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid var(--app-border); }
 .sync-task-detail__wide { grid-column: 1 / -1; }
 @media (max-width: 760px) { .sync-task-detail { grid-template-columns: 1fr; } .sync-task-detail__wide { grid-column: auto; } }
 </style>

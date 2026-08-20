@@ -132,7 +132,11 @@ export const buildRelationLookups = async (
       const field = fields.find((item) => item.field_code === fieldCode)
       if (!field?.id) return
       const map: LookupMap = {}
-      const result = await queryRuntimeRelationOptions(field.id, { menu_id: menuId, page: 1, num: 50 })
+      const result = await queryRuntimeRelationOptions(field.id, {
+        menu_id: menuId,
+        page: 1,
+        num: 50,
+      })
       mergeOptionsIntoLookup(map, result.items)
       lookups[fieldCode] = map
     } catch (error) {
@@ -266,26 +270,6 @@ export const buildColumnFormat = (
   return undefined
 }
 
-/**
- * 批量为所有列表显示字段构建 format 函数映射
- *
- * @returns Record<fieldCode, formatFn>
- */
-export const buildAllColumnFormats = (
-  fields: TableField[],
-  ctx: FormatContext,
-): Record<string, (val: any, row?: any) => string> => {
-  const result: Record<string, (val: any, row?: any) => string> = {}
-  fields.forEach((field) => {
-    if (!field.is_list_show) return
-    const fmt = buildColumnFormat(field, ctx)
-    if (fmt) {
-      result[field.field_code] = fmt
-    }
-  })
-  return result
-}
-
 // ─── 高级封装：自动构建列数组 ─────────────────────────
 
 export interface RuntimeColumnOverride<Row extends object> {
@@ -301,8 +285,7 @@ export interface RuntimeColumnOverride<Row extends object> {
   headerClasses?: string
 }
 
-export interface RuntimeVirtualColumn<Row extends object>
-  extends TableColumn<Row> {
+export interface RuntimeVirtualColumn<Row extends object> extends TableColumn<Row> {
   defaultVisible?: boolean
   order?: number
   serverSortField?: string

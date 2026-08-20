@@ -179,7 +179,6 @@ describe('integration execution retry summary', () => {
       fetchData: () => Promise<void>
     }
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
-    expect(wrapper.find('advanced-query-stub').exists()).toBe(true)
     expect(vm.columns.map((column) => column.name)).toEqual(
       expect.arrayContaining([
         'current_attempt',

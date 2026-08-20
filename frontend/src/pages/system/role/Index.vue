@@ -18,40 +18,29 @@
     >
       <template v-slot:top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector>
-            <query-scheme-selector
-              :schemes="schemePage.runtime.schemes.value"
-              :current-label="schemePage.runtime.currentLabel.value"
-              :loading="schemePage.runtime.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="schemePage.runtime.error.value"
-              @select="schemePage.selectScheme"
-              @restore-current="schemePage.restoreCurrent"
-              @reset-default="schemePage.resetDefault"
-              @retry="schemePage.runtime.loadAvailable"
-              @manage="schemePage.openManager"
-            />
-          </template>
-          <template #quick-presets>
-            <query-quick-presets
-              :config="schemePage.runtime.scope.config.value"
-              @apply="schemePage.applyPreset"
-            />
-          </template>
-          <template #quick-search>
-            <q-input
-              dense
-              outlined
-              debounce="300"
-              v-model="keyword"
-              placeholder="搜索角色名称/备注"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="table_fields_advanced"
             >
-              <template v-slot:append>
-                <q-icon name="search" />
+              <template #quick-search>
+                <q-input
+                  dense
+                  outlined
+                  debounce="300"
+                  v-model="keyword"
+                  placeholder="搜索角色名称/备注"
+                >
+                  <template v-slot:append>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
-            </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+            </query-scheme-controls>
           </template>
+
           <template #column-selector>
             <q-select
               v-model="visibleColumns"
@@ -67,38 +56,7 @@
               options-cover
             ></q-select>
           </template>
-          <template #advanced-trigger>
-            <q-btn
-              outline
-              icon="tune"
-              color="primary"
-              class="q-ml-xs"
-              :aria-label="
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              "
-              @click="showAdvancedQuery = true"
-            >
-              <q-badge v-if="activeFilterCount > 0" floating color="red">{{
-                activeFilterCount
-              }}</q-badge>
-              <q-tooltip>{{
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              }}</q-tooltip>
-            </q-btn>
-          </template>
-          <template #save-scheme>
-            <q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="schemePage.showSaveDialog.value = true"
-            />
-          </template>
+
           <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
@@ -140,22 +98,6 @@
     </q-table>
 
     <!-- 高级查询对话框 -->
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:queryModel="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="table_fields_advanced"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      @search="handleAdvancedSearch"
-    />
-
-    <query-scheme-save-dialog
-      v-model="schemePage.showSaveDialog.value"
-      :source="queryState.schemeSource.value"
-      :loading="schemePage.saving.value"
-      @save="schemePage.savePersonal"
-    />
 
     <!-- 通用表单对话框 - 用于新增和编辑角色 -->
     <dynamic-form-dialog
@@ -187,10 +129,7 @@ import { type QTableProps, useQuasar } from 'quasar'
 import { useRoleApi, type Role } from 'src/api/services/sys-role'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
@@ -198,7 +137,7 @@ import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
+import { hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
@@ -218,7 +157,6 @@ const roleApi = useRoleApi()
 const rows = ref<Role[]>([])
 const total = ref(0)
 const selected = ref([])
-const showAdvancedQuery = ref(false)
 
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('system_role')
 
@@ -296,18 +234,10 @@ const queryState = useTableQueryState<Query>({
     include_deleted: false,
   }),
 })
-const {
-  query,
-  keyword,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
+const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 // 判断是否存在已应用的高级查询条件
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
-
-// 计算活跃的筛选条件数量
-const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 
 // 分页设置
 const pagination = ref({
@@ -329,12 +259,6 @@ const schemePage = useQuerySchemePage('system_role', queryState, resetAndFetch)
 
 const handleBasicSearch = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)
-}
-
-// 高级查询处理
-const handleAdvancedSearch = () => {
-  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
 }
 
 // 获取角色列表数据
@@ -520,16 +444,6 @@ watch(
     }
 
     fetchData()
-  },
-)
-
-// 监听高级查询对话框打开状态，打开时初始化临时查询
-watch(
-  () => showAdvancedQuery.value,
-  (isOpen) => {
-    if (isOpen) {
-      queryState.beginAdvancedEdit()
-    }
   },
 )
 </script>

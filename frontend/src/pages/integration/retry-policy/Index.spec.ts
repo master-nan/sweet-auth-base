@@ -70,7 +70,6 @@ vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./RetryPolicyFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./RetryPolicyDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 
@@ -118,7 +117,6 @@ const mountPage = () =>
         QChip: true,
         QTd: SlotStub,
         TablePagination: true,
-        AdvancedQuery: true,
         RetryPolicyFormDialog: true,
         RetryPolicyDetailDialog: true,
         StandardTableToolbar: ToolbarStub,

@@ -15,85 +15,52 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector
-            ><query-scheme-selector
-              :schemes="querySchemes.schemes.value"
-              :current-label="querySchemes.currentLabel.value"
-              :loading="querySchemes.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="querySchemes.error.value"
-              @select="applySelectedScheme"
-              @restore-current="restoreSchemeQuery"
-              @reset-default="resetDefaultQuery"
-              @retry="querySchemes.loadAvailable"
-              @manage="openSchemeManager"
-          /></template>
-          <template #quick-presets
-            ><query-quick-presets
-              :config="querySchemes.scope.config.value"
-              @apply="applyQuickPreset"
-          /></template>
-          <template #quick-search>
-            <q-input
-              v-model="keyword"
-              dense
-              outlined
-              debounce="300"
-              placeholder="搜索批次编号或任务"
-              @keyup.enter="handleBasicSearch"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="advancedFields"
+              :advanced-enabled="advancedFields.length > 0"
             >
-              <template #append><q-icon name="search" /></template>
-            </q-input>
-            <q-select
-              v-model="query.status"
-              dense
-              outlined
-              emit-value
-              map-options
-              clearable
-              :options="statusOptions"
-              label="状态"
-              style="min-width: 140px"
-              @update:model-value="resetAndFetch"
-            />
-            <q-select
-              v-model="query.trigger_type"
-              dense
-              outlined
-              emit-value
-              map-options
-              clearable
-              :options="triggerOptions"
-              label="触发类型"
-              style="min-width: 140px"
-              @update:model-value="resetAndFetch"
-            />
-            <q-btn color="primary" label="搜索" @click="handleBasicSearch" />
+              <template #quick-search>
+                <q-input
+                  v-model="keyword"
+                  dense
+                  outlined
+                  debounce="300"
+                  placeholder="搜索批次编号或任务"
+                  @keyup.enter="handleBasicSearch"
+                >
+                  <template #append><q-icon name="search" /></template>
+                </q-input>
+                <q-select
+                  v-model="query.status"
+                  dense
+                  outlined
+                  emit-value
+                  map-options
+                  clearable
+                  :options="statusOptions"
+                  label="状态"
+                  style="min-width: 140px"
+                  @update:model-value="resetAndFetch"
+                />
+                <q-select
+                  v-model="query.trigger_type"
+                  dense
+                  outlined
+                  emit-value
+                  map-options
+                  clearable
+                  :options="triggerOptions"
+                  label="触发类型"
+                  style="min-width: 140px"
+                  @update:model-value="resetAndFetch"
+                />
+                <q-btn color="primary" label="搜索" @click="handleBasicSearch" />
+              </template>
+            </query-scheme-controls>
           </template>
-          <template #advanced-trigger>
-            <q-btn
-              v-if="advancedFields.length"
-              outline
-              icon="tune"
-              color="primary"
-              :aria-label="
-                activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
-              "
-              @click="showAdvancedQuery = true"
-              ><q-badge v-if="activeFilterCount" floating color="red">{{
-                activeFilterCount
-              }}</q-badge
-              ><q-tooltip>高级查询</q-tooltip></q-btn
-            >
-          </template>
-          <template #save-scheme
-            ><q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="showSchemeSave = true"
-          /></template>
         </standard-table-toolbar>
       </template>
       <template #body-cell-batch_no="props">
@@ -176,23 +143,6 @@
       >
     </q-table>
 
-    <advanced-query
-      v-if="advancedFields.length"
-      v-model="showAdvancedQuery"
-      v-model:query-model="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="advancedFields"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      @search="handleAdvancedSearch"
-    />
-    <query-scheme-save-dialog
-      v-model="showSchemeSave"
-      :source="queryState.schemeSource.value"
-      :loading="schemeSaving"
-      @save="saveScheme"
-    />
-
     <form-dialog-shell
       v-model="showDetail"
       title="同步批次详情"
@@ -254,10 +204,7 @@ import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import {
   type IntegrationExecutionListItem,
   type SyncBatchDetail,
@@ -282,7 +229,6 @@ const { hasGrantedCapability } = usePageButtons('integration_sync_batch')
 const rows = ref<SyncBatchListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
-const showAdvancedQuery = ref(false)
 const showDetail = ref(false)
 const detailLoading = ref(false)
 const detail = ref<SyncBatchDetail | null>(null)
@@ -340,12 +286,7 @@ const queryState = useTableQueryState<SyncBatchQuery>({
   }),
   createEmptyExpressions: emptyExpressions,
 })
-const {
-  query,
-  keyword,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
+const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>
@@ -379,24 +320,8 @@ const resetAndFetch = () => {
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
 }
-const {
-  runtime: querySchemes,
-  showSaveDialog: showSchemeSave,
-  saving: schemeSaving,
-  initialize: initializeQuerySchemes,
-  runQueryChange,
-  selectScheme: applySelectedScheme,
-  applyPreset: applyQuickPreset,
-  restoreCurrent: restoreSchemeQuery,
-  resetDefault: resetDefaultQuery,
-  openManager: openSchemeManager,
-  savePersonal: saveScheme,
-} = useQuerySchemePage('integration_sync_batch', queryState, resetAndFetch)
-const handleBasicSearch = () => runQueryChange(queryState.submitQuickSearch)
-const handleAdvancedSearch = () => {
-  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
-}
+const schemePage = useQuerySchemePage('integration_sync_batch', queryState, resetAndFetch)
+const handleBasicSearch = () => schemePage.runQueryChange(queryState.submitQuickSearch)
 const openDetail = async (id: number) => {
   if (!canDetail.value) return
   showDetail.value = true
@@ -476,7 +401,7 @@ const detailItems = computed(() =>
 )
 onMounted(async () => {
   await loadMetadata()
-  await initializeQuerySchemes()
+  await schemePage.initialize()
   await fetchData()
   initialized.value = true
 })
@@ -508,7 +433,4 @@ watch(
     resetAndFetch()
   },
 )
-watch(showAdvancedQuery, (open) => {
-  if (open) queryState.beginAdvancedEdit()
-})
 </script>

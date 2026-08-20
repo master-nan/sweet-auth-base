@@ -70,7 +70,6 @@ vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./CredentialFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./CredentialDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 
@@ -117,7 +116,6 @@ const mountPage = () =>
         QChip: true,
         QTd: SlotStub,
         TablePagination: true,
-        AdvancedQuery: true,
         CredentialFormDialog: true,
         CredentialDetailDialog: true,
       },

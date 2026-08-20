@@ -183,7 +183,12 @@ const resolveDisableValue = (field: string, ctx: ButtonDisableContext) => {
 }
 
 const isEmptyValue = (value: any) => {
-  return value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
+  return (
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    (Array.isArray(value) && value.length === 0)
+  )
 }
 
 const evaluateDisableRule = (rule: any, ctx: ButtonDisableContext) => {
@@ -297,7 +302,7 @@ const builtinHandlers: Record<string, ButtonActionHandler> = {
   },
 }
 
-export const resolveButtonHandler = (name: string): ButtonActionHandler | undefined => {
+const resolveButtonHandler = (name: string): ButtonActionHandler | undefined => {
   return builtinHandlers[name]
 }
 

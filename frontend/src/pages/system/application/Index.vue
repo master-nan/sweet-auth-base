@@ -18,37 +18,27 @@
     >
       <template v-slot:top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector
-            ><query-scheme-selector
-              :schemes="schemePage.runtime.schemes.value"
-              :current-label="schemePage.runtime.currentLabel.value"
-              :loading="schemePage.runtime.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="schemePage.runtime.error.value"
-              @select="schemePage.selectScheme"
-              @restore-current="schemePage.restoreCurrent"
-              @reset-default="schemePage.resetDefault"
-              @retry="schemePage.runtime.loadAvailable"
-              @manage="schemePage.openManager"
-          /></template>
-          <template #quick-presets
-            ><query-quick-presets
-              :config="schemePage.runtime.scope.config.value"
-              @apply="schemePage.applyPreset"
-          /></template>
-          <template #quick-search>
-            <q-input
-              dense
-              outlined
-              debounce="300"
-              v-model="query.quick_query!.keyword"
-              placeholder="搜索关键词"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="table_fields_advanced"
             >
-              <template v-slot:append>
-                <q-icon name="search" />
+              <template #quick-search>
+                <q-input
+                  dense
+                  outlined
+                  debounce="300"
+                  v-model="query.quick_query!.keyword"
+                  placeholder="搜索关键词"
+                >
+                  <template v-slot:append>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
-            </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+            </query-scheme-controls>
           </template>
           <template #column-selector>
             <q-select
@@ -65,37 +55,6 @@
               options-cover
             ></q-select>
           </template>
-          <template #advanced-trigger>
-            <q-btn
-              outline
-              icon="tune"
-              color="primary"
-              class="q-ml-xs"
-              :aria-label="
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              "
-              @click="showAdvancedQuery = true"
-            >
-              <q-badge v-if="activeFilterCount > 0" floating color="red">{{
-                activeFilterCount
-              }}</q-badge>
-              <q-tooltip>{{
-                hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
-              }}</q-tooltip>
-            </q-btn>
-          </template>
-          <template #save-scheme
-            ><q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="schemePage.showSaveDialog.value = true"
-          /></template>
           <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
@@ -133,22 +92,6 @@
         <div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div>
       </template>
     </q-table>
-
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:queryModel="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="table_fields_advanced"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      @search="handleAdvancedSearch"
-    />
-    <query-scheme-save-dialog
-      v-model="schemePage.showSaveDialog.value"
-      :source="queryState.schemeSource.value"
-      :loading="schemePage.saving.value"
-      @save="schemePage.savePersonal"
-    />
 
     <dynamic-form-dialog
       v-model="showFormDialog"
@@ -230,10 +173,7 @@ import {
 } from 'src/api/services/application'
 import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import { useDictStore } from 'src/stores/dict'
 import { buildRelationLookups, resolveRuntimeColumns } from 'src/utils/column-format'
 import { usePageButtons } from 'src/composables/page-buttons'
@@ -241,7 +181,7 @@ import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
+import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
@@ -259,8 +199,6 @@ const applicationApi = useApplicationApi()
 const rows = ref<Application[]>([])
 const total = ref(0)
 const selected = ref([])
-const showAdvancedQuery = ref(false)
-
 const { line_buttons, top_buttons, has_line_buttons } = usePageButtons('system_application')
 
 const action_handlers: PageActionHandlers<Application> = {
@@ -319,14 +257,7 @@ const queryState = useTableQueryState<Query>({
   }),
   createEmptyExpressions: () => emptyAdvancedQuery().expressions,
 })
-const {
-  query,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
-
-// 判断是否存在已应用的高级查询条件
-const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
+const { query, appliedAdvanced: appliedAdvancedQuery } = queryState
 
 // 计算活跃的筛选条件数量
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
@@ -345,11 +276,6 @@ const pagination = ref({
   descending: true,
 })
 
-// 初始化临时查询
-const initTempQuery = () => {
-  queryState.beginAdvancedEdit()
-}
-
 const resetAndFetch = () => {
   if (pagination.value.page !== 1) {
     pagination.value.page = 1
@@ -366,12 +292,6 @@ const handleBasicSearch = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
-// 高级查询处理
-const handleAdvancedSearch = () => {
-  // 应用临时查询条件到实际查询
-  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
-}
 // 获取应用列表数据
 const fetchData = async () => {
   loading.value = true
@@ -454,16 +374,6 @@ watch(
     }
 
     fetchData()
-  },
-)
-
-// 监听高级查询对话框打开状态，打开时初始化临时查询
-watch(
-  () => showAdvancedQuery.value,
-  (isOpen) => {
-    if (isOpen) {
-      initTempQuery()
-    }
   },
 )
 

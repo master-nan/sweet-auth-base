@@ -92,3 +92,7 @@ export function useQuerySchemePage<TQuery extends Query>(
     savePersonal,
   }
 }
+
+export type QuerySchemePageController<TQuery extends Query> = ReturnType<
+  typeof useQuerySchemePage<TQuery>
+>

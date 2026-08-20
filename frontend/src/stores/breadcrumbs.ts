@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import type { RouteData } from 'src/types/index'
 import type { RouteRecordNormalized } from 'vue-router'
-// import { getFirst } from 'src/utils/index'
+
 export const useBreadcrumbsStore = defineStore('breadCrumbs', {
   state: () => ({
     breadcrumbs: [] as RouteData[],

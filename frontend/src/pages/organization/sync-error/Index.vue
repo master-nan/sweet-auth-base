@@ -15,58 +15,28 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector>
-            <query-scheme-selector
-              :schemes="schemePage.runtime.schemes.value"
-              :current-label="schemePage.runtime.currentLabel.value"
-              :loading="schemePage.runtime.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="schemePage.runtime.error.value"
-              @select="schemePage.selectScheme"
-              @restore-current="schemePage.restoreCurrent"
-              @reset-default="schemePage.resetDefault"
-              @retry="schemePage.runtime.loadAvailable"
-              @manage="schemePage.openManager"
-            />
-          </template>
-          <template #quick-presets>
-            <query-quick-presets
-              :config="schemePage.runtime.scope.config.value"
-              @apply="schemePage.applyPreset"
-            />
-          </template>
-          <template #quick-search>
-            <q-input
-              v-model="keyword"
-              dense
-              outlined
-              debounce="300"
-              placeholder="搜索关键词"
-              @keyup.enter="search"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="advancedFields"
+              advanced-title="同步异常高级查询"
+              :show-filter-count="false"
             >
-              <template #append><q-icon name="search" /></template>
-            </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
-          </template>
-          <template #advanced-trigger>
-            <q-btn
-              outline
-              color="primary"
-              icon="tune"
-              aria-label="高级查询"
-              @click="openAdvancedQuery"
-            >
-              <q-tooltip>高级查询</q-tooltip>
-            </q-btn>
-          </template>
-          <template #save-scheme>
-            <q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="schemePage.showSaveDialog.value = true"
-            />
+              <template #quick-search>
+                <q-input
+                  v-model="keyword"
+                  dense
+                  outlined
+                  debounce="300"
+                  placeholder="搜索关键词"
+                  @keyup.enter="search"
+                >
+                  <template #append><q-icon name="search" /></template>
+                </q-input>
+                <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+              </template>
+            </query-scheme-controls>
           </template>
         </standard-table-toolbar>
       </template>
@@ -111,23 +81,6 @@
       </template>
     </q-table>
 
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:queryModel="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="advancedFields"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      title="同步异常高级查询"
-      @search="applyAdvancedQuery"
-    />
-    <query-scheme-save-dialog
-      v-model="schemePage.showSaveDialog.value"
-      :source="queryState.schemeSource.value"
-      :loading="schemePage.saving.value"
-      @save="schemePage.savePersonal"
-    />
-
     <organization-record-detail-dialog
       v-model="showDetailDialog"
       title="同步记录详情"
@@ -166,13 +119,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useRoute } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
 import {
   getSyncRecordDetail,
   getSyncRecordError,
@@ -222,7 +172,7 @@ const canQueryRecords = computed(() => hasGrantedCapability('organization_sync_e
 const queryState = useTableQueryState<SyncRecordQueryRequest>({
   createInitialQuery: () => ({ ...createOrganizationQuery('org_sync_record'), status: 'failed' }),
 })
-const { query, keyword, draftAdvanced: tempAdvancedQuery } = queryState
+const { query, keyword } = queryState
 const resetAndFetch = () => {
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
@@ -230,7 +180,6 @@ const resetAndFetch = () => {
 const schemePage = useQuerySchemePage('organization_sync_error', queryState, resetAndFetch)
 const initialized = ref(false)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
-const showAdvancedQuery = ref(false)
 const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: canQueryRecords.value,
@@ -358,16 +307,6 @@ const applyRouteFilters = () => {
 
 const search = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)
-}
-
-const openAdvancedQuery = () => {
-  queryState.beginAdvancedEdit()
-  showAdvancedQuery.value = true
-}
-
-const applyAdvancedQuery = () => {
-  schemePage.runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
 }
 
 const fetchData = async () => {

@@ -16,50 +16,40 @@
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-          <template #scheme-selector>
-            <query-scheme-selector
-              :schemes="querySchemes.schemes.value"
-              :current-label="querySchemes.currentLabel.value"
-              :loading="querySchemes.loading.value"
-              :dirty="queryState.dirty.value"
-              :load-error="querySchemes.error.value"
-              @select="applySelectedScheme"
-              @restore-current="restoreSchemeQuery"
-              @reset-default="resetDefaultQuery"
-              @retry="querySchemes.loadAvailable"
-              @manage="openSchemeManager"
-            />
-          </template>
-          <template #quick-presets
-            ><query-quick-presets
-              :config="querySchemes.scope.config.value"
-              @apply="applyQuickPreset"
-          /></template>
-          <template #quick-search>
-            <q-input
-              v-model="keyword"
-              dense
-              outlined
-              debounce="300"
-              placeholder="搜索接口编码、名称或路径"
-              @keyup.enter="handleBasicSearch"
+          <template #query-controls>
+            <query-scheme-controls
+              :controller="schemePage"
+              :query-state="queryState"
+              :fields="advancedFields"
             >
-              <template #append><q-icon name="search" /></template>
-            </q-input>
-            <q-select
-              v-model="query.external_system_id"
-              dense
-              outlined
-              emit-value
-              map-options
-              clearable
-              :options="systemOptions"
-              label="所属系统"
-              style="min-width: 220px"
-              @update:model-value="resetAndFetch"
-            />
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+              <template #quick-search>
+                <q-input
+                  v-model="keyword"
+                  dense
+                  outlined
+                  debounce="300"
+                  placeholder="搜索接口编码、名称或路径"
+                  @keyup.enter="handleBasicSearch"
+                >
+                  <template #append><q-icon name="search" /></template>
+                </q-input>
+                <q-select
+                  v-model="query.external_system_id"
+                  dense
+                  outlined
+                  emit-value
+                  map-options
+                  clearable
+                  :options="systemOptions"
+                  label="所属系统"
+                  style="min-width: 220px"
+                  @update:model-value="resetAndFetch"
+                />
+                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+              </template>
+            </query-scheme-controls>
           </template>
+
           <template #column-selector>
             <q-select
               v-model="visibleColumns"
@@ -75,30 +65,7 @@
               options-cover
             />
           </template>
-          <template #advanced-trigger>
-            <q-btn
-              outline
-              icon="tune"
-              color="primary"
-              :aria-label="
-                activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
-              "
-              @click="showAdvancedQuery = true"
-            >
-              <q-badge v-if="activeFilterCount" floating color="red">{{
-                activeFilterCount
-              }}</q-badge>
-              <q-tooltip>高级查询</q-tooltip>
-            </q-btn>
-          </template>
-          <template #save-scheme
-            ><q-btn
-              outline
-              color="primary"
-              icon="bookmark_add"
-              label="保存方案"
-              @click="showSchemeSave = true"
-          /></template>
+
           <template #right-actions>
             <q-btn
               v-for="button in top_buttons"
@@ -178,21 +145,6 @@
       /></template>
     </q-table>
 
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:query-model="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="advancedFields"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      @search="handleAdvancedSearch"
-    />
-    <query-scheme-save-dialog
-      v-model="showSchemeSave"
-      :source="queryState.schemeSource.value"
-      :loading="schemeSaving"
-      @save="saveScheme"
-    />
     <interface-definition-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
@@ -216,10 +168,7 @@ import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import InterfaceDefinitionFormDialog from './InterfaceDefinitionFormDialog.vue'
 import InterfaceDefinitionDetailDialog from './InterfaceDefinitionDetailDialog.vue'
 import {
@@ -262,7 +211,6 @@ const credentials = ref<CredentialListItem[]>([])
 const retryPolicies = ref<RetryPolicyListItem[]>([])
 const total = ref(0)
 const initialized = ref(false)
-const showAdvancedQuery = ref(false)
 const showFormDialog = ref(false)
 const showDetailDialog = ref(false)
 const currentDetailId = ref(0)
@@ -304,12 +252,7 @@ const queryState = useTableQueryState<InterfaceDefinitionQuery>({
   },
   createEmptyExpressions: emptyExpressions,
 })
-const {
-  query,
-  keyword,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
+const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
@@ -405,24 +348,8 @@ const resetAndFetch = () => {
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
 }
-const {
-  runtime: querySchemes,
-  showSaveDialog: showSchemeSave,
-  saving: schemeSaving,
-  initialize: initializeQuerySchemes,
-  runQueryChange,
-  selectScheme: applySelectedScheme,
-  applyPreset: applyQuickPreset,
-  restoreCurrent: restoreSchemeQuery,
-  resetDefault: resetDefaultQuery,
-  openManager: openSchemeManager,
-  savePersonal: saveScheme,
-} = useQuerySchemePage('integration_interface_definition', queryState, resetAndFetch)
-const handleBasicSearch = () => runQueryChange(queryState.submitQuickSearch)
-const handleAdvancedSearch = () => {
-  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
-}
+const schemePage = useQuerySchemePage('integration_interface_definition', queryState, resetAndFetch)
+const handleBasicSearch = () => schemePage.runQueryChange(queryState.submitQuickSearch)
 const availableLineButtons = (row: InterfaceDefinitionListItem) =>
   line_buttons.value.filter((button) => {
     if (button.event_action === 'update') return row.status === 'draft'
@@ -539,7 +466,7 @@ onMounted(async () => {
   const requests = [fetchMetadata(), fetchSystems(), fetchCredentials()]
   if (hasGrantedCapability('integration_retry_policy_query')) requests.push(fetchRetryPolicies())
   await Promise.all(requests)
-  await initializeQuerySchemes()
+  await schemePage.initialize()
   await fetchData()
   initialized.value = true
 })
@@ -559,7 +486,4 @@ watch(
     resetAndFetch()
   },
 )
-watch(showAdvancedQuery, (open) => {
-  if (open) queryState.beginAdvancedEdit()
-})
 </script>

@@ -4,7 +4,6 @@
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { TransitionPresets, useTransition } from '@vueuse/core'
-import { isNumber } from 'src/utils/typeof'
 
 defineOptions({ name: 'CountTo' })
 
@@ -77,7 +76,7 @@ function formatNumber(num: number | string) {
   let x1 = x[0]
   const x2 = x.length > 1 ? decimal + x[1] : ''
   const rgx = /(\d+)(\d{3})/
-  if (separator && !isNumber(separator)) {
+  if (separator) {
     while (rgx.test(x1 as string)) {
       x1 = x1?.replace(rgx, `$1${separator}$2`)
     }

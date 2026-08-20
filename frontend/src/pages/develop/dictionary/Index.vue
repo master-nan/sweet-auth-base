@@ -13,53 +13,11 @@
       >
         <template #master-actions>
           <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-            <template #scheme-selector>
-              <query-scheme-selector
-                :schemes="querySchemes.schemes.value"
-                :current-label="querySchemes.currentLabel.value"
-                :loading="querySchemes.loading.value"
-                :dirty="queryState.dirty.value"
-                :load-error="querySchemes.error.value"
-                @select="applySelectedScheme"
-                @restore-current="restoreSchemeQuery"
-                @reset-default="resetDefaultQuery"
-                @retry="querySchemes.loadAvailable"
-                @manage="openSchemeManager"
-              />
-            </template>
-            <template #quick-presets>
-              <query-quick-presets
-                :config="querySchemes.scope.config.value"
-                @apply="applyQuickPreset"
-              />
-            </template>
-            <template #advanced-trigger>
-              <q-btn
-                outline
-                icon="tune"
-                color="primary"
-                :aria-label="
-                  activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
-                "
-                @click="showAdvancedQuery = true"
-              >
-                <q-badge v-if="activeFilterCount" floating color="red">
-                  {{ activeFilterCount }}
-                </q-badge>
-                <q-tooltip>
-                  {{
-                    activeFilterCount ? `高级查询，已启用 ${activeFilterCount} 个条件` : '高级查询'
-                  }}
-                </q-tooltip>
-              </q-btn>
-            </template>
-            <template #save-scheme>
-              <q-btn
-                outline
-                color="primary"
-                icon="bookmark_add"
-                label="保存方案"
-                @click="showSchemeSave = true"
+            <template #query-controls>
+              <query-scheme-controls
+                :controller="schemePage"
+                :query-state="queryState"
+                :fields="dictAdvancedFields"
               />
             </template>
             <template #right-actions>
@@ -276,23 +234,6 @@
       :submit-btn-text="currentEditDictItem && currentEditDictItem.id ? '保存' : '创建'"
       @submit="handleDictItemFormSubmit"
     />
-
-    <advanced-query
-      v-model="showAdvancedQuery"
-      v-model:query-model="tempAdvancedQuery"
-      v-model:bindings="queryState.bindings.value"
-      :fields="dictAdvancedFields"
-      :source-name="queryState.schemeSource.value?.name || ''"
-      :dirty="queryState.dirty.value"
-      @search="handleAdvancedSearch"
-    />
-
-    <query-scheme-save-dialog
-      v-model="showSchemeSave"
-      :source="queryState.schemeSource.value"
-      :loading="schemeSaving"
-      @save="saveScheme"
-    />
   </base-content>
 </template>
 
@@ -302,10 +243,7 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import {
@@ -320,7 +258,6 @@ import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import cloneDeep from 'lodash/cloneDeep'
-import { useDictCache } from 'src/composables/dictCache'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns } from 'src/utils/column-format'
 import { useMasterDetailPageButtons } from 'src/composables/page-buttons'
@@ -329,17 +266,15 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
+import { hasEffectiveQueryRules } from 'src/utils/query-state'
 
 const loading = ref(false)
 const loadError = ref('')
-const showAdvancedQuery = ref(false)
 const dictStore = useDictStore()
 
 const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)
 const dictApi = useDictApi()
-const dictCache = useDictCache()
 const rows = ref<Dict[]>([])
 const total = ref(0)
 
@@ -487,13 +422,7 @@ const queryState = useTableQueryState<Query>({
   }),
   createEmptyExpressions: () => emptyAdvancedQuery().expressions,
 })
-const {
-  query,
-  keyword,
-  draftAdvanced: tempAdvancedQuery,
-  appliedAdvanced: appliedAdvancedQuery,
-} = queryState
-const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
+const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 const listEmptyMessage = computed(() =>
   resolveTableEmptyMessage({
@@ -548,27 +477,10 @@ const resetToFirstPageOrFetch = () => {
   void fetchData()
 }
 
-const {
-  runtime: querySchemes,
-  showSaveDialog: showSchemeSave,
-  saving: schemeSaving,
-  initialize: initializeQuerySchemes,
-  runQueryChange,
-  selectScheme: applySelectedScheme,
-  applyPreset: applyQuickPreset,
-  restoreCurrent: restoreSchemeQuery,
-  resetDefault: resetDefaultQuery,
-  openManager: openSchemeManager,
-  savePersonal: saveScheme,
-} = useQuerySchemePage('develop_dictionary', queryState, resetToFirstPageOrFetch)
+const schemePage = useQuerySchemePage('develop_dictionary', queryState, resetToFirstPageOrFetch)
 
 const handleBasicSearch = () => {
-  runQueryChange(queryState.submitQuickSearch)
-}
-
-const handleAdvancedSearch = () => {
-  runQueryChange(() => queryState.applyAdvancedQuery(tempAdvancedQuery.value))
-  showAdvancedQuery.value = false
+  schemePage.runQueryChange(queryState.submitQuickSearch)
 }
 
 const clearCurrentSelection = () => {
@@ -656,7 +568,7 @@ const confirmDeleteDict = (dict: Dict) => {
           dictItems.value = []
         }
         fetchData()
-        dictCache.clearDictCache(dict.dict_code)
+        dictStore.clearDict(dict.dict_code)
       }
     })()
   })
@@ -673,7 +585,7 @@ const confirmDeleteDictItem = (dictItem: DictItem) => {
         if (currentDict.value) {
           await fetchDictItems(currentDict.value.id)
           // 清除缓存
-          dictCache.clearDictCache(currentDict.value.dict_code)
+          dictStore.clearDict(currentDict.value.dict_code)
         }
       }
     })()
@@ -697,7 +609,7 @@ const handleDictFormSubmit = async (formData: { data: Dict; isEdit: boolean; id?
     }
     // 清除缓存
     if (formData.data.dict_code) {
-      dictCache.clearDictCache(formData.data.dict_code)
+      dictStore.clearDict(formData.data.dict_code)
     }
   } else {
     // 新增字典
@@ -737,7 +649,7 @@ const handleDictItemFormSubmit = async (formData: { data: any; isEdit: boolean; 
     showDictItemFormDialog.value = false
 
     // 清除缓存
-    dictCache.clearDictCache(currentDict.value.dict_code)
+    dictStore.clearDict(currentDict.value.dict_code)
   } catch (error) {
     console.error('保存字典项失败', error)
   }
@@ -774,7 +686,7 @@ const initialized = ref(false)
 
 onMounted(async () => {
   await fetchTableFields()
-  await initializeQuerySchemes()
+  await schemePage.initialize()
   await fetchData()
   initialized.value = true
 })
@@ -793,10 +705,6 @@ watch(
   () => detailLineButtons.value.length,
   () => refreshDictItemColumns(),
 )
-
-watch(showAdvancedQuery, (open) => {
-  if (open) queryState.beginAdvancedEdit()
-})
 </script>
 
 <style scoped lang="scss">

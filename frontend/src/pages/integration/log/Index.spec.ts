@@ -111,13 +111,12 @@ describe('integration log detail permission', () => {
 
   it('queries logs but does not request routed detail without detail permission', async () => {
     permissionCodes.push('integration_log_query')
-    const wrapper = mountPage()
+    mountPage()
     await flushPromises()
 
     expect(apiMocks.queryLogs).toHaveBeenCalled()
     expect(apiMocks.getLog).not.toHaveBeenCalled()
     expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_log')
-    expect(wrapper.find('advanced-query-stub').exists()).toBe(true)
     expect(schemeMocks.initialize).toHaveBeenCalledOnce()
     expect(schemeMocks.initialize.mock.invocationCallOrder[0]).toBeLessThan(
       apiMocks.queryLogs.mock.invocationCallOrder[0]!,

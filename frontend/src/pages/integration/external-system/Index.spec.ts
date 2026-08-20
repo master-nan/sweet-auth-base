@@ -91,10 +91,6 @@ vi.mock('src/components/Table/TablePagination.vue', () => ({
   default: { template: '<div />' },
 }))
 
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
-  default: { template: '<div />' },
-}))
-
 vi.mock('src/components/FormDialog/DynamicFormDialog.vue', () => ({
   default: { template: '<div />' },
 }))
@@ -184,7 +180,6 @@ const mountPage = () =>
         StandardTableToolbar: ToolbarStub,
         StatusChip: true,
         TablePagination: true,
-        AdvancedQuery: true,
         DynamicFormDialog: FormDialogStub,
         ExternalSystemDetailDialog: true,
       },

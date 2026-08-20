@@ -14,16 +14,6 @@ const functionSource = (name: string, nextName: string) => {
 }
 
 describe('Dictionary query scheme integration', () => {
-  it('uses the shared query scheme UX for the dictionary Master list', () => {
-    expect(source).toContain("useQuerySchemePage('develop_dictionary', queryState")
-    expect(source).toContain('<query-scheme-selector')
-    expect(source).toContain('<query-quick-presets')
-    expect(source).toContain('<query-scheme-save-dialog')
-    expect(source).toContain('<advanced-query')
-    expect(source).toContain(':fields="dictAdvancedFields"')
-    expect(source).toContain('await initializeQuerySchemes()')
-  })
-
   it('keeps dictionary Item loading outside the Master query scheme state', () => {
     const masterFetch = functionSource('fetchData', 'syncCurrentDictAfterFetch')
     const itemFetch = functionSource('fetchDictItems', 'refreshDictItems')

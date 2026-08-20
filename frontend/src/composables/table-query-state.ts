@@ -7,10 +7,7 @@ import type {
   QuerySchemeResolvedQuery,
   QuerySchemeSource,
 } from 'src/modules/query-scheme/types'
-import {
-  normalizeQuerySchemePayload,
-  serializeQuerySchemePayload,
-} from 'src/utils/query-state'
+import { normalizeQuerySchemePayload, serializeQuerySchemePayload } from 'src/utils/query-state'
 
 export interface TableQueryStateOptions<TQuery extends Query> {
   createInitialQuery: () => TQuery
@@ -21,9 +18,7 @@ const defaultEmptyExpressions = (): ExpressionGroup[] => [
   { rules: [{ field: '', value: null }], nested: [] },
 ]
 
-export function useTableQueryState<TQuery extends Query>(
-  options: TableQueryStateOptions<TQuery>,
-) {
+export function useTableQueryState<TQuery extends Query>(options: TableQueryStateOptions<TQuery>) {
   const query = ref(options.createInitialQuery()) as Ref<TQuery>
   const draftAdvanced = ref(cloneDeep(query.value)) as Ref<TQuery>
   const appliedAdvanced = ref(cloneDeep(query.value)) as Ref<TQuery>
@@ -134,7 +129,7 @@ export function useTableQueryState<TQuery extends Query>(
     return true
   }
 
-const clearQuery = () => {
+  const clearQuery = () => {
     query.value = options.createInitialQuery()
     draftAdvanced.value = cloneDeep(query.value)
     appliedAdvanced.value = cloneDeep(query.value)
@@ -168,3 +163,5 @@ const clearQuery = () => {
     clearQuery,
   }
 }
+
+export type TableQueryState<TQuery extends Query> = ReturnType<typeof useTableQueryState<TQuery>>

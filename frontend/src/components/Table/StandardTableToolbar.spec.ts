@@ -6,7 +6,8 @@ import StandardTableToolbar from './StandardTableToolbar.vue'
 const QBtnStub = defineComponent({
   emits: ['click'],
   setup(_, { emit, slots }) {
-    return () => h('button', { 'data-testid': 'refresh', onClick: () => emit('click') }, slots.default?.())
+    return () =>
+      h('button', { 'data-testid': 'refresh', onClick: () => emit('click') }, slots.default?.())
   },
 })
 
@@ -25,23 +26,17 @@ describe('StandardTableToolbar', () => {
   it('lays out query scheme slots without owning their API behavior', () => {
     const wrapper = mount(StandardTableToolbar, {
       slots: {
-        'scheme-selector': '<span data-testid="scheme">方案</span>',
-        'quick-presets': '<span data-testid="preset">本月</span>',
-        'save-scheme': '<span data-testid="save">保存方案</span>',
+        'query-controls': '<span data-testid="controls">方案 · 本月 · 保存方案</span>',
       },
       global: { stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true, QSeparator: true } },
     })
-    expect(wrapper.find('[data-testid="scheme"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="preset"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="save"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="controls"]').exists()).toBe(true)
   })
 
   it('keeps query, business, and platform actions in a stable visual order', () => {
     const wrapper = mount(StandardTableToolbar, {
       slots: {
-        'scheme-selector': '<span>方案</span>',
-        'quick-search': '<span>查询</span>',
-        'save-scheme': '<span>保存方案</span>',
+        'query-controls': '<span>方案 查询 保存方案</span>',
         'right-actions': '<span>业务动作</span>',
         'column-selector': '<span>列设置</span>',
       },

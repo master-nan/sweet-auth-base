@@ -64,7 +64,7 @@ watch(() => [props.modelValue, props.id] as const, async ([open, id]) => {
 
 <style scoped lang="scss">
 .retry-policy-detail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; padding: 8px 4px 20px; }
-.retry-policy-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid var(--app-border-color); }
+.retry-policy-detail__item { min-width: 0; padding-bottom: 12px; border-bottom: 1px solid var(--app-border); }
 .retry-policy-detail__wide { grid-column: 1 / -1; }
 @media (max-width: 760px) { .retry-policy-detail { grid-template-columns: 1fr; } .retry-policy-detail__wide { grid-column: auto; } }
 </style>

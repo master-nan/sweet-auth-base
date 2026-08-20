@@ -97,10 +97,32 @@ const QInputStub = defineComponent({
       type: [String, Number],
       default: '',
     },
+    type: {
+      type: String,
+      default: 'text',
+    },
   },
   emits: ['update:modelValue'],
-  setup() {
-    return () => h('input', { 'data-testid': 'q-input' })
+  setup(props, { slots }) {
+    return () =>
+      h('div', [
+        h('input', { 'data-testid': 'q-input', type: props.type }),
+        slots.append?.(),
+      ])
+  },
+})
+
+const QIconStub = defineComponent({
+  name: 'QIcon',
+  props: { name: String },
+  emits: ['click'],
+  setup(props, { emit }) {
+    return () =>
+      h('button', {
+        'data-testid': 'password-visibility',
+        'data-icon': props.name,
+        onClick: () => emit('click'),
+      })
   },
 })
 
@@ -154,9 +176,11 @@ const mountDialog = async (field: TableField, editData: Record<string, unknown> 
     global: {
       stubs: {
         FormDialogShell: FormDialogShellStub,
+        DynamicFieldControl: false,
         QForm: QFormStub,
         OrganizationSelect: OrganizationSelectStub,
         QInput: QInputStub,
+        QIcon: QIconStub,
       },
     },
   })
@@ -201,6 +225,50 @@ describe('DynamicFormDialog organization selector integration', () => {
     expect(wrapper.find('[data-testid="q-input"]').exists()).toBe(true)
   })
 
+  it('hides sensitive content again when the edited record changes', async () => {
+    const field = makeField(
+      'sender_password',
+      {},
+      {
+        field_name: '发件人密码',
+        field_type: SysTableFieldType.VARCHAR,
+        input_type: SysTableFieldInputType.INPUT,
+      },
+    )
+    const wrapper = await mountDialog(field, { id: 1, sender_password: 'first' })
+
+    expect(wrapper.find('[data-testid="q-input"]').attributes('type')).toBe('password')
+    await wrapper.find('[data-testid="password-visibility"]').trigger('click')
+    expect(wrapper.find('[data-testid="q-input"]').attributes('type')).toBe('text')
+
+    await wrapper.setProps({ editData: { id: 2, sender_password: 'second' } })
+    await nextTick()
+    expect(wrapper.find('[data-testid="q-input"]').attributes('type')).toBe('password')
+  })
+
+  it('keeps exact decimal input as a string through field control and submit', async () => {
+    const wrapper = await mountDialog(
+      makeField(
+        'amount',
+        {},
+        {
+          field_name: '金额',
+          field_type: SysTableFieldType.DECIMAL,
+          input_type: SysTableFieldInputType.INPUT_NUMBER,
+        },
+      ),
+    )
+
+    wrapper.findComponent(QInputStub).vm.$emit('update:modelValue', '123456789012345.67')
+    await nextTick()
+    wrapper.findComponent(FormDialogShellStub).vm.$emit('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({
+      data: { amount: '123456789012345.67' },
+    })
+  })
+
   it('gives selector metadata priority over dictionary and linkage configuration', async () => {
     const wrapper = await mountDialog(
       makeField(
@@ -225,10 +293,9 @@ describe('DynamicFormDialog organization selector integration', () => {
   })
 
   it('normalizes selector values to internal IDs before submit', async () => {
-    const wrapper = await mountDialog(
-      makeField('employee_id', { selector_type: 'employee' }),
-      { employee_id: 12 },
-    )
+    const wrapper = await mountDialog(makeField('employee_id', { selector_type: 'employee' }), {
+      employee_id: 12,
+    })
     const selector = wrapper.findComponent(OrganizationSelectStub)
 
     selector.vm.$emit('update:modelValue', 31)

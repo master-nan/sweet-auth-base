@@ -16,6 +16,11 @@ html {
   --app-primary-shadow: rgba(115, 103, 240, 0.2);
   --app-scrollbar-thumb: rgba(100, 116, 139, 0.38);
   --app-scrollbar-thumb-hover: rgba(71, 85, 105, 0.66);
+  --app-surface: #fff;
+  --app-surface-muted: #f8faff;
+  --app-border: rgba(15, 23, 42, 0.08);
+  --app-text-strong: #172033;
+  --app-text-muted: #8290a8;
 
   height: 100%;
   box-sizing: border-box;
@@ -212,6 +217,11 @@ input[type='number']::-webkit-inner-spin-button {
   --app-dark-heading: #f8fafc;
   --app-dark-muted: #9eabc2;
   --app-dark-primary-soft: rgba(115, 103, 240, 0.18);
+  --app-surface: var(--app-dark-surface);
+  --app-surface-muted: var(--app-dark-surface-soft);
+  --app-border: var(--app-dark-border);
+  --app-text-strong: var(--app-dark-text);
+  --app-text-muted: var(--app-dark-muted);
 
   background: var(--app-dark-page);
   color: var(--app-dark-text);
