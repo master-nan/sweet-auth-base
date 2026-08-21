@@ -58,6 +58,10 @@
         </q-item-section>
       </q-item>
       <q-separator />
+      <q-item clickable v-close-popup @click="$emit('save-current')">
+        <q-item-section avatar><q-icon name="bookmark_add" /></q-item-section>
+        <q-item-section>{{ saveActionLabel }}</q-item-section>
+      </q-item>
       <q-item v-if="dirty" clickable v-close-popup @click="$emit('restore-current')">
         <q-item-section avatar><q-icon name="undo" /></q-item-section>
         <q-item-section>撤销当前方案修改</q-item-section>
@@ -90,6 +94,7 @@ import {
   QUERY_SCHEME_TYPE_LABELS,
   QuerySchemeType,
   QuerySchemeValidationStatus,
+  type QuerySchemeSource,
   type QuerySchemeSummary,
 } from 'src/modules/query-scheme/types'
 
@@ -101,6 +106,7 @@ const props = withDefaults(
     disabled?: boolean
     dirty?: boolean
     loadError?: string
+    source?: QuerySchemeSource | null
   }>(),
   {
     currentLabel: '查询方案',
@@ -116,6 +122,7 @@ const emit = defineEmits<{
   manage: []
   'restore-current': []
   'reset-default': []
+  'save-current': []
   retry: []
 }>()
 
@@ -150,11 +157,20 @@ const groupedSchemes = computed(() =>
     }))
     .filter((group) => group.items.length > 0),
 )
+const saveActionLabel = computed(() => {
+  if (props.source?.type === QuerySchemeType.PERSONAL && props.dirty) {
+    return '保存当前方案修改'
+  }
+  if (props.source) return '另存为我的方案'
+  return '保存当前查询为方案'
+})
 </script>
 
 <style scoped>
 .query-scheme-selector {
+  min-width: 0;
   max-width: 240px;
+  overflow: hidden;
 }
 
 .query-scheme-selector :deep(.q-btn__content) {

@@ -30,17 +30,7 @@
                   placeholder="搜索执行编号、系统或接口"
                   @keyup.enter="search"
                   ><template #append><q-icon name="search" /></template></q-input
-                ><q-select
-                  v-model="query.status"
-                  dense
-                  outlined
-                  clearable
-                  emit-value
-                  map-options
-                  :options="statusOptions"
-                  label="状态"
-                  style="min-width: 150px"
-                /><q-btn
+                ><q-btn
                   color="primary"
                   icon="search"
                   label="查询"
@@ -182,6 +172,7 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
+import { ExpressionType } from 'src/types/enum'
 
 const route = useRoute()
 const api = useIntegrationApi()
@@ -200,35 +191,43 @@ const showDetail = ref(false)
 const detail = ref<IntegrationLogDetail | null>(null)
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
+const routeExecutionID = Number(route.query.execution_id)
+const hasRouteExecutionContext = Number.isSafeInteger(routeExecutionID) && routeExecutionID > 0
+const routeExecutionNo =
+  typeof route.query.execution_no === 'string' ? route.query.execution_no.trim() : ''
 const queryState = useTableQueryState<IntegrationLogQuery>({
   createInitialQuery: () => ({
     page: 1,
     num: 15,
     order: { field: 'started_at', is_asc: false },
-    quick_query: { keyword: '' },
-    expressions: emptyExpressions(),
+    quick_query: { keyword: routeExecutionNo },
+    expressions: hasRouteExecutionContext
+      ? [
+          {
+            rules: [
+              {
+                field: 'execution_id',
+                expression_type: ExpressionType.EQ,
+                value: routeExecutionID,
+              },
+            ],
+            nested: [],
+          },
+        ]
+      : emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const { advancedSearchFields: advancedFields, loadMetadata } =
   useRuntimeTableMetadata('integration_log')
-if (typeof route.query.execution_no === 'string')
-  query.value.execution_no = route.query.execution_no
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: canQueryLogs.value,
     error: loadError.value,
-    hasQuery: !!keyword.value || !!query.value.status || activeFilterCount.value > 0,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
   }),
 )
-const statusOptions = [
-  { label: '执行中', value: 'running' },
-  { label: '成功', value: 'succeeded' },
-  { label: '失败', value: 'failed' },
-  { label: '已取消', value: 'cancelled' },
-]
 const statusMeta: Record<string, { label: string; color: string }> = {
   running: { label: '执行中', color: 'primary' },
   succeeded: { label: '成功', color: 'positive' },
@@ -299,7 +298,9 @@ const openDetailFromRoute = async () => {
 }
 onMounted(async () => {
   await loadMetadata()
-  await schemePage.initialize()
+  await schemePage.initialize({
+    preserveInitialQuery: hasRouteExecutionContext || !!routeExecutionNo,
+  })
   if (!canQueryLogs.value) {
     initialized.value = true
     return

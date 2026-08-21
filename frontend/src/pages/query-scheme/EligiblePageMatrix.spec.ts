@@ -20,14 +20,13 @@ const eligiblePages = [
   ['integration/sync-batch/Index.vue', 'integration_sync_batch'],
   ['integration/execution/Index.vue', 'integration_execution'],
   ['integration/log/Index.vue', 'integration_log'],
-  ['develop/dictionary/Index.vue', 'develop_dictionary'],
 ] as const
 
 const pageSource = (path: string) => readFileSync(resolve(process.cwd(), 'src/pages', path), 'utf8')
 
 describe('Query Center eligible page matrix', () => {
   it('keeps eligible pages on the shared integration and presentation contracts', () => {
-    expect(eligiblePages).toHaveLength(18)
+    expect(eligiblePages).toHaveLength(17)
     for (const [path, routeName] of eligiblePages) {
       const source = pageSource(path)
       expect(source, path).toContain(`useQuerySchemePage('${routeName}'`)
@@ -37,5 +36,13 @@ describe('Query Center eligible page matrix', () => {
       expect(source, path).not.toContain('<query-scheme-save-dialog')
       expect(source, path).not.toContain("from 'src/composables/query-schemes'")
     }
+  })
+
+  it('keeps the Dictionary master-detail workspace exempt from standard scheme controls', () => {
+    const source = pageSource('develop/dictionary/Index.vue')
+
+    expect(source).not.toContain('useQuerySchemePage')
+    expect(source).not.toContain('<query-scheme-controls')
+    expect(source).toContain('<master-detail-page')
   })
 })

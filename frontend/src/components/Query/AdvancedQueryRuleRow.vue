@@ -88,7 +88,14 @@
           hide-bottom-space
         >
           <template #append>
-            <q-btn flat round dense icon="close" aria-label="改为固定值" @click="emit('clear-bindings')">
+            <q-btn
+              flat
+              round
+              dense
+              icon="close"
+              aria-label="改为固定值"
+              @click="emit('clear-bindings')"
+            >
               <q-tooltip>改为固定值</q-tooltip>
             </q-btn>
           </template>
@@ -125,7 +132,9 @@
           :options="dictOptionsForRule(rule)"
           :multiple="isMultiValueRule(rule)"
           :display-value="
-            isMultiValueRule(rule) ? multiValueDisplay(rule.value, dictOptionsForRule(rule)) : undefined
+            isMultiValueRule(rule)
+              ? multiValueDisplay(rule.value, dictOptionsForRule(rule))
+              : undefined
           "
           emit-value
           map-options
@@ -135,7 +144,9 @@
           :rules="valueRules(rule)"
           hide-bottom-space
         >
-          <q-tooltip v-if="isMultiValueRule(rule) && multiValueTooltip(rule.value, dictOptionsForRule(rule))">
+          <q-tooltip
+            v-if="isMultiValueRule(rule) && multiValueTooltip(rule.value, dictOptionsForRule(rule))"
+          >
             {{ multiValueTooltip(rule.value, dictOptionsForRule(rule)) }}
           </q-tooltip>
         </q-select>
@@ -167,7 +178,9 @@
           @virtual-scroll="(details) => loadMoreRelationOptions(rule, details)"
         >
           <q-tooltip
-            v-if="isMultiValueRule(rule) && multiValueTooltip(rule.value, relationOptionsForRule(rule))"
+            v-if="
+              isMultiValueRule(rule) && multiValueTooltip(rule.value, relationOptionsForRule(rule))
+            "
           >
             {{ multiValueTooltip(rule.value, relationOptionsForRule(rule)) }}
           </q-tooltip>
@@ -312,9 +325,7 @@ const props = defineProps<{
   expressionLogicOptions: SelectOption[]
   expressionTypeOptionsForRule: (rule: QueryRule) => SelectOption[]
   booleanOptions: SelectOption[]
-  organizationSelectorConfigForRule: (
-    rule: QueryRule,
-  ) => OrganizationSelectorRuntimeConfig | null
+  organizationSelectorConfigForRule: (rule: QueryRule) => OrganizationSelectorRuntimeConfig | null
   updateOrganizationSelectorValue: (rule: QueryRule, value: unknown) => void
   isNullOperator: (rule: QueryRule) => boolean
   hasDictRule: (rule: QueryRule) => boolean
@@ -356,9 +367,7 @@ const hasValue = (value: unknown) => {
   return value !== null && value !== undefined && value !== ''
 }
 
-const requireOrganizationSelectorConfig = (
-  rule: QueryRule,
-): OrganizationSelectorRuntimeConfig => {
+const requireOrganizationSelectorConfig = (rule: QueryRule): OrganizationSelectorRuntimeConfig => {
   return props.organizationSelectorConfigForRule(rule) as OrganizationSelectorRuntimeConfig
 }
 
@@ -384,18 +393,18 @@ const fieldOptionCode = (field: unknown) => {
 
 const fieldOptionCaption = (field: unknown) => {
   const item = field as FieldOption
-  const parts = [fieldOptionCode(item)]
+  const parts: string[] = []
   const fieldTypeLabel =
-    SysTableFieldTypeMap[item?.field_type as keyof typeof SysTableFieldTypeMap] ||
-    (item?.field_type ? `类型 ${item.field_type}` : '')
+    item?.logical_type === 'relation'
+      ? '关联'
+      : SysTableFieldTypeMap[item?.field_type as keyof typeof SysTableFieldTypeMap] ||
+        (item?.field_type ? `类型 ${item.field_type}` : '')
   const inputTypeLabel =
     SysTableFieldInputTypeMap[item?.input_type as keyof typeof SysTableFieldInputTypeMap] ||
     (item?.input_type ? `控件 ${item.input_type}` : '')
   if (fieldTypeLabel) parts.push(fieldTypeLabel)
   if (inputTypeLabel) parts.push(inputTypeLabel)
-  if (item?.dict_code) parts.push(`字典 ${item.dict_code}`)
-  if (item?.linkage_config) parts.push('关联')
-  return parts.filter(Boolean).join(' / ')
+  return parts.join(' · ')
 }
 
 const resetFieldOptions = () => {
@@ -409,11 +418,7 @@ const filterFields = (value: string, update: QSelectFilterUpdate) => {
   update(() => {
     filteredFields.value = keyword
       ? props.fields.filter((field) => {
-          const text = [
-            fieldOptionLabel(field),
-            fieldOptionCode(field),
-            fieldOptionCaption(field),
-          ]
+          const text = [fieldOptionLabel(field), fieldOptionCode(field), fieldOptionCaption(field)]
             .join(' ')
             .toLowerCase()
           return text.includes(keyword)

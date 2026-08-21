@@ -33,30 +33,6 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-select
-                  v-model="query.status"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="statusOptions"
-                  label="状态"
-                  style="min-width: 140px"
-                  @update:model-value="resetAndFetch"
-                />
-                <q-select
-                  v-model="query.trigger_type"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="triggerOptions"
-                  label="触发类型"
-                  style="min-width: 140px"
-                  @update:model-value="resetAndFetch"
-                />
                 <q-btn color="primary" label="搜索" @click="handleBasicSearch" />
               </template>
             </query-scheme-controls>
@@ -246,10 +222,6 @@ const statusMeta = {
   failed: { label: '失败', color: 'negative' },
 }
 const statusFor = (row: SyncBatchListItem) => statusMeta[row.status]
-const statusOptions = Object.entries(statusMeta).map(([value, item]) => ({
-  label: item.label,
-  value,
-}))
 const triggerOptions = [
   { label: '手工', value: 'manual' },
   { label: '定时', value: 'scheduled' },
@@ -284,7 +256,6 @@ const queryState = useTableQueryState<SyncBatchQuery>({
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })
@@ -293,11 +264,7 @@ const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: canQueryBatches.value,
     error: loadError.value,
-    hasQuery:
-      !!keyword.value ||
-      !!query.value.status ||
-      !!query.value.trigger_type ||
-      activeFilterCount.value > 0,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
   }),
 )
 const fetchData = async () => {

@@ -9,7 +9,12 @@ vi.mock('boot/axios', () => ({
 }))
 
 import AdvancedQueryRuleRow from 'src/components/Query/AdvancedQueryRuleRow.vue'
-import { ExpressionLogic, ExpressionType } from 'src/types/enum'
+import {
+  ExpressionLogic,
+  ExpressionType,
+  SysTableFieldInputType,
+  SysTableFieldType,
+} from 'src/types/enum'
 import type { QueryRule } from 'src/types/global'
 import type {
   OrganizationSelectorRuntimeConfig,
@@ -89,8 +94,7 @@ const mountRuleRow = (
       hasDictRule: () => false,
       hasRelationRule: () => false,
       isBooleanRule: () => false,
-      isMultiValueRule: (currentRule) =>
-        currentRule.expression_type === ExpressionType.IN,
+      isMultiValueRule: (currentRule) => currentRule.expression_type === ExpressionType.IN,
       isFreeInputMultiValueRule: () => false,
       isRangeRule: () => false,
       dictOptionsForRule: () => [],
@@ -138,11 +142,7 @@ describe('AdvancedQueryRuleRow organization selector integration', () => {
   it('uses a single ID for equals and an ID array for in', async () => {
     const equalsRule = makeRule(ExpressionType.EQ)
     const equalsUpdate = vi.fn()
-    const equalsWrapper = mountRuleRow(
-      equalsRule,
-      selectorConfig('employee'),
-      equalsUpdate,
-    )
+    const equalsWrapper = mountRuleRow(equalsRule, selectorConfig('employee'), equalsUpdate)
     const equalsSelector = equalsWrapper.findComponent(OrganizationSelectStub)
 
     expect(equalsSelector.props('multiple')).toBe(false)
@@ -166,5 +166,38 @@ describe('AdvancedQueryRuleRow organization selector integration', () => {
 
     expect(wrapper.findComponent(OrganizationSelectStub).exists()).toBe(false)
     expect(wrapper.find('[data-testid="q-input"]').exists()).toBe(true)
+  })
+
+  it('keeps metadata codes searchable but out of the user-facing field caption', () => {
+    const wrapper = mountRuleRow(makeRule(), null)
+    const caption = (
+      wrapper.vm as unknown as { fieldOptionCaption: (field: unknown) => string }
+    ).fieldOptionCaption({
+      field_code: 'internal_status_code',
+      field_name: '处理状态',
+      field_type: SysTableFieldType.VARCHAR,
+      input_type: SysTableFieldInputType.SELECT,
+      dict_code: 'internal_status_dictionary',
+    })
+
+    expect(caption).toBe('字符串 · 下拉选择')
+    expect(caption).not.toContain('internal_status_code')
+    expect(caption).not.toContain('internal_status_dictionary')
+  })
+
+  it('describes relation fields by business semantics instead of storage type', () => {
+    const wrapper = mountRuleRow(makeRule(), null)
+    const caption = (
+      wrapper.vm as unknown as { fieldOptionCaption: (field: unknown) => string }
+    ).fieldOptionCaption({
+      field_code: 'external_system_id',
+      field_name: '所属系统',
+      field_type: SysTableFieldType.BIGINT,
+      input_type: SysTableFieldInputType.SELECT,
+      logical_type: 'relation',
+    })
+
+    expect(caption).toBe('关联 · 下拉选择')
+    expect(caption).not.toContain('大数字')
   })
 })

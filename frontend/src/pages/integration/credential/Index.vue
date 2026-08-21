@@ -32,18 +32,6 @@
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
-                <q-select
-                  v-model="query.external_system_id"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="systemOptions"
-                  label="所属系统"
-                  style="min-width: 220px"
-                  @update:model-value="resetAndFetch"
-                />
                 <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
             </query-scheme-controls>
@@ -184,6 +172,7 @@ import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import type { TableColumn } from 'src/types/global'
+import { ExpressionType } from 'src/types/enum'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
@@ -212,9 +201,7 @@ const {
   advancedSearchFields: metadataAdvancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('integration_credential')
-const advancedFields = computed(() =>
-  metadataAdvancedFields.value.filter((field) => field.field_code !== 'external_system_id'),
-)
+const advancedFields = computed(() => metadataAdvancedFields.value)
 const typeLabels: Record<string, string> = {
   basic: 'Basic',
   api_key: 'API Key',
@@ -231,25 +218,30 @@ const statusMeta: Record<string, { label: string; color: string }> = {
 const columns = ref<TableColumn<CredentialListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
-const systemOptions = computed(() =>
-  systems.value.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })),
-)
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const routeSystemID = Number(route.query.external_system_id)
+const hasRouteSystemContext = Number.isSafeInteger(routeSystemID) && routeSystemID > 0
 const queryState = useTableQueryState<CredentialQuery>({
-  createInitialQuery: () => {
-    const initial: CredentialQuery = {
-      page: 1,
-      num: 15,
-      order: { field: '', is_asc: false },
-      quick_query: { keyword: '' },
-      expressions: emptyExpressions(),
-    }
-    if (Number.isSafeInteger(routeSystemID) && routeSystemID > 0)
-      initial.external_system_id = routeSystemID
-    return initial
-  },
-  createEmptyExpressions: emptyExpressions,
+  createInitialQuery: () => ({
+    page: 1,
+    num: 15,
+    order: { field: '', is_asc: false },
+    quick_query: { keyword: '' },
+    expressions: hasRouteSystemContext
+      ? [
+          {
+            rules: [
+              {
+                field: 'external_system_id',
+                expression_type: ExpressionType.EQ,
+                value: routeSystemID,
+              },
+            ],
+            nested: [],
+          },
+        ]
+      : emptyExpressions(),
+  }),
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
@@ -440,7 +432,7 @@ const handleFormSubmit = async (form: {
 }
 onMounted(async () => {
   await Promise.all([fetchMetadata(), fetchSystems()])
-  await schemePage.initialize()
+  await schemePage.initialize({ preserveInitialQuery: hasRouteSystemContext })
   await fetchData()
   initialized.value = true
 })

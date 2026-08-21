@@ -13,13 +13,6 @@
       >
         <template #master-actions>
           <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
-            <template #query-controls>
-              <query-scheme-controls
-                :controller="schemePage"
-                :query-state="queryState"
-                :fields="dictAdvancedFields"
-              />
-            </template>
             <template #right-actions>
               <q-btn
                 v-for="btn in masterTopButtons"
@@ -243,7 +236,6 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import {
@@ -256,7 +248,6 @@ import type { Query } from 'src/types/global'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import cloneDeep from 'lodash/cloneDeep'
 import { useDictStore } from 'src/stores/dict'
 import { buildTableColumns } from 'src/utils/column-format'
@@ -266,7 +257,6 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
-import { hasEffectiveQueryRules } from 'src/utils/query-state'
 
 const loading = ref(false)
 const loadError = ref('')
@@ -384,7 +374,6 @@ const rawDictItemColumns = ref<QTableProps['columns']>([])
 
 const {
   fields: dictMetadataFields,
-  advancedSearchFields: dictAdvancedFields,
   formFields: dictFields,
   loadMetadata: loadDictMetadata,
 } = useRuntimeTableMetadata('sys_dict')
@@ -420,15 +409,13 @@ const queryState = useTableQueryState<Query>({
     quick_query: { keyword: '' },
     include_deleted: false,
   }),
-  createEmptyExpressions: () => emptyAdvancedQuery().expressions,
 })
-const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
-const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
+const { query, keyword } = queryState
 const listEmptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: true,
     error: loadError.value,
-    hasQuery: !!keyword.value || hasAppliedAdvancedFilters.value,
+    hasQuery: !!keyword.value,
   }),
 )
 
@@ -477,10 +464,10 @@ const resetToFirstPageOrFetch = () => {
   void fetchData()
 }
 
-const schemePage = useQuerySchemePage('develop_dictionary', queryState, resetToFirstPageOrFetch)
-
 const handleBasicSearch = () => {
-  schemePage.runQueryChange(queryState.submitQuickSearch)
+  const previousPage = query.value.page
+  queryState.submitQuickSearch()
+  if (previousPage === 1) resetToFirstPageOrFetch()
 }
 
 const clearCurrentSelection = () => {
@@ -686,7 +673,6 @@ const initialized = ref(false)
 
 onMounted(async () => {
   await fetchTableFields()
-  await schemePage.initialize()
   await fetchData()
   initialized.value = true
 })

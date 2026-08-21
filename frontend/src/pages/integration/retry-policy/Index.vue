@@ -33,30 +33,6 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-select
-                  v-model="query.status"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="statusOptions"
-                  label="状态"
-                  style="min-width: 150px"
-                  @update:model-value="resetAndFetch"
-                />
-                <q-select
-                  v-model="query.backoff_type"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="backoffOptions"
-                  label="退避方式"
-                  style="min-width: 160px"
-                  @update:model-value="resetAndFetch"
-                />
                 <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
             </query-scheme-controls>
@@ -216,11 +192,6 @@ const backoffLabels: Record<RetryBackoffType, string> = {
   fixed: '固定间隔',
   exponential: '指数退避',
 }
-const statusOptions = Object.entries(statusMeta).map(([value, item]) => ({
-  label: item.label,
-  value,
-}))
-const backoffOptions = Object.entries(backoffLabels).map(([value, label]) => ({ label, value }))
 const columns = ref<TableColumn<RetryPolicyListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
@@ -233,7 +204,6 @@ const queryState = useTableQueryState<RetryPolicyQuery>({
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))

@@ -255,7 +255,6 @@ const queryState = useTableQueryState<Query>({
     quick_query: { keyword: '' },
     include_deleted: false,
   }),
-  createEmptyExpressions: () => emptyAdvancedQuery().expressions,
 })
 const { query, appliedAdvanced: appliedAdvancedQuery } = queryState
 

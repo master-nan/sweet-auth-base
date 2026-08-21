@@ -148,7 +148,24 @@ describe('retry policy management page', () => {
     apiMocks.queryRetryPolicies.mockResolvedValue({ data: [row], total: 1 })
     tableApiMocks.queryRuntimeTableByCode.mockResolvedValue({
       success: true,
-      data: { table_fields: [] },
+      data: {
+        table_fields: [
+          {
+            field_code: 'status',
+            field_name: '状态',
+            field_type: 'varchar',
+            is_advanced_search: true,
+            sequence: 1,
+          },
+          {
+            field_code: 'backoff_type',
+            field_name: '退避方式',
+            field_type: 'varchar',
+            is_advanced_search: true,
+            sequence: 2,
+          },
+        ],
+      },
     })
   })
 
@@ -164,6 +181,13 @@ describe('retry policy management page', () => {
       expect.objectContaining({ page: 1, num: 15 }),
     )
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
+    expect(
+      (
+        wrapper.vm as unknown as {
+          advancedFields: Array<{ field_code: string }>
+        }
+      ).advancedFields.map((field) => field.field_code),
+    ).toEqual(['status', 'backoff_type'])
     await (wrapper.vm as unknown as { fetchData: () => Promise<void> }).fetchData()
     expect(schemeMocks.initialize).toHaveBeenCalledOnce()
   })

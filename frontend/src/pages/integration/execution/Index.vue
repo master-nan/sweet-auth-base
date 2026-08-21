@@ -1,53 +1,41 @@
 <template>
-  <base-content class="q-pa-sm">
-    <div class="row q-col-gutter-sm q-mb-sm">
-      <div class="col-12 col-md-8">
-        <q-card flat bordered class="runtime-status-card">
-          <q-card-section class="row items-center q-gutter-md">
-            <q-icon name="monitor_heart" size="32px" color="primary" />
-            <div class="col">
-              <div class="text-subtitle1 text-weight-bold">当前实例状态</div>
-              <div class="text-caption text-grey-7">
-                {{ workerStatus.worker_id || '未启用 Worker' }}
-              </div>
-            </div>
-            <q-chip
-              dense
-              square
-              :color="workerStatus.running ? 'positive' : 'grey-6'"
-              text-color="white"
-            >
-              {{ workerStatus.running ? '运行中' : workerStatus.enabled ? '已停止' : '未启用' }}
-            </q-chip>
-            <div class="text-caption">活动 {{ workerStatus.active_execution_count }}</div>
-            <div class="text-caption">已完成 {{ workerStatus.completed_total }}</div>
-          </q-card-section>
-        </q-card>
+  <base-content class="q-pa-sm column no-wrap execution-page">
+    <div class="runtime-status-strip row items-center no-wrap q-gutter-sm q-px-sm q-py-xs">
+      <q-icon name="monitor_heart" size="22px" color="primary" />
+      <div>
+        <div class="text-weight-medium">Worker运行状态</div>
+        <div class="text-caption text-grey-7">
+          {{ workerStatus.worker_id || '未启用 Worker' }}
+        </div>
       </div>
-      <div class="col-12 col-md-4">
-        <q-card flat bordered class="runtime-status-card fit">
-          <q-card-section class="row items-center justify-between">
-            <span class="text-caption text-grey-7">最近轮询</span>
-            <span>{{ formatDate(workerStatus.last_poll_at) }}</span>
-            <q-btn
-              flat
-              round
-              dense
-              icon="refresh"
-              color="primary"
-              :loading="loading"
-              @click="refresh"
-              aria-label="刷新执行状态"
-              ><q-tooltip>刷新执行状态</q-tooltip></q-btn
-            >
-          </q-card-section>
-        </q-card>
+      <q-separator vertical inset />
+      <status-chip
+        :color="workerStatus.running ? 'positive' : 'grey-6'"
+        :label="workerStatus.running ? '运行中' : workerStatus.enabled ? '已停止' : '未启用'"
+      />
+      <div class="text-caption">活动 {{ workerStatus.active_execution_count }}</div>
+      <div class="text-caption">已完成 {{ workerStatus.completed_total }}</div>
+      <div class="text-caption text-grey-7">
+        最近轮询 {{ formatDate(workerStatus.last_poll_at) }}
       </div>
+      <q-space />
+      <q-btn
+        flat
+        round
+        dense
+        icon="refresh"
+        color="primary"
+        :loading="loading"
+        @click="refresh"
+        aria-label="刷新执行状态"
+      >
+        <q-tooltip>刷新执行状态</q-tooltip>
+      </q-btn>
     </div>
 
     <q-table
       v-model:pagination="pagination"
-      class="fit sticky-header-table"
+      class="col sticky-header-table execution-table"
       color="primary"
       flat
       bordered
@@ -77,17 +65,6 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-select
-                  v-model="query.status"
-                  dense
-                  outlined
-                  clearable
-                  emit-value
-                  map-options
-                  :options="statusOptions"
-                  label="状态"
-                  style="min-width: 150px"
-                />
                 <q-btn
                   color="primary"
                   icon="search"
@@ -242,7 +219,6 @@ const queryState = useTableQueryState<IntegrationExecutionQuery>({
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const { advancedSearchFields: advancedFields, loadMetadata } =
@@ -252,7 +228,7 @@ const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: canQueryExecutions.value,
     error: loadError.value,
-    hasQuery: !!keyword.value || !!query.value.status || activeFilterCount.value > 0,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
   }),
 )
 const workerStatus = ref<IntegrationWorkerStatus>({
@@ -269,14 +245,6 @@ const workerStatus = ref<IntegrationWorkerStatus>({
   failed_total: 0,
   recovered_total: 0,
 })
-const statusOptions = [
-  { label: '待执行', value: 'created' },
-  { label: '执行中', value: 'running' },
-  { label: '等待重试', value: 'retry_waiting' },
-  { label: '成功', value: 'succeeded' },
-  { label: '失败', value: 'failed' },
-  { label: '已取消', value: 'cancelled' },
-]
 const statusMeta: Record<string, { label: string; color: string }> = {
   created: { label: '待执行', color: 'grey-7' },
   running: { label: '执行中', color: 'primary' },
@@ -393,7 +361,18 @@ watch(
 </script>
 
 <style scoped>
-.runtime-status-card {
-  min-height: 76px;
+.execution-page {
+  gap: 8px;
+}
+
+.runtime-status-strip {
+  min-height: 48px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-surface);
+}
+
+.execution-table {
+  min-height: 0;
 }
 </style>

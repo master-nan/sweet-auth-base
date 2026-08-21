@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import type { Query } from 'src/types/global'
-import { QuerySchemeType } from 'src/modules/query-scheme/types'
+import { QuerySchemeBindingKind, QuerySchemeType } from 'src/modules/query-scheme/types'
 
 const createQuery = (): Query => ({
   page: 3,
@@ -39,6 +39,41 @@ describe('useTableQueryState', () => {
     state.query.value.page = 2
     state.setPageSize(50)
     expect(state.query.value).toMatchObject({ page: 1, num: 50 })
+  })
+
+  it('submits quick search without clearing advanced conditions, bindings or sorting', () => {
+    const state = useTableQueryState({ createInitialQuery: createQuery })
+    state.markSchemeSaved({
+      id: 9,
+      name: '启用记录',
+      type: QuerySchemeType.PERSONAL,
+      revision: 1,
+      is_default: false,
+    })
+    state.bindings.value = [
+      {
+        pointer: '/expressions/0/rules/0/value',
+        kind: QuerySchemeBindingKind.CURRENT_USER,
+      },
+    ]
+    state.query.value.order = { field: 'gmt_create', is_asc: false }
+    state.keyword.value = 'Platform'
+
+    state.submitQuickSearch()
+
+    expect(state.query.value).toMatchObject({
+      page: 1,
+      quick_query: { keyword: 'Platform' },
+      expressions: [{ rules: [{ field: 'status', value: 'enabled' }], nested: [] }],
+      order: { field: 'gmt_create', is_asc: false },
+    })
+    expect(state.bindings.value).toEqual([
+      {
+        pointer: '/expressions/0/rules/0/value',
+        kind: QuerySchemeBindingKind.CURRENT_USER,
+      },
+    ])
+    expect(state.schemeSource.value?.id).toBe(9)
   })
 
   it('rejects sorting fields outside the server allowlist', () => {

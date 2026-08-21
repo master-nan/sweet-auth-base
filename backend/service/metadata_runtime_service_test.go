@@ -73,11 +73,17 @@ func TestMetadataRuntimeServiceReadsSafeStableProjectionAndRefreshesCache(t *tes
 	if err != nil {
 		t.Fatalf("get runtime response: %v", err)
 	}
+	if len(runtimeResponse.TableFields) == 0 || len(runtimeResponse.TableFields[0].AllowedOperators) == 0 {
+		t.Fatalf("runtime response omitted allowed operators: %+v", runtimeResponse.TableFields)
+	}
 	encoded, err := json.Marshal(runtimeResponse)
 	if err != nil {
 		t.Fatalf("marshal runtime response: %v", err)
 	}
 	payload := strings.ToLower(string(encoded))
+	if strings.Contains(payload, `"allowed_operators":"`) {
+		t.Fatalf("allowed operators must be a JSON number array: %s", payload)
+	}
 	for _, forbidden := range []string{"protected_source", "access_token", "serializer:json", `"sql"`, `"tag"`, "gmt_create"} {
 		if strings.Contains(payload, forbidden) {
 			t.Fatalf("runtime response leaked %q: %s", forbidden, payload)

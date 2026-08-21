@@ -1,13 +1,24 @@
 <template>
   <base-content class="q-pa-md">
     <div class="row items-center q-mb-md q-gutter-sm">
-      <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"><q-tooltip>返回</q-tooltip></q-btn>
+      <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"
+        ><q-tooltip>返回</q-tooltip></q-btn
+      >
       <div>
         <div class="text-h5">执行详情</div>
         <div class="text-caption text-grey-7">{{ detail?.execution_no || '-' }}</div>
       </div>
       <q-space />
-      <q-btn flat round icon="refresh" color="primary" aria-label="刷新执行详情" :loading="loading" @click="loadDetail"><q-tooltip>刷新执行详情</q-tooltip></q-btn>
+      <q-btn
+        flat
+        round
+        icon="refresh"
+        color="primary"
+        aria-label="刷新执行详情"
+        :loading="loading"
+        @click="loadDetail"
+        ><q-tooltip>刷新执行详情</q-tooltip></q-btn
+      >
       <status-chip
         v-if="detail"
         :color="statusMeta[detail.status]?.color || 'grey'"
@@ -144,19 +155,31 @@
         <q-card-section>
           <div class="text-subtitle1 text-weight-bold q-mb-md">同步业务结果</div>
           <div class="row q-col-gutter-lg">
-            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">状态</div><div>{{ detail.sync_business.status }}</div></div>
-            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">成功 / 失败</div><div>{{ detail.sync_business.success_count }} / {{ detail.sync_business.failed_count }}</div></div>
-            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">原因</div><div>{{ detail.sync_business.reason_code || '-' }}</div></div>
-            <div class="col-6 col-md-3"><div class="text-caption text-grey-7">业务引用</div><div>{{ detail.sync_business.reference || '-' }}</div></div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">状态</div>
+              <div>{{ detail.sync_business.status }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">成功 / 失败</div>
+              <div>
+                {{ detail.sync_business.success_count }} / {{ detail.sync_business.failed_count }}
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">原因</div>
+              <div>{{ detail.sync_business.reason_code || '-' }}</div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="text-caption text-grey-7">业务引用</div>
+              <div>{{ detail.sync_business.reference || '-' }}</div>
+            </div>
           </div>
         </q-card-section>
       </q-card>
       <q-card flat bordered
         ><q-card-section
           ><div class="text-subtitle1 text-weight-bold q-mb-sm">Attempt 记录</div>
-          <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">
-            无调用日志查看权限
-          </div>
+          <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">无调用日志查看权限</div>
           <q-table
             v-else
             flat
@@ -174,7 +197,8 @@
                   dense
                   color="primary"
                   :label="`#${props.row.attempt_no}`"
-                  @click="openLog(props.row.id)" />
+                  @click="openLog(props.row.id)"
+                />
                 <span v-else>#{{ props.row.attempt_no }}</span></q-td
               ></template
             ><template #body-cell-status="props"
@@ -243,7 +267,7 @@ const openLog = (logId: number) => {
   if (detail.value)
     void router.push({
       name: 'integration_log',
-      query: { execution_no: detail.value.execution_no, log_id: String(logId) },
+      query: { execution_id: String(detail.value.id), log_id: String(logId) },
     })
 }
 const loadDetail = async () => {

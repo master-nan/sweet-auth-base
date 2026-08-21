@@ -37,7 +37,7 @@ vi.mock('src/composables/query-scheme-page', async () => {
   }
 })
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { execution_no: 'INT-51', log_id: '91' } }),
+  useRoute: () => ({ query: { execution_id: '51', log_id: '91' } }),
 }))
 vi.mock('src/composables/page-buttons', () => ({
   usePageButtons: () => ({
@@ -118,6 +118,16 @@ describe('integration log detail permission', () => {
     expect(apiMocks.getLog).not.toHaveBeenCalled()
     expect(tableApiMocks.queryRuntimeTableByCode).toHaveBeenCalledWith('integration_log')
     expect(schemeMocks.initialize).toHaveBeenCalledOnce()
+    expect(schemeMocks.initialize).toHaveBeenCalledWith({ preserveInitialQuery: true })
+    expect(apiMocks.queryLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expressions: [
+          expect.objectContaining({
+            rules: [expect.objectContaining({ field: 'execution_id', value: 51 })],
+          }),
+        ],
+      }),
+    )
     expect(schemeMocks.initialize.mock.invocationCallOrder[0]).toBeLessThan(
       apiMocks.queryLogs.mock.invocationCallOrder[0]!,
     )

@@ -1,8 +1,12 @@
 <template>
-  <div class="row items-center q-gutter-xs">
+  <div
+    class="query-scheme-controls row items-center no-wrap q-gutter-xs"
+    :class="`query-scheme-controls--${layout}`"
+  >
     <query-scheme-selector
       :schemes="runtime.schemes.value"
       :current-label="runtime.currentLabel.value"
+      :source="schemeSource"
       :loading="runtime.loading.value"
       :dirty="dirty"
       :load-error="runtime.error.value"
@@ -10,9 +14,9 @@
       @restore-current="restoreCurrent"
       @reset-default="resetDefault"
       @retry="runtime.loadAvailable"
+      @save-current="showSaveDialog = true"
       @manage="openManager"
     />
-    <q-separator vertical inset />
     <query-quick-presets :config="runtime.scope.config.value" @apply="applyPreset" />
     <slot name="quick-search" />
     <q-btn
@@ -20,6 +24,7 @@
       outline
       icon="tune"
       color="primary"
+      class="query-scheme-controls__advanced"
       :aria-label="filterCountLabel"
       @click="openAdvancedQuery"
     >
@@ -28,13 +33,6 @@
       }}</q-badge>
       <q-tooltip>{{ filterCountLabel }}</q-tooltip>
     </q-btn>
-    <q-btn
-      outline
-      color="primary"
-      icon="bookmark_add"
-      label="保存方案"
-      @click="showSaveDialog = true"
-    />
   </div>
 
   <advanced-query
@@ -104,12 +102,14 @@ const props = withDefaults(
     advancedEnabled?: boolean
     enableNested?: boolean
     showFilterCount?: boolean
+    layout?: 'standard' | 'compact'
   }>(),
   {
     advancedTitle: '高级查询',
     advancedEnabled: true,
     enableNested: true,
     showFilterCount: true,
+    layout: 'standard',
   },
 )
 
@@ -152,3 +152,26 @@ const applyAdvancedQuery = () => {
   showAdvancedQuery.value = false
 }
 </script>
+
+<style scoped>
+.query-scheme-controls {
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.query-scheme-controls :deep(.query-scheme-selector) {
+  max-width: 156px;
+}
+
+.query-scheme-controls :deep(.q-input) {
+  width: 180px;
+}
+
+.query-scheme-controls--compact :deep(.query-scheme-selector) {
+  max-width: 132px;
+}
+
+.query-scheme-controls--compact :deep(.q-input) {
+  width: 150px;
+}
+</style>

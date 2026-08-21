@@ -17,6 +17,7 @@ const apiMocks = vi.hoisted(() => ({
 }))
 const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
+const routeQuery = vi.hoisted(() => ({}) as Record<string, string>)
 const permissionCodes = vi.hoisted(() => [] as string[])
 const buttons = vi.hoisted(() => ({
   top: [{ id: 1, name: '新增', event_action: 'create', icon: 'add', color: 'primary' }],
@@ -30,7 +31,7 @@ const buttons = vi.hoisted(() => ({
 }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }) }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: routeQuery }) }))
 vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 vi.mock('src/composables/query-scheme-page', async () => {
   const { ref } = await import('vue')
@@ -47,6 +48,7 @@ vi.mock('src/composables/query-scheme-page', async () => {
       showSaveDialog: ref(false),
       saving: ref(false),
       initialize: schemeMocks.initialize,
+      runQueryChange: vi.fn((change: () => void) => change()),
       selectScheme: vi.fn(),
       applyPreset: vi.fn(),
       restoreCurrent: vi.fn(),
@@ -167,6 +169,7 @@ describe('interface definition management page', () => {
     pinia = createPinia()
     setActivePinia(pinia)
     permissionCodes.splice(0, permissionCodes.length, 'integration_retry_policy_query')
+    Object.keys(routeQuery).forEach((key) => delete routeQuery[key])
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
     schemeMocks.initialize.mockReset()
     schemeMocks.initialize.mockResolvedValue(false)
@@ -221,5 +224,33 @@ describe('interface definition management page', () => {
     expect(
       vm.availableLineButtons({ ...row, status: 'enabled' }).map((item) => item.event_action),
     ).toEqual(['detail', 'create_version', 'disable'])
+  })
+
+  it('converts routed system context into an advanced expression and keeps it with keyword search', async () => {
+    routeQuery.external_system_id = '10'
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(schemeMocks.initialize).toHaveBeenCalledWith({ preserveInitialQuery: true })
+    apiMocks.queryInterfaceDefinitions.mockClear()
+    const vm = wrapper.vm as unknown as {
+      keyword: string
+      handleBasicSearch: () => void
+      fetchData: () => Promise<void>
+    }
+    vm.keyword = '订单'
+    vm.handleBasicSearch()
+    await vm.fetchData()
+
+    expect(apiMocks.queryInterfaceDefinitions).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        quick_query: { keyword: '订单' },
+        expressions: [
+          expect.objectContaining({
+            rules: [expect.objectContaining({ field: 'external_system_id', value: 10 })],
+          }),
+        ],
+      }),
+    )
   })
 })

@@ -145,7 +145,6 @@ func FixedScopeDeclarations() []ScopeDeclaration {
 		fixedScope("integration_sync_batch", "integration.sync_batch.list", "integration_sync_batch", dateAndUser),
 		fixedScope("integration_execution", "integration.execution.list", "integration_execution", dateAndUser),
 		fixedScope("integration_log", "integration.log.list", "integration_log", dateAndUser),
-		fixedScope("develop_dictionary", "develop.dictionary.master", "sys_dict", dateAndUser),
 	}
 }
 

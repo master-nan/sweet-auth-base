@@ -606,8 +606,16 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			items: []systemDictItemSeed{{name: "草稿", code: "integration_sync_task_status_draft", value: model.IntegrationSyncTaskStatusDraft}, {name: "已启用", code: "integration_sync_task_status_enabled", value: model.IntegrationSyncTaskStatusEnabled}, {name: "已停用", code: "integration_sync_task_status_disabled", value: model.IntegrationSyncTaskStatusDisabled}},
 		},
 		{
+			name: "集成同步调度方式", code: "integration_sync_schedule_type",
+			items: []systemDictItemSeed{{name: "仅手工", code: "integration_sync_schedule_type_none", value: model.IntegrationSyncScheduleNone}, {name: "Cron", code: "integration_sync_schedule_type_cron", value: model.IntegrationSyncScheduleCron}},
+		},
+		{
 			name: "集成同步批次状态", code: "integration_sync_batch_status",
 			items: []systemDictItemSeed{{name: "待运行", code: "integration_sync_batch_status_created", value: model.IntegrationSyncBatchStatusCreated}, {name: "运行中", code: "integration_sync_batch_status_running", value: model.IntegrationSyncBatchStatusRunning}, {name: "成功", code: "integration_sync_batch_status_succeeded", value: model.IntegrationSyncBatchStatusSucceeded}, {name: "失败", code: "integration_sync_batch_status_failed", value: model.IntegrationSyncBatchStatusFailed}},
+		},
+		{
+			name: "集成同步触发类型", code: "integration_sync_trigger_type",
+			items: []systemDictItemSeed{{name: "手工", code: "integration_sync_trigger_type_manual", value: model.IntegrationSyncTriggerManual}, {name: "定时", code: "integration_sync_trigger_type_scheduled", value: model.IntegrationSyncTriggerScheduled}},
 		},
 		{
 			name: "集成执行状态",
@@ -2284,6 +2292,9 @@ func seedSystemTableField(db *gorm.DB, sf *utils.Snowflake, table model.SysTable
 		}
 		if field.DefaultValue != nil {
 			updates["default_value"] = *field.DefaultValue
+		}
+		if field.LinkageConfig != nil {
+			updates["linkage_config"] = *field.LinkageConfig
 		}
 		return db.Unscoped().Model(&model.SysTableField{}).Where("id = ?", existing.Id).Updates(updates).Error
 	}

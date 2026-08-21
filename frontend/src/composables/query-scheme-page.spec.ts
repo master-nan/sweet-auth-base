@@ -41,8 +41,16 @@ describe('useQuerySchemePage', () => {
     await page.initialize()
     await page.selectScheme({ id: 2 } as never)
 
-    expect(runtime.initialize).toHaveBeenCalledWith(17)
+    expect(runtime.initialize).toHaveBeenCalledWith(17, {})
     expect(refresh).toHaveBeenCalledOnce()
+  })
+
+  it('passes explicit route-context preservation to runtime initialization', async () => {
+    const page = useQuerySchemePage('system_user', createState(), vi.fn())
+
+    await page.initialize({ preserveInitialQuery: true })
+
+    expect(runtime.initialize).toHaveBeenCalledWith(17, { preserveInitialQuery: true })
   })
 
   it('reports a blocked scheme without refreshing business data', async () => {
@@ -113,9 +121,7 @@ describe('useQuerySchemePage', () => {
   })
 
   it('keeps the save dialog open and absorbs a reported save conflict', async () => {
-    runtime.savePersonal.mockRejectedValueOnce(
-      new Error('方案已被其他操作更新，请刷新后重试'),
-    )
+    runtime.savePersonal.mockRejectedValueOnce(new Error('方案已被其他操作更新，请刷新后重试'))
     const page = useQuerySchemePage('system_user', createState(), vi.fn())
     page.showSaveDialog.value = true
 

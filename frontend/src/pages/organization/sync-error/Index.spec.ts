@@ -8,16 +8,19 @@ const source = readFileSync(
 )
 
 describe('organization sync error query scheme integration', () => {
-  it('applies contextual diagnostics after scheme initialization and before fetching', () => {
+  it('preserves routed diagnostics as standard expressions during initialization', () => {
     const mounted = source.slice(source.indexOf('onMounted(async () => {'))
-    const initializeIndex = mounted.indexOf('await schemePage.initialize()')
-    const routeFilterIndex = mounted.indexOf('applyRouteFilters()')
+    const initializeIndex = mounted.indexOf(
+      'await schemePage.initialize({ preserveInitialQuery: hasRouteContext })',
+    )
     const fetchIndex = mounted.indexOf('await fetchData()')
     expect(initializeIndex).toBeGreaterThanOrEqual(0)
-    expect(initializeIndex).toBeLessThan(routeFilterIndex)
-    expect(routeFilterIndex).toBeLessThan(fetchIndex)
+    expect(initializeIndex).toBeLessThan(fetchIndex)
     expect(source).toContain('@refresh="fetchData"')
-    expect(source.match(/schemePage\.initialize\(\)/g)).toHaveLength(1)
+    expect(source).toContain("field: 'object_type'")
+    expect(source).toContain("field: 'local_id'")
+    expect(source.match(/expression_type: ExpressionType\.EQ/g)).toHaveLength(2)
+    expect(source).not.toContain('applyRouteFilters')
   })
 
   it('keeps failed-record defaults, details, and error diagnosis', () => {

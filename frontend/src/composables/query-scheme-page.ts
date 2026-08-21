@@ -27,10 +27,11 @@ export function useQuerySchemePage<TQuery extends Query>(
     applyWithSingleRefresh(previousPage)
   }
 
-  const initialize = async () => {
+  const initialize = async (options: { preserveInitialQuery?: boolean } = {}) => {
     const requestedID = Number(route.query.query_scheme_id)
     return runtime.initialize(
       Number.isSafeInteger(requestedID) && requestedID > 0 ? requestedID : undefined,
+      options,
     )
   }
 

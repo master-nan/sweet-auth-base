@@ -111,7 +111,7 @@ type RuntimeFieldMetadataRes struct {
 	NumericPrecision   int                             `json:"numeric_precision"`
 	NumericScale       int                             `json:"numeric_scale"`
 	ListWidth          *int                            `json:"list_width,omitempty"`
-	AllowedOperators   []enum.ExpressionType           `json:"allowed_operators"`
+	AllowedOperators   []int                           `json:"allowed_operators"`
 	Relation           *RuntimeRelationDisplayRes      `json:"relation,omitempty"`
 	FormSpan           uint8                           `json:"form_span"`
 	DetailSpan         uint8                           `json:"detail_span"`

@@ -221,7 +221,6 @@ const queryState = useTableQueryState<ExternalSystemQuery>({
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))

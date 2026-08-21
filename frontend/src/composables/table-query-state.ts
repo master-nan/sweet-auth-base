@@ -1,6 +1,6 @@
 import cloneDeep from 'lodash/cloneDeep'
 import { computed, ref, type Ref } from 'vue'
-import type { ExpressionGroup, Query } from 'src/types/global'
+import type { Query } from 'src/types/global'
 import type {
   QuerySchemeBinding,
   QuerySchemePayloadV1,
@@ -11,12 +11,7 @@ import { normalizeQuerySchemePayload, serializeQuerySchemePayload } from 'src/ut
 
 export interface TableQueryStateOptions<TQuery extends Query> {
   createInitialQuery: () => TQuery
-  createEmptyExpressions?: () => ExpressionGroup[]
 }
-
-const defaultEmptyExpressions = (): ExpressionGroup[] => [
-  { rules: [{ field: '', value: null }], nested: [] },
-]
 
 export function useTableQueryState<TQuery extends Query>(options: TableQueryStateOptions<TQuery>) {
   const query = ref(options.createInitialQuery()) as Ref<TQuery>
@@ -38,9 +33,6 @@ export function useTableQueryState<TQuery extends Query>(options: TableQueryStat
   }
 
   const submitQuickSearch = () => {
-    query.value.expressions = (options.createEmptyExpressions || defaultEmptyExpressions)()
-    bindings.value = []
-    appliedAdvanced.value = cloneDeep(query.value)
     resetPage()
   }
 

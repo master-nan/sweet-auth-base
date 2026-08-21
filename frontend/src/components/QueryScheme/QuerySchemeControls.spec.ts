@@ -14,15 +14,21 @@ vi.mock('src/boot/axios', () => ({
 }))
 
 const QBtnStub = defineComponent({
-  props: { icon: String },
+  props: { icon: String, label: String },
   emits: ['click'],
   setup(props, { emit, slots }) {
     return () =>
-      h('button', { 'data-icon': props.icon, onClick: () => emit('click') }, slots.default?.())
+      h(
+        'button',
+        { 'data-icon': props.icon, 'data-label': props.label, onClick: () => emit('click') },
+        slots.default?.(),
+      )
   },
 })
 
-const createHarness = (props: { advancedEnabled?: boolean } = {}) => {
+const createHarness = (
+  props: { advancedEnabled?: boolean; layout?: 'standard' | 'compact' } = {},
+) => {
   const applyAdvancedQuery = vi.fn()
   const runQueryChange = vi.fn((change: () => void) => change())
   const controller = {
@@ -87,7 +93,7 @@ describe('QuerySchemeControls', () => {
     expect(wrapper.find('[data-testid="quick-search"]').exists()).toBe(true)
   })
 
-  it('owns only advanced/save presentation and delegates query mutations', async () => {
+  it('owns advanced/save presentation and delegates query mutations', async () => {
     const { wrapper, controller, queryState, runQueryChange, applyAdvancedQuery } = createHarness()
 
     await wrapper.find('[data-icon="tune"]').trigger('click')
@@ -97,8 +103,16 @@ describe('QuerySchemeControls', () => {
     expect(runQueryChange).toHaveBeenCalledOnce()
     expect(applyAdvancedQuery).toHaveBeenCalledWith(queryState.draftAdvanced.value)
 
-    await wrapper.find('[data-icon="bookmark_add"]').trigger('click')
+    wrapper.findComponent(QuerySchemeSelector).vm.$emit('save-current')
     expect(controller.showSaveDialog.value).toBe(true)
+    expect(wrapper.find('[data-icon="bookmark_add"]').exists()).toBe(false)
+    expect(wrapper.find('[data-icon="tune"]').attributes('data-label')).toBeUndefined()
+  })
+
+  it('uses an icon-only advanced action in compact layout', () => {
+    const { wrapper } = createHarness({ layout: 'compact' })
+
+    expect(wrapper.find('[data-icon="tune"]').attributes('data-label')).toBeUndefined()
   })
 
   it('does not mount the advanced editor when the page has no advanced fields', () => {

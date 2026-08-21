@@ -150,7 +150,7 @@ describe('integration execution detail permissions', () => {
     vm.openLog(91)
     expect(routerPush).toHaveBeenCalledWith({
       name: 'integration_log',
-      query: { execution_no: 'INT-51', log_id: '91' },
+      query: { execution_id: '51', log_id: '91' },
     })
   })
 })

@@ -13,7 +13,7 @@ const functionSource = (name: string, nextName: string) => {
   return source.slice(start, end)
 }
 
-describe('Dictionary query scheme integration', () => {
+describe('Dictionary master-detail workspace', () => {
   it('keeps dictionary Item loading outside the Master query scheme state', () => {
     const masterFetch = functionSource('fetchData', 'syncCurrentDictAfterFetch')
     const itemFetch = functionSource('fetchDictItems', 'refreshDictItems')
@@ -23,5 +23,13 @@ describe('Dictionary query scheme integration', () => {
     expect(itemFetch).not.toContain('queryState')
     expect(itemFetch).not.toContain('query.value')
     expect(source).toContain('v-model="itemSearchText"')
+  })
+
+  it('keeps Query Center controls out of the narrow master pane', () => {
+    expect(source).not.toContain('QuerySchemeControls')
+    expect(source).not.toContain('useQuerySchemePage')
+    expect(source).not.toContain('<query-scheme-controls')
+    expect(source).toContain('master-width="372px"')
+    expect(source).toContain('v-model="keyword"')
   })
 })

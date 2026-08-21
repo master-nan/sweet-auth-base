@@ -566,6 +566,7 @@ func TestSeedSystemTableFieldRepairsGeneratedChineseName(t *testing.T) {
 
 	field := existing
 	field.FieldName = systemFieldDisplayName(table.TableCode, field.FieldCode)
+	field.LinkageConfig = utils.StringPtr(`{"linkage":{"enabled":true,"mode":"relation"}}`)
 	if err := seedSystemTableField(db, newMigrationTestSnowflake(t), table, field); err != nil {
 		t.Fatalf("repair system table field: %v", err)
 	}
@@ -576,6 +577,9 @@ func TestSeedSystemTableFieldRepairsGeneratedChineseName(t *testing.T) {
 	}
 	if got.FieldName != "是否页面按钮" {
 		t.Fatalf("expected field name repaired, got %q", got.FieldName)
+	}
+	if got.LinkageConfig == nil || *got.LinkageConfig != *field.LinkageConfig {
+		t.Fatalf("expected linkage config repaired, got %v", got.LinkageConfig)
 	}
 }
 

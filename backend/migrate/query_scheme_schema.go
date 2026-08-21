@@ -7,10 +7,15 @@ import (
 	"gorm.io/gorm"
 )
 
+const retiredDictionaryQueryScope = "develop.dictionary.master"
+
 func migrateQuerySchemeSchema(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.AutoMigrate(&model.SysMenu{}, &model.QueryScheme{}, &model.QuerySchemeRole{}); err != nil {
 			return fmt.Errorf("auto migrate query scheme: %w", err)
+		}
+		if err := retireDictionaryQueryScope(tx); err != nil {
+			return err
 		}
 		if tx.Dialector.Name() != "postgres" {
 			return nil
@@ -60,4 +65,32 @@ func migrateQuerySchemeSchema(db *gorm.DB) error {
 		}
 		return nil
 	})
+}
+
+func retireDictionaryQueryScope(tx *gorm.DB) error {
+	var schemeIDs []int
+	if err := tx.Unscoped().Model(&model.QueryScheme{}).
+		Where("scope_code = ?", retiredDictionaryQueryScope).
+		Pluck("id", &schemeIDs).Error; err != nil {
+		return fmt.Errorf("load retired dictionary query schemes: %w", err)
+	}
+	if len(schemeIDs) > 0 {
+		if err := tx.Where("scheme_id IN ?", schemeIDs).Delete(&model.QuerySchemeRole{}).Error; err != nil {
+			return fmt.Errorf("delete retired dictionary query scheme roles: %w", err)
+		}
+		if err := tx.Model(&model.QueryScheme{}).
+			Where("scope_code = ? AND gmt_delete IS NULL", retiredDictionaryQueryScope).
+			Updates(map[string]any{
+				"state": false, "is_default": false, "gmt_delete": model.Now(),
+				"revision": gorm.Expr("revision + 1"),
+			}).Error; err != nil {
+			return fmt.Errorf("retire dictionary query schemes: %w", err)
+		}
+	}
+	if err := tx.Model(&model.SysMenu{}).
+		Where("name = ? AND query_scope_code = ?", "develop_dictionary", retiredDictionaryQueryScope).
+		Update("query_scope_code", nil).Error; err != nil {
+		return fmt.Errorf("clear dictionary query scope: %w", err)
+	}
+	return nil
 }

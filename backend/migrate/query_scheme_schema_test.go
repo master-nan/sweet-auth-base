@@ -91,6 +91,73 @@ func TestQuerySchemePostgres16ConstraintsAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestRetireDictionaryQueryScopeIsIdempotentAndIsolated(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := migrateQuerySchemeSchema(db); err != nil {
+		t.Fatalf("initial query scheme migration: %v", err)
+	}
+	dictionaryScope := retiredDictionaryQueryScope
+	otherScope := "system.user.list"
+	menus := []model.SysMenu{
+		{Basic: model.Basic{Id: 301, State: true}, Name: "develop_dictionary", QueryScopeCode: &dictionaryScope},
+		{Basic: model.Basic{Id: 302, State: true}, Name: "system_user", QueryScopeCode: &otherScope},
+	}
+	if err := db.Create(&menus).Error; err != nil {
+		t.Fatalf("create scope menus: %v", err)
+	}
+	ownerID := 8
+	schemes := []model.QueryScheme{
+		postgresQueryScheme(401, "personal", dictionaryScope, model.QuerySchemeTypePersonal),
+		postgresQueryScheme(402, "public", dictionaryScope, model.QuerySchemeTypePublic),
+		postgresQueryScheme(403, "role", dictionaryScope, model.QuerySchemeTypeRole),
+		postgresQueryScheme(404, "default", dictionaryScope, model.QuerySchemeTypePageDefault),
+		postgresQueryScheme(405, "other", otherScope, model.QuerySchemeTypePublic),
+	}
+	schemes[0].OwnerUserID = &ownerID
+	schemes[0].IsDefault = true
+	schemes[3].IsDefault = true
+	if err := db.Create(&schemes).Error; err != nil {
+		t.Fatalf("create query schemes: %v", err)
+	}
+	if err := db.Create(&model.QuerySchemeRole{SchemeID: 403, RoleID: 9}).Error; err != nil {
+		t.Fatalf("create role relation: %v", err)
+	}
+
+	for pass := 1; pass <= 2; pass++ {
+		if err := migrateQuerySchemeSchema(db); err != nil {
+			t.Fatalf("retire dictionary scope pass %d: %v", pass, err)
+		}
+	}
+
+	var retired []model.QueryScheme
+	if err := db.Unscoped().Where("scope_code = ?", dictionaryScope).Find(&retired).Error; err != nil {
+		t.Fatalf("load retired schemes: %v", err)
+	}
+	if len(retired) != 4 {
+		t.Fatalf("retired scheme count=%d, want 4", len(retired))
+	}
+	for _, scheme := range retired {
+		if scheme.State || scheme.IsDefault || !scheme.GmtDelete.Valid || scheme.Revision != 2 {
+			t.Fatalf("scheme was not retired once: %+v", scheme)
+		}
+	}
+	var roleCount int64
+	if err := db.Model(&model.QuerySchemeRole{}).Where("scheme_id = ?", 403).Count(&roleCount).Error; err != nil || roleCount != 0 {
+		t.Fatalf("retired role relation count=%d err=%v", roleCount, err)
+	}
+	var dictionaryMenu, otherMenu model.SysMenu
+	if err := db.First(&dictionaryMenu, 301).Error; err != nil || dictionaryMenu.QueryScopeCode != nil {
+		t.Fatalf("dictionary menu scope=%v err=%v", dictionaryMenu.QueryScopeCode, err)
+	}
+	if err := db.First(&otherMenu, 302).Error; err != nil || otherMenu.QueryScopeCode == nil || *otherMenu.QueryScopeCode != otherScope {
+		t.Fatalf("other menu scope=%v err=%v", otherMenu.QueryScopeCode, err)
+	}
+	var other model.QueryScheme
+	if err := db.First(&other, 405).Error; err != nil || !other.State || other.Revision != 1 {
+		t.Fatalf("other scope scheme=%+v err=%v", other, err)
+	}
+}
+
 func TestQuerySchemePostgresConcurrentPageDefaultHasOneWinner(t *testing.T) {
 	db, cleanup := openQuerySchemePostgresSchema(t)
 	defer cleanup()

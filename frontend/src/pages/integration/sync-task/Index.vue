@@ -32,30 +32,6 @@
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
-                <q-select
-                  v-model="query.status"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="statusOptions"
-                  label="状态"
-                  style="min-width: 140px"
-                  @update:model-value="resetAndFetch"
-                />
-                <q-select
-                  v-model="query.schedule_type"
-                  dense
-                  outlined
-                  emit-value
-                  map-options
-                  clearable
-                  :options="scheduleOptions"
-                  label="调度方式"
-                  style="min-width: 150px"
-                  @update:model-value="resetAndFetch"
-                />
                 <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
               </template>
             </query-scheme-controls>
@@ -231,14 +207,6 @@ const statusMeta = {
   disabled: { label: '已停用', color: 'warning' },
 }
 const statusFor = (row: SyncTaskListItem) => statusMeta[row.status]
-const statusOptions = Object.entries(statusMeta).map(([value, item]) => ({
-  label: item.label,
-  value,
-}))
-const scheduleOptions = [
-  { label: '仅手工', value: 'none' },
-  { label: 'Cron', value: 'cron' },
-]
 const columns = ref<TableColumn<SyncTaskListItem>[]>([])
 const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
@@ -251,7 +219,6 @@ const queryState = useTableQueryState<SyncTaskQuery>({
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),
   }),
-  createEmptyExpressions: emptyExpressions,
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: true })

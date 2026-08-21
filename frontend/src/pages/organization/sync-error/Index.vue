@@ -150,9 +150,10 @@ import {
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
+import { ExpressionType, SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import { countEffectiveQueryRules } from 'src/utils/query-state'
 
 const route = useRoute()
 const dictStore = useDictStore()
@@ -169,10 +170,29 @@ const total = ref(0)
 const loading = ref(false)
 const loadError = ref('')
 const canQueryRecords = computed(() => hasGrantedCapability('organization_sync_error_query'))
+const routeObjectType = String(route.query.object_type || '').trim()
+const routeLocalId = Number(route.query.local_id)
+const hasRouteContext = !!routeObjectType || (Number.isInteger(routeLocalId) && routeLocalId > 0)
 const queryState = useTableQueryState<SyncRecordQueryRequest>({
-  createInitialQuery: () => ({ ...createOrganizationQuery('org_sync_record'), status: 'failed' }),
+  createInitialQuery: () => {
+    const initial = { ...createOrganizationQuery('org_sync_record'), status: 'failed' }
+    const rules: NonNullable<SyncRecordQueryRequest['expressions']>[number]['rules'] = []
+    if (routeObjectType) {
+      rules.push({
+        field: 'object_type',
+        expression_type: ExpressionType.EQ,
+        value: routeObjectType,
+      })
+    }
+    if (Number.isInteger(routeLocalId) && routeLocalId > 0) {
+      rules.push({ field: 'local_id', expression_type: ExpressionType.EQ, value: routeLocalId })
+    }
+    if (rules.length) initial.expressions = [{ rules, nested: [] }]
+    return initial
+  },
 })
-const { query, keyword } = queryState
+const { query, keyword, appliedAdvanced } = queryState
+const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvanced.value))
 const resetAndFetch = () => {
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
@@ -184,7 +204,7 @@ const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
     canRead: canQueryRecords.value,
     error: loadError.value,
-    hasQuery: !!keyword.value || !!query.value.object_type,
+    hasQuery: !!keyword.value || activeFilterCount.value > 0,
   }),
 )
 
@@ -225,6 +245,9 @@ const advancedFields = [
     inputType: SysTableFieldInputType.INPUT_NUMBER,
   }),
   createOrganizationField('对象类型', 'object_type'),
+  createOrganizationField('本地对象ID', 'local_id', SysTableFieldType.BIGINT, {
+    inputType: SysTableFieldInputType.INPUT_NUMBER,
+  }),
   createOrganizationField('同步动作', 'action', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_action',
@@ -297,13 +320,6 @@ const errorItems = computed<OrganizationDetailItem[]>(() => {
 
 const objectTypeLabel = (value: string) =>
   objectTypeOptions.find((item) => item.value === value)?.label || value || '-'
-
-const applyRouteFilters = () => {
-  const objectType = String(route.query.object_type || '')
-  const localId = Number(route.query.local_id)
-  if (objectType) query.value.object_type = objectType
-  if (Number.isInteger(localId) && localId > 0) query.value.local_id = localId
-}
 
 const search = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)
@@ -384,8 +400,7 @@ watch(
 
 onMounted(async () => {
   await dictStore.loadDicts(['org_sync_action', 'org_sync_record_status', 'org_dependency_type'])
-  await schemePage.initialize()
-  applyRouteFilters()
+  await schemePage.initialize({ preserveInitialQuery: hasRouteContext })
   await fetchData()
   initialized.value = true
 })

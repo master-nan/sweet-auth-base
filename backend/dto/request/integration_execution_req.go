@@ -7,37 +7,39 @@ import (
 )
 
 type IntegrationExecutionQueryReq struct {
-	Page                  int         `form:"page" json:"page" binding:"omitempty,gte=1"`
-	Num                   int         `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
-	Order                 Order       `form:"order" json:"order"`
-	QuickQuery            *QuickQuery `form:"quick_query" json:"quick_query"`
-	ExternalSystemID      int         `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
-	InterfaceDefinitionID int         `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
-	SyncBatchID           int         `form:"sync_batch_id" json:"sync_batch_id" binding:"omitempty,gt=0"`
-	TriggerSource         string      `form:"trigger_source" json:"trigger_source" binding:"omitempty,oneof=manual system_event scheduled"`
-	Status                string      `form:"status" json:"status" binding:"omitempty,oneof=created running retry_waiting succeeded failed cancelled"`
-	CreatedFrom           *time.Time  `form:"created_from" json:"created_from"`
-	CreatedTo             *time.Time  `form:"created_to" json:"created_to"`
+	Page                  int               `form:"page" json:"page" binding:"omitempty,gte=1"`
+	Num                   int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
+	Order                 Order             `form:"order" json:"order"`
+	Expressions           []ExpressionGroup `form:"expressions" json:"expressions" binding:"omitempty,max=8"`
+	QuickQuery            *QuickQuery       `form:"quick_query" json:"quick_query"`
+	ExternalSystemID      int               `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
+	InterfaceDefinitionID int               `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
+	SyncBatchID           int               `form:"sync_batch_id" json:"sync_batch_id" binding:"omitempty,gt=0"`
+	TriggerSource         string            `form:"trigger_source" json:"trigger_source" binding:"omitempty,oneof=manual system_event scheduled"`
+	Status                string            `form:"status" json:"status" binding:"omitempty,oneof=created running retry_waiting succeeded failed cancelled"`
+	CreatedFrom           *time.Time        `form:"created_from" json:"created_from"`
+	CreatedTo             *time.Time        `form:"created_to" json:"created_to"`
 }
 
 type IntegrationLogQueryReq struct {
-	Page                  int         `form:"page" json:"page" binding:"omitempty,gte=1"`
-	Num                   int         `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
-	Order                 Order       `form:"order" json:"order"`
-	QuickQuery            *QuickQuery `form:"quick_query" json:"quick_query"`
-	ExecutionID           int         `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
-	ExecutionNo           string      `form:"execution_no" json:"execution_no" binding:"omitempty,max=64"`
-	ExternalSystemID      int         `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
-	InterfaceDefinitionID int         `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
-	AttemptNo             int         `form:"attempt_no" json:"attempt_no" binding:"omitempty,gt=0"`
-	Status                string      `form:"status" json:"status" binding:"omitempty,oneof=running succeeded failed cancelled"`
-	ErrorCategory         string      `form:"error_category" json:"error_category" binding:"omitempty,oneof=configuration credential network timeout remote response business concurrency system"`
-	StartedFrom           *time.Time  `form:"started_from" json:"started_from"`
-	StartedTo             *time.Time  `form:"started_to" json:"started_to"`
+	Page                  int               `form:"page" json:"page" binding:"omitempty,gte=1"`
+	Num                   int               `form:"num" json:"num" binding:"omitempty,gte=1,lte=500"`
+	Order                 Order             `form:"order" json:"order"`
+	Expressions           []ExpressionGroup `form:"expressions" json:"expressions" binding:"omitempty,max=8"`
+	QuickQuery            *QuickQuery       `form:"quick_query" json:"quick_query"`
+	ExecutionID           int               `form:"execution_id" json:"execution_id" binding:"omitempty,gt=0"`
+	ExecutionNo           string            `form:"execution_no" json:"execution_no" binding:"omitempty,max=64"`
+	ExternalSystemID      int               `form:"external_system_id" json:"external_system_id" binding:"omitempty,gt=0"`
+	InterfaceDefinitionID int               `form:"interface_definition_id" json:"interface_definition_id" binding:"omitempty,gt=0"`
+	AttemptNo             int               `form:"attempt_no" json:"attempt_no" binding:"omitempty,gt=0"`
+	Status                string            `form:"status" json:"status" binding:"omitempty,oneof=running succeeded failed cancelled"`
+	ErrorCategory         string            `form:"error_category" json:"error_category" binding:"omitempty,oneof=configuration credential network timeout remote response business concurrency system"`
+	StartedFrom           *time.Time        `form:"started_from" json:"started_from"`
+	StartedTo             *time.Time        `form:"started_to" json:"started_to"`
 }
 
 func (r IntegrationLogQueryReq) ToBasic() Basic {
-	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, QuickQuery: r.QuickQuery}
+	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
 	filters := make(map[string]any, 4)
 	if r.ExecutionID > 0 {
 		filters["execution_id"] = r.ExecutionID
@@ -68,7 +70,7 @@ func (r IntegrationLogQueryReq) ToBasic() Basic {
 }
 
 func (r IntegrationExecutionQueryReq) ToBasic() Basic {
-	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, QuickQuery: r.QuickQuery}
+	basic := Basic{Page: r.Page, Num: r.Num, Order: r.Order, Expressions: r.Expressions, QuickQuery: r.QuickQuery}
 	filters := make(map[string]any, 4)
 	if r.ExternalSystemID > 0 {
 		filters["external_system_id"] = r.ExternalSystemID

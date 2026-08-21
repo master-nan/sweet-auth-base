@@ -96,6 +96,7 @@ const mountPage = () =>
         QBtn: true,
         QIcon: true,
         QSpace: true,
+        QSeparator: true,
         QChip: true,
         QTooltip: true,
         QTd: SlotStub,
@@ -179,6 +180,9 @@ describe('integration execution retry summary', () => {
       fetchData: () => Promise<void>
     }
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
+    expect(wrapper.find('.execution-page').exists()).toBe(true)
+    expect(wrapper.find('.runtime-status-strip').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="table"]').classes()).toContain('col')
     expect(vm.columns.map((column) => column.name)).toEqual(
       expect.arrayContaining([
         'current_attempt',

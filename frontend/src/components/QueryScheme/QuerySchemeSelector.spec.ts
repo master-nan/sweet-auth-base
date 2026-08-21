@@ -90,6 +90,39 @@ describe('QuerySchemeSelector', () => {
     expect(failedWrapper.emitted('retry')).toHaveLength(1)
   })
 
+  it('moves save actions into the selector and reflects the current source', async () => {
+    const wrapper = mount(QuerySchemeSelector, {
+      props: {
+        schemes: [],
+        dirty: true,
+        source: {
+          id: 3,
+          name: '个人方案',
+          type: QuerySchemeType.PERSONAL,
+          revision: 2,
+          is_default: false,
+        },
+      },
+      global: {
+        stubs: {
+          QBtnDropdown: SlotStub,
+          QList: SlotStub,
+          QItem: ItemStub,
+          QItemLabel: SlotStub,
+          QItemSection: SlotStub,
+          QIcon: true,
+          QTooltip: true,
+          QSeparator: true,
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('保存当前方案修改')
+    const save = wrapper.findAll('button').find((item) => item.text().includes('保存当前方案修改'))
+    await save!.trigger('click')
+    expect(wrapper.emitted('save-current')).toHaveLength(1)
+  })
+
   it('keeps a 64-character current name bounded and discoverable', () => {
     const currentLabel = '长'.repeat(64)
     const wrapper = mount(QuerySchemeSelector, {

@@ -27,6 +27,9 @@ const (
 	integrationSyncBatchTableCode = "integration_sync_batch"
 	integrationExecutionTableCode = "integration_execution"
 	integrationLogTableCode       = "integration_log"
+	externalSystemLinkageConfig   = `{"linkage":{"enabled":true,"mode":"relation","tableCode":"integration_external_system","valueKey":"id","labelKey":"name","pageSize":50}}`
+	interfaceLinkageConfig        = `{"linkage":{"enabled":true,"mode":"relation","tableCode":"integration_interface_definition","valueKey":"id","labelKey":"name","pageSize":50}}`
+	executionLinkageConfig        = `{"linkage":{"enabled":true,"mode":"relation","tableCode":"integration_execution","valueKey":"id","labelKey":"execution_no","pageSize":50}}`
 )
 
 func seedIntegrationConfigurationFoundation(db *gorm.DB, sf *utils.Snowflake) error {
@@ -303,6 +306,10 @@ func applyInterfaceDefinitionFieldDefaults(tableCode string, field *model.SysTab
 		field.FieldName = "所属系统"
 		field.IsAdvancedSearch = true
 		field.IsInsertShow = true
+		field.InputType = enum.SelectInputType
+		field.LogicalType = enum.LogicalTypeRelation
+		field.DisplayFormat = enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(externalSystemLinkageConfig)
 		field.Sequence = 1
 	case "interface_code":
 		field.FieldName = "接口编码"
@@ -402,6 +409,10 @@ func applyCredentialFieldDefaults(tableCode string, field *model.SysTableField) 
 	case "external_system_id":
 		field.FieldName = "所属系统"
 		field.IsAdvancedSearch = true
+		field.InputType = enum.SelectInputType
+		field.LogicalType = enum.LogicalTypeRelation
+		field.DisplayFormat = enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(externalSystemLinkageConfig)
 		field.Sequence = 1
 	case "credential_code":
 		field.FieldName = "凭证编码"
@@ -515,13 +526,17 @@ func applyIntegrationSyncTaskFieldDefaults(tableCode string, field *model.SysTab
 	case "status":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_task_status"), 4
 	case "external_system_id":
-		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 5
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.Sequence = "外部系统", true, enum.SelectInputType, 5
+		field.LogicalType, field.DisplayFormat = enum.LogicalTypeRelation, enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(externalSystemLinkageConfig)
 	case "interface_definition_id":
-		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 6
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.Sequence = "接口定义", true, enum.SelectInputType, 6
+		field.LogicalType, field.DisplayFormat = enum.LogicalTypeRelation, enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(interfaceLinkageConfig)
 	case "consumer_code":
 		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "Consumer", true, true, 7
 	case "schedule_type":
-		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "调度方式", true, true, 8
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "调度方式", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_schedule_type"), 8
 	case "checkpoint_mode":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Checkpoint模式", true, true, 9
 	case "checkpoint_at":
@@ -553,7 +568,7 @@ func applyIntegrationSyncBatchFieldDefaults(tableCode string, field *model.SysTa
 	case "task_version":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "任务版本", true, true, 4
 	case "trigger_type":
-		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "触发类型", true, true, 5
+		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "触发类型", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_trigger_type"), 5
 	case "status":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.InputType, field.DictCode, field.Sequence = "状态", true, true, enum.SelectInputType, utils.StringPtr("integration_sync_batch_status"), 6
 	case "window_start":
@@ -589,13 +604,17 @@ func applyIntegrationExecutionFieldDefaults(tableCode string, field *model.SysTa
 	case "execution_no":
 		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "执行编号", true, true, true, 1
 	case "external_system_id":
-		field.FieldName, field.IsAdvancedSearch, field.Sequence = "外部系统", true, 2
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.Sequence = "外部系统", true, enum.SelectInputType, 2
+		field.LogicalType, field.DisplayFormat = enum.LogicalTypeRelation, enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(externalSystemLinkageConfig)
 	case "external_system_code":
 		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "系统编码", true, true, true, 3
 	case "external_system_name":
 		field.FieldName, field.IsListShow, field.IsQuickSearch, field.Sequence = "系统名称", true, true, 4
 	case "interface_definition_id":
-		field.FieldName, field.IsAdvancedSearch, field.Sequence = "接口定义", true, 5
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.Sequence = "接口定义", true, enum.SelectInputType, 5
+		field.LogicalType, field.DisplayFormat = enum.LogicalTypeRelation, enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(interfaceLinkageConfig)
 	case "interface_code":
 		field.FieldName, field.IsListShow, field.IsQuickSearch, field.IsAdvancedSearch, field.Sequence = "接口编码", true, true, true, 6
 	case "interface_name":
@@ -634,7 +653,9 @@ func applyIntegrationLogFieldDefaults(tableCode string, field *model.SysTableFie
 	field.IsSort = true
 	switch field.FieldCode {
 	case "execution_id":
-		field.FieldName, field.IsAdvancedSearch, field.Sequence = "执行记录", true, 1
+		field.FieldName, field.IsAdvancedSearch, field.InputType, field.Sequence = "执行记录", true, enum.SelectInputType, 1
+		field.LogicalType, field.DisplayFormat = enum.LogicalTypeRelation, enum.DisplayFormatRelation
+		field.LinkageConfig = utils.StringPtr(executionLinkageConfig)
 	case "attempt_no":
 		field.FieldName, field.IsListShow, field.IsAdvancedSearch, field.Sequence = "Attempt", true, true, 2
 	case "status":

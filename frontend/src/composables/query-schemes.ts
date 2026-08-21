@@ -109,7 +109,10 @@ export function useQuerySchemes<TQuery extends Query>(
     }
   }
 
-  const initialize = async (requestedSchemeId?: number) => {
+  const initialize = async (
+    requestedSchemeId?: number,
+    options: { preserveInitialQuery?: boolean } = {},
+  ) => {
     if (initialized.value) return false
     const config = await scope.loadScope()
     if (!config) return false
@@ -118,7 +121,9 @@ export function useQuerySchemes<TQuery extends Query>(
     const requestedScheme = requestedSchemeId
       ? schemes.value.find((scheme) => scheme.id === requestedSchemeId)
       : undefined
-    const defaultScheme = requestedScheme || personalDefault.value || pageDefault.value
+    const defaultScheme =
+      requestedScheme ||
+      (options.preserveInitialQuery ? undefined : personalDefault.value || pageDefault.value)
     if (!defaultScheme) {
       initialized.value = true
       return false

@@ -132,13 +132,18 @@ func (s *MetadataRuntimeService) GetTableResponse(
 func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.RuntimeTableMetadataRes {
 	fields := make([]response.RuntimeFieldMetadataRes, 0, len(data.Fields))
 	for _, field := range data.Fields {
+		operators := querycapability.AllowedMetadataOperators(field)
+		allowedOperators := make([]int, len(operators))
+		for index, operator := range operators {
+			allowedOperators[index] = int(operator)
+		}
 		fields = append(fields, response.RuntimeFieldMetadataRes{
 			Id: field.ID, TableId: field.TableID, FieldName: field.DisplayName, FieldCode: field.Code,
 			FieldType: field.StorageType, LogicalType: field.LogicalType, InputType: field.UIComponent,
 			DisplayFormat: field.DisplayFormat,
 			FieldLength:   field.Length, FieldDecimalLength: field.DecimalLength,
 			NumericPrecision: field.NumericPrecision, NumericScale: field.NumericScale, ListWidth: field.ListWidth,
-			AllowedOperators: querycapability.AllowedMetadataOperators(field),
+			AllowedOperators: allowedOperators,
 			FormSpan:         field.FormSpan, DetailSpan: field.DetailSpan,
 			DefaultValue: field.DefaultValue, DictCode: field.DictionaryCode,
 			IsPrimaryKey: field.PrimaryKey, IsIndex: field.Indexed,

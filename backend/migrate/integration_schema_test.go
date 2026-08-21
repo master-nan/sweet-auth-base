@@ -520,3 +520,38 @@ func TestIntegrationExecutionMetadataUsesControlledQueryFields(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegrationAdvancedQueryMetadataUsesBusinessSelectors(t *testing.T) {
+	tests := []struct {
+		tableCode     string
+		fieldCode     string
+		apply         func(string, *model.SysTableField)
+		linkageConfig string
+		dictCode      string
+	}{
+		{interfaceDefinitionTableCode, "external_system_id", applyInterfaceDefinitionFieldDefaults, externalSystemLinkageConfig, ""},
+		{credentialTableCode, "external_system_id", applyCredentialFieldDefaults, externalSystemLinkageConfig, ""},
+		{integrationSyncTaskTableCode, "external_system_id", applyIntegrationSyncTaskFieldDefaults, externalSystemLinkageConfig, ""},
+		{integrationSyncTaskTableCode, "interface_definition_id", applyIntegrationSyncTaskFieldDefaults, interfaceLinkageConfig, ""},
+		{integrationSyncTaskTableCode, "schedule_type", applyIntegrationSyncTaskFieldDefaults, "", "integration_sync_schedule_type"},
+		{integrationSyncBatchTableCode, "trigger_type", applyIntegrationSyncBatchFieldDefaults, "", "integration_sync_trigger_type"},
+		{integrationExecutionTableCode, "external_system_id", applyIntegrationExecutionFieldDefaults, externalSystemLinkageConfig, ""},
+		{integrationLogTableCode, "execution_id", applyIntegrationLogFieldDefaults, executionLinkageConfig, ""},
+	}
+	for _, test := range tests {
+		field := model.SysTableField{FieldCode: test.fieldCode}
+		test.apply(test.tableCode, &field)
+		if !field.IsAdvancedSearch || field.InputType != enum.SelectInputType {
+			t.Fatalf("%s.%s selector metadata=%+v", test.tableCode, test.fieldCode, field)
+		}
+		if test.linkageConfig != "" && (field.LinkageConfig == nil || *field.LinkageConfig != test.linkageConfig) {
+			t.Fatalf("%s.%s linkage=%v", test.tableCode, test.fieldCode, field.LinkageConfig)
+		}
+		if test.linkageConfig != "" && (field.LogicalType != enum.LogicalTypeRelation || field.DisplayFormat != enum.DisplayFormatRelation) {
+			t.Fatalf("%s.%s relation semantics logical=%q display=%q", test.tableCode, test.fieldCode, field.LogicalType, field.DisplayFormat)
+		}
+		if test.dictCode != "" && (field.DictCode == nil || *field.DictCode != test.dictCode) {
+			t.Fatalf("%s.%s dict=%v", test.tableCode, test.fieldCode, field.DictCode)
+		}
+	}
+}
