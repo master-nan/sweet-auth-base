@@ -14,7 +14,7 @@ import (
 
 func TestPostgresReportStatementTimeoutIsTransactionLocalAndConnectionReusable(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
-	db, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	db, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}

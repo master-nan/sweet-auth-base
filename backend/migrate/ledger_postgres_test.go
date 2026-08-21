@@ -222,7 +222,7 @@ func TestMigrationLedgerPostgreSQLSeedUsesSharedAdvisoryLock(t *testing.T) {
 func openMigrationLedgerPostgreSQL(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := testutil.PostgreSQLDSN(t)
-	admin, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	admin, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL admin connection: %v", err)
 	}
@@ -234,7 +234,7 @@ func openMigrationLedgerPostgreSQL(t *testing.T) *gorm.DB {
 		_ = admin.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS %q CASCADE`, schemaName)).Error
 	})
 
-	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := testutil.OpenPostgres(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 		Logger:                                   logger.Default.LogMode(logger.Silent),

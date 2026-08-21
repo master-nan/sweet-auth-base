@@ -75,8 +75,7 @@ quasar dev
 
 ## 文档
 
-- [文档导航](docs/README.md)
-- [用户与管理员指南](docs/user-guide/README.md)
-- [工程文档](docs/engineering/README.md)
-- [运行与排错](docs/operations/README.md)
-- [建设期资料说明](docs/_construction/README.md)
+- [文档总导航](docs/README.md)
+- [系统使用手册](docs/user-guide/PlatformUserGuide.md)
+- [项目结构说明](docs/engineering/ProjectStructureGuide.md)
+- [平台部署运维指南](docs/operations/PlatformOperationsGuide.md)

@@ -4,20 +4,27 @@
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
-from collections import defaultdict
 from pathlib import Path
 from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-ALLOWED_ROOT_FILES = {"README.md", "DocumentationStandard.md"}
-FORBIDDEN_DIRECTORIES = {
-    DOCS / "analysis",
-    DOCS / "report-designer",
-    DOCS / "report-v2",
+EXPECTED_DOCS = {
+    "README.md",
+    "engineering/ExtensionDevelopmentGuide.md",
+    "engineering/FrontendArchitectureGuide.md",
+    "engineering/PlatformEngineeringGuide.md",
+    "engineering/ProjectStructureGuide.md",
+    "operations/PlatformOperationsGuide.md",
+    "user-guide/DataPermissionUserGuide.md",
+    "user-guide/FieldTypeGuide.md",
+    "user-guide/LinkageConfig.md",
+    "user-guide/LowCodeManual.md",
+    "user-guide/OrganizationManagementUserGuide.md",
+    "user-guide/PlatformAdministrationGuide.md",
+    "user-guide/PlatformUserGuide.md",
 }
 INLINE_LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 REFERENCE_LINK_PATTERN = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)", re.MULTILINE)
@@ -25,38 +32,12 @@ HTML_LINK_PATTERN = re.compile(r"\b(?:href|src)=[\"']([^\"']+)[\"']", re.IGNOREC
 FENCED_CODE_PATTERN = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 INLINE_CODE_PATTERN = re.compile(r"`[^`\n]+`")
 SCHEMES = ("http://", "https://", "mailto:", "tel:", "data:")
-LEGACY_REFERENCES = {
-    "docs/analysis/organization-source/",
-    "docs/report-designer/",
-    "docs/report-v2/",
-    "docs/engineering/platform-capability-backlog-v1.md",
-    "docs/Runbook.md",
-    "docs/LowCodeManual.md",
-    "docs/FieldTypeGuide.md",
-    "docs/LinkageConfig.md",
-    "docs/DataPermissionUserGuide.md",
-    "docs/DataPermissionDesign.md",
-    "docs/DataPermissionOwnershipDesign.md",
-    "docs/DataPermissionAcceptanceGuide.md",
-    "docs/DataPermissionAcceptanceReport.md",
-    "docs/DataPermissionFreezeReview.md",
-    "docs/AuthenticationArchitectureDesign.md",
-    "docs/IntegrationFoundationDesign.md",
-    "docs/IntegrationConfigurationDesign.md",
-    "docs/IntegrationRuntimeDesign.md",
-    "docs/IntegrationRetryDesign.md",
-    "docs/IntegrationSyncDesign.md",
-    "docs/OrganizationHRSyncDesign.md",
-}
+FORBIDDEN_REFERENCES = ("docs/" + "_" + "construction", "docs/development")
 
 
 def markdown_files() -> list[Path]:
     files = [ROOT / "README.md"]
-    files.extend(
-        path
-        for path in DOCS.rglob("*.md")
-        if "development" not in path.relative_to(DOCS).parts
-    )
+    files.extend(DOCS.rglob("*.md"))
     return sorted(set(files))
 
 
@@ -90,24 +71,24 @@ def main() -> int:
     errors: list[str] = []
     files = markdown_files()
 
-    root_files = {path.name for path in DOCS.iterdir() if path.is_file() and path.name != ".DS_Store"}
-    unexpected = sorted(root_files - ALLOWED_ROOT_FILES)
+    actual_docs = {
+        path.relative_to(DOCS).as_posix()
+        for path in DOCS.rglob("*")
+        if path.is_file() and path.name != ".DS_Store"
+    }
+    missing = sorted(EXPECTED_DOCS - actual_docs)
+    unexpected = sorted(actual_docs - EXPECTED_DOCS)
+    if missing:
+        errors.append(f"missing required docs: {', '.join(missing)}")
     if unexpected:
-        errors.append(f"unexpected docs root files: {', '.join(unexpected)}")
+        errors.append(f"unexpected docs files: {', '.join(unexpected)}")
 
-    for directory in sorted(FORBIDDEN_DIRECTORIES):
-        if directory.exists():
-            errors.append(f"legacy docs directory still exists: {directory.relative_to(ROOT)}")
-
-    names: dict[str, list[Path]] = defaultdict(list)
     for path in files:
         if not path.exists():
             errors.append(f"missing documentation entry: {path.relative_to(ROOT)}")
             continue
         if path.stat().st_size == 0:
             errors.append(f"empty documentation file: {path.relative_to(ROOT)}")
-        if path.name.lower() != "readme.md":
-            names[path.name.casefold()].append(path)
         text = without_code(path.read_text(encoding="utf-8"))
         for raw_target in link_targets(text):
             target = local_target(path, raw_target)
@@ -115,32 +96,18 @@ def main() -> int:
                 errors.append(
                     f"broken link: {path.relative_to(ROOT)} -> {raw_target}"
                 )
-        for legacy in sorted(LEGACY_REFERENCES):
-            if legacy in text:
-                errors.append(f"legacy path: {path.relative_to(ROOT)} -> {legacy}")
-
-        if DOCS in path.parents and "_construction/analysis" not in path.as_posix():
-            ignored = subprocess.run(
-                ["git", "check-ignore", "-q", str(path.relative_to(ROOT))],
-                cwd=ROOT,
-                check=False,
-            )
-            if ignored.returncode == 0:
-                errors.append(f"governed documentation is ignored: {path.relative_to(ROOT)}")
+        for forbidden in FORBIDDEN_REFERENCES:
+            if forbidden in text:
+                errors.append(f"forbidden path: {path.relative_to(ROOT)} -> {forbidden}")
 
     reference_files = [ROOT / "Makefile", ROOT / "AGENTS.md"]
     for path in reference_files:
         if not path.exists():
             continue
         text = without_code(path.read_text(encoding="utf-8"))
-        for legacy in sorted(LEGACY_REFERENCES):
-            if legacy in text:
-                errors.append(f"legacy path: {path.relative_to(ROOT)} -> {legacy}")
-
-    for name, paths in sorted(names.items()):
-        if len(paths) > 1:
-            rendered = ", ".join(str(path.relative_to(ROOT)) for path in paths)
-            errors.append(f"duplicate documentation name {name}: {rendered}")
+        for forbidden in FORBIDDEN_REFERENCES:
+            if forbidden in text:
+                errors.append(f"forbidden path: {path.relative_to(ROOT)} -> {forbidden}")
 
     if errors:
         print("Documentation check failed:")

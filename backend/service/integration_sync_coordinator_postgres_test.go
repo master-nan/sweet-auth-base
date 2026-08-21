@@ -1007,7 +1007,7 @@ func assertPostgreSQLResignationFixtureUnchanged(t *testing.T, db *gorm.DB) {
 func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := testutil.PostgreSQLDSN(t)
-	admin, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	admin, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1024,7 +1024,7 @@ func openSyncCoordinatorPostgreSQL(t *testing.T) *gorm.DB {
 	query.Set("search_path", schemaName)
 	query.Set("TimeZone", "UTC")
 	parsed.RawQuery = query.Encode()
-	db, err := openPostgresTestDB(t, postgres.Open(parsed.String()), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true, Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now})
+	db, err := testutil.OpenPostgres(t, postgres.Open(parsed.String()), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true, Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now})
 	if err != nil {
 		t.Fatal(err)
 	}

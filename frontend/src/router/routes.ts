@@ -417,7 +417,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'report-v2',
     name: 'report_v2',
     meta: {
-      title: 'Report V2 Prototype',
+      title: 'Report',
       icon: 'assessment',
       isHidden: true,
       isOpen: false,
@@ -454,18 +454,6 @@ const asyncRoutesChildren: Route[] = [
         meta: {
           title: 'Report V2 Designer',
           icon: 'design_services',
-          keepAlive: false,
-          isHidden: true,
-          showTag: true,
-        },
-      },
-      {
-        component: () => import('pages/report-v2/prototype/ReportV2Prototype.vue'),
-        path: 'prototype',
-        name: 'report_v2_prototype',
-        meta: {
-          title: 'Report V2 Prototype',
-          icon: 'dashboard_customize',
           keepAlive: false,
           isHidden: true,
           showTag: true,

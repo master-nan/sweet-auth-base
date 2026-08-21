@@ -62,6 +62,23 @@ func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface
 	return db
 }
 
+// OpenPostgres opens a caller-configured PostgreSQL test database and closes
+// its connection pool after the test. Schema and fixture ownership stay with
+// the domain test that requested the connection.
+func OpenPostgres(t testing.TB, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
+	t.Helper()
+	db, err := gorm.Open(dialector, opts...)
+	if err != nil {
+		return nil, err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	return db, nil
+}
+
 func isolatedSQLiteDSN(t testing.TB, purpose string) string {
 	t.Helper()
 	databaseName := fmt.Sprintf(

@@ -162,7 +162,7 @@ func TestOrganizationDatabaseCommentHelpersRejectMissingAndUnknownColumns(t *tes
 func TestOrganizationDatabaseCommentsPersistOnPostgreSQLWithoutSchemaChanges(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 
-	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{
+	adminDB, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -177,7 +177,7 @@ func TestOrganizationDatabaseCommentsPersistOnPostgreSQLWithoutSchemaChanges(t *
 		_ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error
 	})
 
-	db, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{
+	db, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix:   schemaName + ".",
 			SingularTable: true,

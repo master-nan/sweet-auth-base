@@ -148,7 +148,7 @@ func TestDataPermissionDomainMigrationEnforcesPortableConstraints(t *testing.T) 
 func TestDataPermissionDomainMigrationPostgreSQLConstraints(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 
-	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{
+	adminDB, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -163,7 +163,7 @@ func TestDataPermissionDomainMigrationPostgreSQLConstraints(t *testing.T) {
 	})
 
 	isolatedDSN := postgresDSNWithSearchPath(t, dsn, schemaName)
-	db, err := openPostgresTestDB(t, postgres.Open(isolatedDSN), &gorm.Config{
+	db, err := testutil.OpenPostgres(t, postgres.Open(isolatedDSN), &gorm.Config{
 		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 		Logger:                                   logger.Default.LogMode(logger.Silent),

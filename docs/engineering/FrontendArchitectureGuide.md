@@ -230,7 +230,7 @@ V1 采用页面会话状态：
 
 ### 6.4 Query Center 边界
 
-Frontend Consistency 只统一当前查询状态，不实现 Query Center。页面查询状态至少区分：
+标准列表通过Query Center保存和复用当前查询。页面查询状态至少区分：
 
 - quick query；
 - draft advanced query；
@@ -238,7 +238,9 @@ Frontend Consistency 只统一当前查询状态，不实现 Query Center。页�
 - order；
 - page/page size。
 
-未来 saved query/default query 只通过 Query Center 注入 applied state。页面不得继续增加只能由本页理解的私有查询协议。
+saved query和default query只通过Query Center注入applied state。页面不得继续增加只能由本页理解的私有查询协议。Query Scheme保存quick keyword、advanced expressions、order和bindings，不保存分页或列偏好。
+
+`useQuerySchemePage`负责Scope、初始化、默认、Dirty、应用、保存和恢复；`QuerySchemeControls`只组合Selector、Preset、AdvancedQuery入口和SaveDialog，不请求业务列表。Scope身份只能来自菜单Runtime的`query_scope_code`，Scope Config API只提供运行配置。标准列表可使用STANDARD或COMPACT组合，Dictionary等Master-Detail配置工作台不接入Query Scheme。
 
 `frontend/src/composables/table-query-state.ts` 的 `useTableQueryState` 是标准列表查询状态入口，避免每页复制克隆、计数、应用、重置和页码联动。刷新只重新读取当前查询，不修改查询、分页、排序或列显示；只有明确的清空查询操作才恢复默认状态。
 
@@ -504,7 +506,7 @@ User、Role、Application、SMS、Audit 和 Dictionary 已使用统一查询、T
 
 ### 19.4 Report
 
-Report 标记为 `REPORT_DEFERRED`。Frontend Consistency 只修复公共安全、Theme、Accessibility 和 API 边界问题，不重写 Report 设计器、运行态、Prototype 或产品模式。
+Report使用独立的工作台、设计器和运行页，复用权限、Theme、Accessibility和API安全边界，但不套普通列表页或Query Center。当前保留table/sql dataset、sheet/cell/binding、发布版本、运行和导出能力；Report产品范围由其现有模块边界控制。
 
 ## 20. 公共机制与页面覆盖
 
@@ -528,7 +530,7 @@ Integration 配置页、System 标准列表和 Organization Position 是标准�
 3. System 标准列表使用公共机制，Menu 和 Data Permission 保留复杂配置 Pattern；
 4. Dictionary 使用主从列表 Pattern，Database 和 Generalization 保留复杂 Runtime/配置布局；
 5. Login、Dashboard、Change Password 和 404 不套 CRUD Pattern；
-6. Report 保持 `REPORT_DEFERRED`。
+6. Report使用独立工作台、设计器和运行时页面，不接入Query Center。
 
 ## 21. 架构保护规则
 

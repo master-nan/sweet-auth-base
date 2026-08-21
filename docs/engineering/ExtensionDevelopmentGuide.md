@@ -232,7 +232,21 @@ table_code + field_code
 
 显示名称不是稳定身份，数据库 column 也不应直接成为跨模块公开契约。运行时消费者依赖 `internal/metadata.RuntimeReader` 或 `MetadataRuntimeService` 的 `TableMetadata`、`FieldMetadata`、`QueryFieldMetadata`，不得直接读取 SysTable Repository 或管理页面 DTO。
 
-密码、Token、Credential、内部 SQL、系统维护字段等受保护字段不能配置为列表展示、快捷查询、高级查询或 Data Permission 字段。当前 Runtime Metadata 已提供显示、排序和查询能力事实，但全平台动态列迁移尚未完成，Query Center 也未实现。
+密码、Token、Credential、内部 SQL、系统维护字段等受保护字段不能配置为列表展示、快捷查询、高级查询或 Data Permission 字段。当前 Runtime Metadata 提供显示、排序、查询和Query Scheme校验所需的字段事实；页面仍可保留有明确业务语义的虚拟列和受控静态列。
+
+### 10.1 接入 Query Scheme
+
+标准列表需要保存查询方案时：
+
+1. 在菜单Seed中设置稳定且唯一的`query_scope_code`，前端不复制Scope常量。
+2. 在Backend Query Scope Registry为该Scope声明`table_code`和必要运行配置。
+3. 确认Runtime Metadata提供允许查询、排序、字典和关系事实。
+4. 页面复用`useTableQueryState`、`useQuerySchemePage`和`QuerySchemeControls`。
+5. 页面私有字段筛选应转换为标准Expression；View Mode或Route Context需要明确边界。
+6. 只有确有业务语义时配置Quick Preset，不根据字段名猜“我的”“异常”或主时间字段。
+7. 验证Quick与Advanced按AND组合、默认优先级、Dirty、保存/另存为和Data Permission不扩大。
+
+Master-Detail、Tree、Diagnostic、Config Workbench和Report应先判断是否适合Query Scheme，不能因为存在Metadata就机械接入。
 
 ## 11. 前端新增页面
 
@@ -246,7 +260,7 @@ table_code + field_code
 - 文案按现有 i18n 方式维护。
 - 新列表先评估 Runtime Metadata，不要无条件复制一套静态字段定义。
 
-前端一致性治理尚未完成，当前页面级 CSS、静态列和复用差异不是新代码范例。修改后执行：
+新增或修改页面时遵循当前前端页面模式，并执行：
 
 ```bash
 cd frontend
@@ -351,7 +365,7 @@ HR Source DTO
 
 测试夹具优先用 `backend/internal/test` 的 `OpenSQLite`、HTTP helper 和有界 `Eventually`。只有至少三处真实重复且属于同一领域时才新增 fixture helper；不要建立跨领域万能工厂。SKIP LOCKED、JSONB、partial unique、`CHECK`、DDL、Migration、Integration 和 Organization HR 不能静默降级到 SQLite，并应在 PostgreSQL 16 上执行。
 
-测试文件按长期回归价值保留：安全、事务、状态机、权限、Migration、数据库约束和产品交互优先；重复 GORM CRUD、第三方库透传、阶段 Freeze、文件拆分和源码字符串测试应删除。前端页面只测试页面自己的业务组合，公共组件行为由组件测试覆盖。跨端枚举、Operator 和 Permission Contract Guard 可以保留，但同一契约不得复制多份。
+测试文件按长期回归价值保留：安全、事务、状态机、权限、Migration、数据库约束和产品交互优先；重复 GORM CRUD、第三方库透传、文件拆分和源码字符串测试应删除。前端页面只测试页面自己的业务组合，公共组件行为由组件测试覆盖。跨端枚举、Operator 和 Permission Contract Guard 可以保留，但同一契约不得复制多份。
 
 `make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该唯一门禁包含 tracked secret scan、docs、Node 运维脚本测试、强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。GitHub Actions 提供 PostgreSQL 16/Redis service 后直接调用同一 Make 目标，不复制门禁步骤。
 
@@ -402,4 +416,4 @@ await fetch('/sweet_admin/admin/order/query')
 4. Migration/Seed 是否幂等，PostgreSQL 约束是否真实测试。
 5. Cache 是否在提交后失效，Audit 是否脱敏。
 6. 测试、Race、前端四项和 docs-check 是否按改动范围执行。
-7. `git status` 是否只包含本 Task 文件，是否误纳入秘密、上传文件、日志或构建产物。
+7. `git status` 是否只包含本次修改，是否误纳入秘密、上传文件、日志或构建产物。

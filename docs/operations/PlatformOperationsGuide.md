@@ -102,10 +102,10 @@ yarn dev
 ### 3.2 本地完整 Docker
 
 ```bash
-node scripts/preflight-local.mjs docker
 make docker-up
-node scripts/preflight-local.mjs local
 docker compose ps
+curl -fsS http://127.0.0.1:9009/healthz
+curl -fsS http://127.0.0.1:9009/readyz
 ```
 
 本地完整 Compose 会先启动 PostgreSQL/Redis，再通过 `migrate adopt` 接入或初始化
@@ -383,11 +383,13 @@ Logout 会更新 Login State 并撤销相关 Token。不要因为 JWT 可离线�
 
 ## 14. 预检与只读 Smoke
 
-本地 Docker 资源预检：
+本地Docker运行检查：
 
 ```bash
-node scripts/preflight-local.mjs docker  # Docker、工作区磁盘和构建缓存
-node scripts/preflight-local.mjs local   # 再检查 Compose 服务和 PostgreSQL 数据盘
+make docker-up
+docker compose ps
+curl -fsS http://127.0.0.1:9009/healthz
+curl -fsS http://127.0.0.1:9009/readyz
 ```
 
 外部配置预检：
@@ -464,4 +466,4 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - `make verify` 仍定位为日常快速检查；发布必须使用要求真实 PostgreSQL DSN 的 `make release-check`。
 - 当前没有平台级 Prometheus/OpenTelemetry 指标端点；运行观测主要依赖 health/readiness、结构化日志和业务审计。
 
-以上分别进入 Operations/Observability 或 RC-001 后续治理，不影响本文作为当前运维真值，但可能成为特定生产环境的上线 Gate。
+这些限制必须在部署方案中明确，不能通过关闭安全检查或扩大权限绕过。

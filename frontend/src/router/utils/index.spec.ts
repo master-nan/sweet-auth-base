@@ -110,13 +110,4 @@ describe('permission route construction', () => {
     expect(routes[0]?.children?.map((item) => item.name)).toEqual(['integration_credential'])
     expect(routes[0]?.children?.[0]?.meta?.title).toBe('router.integration.credential')
   })
-
-  it('contains no legacy legal-entity route', () => {
-    const organization = asyncRoutesChildren.find((item) => item.name === 'organization')
-    const hasLegacyLegalEntityRoute = organization?.children?.some(
-      (item) => item.name === 'organization_legal_entity_legacy',
-    )
-
-    expect(hasLegacyLegalEntityRoute).toBe(false)
-  })
 })

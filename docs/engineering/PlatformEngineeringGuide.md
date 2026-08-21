@@ -92,12 +92,11 @@ middleware -> HTTP-facing service ports and context helpers
 | --- | --- | --- | --- |
 | `backend/` | Go 服务端 | HTTP、应用服务、领域能力、持久化、启动和迁移 | 前端页面、临时分析资料 |
 | `frontend/` | Vue 3 + Quasar 客户端 | 页面、组件、API 封装、路由、状态 | 后端业务真值、数据库访问 |
-| `docs/` | 受治理的长期文档与建设期证据 | user-guide、engineering、operations、`_construction` | 原始敏感响应、Task 临时输出 |
+| `docs/` | 当前系统的长期文档 | user-guide、engineering、operations | 原始敏感响应、临时实现记录 |
 | `scripts/` | 部署前检查、只读 smoke、备份和文档检查 | 可独立运行的仓库工具 | 服务端运行时业务流程 |
 | `Makefile` | 常用验证、构建、迁移和 Docker 命令入口 | 对已有脚本和工具的薄编排 | 业务规则 |
 | `.nvmrc` | Node.js 唯一版本真值，当前为 22.23.0 | CI、本地前端工具链 | 第二份 Node 版本文件 |
 | `docker-compose*.yml` | 本地完整环境和外部数据库/Redis连接环境 | PostgreSQL 16、Redis、后端、前端 | 生产秘密 |
-| `design/` | 早期设计遗留区 | 只作历史参考 | 新的正式文档；待 RC-001/DOC-FINAL 评审 |
 | `work/` | 本地临时输出 | 日志、截图、探索材料 | 应提交的源码或正式文档 |
 
 ### 3.2 后端目录
@@ -439,7 +438,7 @@ Metadata 分成两个方向：
 
 Runtime DTO `TableMetadata`、`FieldMetadata`、`QueryFieldMetadata` 区分 Storage Type、Logical Type 和 UI Component，并剔除敏感或系统管理字段。跨模块字段稳定身份是 `table_code + field_code`；数字 ID 用于本地持久化和精确查询，显示名称不能作为引用身份。
 
-Data Permission、Generalization 和 Report 已通过 Runtime Metadata 读取，不直接依赖 SysTable Repository。未来 Query Center 和前端动态列也应使用该边界。配置管理 DTO、GORM Model 和 Runtime DTO 不能混用。
+Data Permission、Generalization、Query Scheme和Report通过Runtime Metadata读取，不直接依赖SysTable Repository。配置管理DTO、GORM Model和Runtime DTO不能混用。
 
 查询、列表显示、标题和顺序等能力可以由 Metadata 提供；当前 `FieldMetadata` 尚未提供列宽，前端也尚未全量迁移动态列。新页面应先评估 Runtime Metadata，仍需静态列或宽度配置时应明确原因，不能声称全平台已经动态化。
 
@@ -509,7 +508,32 @@ Consumer 不可以：
 
 Organization HR 是该扩展点的当前实现样例。Integration 只持有 Consumer 契约，具体注册由 `initialize` 完成。
 
-## 19. 核心模块依赖图
+## 19. Query Scheme
+
+Query Scheme保存和复用标准列表的查询状态。`sys_menu.query_scope_code`是Query Scope唯一持久化身份；Backend Registry只为既有Scope提供`table_code`、快捷日期字段、业务Preset、虚拟排序和Binding白名单等运行配置，前端不维护第二份Scope映射。
+
+Payload只保存`quick_query.keyword`、`expressions`、`order`和`bindings`。分页、每页条数、列显示、列宽、密度、Menu ID、Table Code和DataScopeResult不属于方案。Runtime Resolve按当前Scope权限、方案可见性、Payload Schema、Metadata、Operator、Sort和Binding重新校验，再返回标准Query；Scheme Service不代理业务数据查询。
+
+PERSONAL由认证用户拥有；PUBLIC、ROLE和PAGE_DEFAULT写操作使用共享管理Capability。默认优先级是个人默认、页面默认、页面初始Query，ROLE/PUBLIC不自动参与。业务查询最终执行：
+
+```text
+Resolved Scheme Query
+  AND
+Data Permission
+  -> Business Repository
+```
+
+方案不能保存或扩大Data Permission。动态Binding仅接受Query Scheme领域注册的强类型白名单，不执行SQL、脚本、模板或反射调用。
+
+## 20. Report
+
+Report当前保留`ReportDefinition`、发布版本和`ReportExecutionLog`，支持table/sql dataset、参数、sheet/cell/binding设计、发布版本、运行和CSV导出。设计预览读取草稿配置，正式运行和导出读取已发布快照，草稿修改不影响已发布版本。
+
+权限由报表菜单、按钮、Casbin和服务端对象授权共同控制。table dataset沿用Metadata与Data Permission边界；SQL dataset执行只读安全守卫、超时和结果限制，但不会自动获得任意业务表的Data Permission过滤，管理员必须把它视为受控报表数据集而不是通用查询入口。
+
+Report不接入Query Center，也不提供外部数据库数据源、自由跨表设计器、复杂图表大屏、打印分页、填报、定时调度、邮件订阅或多数据集复杂联动。新平台能力不得依赖Report内部布局或把Report Service作为通用查询服务。
+
+## 21. 核心模块依赖图
 
 ```text
 Generalization ---------> Metadata Runtime <--------- Report
@@ -529,7 +553,7 @@ File -> repository + storage + signer/access policy
 
 `-X->` 表示禁止依赖。跨模块依赖优先指向窄接口，例如 `metadata.RuntimeReader`、`datapermission.Resolver`、`OrgPermissionProvider`、`SyncResultConsumer`，而不是对方 Repository 或管理 DTO。
 
-## 20. Migration、Seed 与配置
+## 22. Migration、Seed 与配置
 
 [migrate/registry.go](../../backend/migrate/registry.go) 是 Migration/Seed 步骤注册入口：[migrate/main.go](../../backend/migrate/main.go) 的默认命令执行 schema migration，`seed` 子命令执行基础数据 Seed。
 
@@ -543,7 +567,7 @@ Migration registry 的已应用事实写入 `schema_migration(version, key, chec
 
 配置结构位于 [config/config.go](../../backend/config/config.go)，`initialize.LoadConfig` 读取 YAML 与受控环境变量并执行生产安全校验。PostgreSQL 与 Redis 的 TLS 配置分别覆盖 mode/CA/client cert/key 和 enabled/server name/CA/client cert/key。秘密不得提交到配置示例或文档，external compose 也不得提供 production secret fallback。
 
-## 21. Initialize、Wire 与启动
+## 23. Initialize、Wire 与启动
 
 [main.go](../../backend/main.go) 的职责只有应用装配、Runner 生命周期、HTTP Server 和优雅退出。依赖装配位于：
 
@@ -556,7 +580,7 @@ Migration registry 的已应用事实写入 `schema_migration(version, key, chec
 
 新增 Repository/Service/Controller 后，在 `wire.go` 增加 provider/bind，再运行 Wire 生成 `wire_gen.go`。业务 Service 不应在方法里自行 new 数据库、缓存、Transport 或另一个 Service。
 
-## 22. Middleware
+## 24. Middleware
 
 当前 HTTP 横切能力包括：
 
@@ -570,7 +594,7 @@ Migration registry 的已应用事实写入 `schema_migration(version, key, chec
 
 Middleware 适合跨请求的 HTTP 能力，不承载完整认证用例、数据权限策略解析或领域写入。它可以调用窄 Service 端口，但不能成为第二个 Service 层。
 
-## 23. 前端架构
+## 25. 前端架构
 
 前端使用 Vue 3 Composition API、Quasar、TypeScript、Vue Router、Pinia、Axios、Vue I18n 和 Vitest。
 
@@ -592,9 +616,9 @@ quasar.config.ts
 
 页面负责页面编排，跨页状态进入 Pinia，可复用交互进入 composable，通用 UI 进入 components。基础 UI 优先 Quasar，并复用 `BaseContent`、`AdvancedQuery`、`DynamicFormDialog`、`MasterDetailPage`、`TablePagination`、`OrganizationSelect` 和 `FileUpload` 等现有组件。
 
-当前 Frontend Consistency 尚未完成：页面级 CSS 较多，部分页面过重，很多列表列仍静态定义，i18n 覆盖不完整，动态元数据只覆盖部分页面。这些是待治理现状，不是推荐架构。新代码应先评估 Metadata Runtime 和公共组件，不能继续无条件复制静态列和大段页面样式。
+前端按标准列表、Master-Detail、Tree、Diagnostic和Report等页面类型复用适合的公共机制。新代码应先评估Metadata Runtime和公共组件，不能无条件复制静态列和大段页面样式，也不能用万能CRUD组件抹平业务布局。
 
-## 24. 测试架构
+## 26. 测试架构
 
 常规 Repository/Service 测试使用 `backend/internal/test`：
 
@@ -622,7 +646,7 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 
 当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试。它不能单独代表完整发布回归。`make release-check` 是唯一发布门禁，包含 secret scan、docs、scripts、强制 PostgreSQL、Race、Frontend Vitest、lint、typecheck 和 build；`.github/workflows/release.yml` 提供 PostgreSQL 16/Redis health service 并直接调用该目标，本地与 CI 不复制步骤。Node 版本只从根 `.nvmrc` 读取，`package.json` 仅允许 Node 22 major。
 
-## 25. 关键文件职责与修改风险
+## 27. 关键文件职责与修改风险
 
 | 文件/类型 | 职责 | 何时修改 | 主要风险 |
 | --- | --- | --- | --- |
@@ -644,7 +668,7 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 | [frontend/src/router/utils/index.ts](../../frontend/src/router/utils/index.ts) | 受控动态页面映射 | 新的正式动态页面类型 | 任意组件加载、权限旁路 |
 | [backend/migrate/registry.go](../../backend/migrate/registry.go) | Migration/Seed 注册顺序 | 新 Schema 或 Seed | 顺序依赖、非幂等、生产数据风险 |
 
-## 26. 新代码放置决策
+## 28. 新代码放置决策
 
 新增能力时按以下顺序判断：
 
@@ -656,11 +680,11 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 6. 是客户端输入/输出吗？放 Request/Response DTO；跨模块内部事实用所属 Runtime DTO。
 7. 是前端后端调用吗？放 `frontend/src/api/services`。
 8. 是页面编排、共享组件还是共享状态？分别放 pages、components/composables、stores。
-9. 是长期使用、工程或运维资料吗？按 DocumentationStandard 进入对应 docs 目录；Task 证据不进入长期工程正文。
+9. 是长期使用、工程或运维资料吗？分别进入`docs/user-guide`、`docs/engineering`或`docs/operations`；临时证据不进入长期工程正文。
 
 若一个 helper 只能由一个领域解释，就留在该领域；不要为了“公共”把它提前移入 `utils`。
 
-## 27. 架构保护规则
+## 29. 架构保护规则
 
 1. Controller/API 只做 HTTP 适配，不直接 Repository、GORM、事务、签名或外部 HTTP。
 2. Service 定义业务事务和 Technical Error 转换；外部 IO 不占数据库事务。
@@ -675,28 +699,28 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 11. Integration Consumer 不自行 HTTP、Credential、Retry、Checkpoint 或 Execution 状态推进。
 12. 前端 API 使用共享 Axios/API service，权限按钮来自菜单事实，基础 UI 优先 Quasar 和平台公共组件。
 
-## 28. 当前例外与延期边界
+## 30. 当前例外与限制
 
 以下是已识别但未作为新代码范例的现状：
 
 - `ReportService` 仍公开使用 `*gin.Context`，直到 Report Platform 重设计；新 Service 不得复制。
 - `internal/utils/tools.go` 仍包含供 Controller 使用的 Gin 参数/Session helper；它们是 HTTP 兼容工具，不代表 Domain 可以依赖 Gin。
 - SysTable 配置服务仍同时承担较多 metadata/DDL 用例；跨模块读取已经收口到 `MetadataRuntimeService`，新消费者不得直接依赖其 Repository。
-- Report 目录存在 V1、V2 和 prototype 形态；其产品化边界按 Report 专项推进，不在一般页面中复用原型代码。
-- 前端动态列、i18n、页面 CSS 和组件复用尚未全平台一致，留给 Frontend Consistency。
+- Report保留当前工作台、设计器、运行页、发布版本、后端导出和执行日志边界，不在一般页面中复用其专属布局。
+- 前端动态列、i18n和页面专属样式按页面类型维护，不构成复制新实现的理由。
 - File 分片暂存是单节点本地能力，多实例共享暂存尚未实现。
 - Organization HR Adapter 能力已存在，但真实源生产 Gate 未关闭，Consumer 保持 disabled。
 - Query Center V1 已通过 Runtime Scope、Query Scheme 和现有 Advanced Query 协议接入标准列表页；Report 仍不接 Query Center。
 - `TableMetadata.QueryModel()` 是 Runtime Metadata 到现有动态 Query Engine 的唯一过渡桥，目前仅供 Generalization 与 Report 使用；禁止新增调用方。待 Report 专项稳定后，应让 Query Engine 直接消费 Runtime Metadata，并一次性删除该桥，不得再造第二个 adapter。
 
-这些例外不改变本手册的新代码规则。需要偏离规则时，应先形成专项设计和评审，而不是把历史例外扩散。
+这些例外不改变本手册的新代码规则。需要偏离规则时，应明确记录当前约束，不能把局部例外扩散。
 
-## 29. 文档关系
+## 31. 文档关系
 
 - 使用和配置：[平台管理员使用手册](../user-guide/PlatformAdministrationGuide.md)
+- 日常系统操作：[系统使用手册](../user-guide/PlatformUserGuide.md)
+- 项目结构与修改入口：[项目结构说明](ProjectStructureGuide.md)
 - 扩展实施：[平台扩展开发指南](ExtensionDevelopmentGuide.md)
 - 部署、环境和排错：[平台部署运维指南](../operations/PlatformOperationsGuide.md)
-- 文档归类：[DocumentationStandard](../DocumentationStandard.md)
-- 建设期设计、验收和冻结证据：`docs/_construction/`，仅供追溯，不作为当前代码入口手册
 
-本文是当前长期工程架构真值。模块的具体扩展步骤由 PE-003 承载；如果代码和本文不一致，应先核实当前实现，再更新代码或文档，不能让两套规则长期并存。
+本文是当前长期工程架构真值。如果代码和本文不一致，应先核实当前实现，再更新代码或文档，不能让两套规则长期并存。

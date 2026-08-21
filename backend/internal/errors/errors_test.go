@@ -3,6 +3,9 @@ package errors
 import (
 	stderrors "errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strconv"
 	"strings"
 	"testing"
@@ -137,5 +140,90 @@ func TestQuerySchemeErrorsRemainStableAndSafe(t *testing.T) {
 		if strings.Contains(strings.ToLower(applicationErr.SafeMessage), "sql") {
 			t.Fatalf("technical detail leaked: %q", applicationErr.SafeMessage)
 		}
+	}
+}
+
+func TestErrorCodesAreUnique(t *testing.T) {
+	packages, err := parser.ParseDir(token.NewFileSet(), ".", nil, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse package: %v", err)
+	}
+	constantValues := make(map[string]int)
+	seenConstants := make(map[int]string)
+	for _, file := range packages["errors"].Files {
+		for _, declaration := range file.Decls {
+			general, ok := declaration.(*ast.GenDecl)
+			if !ok || general.Tok != token.CONST {
+				continue
+			}
+			for _, spec := range general.Specs {
+				valueSpec := spec.(*ast.ValueSpec)
+				for index, name := range valueSpec.Names {
+					if !strings.HasPrefix(name.Name, "ErrorCode") || index >= len(valueSpec.Values) {
+						continue
+					}
+					literal, ok := valueSpec.Values[index].(*ast.BasicLit)
+					if !ok || literal.Kind != token.INT {
+						continue
+					}
+					code, parseErr := strconv.Atoi(literal.Value)
+					if parseErr != nil {
+						t.Fatalf("parse %s: %v", name.Name, parseErr)
+					}
+					if previous, exists := seenConstants[code]; exists {
+						t.Fatalf("duplicate error code %d: %s and %s", code, previous, name.Name)
+					}
+					seenConstants[code] = name.Name
+					constantValues[name.Name] = code
+				}
+			}
+		}
+	}
+
+	seenErrors := make(map[int]string)
+	for _, file := range packages["errors"].Files {
+		for _, declaration := range file.Decls {
+			general, ok := declaration.(*ast.GenDecl)
+			if !ok || general.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range general.Specs {
+				valueSpec := spec.(*ast.ValueSpec)
+				for index, name := range valueSpec.Names {
+					if !strings.HasPrefix(name.Name, "Err") || index >= len(valueSpec.Values) {
+						continue
+					}
+					call, ok := valueSpec.Values[index].(*ast.CallExpr)
+					if !ok || len(call.Args) < 3 {
+						continue
+					}
+					codeName, named := call.Args[2].(*ast.Ident)
+					if !named || !strings.HasPrefix(codeName.Name, "ErrorCode") {
+						t.Fatalf("stable error %s must use a named ErrorCode constant", name.Name)
+					}
+					code, ok := errorCodeValue(call.Args[2], constantValues)
+					if !ok {
+						continue
+					}
+					if previous, exists := seenErrors[code]; exists {
+						t.Fatalf("duplicate stable error code %d: %s and %s", code, previous, name.Name)
+					}
+					seenErrors[code] = name.Name
+				}
+			}
+		}
+	}
+}
+
+func errorCodeValue(expression ast.Expr, constants map[string]int) (int, bool) {
+	switch value := expression.(type) {
+	case *ast.BasicLit:
+		code, err := strconv.Atoi(value.Value)
+		return code, err == nil
+	case *ast.Ident:
+		code, ok := constants[value.Name]
+		return code, ok
+	default:
+		return 0, false
 	}
 }

@@ -113,7 +113,7 @@ func TestReportSQLFieldInferenceEntryCarriesDesignDeadline(t *testing.T) {
 }
 
 func TestReportStatementTimeoutUsesRemainingSharedBudget(t *testing.T) {
-	now := time.Date(2026, 8, 21, 10, 0, 0, 0, time.UTC)
+	now := time.Now()
 	ctx, cancel := context.WithDeadline(context.Background(), now.Add(2500*time.Millisecond))
 	defer cancel()
 	milliseconds, err := reportStatementTimeoutMilliseconds(ctx, now)
