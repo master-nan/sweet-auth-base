@@ -1086,13 +1086,11 @@ func newPostgreSQLSyncCoordinator(t *testing.T, db *gorm.DB, businessStatus stri
 
 func waitForPostgreSQLSyncExecution(t *testing.T, db *gorm.DB, sliceNo int, timeout time.Duration) model.IntegrationExecution {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		var value model.IntegrationExecution
-		if err := db.Where("sync_slice_no = ?", sliceNo).First(&value).Error; err == nil {
-			return value
-		}
-		time.Sleep(25 * time.Millisecond)
+	var value model.IntegrationExecution
+	if testutil.Eventually(timeout, 25*time.Millisecond, func() bool {
+		return db.Where("sync_slice_no = ?", sliceNo).First(&value).Error == nil
+	}) {
+		return value
 	}
 	t.Fatalf("slice %d was not created", sliceNo)
 	return model.IntegrationExecution{}
@@ -1100,13 +1098,11 @@ func waitForPostgreSQLSyncExecution(t *testing.T, db *gorm.DB, sliceNo int, time
 
 func waitForPostgreSQLSyncBatchStatus(t *testing.T, db *gorm.DB, status string, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	if testutil.Eventually(timeout, 25*time.Millisecond, func() bool {
 		var value model.IntegrationSyncBatch
-		if err := db.First(&value).Error; err == nil && value.Status == status {
-			return
-		}
-		time.Sleep(25 * time.Millisecond)
+		return db.First(&value).Error == nil && value.Status == status
+	}) {
+		return
 	}
 	var batch model.IntegrationSyncBatch
 	var executions []model.IntegrationExecution
@@ -1119,13 +1115,11 @@ func waitForPostgreSQLSyncBatchStatus(t *testing.T, db *gorm.DB, status string, 
 
 func waitForPostgreSQLSyncBatchOrdinalStatus(t *testing.T, db *gorm.DB, ordinal int, status string, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	if testutil.Eventually(timeout, 25*time.Millisecond, func() bool {
 		var values []model.IntegrationSyncBatch
-		if err := db.Order("id ASC").Find(&values).Error; err == nil && len(values) >= ordinal && values[ordinal-1].Status == status {
-			return
-		}
-		time.Sleep(25 * time.Millisecond)
+		return db.Order("id ASC").Find(&values).Error == nil && len(values) >= ordinal && values[ordinal-1].Status == status
+	}) {
+		return
 	}
 	var values []model.IntegrationSyncBatch
 	_ = db.Order("id ASC").Find(&values).Error

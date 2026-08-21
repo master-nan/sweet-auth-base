@@ -102,35 +102,6 @@ func MustCreate(t testing.TB, db *gorm.DB, value interface{}) {
 	}
 }
 
-// WithRollback 在事务中执行测试片段，并始终回滚。
-// 此方法用于夹具隔离，不用于测试生产事务辅助能力。
-func WithRollback(t testing.TB, db *gorm.DB, run func(tx *gorm.DB)) {
-	t.Helper()
-	if db == nil {
-		t.Fatal("test database is required")
-	}
-	if run == nil {
-		t.Fatal("rollback callback is required")
-	}
-
-	tx := db.Begin()
-	if tx.Error != nil {
-		t.Fatalf("begin test rollback transaction: %v", tx.Error)
-	}
-	rolledBack := false
-	defer func() {
-		if !rolledBack {
-			_ = tx.Rollback().Error
-		}
-	}()
-
-	run(tx)
-	if err := tx.Rollback().Error; err != nil {
-		t.Fatalf("rollback test transaction: %v", err)
-	}
-	rolledBack = true
-}
-
 func normalizeDatabaseName(value string) string {
 	var builder strings.Builder
 	for _, char := range strings.ToLower(value) {

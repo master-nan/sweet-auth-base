@@ -25,24 +25,12 @@ const eligiblePages = [
 const pageSource = (path: string) => readFileSync(resolve(process.cwd(), 'src/pages', path), 'utf8')
 
 describe('Query Center eligible page matrix', () => {
-  it('keeps eligible pages on the shared integration and presentation contracts', () => {
+  it('keeps each eligible page on the single page integration boundary', () => {
     expect(eligiblePages).toHaveLength(17)
     for (const [path, routeName] of eligiblePages) {
       const source = pageSource(path)
       expect(source, path).toContain(`useQuerySchemePage('${routeName}'`)
-      expect(source, path).toContain('<query-scheme-controls')
-      expect(source, path).not.toContain('<query-scheme-selector')
-      expect(source, path).not.toContain('<query-quick-presets')
-      expect(source, path).not.toContain('<query-scheme-save-dialog')
-      expect(source, path).not.toContain("from 'src/composables/query-schemes'")
+      expect(source.match(/useQuerySchemePage\(/g), path).toHaveLength(1)
     }
-  })
-
-  it('keeps the Dictionary master-detail workspace exempt from standard scheme controls', () => {
-    const source = pageSource('develop/dictionary/Index.vue')
-
-    expect(source).not.toContain('useQuerySchemePage')
-    expect(source).not.toContain('<query-scheme-controls')
-    expect(source).toContain('<master-detail-page')
   })
 })

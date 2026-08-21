@@ -2,6 +2,7 @@ package integration
 
 import (
 	myerrors "backend/internal/errors"
+	testutil "backend/internal/test"
 	"backend/model"
 	"backend/repository"
 	"context"
@@ -229,12 +230,8 @@ func mustWorkerNoError(t *testing.T, err error) {
 
 func mustWorkerEventually(t *testing.T, condition func() bool, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if condition() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	if testutil.Eventually(timeout, 10*time.Millisecond, condition) {
+		return
 	}
 	t.Fatal("condition was not satisfied before timeout")
 }

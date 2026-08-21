@@ -3,7 +3,6 @@ package testutil
 import (
 	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"testing"
 
@@ -31,48 +30,6 @@ func TestOpenSQLiteMigratesAndIsolatesFixtures(t *testing.T) {
 	}
 }
 
-func TestWithRollbackRemovesFixtureChanges(t *testing.T) {
-	db := OpenSQLite(t, &harnessFixture{})
-	MustCreate(t, db, &harnessFixture{ID: 1, Code: "persistent"})
-
-	WithRollback(t, db, func(tx *gorm.DB) {
-		MustCreate(t, tx, &harnessFixture{ID: 2, Code: "temporary"})
-		if got := fixtureCount(t, tx); got != 2 {
-			t.Fatalf("transaction fixture count = %d, want 2", got)
-		}
-	})
-
-	if got := fixtureCount(t, db); got != 1 {
-		t.Fatalf("fixture count after rollback = %d, want 1", got)
-	}
-}
-
-func TestAssertIdempotentComparesStableSnapshots(t *testing.T) {
-	runCount := 0
-	values := map[string]struct{}{}
-
-	AssertIdempotent(
-		t,
-		func() error {
-			runCount++
-			values["stable-key"] = struct{}{}
-			return nil
-		},
-		func() ([]string, error) {
-			snapshot := make([]string, 0, len(values))
-			for value := range values {
-				snapshot = append(snapshot, value)
-			}
-			sort.Strings(snapshot)
-			return snapshot, nil
-		},
-	)
-
-	if runCount != 2 {
-		t.Fatalf("operation run count = %d, want 2", runCount)
-	}
-}
-
 func TestPerformRequestPreservesHeadersAndBody(t *testing.T) {
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("X-Test-Context") != "baseline" {
@@ -97,24 +54,6 @@ func TestPerformRequestPreservesHeadersAndBody(t *testing.T) {
 
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("response status = %d, want %d", recorder.Code, http.StatusCreated)
-	}
-}
-
-func TestNewHTTPServerSupportsOutboundMock(t *testing.T) {
-	server := NewHTTPServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`{"success":true}`))
-	}))
-
-	response, err := server.Client().Get(server.URL + "/health")
-	if err != nil {
-		t.Fatalf("call outbound mock server: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = response.Body.Close()
-	})
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("mock response status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
 }
 

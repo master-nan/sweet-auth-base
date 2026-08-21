@@ -26,7 +26,7 @@ describe('StandardTableToolbar', () => {
   it('lays out query scheme slots without owning their API behavior', () => {
     const wrapper = mount(StandardTableToolbar, {
       slots: {
-        'query-controls': '<span data-testid="controls">方案 · 本月 · 保存方案</span>',
+        'query-controls': '<span data-testid="controls">方案 · 本月 · 高级查询</span>',
       },
       global: { stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true, QSeparator: true } },
     })
@@ -36,7 +36,7 @@ describe('StandardTableToolbar', () => {
   it('keeps query, business, and platform actions in a stable visual order', () => {
     const wrapper = mount(StandardTableToolbar, {
       slots: {
-        'query-controls': '<span>方案 查询 保存方案</span>',
+        'query-controls': '<span>方案 查询</span>',
         'right-actions': '<span>业务动作</span>',
         'column-selector': '<span>列设置</span>',
       },
@@ -44,8 +44,7 @@ describe('StandardTableToolbar', () => {
     })
     const text = wrapper.text()
     expect(text.indexOf('方案')).toBeLessThan(text.indexOf('查询'))
-    expect(text.indexOf('查询')).toBeLessThan(text.indexOf('保存方案'))
-    expect(text.indexOf('保存方案')).toBeLessThan(text.indexOf('业务动作'))
+    expect(text.indexOf('查询')).toBeLessThan(text.indexOf('业务动作'))
     expect(text.indexOf('业务动作')).toBeLessThan(text.indexOf('列设置'))
   })
 })

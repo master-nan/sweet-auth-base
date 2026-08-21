@@ -39,27 +39,9 @@ const permissions = vi.hoisted(() => ({
 const notify = vi.hoisted(() => vi.fn())
 const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
 vi.mock('src/composables/query-scheme-page', async () => {
-  const { ref } = await import('vue')
+  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
   return {
-    useQuerySchemePage: () => ({
-      runtime: {
-        schemes: ref([]),
-        currentLabel: ref('查询方案'),
-        loading: ref(false),
-        error: ref(''),
-        scope: { config: ref(null) },
-        loadAvailable: vi.fn(),
-      },
-      showSaveDialog: ref(false),
-      saving: ref(false),
-      initialize: schemeMocks.initialize,
-      selectScheme: vi.fn(),
-      applyPreset: vi.fn(),
-      restoreCurrent: vi.fn(),
-      resetDefault: vi.fn(),
-      openManager: vi.fn(),
-      savePersonal: vi.fn(),
-    }),
+    useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
 })
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } }, notify }) }))

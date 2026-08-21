@@ -599,7 +599,8 @@ quasar.config.ts
 - `ConfigureGinTestMode`：统一 Gin 测试全局状态；
 - HTTP harness：请求和权限断言；
 - `PostgreSQLDSN`：真实 PostgreSQL Gate；
-- `WithRollback`、`MustCreate`：测试数据辅助。
+- `MustCreate`：显式测试数据写入；
+- `Eventually`：异步状态的有界轮询，替代各包重复的 `time.Sleep` 循环。
 
 SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL：
 
@@ -610,11 +611,13 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 - Organization HR 同步完整性；
 - Metadata PostgreSQL DDL。
 
-测试读取 `SWEET_TEST_POSTGRES_DSN`。设置 `SWEET_REQUIRE_POSTGRES_TESTS=true` 时，缺少 DSN 必须失败，不允许静默降级 SQLite。并发测试使用 channel、WaitGroup、barrier 或事件 hook，不用 sleep 掩盖竞态。生产相关包应定期执行 `go test -race ./... -count=1`。
+测试读取 `SWEET_TEST_POSTGRES_DSN`。设置 `SWEET_REQUIRE_POSTGRES_TESTS=true` 时，缺少 DSN 必须失败，不允许静默降级 SQLite。并发测试使用 channel、WaitGroup、barrier、事件 hook 或有界 `Eventually`，不用开放式 sleep 掩盖竞态。仅当测试本身需要模拟远端延迟时保留明确的 `time.Sleep`。生产相关包应定期执行 `go test -race ./... -count=1`。
 
-前端使用 Vitest + Vue Test Utils；提交前按改动范围执行 `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build`。文档修改运行 `make docs-check`。
+前端使用 Vitest + Vue Test Utils。组件和页面测试应验证点击、emit、权限、请求、状态、表单或布局行为；不为某轮整改长期保存 class、import、组件名或源码字符串断言。只允许少量真正稳定的跨端 Contract Guard 和 Architecture Guard，且一个契约只保留一处真值测试。
 
-当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL 或前端 Vitest。它不能单独代表完整发布回归；涉及并发、数据库专属语义或前端行为时必须补跑对应命令。
+运维 Node 脚本使用 `node:test`，通过 `make scripts-test` 执行。提交前按改动范围执行 `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build`；文档修改运行 `make docs-check`。浏览器验收用于主题、真实权限、Console、布局和跨页面流程，不由 source-string 页面测试替代。
+
+当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试。它不能单独代表完整发布回归。完整发布门禁使用带 PostgreSQL 16 DSN 的 `make release-check`，包含 docs、scripts、强制 PostgreSQL、Race、Frontend Vitest、lint、typecheck 和 build。
 
 ## 25. 关键文件职责与修改风险
 

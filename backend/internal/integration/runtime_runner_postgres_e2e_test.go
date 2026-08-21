@@ -572,12 +572,8 @@ func openRuntimeAcceptancePostgreSQL(t *testing.T) *gorm.DB {
 
 func waitRuntimeAcceptance(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if condition() {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
+	if testutil.Eventually(timeout, 20*time.Millisecond, condition) {
+		return
 	}
 	t.Fatal("runtime acceptance condition was not satisfied")
 }

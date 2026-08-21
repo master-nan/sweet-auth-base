@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ExpressionLogic } from 'src/types/enum'
-import { isSimpleQueryExpression, normalizeQuerySchemePayload, queryExpressionDepth } from './query-state'
-import { ExpressionType } from 'src/types/enum'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
+import {
+  isSimpleQueryExpression,
+  normalizeQuerySchemePayload,
+  normalizeQueryValueByFieldType,
+  queryExpressionDepth,
+} from './query-state'
 import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
 
 describe('query scheme expression modes', () => {
@@ -27,5 +31,16 @@ describe('query scheme expression modes', () => {
     )
     expect(payload.expressions[0]?.rules).toHaveLength(1)
     expect(payload.bindings[0]?.kind).toBe(QuerySchemeBindingKind.TODAY)
+  })
+})
+
+describe('query scheme numeric values', () => {
+  it('keeps exact Decimal conditions outside JavaScript Number conversion', () => {
+    const value = '12345678901234567890.1234567890'
+    expect(normalizeQueryValueByFieldType(value, SysTableFieldType.DECIMAL)).toBe(value)
+  })
+
+  it('normalizes canonical SmallInt conditions as integers', () => {
+    expect(normalizeQueryValueByFieldType('32767', SysTableFieldType.SMALLINT)).toBe(32767)
   })
 })

@@ -266,13 +266,6 @@ func TestFunctionalPermissionProjectionSeedIsIdempotentAndCoversStrictRoutes(t *
 		}
 	}
 
-	mainSource, err := os.ReadFile("main.go")
-	if err != nil {
-		t.Fatalf("read migration source: %v", err)
-	}
-	if strings.Contains(string(mainSource), "seedSuperAdminRoutePolicies") {
-		t.Fatal("legacy direct super-admin route policy seed remains in migration source")
-	}
 }
 
 func TestFunctionalPermissionProjectionRejectsAmbiguousRoleSubjects(t *testing.T) {

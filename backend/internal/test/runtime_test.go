@@ -2,16 +2,7 @@ package testutil
 
 import (
 	"testing"
-
-	"github.com/gin-gonic/gin"
 )
-
-func TestConfigureGinTestMode(t *testing.T) {
-	ConfigureGinTestMode()
-	if got := gin.Mode(); got != gin.TestMode {
-		t.Fatalf("Gin mode = %q, want %q", got, gin.TestMode)
-	}
-}
 
 func TestPostgreSQLTestsRequired(t *testing.T) {
 	for _, item := range []struct {

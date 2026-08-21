@@ -5,6 +5,7 @@ import (
 	"backend/internal/integration"
 	"backend/internal/organization/hrsync"
 	"backend/internal/security"
+	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository/impl"
@@ -295,17 +296,18 @@ func newOrganizationHRAcceptanceTransport(t *testing.T, server *httptest.Server)
 
 func waitForOrganizationHRAcceptanceBatch(t *testing.T, db *gorm.DB, taskCode string, timeout time.Duration) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
+	if testutil.Eventually(timeout, 100*time.Millisecond, func() bool {
 		var batch model.IntegrationSyncBatch
 		err := db.Where("task_code = ?", taskCode).Order("id DESC").First(&batch).Error
 		if err == nil && batch.Status == model.IntegrationSyncBatchStatusSucceeded {
-			return
+			return true
 		}
 		if err == nil && batch.Status == model.IntegrationSyncBatchStatusFailed {
 			t.Fatalf("task %s failed: reason=%s summary=%s", taskCode, batch.ReasonCode, batch.ResultSummary)
 		}
-		time.Sleep(100 * time.Millisecond)
+		return false
+	}) {
+		return
 	}
 	t.Fatalf("task %s did not complete in %s", taskCode, timeout)
 }

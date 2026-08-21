@@ -346,11 +346,14 @@ HR Source DTO
 | PostgreSQL 约束/DDL | `SWEET_REQUIRE_POSTGRES_TESTS=true` + PostgreSQL 16 |
 | Integration/Organization HR | Runner/Worker/TLS Mock PostgreSQL E2E + race |
 | 前端 | `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build` |
+| 运维 Node 脚本 | `make scripts-test` |
 | 文档 | `make docs-check` |
 
-测试夹具优先用 `backend/internal/test` 的 `OpenSQLite` 和 HTTP helper。SKIP LOCKED、JSONB、partial unique、`CHECK`、DDL、Migration、Integration 和 Organization HR 不能静默降级到 SQLite。
+测试夹具优先用 `backend/internal/test` 的 `OpenSQLite`、HTTP helper 和有界 `Eventually`。只有至少三处真实重复且属于同一领域时才新增 fixture helper；不要建立跨领域万能工厂。SKIP LOCKED、JSONB、partial unique、`CHECK`、DDL、Migration、Integration 和 Organization HR 不能静默降级到 SQLite，并应在 PostgreSQL 16 上执行。
 
-`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该目标包含强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。
+测试文件按长期回归价值保留：安全、事务、状态机、权限、Migration、数据库约束和产品交互优先；重复 GORM CRUD、第三方库透传、阶段 Freeze、文件拆分和源码字符串测试应删除。前端页面只测试页面自己的业务组合，公共组件行为由组件测试覆盖。跨端枚举、Operator 和 Permission Contract Guard 可以保留，但同一契约不得复制多份。
+
+`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该目标包含 docs、Node 运维脚本测试、强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。
 
 ## 18. 常见反例
 
