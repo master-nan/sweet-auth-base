@@ -67,15 +67,11 @@ export const parseLinkageConfig = (field: Partial<TableField>) => {
   return cfg.linkage
 }
 
-const organizationSelectorTypeAliases: Record<string, OrganizationSelectorType> = {
+const organizationSelectorTypeMap: Record<string, OrganizationSelectorType> = {
   legal_entity: 'legal_entity',
-  legal_entity_select: 'legal_entity',
   org_unit: 'org_unit',
-  org_unit_select: 'org_unit',
   employee: 'employee',
-  employee_select: 'employee',
   position: 'position',
-  position_select: 'position',
 }
 
 const metadataRecord = (value: unknown): Record<string, unknown> | null => {
@@ -91,7 +87,7 @@ const parseMetadataRecord = (value: unknown): Record<string, unknown> | null => 
 
 const normalizeOrganizationSelectorType = (value: unknown): OrganizationSelectorType | null => {
   if (typeof value !== 'string') return null
-  return organizationSelectorTypeAliases[value.trim().toLowerCase()] || null
+  return organizationSelectorTypeMap[value.trim().toLowerCase()] || null
 }
 
 const hasMetadataValue = (value: unknown) => {
@@ -350,7 +346,7 @@ export const getFieldControlType = (field: TableField): FieldControlType => {
       return 'time'
     case SysTableFieldInputType.YEAR_PICKER:
       return 'year'
-    case SysTableFieldInputType.YREA_MONTH_PICKER:
+    case SysTableFieldInputType.YEAR_MONTH_PICKER:
       return 'year-month'
     case SysTableFieldInputType.FILE_PICKER:
       return 'file'

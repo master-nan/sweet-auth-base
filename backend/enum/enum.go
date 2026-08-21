@@ -11,15 +11,6 @@ import (
 	"strings"
 )
 
-// DataPermissionsEnum 数据权限字典
-type DataPermissionsEnum uint8
-
-const (
-	Whole   DataPermissionsEnum = iota + 1 //全部
-	Custom                                 //自定义
-	Tacitly                                // 默认
-)
-
 // SysMenuPageType 菜单页面类型
 type SysMenuPageType string
 
@@ -287,16 +278,16 @@ type SysTableFieldType uint8
 
 const (
 	BigIntFieldType   SysTableFieldType = 1
+	DecimalFieldType  SysTableFieldType = 2
 	VarcharFieldType  SysTableFieldType = 3
 	TextFieldType     SysTableFieldType = 4
 	BooleanFieldType  SysTableFieldType = 5
 	DateFieldType     SysTableFieldType = 6
 	DatetimeFieldType SysTableFieldType = 7
 	TimeFieldType     SysTableFieldType = 8
+	SmallIntFieldType SysTableFieldType = 9
 	JsonFieldType     SysTableFieldType = 10
 	IntFieldType      SysTableFieldType = 11
-	SmallIntFieldType SysTableFieldType = 12
-	DecimalFieldType  SysTableFieldType = 13
 )
 
 // SysTableFieldLogicalType describes business value semantics independently

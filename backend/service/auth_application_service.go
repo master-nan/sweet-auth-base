@@ -235,14 +235,9 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "login_state_failed", HTTPStatus: authAuditHTTPStatus(err)})
 		return AuthenticationResult{}, err
 	}
-	// Close the logout/refresh race after the local login-state write. If logout
-	// won at any point, the new access token is already covered by its cutoff.
-	revokedSince := false
-	var revokeErr error
-	if claims.SessionID == "" {
-		revokedSince, revokeErr = s.tokens.UserRevokedSince(userID, startedAt)
-	}
-	if _, err := s.tokens.ValidateAccess(ctx, pair.AccessToken); err != nil || revokeErr != nil || revokedSince {
+	// Close the logout/refresh race after the local login-state write. A logout
+	// deactivates the session shared by the old and newly issued token pair.
+	if _, err := s.tokens.ValidateAccess(ctx, pair.AccessToken); err != nil {
 		s.tokens.RevokePair(pair)
 		_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "refresh_conflict"})
@@ -259,8 +254,7 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 }
 
 func (s *AuthApplicationService) Logout(ctx context.Context, accessToken string) error {
-	at := s.now().UTC()
-	userID, err := s.tokens.RevokeAccessAndSession(accessToken, at)
+	userID, err := s.tokens.RevokeAccessAndSession(accessToken)
 	if err != nil {
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialAccess, ReasonCode: "logout_token_invalid", HTTPStatus: authAuditHTTPStatus(err)})
 		return err

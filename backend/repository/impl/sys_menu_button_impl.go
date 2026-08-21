@@ -121,15 +121,6 @@ func normalizeSysMenuButtonDefaults(button *model.SysMenuButton) {
 	button.DisplayMode = displayMode
 }
 
-func (s *SysMenuButtonRepositoryImpl) FindLegacyLowCodeButtons(tx *gorm.DB, menuId int) ([]model.SysMenuButton, error) {
-	var buttons []model.SysMenuButton
-	if tx == nil {
-		tx = s.db
-	}
-	err := tx.Where("menu_id = ? AND code >= ? AND code < ?", menuId, "system_", "system`").Find(&buttons).Error
-	return buttons, err
-}
-
 func (s *SysMenuButtonRepositoryImpl) UpdateMenuButtonFields(tx *gorm.DB, id int, values map[string]any) error {
 	if tx == nil {
 		tx = s.db

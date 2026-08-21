@@ -90,7 +90,7 @@ const inputTypeMap: Record<string, SysTableFieldInputType> = {
   datetime: SysTableFieldInputType.DATETIME_PICKER,
   time: SysTableFieldInputType.TIME_PICKER,
   year: SysTableFieldInputType.YEAR_PICKER,
-  year_month: SysTableFieldInputType.YREA_MONTH_PICKER,
+  year_month: SysTableFieldInputType.YEAR_MONTH_PICKER,
   file: SysTableFieldInputType.FILE_PICKER,
   file_picker: SysTableFieldInputType.FILE_PICKER,
   boolean: SysTableFieldInputType.BOOLEAN,
@@ -206,7 +206,7 @@ const inferFieldTypeByInputType = (
       return SysTableFieldType.BOOLEAN
     case SysTableFieldInputType.DATE_PICKER:
     case SysTableFieldInputType.YEAR_PICKER:
-    case SysTableFieldInputType.YREA_MONTH_PICKER:
+    case SysTableFieldInputType.YEAR_MONTH_PICKER:
       return SysTableFieldType.DATE
     case SysTableFieldInputType.DATETIME_PICKER:
       return SysTableFieldType.DATETIME

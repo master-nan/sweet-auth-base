@@ -14,7 +14,7 @@ import (
 func TestNormalizeSyncExecutionInputPlanUsesSnapshotContract(t *testing.T) {
 	contract := syncPlanContract(t, false)
 	plan := SyncExecutionInputPlan{
-		Version: SyncExecutionInputPlanVersion,
+		Version: SyncExecutionInputPlanVersionV1,
 		StaticInput: ExecutionInputValues{
 			Headers:  map[string][]string{"X-Correlation-ID": {"sweet"}},
 			JSONBody: json.RawMessage(`{"tenant":"north"}`),

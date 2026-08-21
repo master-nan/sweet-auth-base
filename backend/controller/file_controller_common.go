@@ -20,7 +20,7 @@ type fileBusinessContext struct {
 	Action    enum.SysMenuButtonEventAction
 }
 
-// FileBusinessAccessAdapter is the HTTP-only bridge to the legacy low-code
+// FileBusinessAccessAdapter connects HTTP file requests to the low-code
 // data-permission API. Gin does not cross into File services or repositories.
 type FileBusinessAccessAdapter struct {
 	files          *service.FileAccessService

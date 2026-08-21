@@ -8,21 +8,22 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func TestJWTParseRejectsWrongAlgorithmAndMalformedClaimsWithoutPanic(t *testing.T) {
+func TestJWTParseRejectsNonCanonicalAndMalformedClaimsWithoutPanic(t *testing.T) {
 	config := Config{Issuer: "sweet", SecretKey: "secret"}
 	claims := jwt.MapClaims{
 		"iss": "sweet", "sub": "1", "type": string(enum.AccessToken),
 		"iat": time.Now().Unix(), "nbf": time.Now().Unix(), "exp": time.Now().Add(time.Hour).Unix(),
 	}
-	legacy := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	legacyValue, err := legacy.SignedString([]byte(config.SecretKey))
+	nonCanonical := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	nonCanonicalValue, err := nonCanonical.SignedString([]byte(config.SecretKey))
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := NewJWTGenerator().ParseToken(legacyValue, config)
-	if err != nil || parsed.TokenID != "" {
-		t.Fatalf("legacy token compatibility: claims=%+v err=%v", parsed, err)
+	if _, err := NewJWTGenerator().ParseToken(nonCanonicalValue, config); err == nil {
+		t.Fatal("expected token without jti/sid to be rejected")
 	}
+	claims["jti"] = "token-id"
+	claims["sid"] = "session-id"
 
 	wrong := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	value, err := wrong.SignedString([]byte(config.SecretKey))

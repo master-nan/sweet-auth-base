@@ -1373,12 +1373,7 @@ const fetchMenuButtons = async () => {
       }
     }
   } catch (error) {
-    console.warn('获取我的菜单按钮失败，回退到全量按钮', error)
-  }
-
-  const res = await menuApi.queryMenuButtons(menuId)
-  if (res.success && res.data) {
-    menuButtons.value = res.data
+    console.warn('获取我的菜单按钮失败', error)
   }
 }
 

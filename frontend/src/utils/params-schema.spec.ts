@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SysTableFieldType } from 'src/types/enum'
+import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { parseParamsSchema } from 'src/utils/params-schema'
 
 describe('parameter schema storage types', () => {
@@ -18,11 +18,25 @@ describe('parameter schema storage types', () => {
     expect(fields[0]?.default_value).toBe('12.34')
   })
 
-  it('does not accept removed storage type ids', () => {
+  it('accepts canonical Decimal and SmallInt ids', () => {
     const fields = parseParamsSchema(
       JSON.stringify([
-        { field_code: 'old_float', field_type: 2 },
-        { field_code: 'old_tiny', field_type: 9 },
+        { field_code: 'amount', field_type: 2 },
+        { field_code: 'quantity', field_type: 9 },
+      ]),
+    )
+
+    expect(fields.map((field) => field.field_type)).toEqual([
+      SysTableFieldType.DECIMAL,
+      SysTableFieldType.SMALLINT,
+    ])
+  })
+
+  it('rejects historical storage type ids after canonical migration', () => {
+    const fields = parseParamsSchema(
+      JSON.stringify([
+        { field_code: 'historical_smallint', field_type: 12 },
+        { field_code: 'historical_decimal', field_type: 13 },
       ]),
     )
 
@@ -30,5 +44,15 @@ describe('parameter schema storage types', () => {
       SysTableFieldType.VARCHAR,
       SysTableFieldType.VARCHAR,
     ])
+  })
+
+  it('maps year_month to the canonical input type', () => {
+    const fields = parseParamsSchema(
+      JSON.stringify([
+        { field_code: 'billing_month', field_type: 'date', input_type: 'year_month' },
+      ]),
+    )
+
+    expect(fields[0]?.input_type).toBe(SysTableFieldInputType.YEAR_MONTH_PICKER)
   })
 })

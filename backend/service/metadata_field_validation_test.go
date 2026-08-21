@@ -41,15 +41,15 @@ func TestValidateMetadataFieldDefinitionRejectsProtectedAndExecutableMetadata(t 
 			},
 		},
 		{
-			name: "removed approximate numeric type",
+			name: "historical smallint type",
 			mutate: func(field *model.SysTableField) {
-				field.FieldType = enum.SysTableFieldType(2)
+				field.FieldType = enum.SysTableFieldType(12)
 			},
 		},
 		{
-			name: "removed narrow integer type",
+			name: "historical decimal type",
 			mutate: func(field *model.SysTableField) {
-				field.FieldType = enum.SysTableFieldType(9)
+				field.FieldType = enum.SysTableFieldType(13)
 			},
 		},
 	}

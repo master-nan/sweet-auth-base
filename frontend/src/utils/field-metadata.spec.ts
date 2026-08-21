@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType, SysTableFieldTypeMap } from 'src/types/enum'
@@ -11,12 +13,46 @@ import {
 } from 'src/utils/field-metadata'
 import type { OrganizationSelectorType } from 'src/types/organization-selector'
 
+const canonicalFieldTypes = [
+  ['BigIntFieldType', SysTableFieldType.BIGINT],
+  ['DecimalFieldType', SysTableFieldType.DECIMAL],
+  ['VarcharFieldType', SysTableFieldType.VARCHAR],
+  ['TextFieldType', SysTableFieldType.TEXT],
+  ['BooleanFieldType', SysTableFieldType.BOOLEAN],
+  ['DateFieldType', SysTableFieldType.DATE],
+  ['DatetimeFieldType', SysTableFieldType.DATETIME],
+  ['TimeFieldType', SysTableFieldType.TIME],
+  ['SmallIntFieldType', SysTableFieldType.SMALLINT],
+  ['JsonFieldType', SysTableFieldType.JSON],
+  ['IntFieldType', SysTableFieldType.INT],
+] as const
+
+describe('canonical metadata contract', () => {
+  it('keeps Backend and Frontend storage type ids identical', () => {
+    const backendSource = readFileSync(
+      resolve(process.cwd(), '../backend/enum/enum.go'),
+      'utf8',
+    )
+    const block = backendSource.match(/type SysTableFieldType uint8[\s\S]*?const \(\n([\s\S]*?)\n\)/)?.[1]
+    const backendFieldTypes = Object.fromEntries(
+      [...(block?.matchAll(/^\s*(\w+FieldType)\s+SysTableFieldType\s*=\s*(\d+)$/gm) || [])].map(
+        (match) => [match[1], Number(match[2])],
+      ),
+    )
+
+    expect(backendFieldTypes).toEqual(Object.fromEntries(canonicalFieldTypes))
+  })
+})
+
 describe('organization selector metadata resolver', () => {
   it('exposes only canonical storage type ids', () => {
-    expect(SysTableFieldType.SMALLINT).toBe(12)
-    expect(SysTableFieldType.DECIMAL).toBe(13)
-    expect(SysTableFieldTypeMap).not.toHaveProperty('2')
-    expect(SysTableFieldTypeMap).not.toHaveProperty('9')
+    expect(Object.values(SysTableFieldType).filter((value) => typeof value === 'number')).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ])
+    expect(SysTableFieldType.DECIMAL).toBe(2)
+    expect(SysTableFieldType.SMALLINT).toBe(9)
+    expect(SysTableFieldTypeMap).not.toHaveProperty('12')
+    expect(SysTableFieldTypeMap).not.toHaveProperty('13')
   })
 
   it('keeps Decimal values as text and recognizes canonical SmallInt', () => {
@@ -50,12 +86,12 @@ describe('organization selector metadata resolver', () => {
     })
   })
 
-  it('reads flags and reviewed selector aliases from linkage_config', () => {
+  it('reads flags and canonical selector metadata from linkage_config', () => {
     expect(
       resolveOrganizationSelectorConfig({
         input_type: SysTableFieldInputType.SELECT,
         linkage_config: JSON.stringify({
-          selector_type: 'position_select',
+          selector_type: 'position',
           multiple: true,
           include_history: 'true',
           disabled: 1,
@@ -67,6 +103,15 @@ describe('organization selector metadata resolver', () => {
       includeHistory: true,
       disabled: true,
     })
+  })
+
+  it('rejects removed selector aliases at runtime', () => {
+    expect(
+      resolveOrganizationSelectorConfig({
+        input_type: SysTableFieldInputType.SELECT,
+        linkage_config: JSON.stringify({ selector_type: 'position_select' }),
+      }),
+    ).toBeNull()
   })
 
   it('gives direct selector metadata priority over linkage and dictionary metadata', () => {

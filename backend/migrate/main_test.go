@@ -90,6 +90,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"remove_legacy_data_permission_schema",
 		"ensure_sys_menu_option_text",
 		"backfill_sys_menu_page_binding",
+		"canonical_runtime_contract",
 		"organization_database_comments",
 	}
 	if !reflect.DeepEqual(got, want) {

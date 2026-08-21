@@ -5431,29 +5431,29 @@ const docTemplate = `{
             "type": "integer",
             "enum": [
                 1,
+                2,
                 3,
                 4,
                 5,
                 6,
                 7,
                 8,
+                9,
                 10,
-                11,
-                12,
-                13
+                11
             ],
             "x-enum-varnames": [
                 "BigIntFieldType",
+                "DecimalFieldType",
                 "VarcharFieldType",
                 "TextFieldType",
                 "BooleanFieldType",
                 "DateFieldType",
                 "DatetimeFieldType",
                 "TimeFieldType",
-                "JsonFieldType",
-                "IntFieldType",
                 "SmallIntFieldType",
-                "DecimalFieldType"
+                "JsonFieldType",
+                "IntFieldType"
             ]
         },
         "enum.SysTableRelationType": {

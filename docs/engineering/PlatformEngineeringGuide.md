@@ -681,7 +681,8 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 - 前端动态列、i18n、页面 CSS 和组件复用尚未全平台一致，留给 Frontend Consistency。
 - File 分片暂存是单节点本地能力，多实例共享暂存尚未实现。
 - Organization HR Adapter 能力已存在，但真实源生产 Gate 未关闭，Consumer 保持 disabled。
-- Query Center 尚未实现；Metadata 中的 advanced-query 标记不代表完整 Query Center 产品能力。
+- Query Center V1 已通过 Runtime Scope、Query Scheme 和现有 Advanced Query 协议接入标准列表页；Report 仍不接 Query Center。
+- `TableMetadata.QueryModel()` 是 Runtime Metadata 到现有动态 Query Engine 的唯一过渡桥，目前仅供 Generalization 与 Report 使用；禁止新增调用方。待 Report 专项稳定后，应让 Query Engine 直接消费 Runtime Metadata，并一次性删除该桥，不得再造第二个 adapter。
 
 这些例外不改变本手册的新代码规则。需要偏离规则时，应先形成专项设计和评审，而不是把历史例外扩散。
 

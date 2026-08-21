@@ -7,10 +7,6 @@ export const organizationSelectorTypes = [
 
 export type OrganizationSelectorType = (typeof organizationSelectorTypes)[number]
 
-export type OrganizationSelectorMetadataType =
-  | OrganizationSelectorType
-  | `${OrganizationSelectorType}_select`
-
 export interface OrganizationSelectorFieldMetadata {
   input_type?: string | number | null
   selector_type?: string | null

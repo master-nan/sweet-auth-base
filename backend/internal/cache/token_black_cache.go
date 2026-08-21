@@ -23,8 +23,6 @@ const TokenBlackCacheKey = "TOKEN_BLACK_"
 
 const RefreshTokenBlackCacheKey = "REFRESH_TOKEN_BLACK_"
 
-const UserTokenRevokedAtCacheKey = "USER_TOKEN_REVOKED_AT_"
-
 const UserTokenSessionCacheKey = "USER_TOKEN_SESSION_"
 
 type atomicTokenCacher interface {
@@ -37,16 +35,8 @@ func NewTokenBlackCache(cacher Cacher) *TokenBlackCache {
 	}
 }
 
-func (t *TokenBlackCache) IsRevoked(tokenType enum.TokenTypeEnum, value string, includeLegacyKey bool) (bool, error) {
-	prefix := TokenBlackCacheKey
-	if tokenType == enum.RefreshToken {
-		prefix = RefreshTokenBlackCacheKey
-	}
-	keys := []string{tokenCacheKey(tokenType, value)}
-	if includeLegacyKey {
-		keys = append(keys, prefix+value)
-	}
-	exists, err := t.cacher.Exists(keys...)
+func (t *TokenBlackCache) IsRevoked(tokenType enum.TokenTypeEnum, value string) (bool, error) {
+	exists, err := t.cacher.Exists(tokenCacheKey(tokenType, value))
 	return exists > 0, err
 }
 
@@ -68,30 +58,6 @@ func (t *TokenBlackCache) ConsumeRefresh(value string, expiresAt time.Time) (boo
 		return false, nil
 	}
 	return atomic.SetIfAbsent(tokenCacheKey(enum.RefreshToken, value), true, ttl)
-}
-
-func (t *TokenBlackCache) RevokeUser(userID int, at time.Time, ttl time.Duration) error {
-	return t.cacher.Set(UserTokenRevokedAtCacheKey+strconv.Itoa(userID), at.UnixNano(), ttl)
-}
-
-func (t *TokenBlackCache) UserRevokedAt(userID int) (time.Time, error) {
-	var value string
-	err := t.cacher.Get(UserTokenRevokedAtCacheKey+strconv.Itoa(userID), &value)
-	if errors.Is(err, ErrCacheMiss) {
-		return time.Time{}, nil
-	}
-	if err != nil {
-		return time.Time{}, err
-	}
-	timestamp, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return time.Time{}, err
-	}
-	// Values written before AF-002 used Unix seconds.
-	if timestamp < 1_000_000_000_000 {
-		return time.Unix(timestamp, 0), nil
-	}
-	return time.Unix(0, timestamp), nil
 }
 
 func (t *TokenBlackCache) ActivateSession(userID int, sessionID string, ttl time.Duration) error {

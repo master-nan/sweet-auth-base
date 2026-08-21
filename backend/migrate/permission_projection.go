@@ -216,6 +216,25 @@ func retireUnimplementedOrganizationPermissions(db *gorm.DB) error {
 	return nil
 }
 
+func removeLegacyLowCodeMenuButtons(db *gorm.DB) error {
+	var buttonIDs []int
+	if err := db.Table("sys_menu_button").
+		Select("sys_menu_button.id").
+		Joins("JOIN sys_menu ON sys_menu.id = sys_menu_button.menu_id").
+		Where("sys_menu.page_type = ?", enum.MenuPageTypeLowCode).
+		Where("sys_menu_button.code >= ? AND sys_menu_button.code < ?", "system_", "system`").
+		Scan(&buttonIDs).Error; err != nil {
+		return err
+	}
+	if len(buttonIDs) == 0 {
+		return nil
+	}
+	if err := db.Unscoped().Where("button_id IN ?", buttonIDs).Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+		return err
+	}
+	return db.Unscoped().Where("id IN ?", buttonIDs).Delete(&model.SysMenuButton{}).Error
+}
+
 func rebuildFunctionalPermissionPolicies(db *gorm.DB) error {
 	var roles []model.SysRole
 	if err := db.Order("id").Find(&roles).Error; err != nil {

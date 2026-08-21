@@ -72,13 +72,15 @@ func (g *JWTGenerator) ParseToken(token string, config Config) (*Claims, error) 
 		subject, subjectOK := claims["sub"].(string)
 		typeValue, typeOK := claims["type"].(string)
 		issuer, issuerOK := claims["iss"].(string)
-		if !subjectOK || subject == "" || !typeOK || !issuerOK || issuer != config.Issuer {
+		tokenID := stringClaim(claims, "jti")
+		sessionID := stringClaim(claims, "sid")
+		if !subjectOK || subject == "" || !typeOK || !issuerOK || issuer != config.Issuer || tokenID == "" || sessionID == "" {
 			return nil, error2.ErrTokenInvalid
 		}
 		tokenClaims := &Claims{
 			ID:        subject,
-			TokenID:   stringClaim(claims, "jti"),
-			SessionID: stringClaim(claims, "sid"),
+			TokenID:   tokenID,
+			SessionID: sessionID,
 			Type:      enum.TokenTypeEnum(typeValue),
 		}
 		if iat, ok := claims["iat"].(float64); ok {

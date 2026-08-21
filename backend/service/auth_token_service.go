@@ -163,7 +163,7 @@ func (s *AuthTokenService) RevokePair(pair AuthTokenPair) {
 	}
 }
 
-func (s *AuthTokenService) RevokeAccessAndSession(value string, at time.Time) (int, error) {
+func (s *AuthTokenService) RevokeAccessAndSession(value string) (int, error) {
 	claims, err := s.ParseForLogout(value)
 	if err != nil {
 		return 0, err
@@ -172,14 +172,8 @@ func (s *AuthTokenService) RevokeAccessAndSession(value string, at time.Time) (i
 	if err := s.state.Revoke(enum.AccessToken, value, claims.ExpiresAt); err != nil {
 		return 0, errors.WrapSystemError(err)
 	}
-	if claims.SessionID != "" {
-		if err := s.state.DeactivateSession(userID, claims.SessionID); err != nil {
-			return 0, errors.WrapSystemError(err)
-		}
-	} else {
-		if err := s.state.RevokeUser(userID, at.UTC(), authRefreshTokenTTL); err != nil {
-			return 0, errors.WrapSystemError(err)
-		}
+	if err := s.state.DeactivateSession(userID, claims.SessionID); err != nil {
+		return 0, errors.WrapSystemError(err)
 	}
 	return userID, nil
 }
@@ -196,37 +190,22 @@ func (s *AuthTokenService) validate(value string, expected enum.TokenTypeEnum) (
 	if err != nil || userID <= 0 {
 		return nil, errors.ErrTokenInvalid
 	}
-	revoked, err := s.state.IsRevoked(expected, value, claims.TokenID == "")
+	if claims.TokenID == "" || claims.SessionID == "" {
+		return nil, errors.ErrTokenInvalid
+	}
+	revoked, err := s.state.IsRevoked(expected, value)
 	if err != nil {
 		return nil, errors.WrapSystemError(err)
 	}
 	if revoked {
 		return nil, errors.ErrTokenExpired
 	}
-	if claims.SessionID != "" {
-		active, err := s.state.IsSessionActive(userID, claims.SessionID)
-		if err != nil {
-			return nil, errors.WrapSystemError(err)
-		}
-		if !active {
-			return nil, errors.ErrTokenExpired
-		}
-	} else {
-		revokedAt, err := s.state.UserRevokedAt(userID)
-		if err != nil {
-			return nil, errors.WrapSystemError(err)
-		}
-		if !revokedAt.IsZero() && !claims.IssuedAt.After(revokedAt) {
-			return nil, errors.ErrTokenExpired
-		}
+	active, err := s.state.IsSessionActive(userID, claims.SessionID)
+	if err != nil {
+		return nil, errors.WrapSystemError(err)
+	}
+	if !active {
+		return nil, errors.ErrTokenExpired
 	}
 	return claims, nil
-}
-
-func (s *AuthTokenService) UserRevokedSince(userID int, since time.Time) (bool, error) {
-	revokedAt, err := s.state.UserRevokedAt(userID)
-	if err != nil {
-		return false, errors.WrapSystemError(err)
-	}
-	return !revokedAt.IsZero() && !revokedAt.Before(since), nil
 }

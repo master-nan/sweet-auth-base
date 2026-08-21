@@ -349,16 +349,16 @@ func seedDicts(db *gorm.DB, sf *utils.Snowflake) error {
 			code: "sys_table_field_type",
 			items: []systemDictItemSeed{
 				{name: "大数字", code: "sys_table_field_type_bigint", value: "1"},
+				{name: "精确小数", code: "sys_table_field_type_decimal", value: "2"},
 				{name: "字符串", code: "sys_table_field_type_varchar", value: "3"},
 				{name: "文本", code: "sys_table_field_type_text", value: "4"},
 				{name: "布尔", code: "sys_table_field_type_boolean", value: "5"},
 				{name: "日期", code: "sys_table_field_type_date", value: "6"},
 				{name: "日期时间", code: "sys_table_field_type_datetime", value: "7"},
 				{name: "时间", code: "sys_table_field_type_time", value: "8"},
+				{name: "小整数", code: "sys_table_field_type_smallint", value: "9"},
 				{name: "JSON", code: "sys_table_field_type_json", value: "10"},
 				{name: "数字", code: "sys_table_field_type_int", value: "11"},
-				{name: "SmallInt", code: "sys_table_field_type_smallint", value: "12"},
-				{name: "Decimal / Numeric", code: "sys_table_field_type_decimal", value: "13"},
 			},
 		},
 		{

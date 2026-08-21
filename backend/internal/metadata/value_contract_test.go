@@ -5,10 +5,24 @@ import (
 	"testing"
 )
 
-func TestStorageDescriptorsRejectRemovedTypeIDs(t *testing.T) {
-	for _, removed := range []enum.SysTableFieldType{2, 9} {
+func TestStorageDescriptorsUseCanonicalFieldTypeIDs(t *testing.T) {
+	canonical := []enum.SysTableFieldType{
+		enum.BigIntFieldType, enum.DecimalFieldType, enum.VarcharFieldType,
+		enum.TextFieldType, enum.BooleanFieldType, enum.DateFieldType,
+		enum.DatetimeFieldType, enum.TimeFieldType, enum.SmallIntFieldType,
+		enum.JsonFieldType, enum.IntFieldType,
+	}
+	for index, fieldType := range canonical {
+		if fieldType != enum.SysTableFieldType(index+1) {
+			t.Fatalf("canonical field type at index %d = %d", index, fieldType)
+		}
+		if _, ok := DescribeStorage(fieldType); !ok {
+			t.Fatalf("canonical storage type %d must be accepted", fieldType)
+		}
+	}
+	for _, removed := range []enum.SysTableFieldType{12, 13} {
 		if _, ok := DescribeStorage(removed); ok {
-			t.Fatalf("removed storage type %d must not be accepted", removed)
+			t.Fatalf("historical storage type %d must not be accepted", removed)
 		}
 	}
 	decimal, ok := DescribeStorage(enum.DecimalFieldType)

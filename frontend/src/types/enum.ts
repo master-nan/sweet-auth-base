@@ -55,7 +55,7 @@ export enum SysTableFieldInputType {
   DATETIME_PICKER,
   TIME_PICKER,
   YEAR_PICKER,
-  YREA_MONTH_PICKER,
+  YEAR_MONTH_PICKER,
   FILE_PICKER,
   BOOLEAN,
   JSON_EDITOR,
@@ -74,7 +74,7 @@ export const SysTableFieldInputTypeMap = {
   [SysTableFieldInputType.DATETIME_PICKER]: '日期时间',
   [SysTableFieldInputType.TIME_PICKER]: '时间选择',
   [SysTableFieldInputType.YEAR_PICKER]: '年份选择',
-  [SysTableFieldInputType.YREA_MONTH_PICKER]: '年月选择',
+  [SysTableFieldInputType.YEAR_MONTH_PICKER]: '年月选择',
   [SysTableFieldInputType.FILE_PICKER]: '文件选择',
   [SysTableFieldInputType.BOOLEAN]: '布尔开关',
   [SysTableFieldInputType.JSON_EDITOR]: 'JSON编辑器',
@@ -130,30 +130,30 @@ export const ExpressionTypeMap = {
 
 export enum SysTableFieldType {
   BIGINT = 1,
+  DECIMAL = 2,
   VARCHAR = 3,
   TEXT = 4,
   BOOLEAN = 5,
   DATE = 6,
   DATETIME = 7,
   TIME = 8,
+  SMALLINT = 9,
   JSON = 10,
   INT = 11,
-  SMALLINT = 12,
-  DECIMAL = 13,
 }
 
 export const SysTableFieldTypeMap = {
   [SysTableFieldType.BIGINT]: '大数字',
+  [SysTableFieldType.DECIMAL]: '精确小数',
   [SysTableFieldType.VARCHAR]: '字符串',
   [SysTableFieldType.TEXT]: '文本',
   [SysTableFieldType.BOOLEAN]: '布尔',
   [SysTableFieldType.DATE]: '日期',
   [SysTableFieldType.DATETIME]: '日期时间',
   [SysTableFieldType.TIME]: '时间',
+  [SysTableFieldType.SMALLINT]: '小整数',
   [SysTableFieldType.JSON]: 'JSON',
   [SysTableFieldType.INT]: '数字',
-  [SysTableFieldType.SMALLINT]: '小整数',
-  [SysTableFieldType.DECIMAL]: '精确小数',
 }
 
 export enum SysMenuButtonPosition {

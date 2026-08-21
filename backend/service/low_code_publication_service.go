@@ -75,9 +75,6 @@ func (s *LowCodePublicationService) PublishTableAsMenu(ctx context.Context, tabl
 		if err != nil {
 			return err
 		}
-		if err := s.cleanupLegacyLowCodeMenuButtons(tx, menuID); err != nil {
-			return err
-		}
 		if err := s.hideDuplicateLowCodeMenus(tx, table.TableCode, menuID); err != nil {
 			return err
 		}
@@ -226,24 +223,6 @@ func (s *LowCodePublicationService) ensureLowCodeMenu(tx *gorm.DB, table model.S
 		TableCode: table.TableCode,
 	}
 	return menu.Id, s.sysMenuRepo.Create(tx, &menu)
-}
-
-func (s *LowCodePublicationService) cleanupLegacyLowCodeMenuButtons(tx *gorm.DB, menuID int) error {
-	buttons, err := s.sysMenuButtonRepo.FindLegacyLowCodeButtons(tx, menuID)
-	if err != nil {
-		return err
-	}
-	if len(buttons) == 0 {
-		return nil
-	}
-	buttonIDs := make([]int, 0, len(buttons))
-	for _, button := range buttons {
-		buttonIDs = append(buttonIDs, button.Id)
-	}
-	if err := s.sysRoleMenuButtonRepo.DeleteByButtonIds(tx, buttonIDs); err != nil {
-		return err
-	}
-	return s.sysMenuButtonRepo.DeleteByIds(tx, buttonIDs)
 }
 
 func (s *LowCodePublicationService) hideDuplicateLowCodeMenus(tx *gorm.DB, tableCode string, keepMenuID int) error {

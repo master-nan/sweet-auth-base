@@ -13,8 +13,6 @@ import (
 const (
 	SyncExecutionInputPlanVersionV1 = 1
 	SyncExecutionInputPlanVersionV2 = 2
-	// SyncExecutionInputPlanVersion 保留为 V1 别名，避免既有调用方静默改变冻结语义。
-	SyncExecutionInputPlanVersion = SyncExecutionInputPlanVersionV1
 
 	SyncWindowModeBoundedWindow  = "bounded_window"
 	SyncWindowModeLowerBoundOnly = "lower_bound_only"

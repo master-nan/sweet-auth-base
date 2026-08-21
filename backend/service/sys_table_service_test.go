@@ -268,45 +268,6 @@ func TestHideDuplicateLowCodeMenusRevokesDuplicateGrants(t *testing.T) {
 	}
 }
 
-func TestCleanupLegacyLowCodeMenuButtonsRemovesSystemButtonsOnly(t *testing.T) {
-	db := testutil.OpenSQLite(t, &model.SysMenuButton{}, &model.SysRoleMenuButton{})
-	buttons := []model.SysMenuButton{
-		{Basic: model.Basic{Id: 1, State: true}, MenuId: 900, Name: "旧查询", Code: "system_user_query", Position: enum.Top, EventAction: "query"},
-		{Basic: model.Basic{Id: 2, State: true}, MenuId: 900, Name: "新查询", Code: "sys_user_query", Position: enum.Top, EventAction: "query"},
-		{Basic: model.Basic{Id: 3, State: true}, MenuId: 900, Name: "自定义", Code: "demo_ticket_mark_done", Position: enum.Line, EventAction: "custom"},
-	}
-	if err := db.Create(&buttons).Error; err != nil {
-		t.Fatalf("seed buttons: %v", err)
-	}
-	grants := []model.SysRoleMenuButton{
-		{RoleId: 1, ButtonId: 1},
-		{RoleId: 1, ButtonId: 2},
-	}
-	if err := db.Create(&grants).Error; err != nil {
-		t.Fatalf("seed grants: %v", err)
-	}
-
-	svc := newSysTablePublishTestService(db)
-	if err := svc.cleanupLegacyLowCodeMenuButtons(db, 900); err != nil {
-		t.Fatalf("cleanup legacy buttons: %v", err)
-	}
-
-	var remaining []model.SysMenuButton
-	if err := db.Order("id").Find(&remaining).Error; err != nil {
-		t.Fatalf("query remaining buttons: %v", err)
-	}
-	if len(remaining) != 2 || remaining[0].Code != "sys_user_query" || remaining[1].Code != "demo_ticket_mark_done" {
-		t.Fatalf("remaining buttons = %#v, want new low-code and custom buttons", remaining)
-	}
-	var grantCount int64
-	if err := db.Model(&model.SysRoleMenuButton{}).Where("button_id = ?", 1).Count(&grantCount).Error; err != nil {
-		t.Fatalf("count deleted grants: %v", err)
-	}
-	if grantCount != 0 {
-		t.Fatalf("legacy grant count = %d, want 0", grantCount)
-	}
-}
-
 func newSysTablePublishTestService(db *gorm.DB) *LowCodePublicationService {
 	primaryDB := &database.PrimaryDB{DB: db}
 	return &LowCodePublicationService{

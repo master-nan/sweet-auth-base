@@ -107,6 +107,77 @@ func TestFunctionalPermissionProjectionUsesButtonMetadataOnly(t *testing.T) {
 	}
 }
 
+func TestCanonicalRuntimeContractMigratesSelectorsAndLowCodeButtons(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(
+		&model.SysTableField{},
+		&model.DataDimensionDefinition{},
+		&model.SysMenu{},
+		&model.SysMenuButton{},
+		&model.SysRoleMenuButton{},
+	); err != nil {
+		t.Fatalf("migrate canonical runtime fixtures: %v", err)
+	}
+	legacyLinkage := `{"selector_type":"employee_select","selector":{"selector_type":"position_select"}}`
+	field := model.SysTableField{Basic: model.Basic{Id: 101, State: true}, TableId: 1, FieldCode: "employee_id", FieldName: "员工", LinkageConfig: &legacyLinkage}
+	selector := "legal_entity_select"
+	dimension := model.DataDimensionDefinition{Basic: model.Basic{Id: 102, State: true}, Code: "legal_entity", Name: "法人", Category: model.DataDimensionCategoryOrganization, ValueType: model.DataDimensionValueTypeBigint, ProviderCode: "organization", SelectorType: &selector}
+	menus := []model.SysMenu{
+		{Basic: model.Basic{Id: 201, State: true}, Name: "demo_low_code", PageType: enum.MenuPageTypeLowCode},
+		{Basic: model.Basic{Id: 202, State: true}, Name: "system_user", PageType: enum.MenuPageTypeFixed},
+	}
+	buttons := []model.SysMenuButton{
+		{Basic: model.Basic{Id: 301, State: true}, MenuId: 201, Name: "旧查询", Code: "system_demo_query"},
+		{Basic: model.Basic{Id: 302, State: true}, MenuId: 201, Name: "新查询", Code: "demo_query"},
+		{Basic: model.Basic{Id: 303, State: true}, MenuId: 202, Name: "用户查询", Code: "system_user_query"},
+	}
+	if err := db.Create(&field).Error; err != nil {
+		t.Fatalf("seed selector field: %v", err)
+	}
+	if err := db.Create(&dimension).Error; err != nil {
+		t.Fatalf("seed selector dimension: %v", err)
+	}
+	if err := db.Create(&menus).Error; err != nil {
+		t.Fatalf("seed menus: %v", err)
+	}
+	if err := db.Create(&buttons).Error; err != nil {
+		t.Fatalf("seed buttons: %v", err)
+	}
+	if err := db.Exec("INSERT INTO sys_role_menu_button (role_id, button_id) VALUES (?, ?)", 1, 301).Error; err != nil {
+		t.Fatalf("seed legacy button grant: %v", err)
+	}
+
+	if err := migrateCanonicalRuntimeContract(db); err != nil {
+		t.Fatalf("first canonical runtime migration: %v", err)
+	}
+	if err := migrateCanonicalRuntimeContract(db); err != nil {
+		t.Fatalf("second canonical runtime migration: %v", err)
+	}
+	if err := db.First(&field, field.Id).Error; err != nil {
+		t.Fatalf("read canonical field: %v", err)
+	}
+	if field.LinkageConfig == nil || *field.LinkageConfig != `{"selector":{"selector_type":"position"},"selector_type":"employee"}` {
+		t.Fatalf("canonical linkage config=%v", field.LinkageConfig)
+	}
+	if err := db.First(&dimension, dimension.Id).Error; err != nil {
+		t.Fatalf("read canonical dimension: %v", err)
+	}
+	if dimension.SelectorType == nil || *dimension.SelectorType != "legal_entity" {
+		t.Fatalf("canonical dimension selector=%v", dimension.SelectorType)
+	}
+	var remaining []model.SysMenuButton
+	if err := db.Order("id").Find(&remaining).Error; err != nil {
+		t.Fatalf("read canonical buttons: %v", err)
+	}
+	if len(remaining) != 2 || remaining[0].Id != 302 || remaining[1].Id != 303 {
+		t.Fatalf("remaining buttons=%+v", remaining)
+	}
+	var grantCount int64
+	if err := db.Model(&model.SysRoleMenuButton{}).Where("button_id = ?", 301).Count(&grantCount).Error; err != nil || grantCount != 0 {
+		t.Fatalf("legacy button grants=%d err=%v", grantCount, err)
+	}
+}
+
 func TestFunctionalPermissionProjectionSeedIsIdempotentAndCoversStrictRoutes(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := autoMigrateCoreSchema(db); err != nil {

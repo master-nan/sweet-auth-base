@@ -34,6 +34,7 @@ func migrationSteps() []migrationStep {
 		{name: "remove_legacy_data_permission_schema", run: removeLegacyDataPermissionSchema},
 		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
 		{name: "backfill_sys_menu_page_binding", run: backfillSysMenuPageBinding},
+		{name: "canonical_runtime_contract", run: migrateCanonicalRuntimeContract},
 		{name: "organization_database_comments", run: applyOrganizationDatabaseComments},
 	}
 }
