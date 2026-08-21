@@ -1,14 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -28,25 +33,57 @@ func main() {
 	fileServer := http.FileServer(fs)
 	spaHandler := newStaticHandler(root, fs, fileServer, "")
 	sweetAdminHandler := newStaticHandler(root, fs, fileServer, "/sweet_admin")
-	http.HandleFunc("/sweet_admin", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sweet_admin", func(w http.ResponseWriter, r *http.Request) {
 		if proxy != nil && shouldProxyToBackend(r.URL.Path) {
 			proxy.ServeHTTP(w, r)
 			return
 		}
 		sweetAdminHandler.ServeHTTP(w, r)
 	})
-	http.HandleFunc("/sweet_admin/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/sweet_admin/", func(w http.ResponseWriter, r *http.Request) {
 		if proxy != nil && shouldProxyToBackend(r.URL.Path) {
 			proxy.ServeHTTP(w, r)
 			return
 		}
 		sweetAdminHandler.ServeHTTP(w, r)
 	})
-	http.Handle("/", spaHandler)
+	mux.Handle("/", spaHandler)
 	addr := ":80"
-	log.Printf("static server listening on %s", addr)
-	if err := http.ListenAndServe(addr, nil); !errors.Is(err, http.ErrServerClosed) {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
 		log.Fatal(err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	log.Printf("static server listening on %s", addr)
+	if err := serveStatic(ctx, listener, mux); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func serveStatic(ctx context.Context, listener net.Listener, handler http.Handler) error {
+	server := &http.Server{
+		Handler:      handler,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	serveError := make(chan error, 1)
+	go func() {
+		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		serveError <- err
+	}()
+	select {
+	case err := <-serveError:
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return server.Shutdown(shutdownCtx)
 	}
 }
 

@@ -71,16 +71,6 @@
     </q-card>
   </q-dialog>
 
-  <q-btn
-    class="fixed"
-    size="17px"
-    unelevated
-    color="primary"
-    style="right: 5px; bottom: 350px; z-index: 1000"
-    dense
-    icon="fa-solid fa-gear"
-    @click="toggleSettingPanel()"
-  />
 </template>
 
 <script setup lang="ts">

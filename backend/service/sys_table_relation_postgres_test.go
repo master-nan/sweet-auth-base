@@ -218,7 +218,7 @@ func newSysTableRelationPostgreSQLService(t *testing.T, db *gorm.DB) *SysTableSe
 func openSysTableRelationPostgreSQL(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := testutil.PostgreSQLDSN(t)
-	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	admin, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
@@ -234,7 +234,7 @@ func openSysTableRelationPostgreSQL(t *testing.T) *gorm.DB {
 	query := parsed.Query()
 	query.Set("search_path", schemaName)
 	parsed.RawQuery = query.Encode()
-	db, err := gorm.Open(postgres.Open(parsed.String()), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(parsed.String()), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
 	})
 	if err != nil {

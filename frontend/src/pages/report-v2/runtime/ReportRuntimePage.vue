@@ -154,7 +154,7 @@ async function loadReport() {
   loadError.value = ''
   resetRuntime()
   try {
-    const loadedReport = await reportApi.queryReportById(id).then((res) => res.data)
+    const loadedReport = await reportApi.queryReportById(id, routeMenuId.value).then((res) => res.data)
     report.value = loadedReport
     initRuntime(loadedReport)
     await loadControls(loadedReport, resolveParameters(loadedReport))

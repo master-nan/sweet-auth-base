@@ -74,14 +74,18 @@ export const REQUIRED_KEYS = [
   'APP_DBS_PRIMARY_NAME',
   'APP_DBS_PRIMARY_USER',
   'APP_DBS_PRIMARY_PASSWORD',
+  'APP_DBS_PRIMARY_TLS_MODE',
   'APP_REDIS_HOST',
   'APP_REDIS_PORT',
   'APP_REDIS_DB',
   'APP_REDIS_PASSWORD',
+  'APP_REDIS_TLS_ENABLED',
   'APP_SESSION_SECRET',
   'APP_CONF_SALT',
   'APP_BOOTSTRAP_ADMIN_PASSWORD',
+  'APP_BOOTSTRAP_APPLICATION_SECRET',
   'APP_RUN_MIGRATIONS',
+  'APP_RUN_SEEDS',
   'APP_REQUIRE_SECURE_CONFIG',
   'APP_ENFORCE_CASBIN_POLICY_COVERAGE',
   'APP_SECURITY_CORS_ALLOWED_ORIGINS',
@@ -92,13 +96,26 @@ export const REQUIRED_KEYS = [
   'APP_UPLOAD_BASE_URL',
   'APP_UPLOAD_MAX_SIZE',
   'APP_UPLOAD_CHUNK_SIZE',
+  'APP_UPLOAD_CHUNK_TTL_HOURS',
+  'APP_UPLOAD_CHUNK_CLEANUP_MINUTES',
   'APP_UPLOAD_ALLOWED_EXTENSIONS',
   'APP_UPLOAD_ALLOWED_MIME_TYPES',
   'APP_UPLOAD_PUBLIC_PREVIEW',
 ]
 
+export const DECLARED_KEYS = [
+  'APP_DBS_PRIMARY_TLS_ROOT_CA_FILE',
+  'APP_DBS_PRIMARY_TLS_CERT_FILE',
+  'APP_DBS_PRIMARY_TLS_KEY_FILE',
+  'APP_REDIS_TLS_SERVER_NAME',
+  'APP_REDIS_TLS_CA_FILE',
+  'APP_REDIS_TLS_CERT_FILE',
+  'APP_REDIS_TLS_KEY_FILE',
+]
+
 export const TEMPLATE_KEYS = [
   ...REQUIRED_KEYS,
+  ...DECLARED_KEYS,
   'SWEET_ADMIN_EXTERNAL_TARGET_PURPOSE',
   'SWEET_ADMIN_BASE_URL',
   'SWEET_ADMIN_HEALTH_BASE_URL',
@@ -152,7 +169,7 @@ export function validateExternalEnv(env, options = {}) {
   const problems = []
   const warnings = []
   const allowNonProduction = options.allowNonProduction === true
-  const requireMigrationsDisabled = options.requireMigrationsDisabled === true
+  const requireStartupWritesDisabled = options.requireStartupWritesDisabled === true || options.requireMigrationsDisabled === true
   const requireSmokeCredentials = options.requireSmokeCredentials === true
 
   for (const key of REQUIRED_KEYS) {
@@ -160,30 +177,52 @@ export function validateExternalEnv(env, options = {}) {
       problems.push(`${key} must be set`)
     }
   }
+  for (const key of DECLARED_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(env, key)) {
+      problems.push(`${key} must be declared (it may be empty when unused)`)
+    }
+  }
 
   const environment = get(env, 'APP_ENV').toLowerCase()
-  if (!['pro', 'prod', 'production'].includes(environment) && !allowNonProduction) {
+  const production = ['pro', 'prod', 'production'].includes(environment)
+  if (!production && !allowNonProduction) {
     problems.push('APP_ENV should be pro, prod, or production for external deploy validation')
   }
 
-  requireBoolean(env, 'APP_REQUIRE_SECURE_CONFIG', true, problems)
+  const explicitlyAllowedNonProduction = !production && allowNonProduction
+  if (!explicitlyAllowedNonProduction) {
+    requireBoolean(env, 'APP_REQUIRE_SECURE_CONFIG', true, problems)
+  } else {
+    requireBooleanValue(env, 'APP_REQUIRE_SECURE_CONFIG', problems)
+    if (parseBoolean(get(env, 'APP_REQUIRE_SECURE_CONFIG')) === false) {
+      warnings.push('APP_REQUIRE_SECURE_CONFIG is false for an explicitly allowed non-production target')
+    }
+  }
   requireBoolean(env, 'APP_ENFORCE_CASBIN_POLICY_COVERAGE', true, problems)
   requireBoolean(env, 'APP_UPLOAD_PUBLIC_PREVIEW', false, problems)
   const runMigrations = parseBoolean(get(env, 'APP_RUN_MIGRATIONS'))
   if (runMigrations === null) {
     problems.push('APP_RUN_MIGRATIONS must be a boolean')
-  } else if (runMigrations && requireMigrationsDisabled) {
-    problems.push('APP_RUN_MIGRATIONS must be false for readonly external checks')
+  } else if (runMigrations && requireStartupWritesDisabled) {
+    problems.push('APP_RUN_MIGRATIONS must be false when startup writes are disabled')
   } else if (runMigrations) {
     warnings.push('APP_RUN_MIGRATIONS is true; backend startup will apply migrations to the target database')
+  }
+  const runSeeds = parseBoolean(get(env, 'APP_RUN_SEEDS'))
+  if (runSeeds === null) {
+    problems.push('APP_RUN_SEEDS must be a boolean')
+  } else if (runSeeds && requireStartupWritesDisabled) {
+    problems.push('APP_RUN_SEEDS must be false when startup writes are disabled')
+  } else if (runSeeds) {
+    warnings.push('APP_RUN_SEEDS is true; backend startup will seed the target database')
   }
 
   if (parseBoolean(get(env, 'APP_SECURITY_CORS_ALLOW_CREDENTIALS')) === true) {
     warnings.push('APP_SECURITY_CORS_ALLOW_CREDENTIALS is true; keep it false unless cross-site cookies are required')
   }
 
-  validateDB(env, 'APP_DBS_PRIMARY', problems)
-  validateRedis(env, problems)
+  validateDB(env, 'APP_DBS_PRIMARY', production, problems)
+  validateRedis(env, production, problems)
   validateSecrets(env, problems)
   validateCors(env, problems)
   validateAudit(env, problems)
@@ -382,7 +421,7 @@ function validateSmokeCredentials(env, problems, warnings) {
   }
 }
 
-function validateDB(env, prefix, problems) {
+function validateDB(env, prefix, production, problems) {
   const host = get(env, `${prefix}_HOST`)
   const port = get(env, `${prefix}_PORT`)
   const name = get(env, `${prefix}_NAME`)
@@ -396,9 +435,17 @@ function validateDB(env, prefix, problems) {
   if (insecureCredentialValue(password)) {
     problems.push(`${prefix}_PASSWORD must be a non-default credential with at least 8 characters`)
   }
+
+  const tlsMode = get(env, `${prefix}_TLS_MODE`).toLowerCase()
+  if (!['disable', 'require', 'verify-ca', 'verify-full'].includes(tlsMode)) {
+    problems.push(`${prefix}_TLS_MODE must be disable, require, verify-ca, or verify-full`)
+  } else if (production && tlsMode === 'disable') {
+    problems.push(`${prefix}_TLS_MODE must not be disable in production`)
+  }
+  requirePairedValues(env, `${prefix}_TLS_CERT_FILE`, `${prefix}_TLS_KEY_FILE`, problems)
 }
 
-function validateRedis(env, problems) {
+function validateRedis(env, production, problems) {
   if (missingConfigValue(get(env, 'APP_REDIS_HOST'))) {
     problems.push('APP_REDIS_HOST must be a real host, not a placeholder')
   }
@@ -407,6 +454,16 @@ function validateRedis(env, problems) {
   if (insecureCredentialValue(get(env, 'APP_REDIS_PASSWORD'))) {
     problems.push('APP_REDIS_PASSWORD must be a non-default credential with at least 8 characters')
   }
+  const tlsEnabled = parseBoolean(get(env, 'APP_REDIS_TLS_ENABLED'))
+  if (tlsEnabled === null) {
+    problems.push('APP_REDIS_TLS_ENABLED must be a boolean')
+  } else if (production && !tlsEnabled) {
+    problems.push('APP_REDIS_TLS_ENABLED must be true in production')
+  }
+  if (tlsEnabled && missingConfigValue(get(env, 'APP_REDIS_TLS_SERVER_NAME'))) {
+    problems.push('APP_REDIS_TLS_SERVER_NAME must be set when Redis TLS is enabled')
+  }
+  requirePairedValues(env, 'APP_REDIS_TLS_CERT_FILE', 'APP_REDIS_TLS_KEY_FILE', problems)
 }
 
 function validateSecrets(env, problems) {
@@ -419,6 +476,17 @@ function validateSecrets(env, problems) {
   const bootstrapPassword = get(env, 'APP_BOOTSTRAP_ADMIN_PASSWORD').toLowerCase()
   if (bootstrapPassword.length < 12 || insecureCredentialValue(bootstrapPassword)) {
     problems.push('APP_BOOTSTRAP_ADMIN_PASSWORD must be strong and must not be admin123 or a placeholder')
+  }
+  if (insecureApplicationSecretValue(get(env, 'APP_BOOTSTRAP_APPLICATION_SECRET'))) {
+    problems.push('APP_BOOTSTRAP_APPLICATION_SECRET must be non-default and at least 32 characters')
+  }
+}
+
+function requirePairedValues(env, firstKey, secondKey, problems) {
+  const first = get(env, firstKey)
+  const second = get(env, secondKey)
+  if ((first === '') !== (second === '')) {
+    problems.push(`${firstKey} and ${secondKey} must be configured together`)
   }
 }
 
@@ -459,6 +527,8 @@ function validateUpload(env, problems) {
   validateUploadBaseURL(get(env, 'APP_UPLOAD_BASE_URL'), 'APP_UPLOAD_BASE_URL', true, problems)
   validateIntegerRange(get(env, 'APP_UPLOAD_MAX_SIZE'), 'APP_UPLOAD_MAX_SIZE', 1, 512, problems)
   validateIntegerRange(get(env, 'APP_UPLOAD_CHUNK_SIZE'), 'APP_UPLOAD_CHUNK_SIZE', 1, 128, problems)
+  validateIntegerRange(get(env, 'APP_UPLOAD_CHUNK_TTL_HOURS'), 'APP_UPLOAD_CHUNK_TTL_HOURS', 1, 24 * 365, problems)
+  validateIntegerRange(get(env, 'APP_UPLOAD_CHUNK_CLEANUP_MINUTES'), 'APP_UPLOAD_CHUNK_CLEANUP_MINUTES', 1, 24 * 60, problems)
 
   const extensions = splitCSV(get(env, 'APP_UPLOAD_ALLOWED_EXTENSIONS')).map(normalizeExtension)
   const mimeTypes = splitCSV(get(env, 'APP_UPLOAD_ALLOWED_MIME_TYPES')).map(normalizeMimeType)
@@ -552,6 +622,12 @@ function requireBoolean(env, key, expected, problems) {
   }
 }
 
+function requireBooleanValue(env, key, problems) {
+  if (parseBoolean(get(env, key)) === null) {
+    problems.push(`${key} must be a boolean`)
+  }
+}
+
 function validatePort(value, key, problems) {
   validateIntegerRange(value, key, 1, 65535, problems)
 }
@@ -599,6 +675,12 @@ function insecureSecureConfigValue(value) {
   return ['replace-with', 'change-me', 'changeme', 'local-docker', 'local-external', 'sweet-admin', 'placeholder', 'example', 'secret'].some((marker) =>
     normalized.includes(marker),
   )
+}
+
+function insecureApplicationSecretValue(value) {
+  const normalized = value.toLowerCase().trim()
+  if (normalized.length < 32 || placeholderConfigValue(normalized)) return true
+  return ['sweet-admin-secret', 'local-docker', 'local-external'].some((marker) => normalized.includes(marker))
 }
 
 function insecureDBUserValue(value) {
@@ -710,6 +792,8 @@ function main() {
       runtimeBoolean(['SWEET_ADMIN_PREFLIGHT_ALLOW_NON_PRODUCTION']) === true,
     requireMigrationsDisabled:
       runtimeBoolean(['SWEET_ADMIN_PREFLIGHT_REQUIRE_MIGRATIONS_DISABLED']) === true,
+    requireStartupWritesDisabled:
+      runtimeBoolean(['SWEET_ADMIN_PREFLIGHT_REQUIRE_STARTUP_WRITES_DISABLED']) === true,
     requireSmokeCredentials:
       runtimeBoolean(['SWEET_ADMIN_PREFLIGHT_REQUIRE_SMOKE_CREDENTIALS']) === true,
   })

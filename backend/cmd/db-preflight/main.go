@@ -4,6 +4,9 @@ import (
 	"backend/config"
 	"backend/enum"
 	"backend/initialize"
+	"backend/internal/cache"
+	"backend/internal/database"
+	migrationstate "backend/internal/migration"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -18,7 +21,6 @@ import (
 )
 
 const queryTimeout = 15 * time.Second
-const postgresSchema = "public"
 
 type componentStatus struct {
 	Name    string `json:"name"`
@@ -99,7 +101,13 @@ func newReport(environment string, requireMigrated bool) *preflightReport {
 }
 
 func checkPostgres(ctx context.Context, report *preflightReport, redactor func(string) string, name string, dbCfg config.DB) *sql.DB {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable connect_timeout=10", dbCfg.Host, dbCfg.Port, dbCfg.User, dbCfg.Password, dbCfg.Name)
+	dsn, err := database.PostgresDSN(dbCfg)
+	if err != nil {
+		message := redactor(err.Error())
+		report.addComponent(name, false, message)
+		report.addProblem(name, message)
+		return nil
+	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		message := redactor(err.Error())
@@ -122,14 +130,16 @@ func checkPostgres(ctx context.Context, report *preflightReport, redactor func(s
 }
 
 func checkRedis(ctx context.Context, report *preflightReport, redactor func(string) string, redisCfg config.Redis) {
-	client := redis.NewClient(&redis.Options{
-		Addr:            fmt.Sprintf("%s:%d", redisCfg.Host, redisCfg.Port),
-		Password:        redisCfg.Password,
-		DB:              redisCfg.DB,
-		PoolSize:        2,
-		MinIdleConns:    0,
-		ConnMaxIdleTime: time.Duration(redisCfg.ConnMaxIdleTime) * time.Second,
-	})
+	options, err := cache.RedisOptions(redisCfg)
+	if err != nil {
+		message := redactor(err.Error())
+		report.addComponent("redis", false, message)
+		report.addProblem("redis", message)
+		return
+	}
+	options.PoolSize = 2
+	options.MinIdleConns = 0
+	client := redis.NewClient(options)
 	defer client.Close()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -142,8 +152,15 @@ func checkRedis(ctx context.Context, report *preflightReport, redactor func(stri
 }
 
 func inspectPrimaryDB(ctx context.Context, report *preflightReport, db *sql.DB, cfg *config.Server, requireMigrated bool) {
+	schemaName, err := currentSchema(ctx, db)
+	if err != nil {
+		report.addProblem("db_primary_schema", err.Error())
+		return
+	}
+	checkMigrationLedger(ctx, report, db, requireMigrated)
+
 	tables := requiredPrimaryTables()
-	existing, err := existingTables(ctx, db, postgresSchema, tables)
+	existing, err := existingTables(ctx, db, schemaName, tables)
 	if err != nil {
 		report.addProblem("db_primary_schema", err.Error())
 		return
@@ -151,10 +168,10 @@ func inspectPrimaryDB(ctx context.Context, report *preflightReport, db *sql.DB, 
 
 	missing := missingItems(tables, existing)
 	if len(missing) > 0 {
-		report.addMigratedIssue(requireMigrated, "db_primary_schema", fmt.Sprintf("missing core tables: %s", strings.Join(missing, ", ")))
+		report.addMigratedIssue(requireMigrated, "db_primary_schema", fmt.Sprintf("missing managed tables: %s", strings.Join(missing, ", ")))
 	}
 
-	checkDatabaseFootprint(ctx, report, db, postgresSchema)
+	checkDatabaseFootprint(ctx, report, db, schemaName)
 
 	for _, table := range sortedKeys(seedMinimums()) {
 		if !existing[table] {
@@ -172,52 +189,65 @@ func inspectPrimaryDB(ctx context.Context, report *preflightReport, db *sql.DB, 
 	}
 
 	if existing["access_log"] {
-		checkAccessLogIndexes(ctx, report, db, postgresSchema, requireMigrated)
+		checkAccessLogIndexes(ctx, report, db, schemaName, requireMigrated)
 	}
 	if existing["sys_dict"] {
 		checkRequiredDicts(ctx, report, db, requireMigrated)
 	}
 	if existing["casbin_rule"] {
-		checkCasbinColumnsAndPolicies(ctx, report, db, postgresSchema, requireMigrated)
+		checkCasbinColumnsAndPolicies(ctx, report, db, schemaName, requireMigrated)
 	}
 	if existing["file"] {
 		checkDeletedFileUniqueBackfill(ctx, report, db, requireMigrated)
 	}
-	checkMetadataIntegrity(ctx, report, db, postgresSchema, existing)
+	if existing["application"] {
+		checkDefaultApplicationSecret(ctx, report, db)
+	}
+	checkMetadataIntegrity(ctx, report, db, schemaName, existing)
 }
 
 func requiredPrimaryTables() []string {
-	return []string{
-		"access_log",
-		"application",
-		"casbin_rule",
-		"file",
-		"file_chunk",
-		"login_log",
-		"sms_log",
-		"sms_template",
-		"sys_configure",
-		"sys_dict",
-		"sys_dict_item",
-		"sys_menu",
-		"sys_menu_button",
-		"sys_role",
-		"sys_role_menu",
-		"sys_role_menu_button",
-		"sys_data_dimension_definition",
-		"sys_data_resource",
-		"sys_data_resource_operation",
-		"sys_data_ownership_field",
-		"sys_data_policy",
-		"sys_data_policy_rule",
-		"sys_data_grant",
-		"sys_table",
-		"sys_table_field",
-		"sys_table_index",
-		"sys_table_index_field",
-		"sys_table_relation",
-		"sys_user",
-		"sys_user_role",
+	return migrationstate.ManagedTables()
+}
+
+func currentSchema(ctx context.Context, db *sql.DB) (string, error) {
+	var schemaName string
+	if err := db.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
+		return "", fmt.Errorf("query current PostgreSQL schema: %w", err)
+	}
+	if strings.TrimSpace(schemaName) == "" {
+		return "", fmt.Errorf("current PostgreSQL schema is empty")
+	}
+	return schemaName, nil
+}
+
+func checkMigrationLedger(ctx context.Context, report *preflightReport, db *sql.DB, requireMigrated bool) {
+	definitions := migrationstate.Catalog()
+	report.Metrics["schema_migration.expected"] = int64(len(definitions))
+	if err := migrationstate.ValidateCatalog(definitions); err != nil {
+		report.addProblem("schema_migration", err.Error())
+		return
+	}
+	entries, exists, err := migrationstate.LoadLedger(ctx, db)
+	if err != nil {
+		report.addProblem("schema_migration", err.Error())
+		return
+	}
+	report.Metrics["schema_migration.applied"] = int64(len(entries))
+	if !exists {
+		report.addMigratedIssue(requireMigrated, "schema_migration", "migration ledger is missing; existing databases require explicit `migrate adopt`")
+		return
+	}
+	if err := migrationstate.ValidateLedger(entries, definitions, false); err != nil {
+		report.addProblem("schema_migration", err.Error())
+		return
+	}
+	if len(entries) != len(definitions) {
+		report.addMigratedIssue(
+			requireMigrated,
+			"schema_migration",
+			fmt.Sprintf("migration ledger incomplete: applied %d of %d migrations", len(entries), len(definitions)),
+		)
 	}
 }
 
@@ -433,6 +463,37 @@ WHERE gmt_delete IS NOT NULL
 	if count > 0 {
 		report.addMigratedIssue(requireMigrated, "file.deleted_unique_backfill", fmt.Sprintf("%d soft-deleted files still need unique-key backfill", count))
 	}
+}
+
+func checkDefaultApplicationSecret(ctx context.Context, report *preflightReport, db *sql.DB) {
+	if !securePreflightMode(report.Environment) {
+		return
+	}
+	const knownBootstrapApplicationSecret = "sweet-admin-secret"
+	var count int64
+	if err := db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM application
+WHERE gmt_delete IS NULL
+  AND state = TRUE
+  AND (id = 1 OR app_key = 'sweet-admin')
+  AND app_secret = $1
+`, knownBootstrapApplicationSecret).Scan(&count); err != nil {
+		report.addProblem("security.default_application_secret", "could not verify the default application credential")
+		return
+	}
+	report.Metrics["security.default_application_secret_matches"] = count
+	if count > 0 {
+		report.addProblem("security.default_application_secret", "an enabled default application still uses the known bootstrap credential; rotate it before startup")
+	}
+}
+
+func securePreflightMode(environment string) bool {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "pro", "prod", "production":
+		return true
+	}
+	return parseBoolEnv(os.Getenv("APP_REQUIRE_SECURE_CONFIG"))
 }
 
 func existingColumns(ctx context.Context, db *sql.DB, schemaName string, table string, columns []string) (map[string]bool, error) {

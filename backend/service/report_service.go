@@ -126,7 +126,11 @@ func (s *ReportService) GetReportDefinitionList(basic *request.Basic, table mode
 }
 
 func (s *ReportService) GetReportDefinitionById(id int) (model.ReportDefinition, error) {
-	report, err := s.reportRepo.FindById(id)
+	return s.GetReportDefinitionByIdWithContext(context.Background(), id)
+}
+
+func (s *ReportService) GetReportDefinitionByIdWithContext(ctx context.Context, id int) (model.ReportDefinition, error) {
+	report, err := s.reportRepo.WithContext(ctx).FindById(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return model.ReportDefinition{}, nil
@@ -171,6 +175,8 @@ func (s *ReportService) ResolveRuntimeTable(ctx context.Context, tableCode strin
 }
 
 func (s *ReportService) InferSQLFields(ctx *gin.Context, req request.ReportSQLFieldsReq) ([]response.ReportPreviewColumn, error) {
+	executionCtx, cancel := withReportExecutionDeadline(reportRequestContext(ctx), reportDesignPreviewDeadline)
+	defer cancel()
 	if s.reportRepo == nil {
 		return nil, myerrors.NewValidationError("报表数据仓储未初始化")
 	}
@@ -179,12 +185,17 @@ func (s *ReportService) InferSQLFields(ctx *gin.Context, req request.ReportSQLFi
 		return nil, err
 	}
 	wrapped := fmt.Sprintf("SELECT * FROM (%s) AS report_sql_dataset_fields LIMIT 0", sqlText)
-	sqlRows, err := s.reportRepo.DBWithContext(ctx).Raw(wrapped).Rows()
-	if err != nil {
-		return nil, err
-	}
-	defer sqlRows.Close()
-	return reportSQLColumns(sqlRows)
+	var columns []response.ReportPreviewColumn
+	err = withReportExecutionTransaction(executionCtx, s.reportRepo.DBWithContext(executionCtx), func(tx *gorm.DB) error {
+		sqlRows, queryErr := tx.Raw(wrapped).Rows()
+		if queryErr != nil {
+			return queryErr
+		}
+		defer sqlRows.Close()
+		columns, queryErr = reportSQLColumns(sqlRows)
+		return queryErr
+	})
+	return columns, normalizeReportExecutionError(err)
 }
 
 func (s *ReportService) CreateReportDefinition(ctx *gin.Context, req request.ReportDefinitionCreateReq) (int, error) {
@@ -565,11 +576,14 @@ func (s *ReportService) UnpublishReportMenu(ctx *gin.Context, reportId int) (res
 
 func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
 	start := time.Now()
+	executionCtx, cancel := withReportExecutionDeadline(reportRequestContext(ctx), reportDesignPreviewDeadline)
+	defer cancel()
+	ctx = reportGinContextWithExecutionContext(ctx, executionCtx)
 	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeDesignPreview}
-	report, err := s.GetReportDefinitionById(reportId)
+	report, err := s.GetReportDefinitionByIdWithContext(reportRequestContext(ctx), reportId)
 	if err != nil {
 		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
-		return response.ReportPreviewRes{}, err
+		return response.ReportPreviewRes{}, normalizeReportExecutionError(err)
 	}
 	if report.Id == 0 {
 		err = myerrors.ErrDataNotFound
@@ -582,24 +596,37 @@ func (s *ReportService) DesignPreview(ctx *gin.Context, reportId int, req reques
 		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
-	return s.executeReportSnapshot(ctx, snapshot, req, start)
+	result, err := s.executeReportSnapshot(ctx, snapshot, req, start)
+	return result, normalizeReportExecutionError(err)
 }
 
 func (s *ReportService) RunReport(ctx *gin.Context, reportId int, req request.ReportPreviewReq) (response.ReportPreviewRes, error) {
 	start := time.Now()
+	executionCtx, cancel := withReportExecutionDeadline(reportRequestContext(ctx), reportRuntimeRunDeadline)
+	defer cancel()
+	ctx = reportGinContextWithExecutionContext(ctx, executionCtx)
 	snapshot, err := s.loadPublishedReportSnapshot(ctx, reportId, reportRuntimeRun)
 	if err != nil {
 		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
+		return response.ReportPreviewRes{}, normalizeReportExecutionError(err)
+	}
+	if err := s.authorizePublishedReportRun(reportRequestContext(ctx), reportUserFromContext(ctx), snapshot.PermissionMenuId, req.MenuId); err != nil {
+		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportPreviewRes{}, err
 	}
-	return s.executeReportSnapshot(ctx, snapshot, req, start)
+	result, err := s.executeReportSnapshot(ctx, snapshot, req, start)
+	return result, normalizeReportExecutionError(err)
 }
 
 func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request.ReportExportReq) (response.ReportExportFile, error) {
 	start := time.Now()
+	executionCtx, cancel := withReportExecutionDeadline(reportRequestContext(ctx), reportRuntimeExportDeadline)
+	defer cancel()
+	ctx = reportGinContextWithExecutionContext(ctx, executionCtx)
 	previewReq := reportExportPreviewReq(req)
 	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: reportRuntimeExport}
 	fail := func(err error) (response.ReportExportFile, error) {
+		err = normalizeReportExecutionError(err)
 		_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
 		return response.ReportExportFile{}, err
 	}
@@ -621,6 +648,9 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 	previewReq.Query.Num = effectiveMaxRows
 	snapshot, err = s.loadPublishedReportSnapshot(ctx, reportId, reportRuntimeExport)
 	if err != nil {
+		return fail(err)
+	}
+	if err := s.authorizePublishedReportExport(reportRequestContext(ctx), reportUserFromContext(ctx), snapshot.PermissionMenuId, req.MenuId); err != nil {
 		return fail(err)
 	}
 	preview, err := s.executeReportSnapshotWithOptions(ctx, snapshot, previewReq, start, ReportExecutionOptions{
@@ -654,7 +684,7 @@ func (s *ReportService) ExportReport(ctx *gin.Context, reportId int, req request
 
 func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId int, runtimeType string) (ReportExecutionSnapshot, error) {
 	snapshot := ReportExecutionSnapshot{ReportId: reportId, RuntimeType: runtimeType}
-	report, err := s.GetReportDefinitionById(reportId)
+	report, err := s.GetReportDefinitionByIdWithContext(reportRequestContext(ctx), reportId)
 	if err != nil {
 		return snapshot, err
 	}
@@ -669,12 +699,15 @@ func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId i
 	if normalizeReportStatus(report.Status) != reportStatusPublished || report.PublishedVersionId <= 0 {
 		return snapshot, myerrors.NewValidationError("报表未发布，请先调用发布接口")
 	}
-	version, err := s.reportVersionRepo.FindByReportAndId(report.Id, report.PublishedVersionId)
+	version, err := s.reportVersionRepo.WithContext(reportRequestContext(ctx)).FindById(report.PublishedVersionId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = myerrors.NewValidationError("报表发布版本不存在")
 		}
 		return snapshot, err
+	}
+	if version.ReportId != report.Id {
+		return snapshot, myerrors.NewValidationError("报表发布版本不存在")
 	}
 	if !version.State {
 		return snapshot, myerrors.NewValidationError("报表发布版本不可用")
@@ -683,6 +716,9 @@ func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId i
 		return snapshot, myerrors.NewValidationError("报表发布版本状态不可运行")
 	}
 	snapshot = reportSnapshotFromVersion(version, runtimeType)
+	// Menu publication is a runtime assignment made after version publication.
+	// Authorization must follow the current report-menu binding, not a stale snapshot value.
+	snapshot.PermissionMenuId = report.PermissionMenuId
 	return snapshot, nil
 }
 
@@ -703,7 +739,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 	options = normalizeReportExecutionOptions(options)
 	writeFailure := func(err error) {
 		if options.WriteLog {
-			_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, err)
+			_ = s.writeExecutionLog(reportRequestContext(ctx), snapshot, false, 0, start, normalizeReportExecutionError(err))
 		}
 	}
 	writeSuccess := func(rowCount int) {
@@ -753,7 +789,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 		return preview, nil
 	}
 	activeDatasetID := reportDatasetIdForPreview(config, selectedDataset)
-	sourceTable, _, err := s.resolveReportPreviewTable(snapshot, selectedDataset)
+	sourceTable, _, err := s.resolveReportPreviewTable(reportRequestContext(ctx), snapshot, selectedDataset)
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
@@ -778,21 +814,24 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
 	}
-	result, err := s.generalizationService.QueryWithResolvedDataPermission(reportRequestContext(ctx), &query, sourceTable, permission)
+	var result repository.GeneralizationListResult
+	err = withReportExecutionTransaction(reportRequestContext(ctx), s.reportRepo.DBWithContext(reportRequestContext(ctx)), func(tx *gorm.DB) error {
+		var queryErr error
+		result, queryErr = s.generalizationService.QueryWithResolvedDataPermissionDB(tx, &query, sourceTable, permission)
+		if queryErr != nil {
+			return queryErr
+		}
+		if !options.ExportMode {
+			return nil
+		}
+		if result.Total > options.MaxRows {
+			return myerrors.NewValidationError("导出行数超过系统限制，请缩小查询条件后重试")
+		}
+		return s.completeReportTableExportRows(tx, query, sourceTable, permission, &result, options.MaxRows)
+	})
 	if err != nil {
 		writeFailure(err)
 		return response.ReportPreviewRes{}, err
-	}
-	if options.ExportMode {
-		if result.Total > options.MaxRows {
-			err = myerrors.NewValidationError("导出行数超过系统限制，请缩小查询条件后重试")
-			writeFailure(err)
-			return response.ReportPreviewRes{}, err
-		}
-		if err := s.completeReportTableExportRows(reportRequestContext(ctx), query, sourceTable, permission, &result, options.MaxRows); err != nil {
-			writeFailure(err)
-			return response.ReportPreviewRes{}, err
-		}
 	}
 	columns := reportPreviewColumnsFromConfig(sourceTable, snapshot.QueryConfig)
 	preview := response.ReportPreviewRes{
@@ -940,10 +979,14 @@ func (s *ReportService) validateReportTables(report model.ReportDefinition) erro
 }
 
 func (s *ReportService) resolveReportTables(report model.ReportDefinition) (model.SysTable, model.SysTable, error) {
+	return s.resolveReportTablesWithContext(context.Background(), report)
+}
+
+func (s *ReportService) resolveReportTablesWithContext(ctx context.Context, report model.ReportDefinition) (model.SysTable, model.SysTable, error) {
 	if normalizeReportSourceType(report.SourceType) == "" {
 		return model.SysTable{}, model.SysTable{}, myerrors.NewValidationError("报表数据源类型不合法")
 	}
-	sourceTable, err := s.ResolveRuntimeTable(context.Background(), strings.TrimSpace(report.SourceCode))
+	sourceTable, err := s.ResolveRuntimeTable(ctx, strings.TrimSpace(report.SourceCode))
 	if err != nil {
 		return model.SysTable{}, model.SysTable{}, err
 	}
@@ -957,11 +1000,11 @@ func (s *ReportService) resolveReportTables(report model.ReportDefinition) (mode
 	return sourceTable, permissionTable, nil
 }
 
-func (s *ReportService) resolveReportPreviewTable(snapshot ReportExecutionSnapshot, selectedDataset reportconfig.Dataset) (model.SysTable, model.SysTable, error) {
+func (s *ReportService) resolveReportPreviewTable(ctx context.Context, snapshot ReportExecutionSnapshot, selectedDataset reportconfig.Dataset) (model.SysTable, model.SysTable, error) {
 	if selectedDataset.Id == "" {
-		return s.resolveReportTables(reportDefinitionFromSnapshot(snapshot))
+		return s.resolveReportTablesWithContext(ctx, reportDefinitionFromSnapshot(snapshot))
 	}
-	sourceTable, err := s.ResolveRuntimeTable(context.Background(), strings.TrimSpace(selectedDataset.SourceCode))
+	sourceTable, err := s.ResolveRuntimeTable(ctx, strings.TrimSpace(selectedDataset.SourceCode))
 	if err != nil {
 		return model.SysTable{}, model.SysTable{}, err
 	}
@@ -1072,36 +1115,6 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	}
 
 	aliasByDatasetID := reportDatasetAliases(config, primaryDataset.Id, primaryTable.TableCode)
-	query := s.reportRepo.DBWithContext(ctx).Table(quoteReportIdentifier(primaryTable.TableCode))
-	if _, ok := reportFindTableField(primaryTable, "gmt_delete"); ok {
-		query = query.Where(fmt.Sprintf("%s IS NULL", reportDatasetFieldExpr(primaryDataset.Id, "gmt_delete", primaryDataset.Id, primaryTable.TableCode, aliasByDatasetID)))
-	}
-	if err := s.applyJoinedReportDataScope(ctx, &query, primaryTable, options.DataPermissionAction); err != nil {
-		return response.ReportPreviewRes{}, err
-	}
-	joinedDatasetIDs := make(map[string]struct{})
-	for _, join := range config.DatasetJoins() {
-		targetID := reportJoinTargetDatasetID(join, primaryDataset.Id)
-		if targetID != "" {
-			if _, exists := joinedDatasetIDs[targetID]; exists {
-				continue
-			}
-			joinedDatasetIDs[targetID] = struct{}{}
-		}
-		joinExpr, err := reportJoinSQL(join, primaryDataset.Id, primaryTable.TableCode, datasetByID, tableByDatasetID, aliasByDatasetID)
-		if err != nil {
-			return response.ReportPreviewRes{}, err
-		}
-		if joinExpr != "" {
-			query = query.Joins(joinExpr)
-		}
-	}
-	var err error
-	query, err = reportApplyJoinedParameters(query, config, primaryDataset.Id, primaryTable.TableCode, tableByDatasetID, aliasByDatasetID, req.Parameters)
-	if err != nil {
-		return response.ReportPreviewRes{}, err
-	}
-
 	selections, columns, err := reportJoinedPreviewSelections(config, primaryDataset.Id, primaryTable, tableByDatasetID, aliasByDatasetID)
 	if err != nil {
 		return response.ReportPreviewRes{}, err
@@ -1113,26 +1126,62 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 	if req.Query.QuickQuery != nil {
 		keyword = req.Query.QuickQuery.Keyword
 	}
-	query = reportApplyJoinedQuickSearch(query, keyword, selections)
-
 	page := req.Query.Page
 	if page <= 0 {
 		page = 1
 	}
 	pageSize := normalizeReportPageSize(req.Query.Num, options)
-	var total int64
-	if err := query.Session(&gorm.Session{}).Count(&total).Error; err != nil {
-		return response.ReportPreviewRes{}, err
-	}
-	sqlRows, err := query.
-		Select(strings.Join(reportSelectExprs(selections), ", ")).
-		Limit(pageSize).
-		Offset((page - 1) * pageSize).
-		Rows()
+	permission, err := s.generalizationService.ResolveDataPermission(reportRequestContext(ctx), primaryTable, reportDataPermissionOperation(options.DataPermissionAction))
 	if err != nil {
 		return response.ReportPreviewRes{}, err
 	}
-	rows, _, err := scanReportSQLRows(sqlRows)
+	var total int64
+	var rows []map[string]interface{}
+	err = withReportExecutionTransaction(reportRequestContext(ctx), s.reportRepo.DBWithContext(reportRequestContext(ctx)), func(tx *gorm.DB) error {
+		query := tx.Table(quoteReportIdentifier(primaryTable.TableCode))
+		if _, ok := reportFindTableField(primaryTable, "gmt_delete"); ok {
+			query = query.Where(fmt.Sprintf("%s IS NULL", reportDatasetFieldExpr(primaryDataset.Id, "gmt_delete", primaryDataset.Id, primaryTable.TableCode, aliasByDatasetID)))
+		}
+		query, err = queryutil.ApplyGeneralizationPermission(query, permission, primaryTable)
+		if err != nil {
+			return err
+		}
+		joinedDatasetIDs := make(map[string]struct{})
+		for _, join := range config.DatasetJoins() {
+			targetID := reportJoinTargetDatasetID(join, primaryDataset.Id)
+			if targetID != "" {
+				if _, exists := joinedDatasetIDs[targetID]; exists {
+					continue
+				}
+				joinedDatasetIDs[targetID] = struct{}{}
+			}
+			joinExpr, joinErr := reportJoinSQL(join, primaryDataset.Id, primaryTable.TableCode, datasetByID, tableByDatasetID, aliasByDatasetID)
+			if joinErr != nil {
+				return joinErr
+			}
+			if joinExpr != "" {
+				query = query.Joins(joinExpr)
+			}
+		}
+		query, err = reportApplyJoinedParameters(query, config, primaryDataset.Id, primaryTable.TableCode, tableByDatasetID, aliasByDatasetID, req.Parameters)
+		if err != nil {
+			return err
+		}
+		query = reportApplyJoinedQuickSearch(query, keyword, selections)
+		if err = query.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+			return err
+		}
+		sqlRows, queryErr := query.
+			Select(strings.Join(reportSelectExprs(selections), ", ")).
+			Limit(pageSize).
+			Offset((page - 1) * pageSize).
+			Rows()
+		if queryErr != nil {
+			return queryErr
+		}
+		rows, _, queryErr = scanReportSQLRows(sqlRows)
+		return queryErr
+	})
 	if err != nil {
 		return response.ReportPreviewRes{}, err
 	}
@@ -1157,22 +1206,29 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 }
 
 func reportRequestContext(ctx *gin.Context) context.Context {
+	if ctx != nil {
+		if value, exists := ctx.Get(reportExecutionContextKey); exists {
+			if executionCtx, ok := value.(context.Context); ok && executionCtx != nil {
+				return executionCtx
+			}
+		}
+	}
 	if ctx != nil && ctx.Request != nil {
 		return ctx.Request.Context()
 	}
 	return context.Background()
 }
 
-func (s *ReportService) applyJoinedReportDataScope(ctx *gin.Context, query **gorm.DB, primaryTable model.SysTable, action enum.SysMenuButtonEventAction) error {
-	permission, err := s.generalizationService.ResolveDataPermission(reportRequestContext(ctx), primaryTable, reportDataPermissionOperation(action))
-	if err != nil {
-		return err
+func reportGinContextWithExecutionContext(ctx *gin.Context, executionCtx context.Context) *gin.Context {
+	if ctx == nil {
+		return nil
 	}
-	*query, err = queryutil.ApplyGeneralizationPermission(*query, permission, primaryTable)
-	if err != nil {
-		return err
+	cloned := ctx.Copy()
+	cloned.Set(reportExecutionContextKey, executionCtx)
+	if ctx.Request != nil {
+		cloned.Request = ctx.Request.Clone(executionCtx)
 	}
-	return nil
+	return cloned
 }
 
 func safeReportPreviewSQL(raw string) (string, error) {
@@ -1192,21 +1248,28 @@ func (s *ReportService) queryReportSQL(ctx *gin.Context, sqlText string, whereCl
 		wrapped += " WHERE " + whereClause
 	}
 	var total int64
-	if err := s.reportRepo.DBWithContext(ctx).Raw("SELECT COUNT(1) FROM ("+wrapped+") AS report_sql_dataset_count", args...).Scan(&total).Error; err != nil {
-		return nil, nil, 0, err
-	}
-	queryArgs := append([]any{}, args...)
-	wrapped += " LIMIT ? OFFSET ?"
-	queryArgs = append(queryArgs, limit, (page-1)*limit)
-	sqlRows, err := s.reportRepo.DBWithContext(ctx).Raw(wrapped, queryArgs...).Rows()
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	columnMeta, err := reportSQLColumns(sqlRows)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	records, columnNames, err := scanReportSQLRows(sqlRows)
+	var columnMeta []response.ReportPreviewColumn
+	var records []map[string]interface{}
+	var columnNames []string
+	err := withReportExecutionTransaction(reportRequestContext(ctx), s.reportRepo.DBWithContext(reportRequestContext(ctx)), func(tx *gorm.DB) error {
+		if queryErr := tx.Raw("SELECT COUNT(1) FROM ("+wrapped+") AS report_sql_dataset_count", args...).Scan(&total).Error; queryErr != nil {
+			return queryErr
+		}
+		queryArgs := append([]any{}, args...)
+		dataSQL := wrapped + " LIMIT ? OFFSET ?"
+		queryArgs = append(queryArgs, limit, (page-1)*limit)
+		sqlRows, queryErr := tx.Raw(dataSQL, queryArgs...).Rows()
+		if queryErr != nil {
+			return queryErr
+		}
+		columnMeta, queryErr = reportSQLColumns(sqlRows)
+		if queryErr != nil {
+			_ = sqlRows.Close()
+			return queryErr
+		}
+		records, columnNames, queryErr = scanReportSQLRows(sqlRows)
+		return queryErr
+	})
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -1846,7 +1909,7 @@ func normalizeReportPageSize(raw int, options ReportExecutionOptions) int {
 	return raw
 }
 
-func (s *ReportService) completeReportTableExportRows(ctx context.Context, query request.Basic, table model.SysTable, permission repository.GeneralizationPermission, result *repository.GeneralizationListResult, maxRows int) error {
+func (s *ReportService) completeReportTableExportRows(db *gorm.DB, query request.Basic, table model.SysTable, permission repository.GeneralizationPermission, result *repository.GeneralizationListResult, maxRows int) error {
 	if result == nil || maxRows <= 0 || result.Total <= len(result.Data) || result.Total > maxRows {
 		return nil
 	}
@@ -1858,7 +1921,7 @@ func (s *ReportService) completeReportTableExportRows(ctx context.Context, query
 		nextQuery := query
 		nextQuery.Page = len(result.Data)/pageSize + 1
 		nextQuery.Num = pageSize
-		nextResult, err := s.generalizationService.QueryWithResolvedDataPermission(ctx, &nextQuery, table, permission)
+		nextResult, err := s.generalizationService.QueryWithResolvedDataPermissionDB(db, &nextQuery, table, permission)
 		if err != nil {
 			return err
 		}
@@ -2666,7 +2729,7 @@ func (s *ReportService) ensureReportRuntimeButtons(tx *gorm.DB, report model.Rep
 				"path":         item.Path,
 				"method":       strings.ToUpper(item.Method),
 				"is_button":    item.IsButton,
-				"is_hidden":    false,
+				"is_hidden":    item.IsHidden,
 				"is_disabled":  false,
 				"state":        true,
 				"gmt_modify":   model.Now(),
@@ -2698,6 +2761,17 @@ func (s *ReportService) ensureReportRuntimeButtons(tx *gorm.DB, report model.Rep
 
 func reportRuntimeDefaultButtons(reportCode string) []model.SysMenuButton {
 	return []model.SysMenuButton{
+		{
+			Name:        "详情",
+			Code:        reportMenuButtonCode(reportCode, "detail"),
+			Position:    enum.Top,
+			EventAction: string(enum.ButtonActionDetail),
+			Sequence:    90,
+			Path:        "/admin/report/:id",
+			Method:      "GET",
+			IsButton:    false,
+			IsHidden:    true,
+		},
 		{
 			Name:        "查询",
 			Code:        reportMenuButtonCode(reportCode, "query"),

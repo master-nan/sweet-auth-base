@@ -19,7 +19,7 @@
         </q-btn>
         <breadcrumbs class="app-header__breadcrumbs text-weight-bold" :show-icon="false" v-if="$q.screen.gt.sm" />
         <q-space />
-        <toolbar-item />
+        <toolbar-item @open-settings="openThemeSettings" />
       </q-toolbar>
       <div class="app-header__tabs">
         <tag-view />
@@ -59,9 +59,13 @@ import Breadcrumbs from 'src/components/Breadcrumbs/Breadcrumbs.vue'
 import ToolbarItem from 'src/components/Toolbar/ToolbarItem.vue'
 import ThemeSetting from 'src/components/Setting/ThemeSetting.vue'
 const drawerRef = ref<typeof Drawer | null>(null)
+const settingRef = ref<InstanceType<typeof ThemeSetting> | null>(null)
 const isDrawerOpen = ref<boolean>(false)
 const toggleLeftDrawer = () => {
   drawerRef.value?.toggleDrawer()
+}
+const openThemeSettings = () => {
+  settingRef.value?.toggleSettingPanel()
 }
 import { useAppStore } from 'src/stores/app'
 import { useKeepAliveStore } from 'src/stores/keep-alive'

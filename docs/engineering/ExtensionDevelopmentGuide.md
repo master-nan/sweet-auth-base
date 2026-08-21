@@ -69,7 +69,7 @@
 
 ### 3.2 Migration
 
-正式 Schema 演进位于 `backend/migrate/`，并注册到 `migrationSteps()`。当前 Migration 没有独立版本账本，依赖 Registry 顺序和每一步自身幂等，因此每一步都必须能安全重跑。
+正式 Schema 演进位于 `backend/migrate/`，并注册到 `migrationSteps()`。每一步都必须能安全重跑；已应用版本、key、checksum 和时间写入 `schema_migration`，严格 db-preflight 会拒绝 ledger 缺失、不完整、未知版本或 checksum 漂移。
 
 Migration 应做到：
 
@@ -353,7 +353,7 @@ HR Source DTO
 
 测试文件按长期回归价值保留：安全、事务、状态机、权限、Migration、数据库约束和产品交互优先；重复 GORM CRUD、第三方库透传、阶段 Freeze、文件拆分和源码字符串测试应删除。前端页面只测试页面自己的业务组合，公共组件行为由组件测试覆盖。跨端枚举、Operator 和 Permission Contract Guard 可以保留，但同一契约不得复制多份。
 
-`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该目标包含 docs、Node 运维脚本测试、强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。
+`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该唯一门禁包含 tracked secret scan、docs、Node 运维脚本测试、强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。GitHub Actions 提供 PostgreSQL 16/Redis service 后直接调用同一 Make 目标，不复制门禁步骤。
 
 ## 18. 常见反例
 

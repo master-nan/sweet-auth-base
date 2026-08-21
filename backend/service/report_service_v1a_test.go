@@ -64,7 +64,7 @@ func TestReportV1ADesignPreviewAndStatusRules(t *testing.T) {
 }
 
 func TestReportV1APublishRunUsesVersionSnapshot(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	nameQuery, nameLayout := reportV1ATableConfig("name")
 	report := env.createReport(t, "v1a_snapshot", reportStatusDraft, nameQuery, nameLayout)
 

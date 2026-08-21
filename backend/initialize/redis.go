@@ -7,8 +7,8 @@ package initialize
 
 import (
 	"backend/config"
+	"backend/internal/cache"
 	"context"
-	"fmt"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"time"
@@ -16,19 +16,19 @@ import (
 
 func InitRedis(serverConfig *config.Server, zapLogger *zap.Logger) (*redis.Client, error) {
 	cfg := serverConfig.Redis
-	client := redis.NewClient(&redis.Options{
-		Addr:            fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		Password:        cfg.Password,
-		DB:              cfg.DB,
-		PoolSize:        cfg.PoolSize,
-		MinIdleConns:    cfg.MinIdleConns,
-		ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
-	})
-
-	ctx := context.Background()
-	if _, err := client.Ping(ctx).Result(); err != nil {
-		zap.L().Error("Failed to connect to Redis: %v", zap.Error(err))
+	options, err := cache.RedisOptions(cfg)
+	if err != nil {
 		return nil, err
 	}
+	client := redis.NewClient(options)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := client.Ping(ctx).Result(); err != nil {
+		_ = client.Close()
+		zap.L().Error("failed to connect to Redis", zap.Error(err))
+		return nil, err
+	}
+	zap.L().Info("Redis connection initialized", zap.Bool("tls_enabled", cfg.TLS.Enabled))
 	return client, nil
 }

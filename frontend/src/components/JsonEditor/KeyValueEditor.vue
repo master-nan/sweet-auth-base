@@ -12,7 +12,7 @@
             color="primary"
             icon="add"
             @click="addKeyValue"
-            :disable="loading"
+            :disable="disabled || loading"
           />
         </div>
       </q-card-section>
@@ -32,6 +32,7 @@
             dense
             class="col-5"
             label="键"
+            :disable="disabled"
             @blur="handleBlur"
           />
           <q-input
@@ -40,6 +41,7 @@
             dense
             class="col-5 q-mx-sm"
             label="值"
+            :disable="disabled"
             @blur="handleBlur"
           />
           <div class="col-1">
@@ -50,12 +52,13 @@
               color="negative"
               icon="remove"
               @click="removeEntry(index)"
-              :disable="loading"
+              :disable="disabled || loading"
             />
           </div>
         </div>
       </q-card-section>
     </q-card>
+    <div v-if="errorMessage" class="text-negative text-caption q-mt-xs">{{ errorMessage }}</div>
   </div>
 </template>
 
@@ -72,11 +75,15 @@ interface KeyValueEntry {
 interface KeyValueEditorProps {
   modelValue?: Record<string, any> | string | null
   label?: string
+  rules?: Array<(value: any) => boolean | string>
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<KeyValueEditorProps>(), {
   modelValue: () => ({}),
   label: '键值对',
+  rules: () => [],
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -85,6 +92,7 @@ const emit = defineEmits<{
 
 const entries = ref<KeyValueEntry[]>([])
 const loading = ref(false)
+const errorMessage = ref('')
 const isInternalUpdate = ref(false)
 
 // 初始化键值对数组
@@ -160,7 +168,7 @@ const emitUpdate = (force = false) => {
 
 // 添加键值对
 const addKeyValue = () => {
-  if (loading.value) return
+  if (props.disabled || loading.value) return
 
   loading.value = true
   isInternalUpdate.value = true
@@ -178,7 +186,7 @@ const addKeyValue = () => {
 
 // 删除条目
 const removeEntry = (index: number) => {
-  if (loading.value) return
+  if (props.disabled || loading.value) return
 
   loading.value = true
   isInternalUpdate.value = true
@@ -243,6 +251,32 @@ watch(
 onMounted(() => {
   initEntries()
 })
+
+const currentValue = () => {
+  const result: Record<string, any> = {}
+  for (const entry of entries.value) {
+    if (entry.key.trim()) result[entry.key] = entry.value
+  }
+  return result
+}
+
+const validate = () => {
+  errorMessage.value = ''
+  for (const rule of props.rules) {
+    const result = rule(currentValue())
+    if (result !== true) {
+      errorMessage.value = typeof result === 'string' ? result : '字段值不合法'
+      return false
+    }
+  }
+  return true
+}
+
+const resetValidation = () => {
+  errorMessage.value = ''
+}
+
+defineExpose({ validate, resetValidation })
 </script>
 
 <style scoped>

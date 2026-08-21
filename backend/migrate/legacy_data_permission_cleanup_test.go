@@ -82,7 +82,7 @@ func TestRemoveLegacyDataPermissionSchemaIsIdempotentAndPreservesNewDomain(t *te
 func TestRemoveLegacyDataPermissionSchemaPostgreSQL(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 
-	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
@@ -96,7 +96,7 @@ func TestRemoveLegacyDataPermissionSchemaPostgreSQL(t *testing.T) {
 		_ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS %q CASCADE`, schemaName)).Error
 	})
 
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 		Logger:                                   logger.Default.LogMode(logger.Silent),

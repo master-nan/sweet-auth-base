@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/datatypes"
@@ -47,7 +48,7 @@ func TestReportV1BExportStatusRulesAndLogs(t *testing.T) {
 }
 
 func TestReportV1BExportUsesPublishedVersionSnapshot(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	nameQuery, nameLayout := reportV1ATableConfig("name")
 	report := env.createReport(t, "v1b_snapshot", reportStatusDraft, nameQuery, nameLayout)
 
@@ -141,7 +142,7 @@ func TestReportV1BExportRejectsVersionAndSQLPermission(t *testing.T) {
 }
 
 func TestReportV1BExportMaxRowsAndFormatValidation(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	queryConfig, layoutConfig := reportV1ATableConfig("name")
 	report := env.createReport(t, "v1b_limits", reportStatusDraft, queryConfig, layoutConfig)
 	published, err := env.svc.PublishReport(env.ctx, report.Id, request.ReportPublishReq{})
@@ -175,7 +176,7 @@ func TestReportV1BExportMaxRowsAndFormatValidation(t *testing.T) {
 }
 
 func TestReportV1BTableExportCompletesRowsBeyondSingleQueryLimit(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	const totalRows = 6000
 	appendDemoOrderRows(t, env, 3, totalRows)
 	queryConfig, layoutConfig := reportV1ATableConfig("name")
@@ -250,7 +251,7 @@ func TestReportV1BSQLDatasetTotalLimitFails(t *testing.T) {
 }
 
 func TestReportV1BJoinedTableDatasetExportUsesNewRuntime(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	seedReportV1BJoinedTables(t, env)
 	queryConfig, layoutConfig := reportV1BJoinedConfig()
 	report := env.createReport(t, "v1b_joined_export_success", reportStatusDraft, queryConfig, layoutConfig)
@@ -289,7 +290,7 @@ func TestReportV1BJoinedTableDatasetExportUsesNewRuntime(t *testing.T) {
 }
 
 func TestReportV1BJoinedTableDatasetTotalLimitFails(t *testing.T) {
-	env := newReportV1ATestEnv(t, reportV1AUser(false))
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
 	seedReportV1BJoinedTables(t, env)
 	queryConfig, layoutConfig := reportV1BJoinedConfig()
 	report := env.createReport(t, "v1b_joined_export_limit", reportStatusDraft, queryConfig, layoutConfig)
@@ -477,10 +478,11 @@ func (r reportDefinitionRepoWithQueryDB) DBWithContext(context.Context) *gorm.DB
 }
 
 type reportJoinedQueryRecorder struct {
-	total   int64
-	rows    [][]driver.Value
-	queries []string
-	args    [][]driver.NamedValue
+	total     int64
+	rows      [][]driver.Value
+	queries   []string
+	args      [][]driver.NamedValue
+	deadlines []time.Time
 }
 
 func newReportJoinedQueryRecorder(total int64, rows [][]driver.Value) *reportJoinedQueryRecorder {
@@ -558,7 +560,10 @@ func (c *reportJoinedConn) Begin() (driver.Tx, error) {
 	return reportJoinedTx{}, nil
 }
 
-func (c *reportJoinedConn) QueryContext(_ context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *reportJoinedConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if deadline, ok := ctx.Deadline(); ok && c.recorder != nil {
+		c.recorder.deadlines = append(c.recorder.deadlines, deadline)
+	}
 	return c.query(query, args)
 }
 
@@ -573,6 +578,13 @@ func (c *reportJoinedConn) query(query string, args []driver.NamedValue) (driver
 	lower := strings.ToLower(query)
 	if strings.Contains(lower, "sqlite_version") {
 		return &reportJoinedRows{columns: []string{"sqlite_version()"}, values: [][]driver.Value{{"3.45.0"}}}, nil
+	}
+	if strings.Contains(lower, "set_config") {
+		value := driver.Value("0")
+		if len(args) > 0 {
+			value = args[0].Value
+		}
+		return &reportJoinedRows{columns: []string{"set_config"}, values: [][]driver.Value{{value}}}, nil
 	}
 	if strings.Contains(lower, "count(") {
 		total := int64(0)

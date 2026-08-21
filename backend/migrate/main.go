@@ -5,6 +5,8 @@ import (
 	"backend/enum"
 	"backend/initialize"
 	"backend/internal/cache"
+	"backend/internal/database"
+	migrationstate "backend/internal/migration"
 	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
@@ -34,34 +36,54 @@ const (
 )
 
 func main() {
-	command := migrationCommand(os.Args)
+	if err := executeMigrationCommand(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func executeMigrationCommand(args []string) error {
+	command := migrationCommand(args)
 	cfg, err := initialize.LoadConfig()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	db, err := openPrimaryDB(cfg)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = sqlDB.Close() }()
 
 	switch command {
 	case "migrate":
+		log.Println("schema migration started")
 		if err := migrateSchema(db); err != nil {
-			log.Fatal(err)
+			return err
 		}
 		log.Println("schema migration completed")
+	case "adopt":
+		log.Println("schema migration adoption started")
+		if err := adoptSchema(db); err != nil {
+			return err
+		}
+		log.Println("schema migration adoption completed")
 	case "seed":
+		log.Println("base seed started")
 		sf, err := initialize.InitSnowflake(cfg)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		if err := seedAllData(db, cfg, sf); err != nil {
-			log.Fatal(err)
+			return err
 		}
 		log.Println("base seed completed")
 	default:
-		log.Fatalf("unknown migrate command %q, use migrate or seed", command)
+		return fmt.Errorf("unknown migrate command %q, use migrate, adopt, or seed", command)
 	}
+	return nil
 }
 
 func migrationCommand(args []string) string {
@@ -78,7 +100,10 @@ func migrationCommand(args []string) string {
 
 func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
 	dbCfg := cfg.DBS.Primary
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Shanghai", dbCfg.Host, dbCfg.Port, dbCfg.User, dbCfg.Password, dbCfg.Name)
+	dsn, err := database.PostgresDSN(dbCfg)
+	if err != nil {
+		return nil, err
+	}
 	dbLogger := logger.New(log.Default(), logger.Config{
 		SlowThreshold:             time.Second,
 		Colorful:                  false,
@@ -114,6 +139,10 @@ func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
 
 func migrateSchema(db *gorm.DB) error {
 	return runMigrationSteps(db, migrationSteps())
+}
+
+func adoptSchema(db *gorm.DB) error {
+	return runMigrationStepsWithMode(db, migrationSteps(), migrationstate.ManagedTables(), true)
 }
 
 func ensureSysMenuOptionText(db *gorm.DB) error {
@@ -180,14 +209,11 @@ func flushMigrationCaches(cfg *config.Server) error {
 		return nil
 	}
 	redisCfg := cfg.Redis
-	client := redis.NewClient(&redis.Options{
-		Addr:            fmt.Sprintf("%s:%d", redisCfg.Host, redisCfg.Port),
-		Password:        redisCfg.Password,
-		DB:              redisCfg.DB,
-		PoolSize:        redisCfg.PoolSize,
-		MinIdleConns:    redisCfg.MinIdleConns,
-		ConnMaxIdleTime: time.Duration(redisCfg.ConnMaxIdleTime) * time.Second,
-	})
+	options, err := cache.RedisOptions(redisCfg)
+	if err != nil {
+		return err
+	}
+	client := redis.NewClient(options)
 	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -831,15 +857,43 @@ func seedApplication(db *gorm.DB) error {
 	if err != gorm.ErrRecordNotFound {
 		return err
 	}
+	secret, err := bootstrapApplicationSecret()
+	if err != nil {
+		return err
+	}
 	app = model.Application{
 		Basic:      model.Basic{Id: 1, State: true},
 		Name:       "Default Admin App",
 		AppKey:     "sweet-admin",
-		AppSecret:  "sweet-admin-secret",
+		AppSecret:  secret,
 		Expiration: 7200,
 		Remark:     "本地开发默认应用",
 	}
 	return db.Create(&app).Error
+}
+
+func bootstrapApplicationSecret() (string, error) {
+	secret := strings.TrimSpace(os.Getenv("APP_BOOTSTRAP_APPLICATION_SECRET"))
+	if secret == "" {
+		secret = "sweet-admin-secret"
+	}
+	if requiresSecureBootstrap() && insecureBootstrapApplicationSecret(secret) {
+		return "", fmt.Errorf("insecure bootstrap application secret: set APP_BOOTSTRAP_APPLICATION_SECRET to a random value with at least 32 characters")
+	}
+	return secret, nil
+}
+
+func insecureBootstrapApplicationSecret(secret string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(secret))
+	if len(normalized) < 32 {
+		return true
+	}
+	for _, marker := range []string{"sweet-admin-secret", "change-me", "replace-with", "placeholder", "example"} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func seedAdminUser(db *gorm.DB, cfg *config.Server) error {

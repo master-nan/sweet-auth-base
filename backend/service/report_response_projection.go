@@ -3,7 +3,9 @@ package service
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	myerrors "backend/internal/errors"
 	"backend/model"
+	"context"
 	"encoding/json"
 )
 
@@ -32,8 +34,8 @@ func reportDefinitionDetailResponse(data model.ReportDefinition) response.Report
 	}
 }
 
-func (s *ReportService) GetReportDefinitionListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.ReportDefinitionListRes], error) {
-	result, err := s.GetReportDefinitionList(basic, table)
+func (s *ReportService) GetReportDefinitionListResponse(ctx context.Context, user model.SysUser, basic *request.Basic, table model.SysTable) (response.ListResult[response.ReportDefinitionListRes], error) {
+	result, err := s.GetAuthorizedReportDefinitionList(ctx, user, basic, table)
 	if err != nil {
 		return response.ListResult[response.ReportDefinitionListRes]{}, err
 	}
@@ -44,9 +46,15 @@ func (s *ReportService) GetReportDefinitionListResponse(basic *request.Basic, ta
 	return response.ListResult[response.ReportDefinitionListRes]{Data: items, Total: result.Total}, nil
 }
 
-func (s *ReportService) GetReportDefinitionByIdResponse(id int) (response.ReportDefinitionDetailRes, error) {
-	data, err := s.GetReportDefinitionById(id)
+func (s *ReportService) GetReportDefinitionByIdResponse(ctx context.Context, user model.SysUser, id int, requestedMenuID int) (response.ReportDefinitionDetailRes, error) {
+	data, err := s.GetReportDefinitionByIdWithContext(ctx, id)
 	if err != nil {
+		return response.ReportDefinitionDetailRes{}, err
+	}
+	if data.Id == 0 {
+		return response.ReportDefinitionDetailRes{}, myerrors.ErrDataNotFound
+	}
+	if err := s.AuthorizeReportDetail(ctx, user, data, requestedMenuID); err != nil {
 		return response.ReportDefinitionDetailRes{}, err
 	}
 	return reportDefinitionDetailResponse(data), nil

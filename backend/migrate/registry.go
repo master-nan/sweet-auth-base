@@ -2,16 +2,22 @@ package main
 
 import (
 	"backend/config"
+	migrationstate "backend/internal/migration"
 	"backend/internal/utils"
 	"backend/model"
+	"context"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 )
 
 type migrationStep struct {
-	name string
-	run  func(*gorm.DB) error
+	version  int64
+	name     string
+	contract string
+	checksum string
+	run      func(*gorm.DB) error
 }
 
 type seedStep struct {
@@ -21,25 +27,127 @@ type seedStep struct {
 
 // migrationSteps 是 schema 变更和 migrate 阶段幂等回填的唯一注册点。
 func migrationSteps() []migrationStep {
-	return []migrationStep{
-		{name: "auto_migrate_core_schema", run: autoMigrateCoreSchema},
-		{name: "metadata_value_contract", run: migrateMetadataValueContract},
-		{name: "backfill_sys_table_index_field_sequence", run: backfillSysTableIndexFieldSequence},
-		{name: "query_scheme_schema", run: migrateQuerySchemeSchema},
-		{name: "integration_configuration_schema", run: migrateIntegrationConfigurationSchema},
-		{name: "integration_runtime_schema", run: migrateIntegrationRuntimeSchema},
-		{name: "integration_sync_schema", run: migrateIntegrationSyncSchema},
-		{name: "organization_sync_integrity_schema", run: migrateOrganizationSyncIntegritySchema},
-		{name: "data_permission_domain_schema", run: migrateDataPermissionSchema},
-		{name: "remove_legacy_data_permission_schema", run: removeLegacyDataPermissionSchema},
-		{name: "ensure_sys_menu_option_text", run: ensureSysMenuOptionText},
-		{name: "backfill_sys_menu_page_binding", run: backfillSysMenuPageBinding},
-		{name: "canonical_runtime_contract", run: migrateCanonicalRuntimeContract},
-		{name: "organization_database_comments", run: applyOrganizationDatabaseComments},
+	runners := []func(*gorm.DB) error{
+		autoMigrateCoreSchema,
+		migrateMetadataValueContract,
+		backfillSysTableIndexFieldSequence,
+		migrateQuerySchemeSchema,
+		migrateIntegrationConfigurationSchema,
+		migrateIntegrationRuntimeSchema,
+		migrateIntegrationSyncSchema,
+		migrateOrganizationSyncIntegritySchema,
+		migrateDataPermissionSchema,
+		removeLegacyDataPermissionSchema,
+		ensureSysMenuOptionText,
+		backfillSysMenuPageBinding,
+		migrateCanonicalRuntimeContract,
+		applyOrganizationDatabaseComments,
+		ensureAccessLogOperationalIndexes,
 	}
+	definitions := migrationstate.Catalog()
+	if len(definitions) != len(runners) {
+		panic(fmt.Sprintf("migration catalog has %d definitions for %d runners", len(definitions), len(runners)))
+	}
+	steps := make([]migrationStep, 0, len(definitions))
+	for i, definition := range definitions {
+		steps = append(steps, migrationStep{
+			version:  definition.Version,
+			name:     definition.Key,
+			contract: definition.Contract,
+			checksum: definition.Checksum,
+			run:      runners[i],
+		})
+	}
+	return steps
+}
+
+func ensureAccessLogOperationalIndexes(db *gorm.DB) error {
+	for _, statement := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_access_log_time ON access_log (gmt_create DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_access_log_action_time ON access_log (action, gmt_create DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_access_log_resource_time ON access_log (resource_type, resource_code, resource_id, gmt_create DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_access_log_success_time ON access_log (success, gmt_create DESC)`,
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			return fmt.Errorf("ensure access log operational index: %w", err)
+		}
+	}
+	return nil
 }
 
 func runMigrationSteps(db *gorm.DB, steps []migrationStep) error {
+	return runMigrationStepsWithMode(db, steps, migrationstate.ManagedTables(), false)
+}
+
+func runMigrationStepsWithMode(db *gorm.DB, steps []migrationStep, managedTables []string, adopt bool) error {
+	if db.Dialector.Name() != "postgres" {
+		return runUntrackedMigrationSteps(db, steps)
+	}
+	definitions := definitionsForSteps(steps)
+	if err := migrationstate.ValidateCatalog(definitions); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	return migrationstate.WithAdvisoryLock(ctx, db, func(lockedDB *gorm.DB) error {
+		conn := lockedDB.Statement.ConnPool
+		existingTables, err := migrationstate.ExistingManagedTables(ctx, conn, managedTables)
+		if err != nil {
+			return err
+		}
+		entries, ledgerExists, err := migrationstate.LoadLedger(ctx, conn)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 0 && len(existingTables) > 0 && !adopt {
+			return fmt.Errorf(
+				"database contains managed tables but has no migration history; inspect it, then run explicit `migrate adopt` (found: %s)",
+				strings.Join(existingTables, ", "),
+			)
+		}
+		if !ledgerExists {
+			if err := migrationstate.EnsureLedger(ctx, conn); err != nil {
+				return err
+			}
+		}
+
+		if err := migrationstate.ValidateLedger(entries, definitions, false); err != nil {
+			return err
+		}
+		for _, step := range steps[len(entries):] {
+			transactionDB := lockedDB.Session(&gorm.Session{NewDB: true, DisableNestedTransaction: true})
+			if err := transactionDB.Transaction(func(tx *gorm.DB) error {
+				if err := step.run(tx); err != nil {
+					return err
+				}
+				if err := tx.Exec(`
+INSERT INTO schema_migration (version, "key", checksum, applied_at)
+VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+`, step.version, step.name, step.checksum).Error; err != nil {
+					return fmt.Errorf("record migration ledger: %w", err)
+				}
+				return nil
+			}); err != nil {
+				return fmt.Errorf("migration step %d/%s: %w", step.version, step.name, err)
+			}
+		}
+		return nil
+	})
+}
+
+func definitionsForSteps(steps []migrationStep) []migrationstate.Definition {
+	definitions := make([]migrationstate.Definition, 0, len(steps))
+	for _, step := range steps {
+		definitions = append(definitions, migrationstate.Definition{
+			Version:  step.version,
+			Key:      step.name,
+			Contract: step.contract,
+			Checksum: step.checksum,
+		})
+	}
+	return definitions
+}
+
+func runUntrackedMigrationSteps(db *gorm.DB, steps []migrationStep) error {
 	for _, step := range steps {
 		if err := step.run(db); err != nil {
 			return fmt.Errorf("migration step %s: %w", step.name, err)
@@ -90,7 +198,9 @@ func autoMigrateCoreSchema(db *gorm.DB) error {
 }
 
 func seedAllData(db *gorm.DB, cfg *config.Server, sf *utils.Snowflake) error {
-	return runSeedSteps(db, cfg, sf, platformSeedSteps())
+	return migrationstate.WithAdvisoryLock(context.Background(), db, func(lockedDB *gorm.DB) error {
+		return runSeedSteps(lockedDB, cfg, sf, platformSeedSteps())
+	})
 }
 
 func baseSeedSteps() []seedStep {

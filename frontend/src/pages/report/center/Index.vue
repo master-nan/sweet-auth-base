@@ -318,7 +318,7 @@ async function loadDataSources() {
 
 async function openRuntime(row: Report) {
   try {
-    const res = await reportApi.queryReportById(row.id)
+    const res = await reportApi.queryReportById(row.id, row.permission_menu_id || 0)
     runtimeReport.value = res.data
     runtimeVisible.value = true
   } catch {

@@ -299,6 +299,7 @@ func InitializeApp() (*App, error) {
 		ApplicationCache:               applicationCache,
 		IntegrationWorker:              integrationWorkerRunner,
 		IntegrationSyncRunner:          integrationSyncRunner,
+		FileUploadService:              fileUploadService,
 	}
 	return app, nil
 }
@@ -349,6 +350,7 @@ type App struct {
 	ApplicationCache               *cache.ApplicationCache
 	IntegrationWorker              *integration.IntegrationWorkerRunner
 	IntegrationSyncRunner          *integration.IntegrationSyncRunner
+	FileUploadService              *service.FileUploadService
 }
 
 // Repository 提供者

@@ -62,6 +62,20 @@ func TestBootstrapAdminPasswordRejectsDefaultInPro(t *testing.T) {
 	}
 }
 
+func TestBootstrapApplicationSecretRequiresStrongProductionValue(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("APP_BOOTSTRAP_APPLICATION_SECRET", "sweet-admin-secret")
+	if _, err := bootstrapApplicationSecret(); err == nil {
+		t.Fatal("expected default application secret to be rejected in production")
+	}
+
+	t.Setenv("APP_BOOTSTRAP_APPLICATION_SECRET", "ApplicationSecret-2026-Long-Random-Value")
+	secret, err := bootstrapApplicationSecret()
+	if err != nil || secret == "" {
+		t.Fatalf("expected strong application secret, secret=%q err=%v", secret, err)
+	}
+}
+
 func TestInsecureBootstrapAdminPassword(t *testing.T) {
 	insecure := []string{"", "admin123", "my-admin123", "password", "short"}
 	for _, password := range insecure {
@@ -92,6 +106,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"backfill_sys_menu_page_binding",
 		"canonical_runtime_contract",
 		"organization_database_comments",
+		"access_log_operational_indexes",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)

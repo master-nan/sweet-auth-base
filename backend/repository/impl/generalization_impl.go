@@ -52,7 +52,16 @@ func (g *GeneralizationRepositoryImpl) QueryWithPermission(
 	table model.SysTable,
 	permission repository.GeneralizationPermission,
 ) (repository.GeneralizationListResult, error) {
-	result, err := util.DynamicQueryWithPermission(g.db.WithContext(ctx), basic, table, permission)
+	return g.QueryWithPermissionDB(g.db.WithContext(ctx), basic, table, permission)
+}
+
+func (g *GeneralizationRepositoryImpl) QueryWithPermissionDB(
+	db *gorm.DB,
+	basic *request.Basic,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (repository.GeneralizationListResult, error) {
+	result, err := util.DynamicQueryWithPermission(db, basic, table, permission)
 	if err != nil {
 		return repository.GeneralizationListResult{}, err
 	}

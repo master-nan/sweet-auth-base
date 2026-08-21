@@ -199,7 +199,7 @@ func TestQuerySchemePostgresConcurrentPageDefaultHasOneWinner(t *testing.T) {
 func openQuerySchemePostgresSchema(t *testing.T) (*gorm.DB, func()) {
 	t.Helper()
 	dsn := testutil.PostgreSQLDSN(t)
-	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	admin, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
@@ -207,7 +207,7 @@ func openQuerySchemePostgresSchema(t *testing.T) (*gorm.DB, func()) {
 	if err := admin.Exec(fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)).Error; err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
 		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
 	})

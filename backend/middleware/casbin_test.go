@@ -239,6 +239,35 @@ func TestCasbinHandlerAllowsControllerScopedLowCodeRouteForAuthenticatedUser(t *
 	}
 }
 
+func TestCasbinHandlerLeavesReportObjectAuthorizationToService(t *testing.T) {
+	for _, route := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/admin/report/query"},
+		{method: http.MethodGet, path: "/admin/report/:id"},
+		{method: http.MethodPost, path: "/admin/report/:id/run"},
+		{method: http.MethodPost, path: "/admin/report/:id/export"},
+	} {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			enforcer := newTestEnforcer(t)
+			called := false
+			router := gin.New()
+			router.Use(func(ctx *gin.Context) {
+				ctx.Set("user", model.SysUser{UserName: "report-viewer"})
+				ctx.Next()
+			})
+			router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
+			router.Handle(route.method, route.path, func(ctx *gin.Context) { called = true })
+			requestPath := strings.Replace(route.path, ":id", "42", 1)
+			router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(route.method, requestPath, nil))
+			if !called {
+				t.Fatalf("authenticated report route %s should reach object authorization", route.path)
+			}
+		})
+	}
+}
+
 func TestCasbinHandlerDeniesControllerScopedLowCodeRouteWithoutLogin(t *testing.T) {
 	enforcer := newTestEnforcer(t)
 	if _, err := enforcer.AddPolicy("lowcode_admin", "/admin/generalization/query/code/:code", "POST"); err != nil {

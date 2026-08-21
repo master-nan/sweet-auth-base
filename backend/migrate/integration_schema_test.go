@@ -78,7 +78,7 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 
 func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
-	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 		t.Fatalf("create schema: %v", err)
 	}
 	t.Cleanup(func() { _ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
 		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
 	})
@@ -140,7 +140,7 @@ func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 
 func TestRetryPolicyPostgresConstraintsAndExecutionSnapshot(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
-	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestRetryPolicyPostgresConstraintsAndExecutionSnapshot(t *testing.T) {
 		t.Fatalf("create schema: %v", err)
 	}
 	t.Cleanup(func() { _ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
 		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
 	})

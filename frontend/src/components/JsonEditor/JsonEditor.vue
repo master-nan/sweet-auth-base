@@ -9,6 +9,7 @@
       class="full-width"
       :error="!!error"
       :error-message="error"
+      :disable="disabled"
       @blur="validateJson"
     />
     <div v-if="!error && jsonText" class="q-mt-xs text-caption text-green">有效的JSON格式</div>
@@ -22,11 +23,15 @@ import { ref, watch, onMounted } from 'vue'
 interface JsonEditorProps {
   modelValue?: string | object | null
   label?: string
+  rules?: Array<(value: any) => boolean | string>
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<JsonEditorProps>(), {
   modelValue: null,
   label: 'JSON数据',
+  rules: () => [],
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -80,6 +85,7 @@ const initJsonText = () => {
 
 // 验证JSON并更新
 const validateJson = () => {
+  if (props.disabled) return
   if (isInternalUpdate.value) return
 
   isInternalUpdate.value = true
@@ -112,6 +118,25 @@ const validateJson = () => {
     isInternalUpdate.value = false
   }, 100)
 }
+
+const validate = () => {
+  validateJson()
+  if (error.value) return false
+  for (const rule of props.rules) {
+    const result = rule(props.modelValue)
+    if (result !== true) {
+      error.value = typeof result === 'string' ? result : '字段值不合法'
+      return false
+    }
+  }
+  return true
+}
+
+const resetValidation = () => {
+  error.value = ''
+}
+
+defineExpose({ validate, resetValidation })
 
 // 监听外部值变化
 watch(

@@ -21,7 +21,7 @@ Browser
 - `docker-compose.yml`：本地完整环境，包含 PostgreSQL 16、Redis 6.2.7、backend 和 frontend。
 - `docker-compose.external.yml`：只启动 backend/frontend，连接已有 PostgreSQL 和 Redis。
 
-后端使用 Go 1.23.2；前端 `package.json` 要求 Node.js >= 22.22.0、Yarn >= 1.21.1。生产环境必须使用 PostgreSQL；SQLite 只用于允许的常规单元测试夹具。
+后端使用 Go 1.23.2；前端 Node.js 的唯一版本入口是仓库根 `.nvmrc` 的 `22.23.0`，`package.json` 将 engine 限定为 `>=22.23.0 <23`。生产环境必须使用 PostgreSQL；SQLite 只用于允许的常规单元测试夹具。
 
 ## 2. 配置来源与优先级
 
@@ -39,8 +39,8 @@ upload.oss.access_key_secret -> APP_UPLOAD_OSS_ACCESS_KEY_SECRET
 
 | 配置组 | 关键字段 | 作用 |
 | --- | --- | --- |
-| `dbs.primary` | host、port、name、user、password、prefix | PostgreSQL |
-| `redis` | host、port、db、password、pool_size、min_idle_conns、conn_max_idle_time | Cache、认证状态等 |
+| `dbs.primary` | host、port、name、user、password、prefix、TLS mode/CA/client cert/key | PostgreSQL |
+| `redis` | host、port、db、password、pool、TLS enabled/server name/CA/client cert/key | Cache、认证状态等 |
 | `session` | secret | Session 安全材料 |
 | `security` | Casbin coverage、CORS origins/credentials | HTTP 安全策略 |
 | `audit` | access_log_retention_days | AccessLog 保留策略 |
@@ -49,6 +49,7 @@ upload.oss.access_key_secret -> APP_UPLOAD_OSS_ACCESS_KEY_SECRET
 | `integration.sync_runner` | enabled、runner_id、poll、batch、shutdown | Sync Runner |
 | `aliyun.sms` | access key、sign、template、发送间隔 | 短信验证码 |
 | `conf` | salt、enable | 平台配置加密和现有通用开关 |
+| Bootstrap/startup | application secret、admin password、run migrations、run seeds | 首次数据和启动期写入边界 |
 
 生产模式会检查 Session/配置 Salt、数据库和 Redis、CORS、上传安全以及 OSS/SMS 配置完整性。不要关闭 `APP_REQUIRE_SECURE_CONFIG` 或 Casbin coverage 来绕过启动失败，应修正配置。
 
@@ -61,6 +62,8 @@ node scripts/preflight-external.mjs init .env.external .env.external.example
 chmod 600 .env.external
 node scripts/preflight-external.mjs .env.external
 ```
+
+`docker-compose.external.yml` 对所有安全关键变量采用必填插值，不提供数据库口令、Session/Salt、Bootstrap secret，也不默认关闭或开启 secure config、Migration、Seed。`.env.external.example` 明确选择 development，仅用于复制后填写；生产必须改为 `APP_ENV=production`，启用 `APP_REQUIRE_SECURE_CONFIG`，设置 PostgreSQL/Redis TLS 和独立强秘密。development 预检需要显式设置 `SWEET_ADMIN_PREFLIGHT_ALLOW_NON_PRODUCTION=true`。
 
 生产写操作还会检查 `SWEET_ADMIN_EXTERNAL_TARGET_PURPOSE` 和显式确认。不要把 `.env.external` 放入仓库，也不要在工单、聊天或日志中粘贴完整文件。
 
@@ -128,7 +131,7 @@ make docker-logs
 make docker-down
 ```
 
-完整 Compose 的 backend entrypoint 默认执行 Migration 和 Seed；外部 Compose 默认将二者关闭。
+完整 Compose 的 backend entrypoint 按本地配置执行 Migration 和 Seed；外部 Compose 要求环境文件显式声明 `APP_RUN_MIGRATIONS` 与 `APP_RUN_SEEDS`。标准 external Make 入口要求两者均为 `false`，写库只通过单独的受控命令执行。
 
 ## 4. 连接外部 PostgreSQL/Redis
 
@@ -141,8 +144,7 @@ make docker-down
 7. 检查 readiness，再执行只读 smoke。
 
 ```bash
-SWEET_ADMIN_PREFLIGHT_REQUIRE_MIGRATIONS_DISABLED=true \
-node scripts/preflight-external.mjs .env.external
+make external-preflight EXTERNAL_ENV_FILE=.env.external
 node scripts/db-backup-external.mjs plan .env.external backups
 node scripts/db-backup-external.mjs backup .env.external backups
 make db-migrate-external EXTERNAL_ENV_FILE=.env.external
@@ -154,7 +156,7 @@ make docker-up-external EXTERNAL_ENV_FILE=.env.external
 SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 ```
 
-`.env.external` 中 `APP_RUN_MIGRATIONS` / `APP_RUN_SEEDS` 默认应为 false，避免应用每次启动隐式修改目标库。Migration 和 Seed 由发布步骤显式执行。
+`.env.external` 中 `APP_RUN_MIGRATIONS` / `APP_RUN_SEEDS` 必须显式设为 `false`，避免应用每次启动隐式修改目标库。所有 external Make 入口先执行同一 preflight；生产还要求 PostgreSQL TLS mode 不是 `disable`、Redis TLS 为 true 且有 server name，并校验 TLS client cert/key 成对配置和 `APP_BOOTSTRAP_APPLICATION_SECRET`。
 
 ## 5. 健康检查与启动关闭
 
@@ -164,7 +166,7 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - `/readyz` 会检查 PostgreSQL 和 Redis，依赖异常时返回 503。
 - 前端容器健康检查访问 `/`。
 
-收到 `SIGINT` 或 `SIGTERM` 后，应用先停止 Sync Runner，再停止 Worker，并在 5 秒窗口内关闭 HTTP Server。发布平台应先摘除流量、等待 readiness 退出，再终止容器。
+收到 `SIGINT` 或 `SIGTERM` 后，应用在统一 45 秒预算内先关闭 HTTP listener，随后取消 Cron、Sync Runner、Worker 和 Chunk cleanup，等待受控 in-flight 请求/任务结束，再依次关闭 Redis、SQL 连接池和异步日志。容器 entrypoint 使用 `exec` 让 Go 进程成为 PID 1；Compose 的 `stop_grace_period` 不得短于应用预算。发布平台仍应先摘除流量、等待 readiness 退出，再终止容器。
 
 若 `/healthz` 正常但 `/readyz` 失败，优先检查 readiness 返回的 component、数据库连通性、Redis 和配置，而不是反复重启。
 
@@ -172,7 +174,14 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 
 ### 6.1 版本与迁移
 
-生产基线为 PostgreSQL 16。正式 Migration 由 `backend/migrate/registry.go` 的顺序 Registry 驱动，每一步必须幂等；当前没有 Flyway/Liquibase 式独立版本账本。
+生产基线为 PostgreSQL 16。正式 Migration 由 `backend/migrate/registry.go` 的顺序 Registry 驱动，每一步必须幂等；`schema_migration` 记录 version、key、checksum、applied_at，严格 db-preflight 会拒绝缺失、未知、checksum 漂移或未完整应用的 ledger。
+
+- Fresh DB：直接运行 `migrate`，每一步成功后在同一事务写入 ledger；失败步骤不登记。
+- 已有且已达到当前 Canonical Schema、但尚无 ledger 的数据库：先备份并验证，再由运维人员显式运行 `migrate adopt`。Adopt 会在 advisory lock 下重跑全部幂等步骤并逐步登记，不会只因表存在就盲目标记完成。
+- 部分升级数据库：同样只能在备份和变更窗口内运行 `migrate adopt`，由实际迁移步骤补齐；若任何步骤失败，停止并修复数据库状态，不手写 ledger。
+- 已有 ledger：普通 `migrate` 只执行尚未登记的后续步骤；版本/key/checksum 不匹配或出现未知版本时 fail closed。
+
+正式 Migration 与 Seed 共享数据库 advisory lock，避免多个实例并发修改 Schema/基础事实。`dbs.primary.prefix` 当前不属于生产 Migration/Preflight 契约，生产 secure config 会拒绝非空值。
 
 ```bash
 make db-migrate
@@ -194,7 +203,7 @@ docker compose --env-file .env.external -f docker-compose.external.yml \
   backend /app/db-preflight
 ```
 
-该命令检查 PostgreSQL、Redis、核心表、Seed 基线、Casbin、AccessLog 索引、File 回填和 Metadata 完整性。
+该命令检查 PostgreSQL、Redis、migration ledger、核心表、Seed 基线、Casbin、AccessLog 索引、File 回填和 Metadata 完整性。
 
 Seed 负责初始菜单、按钮、角色关系、字典、Metadata、Organization、Integration 和 Data Permission 的基础事实。Seed 可重跑，但仍应纳入变更窗口和备份流程。
 
@@ -206,7 +215,7 @@ node scripts/db-backup-external.mjs backup .env.external backups
 node scripts/db-backup-external.mjs verify backups/<backup.sql>
 ```
 
-脚本使用 PostgreSQL 16 client 容器，生成 SQL 和 SHA-256 manifest。备份文件和恢复证据包含环境信息，应保存到受控位置，不提交 Git。
+脚本使用 PostgreSQL 16 client 容器并遵循 `APP_DBS_PRIMARY_TLS_*`，生成 SQL 和 schema v2 SHA-256 manifest。manifest 同时记录实际数据库身份和 `schema_migration` 的条目数、首末版本及规范化摘要；备份文件和恢复证据包含环境信息，应保存到受控位置，不提交 Git。
 
 恢复是破坏性操作，只能在已验证目标、变更审批和停写窗口内执行：
 
@@ -217,7 +226,7 @@ BACKUP_FILE='backups/<backup.sql>' \
 node scripts/db-backup-external.mjs restore .env.external
 ```
 
-生产目标还需要脚本要求的生产写确认。恢复后必须运行 db-preflight、readiness 和只读 smoke，并保存恢复 evidence。
+生产目标还需要脚本要求的生产写确认。恢复使用 `psql --single-transaction`；SQL 成功后脚本强制核对 migration ledger、运行 `APP_DB_PREFLIGHT_REQUIRE_MIGRATED=true` 的 db-preflight，并确认 `/readyz` 全组件健康，全部通过后才写恢复 evidence。只读 smoke 仍作为恢复后的独立应用验收执行。
 
 ### 6.3 回滚策略
 
@@ -228,7 +237,7 @@ node scripts/db-backup-external.mjs restore .env.external
 3. 只有确认需要数据级恢复时，才从已验证备份恢复。
 4. 不手工删除未知约束或回写生产表来“让旧版本先跑”。
 
-当前数据库 DSN 在初始化和迁移路径中固定 `sslmode=disable`。需要 TLS 的托管 PostgreSQL 在代码支持前不能按本手册直接视为已满足生产安全要求，应列为部署阻塞项。
+PostgreSQL TLS 支持 `disable`、`require`、`verify-ca`、`verify-full`；生产 external preflight 拒绝 `disable`。自定义 CA 或 mTLS 文件路径必须在 backend 容器和 PostgreSQL client 容器中可读，client cert/key 必须成对提供。
 
 ## 7. Redis 运维
 
@@ -242,11 +251,13 @@ Redis 当前用于：
 
 Redis 不是业务数据库真值，但它是当前应用必需依赖。Redis 异常会使 `/readyz` 失败，并让认证、Refresh/Logout、短信以及缓存相关路径 fail closed。
 
-排错顺序：连接地址和 DB 编号、密码、网络、连接池耗尽、Redis 内存/淘汰策略、应用日志。不要直接删除登录锁、Token blacklist 或未知 key 作为恢复手段；先确定 key 所属能力和安全影响。
+生产 Redis 必须启用 TLS 并配置用于证书验证的 server name；可选自定义 CA 和 client cert/key，client cert/key 必须成对提供。排错顺序：连接地址和 DB 编号、密码、TLS/server name/证书、网络、连接池耗尽、Redis 内存/淘汰策略、应用日志。不要直接删除登录锁、Token blacklist 或未知 key 作为恢复手段；先确定 key 所属能力和安全影响。
 
 ## 8. File 存储
 
 `upload.driver` 当前支持 `local` 和阿里云 OSS。两种模式都必须配置允许扩展名、MIME、单文件大小、Chunk 大小和访问 URL；生产保持 `public_preview=false`。
+
+未完成分片只存在于受控 `upload.dir/chunks/<upload_id>` 暂存目录。应用启动时立即清理一次，并按 `chunk_cleanup_minutes` 周期删除最近活动时间超过 `chunk_ttl_hours` 的会话；合并成功会立即清理。当前没有正式客户端 cancel API，用户放弃、断连或进程崩溃由 TTL 兜底。清理器跳过 symlink，且不会扫描或删除持久文件目录。
 
 ### 8.1 Local
 
@@ -400,10 +411,11 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 | 前端静态检查 | `cd frontend && yarn lint && yarn typecheck` |
 | 前端构建 | `cd frontend && yarn build` |
 | 文档 | `make docs-check` |
+| Git tracked secret/static scan | `make secret-scan` |
 | 基础聚合 | `make verify` |
 | 完整发布门禁 | `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check` |
 
-`make verify` 是快速验证，不包含前端 Vitest、Race 和强制 PostgreSQL 测试。`make release-check` 才是完整发布门禁，并会在缺少 `SWEET_TEST_POSTGRES_DSN` 或其不是 `postgres://` / `postgresql://` URL 时直接失败。
+`make verify` 是快速验证，不包含前端 Vitest、Race 和强制 PostgreSQL 测试。`make release-check` 是 CI 与本地发布的共同真值，包含 tracked secret/static scan、docs、Node scripts、强制 PostgreSQL、Race、前端 Vitest 和前端构建；缺少 PostgreSQL DSN 或 DSN scheme 不正确时直接失败。GitHub Actions 只保留 `.github/workflows/release.yml`：它读取根 `.nvmrc`，提供带 healthcheck 的 PostgreSQL 16 与 Redis service，设置 `SWEET_REQUIRE_POSTGRES_TESTS=true` 后直接调用该 Make 目标。
 
 ## 16. 发布 Checklist
 
@@ -414,6 +426,7 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - [ ] PostgreSQL 16 强制测试实际执行，未跳过。
 - [ ] 前端 test、lint、typecheck、build 全部通过。
 - [ ] `make docs-check` 通过。
+- [ ] `make secret-scan` 通过，DSN、token、私钥和 production secret fallback 未进入 tracked 文件。
 - [ ] Migration/Seed 在等价环境验证幂等。
 - [ ] `.env.external` 通过预检，权限为 600，秘密未进入 Git/日志。
 - [ ] 数据库备份、manifest 和恢复演练证据可用。
@@ -440,13 +453,10 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 
 这些是当前真实限制，不应靠运行手册绕过：
 
-- PostgreSQL DSN 固定 `sslmode=disable`，尚不能满足要求数据库 TLS 的生产环境。
-- Migration 没有独立版本账本，依赖有序幂等 Registry。
 - File Chunk 使用节点本地暂存，多实例需要会话粘性，尚无共享暂存。
 - 文件物理清理失败没有独立后台重试 Worker，需要受控重试和监控。
 - 只有 Worker 状态 API/页面能力，没有同等 Sync Runner 状态页面。
 - `make verify` 仍定位为日常快速检查；发布必须使用要求真实 PostgreSQL DSN 的 `make release-check`。
-- Graceful shutdown 会停止 Runner、Worker 和 HTTP Server，但 `main.go` 当前没有显式关闭 SQL/Redis Client 的生命周期步骤。
 - 当前没有平台级 Prometheus/OpenTelemetry 指标端点；运行观测主要依赖 health/readiness、结构化日志和业务审计。
 
 以上分别进入 Operations/Observability 或 RC-001 后续治理，不影响本文作为当前运维真值，但可能成为特定生产环境的上线 Gate。

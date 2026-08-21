@@ -69,6 +69,22 @@ func TestParseBoolEnv(t *testing.T) {
 	}
 }
 
+func TestSecurePreflightMode(t *testing.T) {
+	t.Setenv("APP_REQUIRE_SECURE_CONFIG", "")
+	for _, environment := range []string{"pro", "prod", "production"} {
+		if !securePreflightMode(environment) {
+			t.Fatalf("expected %q to enable secure preflight", environment)
+		}
+	}
+	if securePreflightMode("dev") {
+		t.Fatal("expected dev without secure override to remain non-secure")
+	}
+	t.Setenv("APP_REQUIRE_SECURE_CONFIG", "true")
+	if !securePreflightMode("dev") {
+		t.Fatal("expected secure override to enable secure preflight")
+	}
+}
+
 func TestMetadataFieldTypeCompatible(t *testing.T) {
 	tests := []struct {
 		name       string

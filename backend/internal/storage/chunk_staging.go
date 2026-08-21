@@ -8,12 +8,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // LocalChunkStaging owns temporary chunk paths. It is staging for the existing
 // upload protocol, not a second durable Storage implementation.
 type LocalChunkStaging struct {
 	baseDir string
+	mu      sync.RWMutex
 }
 
 type MergedChunk struct {
@@ -27,6 +30,8 @@ func NewLocalChunkStaging(baseDir string) *LocalChunkStaging {
 }
 
 func (s *LocalChunkStaging) Write(uploadID string, index int, reader io.Reader) (string, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if index < 0 {
 		return "", "", fmt.Errorf("invalid chunk index")
 	}
@@ -56,6 +61,8 @@ func (s *LocalChunkStaging) Write(uploadID string, index int, reader io.Reader) 
 }
 
 func (s *LocalChunkStaging) Merge(uploadID, suffix string, chunkPaths []string) (MergedChunk, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	relative := filepath.Join("chunks", uploadID, "merged-"+suffix)
 	fullPath, err := s.safeFullPath(relative)
 	if err != nil {
@@ -72,7 +79,7 @@ func (s *LocalChunkStaging) Merge(uploadID, suffix string, chunkPaths []string) 
 	writer := io.MultiWriter(destination, hash)
 	var size int64
 	for _, chunkPath := range chunkPaths {
-		chunk, openErr := s.Open(chunkPath)
+		chunk, openErr := s.open(chunkPath)
 		if openErr != nil {
 			_ = destination.Close()
 			_ = os.Remove(fullPath)
@@ -95,6 +102,12 @@ func (s *LocalChunkStaging) Merge(uploadID, suffix string, chunkPaths []string) 
 }
 
 func (s *LocalChunkStaging) Open(relative string) (*os.File, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.open(relative)
+}
+
+func (s *LocalChunkStaging) open(relative string) (*os.File, error) {
 	fullPath, err := s.safeFullPath(relative)
 	if err != nil {
 		return nil, err
@@ -103,6 +116,8 @@ func (s *LocalChunkStaging) Open(relative string) (*os.File, error) {
 }
 
 func (s *LocalChunkStaging) Remove(relative string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	fullPath, err := s.safeFullPath(relative)
 	if err != nil {
 		return err
@@ -114,11 +129,81 @@ func (s *LocalChunkStaging) Remove(relative string) error {
 }
 
 func (s *LocalChunkStaging) Cleanup(uploadID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	fullPath, err := s.safeFullPath(filepath.Join("chunks", uploadID))
 	if err != nil {
 		return err
 	}
 	return os.RemoveAll(fullPath)
+}
+
+// CleanupExpired removes only inactive upload-session directories under the
+// controlled chunks staging root. Persistent uploaded files outside that root
+// are never considered.
+func (s *LocalChunkStaging) CleanupExpired(now time.Time, ttl time.Duration) (int, error) {
+	if ttl <= 0 {
+		return 0, fmt.Errorf("chunk staging TTL must be positive")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	root, err := s.safeFullPath("chunks")
+	if err != nil {
+		return 0, err
+	}
+	entries, err := os.ReadDir(root)
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	cutoff := now.Add(-ttl)
+	removed := 0
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		directory, pathErr := s.safeFullPath(filepath.Join("chunks", entry.Name()))
+		if pathErr != nil {
+			return removed, pathErr
+		}
+		latest, activityErr := latestStagingActivity(directory)
+		if activityErr != nil {
+			return removed, activityErr
+		}
+		if !latest.Before(cutoff) {
+			continue
+		}
+		if err := os.RemoveAll(directory); err != nil {
+			return removed, err
+		}
+		removed++
+	}
+	return removed, nil
+}
+
+func latestStagingActivity(root string) (time.Time, error) {
+	latest := time.Time{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path != root && entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.ModTime().After(latest) {
+			latest = info.ModTime()
+		}
+		return nil
+	})
+	return latest, err
 }
 
 func (s *LocalChunkStaging) safeFullPath(relative string) (string, error) {

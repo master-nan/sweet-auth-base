@@ -6,16 +6,19 @@
 package main
 
 import (
+	"backend/config"
 	"backend/initialize"
 	"context"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // @title Sweet Admin
@@ -23,57 +26,202 @@ import (
 // @description 基于 Gin、Gorm 和 Quasar 的低代码管理底座
 // @BasePath  /sweet_admin
 
+const runtimeShutdownTimeout = 45 * time.Second
+
+type backgroundRunner interface {
+	Start(context.Context) error
+	Stop(context.Context) error
+}
+
+type expiredChunkCleaner interface {
+	CleanupExpiredChunks(time.Time, time.Duration) (int, error)
+}
+
+type runtimeDependencies struct {
+	worker         backgroundRunner
+	syncRunner     backgroundRunner
+	chunkCleaner   expiredChunkCleaner
+	uploadConfig   config.Upload
+	stopCron       func(context.Context) error
+	closeResources func() error
+	closeLogger    func()
+}
+
 func main() {
+	if err := run(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "sweet_admin stopped: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	app, err := initialize.InitializeApp()
 	if err != nil {
-		zap.L().Fatal("failed to initialize application", zap.Error(err))
+		return fmt.Errorf("initialize application: %w", err)
 	}
-	if err := app.IntegrationWorker.Start(context.Background()); err != nil {
-		zap.L().Fatal("failed to start integration worker", zap.Error(err))
-	}
-	if err := app.IntegrationSyncRunner.Start(context.Background()); err != nil {
-		_ = app.IntegrationWorker.Stop(context.Background())
-		zap.L().Fatal("failed to start integration sync runner", zap.Error(err))
-	}
+
 	initialize.InitCron(app)
 	router := initialize.InitRouter(app)
-	port := app.Config.Port
-	// 使用一个独立的 goroutine 启动服务器
 	server := &http.Server{
-		Addr:           fmt.Sprintf(":%d", port),
+		Addr:           fmt.Sprintf(":%d", app.Config.Port),
 		Handler:        router,
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 10 * 1024 * 1024,
 	}
-	zap.L().Info("Starting server on port", zap.Int("port", port))
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		_ = initialize.StopCron(context.Background())
+		_ = initialize.CloseRuntimeResources(app)
+		initialize.CloseLogger()
+		return fmt.Errorf("listen on %s: %w", server.Addr, err)
+	}
+
+	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
+	return runRuntime(rootCtx, listener, server, runtimeDependencies{
+		worker:         app.IntegrationWorker,
+		syncRunner:     app.IntegrationSyncRunner,
+		chunkCleaner:   app.FileUploadService,
+		uploadConfig:   app.Config.Upload,
+		stopCron:       initialize.StopCron,
+		closeResources: func() error { return initialize.CloseRuntimeResources(app) },
+		closeLogger:    initialize.CloseLogger,
+	})
+}
+
+func runRuntime(parent context.Context, listener net.Listener, server *http.Server, dependencies runtimeDependencies) error {
+	runtimeCtx, cancelRuntime := context.WithCancel(parent)
+	defer cancelRuntime()
+
+	if err := dependencies.worker.Start(runtimeCtx); err != nil {
+		closeRuntime(dependencies)
+		return fmt.Errorf("start integration worker: %w", err)
+	}
+	zap.L().Info("integration worker start completed")
+	if err := dependencies.syncRunner.Start(runtimeCtx); err != nil {
+		_ = dependencies.worker.Stop(context.Background())
+		closeRuntime(dependencies)
+		return fmt.Errorf("start integration sync runner: %w", err)
+	}
+	zap.L().Info("integration sync runner start completed")
+	chunkDone := maintainExpiredChunks(runtimeCtx, dependencies.chunkCleaner, dependencies.uploadConfig)
+
+	zap.L().Info("HTTP server started", zap.String("address", listener.Addr().String()))
+	serveError := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			zap.L().Fatal("listen: ", zap.Error(err))
+		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		serveError <- err
+	}()
+
+	var runtimeError error
+	select {
+	case <-parent.Done():
+		zap.L().Info("shutdown signal received")
+	case err := <-serveError:
+		if err != nil {
+			runtimeError = fmt.Errorf("serve HTTP: %w", err)
+		}
+	}
+
+	var shutdownErrors []error
+	if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("stop accepting HTTP requests: %w", err))
+	}
+	cancelRuntime()
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), runtimeShutdownTimeout)
+	defer cancelShutdown()
+	httpShutdown := make(chan error, 1)
+	go func() {
+		httpShutdown <- server.Shutdown(shutdownCtx)
+	}()
+
+	if dependencies.stopCron != nil {
+		if err := dependencies.stopCron(shutdownCtx); err != nil {
+			shutdownErrors = append(shutdownErrors, err)
+		}
+	}
+	if err := dependencies.syncRunner.Stop(shutdownCtx); err != nil {
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("stop integration sync runner: %w", err))
+	} else {
+		zap.L().Info("integration sync runner stopped")
+	}
+	if err := dependencies.worker.Stop(shutdownCtx); err != nil {
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("stop integration worker: %w", err))
+	} else {
+		zap.L().Info("integration worker stopped")
+	}
+	if err := <-httpShutdown; err != nil {
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("shutdown HTTP server: %w", err))
+	}
+	select {
+	case <-chunkDone:
+	case <-shutdownCtx.Done():
+		shutdownErrors = append(shutdownErrors, fmt.Errorf("stop chunk cleanup: %w", shutdownCtx.Err()))
+	}
+	if dependencies.closeResources != nil {
+		if err := dependencies.closeResources(); err != nil {
+			shutdownErrors = append(shutdownErrors, err)
+		}
+	}
+	zap.L().Info("runtime shutdown completed")
+	if dependencies.closeLogger != nil {
+		dependencies.closeLogger()
+	}
+	return errors.Join(runtimeError, errors.Join(shutdownErrors...))
+}
+
+func maintainExpiredChunks(ctx context.Context, cleaner expiredChunkCleaner, upload config.Upload) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if cleaner == nil {
+			return
+		}
+		ttl := time.Duration(upload.ChunkTTLHours) * time.Hour
+		interval := time.Duration(upload.ChunkCleanupMinutes) * time.Minute
+		if ttl <= 0 {
+			ttl = 24 * time.Hour
+		}
+		if interval <= 0 {
+			interval = time.Hour
+		}
+		cleanup := func() {
+			removed, err := cleaner.CleanupExpiredChunks(time.Now(), ttl)
+			if err != nil {
+				zap.L().Warn("chunk staging cleanup failed", zap.Error(err))
+				return
+			}
+			zap.L().Info("chunk staging cleanup completed", zap.Int("removed_sessions", removed))
+		}
+		cleanup()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cleanup()
+			}
 		}
 	}()
-	// 创建一个通道，用于接收退出信号
-	quit := make(chan os.Signal, 1)
-	// 接收 SIGINT 和 SIGTERM 信号
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit // 阻塞，直到接收到信号
-	zap.L().Info("Shutting down server...")
-	if err := app.IntegrationSyncRunner.Stop(context.Background()); err != nil {
-		zap.L().Warn("integration sync runner did not stop cleanly", zap.Error(err))
-	}
-	if err := app.IntegrationWorker.Stop(context.Background()); err != nil {
-		zap.L().Warn("integration worker did not stop cleanly", zap.Error(err))
-	}
-	// 创建一个5秒的超时上下文
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	// 优雅关闭服务器
-	if err := server.Shutdown(ctx); err != nil {
-		zap.L().Fatal("Server forced to shutdown:", zap.Error(err))
-	}
-	zap.L().Info("Server exiting")
-	// 关闭日志
-	initialize.CloseLogger()
+	return done
+}
 
+func closeRuntime(dependencies runtimeDependencies) {
+	if dependencies.stopCron != nil {
+		_ = dependencies.stopCron(context.Background())
+	}
+	if dependencies.closeResources != nil {
+		_ = dependencies.closeResources()
+	}
+	if dependencies.closeLogger != nil {
+		dependencies.closeLogger()
+	}
 }

@@ -95,6 +95,7 @@ middleware -> HTTP-facing service ports and context helpers
 | `docs/` | 受治理的长期文档与建设期证据 | user-guide、engineering、operations、`_construction` | 原始敏感响应、Task 临时输出 |
 | `scripts/` | 部署前检查、只读 smoke、备份和文档检查 | 可独立运行的仓库工具 | 服务端运行时业务流程 |
 | `Makefile` | 常用验证、构建、迁移和 Docker 命令入口 | 对已有脚本和工具的薄编排 | 业务规则 |
+| `.nvmrc` | Node.js 唯一版本真值，当前为 22.23.0 | CI、本地前端工具链 | 第二份 Node 版本文件 |
 | `docker-compose*.yml` | 本地完整环境和外部数据库/Redis连接环境 | PostgreSQL 16、Redis、后端、前端 | 生产秘密 |
 | `design/` | 早期设计遗留区 | 只作历史参考 | 新的正式文档；待 RC-001/DOC-FINAL 评审 |
 | `work/` | 本地临时输出 | 日志、截图、探索材料 | 应提交的源码或正式文档 |
@@ -538,7 +539,9 @@ File -> repository + storage + signer/access policy
 - 在线业务流程、Scheduler、外部接口调用不能进入 Migration；
 - 新 Model 不能只加 `AutoMigrate`，还要评估约束、索引、数据回填和 Seed 权限。
 
-配置结构位于 [config/config.go](../../backend/config/config.go)，`initialize.LoadConfig` 读取 YAML 与受控环境变量并执行生产安全校验。秘密不得提交到配置示例或文档。
+Migration registry 的已应用事实写入 `schema_migration(version, key, checksum, applied_at)`。checksum 绑定已发布步骤内容，严格 db-preflight 负责检查 ledger 是否缺失、不完整、含未知版本或发生 checksum 漂移；不得手改 ledger 来绕过迁移失败。外部部署必须显式关闭启动期 Migration/Seed，再通过受控 Make 目标分别执行。
+
+配置结构位于 [config/config.go](../../backend/config/config.go)，`initialize.LoadConfig` 读取 YAML 与受控环境变量并执行生产安全校验。PostgreSQL 与 Redis 的 TLS 配置分别覆盖 mode/CA/client cert/key 和 enabled/server name/CA/client cert/key。秘密不得提交到配置示例或文档，external compose 也不得提供 production secret fallback。
 
 ## 21. Initialize、Wire 与启动
 
@@ -615,9 +618,9 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 
 前端使用 Vitest + Vue Test Utils。组件和页面测试应验证点击、emit、权限、请求、状态、表单或布局行为；不为某轮整改长期保存 class、import、组件名或源码字符串断言。只允许少量真正稳定的跨端 Contract Guard 和 Architecture Guard，且一个契约只保留一处真值测试。
 
-运维 Node 脚本使用 `node:test`，通过 `make scripts-test` 执行。提交前按改动范围执行 `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build`；文档修改运行 `make docs-check`。浏览器验收用于主题、真实权限、Console、布局和跨页面流程，不由 source-string 页面测试替代。
+运维 Node 脚本使用 `node:test`，通过 `make scripts-test` 执行；tracked 凭据扫描通过 `make secret-scan` 执行，只输出规则和位置，不回显命中值。提交前按改动范围执行 `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build`；文档修改运行 `make docs-check`。浏览器验收用于主题、真实权限、Console、布局和跨页面流程，不由 source-string 页面测试替代。
 
-当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试。它不能单独代表完整发布回归。完整发布门禁使用带 PostgreSQL 16 DSN 的 `make release-check`，包含 docs、scripts、强制 PostgreSQL、Race、Frontend Vitest、lint、typecheck 和 build。
+当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试。它不能单独代表完整发布回归。`make release-check` 是唯一发布门禁，包含 secret scan、docs、scripts、强制 PostgreSQL、Race、Frontend Vitest、lint、typecheck 和 build；`.github/workflows/release.yml` 提供 PostgreSQL 16/Redis health service 并直接调用该目标，本地与 CI 不复制步骤。Node 版本只从根 `.nvmrc` 读取，`package.json` 仅允许 Node 22 major。
 
 ## 25. 关键文件职责与修改风险
 
@@ -679,7 +682,6 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 - `ReportService` 仍公开使用 `*gin.Context`，直到 Report Platform 重设计；新 Service 不得复制。
 - `internal/utils/tools.go` 仍包含供 Controller 使用的 Gin 参数/Session helper；它们是 HTTP 兼容工具，不代表 Domain 可以依赖 Gin。
 - SysTable 配置服务仍同时承担较多 metadata/DDL 用例；跨模块读取已经收口到 `MetadataRuntimeService`，新消费者不得直接依赖其 Repository。
-- 当前 Migration 没有独立版本台账，依赖注册顺序和每个步骤的幂等性；迁移框架演进应作为独立基础设施任务处理。
 - Report 目录存在 V1、V2 和 prototype 形态；其产品化边界按 Report 专项推进，不在一般页面中复用原型代码。
 - 前端动态列、i18n、页面 CSS 和组件复用尚未全平台一致，留给 Frontend Consistency。
 - File 分片暂存是单节点本地能力，多实例共享暂存尚未实现。

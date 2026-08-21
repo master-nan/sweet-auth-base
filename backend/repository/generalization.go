@@ -38,6 +38,7 @@ type GeneralizationRepository interface {
 type GeneralizationPermissionRepository interface {
 	DBWithContext(context.Context) *gorm.DB
 	QueryWithPermission(context.Context, *request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)
+	QueryWithPermissionDB(*gorm.DB, *request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)
 	GetByIdWithPermission(context.Context, model.SysTable, int, GeneralizationPermission) (map[string]interface{}, error)
 	UpdateWithPermission(context.Context, model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)
 	SoftDeleteWithPermission(context.Context, model.SysTable, int, map[string]interface{}, GeneralizationPermission) (bool, error)

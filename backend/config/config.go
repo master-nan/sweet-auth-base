@@ -26,23 +26,40 @@ type DBS struct {
 }
 
 type DB struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Name     string `mapstructure:"name"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	Prefix   string `mapstructure:"prefix"`
+	Host     string      `mapstructure:"host"`
+	Port     int         `mapstructure:"port"`
+	Name     string      `mapstructure:"name"`
+	User     string      `mapstructure:"user"`
+	Password string      `mapstructure:"password"`
+	Prefix   string      `mapstructure:"prefix"`
+	TLS      PostgresTLS `mapstructure:"tls"`
+}
+
+type PostgresTLS struct {
+	Mode       string `mapstructure:"mode"`
+	RootCAFile string `mapstructure:"root_ca_file"`
+	CertFile   string `mapstructure:"cert_file"`
+	KeyFile    string `mapstructure:"key_file"`
 }
 
 type Redis struct {
-	Host            string `mapstructure:"host"`
-	Port            int    `mapstructure:"port"`
-	DB              int    `mapstructure:"db"`
-	Password        string `mapstructure:"password"`
-	PoolSize        int    `mapstructure:"pool_size"`
-	MinIdleConns    int    `mapstructure:"min_idle_conns"`
-	MaxIdleConns    int    `mapstructure:"max_idle_conns"`
-	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"`
+	Host            string   `mapstructure:"host"`
+	Port            int      `mapstructure:"port"`
+	DB              int      `mapstructure:"db"`
+	Password        string   `mapstructure:"password"`
+	PoolSize        int      `mapstructure:"pool_size"`
+	MinIdleConns    int      `mapstructure:"min_idle_conns"`
+	MaxIdleConns    int      `mapstructure:"max_idle_conns"`
+	ConnMaxIdleTime int      `mapstructure:"conn_max_idle_time"`
+	TLS             RedisTLS `mapstructure:"tls"`
+}
+
+type RedisTLS struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	ServerName string `mapstructure:"server_name"`
+	CAFile     string `mapstructure:"ca_file"`
+	CertFile   string `mapstructure:"cert_file"`
+	KeyFile    string `mapstructure:"key_file"`
 }
 
 type Session struct {
@@ -108,6 +125,8 @@ type Upload struct {
 	PublicPreview       bool      `mapstructure:"public_preview"`            // 是否允许通过 /files/:uuid 公开预览
 	AccessTTLMinutes    int64     `mapstructure:"access_ttl_minutes"`        // 文件签名访问默认有效期（分钟）
 	MaxAccessTTLMinutes int64     `mapstructure:"max_access_ttl_minutes"`    // 文件签名访问最大有效期（分钟）
+	ChunkTTLHours       int       `mapstructure:"chunk_ttl_hours"`           // 未完成分片暂存保留时间（小时）
+	ChunkCleanupMinutes int       `mapstructure:"chunk_cleanup_minutes"`     // 分片暂存清理周期（分钟）
 	OSS                 OSSConfig `mapstructure:"oss"`                       // 阿里云 OSS 配置
 }
 

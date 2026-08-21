@@ -13,7 +13,7 @@
           <q-chip
             v-for="(item, index) in filteredItems"
             :key="`chip-${index}`"
-            removable
+            :removable="!disabled"
             @remove="removeItem(index)"
             color="primary"
             text-color="white"
@@ -36,6 +36,7 @@
               outlined
               dense
               :placeholder="`请输入${label}项`"
+              :disable="disabled"
               @keyup.enter="addItemFromInput"
               @blur="handleInputBlur"
             >
@@ -47,7 +48,7 @@
                   color="primary"
                   icon="add"
                   @click="addItemFromInput"
-                  :disable="loading || !newItem.trim()"
+                  :disable="disabled || loading || !newItem.trim()"
                 />
               </template>
             </q-input>
@@ -55,6 +56,7 @@
         </div>
       </q-card-section>
     </q-card>
+    <div v-if="errorMessage" class="text-negative text-caption q-mt-xs">{{ errorMessage }}</div>
   </div>
 </template>
 
@@ -65,11 +67,15 @@ import { ref, watch, onMounted, computed } from 'vue'
 interface ArrayInputProps {
   modelValue?: string[] | string | null
   label?: string
+  rules?: Array<(value: any) => boolean | string>
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<ArrayInputProps>(), {
   modelValue: () => [],
   label: '数组数据',
+  rules: () => [],
+  disabled: false,
 })
 
 const emit = defineEmits<{
@@ -82,6 +88,7 @@ const internalItems = ref<string[]>([])
 const newItem = ref('')
 // 用于防止高频操作
 const loading = ref(false)
+const errorMessage = ref('')
 // 防止循环更新
 const isInternalUpdate = ref(false)
 
@@ -137,7 +144,7 @@ const emitUpdate = (force = false) => {
 
 // 从输入框添加项目
 const addItemFromInput = () => {
-  if (loading.value || !newItem.value.trim()) return
+  if (props.disabled || loading.value || !newItem.value.trim()) return
 
   loading.value = true
   isInternalUpdate.value = true
@@ -162,7 +169,7 @@ const addItemFromInput = () => {
 
 // 删除项目
 const removeItem = (index: number) => {
-  if (loading.value) return
+  if (props.disabled || loading.value) return
 
   loading.value = true
   isInternalUpdate.value = true
@@ -221,6 +228,24 @@ watch(
 onMounted(() => {
   initInternalItems()
 })
+
+const validate = () => {
+  errorMessage.value = ''
+  for (const rule of props.rules) {
+    const result = rule(filteredItems.value)
+    if (result !== true) {
+      errorMessage.value = typeof result === 'string' ? result : '字段值不合法'
+      return false
+    }
+  }
+  return true
+}
+
+const resetValidation = () => {
+  errorMessage.value = ''
+}
+
+defineExpose({ validate, resetValidation })
 </script>
 
 <style scoped>

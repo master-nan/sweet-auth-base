@@ -6,6 +6,8 @@
 package initialize
 
 import (
+	"context"
+	"fmt"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )
@@ -21,6 +23,21 @@ func InitCron(app *App) {
 		zap.L().Warn("通用底座暂未配置业务定时任务")
 	} else {
 		zap.L().Warn("定时任务未开启")
+	}
+}
+
+// StopCron stops scheduling new jobs and waits for active jobs within the
+// caller's shutdown budget.
+func StopCron(ctx context.Context) error {
+	if c == nil {
+		return nil
+	}
+	done := c.Stop()
+	select {
+	case <-done.Done():
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stop cron: %w", ctx.Err())
 	}
 }
 

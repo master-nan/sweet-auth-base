@@ -106,7 +106,7 @@ func TestIntegrationRuntimeSchemaClosesLegacyPendingExecutionWithoutSnapshot(t *
 
 func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
-	adminDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	adminDB, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL test database: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestIntegrationRuntimeSchemaPostgreSQLConstraints(t *testing.T) {
 		_ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error
 	})
 
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
 		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 		Logger:                                   logger.Default.LogMode(logger.Silent),

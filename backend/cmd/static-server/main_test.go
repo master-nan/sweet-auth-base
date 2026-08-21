@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestShouldProxyToBackend(t *testing.T) {
@@ -30,6 +33,35 @@ func TestShouldProxyToBackend(t *testing.T) {
 		if shouldProxyToBackend(path) {
 			t.Fatalf("expected %s to be served by SPA", path)
 		}
+	}
+}
+
+func TestServeStaticStopsOnContextCancellation(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- serveStatic(ctx, listener, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			writer.WriteHeader(http.StatusNoContent)
+		}))
+	}()
+
+	response, err := http.Get("http://" + listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("serveStatic: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("static server did not stop after cancellation")
 	}
 }
 

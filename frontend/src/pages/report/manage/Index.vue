@@ -24,6 +24,7 @@
             </template>
           </q-input>
           <q-btn
+            v-if="canCreateReport"
             color="primary"
             icon="add"
             label="新建报表"
@@ -168,6 +169,7 @@
               <q-td :props="props">
                 <div class="row no-wrap justify-center q-gutter-xs">
                   <q-btn
+                    v-if="canRunReport"
                     :disable="props.row.status !== 'published'"
                     flat
                     size="sm"
@@ -179,6 +181,7 @@
                     <q-tooltip>运行</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="canExportReport"
                     :disable="props.row.status !== 'published'"
                     :loading="exportingReportId === props.row.id"
                     flat
@@ -191,6 +194,7 @@
                     <q-tooltip>导出</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="canDesignReport"
                     flat
                     size="sm"
                     round
@@ -201,7 +205,7 @@
                     <q-tooltip>设计</q-tooltip>
                   </q-btn>
                   <q-btn
-                    v-if="props.row.status === 'published'"
+                    v-if="canCopyReport && props.row.status === 'published'"
                     flat
                     size="sm"
                     round
@@ -212,6 +216,7 @@
                     <q-tooltip>复制</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="canPublishReport"
                     :disable="props.row.status === 'disabled'"
                     flat
                     size="sm"
@@ -223,6 +228,7 @@
                     <q-tooltip>发布</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="canViewReportVersions"
                     :disable="!canViewVersions(props.row)"
                     flat
                     size="sm"
@@ -234,7 +240,7 @@
                     <q-tooltip>版本</q-tooltip>
                   </q-btn>
                   <q-btn
-                    v-if="props.row.status === 'published'"
+                    v-if="canChangeReportStatus && props.row.status === 'published'"
                     flat
                     size="sm"
                     round
@@ -245,6 +251,7 @@
                     <q-tooltip>停用</q-tooltip>
                   </q-btn>
                   <q-btn
+                    v-if="canDeleteReport"
                     flat
                     size="sm"
                     round
@@ -305,6 +312,7 @@ import {
   type ReportKind,
 } from 'src/api/services/report'
 import { useLoadingStore } from 'src/stores/loading'
+import { usePageButtons } from 'src/composables/page-buttons'
 import { storeToRefs } from 'pinia'
 import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
 import ReportVersionDialog from '../components/ReportVersionDialog.vue'
@@ -315,6 +323,20 @@ const router = useRouter()
 const reportApi = useReportApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
+const { hasGrantedCapability } = usePageButtons('report_manage')
+
+const canCreateReport = computed(() => hasGrantedCapability('report_manage_create'))
+const canDesignReport = computed(() => hasGrantedCapability('report_manage_design'))
+const canCopyReport = computed(() => hasGrantedCapability('report_manage_copy'))
+const canChangeReportStatus = computed(() => hasGrantedCapability('report_manage_status'))
+const canDeleteReport = computed(() => hasGrantedCapability('report_manage_delete'))
+const canPublishReport = computed(() => hasGrantedCapability('report_manage_publish'))
+const canRunReport = computed(
+  () =>
+    hasGrantedCapability('report_manage_run') || hasGrantedCapability('report_manage_preview'),
+)
+const canExportReport = computed(() => hasGrantedCapability('report_manage_export'))
+const canViewReportVersions = computed(() => hasGrantedCapability('report_manage_versions'))
 
 const query = ref<Query>({
   page: 1,
@@ -378,7 +400,9 @@ const categories = computed(() => {
 
 const filteredRows = computed(() => rows.value)
 
-const emptyText = computed(() => '暂无报表，点击右上角新建报表开始配置。')
+const emptyText = computed(() =>
+  canCreateReport.value ? '暂无报表，点击右上角新建报表开始配置。' : '暂无报表。',
+)
 
 const publishedCount = computed(
   () => rows.value.filter((item) => item.status === 'published').length,

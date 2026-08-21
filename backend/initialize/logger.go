@@ -27,7 +27,10 @@ type asyncLog struct {
 	lumberJackLogger *lumberjack.Logger
 	currentDate      string
 	mu               sync.Mutex
+	stateMu          sync.RWMutex
 	wg               sync.WaitGroup
+	closeOnce        sync.Once
+	closed           bool
 	basePath         string
 	lastCleanupDate  string
 	logPrefix        string
@@ -117,11 +120,8 @@ func (al *asyncLog) processLogEntries() {
 
 // 写入日志（确保每日只更新一次日志文件）
 func (al *asyncLog) writeLog(logEntry []byte) {
-	// 确保日志文件每日只切换一次
-	newDate := time.Now().Format(time.DateOnly)
-	if newDate != al.currentDate {
-		al.updateLogFile()
-	}
+	// updateLogFile is idempotent and keeps the date check under the file lock.
+	al.updateLogFile()
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	if _, err := al.lumberJackLogger.Write(logEntry); err != nil {
@@ -132,6 +132,11 @@ func (al *asyncLog) writeLog(logEntry []byte) {
 // Write 方法，异步写入日志
 func (al *asyncLog) Write(p []byte) (n int, err error) {
 	logEntry := append([]byte{}, p...) // 确保传入的 p 不会被修改
+	al.stateMu.RLock()
+	defer al.stateMu.RUnlock()
+	if al.closed {
+		return 0, os.ErrClosed
+	}
 
 	select {
 	case al.writeChannel <- logEntry:
@@ -145,18 +150,19 @@ func (al *asyncLog) Write(p []byte) (n int, err error) {
 
 // Close 关闭通道并等待所有日志条目处理完毕
 func (al *asyncLog) Close() {
-	al.mu.Lock()
-	defer al.mu.Unlock()
-	// 关闭通道，确保不会再接收新的日志
-	close(al.writeChannel)
-	// 处理剩余的日志
-	for logEntry := range al.writeChannel {
-		al.writeLog(logEntry)
-	}
-	// 关闭日志文件
-	if al.lumberJackLogger != nil {
-		al.lumberJackLogger.Close()
-	}
+	al.closeOnce.Do(func() {
+		al.stateMu.Lock()
+		al.closed = true
+		close(al.writeChannel)
+		al.stateMu.Unlock()
+
+		al.wg.Wait()
+		al.mu.Lock()
+		if al.lumberJackLogger != nil {
+			_ = al.lumberJackLogger.Close()
+		}
+		al.mu.Unlock()
+	})
 }
 
 // createLogDirectory 创建日志文件夹

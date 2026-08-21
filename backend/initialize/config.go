@@ -7,6 +7,7 @@ package initialize
 
 import (
 	"backend/config"
+	"backend/internal/database"
 	"fmt"
 	"github.com/spf13/viper"
 	"net/url"
@@ -65,6 +66,12 @@ func validateSecureConfig(environment string, cfg *config.Server) error {
 	}
 
 	problems = append(problems, validateSecureDB("dbs.primary", cfg.DBS.Primary)...)
+	if strings.TrimSpace(cfg.DBS.Primary.Prefix) != "" {
+		problems = append(problems, "dbs.primary.prefix is not supported by the production migration and preflight contract")
+	}
+	if cfg.DBS.Primary.TLS.Mode == database.PostgresTLSDisable {
+		problems = append(problems, "dbs.primary.tls.mode must require certificate-protected transport in production")
+	}
 	if missingConfigValue(cfg.Redis.Host) {
 		problems = append(problems, "redis.host must be set with APP_REDIS_HOST")
 	}
@@ -73,6 +80,18 @@ func validateSecureConfig(environment string, cfg *config.Server) error {
 	}
 	if insecureCredentialValue(cfg.Redis.Password) {
 		problems = append(problems, "redis.password must be set with APP_REDIS_PASSWORD to a non-default value")
+	}
+	if !cfg.Redis.TLS.Enabled {
+		problems = append(problems, "redis.tls.enabled must be true in production")
+	}
+	if cfg.Redis.TLS.Enabled && missingConfigValue(cfg.Redis.TLS.ServerName) {
+		problems = append(problems, "redis.tls.server_name must be set in production")
+	}
+	if cfg.Upload.ChunkTTLHours <= 0 {
+		problems = append(problems, "upload.chunk_ttl_hours must be greater than zero in production")
+	}
+	if cfg.Upload.ChunkCleanupMinutes <= 0 {
+		problems = append(problems, "upload.chunk_cleanup_minutes must be greater than zero in production")
 	}
 	if cfg.Upload.PublicPreview {
 		problems = append(problems, "upload.public_preview must be false in production")
@@ -370,6 +389,13 @@ func validateSecureDB(prefix string, db config.DB) []string {
 	}
 	if insecureCredentialValue(db.Password) {
 		problems = append(problems, prefix+".password must be set to a non-default value")
+	}
+	mode := strings.ToLower(strings.TrimSpace(db.TLS.Mode))
+	if !database.SupportedPostgresTLSMode(mode) {
+		problems = append(problems, prefix+".tls.mode must be one of disable, require, verify-ca, verify-full")
+	}
+	if (strings.TrimSpace(db.TLS.CertFile) == "") != (strings.TrimSpace(db.TLS.KeyFile) == "") {
+		problems = append(problems, prefix+".tls.cert_file and tls.key_file must be configured together")
 	}
 	return problems
 }

@@ -151,6 +151,37 @@ func TestValidateSecureConfigRejectsProductionWildcardCORS(t *testing.T) {
 	}
 }
 
+func TestValidateSecureConfigRejectsUnprotectedProductionConnections(t *testing.T) {
+	cfg := secureServerConfig()
+	cfg.DBS.Primary.TLS.Mode = "disable"
+	cfg.Redis.TLS.Enabled = false
+
+	err := validateSecureConfig("prod", cfg)
+	if err == nil {
+		t.Fatal("expected production config to reject unprotected database and Redis connections")
+	}
+	if !strings.Contains(err.Error(), "dbs.primary.tls.mode") || !strings.Contains(err.Error(), "redis.tls.enabled") {
+		t.Fatalf("expected database and Redis TLS errors, got: %v", err)
+	}
+}
+
+func TestValidateSecureConfigRejectsUnsupportedPrefixAndDisabledChunkCleanup(t *testing.T) {
+	cfg := secureServerConfig()
+	cfg.DBS.Primary.Prefix = "tenant_"
+	cfg.Upload.ChunkTTLHours = 0
+	cfg.Upload.ChunkCleanupMinutes = 0
+
+	err := validateSecureConfig("prod", cfg)
+	if err == nil {
+		t.Fatal("expected production config to reject unsupported prefix and disabled chunk cleanup")
+	}
+	for _, expected := range []string{"dbs.primary.prefix", "upload.chunk_ttl_hours", "upload.chunk_cleanup_minutes"} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("expected %s error, got: %v", expected, err)
+		}
+	}
+}
+
 func TestApplySecurityEnvOverrides(t *testing.T) {
 	t.Setenv("APP_SECURITY_CORS_ALLOWED_ORIGINS", "https://admin.company.local, https://ops.company.local")
 	t.Setenv("APP_SECURITY_CORS_ALLOW_CREDENTIALS", "true")
@@ -233,14 +264,19 @@ func secureServerConfig() *config.Server {
 		Name:     "sweet_admin",
 		User:     "auth_app",
 		Password: "PrimaryDBStrong2026!",
+		TLS:      config.PostgresTLS{Mode: "verify-full"},
 	}
 	cfg.Redis.Host = "redis.internal"
 	cfg.Redis.Port = 6379
 	cfg.Redis.Password = "RedisStrong2026!"
+	cfg.Redis.TLS.Enabled = true
+	cfg.Redis.TLS.ServerName = "redis.internal"
 	cfg.Session.Secret = "9c9a5f58e1454b8ea8cd6073120f8970"
 	cfg.Conf.Salt = "4f44786dfd3a4d5085bb585335230d0f"
 	cfg.Security.CORSAllowedOrigins = []string{"https://admin.company.local"}
 	cfg.Upload.Driver = "local"
 	cfg.Upload.BaseURL = "/sweet_admin/files"
+	cfg.Upload.ChunkTTLHours = 24
+	cfg.Upload.ChunkCleanupMinutes = 60
 	return cfg
 }

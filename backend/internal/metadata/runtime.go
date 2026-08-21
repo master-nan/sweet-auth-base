@@ -239,9 +239,10 @@ func (table TableMetadata) QueryFields() []QueryFieldMetadata {
 	return result
 }
 
-// QueryModel is a compatibility adapter for the existing dynamic query
-// engine. Runtime callers receive TableMetadata; conversion to the legacy ORM
-// description remains inside an application service.
+// QueryModel is the only compatibility bridge into the existing dynamic query
+// engine. Its production use is intentionally limited to Generalization and
+// the deferred Report module; new Runtime Metadata consumers must not depend on
+// this legacy model projection.
 func (table TableMetadata) QueryModel() model.SysTable {
 	result := model.SysTable{
 		Basic:            model.Basic{Id: table.ID, State: true},

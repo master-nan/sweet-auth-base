@@ -629,7 +629,11 @@ import {
   hydrateRelationLookups,
   type LookupMap,
 } from 'src/utils/column-format'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
+import {
+  countEffectiveQueryRules,
+  hasEffectiveQueryRules,
+  sanitizeQueryExpressions,
+} from 'src/utils/query-state'
 import { findMenuById, findMenuByTableCode, toPositiveMenuId } from 'src/utils/menu-context'
 import { isPageButton } from 'src/utils/menu-button'
 import { compactSelectionDisplay } from 'src/utils/select-display'
@@ -696,7 +700,7 @@ const query = ref<Query>({
     is_asc: false,
   },
   table_code: '',
-  expressions: emptyAdvancedQuery().expressions,
+  expressions: [],
   quick_query: {
     keyword: '',
   },
@@ -725,7 +729,7 @@ const detailQuery = ref<Query>({
     is_asc: false,
   },
   table_code: '',
-  expressions: emptyAdvancedQuery().expressions,
+  expressions: [],
   quick_query: {
     keyword: '',
   },
@@ -875,6 +879,9 @@ const detailCanWrite = computed(() => !!detailTable.value?.table_code)
 
 const initTempQuery = () => {
   tempAdvancedQuery.value = cloneDeep(query.value)
+  if (!tempAdvancedQuery.value.expressions.length) {
+    tempAdvancedQuery.value.expressions = emptyAdvancedQuery().expressions
+  }
 }
 
 const resetToFirstPageOrFetch = () => {
@@ -886,7 +893,6 @@ const resetToFirstPageOrFetch = () => {
 }
 
 const handleBasicSearch = () => {
-  query.value.expressions = emptyAdvancedQuery().expressions
   appliedAdvancedQuery.value = cloneDeep({
     expressions: query.value.expressions,
     page: query.value.page,
@@ -896,7 +902,9 @@ const handleBasicSearch = () => {
 }
 
 const handleAdvancedSearch = () => {
-  query.value.expressions = cloneDeep(tempAdvancedQuery.value.expressions)
+  query.value.expressions = sanitizeQueryExpressions(
+    cloneDeep(tempAdvancedQuery.value.expressions),
+  )
   appliedAdvancedQuery.value = cloneDeep({
     expressions: query.value.expressions,
     page: query.value.page,
@@ -1415,14 +1423,14 @@ const resetPageState = () => {
   query.value.page = 1
   query.value.num = 15
   query.value.order = { field: '', is_asc: false }
-  query.value.expressions = emptyAdvancedQuery().expressions
+  query.value.expressions = []
   query.value.quick_query = { keyword: '' }
   query.value.include_deleted = false
 
   detailQuery.value.page = 1
   detailQuery.value.num = 15
   detailQuery.value.order = { field: '', is_asc: false }
-  detailQuery.value.expressions = emptyAdvancedQuery().expressions
+  detailQuery.value.expressions = []
   detailQuery.value.quick_query = { keyword: '' }
   detailQuery.value.include_deleted = false
 }

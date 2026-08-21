@@ -34,7 +34,7 @@ func TestIntegrationSyncSchemaSQLiteIsIdempotent(t *testing.T) {
 
 func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
-	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	admin, err := openPostgresTestDB(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatalf("open PostgreSQL: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestIntegrationSyncSchemaPostgreSQLConstraints(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = admin.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
-	db, err := gorm.Open(postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true, Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now})
+	db, err := openPostgresTestDB(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true, Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,8 +1,9 @@
-.PHONY: help verify release-check docs-check scripts-test backend-test frontend-ci db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
-EXTERNAL_DOCKER_COMPOSE = docker compose $(if $(wildcard $(EXTERNAL_ENV_FILE)),--env-file "$(EXTERNAL_ENV_FILE)") -f docker-compose.external.yml
+EXTERNAL_DOCKER_COMPOSE = docker compose --env-file "$(EXTERNAL_ENV_FILE)" -f docker-compose.external.yml
+EXTERNAL_PREFLIGHT = SWEET_ADMIN_PREFLIGHT_REQUIRE_STARTUP_WRITES_DISABLED=true node scripts/preflight-external.mjs "$(EXTERNAL_ENV_FILE)"
 
 help:
 	@printf '%s\n' 'Sweet Admin 常用命令'
@@ -13,6 +14,7 @@ help:
 	@printf '%s\n' ''
 	@printf '%s\n' '测试验证：'
 	@printf '%s\n' '  make docs-check                           检查文档目录、旧路径和相对链接'
+	@printf '%s\n' '  make secret-scan                          扫描 Git tracked 文件中的静态凭据'
 	@printf '%s\n' '  make scripts-test                        运行运维脚本 Node 原生测试'
 	@printf '%s\n' '  make backend-test                         只跑 Go 测试'
 	@printf '%s\n' '  make frontend-ci                          只跑前端 lint/typecheck/build'
@@ -35,6 +37,7 @@ help:
 	@printf '%s\n' ''
 	@printf '%s\n' 'Docker 连接宿主机 PostgreSQL/Redis：'
 	@printf '%s\n' '  cp .env.external.example .env.external    首次复制外部环境配置'
+	@printf '%s\n' '  make external-preflight                  验证外部部署配置且禁止启动期写库'
 	@printf '%s\n' '  make docker-up-external                   只启动 backend、frontend'
 	@printf '%s\n' ''
 	@printf '%s\n' '详细说明见 docs/operations/PlatformOperationsGuide.md'
@@ -42,14 +45,19 @@ help:
 verify: docs-check backend-test frontend-ci
 
 release-check:
-	@test -n "$(SWEET_TEST_POSTGRES_DSN)" || (printf '%s\n' 'SWEET_TEST_POSTGRES_DSN is required for release-check' >&2; exit 1)
-	@case "$(SWEET_TEST_POSTGRES_DSN)" in postgres://*|postgresql://*) ;; *) printf '%s\n' 'SWEET_TEST_POSTGRES_DSN must be a postgres:// or postgresql:// URL' >&2; exit 1;; esac
+	@test -n "$${SWEET_TEST_POSTGRES_DSN}" || (printf '%s\n' 'SWEET_TEST_POSTGRES_DSN is required for release-check' >&2; exit 1)
+	@case "$${SWEET_TEST_POSTGRES_DSN}" in postgres://*|postgresql://*) ;; *) printf '%s\n' 'SWEET_TEST_POSTGRES_DSN must be a postgres:// or postgresql:// URL' >&2; exit 1;; esac
+	$(MAKE) secret-scan
 	$(MAKE) docs-check
 	$(MAKE) scripts-test
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true SWEET_TEST_POSTGRES_DSN="$(SWEET_TEST_POSTGRES_DSN)" go test ./... -count=1
-	@cd backend && go test -race ./... -count=1
+	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test ./... -count=1
+	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -p=1 ./... -count=3
+	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -race -p=1 ./... -count=1
 	cd frontend && yarn quasar prepare && yarn test
 	$(MAKE) frontend-ci
+
+secret-scan:
+	node scripts/check-tracked-secrets.mjs
 
 docs-check:
 	python3 scripts/check_docs.py
@@ -63,16 +71,23 @@ backend-test:
 frontend-ci:
 	cd frontend && VITE_API_URL=$(APP_BASE_PATH) VITE_PUBLIC_PATH=$(APP_BASE_PATH) yarn ci
 
+external-preflight:
+	$(EXTERNAL_PREFLIGHT)
+
 db-migrate:
 	cd backend && go run ./migrate
 
 db-seed:
 	cd backend && go run ./migrate seed
 
-db-migrate-external: docker-build-backend-assets
+db-migrate-external:
+	$(EXTERNAL_PREFLIGHT) migration
+	$(MAKE) docker-build-backend-assets
 	$(EXTERNAL_DOCKER_COMPOSE) run --rm --no-deps backend /app/migrate
 
-db-seed-external: docker-build-backend-assets
+db-seed-external:
+	$(EXTERNAL_PREFLIGHT) seed
+	$(MAKE) docker-build-backend-assets
 	$(EXTERNAL_DOCKER_COMPOSE) run --rm --no-deps backend /app/migrate seed
 
 docker-build-backend-assets:
@@ -99,6 +114,7 @@ docker-up:
 	docker compose ps
 
 docker-up-external:
+	$(EXTERNAL_PREFLIGHT)
 	$(MAKE) docker-build-assets
 	$(EXTERNAL_DOCKER_COMPOSE) up -d --build
 	$(EXTERNAL_DOCKER_COMPOSE) ps
@@ -111,11 +127,15 @@ docker-rebuild-frontend: docker-build-frontend-assets
 	docker compose up -d --build frontend
 	docker compose ps frontend
 
-docker-rebuild-backend-external: docker-build-backend-assets
+docker-rebuild-backend-external:
+	$(EXTERNAL_PREFLIGHT)
+	$(MAKE) docker-build-backend-assets
 	$(EXTERNAL_DOCKER_COMPOSE) up -d --build backend
 	$(EXTERNAL_DOCKER_COMPOSE) ps backend
 
-docker-rebuild-frontend-external: docker-build-frontend-assets
+docker-rebuild-frontend-external:
+	$(EXTERNAL_PREFLIGHT)
+	$(MAKE) docker-build-frontend-assets
 	$(EXTERNAL_DOCKER_COMPOSE) up -d --build frontend
 	$(EXTERNAL_DOCKER_COMPOSE) ps frontend
 

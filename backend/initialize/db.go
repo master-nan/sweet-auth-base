@@ -7,6 +7,7 @@ package initialize
 
 import (
 	"backend/config"
+	"backend/internal/database"
 	"backend/model"
 	"context"
 	"fmt"
@@ -63,12 +64,26 @@ func InitDB(zapLogger *zap.Logger, serverConfig *config.Server) (map[string]*gor
 	}
 	// 配置多数据库
 	dbs := make(map[string]*gorm.DB)
+	initialized := false
+	defer func() {
+		if initialized {
+			return
+		}
+		for _, db := range dbs {
+			if sqlDB, err := db.DB(); err == nil {
+				_ = sqlDB.Close()
+			}
+		}
+	}()
 	v := reflect.ValueOf(serverConfig.DBS)
 	t := reflect.TypeOf(serverConfig.DBS)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i).Interface().(config.DB)
 		name := t.Field(i).Tag.Get("mapstructure")
-		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable TimeZone=Asia/Shanghai", field.Host, field.Port, field.User, field.Password, field.Name)
+		dsn, err := database.PostgresDSN(field)
+		if err != nil {
+			return nil, fmt.Errorf("database %s configuration: %w", name, err)
+		}
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 			NamingStrategy: schema.NamingStrategy{
 				TablePrefix:   field.Prefix,
@@ -91,6 +106,11 @@ func InitDB(zapLogger *zap.Logger, serverConfig *config.Server) (map[string]*gor
 		sqlDB.SetMaxOpenConns(100)
 		sqlDB.SetConnMaxLifetime(time.Hour)
 		dbs[name] = db
+		zap.L().Info("database connection initialized",
+			zap.String("database_role", name),
+			zap.String("tls_mode", field.TLS.Mode),
+		)
 	}
+	initialized = true
 	return dbs, nil
 }

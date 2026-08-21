@@ -2,6 +2,8 @@
 
 Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字典、审计日志、文件上传和低代码 CRUD 能力。后端使用 Go/Gin/Gorm，前端使用 Vue 3 + Quasar，默认数据库为 PostgreSQL，缓存为 Redis。
 
+本地与 CI 的前端 Node.js 版本以仓库根 `.nvmrc` 为唯一真值。完整发布门禁使用带真实 PostgreSQL 16 DSN 的 `make release-check`；部署、Migration Ledger、TLS、备份恢复和优雅关闭规则见平台部署运维指南。
+
 常用入口：
 
 - 文档总导航：[docs/README.md](docs/README.md)
@@ -62,6 +64,7 @@ go run main.go
 
 ```bash
 cd frontend
+nvm use "$(cat ../.nvmrc)"
 yarn
 quasar dev
 ```

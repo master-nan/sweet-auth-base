@@ -10,6 +10,11 @@ dbs:
     user: 'replace-with-primary-postgres-user'
     password: 'replace-with-primary-postgres-password'
     prefix: ''
+    tls:
+      mode: 'verify-full'
+      root_ca_file: '/run/secrets/postgres-ca.pem'
+      cert_file: ''
+      key_file: ''
 redis:
   host: 'replace-with-redis-host'
   port: 6379
@@ -19,6 +24,12 @@ redis:
   min_idle_conns: 5
   max_idle_conns: 5
   conn_max_idle_time: 3600
+  tls:
+    enabled: true
+    server_name: 'replace-with-redis-server-name'
+    ca_file: '/run/secrets/redis-ca.pem'
+    cert_file: ''
+    key_file: ''
 session:
   secret: 'replace-with-at-least-32-random-characters'
 security:
@@ -59,6 +70,8 @@ upload:
   public_preview: false
   access_ttl_minutes: 15
   max_access_ttl_minutes: 60
+  chunk_ttl_hours: 24
+  chunk_cleanup_minutes: 60
   oss:
     endpoint: ''
     access_key_id: ''

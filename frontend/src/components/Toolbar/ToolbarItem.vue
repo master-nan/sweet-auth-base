@@ -20,6 +20,17 @@
       round
       dense
       flat
+      icon="settings"
+      :aria-label="t('themeSetting.title')"
+      @click="emit('open-settings')"
+    >
+      <q-tooltip>{{ t('themeSetting.title') }}</q-tooltip>
+    </q-btn>
+    <q-btn
+      class="toolbar-actions__btn"
+      round
+      dense
+      flat
       icon="refresh"
       @click="appStore.reloadPage(200)"
       v-if="$q.screen.gt.sm"
@@ -77,6 +88,7 @@ import LangSelector from 'src/components/Toolbar/LangSelector.vue'
 import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
+const emit = defineEmits<{ 'open-settings': [] }>()
 
 const { t } = useI18n()
 

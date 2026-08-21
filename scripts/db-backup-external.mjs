@@ -18,6 +18,8 @@ import {
 const DEFAULT_POSTGRES_CLIENT_IMAGE = 'postgres:16-alpine'
 const DEFAULT_RESTORE_EVIDENCE_DIR = 'reports'
 const RESTORE_CONFIRMATION = 'I_UNDERSTAND_THIS_OVERWRITES_DATA'
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const EXTERNAL_COMPOSE_FILE = path.join(PROJECT_ROOT, 'docker-compose.external.yml')
 
 function parseBoolean(value) {
   const normalized = String(value || '').toLowerCase().trim()
@@ -45,6 +47,7 @@ function readExternalEnv(envPath) {
 function requireValidExternalEnv(env) {
   const result = validateExternalEnv(env, {
     allowNonProduction: parseBoolean(process.env.SWEET_ADMIN_PREFLIGHT_ALLOW_NON_PRODUCTION || '') === true,
+    requireStartupWritesDisabled: true,
   })
   if (!result.ok) {
     throw new Error(`External env is not safe for database backup:\n- ${result.problems.join('\n- ')}`)
@@ -79,6 +82,12 @@ function dbConfig(env, label) {
     name: required(env, `${prefix}_NAME`),
     user: required(env, `${prefix}_USER`),
     password: required(env, `${prefix}_PASSWORD`),
+    tls: {
+      mode: required(env, `${prefix}_TLS_MODE`).toLowerCase(),
+      rootCAFile: optional(env, `${prefix}_TLS_ROOT_CA_FILE`),
+      certFile: optional(env, `${prefix}_TLS_CERT_FILE`),
+      keyFile: optional(env, `${prefix}_TLS_KEY_FILE`),
+    },
   }
 }
 
@@ -88,6 +97,37 @@ function required(env, key) {
     throw new Error(`${key} must be set`)
   }
   return value
+}
+
+function optional(env, key) {
+  return (env[key] || '').trim()
+}
+
+function postgresDockerInvocation(image, database, { interactive = false } = {}) {
+  const args = ['run', '--rm']
+  if (interactive) args.push('-i')
+
+  const env = {
+    ...process.env,
+    PGPASSWORD: database.password,
+    PGSSLMODE: database.tls.mode,
+  }
+  args.push('-e', 'PGPASSWORD', '-e', 'PGSSLMODE')
+
+  const tlsFiles = [
+    ['PGSSLROOTCERT', database.tls.rootCAFile, 'root-ca.pem'],
+    ['PGSSLCERT', database.tls.certFile, 'client-cert.pem'],
+    ['PGSSLKEY', database.tls.keyFile, 'client-key.pem'],
+  ]
+  for (const [key, configuredPath, filename] of tlsFiles) {
+    if (!configuredPath) continue
+    const source = path.resolve(configuredPath)
+    const destination = `/run/sweet-admin-db-tls/${filename}`
+    args.push('--mount', `type=bind,src=${source},dst=${destination},readonly`, '-e', key)
+    env[key] = destination
+  }
+  args.push(image)
+  return { args, env }
 }
 
 export function resolveBackupTargetNames(value = 'primary') {
@@ -149,6 +189,7 @@ export function createBackupPlans(env, options = {}) {
       outputDir,
       `${timestamp}-${safeFilenamePart(database.label)}-${safeFilenamePart(database.name)}.sql`,
     )
+    const invocation = postgresDockerInvocation(image, database)
     return {
       action: 'backup',
       image,
@@ -156,12 +197,9 @@ export function createBackupPlans(env, options = {}) {
       manifestPath: backupManifestPath(outputPath),
       database,
       executable: 'docker',
+      clientEnv: invocation.env,
       args: [
-        'run',
-        '--rm',
-        '-e',
-        'PGPASSWORD',
-        image,
+        ...invocation.args,
         'pg_dump',
         '--format=plain',
         '--no-owner',
@@ -193,22 +231,20 @@ export function createRestorePlan(env, backupFile, options = {}) {
     throw new Error('APP_DB_RESTORE_TARGET must be primary')
   }
   const database = dbConfig(env, String(target).toLowerCase().trim())
+  const invocation = postgresDockerInvocation(image, database, { interactive: true })
   return {
     action: 'restore',
     image,
     backupFile: resolvedBackupFile,
     database,
     executable: 'docker',
+    clientEnv: invocation.env,
     args: [
-      'run',
-      '--rm',
-      '-i',
-      '-e',
-      'PGPASSWORD',
-      image,
+      ...invocation.args,
       'psql',
       '--set',
       'ON_ERROR_STOP=on',
+      '--single-transaction',
       '--no-password',
       '-h',
       database.host,
@@ -235,6 +271,7 @@ export function redactPlan(plan) {
       port: plan.database.port,
       name: plan.database.name,
       user: plan.database.user,
+      tlsMode: plan.database.tls.mode,
     },
     executable: plan.executable,
     args: plan.args,
@@ -246,9 +283,136 @@ export function backupManifestPath(outputPath) {
   return `${outputPath}.manifest.json`
 }
 
-export function createBackupManifest(plan, { sizeBytes, sha256, createdAt = new Date() } = {}) {
+function createPostgresQueryPlan(plan, sql) {
+  const invocation = postgresDockerInvocation(plan.image, plan.database)
   return {
-    schema_version: 1,
+    action: 'database inspection',
+    executable: 'docker',
+    clientEnv: invocation.env,
+    args: [
+      ...invocation.args,
+      'psql',
+      '--no-password',
+      '--tuples-only',
+      '--no-align',
+      '--field-separator',
+      '\t',
+      '-h',
+      plan.database.host,
+      '-p',
+      plan.database.port,
+      '-U',
+      plan.database.user,
+      '-d',
+      plan.database.name,
+      '--command',
+      sql,
+    ],
+  }
+}
+
+export function parseDatabaseIdentityOutput(output) {
+  const value = String(output || '').trim()
+  if (!value) throw new Error('Database identity query returned no data')
+  let identity
+  try {
+    identity = JSON.parse(value)
+  } catch (error) {
+    throw new Error(`Database identity query returned invalid JSON: ${error.message}`)
+  }
+  for (const key of ['database_name', 'database_user', 'database_schema', 'server_version_num', 'database_oid']) {
+    if (String(identity[key] ?? '').trim() === '') {
+      throw new Error(`Database identity is missing ${key}`)
+    }
+  }
+  return identity
+}
+
+export function parseMigrationLedgerRows(output) {
+  const value = String(output || '').trim()
+  if (!value) return []
+  return value.split(/\r?\n/).map((line) => {
+    const [version, key, checksum, appliedAt] = line.split('\t')
+    if (!/^-?\d+$/.test(version || '') || !key || !/^[a-f0-9]{64}$/i.test(checksum || '') || !appliedAt) {
+      throw new Error('Migration ledger query returned an invalid row')
+    }
+    return {
+      version,
+      key,
+      checksum: checksum.toLowerCase(),
+      applied_at: appliedAt,
+    }
+  })
+}
+
+export function createMigrationLedgerSummary(entries, { exists = true } = {}) {
+  const normalized = [...entries]
+    .map((entry) => ({
+      version: String(entry.version),
+      key: String(entry.key),
+      checksum: String(entry.checksum).toLowerCase(),
+      applied_at: String(entry.applied_at),
+    }))
+    .sort((left, right) => BigInt(left.version) < BigInt(right.version) ? -1 : BigInt(left.version) > BigInt(right.version) ? 1 : 0)
+  const first = normalized[0] || null
+  const latest = normalized.at(-1) || null
+  return {
+    table: 'schema_migration',
+    exists,
+    entry_count: normalized.length,
+    first_version: first?.version || null,
+    latest_version: latest?.version || null,
+    latest_key: latest?.key || null,
+    latest_applied_at: latest?.applied_at || null,
+    entries_sha256: exists
+      ? crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex')
+      : null,
+  }
+}
+
+export async function inspectDatabaseState(plan) {
+  const identityQuery = `SELECT json_build_object(
+    'database_name', current_database(),
+    'database_user', current_user,
+    'database_schema', current_schema(),
+    'server_version_num', current_setting('server_version_num'),
+    'server_address', inet_server_addr()::text,
+    'server_port', inet_server_port(),
+    'database_oid', (SELECT oid::text FROM pg_database WHERE datname = current_database())
+  )::text;`
+  const identityOutput = await runCapturedProcess(createPostgresQueryPlan(plan, identityQuery))
+  const identity = parseDatabaseIdentityOutput(identityOutput)
+
+  const ledgerExistsOutput = await runCapturedProcess(createPostgresQueryPlan(
+    plan,
+    "SELECT COALESCE(to_regclass('schema_migration')::text, '');",
+  ))
+  const ledgerExists = ledgerExistsOutput.trim() !== ''
+  let entries = []
+  if (ledgerExists) {
+    const ledgerOutput = await runCapturedProcess(createPostgresQueryPlan(
+      plan,
+      `SELECT version::text, key, checksum,
+        to_char(applied_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+      FROM schema_migration ORDER BY version;`,
+    ))
+    entries = parseMigrationLedgerRows(ledgerOutput)
+  }
+  return {
+    identity,
+    migrationLedger: createMigrationLedgerSummary(entries, { exists: ledgerExists }),
+  }
+}
+
+export function createBackupManifest(plan, {
+  sizeBytes,
+  sha256,
+  databaseIdentity,
+  migrationLedger,
+  createdAt = new Date(),
+} = {}) {
+  return {
+    schema_version: 2,
     action: 'backup',
     created_at: createdAt instanceof Date ? createdAt.toISOString() : String(createdAt || ''),
     image: plan.image,
@@ -262,6 +426,8 @@ export function createBackupManifest(plan, { sizeBytes, sha256, createdAt = new 
       name: plan.database.name,
       user: plan.database.user,
     },
+    database_identity: databaseIdentity,
+    migration_ledger: migrationLedger,
     command: {
       executable: plan.executable,
       args: plan.args,
@@ -270,9 +436,14 @@ export function createBackupManifest(plan, { sizeBytes, sha256, createdAt = new 
   }
 }
 
-export function createRestoreEvidence(plan, backupEvidence, { envPath = '', targetPurpose = '', restoredAt = new Date() } = {}) {
+export function createRestoreEvidence(plan, backupEvidence, {
+  envPath = '',
+  targetPurpose = '',
+  verification = null,
+  restoredAt = new Date(),
+} = {}) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     action: 'restore',
     restored_at: restoredAt instanceof Date ? restoredAt.toISOString() : String(restoredAt || ''),
     env_path: envPath ? path.resolve(envPath) : null,
@@ -305,6 +476,7 @@ export function createRestoreEvidence(plan, backupEvidence, { envPath = '', targ
       args: plan.args,
       passwordEnv: 'PGPASSWORD',
     },
+    post_restore: verification,
   }
 }
 
@@ -320,6 +492,7 @@ export async function writeRestoreEvidence(plan, backupEvidence, options = {}) {
   const evidence = createRestoreEvidence(plan, backupEvidence, {
     envPath: options.envPath,
     targetPurpose: options.targetPurpose,
+    verification: options.verification,
     restoredAt,
   })
   const outputPath = path.join(outputDir, restoreEvidenceName(plan, backupEvidence, restoredAt))
@@ -344,8 +517,8 @@ export function validateRestoreBackupManifest({ backupFile, manifest, stat, mani
   if (!manifest || typeof manifest !== 'object') {
     return `Backup manifest is missing or invalid for ${label}`
   }
-  if (manifest.schema_version !== 1) {
-    return `Backup manifest schema_version must be 1 for ${label}`
+  if (![1, 2].includes(manifest.schema_version)) {
+    return `Backup manifest schema_version must be 1 or 2 for ${label}`
   }
   if (manifest.action !== 'backup') {
     return `Backup manifest action must be backup for ${label}`
@@ -364,6 +537,37 @@ export function validateRestoreBackupManifest({ backupFile, manifest, stat, mani
   }
   if (!manifest.database?.label || !manifest.database?.name || !manifest.database?.host) {
     return `Backup manifest database summary is incomplete for ${label}`
+  }
+  if (manifest.schema_version === 2) {
+    const identity = manifest.database_identity
+    if (
+      !identity?.database_name
+      || !identity?.database_user
+      || !identity?.database_schema
+      || !identity?.server_version_num
+      || !identity?.database_oid
+    ) {
+      return `Backup manifest database identity is incomplete for ${label}`
+    }
+    if (identity.database_name !== manifest.database.name) {
+      return `Backup manifest database identity does not match its configured database for ${label}`
+    }
+    const ledger = manifest.migration_ledger
+    if (
+      !ledger
+      || ledger.table !== 'schema_migration'
+      || typeof ledger.exists !== 'boolean'
+      || !Number.isInteger(ledger.entry_count)
+      || ledger.entry_count < 0
+    ) {
+      return `Backup manifest migration ledger summary is incomplete for ${label}`
+    }
+    if (ledger.exists && !/^[a-f0-9]{64}$/i.test(String(ledger.entries_sha256 || ''))) {
+      return `Backup manifest migration ledger digest is invalid for ${label}`
+    }
+    if (!ledger.exists && ledger.entry_count !== 0) {
+      return `Backup manifest missing migration ledger must have zero entries for ${label}`
+    }
   }
   if (!Number.isFinite(Date.parse(manifest.created_at || ''))) {
     return `Backup manifest created_at is invalid for ${label}`
@@ -426,12 +630,145 @@ export async function verifyRestoreBackupEvidence(backupFile) {
   }
 }
 
+export function validateRestoreTarget(plan, backupEvidence) {
+  const sourceName = backupEvidence.manifest?.database_identity?.database_name
+    || backupEvidence.manifest?.database?.name
+  if (!sourceName) return 'Backup manifest does not identify its source database'
+  if (sourceName !== plan.database.name) {
+    return `Backup source database ${sourceName} does not match restore target ${plan.database.name}`
+  }
+  return ''
+}
+
+export function validateRestoredMigrationLedger(manifest, targetLedger) {
+  if (manifest?.schema_version !== 2) return ''
+  const sourceLedger = manifest.migration_ledger
+  if (!sourceLedger || !targetLedger) return 'Migration ledger summary is unavailable after restore'
+  if (sourceLedger.exists !== targetLedger.exists) {
+    return 'Restored migration ledger existence does not match the backup manifest'
+  }
+  if (sourceLedger.entry_count !== targetLedger.entry_count) {
+    return 'Restored migration ledger entry count does not match the backup manifest'
+  }
+  if (sourceLedger.entries_sha256 !== targetLedger.entries_sha256) {
+    return 'Restored migration ledger digest does not match the backup manifest'
+  }
+  return ''
+}
+
+export function validateReadinessPayload(payload) {
+  if (!payload || payload.status !== 'ready') {
+    return 'Readiness status must be ready after restore'
+  }
+  if (!payload.components || typeof payload.components !== 'object') {
+    return 'Readiness response must include dependency components'
+  }
+  const components = Object.entries(payload.components)
+  if (components.length === 0 || components.some(([, status]) => status?.ok !== true)) {
+    return 'Every readiness dependency component must be healthy after restore'
+  }
+  return ''
+}
+
+async function runDatabasePreflight(envPath) {
+  const plan = {
+    action: 'post-restore database preflight',
+    executable: 'docker',
+    args: [
+      'compose',
+      '--env-file',
+      envPath,
+      '-f',
+      EXTERNAL_COMPOSE_FILE,
+      'run',
+      '--rm',
+      '--no-deps',
+      '-e',
+      'APP_DB_PREFLIGHT_REQUIRE_MIGRATED=true',
+      'backend',
+      '/app/db-preflight',
+    ],
+  }
+  await runProcess(plan, {
+    env: process.env,
+    stdin: 'ignore',
+    stdout: 'inherit',
+  })
+}
+
+export function resolveReadinessURL(baseURL) {
+  let configuredURL
+  try {
+    configuredURL = new URL(required({ SWEET_ADMIN_HEALTH_BASE_URL: baseURL }, 'SWEET_ADMIN_HEALTH_BASE_URL'))
+  } catch (error) {
+    throw new Error(`SWEET_ADMIN_HEALTH_BASE_URL must be a valid http(s) URL: ${error.message}`)
+  }
+  if (
+    !['http:', 'https:'].includes(configuredURL.protocol)
+    || configuredURL.username
+    || configuredURL.password
+    || configuredURL.search
+    || configuredURL.hash
+  ) {
+    throw new Error('SWEET_ADMIN_HEALTH_BASE_URL must be an http(s) URL without credentials, query, or fragment')
+  }
+  return new URL('/readyz', configuredURL)
+}
+
+async function checkReadiness(baseURL) {
+  const readinessURL = resolveReadinessURL(baseURL)
+
+  const response = await fetch(readinessURL, {
+    headers: { accept: 'application/json' },
+    redirect: 'error',
+    signal: AbortSignal.timeout(15_000),
+  })
+  let payload
+  try {
+    payload = await response.json()
+  } catch (error) {
+    throw new Error(`Readiness response is not valid JSON: ${error.message}`)
+  }
+  const problem = validateReadinessPayload(payload)
+  if (!response.ok || problem) {
+    throw new Error(problem || `Readiness endpoint returned HTTP ${response.status}`)
+  }
+  return {
+    status: payload.status,
+    url: readinessURL.toString(),
+    checked_at: new Date().toISOString(),
+    components: payload.components,
+  }
+}
+
+async function verifyRestoredDatabase(plan, backupEvidence, options) {
+  const targetState = await inspectDatabaseState(plan)
+  const ledgerProblem = validateRestoredMigrationLedger(
+    backupEvidence.manifest,
+    targetState.migrationLedger,
+  )
+  if (ledgerProblem) throw new Error(ledgerProblem)
+
+  await runDatabasePreflight(options.envPath)
+  const readiness = await checkReadiness(options.healthBaseURL)
+  return {
+    database_identity: targetState.identity,
+    migration_ledger: targetState.migrationLedger,
+    db_preflight: {
+      status: 'passed',
+      require_migrated: true,
+    },
+    readiness,
+  }
+}
+
 async function runBackup(plan) {
   await fs.promises.mkdir(path.dirname(plan.outputPath), { recursive: true })
   const output = fs.createWriteStream(plan.outputPath, { flags: 'wx', mode: 0o600 })
   try {
+    const databaseState = await inspectDatabaseState(plan)
     await runProcess(plan, {
-      env: { ...process.env, PGPASSWORD: plan.database.password },
+      env: plan.clientEnv,
       stdout: output,
       stdin: 'ignore',
     })
@@ -441,6 +778,8 @@ async function runBackup(plan) {
     const manifest = createBackupManifest(plan, {
       sizeBytes: stat.size,
       sha256,
+      databaseIdentity: databaseState.identity,
+      migrationLedger: databaseState.migrationLedger,
     })
     await fs.promises.writeFile(plan.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
       flag: 'wx',
@@ -461,16 +800,42 @@ async function runBackup(plan) {
 async function runRestore(plan, options = {}) {
   const evidence = await verifyRestoreBackupEvidence(plan.backupFile)
   console.log(`Restore backup evidence verified: ${evidence.manifestPath}`)
+  const targetProblem = validateRestoreTarget(plan, evidence)
+  if (targetProblem) throw new Error(targetProblem)
   const input = fs.createReadStream(plan.backupFile)
   await runProcess(plan, {
-    env: { ...process.env, PGPASSWORD: plan.database.password },
+    env: plan.clientEnv,
     stdin: input,
     stdout: 'inherit',
+  })
+  const verification = await verifyRestoredDatabase(plan, evidence, {
+    envPath: options.envPath,
+    healthBaseURL: options.healthBaseURL,
   })
   return writeRestoreEvidence(plan, evidence, {
     envPath: options.envPath,
     targetPurpose: options.targetPurpose,
     outputDir: options.evidenceDir,
+    verification,
+  })
+}
+
+function runCapturedProcess(plan) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    const child = spawn(plan.executable, plan.args, {
+      env: plan.clientEnv,
+      stdio: ['ignore', 'pipe', 'inherit'],
+    })
+    child.stdout.on('data', (chunk) => chunks.push(chunk))
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve(Buffer.concat(chunks).toString('utf8'))
+        return
+      }
+      reject(new Error(`${plan.action} failed with exit code ${code}`))
+    })
   })
 }
 
@@ -563,6 +928,7 @@ async function main() {
     const result = await runRestore(plan, {
       envPath,
       targetPurpose: runtimeEnv.SWEET_ADMIN_EXTERNAL_TARGET_PURPOSE,
+      healthBaseURL: runtimeEnv.SWEET_ADMIN_HEALTH_BASE_URL,
       evidenceDir:
         process.env.RESTORE_EVIDENCE_DIR ||
         process.env.SWEET_ADMIN_RESTORE_EVIDENCE_DIR ||

@@ -26,18 +26,29 @@
     v-model="value"
     :label="field.field_name"
     :rules="context.rules"
+    :disabled="context.readonly"
+    :ref="context.fieldRef"
+    @update:model-value="notifyInput"
   />
 
   <array-input
     v-else-if="context.controlType === 'array-input'"
     v-model="value"
     :label="field.field_name"
+    :rules="context.rules"
+    :disabled="context.readonly"
+    :ref="context.fieldRef"
+    @update:model-value="notifyInput"
   />
 
   <key-value-editor
     v-else-if="context.controlType === 'key-value-editor'"
     v-model="value"
     :label="field.field_name"
+    :rules="context.rules"
+    :disabled="context.readonly"
+    :ref="context.fieldRef"
+    @update:model-value="notifyInput"
   />
 
   <cascader-select
@@ -273,11 +284,12 @@
     v-model="value"
     :label="field.field_name"
     :rules="context.rules"
-    :disabled="field.field_code === 'id'"
+    :disabled="context.readonly || field.field_code === 'id'"
     :table-code="context.tableCode"
     :menu-id="context.menuId"
     :row-id="context.rowId"
     :field-code="field.field_code"
+    :ref="context.fieldRef"
   />
 
   <q-input

@@ -11,12 +11,19 @@ import {
   backupManifestPath,
   createBackupManifest,
   createBackupPlans,
+  createMigrationLedgerSummary,
   createRestoreEvidence,
   createRestorePlan,
   mergeRuntimeOptions,
+  parseDatabaseIdentityOutput,
+  parseMigrationLedgerRows,
   redactPlan,
+  resolveReadinessURL,
   resolveBackupTargetNames,
+  validateReadinessPayload,
+  validateRestoredMigrationLedger,
   validateRestoreBackupManifest,
+  validateRestoreTarget,
   verifyRestoreBackupEvidence,
   writeRestoreEvidence,
 } from './db-backup-external.mjs'
@@ -27,7 +34,30 @@ const env = {
   APP_DBS_PRIMARY_NAME: 'sweet_admin',
   APP_DBS_PRIMARY_USER: 'sweet_admin_app',
   APP_DBS_PRIMARY_PASSWORD: 'PrimaryPassword_2026!',
+  APP_DBS_PRIMARY_TLS_MODE: 'verify-full',
+  APP_DBS_PRIMARY_TLS_ROOT_CA_FILE: '',
+  APP_DBS_PRIMARY_TLS_CERT_FILE: '',
+  APP_DBS_PRIMARY_TLS_KEY_FILE: '',
 }
+
+const databaseIdentity = {
+  database_name: 'sweet_admin',
+  database_user: 'sweet_admin_app',
+  database_schema: 'public',
+  server_version_num: '160010',
+  server_address: '10.0.0.10',
+  server_port: 5432,
+  database_oid: '16384',
+}
+
+const migrationLedger = createMigrationLedgerSummary([
+  {
+    version: '202606070001',
+    key: 'baseline',
+    checksum: 'b'.repeat(64),
+    applied_at: '2026-06-07 12:00:00+00',
+  },
+])
 
 test('resolveBackupTargetNames supports the primary PostgreSQL database only', () => {
   assert.deepEqual(resolveBackupTargetNames(), ['primary'])
@@ -57,9 +87,10 @@ test('createBackupPlans builds safe pg_dump plans without password arguments', (
   )
   assert.equal(plans[0].database.password, 'PrimaryPassword_2026!')
   assert.equal(plans[0].args.includes('PrimaryPassword_2026!'), false)
-  assert.deepEqual(plans[0].args.slice(0, 5), ['run', '--rm', '-e', 'PGPASSWORD', 'postgres:16-alpine'])
+  assert.deepEqual(plans[0].args.slice(0, 7), ['run', '--rm', '-e', 'PGPASSWORD', '-e', 'PGSSLMODE', 'postgres:16-alpine'])
   assert.equal(plans[0].args.includes('pg_dump'), true)
   assert.equal(plans[0].args.includes('--no-owner'), true)
+  assert.equal(plans[0].clientEnv.PGSSLMODE, 'verify-full')
   assert.equal(plans[0].args.at(-1), 'sweet_admin')
 
   const redacted = redactPlan(plans[0])
@@ -82,6 +113,7 @@ test('createRestorePlan targets one database and keeps password out of arguments
   assert.equal(plan.args.includes('PrimaryPassword_2026!'), false)
   assert.equal(plan.args.includes('-i'), true)
   assert.equal(plan.args.includes('psql'), true)
+  assert.equal(plan.args.includes('--single-transaction'), true)
   assert.equal(plan.args.at(-1), 'sweet_admin')
 })
 
@@ -113,18 +145,82 @@ test('createBackupManifest records backup evidence without secrets', () => {
   const manifest = createBackupManifest(plan, {
     sizeBytes: 2048,
     sha256: 'a'.repeat(64),
+    databaseIdentity,
+    migrationLedger,
     createdAt: new Date('2026-06-07T12:30:00.000Z'),
   })
 
   assert.equal(backupManifestPath(plan.outputPath), plan.manifestPath)
-  assert.equal(manifest.schema_version, 1)
+  assert.equal(manifest.schema_version, 2)
   assert.equal(manifest.action, 'backup')
   assert.equal(manifest.created_at, '2026-06-07T12:30:00.000Z')
   assert.equal(manifest.size_bytes, 2048)
   assert.equal(manifest.sha256, 'a'.repeat(64))
   assert.equal(manifest.database.name, 'sweet_admin')
+  assert.deepEqual(manifest.database_identity, databaseIdentity)
+  assert.equal(manifest.migration_ledger.entries_sha256, migrationLedger.entries_sha256)
   assert.equal(manifest.command.passwordEnv, 'PGPASSWORD')
   assert.equal(JSON.stringify(manifest).includes('PrimaryPassword_2026!'), false)
+})
+
+test('database identity and migration ledger parsers produce a stable summary', () => {
+  assert.deepEqual(parseDatabaseIdentityOutput(JSON.stringify(databaseIdentity)), databaseIdentity)
+
+  const rows = parseMigrationLedgerRows([
+    `202606070002\tsecond\t${'c'.repeat(64)}\t2026-06-07 12:05:00+00`,
+    `202606070001\tbaseline\t${'b'.repeat(64)}\t2026-06-07 12:00:00+00`,
+  ].join('\n'))
+  const summary = createMigrationLedgerSummary(rows)
+  const reversedSummary = createMigrationLedgerSummary([...rows].reverse())
+
+  assert.equal(summary.exists, true)
+  assert.equal(summary.entry_count, 2)
+  assert.equal(summary.first_version, '202606070001')
+  assert.equal(summary.latest_version, '202606070002')
+  assert.equal(summary.entries_sha256, reversedSummary.entries_sha256)
+  assert.match(summary.entries_sha256, /^[a-f0-9]{64}$/)
+})
+
+test('restore target, migration ledger, and readiness checks fail closed', () => {
+  const plan = createRestorePlan(env, '/tmp/sweet-admin-backups/primary.sql')
+  const backupEvidence = {
+    manifest: {
+      schema_version: 2,
+      database: { name: 'sweet_admin' },
+      database_identity: databaseIdentity,
+      migration_ledger: migrationLedger,
+    },
+  }
+
+  assert.equal(validateRestoreTarget(plan, backupEvidence), '')
+  assert.match(
+    validateRestoreTarget(
+      plan,
+      { manifest: { database_identity: { database_name: 'another_database' } } },
+    ),
+    /does not match restore target/,
+  )
+  assert.equal(validateRestoredMigrationLedger(backupEvidence.manifest, migrationLedger), '')
+  assert.match(
+    validateRestoredMigrationLedger(
+      backupEvidence.manifest,
+      { ...migrationLedger, entries_sha256: 'f'.repeat(64) },
+    ),
+    /digest does not match/,
+  )
+  assert.equal(validateReadinessPayload({
+    status: 'ready',
+    components: { db_primary: { ok: true }, redis: { ok: true } },
+  }), '')
+  assert.match(
+    validateReadinessPayload({ status: 'ready', components: { redis: { ok: false } } }),
+    /Every readiness dependency component/,
+  )
+  assert.equal(resolveReadinessURL('https://health.company.test').toString(), 'https://health.company.test/readyz')
+  assert.throws(
+    () => resolveReadinessURL('https://operator:credential@health.company.test?token=value'),
+    /without credentials, query, or fragment/,
+  )
 })
 
 test('createRestoreEvidence records restore rehearsal details without secrets', () => {
@@ -157,10 +253,14 @@ test('createRestoreEvidence records restore rehearsal details without secrets', 
       envPath: '/secure/.env.external',
       targetPurpose: 'staging',
       restoredAt,
+      verification: {
+        db_preflight: { status: 'passed', require_migrated: true },
+        readiness: { status: 'ready' },
+      },
     },
   )
 
-  assert.equal(evidence.schema_version, 1)
+  assert.equal(evidence.schema_version, 2)
   assert.equal(evidence.action, 'restore')
   assert.equal(evidence.restored_at, restoredAt.toISOString())
   assert.equal(evidence.target_purpose, 'staging')
@@ -168,6 +268,8 @@ test('createRestoreEvidence records restore rehearsal details without secrets', 
   assert.equal(evidence.backup.database.name, 'sweet_admin')
   assert.equal(evidence.target_database.name, 'sweet_admin')
   assert.equal(evidence.command.passwordEnv, 'PGPASSWORD')
+  assert.equal(evidence.post_restore.db_preflight.status, 'passed')
+  assert.equal(evidence.post_restore.readiness.status, 'ready')
   assert.equal(JSON.stringify(evidence).includes('PrimaryPassword_2026!'), false)
 })
 
@@ -236,6 +338,41 @@ test('validateRestoreBackupManifest accepts matching manifest evidence', () => {
   })
 
   assert.equal(problem, '')
+})
+
+test('validateRestoreBackupManifest requires database identity and ledger evidence in schema 2', () => {
+  const backupFile = '/tmp/sweet-admin-backups/20260607-120000-primary-sweet_admin.sql'
+  const manifest = {
+    schema_version: 2,
+    action: 'backup',
+    created_at: '2026-06-07T12:30:00.000Z',
+    output_path: backupFile,
+    size_bytes: 2048,
+    sha256: 'a'.repeat(64),
+    database: {
+      label: 'primary',
+      host: 'postgres.primary.internal',
+      name: 'sweet_admin',
+    },
+    database_identity: databaseIdentity,
+    migration_ledger: migrationLedger,
+  }
+
+  assert.equal(validateRestoreBackupManifest({
+    backupFile,
+    manifest,
+    stat: { size: 2048, mode: 0o600 },
+    manifestStat: { mode: 0o600 },
+    sha256: 'a'.repeat(64),
+  }), '')
+
+  assert.match(validateRestoreBackupManifest({
+    backupFile,
+    manifest: { ...manifest, migration_ledger: null },
+    stat: { size: 2048, mode: 0o600 },
+    manifestStat: { mode: 0o600 },
+    sha256: 'a'.repeat(64),
+  }), /migration ledger summary is incomplete/)
 })
 
 test('validateRestoreBackupManifest rejects mismatched hash and broad permissions', () => {

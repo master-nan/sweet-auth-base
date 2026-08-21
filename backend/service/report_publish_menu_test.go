@@ -159,7 +159,7 @@ func TestReportPublishMenuCreatesMenuButtonsPermissionsAndOption(t *testing.T) {
 	}
 
 	buttons := env.reportMenuButtons(t, menu.Id)
-	wantActions := map[string]bool{"query": false, "export": false, "refresh": false}
+	wantActions := map[string]bool{"detail": false, "query": false, "export": false, "refresh": false}
 	for _, button := range buttons {
 		if _, ok := wantActions[button.EventAction]; ok {
 			wantActions[button.EventAction] = true
@@ -171,6 +171,11 @@ func TestReportPublishMenuCreatesMenuButtonsPermissionsAndOption(t *testing.T) {
 	for action, found := range wantActions {
 		if !found {
 			t.Fatalf("missing default report menu button action %s, buttons=%+v", action, buttons)
+		}
+	}
+	for _, button := range buttons {
+		if button.EventAction == string(enum.ButtonActionDetail) && (button.IsButton || !button.IsHidden) {
+			t.Fatalf("runtime detail permission must stay hidden and non-button: %#v", button)
 		}
 	}
 
@@ -186,6 +191,9 @@ func TestReportPublishMenuCreatesMenuButtonsPermissionsAndOption(t *testing.T) {
 	}
 	if ok, err := env.enforcer.Enforce(reportSuperAdminRoleName, "/admin/report/:id/export", "POST"); err != nil || !ok {
 		t.Fatalf("super_admin should have export policy, ok=%v err=%v", ok, err)
+	}
+	if ok, err := env.enforcer.Enforce(reportSuperAdminRoleName, "/admin/report/:id", "GET"); err != nil || !ok {
+		t.Fatalf("super_admin should have runtime detail policy, ok=%v err=%v", ok, err)
 	}
 }
 
@@ -251,6 +259,11 @@ func TestReportPublishMenuIsIdempotentAndUpdatesExistingMenu(t *testing.T) {
 	}
 	if menu.Title != "更新标题" || menu.Path != "report/runtime/repeat-publish-custom" {
 		t.Fatalf("menu was not updated: title=%q path=%q", menu.Title, menu.Path)
+	}
+	for _, button := range env.reportMenuButtons(t, menu.Id) {
+		if button.EventAction == string(enum.ButtonActionDetail) && (button.IsButton || !button.IsHidden) {
+			t.Fatalf("repeated publish exposed runtime detail permission: %#v", button)
+		}
 	}
 }
 

@@ -370,8 +370,10 @@ export const useReportApi = () => {
     })
   }
 
-  const queryReportById = async (id: number) => {
-    return instance.get<ResponseData<BackendReport>>(`/admin/report/${id}`).then((res) => {
+  const queryReportById = async (id: number, menuId = 0) => {
+    return instance.get<ResponseData<BackendReport>>(`/admin/report/${id}`, {
+      params: menuId > 0 ? { menu_id: menuId } : undefined,
+    }).then((res) => {
       return {
         ...res.data,
         data: toReport(res.data.data),

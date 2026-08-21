@@ -90,7 +90,6 @@ export default defineConfig((ctx) => {
             : {}),
           manualChunks(id: string) {
             if (!id.includes('node_modules')) return undefined
-            if (id.includes('/@open-file-viewer/')) return 'vendor-file-preview'
             if (id.includes('/quasar/') || id.includes('@quasar/extras')) return 'vendor-quasar'
             if (id.includes('/vue') || id.includes('/pinia/') || id.includes('/vue-router/')) {
               return 'vendor-vue'

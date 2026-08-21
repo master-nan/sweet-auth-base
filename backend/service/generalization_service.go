@@ -127,6 +127,21 @@ func (gs *GeneralizationService) QueryWithResolvedDataPermission(
 	return gs.permissionRepo.QueryWithPermission(ctx, basic, table, permission)
 }
 
+func (gs *GeneralizationService) QueryWithResolvedDataPermissionDB(
+	db *gorm.DB,
+	basic *request.Basic,
+	table model.SysTable,
+	permission repository.GeneralizationPermission,
+) (repository.GeneralizationListResult, error) {
+	if err := validateGeneralizationQuery(basic, table); err != nil {
+		return repository.GeneralizationListResult{}, err
+	}
+	if gs.permissionRepo == nil || db == nil {
+		return repository.GeneralizationListResult{}, error2.ErrDataPermissionRuntimeFailed
+	}
+	return gs.permissionRepo.QueryWithPermissionDB(db, basic, table, permission)
+}
+
 func (gs *GeneralizationService) ResolveDataPermission(
 	ctx context.Context,
 	table model.SysTable,

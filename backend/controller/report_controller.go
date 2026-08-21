@@ -3,7 +3,9 @@ package controller
 import (
 	"backend/dto/request"
 	"backend/dto/response"
+	myerrors "backend/internal/errors"
 	"backend/internal/utils"
+	"backend/model"
 	"backend/service"
 	"strconv"
 
@@ -40,7 +42,7 @@ func (r *ReportController) QueryReportDefinitions(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	result, err := r.reportService.GetReportDefinitionListResponse(&data, table)
+	result, err := r.reportService.GetReportDefinitionListResponse(ctx.Request.Context(), reportRequestUser(ctx), &data, table)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -56,12 +58,32 @@ func (r *ReportController) GetReportDefinitionById(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
-	data, err := r.reportService.GetReportDefinitionByIdResponse(id)
+	requestedMenuID := 0
+	if rawMenuID := ctx.Query("menu_id"); rawMenuID != "" {
+		requestedMenuID, err = strconv.Atoi(rawMenuID)
+		if err != nil || requestedMenuID <= 0 {
+			_ = ctx.Error(myerrors.NewParameterError("menu_id 参数错误"))
+			return
+		}
+	}
+	data, err := r.reportService.GetReportDefinitionByIdResponse(ctx.Request.Context(), reportRequestUser(ctx), id, requestedMenuID)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
 	resp.SetData(data)
+}
+
+func reportRequestUser(ctx *gin.Context) model.SysUser {
+	if ctx == nil {
+		return model.SysUser{}
+	}
+	value, exists := ctx.Get("user")
+	if !exists {
+		return model.SysUser{}
+	}
+	user, _ := value.(model.SysUser)
+	return user
 }
 
 func (r *ReportController) GetReportDataSources(ctx *gin.Context) {

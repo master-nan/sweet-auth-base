@@ -23,21 +23,18 @@ func main() {
 	} else {
 		log.Println("seed skipped because APP_RUN_SEEDS=false")
 	}
-	cmd := exec.Command("/app/sweet_admin")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	if err := cmd.Start(); err != nil {
-		log.Fatalf("failed to start backend: %v", err)
+	if err := runStrictPreflight(); err != nil {
+		log.Fatalf("database preflight failed: %v", err)
 	}
-	if err := cmd.Wait(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				os.Exit(status.ExitStatus())
-			}
-		}
-		log.Fatal(err)
+	if err := execApplication("/app/sweet_admin", os.Environ()); err != nil {
+		log.Fatalf("failed to exec backend: %v", err)
 	}
+}
+
+var syscallExec = syscall.Exec
+
+func execApplication(path string, environment []string) error {
+	return syscallExec(path, []string{path}, environment)
 }
 
 func run(name string, args ...string) error {
@@ -46,6 +43,26 @@ func run(name string, args ...string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
+}
+
+func runStrictPreflight() error {
+	cmd := exec.Command("/app/db-preflight")
+	cmd.Env = environmentWith("APP_DB_PREFLIGHT_REQUIRE_MIGRATED", "true")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+func environmentWith(key string, value string) []string {
+	prefix := key + "="
+	environment := make([]string, 0, len(os.Environ())+1)
+	for _, item := range os.Environ() {
+		if !strings.HasPrefix(item, prefix) {
+			environment = append(environment, item)
+		}
+	}
+	return append(environment, prefix+value)
 }
 
 func shouldRunStartupStep(value string) bool {

@@ -22,14 +22,25 @@ APP_DBS_PRIMARY_PORT=5432
 APP_DBS_PRIMARY_NAME=sweet_admin
 APP_DBS_PRIMARY_USER=sweet_admin_app
 APP_DBS_PRIMARY_PASSWORD=DbCred_2026_Strong!
+APP_DBS_PRIMARY_TLS_MODE=verify-full
+APP_DBS_PRIMARY_TLS_ROOT_CA_FILE=
+APP_DBS_PRIMARY_TLS_CERT_FILE=
+APP_DBS_PRIMARY_TLS_KEY_FILE=
 APP_REDIS_HOST=redis.internal
 APP_REDIS_PORT=6379
 APP_REDIS_DB=5
 APP_REDIS_PASSWORD=RedisCred_2026_Strong!
+APP_REDIS_TLS_ENABLED=true
+APP_REDIS_TLS_SERVER_NAME=redis.internal
+APP_REDIS_TLS_CA_FILE=
+APP_REDIS_TLS_CERT_FILE=
+APP_REDIS_TLS_KEY_FILE=
 APP_SESSION_SECRET=zN8vYq3rT7pLm4sWx9Cb2Kj6Hf5Da0Rt
 APP_CONF_SALT=qM7sWc2Jk8Pn4Vt6Ry9Lx5Ha3Db0Fu1G
 APP_BOOTSTRAP_ADMIN_PASSWORD=StartAdmin_2026_Strong!
+APP_BOOTSTRAP_APPLICATION_SECRET=pR8vYq3rT7mLn4sWx9Cb2Kj6Hf5Da0Rt
 APP_RUN_MIGRATIONS=false
+APP_RUN_SEEDS=false
 APP_REQUIRE_SECURE_CONFIG=true
 APP_ENFORCE_CASBIN_POLICY_COVERAGE=true
 APP_SECURITY_CORS_ALLOWED_ORIGINS=https://admin.company.test
@@ -45,6 +56,8 @@ APP_UPLOAD_DIR=/app/uploads
 APP_UPLOAD_BASE_URL=/sweet_admin/files
 APP_UPLOAD_MAX_SIZE=50
 APP_UPLOAD_CHUNK_SIZE=5
+APP_UPLOAD_CHUNK_TTL_HOURS=24
+APP_UPLOAD_CHUNK_CLEANUP_MINUTES=60
 APP_UPLOAD_ALLOWED_EXTENSIONS=.jpg,.png,.pdf,.txt,.csv,.docx,.xlsx
 APP_UPLOAD_ALLOWED_MIME_TYPES=image/jpeg,image/png,application/pdf,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 APP_UPLOAD_PUBLIC_PREVIEW=false
@@ -305,6 +318,59 @@ test('validateExternalEnv rejects migrations when readonly mode requires them di
 
   assert.equal(result.ok, false)
   assert.match(result.problems.join('\n'), /APP_RUN_MIGRATIONS must be false/)
+})
+
+test('validateExternalEnv validates seed startup writes independently', () => {
+  const env = parseEnvContent(validEnvContent)
+  env.APP_RUN_SEEDS = 'true'
+
+  const warningResult = validateExternalEnv(env)
+  assert.equal(warningResult.ok, true, warningResult.problems.join('\n'))
+  assert.match(warningResult.warnings.join('\n'), /APP_RUN_SEEDS is true/)
+
+  const blockedResult = validateExternalEnv(env, { requireStartupWritesDisabled: true })
+  assert.equal(blockedResult.ok, false)
+  assert.match(blockedResult.problems.join('\n'), /APP_RUN_SEEDS must be false/)
+})
+
+test('validateExternalEnv requires production database and Redis TLS', () => {
+  const env = parseEnvContent(validEnvContent)
+  env.APP_DBS_PRIMARY_TLS_MODE = 'disable'
+  env.APP_REDIS_TLS_ENABLED = 'false'
+
+  const result = validateExternalEnv(env)
+
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join('\n'), /APP_DBS_PRIMARY_TLS_MODE must not be disable/)
+  assert.match(result.problems.join('\n'), /APP_REDIS_TLS_ENABLED must be true/)
+})
+
+test('validateExternalEnv permits an explicitly selected development transport profile', () => {
+  const env = parseEnvContent(validEnvContent)
+  env.APP_ENV = 'docker'
+  env.APP_DBS_PRIMARY_TLS_MODE = 'disable'
+  env.APP_REDIS_TLS_ENABLED = 'false'
+  env.APP_REDIS_TLS_SERVER_NAME = ''
+  env.APP_REQUIRE_SECURE_CONFIG = 'false'
+
+  const result = validateExternalEnv(env, { allowNonProduction: true })
+
+  assert.equal(result.ok, true, result.problems.join('\n'))
+  assert.match(result.warnings.join('\n'), /explicitly allowed non-production target/)
+})
+
+test('validateExternalEnv validates TLS client certificate pairs and application secret', () => {
+  const env = parseEnvContent(validEnvContent)
+  env.APP_DBS_PRIMARY_TLS_CERT_FILE = '/run/tls/postgres.crt'
+  env.APP_REDIS_TLS_KEY_FILE = '/run/tls/redis.key'
+  env.APP_BOOTSTRAP_APPLICATION_SECRET = 'sweet-admin-secret'
+
+  const result = validateExternalEnv(env)
+
+  assert.equal(result.ok, false)
+  assert.match(result.problems.join('\n'), /APP_DBS_PRIMARY_TLS_CERT_FILE and APP_DBS_PRIMARY_TLS_KEY_FILE/)
+  assert.match(result.problems.join('\n'), /APP_REDIS_TLS_CERT_FILE and APP_REDIS_TLS_KEY_FILE/)
+  assert.match(result.problems.join('\n'), /APP_BOOTSTRAP_APPLICATION_SECRET/)
 })
 
 test('validateExternalEnv rejects placeholder readonly smoke credentials when required', () => {
