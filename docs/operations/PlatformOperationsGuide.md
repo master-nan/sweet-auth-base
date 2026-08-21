@@ -108,6 +108,11 @@ node scripts/preflight-local.mjs local
 docker compose ps
 ```
 
+本地完整 Compose 会先启动 PostgreSQL/Redis，再通过 `migrate adopt` 接入或初始化
+Migration Ledger，最后启动 backend/frontend。该步骤只属于仓库内置的本地开发环境；
+它会执行真实幂等 Migration，不会仅按表名盲写 Ledger。外部及生产数据库仍必须按下文
+的备份、Preflight 和显式 Migration/Adopt 流程执行，不会由应用启动自动认领。
+
 默认地址：
 
 | 服务 | 地址 |

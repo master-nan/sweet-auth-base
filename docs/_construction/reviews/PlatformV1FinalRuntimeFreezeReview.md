@@ -33,7 +33,7 @@ Node唯一版本真值为仓库根`.nvmrc`的`22.23.0`；Frontend engine限定`>
 
 当前`version: 0.1`不是可靠的发布版本来源，因此ledger不写入容易漂移的application version；正式事实只使用稳定Migration version/key/checksum。
 
-Fresh DB逐步迁移并登记。已有Canonical或部分升级但无ledger的数据库会被普通`migrate`拒绝，必须先备份和核验，再显式运行`migrate adopt`；Adopt重跑实际幂等步骤后逐步登记，不按“表存在”盲写完成事实。测试Fixture的AutoMigrate不进入ledger。V1基线仍包含现有`auto_migrate_core_schema`首步，后续生产Schema变化必须追加显式catalog步骤。
+Fresh DB逐步迁移并登记。已有Canonical或部分升级但无ledger的数据库会被普通`migrate`拒绝，必须先备份和核验，再显式运行`migrate adopt`；Adopt重跑实际幂等步骤后逐步登记，不按“表存在”盲写完成事实。仓库内置的本地完整Compose由`make docker-up`显式执行受控Adopt，以便既有开发卷一次性接入Ledger；外部/生产Compose不自动Adopt。测试Fixture的AutoMigrate不进入ledger。V1基线仍包含现有`auto_migrate_core_schema`首步，后续生产Schema变化必须追加显式catalog步骤。
 
 Release Drill第一次严格Preflight发现`access_log`缺少运行所需索引，说明仅有表结构并不足以安全上线。修复通过追加version 15 `access_log_operational_indexes`完成，没有改写已登记checksum。最终Fresh、14→15 Upgrade、Adopt、重复执行、checksum mismatch、失败不登记和并发启动均由PostgreSQL 16测试覆盖。
 

@@ -1,4 +1,4 @@
-.PHONY: help verify release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-prepare-local-database docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
@@ -108,9 +108,15 @@ docker-build-assets:
 	$(MAKE) docker-build-backend-assets
 	$(MAKE) docker-build-frontend-assets
 
+docker-prepare-local-database:
+	docker compose up -d postgres redis
+	docker compose run --rm --no-deps backend /app/migrate adopt
+
 docker-up:
 	$(MAKE) docker-build-assets
-	docker compose up -d --build
+	docker compose build
+	$(MAKE) docker-prepare-local-database
+	docker compose up -d
 	docker compose ps
 
 docker-up-external:
@@ -120,7 +126,9 @@ docker-up-external:
 	$(EXTERNAL_DOCKER_COMPOSE) ps
 
 docker-rebuild-backend: docker-build-backend-assets
-	docker compose up -d --build backend
+	docker compose build backend
+	$(MAKE) docker-prepare-local-database
+	docker compose up -d backend
 	docker compose ps backend
 
 docker-rebuild-frontend: docker-build-frontend-assets
