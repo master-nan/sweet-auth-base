@@ -71,12 +71,6 @@ func (a *ApplicationService) GetApplicationForAuthentication(ctx context.Context
 	return result, nil
 }
 
-// getApplicationList 获取应用列表
-func (a *ApplicationService) getApplicationList(basic *request.Basic, table model.SysTable) (response.ListResult[model.Application], error) {
-	result, err := a.applicationRepo.GetApplicationList(basic, table)
-	return result, err
-}
-
 // GetApplicationByAppKey 根据appKey获取应用信息
 func (a *ApplicationService) GetApplicationByAppKey(appKey string) (model.Application, error) {
 	var data model.Application
@@ -105,36 +99,36 @@ func (a *ApplicationService) GetApplicationByAppKey(appKey string) (model.Applic
 	return data, nil
 }
 
-// createApplication 创建应用
-func (a *ApplicationService) createApplication(ctx context.Context, req request.ApplicationCreateReq) (model.Application, error) {
+// CreateApplicationResponse 创建应用并返回只展示一次的凭据。
+func (a *ApplicationService) CreateApplicationResponse(ctx context.Context, req request.ApplicationCreateReq) (response.ApplicationSecretRes, error) {
 	var data model.Application
 	app, err := a.applicationRepo.FindByField("name", req.Name)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	if app.Id != 0 {
-		return model.Application{}, error2.ErrAppNameExist
+		return response.ApplicationSecretRes{}, error2.ErrAppNameExist
 	}
 	appKey, appSecret, err := a.generateAppKeyAndSecret()
 	if err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	err = copier.Copy(&data, &req)
 	if err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	data.AppKey = appKey
 	data.AppSecret = appSecret
 	id, err := a.sf.GenerateUniqueID()
 	if err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	data.Id = int(id)
 	tx := a.applicationRepo.DBWithContext(ctx)
 	if err := a.applicationRepo.Create(tx, &data); err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
-	return data, nil
+	return applicationSecretResponse(data), nil
 }
 
 // UpdateApplication 更新应用
@@ -155,23 +149,23 @@ func (a *ApplicationService) UpdateApplication(ctx context.Context, req request.
 	return nil
 }
 
-func (a *ApplicationService) rotateApplicationSecret(ctx context.Context, id int) (model.Application, error) {
+func (a *ApplicationService) RotateApplicationSecretResponse(ctx context.Context, id int) (response.ApplicationSecretRes, error) {
 	app, err := a.applicationRepo.FindById(id)
 	if err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	appSecret, err := a.generateUniqueAppSecret()
 	if err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	tx := a.applicationRepo.DBWithContext(ctx)
 	data := map[string]interface{}{"app_secret": appSecret}
 	if err = a.applicationRepo.WithSelect("app_secret").Update(tx, data, id); err != nil {
-		return model.Application{}, err
+		return response.ApplicationSecretRes{}, err
 	}
 	app.AppSecret = appSecret
 	a.RefreshCache(id)
-	return app, nil
+	return applicationSecretResponse(app), nil
 }
 
 // DeleteApplicationById 根据id删除应用
@@ -229,7 +223,7 @@ func (s *ApplicationService) GetApplicationByIdResponse(id int) (response.Applic
 }
 
 func (s *ApplicationService) GetApplicationListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.ApplicationRes], error) {
-	data, err := s.getApplicationList(basic, table)
+	data, err := s.applicationRepo.GetApplicationList(basic, table)
 	if err != nil {
 		return response.ListResult[response.ApplicationRes]{}, err
 	}
@@ -238,16 +232,6 @@ func (s *ApplicationService) GetApplicationListResponse(basic *request.Basic, ta
 		items = append(items, applicationResponse(item))
 	}
 	return response.ListResult[response.ApplicationRes]{Data: items, Total: data.Total}, nil
-}
-
-func (s *ApplicationService) CreateApplicationResponse(ctx context.Context, req request.ApplicationCreateReq) (response.ApplicationSecretRes, error) {
-	data, err := s.createApplication(ctx, req)
-	return applicationSecretResponse(data), err
-}
-
-func (s *ApplicationService) RotateApplicationSecretResponse(ctx context.Context, id int) (response.ApplicationSecretRes, error) {
-	data, err := s.rotateApplicationSecret(ctx, id)
-	return applicationSecretResponse(data), err
 }
 
 func (a *ApplicationService) DeleteCache(id int) {

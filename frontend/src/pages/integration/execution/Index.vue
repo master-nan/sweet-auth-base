@@ -192,7 +192,7 @@ import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
-import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 

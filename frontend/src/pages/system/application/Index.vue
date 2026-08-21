@@ -185,7 +185,7 @@ import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-actions'
+import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import type { TableColumn } from 'src/types/global'
 

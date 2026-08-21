@@ -21,6 +21,8 @@ frontend/bin/
 frontend/dist/
 frontend/node_modules/
 frontend/.quasar/
+backend/docs/swagger.json
+backend/docs/swagger.yaml
 node_modules/
 .DS_Store
 AGENTS.md

@@ -60,7 +60,7 @@ secret-scan:
 	node scripts/check-tracked-secrets.mjs
 
 docs-check:
-	python3 scripts/check_docs.py
+	node scripts/check-docs.mjs
 
 scripts-test:
 	node --test scripts/*.test.mjs

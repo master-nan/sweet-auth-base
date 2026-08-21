@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import { dispatchPageAction } from './button-actions'
+import { dispatchPageAction } from './button-handlers'
 
 const button = (action: string) => ({ event_action: action }) as MenuButton
 

@@ -58,11 +58,6 @@ func (s *SysDictService) getSysDictByID(id int) (model.SysDict, error) {
 	return dict, nil
 }
 
-func (s *SysDictService) getSysDictList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SysDict], error) {
-	result, err := s.sysDictRepo.GetSysDictList(basic, table)
-	return result, err
-}
-
 func (s *SysDictService) getSysDictByCode(code string) (model.SysDict, error) {
 	data, err := s.sysDictCache.Get(code)
 	if err == nil {
@@ -139,11 +134,6 @@ func (s *SysDictService) getSysDictItemByID(id int) (model.SysDictItem, error) {
 		return model.SysDictItem{}, nil
 	}
 	return data, err
-}
-
-func (s *SysDictService) getSysDictItemsByDictID(id int) ([]model.SysDictItem, error) {
-	result, err := s.sysDictItemRepo.GetSysDictItemsByDictId(id)
-	return result, err
 }
 
 func (s *SysDictService) CreateSysDictItem(ctx context.Context, req request.DictItemCreateReq) error {
@@ -279,7 +269,7 @@ func runtimeDictResponse(data model.SysDict) response.RuntimeDictRes {
 }
 
 func (s *SysDictService) GetSysDictListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SysDictRes], error) {
-	data, err := s.getSysDictList(basic, table)
+	data, err := s.sysDictRepo.GetSysDictList(basic, table)
 	if err != nil {
 		return response.ListResult[response.SysDictRes]{}, err
 	}
@@ -296,6 +286,6 @@ func (s *SysDictService) GetSysDictItemByIdResponse(id int) (response.SysDictIte
 }
 
 func (s *SysDictService) GetSysDictItemsByDictIdResponse(id int) ([]response.SysDictItemRes, error) {
-	data, err := s.getSysDictItemsByDictID(id)
+	data, err := s.sysDictItemRepo.GetSysDictItemsByDictId(id)
 	return sysDictItemResponses(data), err
 }

@@ -63,7 +63,7 @@ func TestCreateApplicationReturnsGeneratedCredential(t *testing.T) {
 	}
 	svc := NewApplicationService(repo, nil, sf)
 
-	created, err := svc.createApplication(testContextWithUser(), request.ApplicationCreateReq{
+	created, err := svc.CreateApplicationResponse(testContextWithUser(), request.ApplicationCreateReq{
 		Name:       "Smoke Client",
 		Expiration: 3600,
 		Remark:     "created in test",
@@ -102,7 +102,7 @@ func TestRotateApplicationSecretReplacesStoredSecret(t *testing.T) {
 
 	repo := impl.NewApplicationRepositoryImpl(&database.PrimaryDB{DB: db})
 	svc := &ApplicationService{applicationRepo: repo}
-	rotated, err := svc.rotateApplicationSecret(testContextWithUser(), 1)
+	rotated, err := svc.RotateApplicationSecretResponse(testContextWithUser(), 1)
 	if err != nil {
 		t.Fatalf("rotate application secret: %v", err)
 	}

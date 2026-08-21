@@ -187,9 +187,3 @@ const isButtonDisabled = (button: MenuButton) =>
     params: {},
   })
 </script>
-
-<style scoped>
-.organization-detail-loading {
-  min-height: 260px;
-}
-</style>

@@ -130,7 +130,7 @@ frontend/src/
 | 脚本 | 用途 |
 | --- | --- |
 | `check-tracked-secrets.mjs` | 扫描Git tracked秘密和敏感配置 |
-| `check_docs.py` | 检查最终docs结构、空文档和相对链接 |
+| `check-docs.mjs` | 检查最终docs结构、空文档和相对链接 |
 | `preflight-external.mjs` | 外部环境配置和目标安全预检 |
 | `db-backup-external.mjs` | 外部PostgreSQL备份、Manifest、Checksum和恢复验证 |
 | `smoke-readonly.mjs` | 发布后只读HTTP Smoke |

@@ -7,6 +7,7 @@ import (
 	"backend/model"
 	"backend/service"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -140,4 +141,12 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func contentDisposition(disposition, fileName string) string {
+	fileName = strings.TrimSpace(fileName)
+	if fileName == "" {
+		fileName = "download"
+	}
+	return fmt.Sprintf("%s; filename*=UTF-8''%s", disposition, url.PathEscape(fileName))
 }

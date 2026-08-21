@@ -150,10 +150,6 @@ const isButtonDisabled = (button: MenuButton) =>
 </script>
 
 <style scoped>
-.organization-detail-loading {
-  min-height: 260px;
-}
-
 .organization-detail-page {
   position: relative;
   display: flex;

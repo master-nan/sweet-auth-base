@@ -154,10 +154,6 @@ func (gs *GeneralizationService) ResolveDataPermission(
 	return resolution.permission, nil
 }
 
-func (gs *GeneralizationService) getByID(ctx context.Context, table model.SysTable, id int) (map[string]interface{}, error) {
-	return gs.generalizationRepo.GetById(ctx, table, id)
-}
-
 func (gs *GeneralizationService) GetByIdWithDataPermission(
 	ctx context.Context,
 	table model.SysTable,

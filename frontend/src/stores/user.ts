@@ -5,7 +5,16 @@ import { useConfigureStore } from './configure'
 import { Router as router } from 'src/router/index'
 import type { Role } from 'src/api/services/sys-role'
 import type { Menu } from 'src/api/services/sys-menu'
-import { clearAuthSessionStorage } from 'src/utils/auth-session-storage'
+
+const authSessionStorageKeys = [
+  'access_token',
+  'must_change_password',
+  'password_change_reason',
+] as const
+
+const clearAuthSessionStorage = () => {
+  authSessionStorageKeys.forEach((key) => LocalStorage.remove(key))
+}
 
 interface User {
   roles: Role[]

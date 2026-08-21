@@ -255,10 +255,6 @@ func parseAccessLogQueryTime(value string) (*time.Time, error) {
 	return nil, error2.NewValidationError("时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss")
 }
 
-func (ls *LogService) getAccessLogByID(ctx context.Context, id int) (model.AccessLog, error) {
-	return ls.accessLogRepository.WithContext(ctx).FindById(id)
-}
-
 func accessLogResponse(data model.AccessLog) response.AccessLogRes {
 	return response.AccessLogRes{
 		BasicRes:     response.NewBasicRes(data.Basic),
@@ -295,6 +291,6 @@ func (ls *LogService) QueryAccessLogsResponse(ctx context.Context, req request.A
 }
 
 func (ls *LogService) GetAccessLogByIdResponse(ctx context.Context, id int) (response.AccessLogRes, error) {
-	data, err := ls.getAccessLogByID(ctx, id)
+	data, err := ls.accessLogRepository.WithContext(ctx).FindById(id)
 	return accessLogResponse(data), err
 }
