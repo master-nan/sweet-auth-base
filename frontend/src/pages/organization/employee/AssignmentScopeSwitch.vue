@@ -73,9 +73,9 @@ const selectScope = (scope: AssignmentTimeScope) => {
   grid-template-columns: repeat(4, minmax(62px, 1fr));
   min-width: 272px;
   padding: 4px;
-  border: 1px solid rgb(112 122 142 / 22%);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
-  background: rgb(112 122 142 / 8%);
+  background: var(--app-surface-muted);
 }
 
 .assignment-scope-switch__indicator {
@@ -87,7 +87,7 @@ const selectScope = (scope: AssignmentTimeScope) => {
   height: calc(100% - 8px);
   border: 1px solid var(--app-primary-border);
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--app-surface);
   box-shadow: 0 4px 10px var(--app-primary-shadow);
   transform: translateX(calc(var(--assignment-scope-index) * 100%));
   transition:
@@ -103,7 +103,7 @@ const selectScope = (scope: AssignmentTimeScope) => {
   padding: 0 10px;
   border: 0;
   border-radius: 6px;
-  color: #424b5d;
+  color: var(--app-text-strong);
   background: transparent;
   cursor: pointer;
   font-weight: 500;
@@ -118,24 +118,6 @@ const selectScope = (scope: AssignmentTimeScope) => {
 .assignment-scope-switch__option:disabled {
   cursor: wait;
   opacity: 0.6;
-}
-
-:global(body.body--dark) .assignment-scope-switch {
-  border-color: rgb(255 255 255 / 12%);
-  background: rgb(255 255 255 / 5%);
-}
-
-:global(body.body--dark) .assignment-scope-switch__indicator {
-  background: #30384b;
-}
-
-:global(body.body--dark) .assignment-scope-switch__option {
-  color: #c4ccdb;
-}
-
-:global(body.body--dark) .assignment-scope-switch__option:hover:not(:disabled),
-:global(body.body--dark) .assignment-scope-switch__option.is-active {
-  color: var(--q-primary);
 }
 
 @media (max-width: 720px) {

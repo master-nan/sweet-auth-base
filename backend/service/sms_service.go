@@ -217,12 +217,6 @@ func smsStatusLogOwnedBy(log model.SmsLog, applicationID int, mobile string) boo
 	return applicationID > 0 && log.ApplicationId == applicationID && log.Mobile == mobile
 }
 
-// getSmsTemplateList 获取短信模板列表
-func (s *SmsService) getSmsTemplateList(basic *request.Basic, table model.SysTable) (response.ListResult[model.SmsTemplate], error) {
-	result, err := s.smsTemplateRepo.GetSmsTemplateList(basic, table)
-	return result, err
-}
-
 // CreateSmsTemplate 创建短信模板
 func (s *SmsService) CreateSmsTemplate(ctx context.Context, data request.SmsTemplateCreateReq) (int, error) {
 	var template model.SmsTemplate
@@ -268,7 +262,7 @@ func smsTemplateResponse(data model.SmsTemplate) response.SmsTemplateRes {
 }
 
 func (s *SmsService) GetSmsTemplateListResponse(basic *request.Basic, table model.SysTable) (response.ListResult[response.SmsTemplateRes], error) {
-	data, err := s.getSmsTemplateList(basic, table)
+	data, err := s.smsTemplateRepo.GetSmsTemplateList(basic, table)
 	if err != nil {
 		return response.ListResult[response.SmsTemplateRes]{}, err
 	}

@@ -164,14 +164,6 @@ func (ls *LogService) recordTransactionalAudit(
 	})
 }
 
-func (ls *LogService) queryAccessLogs(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[model.AccessLog], error) {
-	basic, err := buildAccessLogQueryBasic(req)
-	if err != nil {
-		return response.ListResult[model.AccessLog]{}, err
-	}
-	return ls.accessLogRepository.GetAccessLogList(ctx, basic)
-}
-
 func buildAccessLogQueryBasic(req request.AccessLogQueryReq) (*request.Basic, error) {
 	basic := req.Basic
 	if basic.Order.Field == "" {
@@ -279,7 +271,11 @@ func accessLogResponse(data model.AccessLog) response.AccessLogRes {
 }
 
 func (ls *LogService) QueryAccessLogsResponse(ctx context.Context, req request.AccessLogQueryReq) (response.ListResult[response.AccessLogRes], error) {
-	data, err := ls.queryAccessLogs(ctx, req)
+	basic, err := buildAccessLogQueryBasic(req)
+	if err != nil {
+		return response.ListResult[response.AccessLogRes]{}, err
+	}
+	data, err := ls.accessLogRepository.GetAccessLogList(ctx, basic)
 	if err != nil {
 		return response.ListResult[response.AccessLogRes]{}, err
 	}

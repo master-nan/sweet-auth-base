@@ -162,8 +162,8 @@ const isButtonDisabled = (button: MenuButton) =>
 
 .organization-detail-page-header,
 .organization-detail-page-panel {
-  border: 1px solid rgba(127, 143, 178, 0.24);
-  background: #fff;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
   border-radius: 8px;
 }
 
@@ -199,12 +199,6 @@ const isButtonDisabled = (button: MenuButton) =>
 
 .organization-detail-page-panel {
   padding: 20px 22px;
-}
-
-body.body--dark .organization-detail-page-header,
-body.body--dark .organization-detail-page-panel {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: #1d1d1d;
 }
 
 @media (max-width: 700px) {

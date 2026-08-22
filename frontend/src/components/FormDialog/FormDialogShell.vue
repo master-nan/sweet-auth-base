@@ -195,7 +195,7 @@ const show = computed({
   max-height: calc(100vh - 142px);
   border: 1px solid rgba(115, 103, 240, 0.18);
   box-shadow: none;
-  background: #fff;
+  background: var(--app-surface);
 }
 
 .form-dialog-shell__header {
@@ -204,8 +204,8 @@ const show = computed({
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
 
 .form-dialog-shell__mark {
@@ -233,21 +233,21 @@ const show = computed({
   font-size: 19px;
   line-height: 1.2;
   font-weight: 800;
-  color: #172033;
+  color: var(--app-text-strong);
 }
 
 .form-dialog-shell__subtitle {
   margin-top: 4px;
   font-size: 12px;
-  color: #748098;
+  color: var(--app-text-muted);
 }
 
 .form-dialog-shell__close {
   width: 34px;
   height: 34px;
-  color: #111827;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  color: var(--app-text-strong);
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
 }
 
 .form-dialog-shell__body {
@@ -255,7 +255,7 @@ const show = computed({
   padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  background: #f8faff;
+  background: var(--app-surface-muted);
 }
 
 .form-dialog-shell__body.has-preview {
@@ -288,8 +288,8 @@ const show = computed({
   min-width: 0;
   overflow: auto;
   padding: 18px;
-  border-left: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
+  border-left: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
 
 .form-dialog-shell__footer {
@@ -298,8 +298,8 @@ const show = computed({
   align-items: center;
   gap: 10px;
   padding: 12px 18px;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
 
 .form-dialog-shell__footer-left {
@@ -311,7 +311,7 @@ const show = computed({
 
 .form-dialog-shell__status {
   font-size: 13px;
-  color: #748098;
+  color: var(--app-text-muted);
 }
 
 .form-dialog-shell__submit {
@@ -319,38 +319,6 @@ const show = computed({
   height: 36px;
   border-radius: 7px;
   box-shadow: 0 8px 18px rgba($primary, 0.28);
-}
-
-body.body--dark .form-dialog-shell--embedded,
-body.body--dark .form-dialog-shell__header,
-body.body--dark .form-dialog-shell__footer,
-body.body--dark .form-dialog-shell__preview {
-  background: #1d1f27;
-}
-
-body.body--dark .form-dialog-shell__body {
-  background: #181a21;
-}
-
-body.body--dark .form-dialog-shell__title {
-  color: #f1f4fa;
-}
-
-body.body--dark .form-dialog-shell__subtitle,
-body.body--dark .form-dialog-shell__status {
-  color: #98a4ba;
-}
-
-body.body--dark .form-dialog-shell__header,
-body.body--dark .form-dialog-shell__footer,
-body.body--dark .form-dialog-shell__preview {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .form-dialog-shell__close {
-  color: #f1f4fa;
-  background: #252833;
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 900px) {
@@ -370,7 +338,7 @@ body.body--dark .form-dialog-shell__close {
 
   .form-dialog-shell__navigation {
     max-height: 220px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    border-bottom: 1px solid var(--app-border);
   }
 
   .form-dialog-shell__preview {

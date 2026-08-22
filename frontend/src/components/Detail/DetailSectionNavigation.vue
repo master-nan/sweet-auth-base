@@ -46,11 +46,11 @@ const emit = defineEmits<{
   min-height: 0;
   height: 100%;
   padding: 18px 14px;
-  border-right: 1px solid #e7edf7;
+  border-right: 1px solid var(--app-border);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #fbfcff;
+  background: var(--app-surface-muted);
 }
 
 .detail-section-navigation__item {
@@ -63,7 +63,7 @@ const emit = defineEmits<{
   align-items: center;
   gap: 12px;
   background: transparent;
-  color: #4a5870;
+  color: var(--app-text-muted);
   text-align: left;
   cursor: pointer;
 }
@@ -75,7 +75,7 @@ const emit = defineEmits<{
 
 .detail-section-navigation__item strong {
   display: block;
-  color: #243047;
+  color: var(--app-text-strong);
   font-size: 15px;
   line-height: 1.2;
   font-weight: 700;
@@ -84,7 +84,7 @@ const emit = defineEmits<{
 .detail-section-navigation__item small {
   display: block;
   margin-top: 5px;
-  color: #8390a6;
+  color: var(--app-text-muted);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -96,50 +96,25 @@ const emit = defineEmits<{
   border-radius: 15px;
   display: grid;
   place-items: center;
-  background: #f0efff;
-  color: #6957ed;
+  background: var(--app-primary-soft);
+  color: var(--q-primary);
   font-style: normal;
   font-weight: 700;
 }
 
 .detail-section-navigation__item.is-active {
-  border-color: #d8d4ff;
-  background: #ffffff;
-  color: #6957ed;
+  border-color: var(--app-primary-border);
+  background: var(--app-surface);
+  color: var(--q-primary);
   box-shadow: 0 8px 18px rgb(105 87 237 / 10%);
 }
 
 .detail-section-navigation__item.is-active strong {
-  color: #6957ed;
+  color: var(--q-primary);
 }
 
 .detail-section-navigation__footer {
   margin-top: auto;
 }
 
-body.body--dark .detail-section-navigation {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: #171a22;
-}
-
-body.body--dark .detail-section-navigation__item {
-  color: #aab4c8;
-}
-
-body.body--dark .detail-section-navigation__item strong {
-  color: #e8ecf4;
-}
-
-body.body--dark .detail-section-navigation__item small {
-  color: #8e9ab0;
-}
-
-body.body--dark .detail-section-navigation__item.is-active {
-  border-color: rgba(141, 127, 255, 0.48);
-  background: #25283a;
-}
-
-body.body--dark .detail-section-navigation__item.is-active strong {
-  color: #a99eff;
-}
 </style>

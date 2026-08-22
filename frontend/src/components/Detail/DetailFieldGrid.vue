@@ -75,7 +75,7 @@ const displayValue = (value: DetailFieldItem['value']) => {
 
 .detail-field-grid--card .detail-field-grid__item {
   padding: 12px;
-  border: 1px solid rgba(127, 143, 178, 0.22);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
 }
 
@@ -88,28 +88,16 @@ const displayValue = (value: DetailFieldItem['value']) => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #7c879c;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
 .detail-field-grid__value {
   margin-top: 8px;
-  color: #172033;
+  color: var(--app-text-strong);
   font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-
-body.body--dark .detail-field-grid__label {
-  color: #98a4ba;
-}
-
-body.body--dark .detail-field-grid__value {
-  color: #f1f4fa;
-}
-
-body.body--dark .detail-field-grid--card .detail-field-grid__item {
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 700px) {

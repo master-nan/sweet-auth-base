@@ -228,7 +228,8 @@ func (s *RetryPolicyService) changeRetryPolicyStatus(ctx context.Context, id, re
 			return myerrors.ErrRetryPolicyRevisionConflict
 		}
 		if current.Status == target {
-			return responseRetryPolicyUnchanged(&updated, current)
+			updated = current
+			return nil
 		}
 		if target == model.RetryPolicyStatusEnabled {
 			if current.Status != model.RetryPolicyStatusDraft && current.Status != model.RetryPolicyStatusDisabled {
@@ -281,11 +282,6 @@ func (s *RetryPolicyService) changeRetryPolicyStatus(ctx context.Context, id, re
 		return response.RetryPolicyDetailRes{}, err
 	}
 	return response.NewRetryPolicyDetailRes(updated), nil
-}
-
-func responseRetryPolicyUnchanged(target *model.RetryPolicy, current model.RetryPolicy) error {
-	*target = current
-	return nil
 }
 
 func newRetryPolicy(req request.RetryPolicyCreateReq) (model.RetryPolicy, error) {
