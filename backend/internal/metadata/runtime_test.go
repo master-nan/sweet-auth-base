@@ -72,6 +72,9 @@ func TestProjectTableSeparatesRuntimeConcernsAndFiltersUnsafeFields(t *testing.T
 	if projected.Fields[0].ListVisible || projected.Fields[0].QuickQuery || projected.Fields[0].AdvancedQuery {
 		t.Fatalf("managed field exposed runtime capabilities: %+v", projected.Fields[0])
 	}
+	if !projected.Fields[0].DetailVisible {
+		t.Fatalf("explicitly visible managed field was hidden from detail: %+v", projected.Fields[0])
+	}
 	if projected.Fields[1].Code != "org_name" || projected.Fields[1].RelationExpression != relationExpression {
 		t.Fatalf("structured relation projection = %+v", projected.Fields[1])
 	}
@@ -90,6 +93,20 @@ func TestProjectTableSeparatesRuntimeConcernsAndFiltersUnsafeFields(t *testing.T
 	}
 	if legacy.MasterDetailMode != table.MasterDetailMode || legacy.FormOpenMode != table.FormOpenMode || legacy.DetailOpenMode != table.DetailOpenMode {
 		t.Fatalf("legacy runtime UI metadata was not preserved: %+v", legacy)
+	}
+}
+
+func TestProjectFieldHidesManagedDetailByDefaultAndNeverProjectsSensitiveFields(t *testing.T) {
+	managed := metadataTestField(31, "gmt_create", 1, enum.DatetimeFieldType)
+	managed.IsListShow = false
+	projected, ok := ProjectField(managed)
+	if !ok || !projected.SystemManaged || projected.DetailVisible {
+		t.Fatalf("managed detail visibility = %+v, ok=%v", projected, ok)
+	}
+
+	sensitive := metadataTestField(32, "password", 2, enum.VarcharFieldType)
+	if _, ok := ProjectField(sensitive); ok {
+		t.Fatal("sensitive field must never enter runtime metadata")
 	}
 }
 

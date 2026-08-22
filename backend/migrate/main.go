@@ -991,7 +991,6 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
 		menuWithTable(menu(902, 900, "report_manage", "manage", "pages/report/manage/Index.vue", "router.report.manage", "build", 2), "report_definition"),
 		reportDesignMenu,
-		menuWithTable(menu(904, 900, "report_v2_workbench", "report-v2/workbench", "pages/report-v2/workbench/ReportWorkbenchPage.vue", "router.report.workbench", "space_dashboard", 4), "report_definition"),
 	}
 	menuByName := make(map[string]model.SysMenu, len(menus))
 	for _, item := range menus {
@@ -1153,13 +1152,6 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 		return fmt.Errorf("report_manage menu missing after seed")
 	}
 	if err := seedReportManageMenuButtons(db, sf, roleID, roleName, reportManageMenu.Id); err != nil {
-		return err
-	}
-	reportV2WorkbenchMenu, ok := menuByName["report_v2_workbench"]
-	if !ok {
-		return fmt.Errorf("report_v2_workbench menu missing after seed")
-	}
-	if err := seedReportV2WorkbenchMenuButtons(db, sf, roleID, roleName, reportV2WorkbenchMenu.Id); err != nil {
 		return err
 	}
 	reportDesignMenu, ok := menuByName["report_design"]
@@ -1752,25 +1744,6 @@ func seedReportManageMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, r
 		apiPermissionWithAPI(727, menuID, "报表详情", "report_manage_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
 		apiPermissionWithAPI(728, menuID, "数据源列表", "report_manage_data_source", enum.Top, "metadata", "dataset", "primary", 92, "/admin/report/data-sources", "GET"),
 		apiPermissionWithAPI(729, menuID, "SQL字段解析", "report_manage_sql_fields", enum.Top, "metadata", "schema", "primary", 93, "/admin/report/sql-fields", "POST"),
-	}
-	return seedMenuButtons(db, sf, roleID, roleName, buttons)
-}
-
-func seedReportV2WorkbenchMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
-	buttons := []model.SysMenuButton{
-		apiPermissionWithAPI(740, menuID, "报表列表", "report_v2_workbench_query", enum.Top, "query", "search", "primary", 90, "/admin/report/query", "POST"),
-		apiPermissionWithAPI(741, menuID, "报表详情", "report_v2_workbench_detail", enum.Line, "detail", "visibility", "primary", 91, "/admin/report/:id", "GET"),
-		apiPermissionWithAPI(742, menuID, "页面元数据", "report_v2_workbench_metadata", enum.Top, "metadata", "data_object", "primary", 92, "/admin/table/code/:code", "GET"),
-		menuButtonWithAPI(743, menuID, "新建报表", "report_v2_workbench_create", enum.Top, "create", "add", "primary", 1, "/admin/report", "POST"),
-		menuButton(744, menuID, "刷新", "report_v2_workbench_refresh", enum.Top, "refresh", "refresh", "primary", 2),
-		menuButtonWithAPI(745, menuID, "设计", "report_v2_workbench_design", enum.Line, "update", "design_services", "primary", 1, "/admin/report/:id", "GET"),
-		menuButtonWithAPI(746, menuID, "运行", "report_v2_workbench_run", enum.Line, "run", "play_circle", "primary", 2, "/admin/report/:id/run", "POST"),
-		menuButtonWithAPI(747, menuID, "发布版本", "report_v2_workbench_publish", enum.Line, "publish", "published_with_changes", "primary", 3, "/admin/report/:id/publish", "POST"),
-		menuButtonWithAPI(748, menuID, "发布到菜单", "report_v2_workbench_publish_menu", enum.Line, "publish_menu", "add_to_queue", "primary", 4, "/admin/report/:id/publish-menu", "POST"),
-		menuButtonWithAPI(749, menuID, "取消发布菜单", "report_v2_workbench_unpublish_menu", enum.Line, "unpublish_menu", "remove_from_queue", "warning", 5, "/admin/report/:id/publish-menu", "DELETE"),
-		menuButtonWithAPI(750, menuID, "版本", "report_v2_workbench_version", enum.Line, "version", "history", "primary", 6, "/admin/report/:id/versions", "GET"),
-		menuButtonWithAPI(751, menuID, "停用", "report_v2_workbench_disable", enum.Line, "disable", "block", "negative", 7, "/admin/report/:id/status", "POST"),
-		menuButtonWithAPI(752, menuID, "删除", "report_v2_workbench_delete", enum.Line, "delete", "delete", "negative", 8, "/admin/report/:id", "DELETE"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
@@ -2436,6 +2409,7 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	}
 	applyMigrationSensitiveFieldDefaults(&field)
 	applyMigrationManagedFieldDefaults(&field)
+	applySysUserFieldDefaults(tableCode, &field)
 	applyExternalSystemFieldDefaults(tableCode, &field)
 	applyInterfaceDefinitionFieldDefaults(tableCode, &field)
 	applyCredentialFieldDefaults(tableCode, &field)
@@ -2446,6 +2420,14 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
 	return field, nil
+}
+
+func applySysUserFieldDefaults(tableCode string, field *model.SysTableField) {
+	if tableCode != "sys_user" || field.FieldCode != "gmt_last_login" {
+		return
+	}
+	field.IsInsertShow = false
+	field.IsUpdateShow = false
 }
 
 func normalizeSystemColumnDefault(fieldType enum.SysTableFieldType, defaultValue string) string {

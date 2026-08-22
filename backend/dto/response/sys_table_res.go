@@ -123,6 +123,7 @@ type RuntimeFieldMetadataRes struct {
 	IsSort             bool                            `json:"is_sort"`
 	IsNull             bool                            `json:"is_null"`
 	IsListShow         bool                            `json:"is_list_show"`
+	DetailVisible      bool                            `json:"detail_visible"`
 	IsInsertShow       bool                            `json:"is_insert_show"`
 	IsUpdateShow       bool                            `json:"is_update_show"`
 	Sequence           uint8                           `json:"sequence"`

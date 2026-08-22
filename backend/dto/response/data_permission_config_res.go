@@ -114,13 +114,14 @@ type DataPolicyRuleDetailRes struct {
 
 type DataGrantListRes struct {
 	DataPermissionConfigBaseRes
-	SubjectType string     `json:"subject_type"`
-	SubjectId   int        `json:"subject_id"`
-	ResourceId  int        `json:"resource_id"`
-	Operation   string     `json:"operation"`
-	PolicyId    int        `json:"policy_id"`
-	ValidFrom   *time.Time `json:"valid_from"`
-	ValidTo     *time.Time `json:"valid_to"`
+	SubjectType string                             `json:"subject_type"`
+	SubjectId   int                                `json:"subject_id"`
+	Subject     *DataPermissionReferenceSummaryRes `json:"subject,omitempty"`
+	ResourceId  int                                `json:"resource_id"`
+	Operation   string                             `json:"operation"`
+	PolicyId    int                                `json:"policy_id"`
+	ValidFrom   *time.Time                         `json:"valid_from"`
+	ValidTo     *time.Time                         `json:"valid_to"`
 }
 
 type DataGrantDetailRes struct {

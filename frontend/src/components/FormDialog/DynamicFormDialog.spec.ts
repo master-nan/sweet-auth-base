@@ -172,6 +172,7 @@ const mountDialog = async (field: TableField, editData: Record<string, unknown> 
       modelValue: true,
       fields: [field],
       editData,
+      menuId: 205,
     },
     global: {
       stubs: {
@@ -308,6 +309,34 @@ describe('DynamicFormDialog organization selector integration', () => {
         employee_id: 31,
       },
     })
+  })
+
+  it('loads the current relation label when the edited value is outside the first page', async () => {
+    postMock
+      .mockResolvedValueOnce({ data: { data: [], total: 80 } })
+      .mockResolvedValueOnce({
+        data: { data: [{ value: '9527', label: '华东客户' }], total: 1 },
+      })
+    await mountDialog(
+      makeField('customer_id', {}, {
+        linkage_config: JSON.stringify({
+          linkage: {
+            enabled: true,
+            mode: 'relation',
+            tableCode: 'customer',
+            valueKey: 'id',
+            labelKey: 'name',
+          },
+        }),
+      }),
+      { customer_id: 9527 },
+    )
+
+    expect(postMock).toHaveBeenCalledWith(
+      '/admin/runtime/relation-fields/1/options',
+      expect.objectContaining({ menu_id: 205, selected_values: ['9527'] }),
+      expect.any(Object),
+    )
   })
 
   it('passes multiple, history, disabled and existing values to the selector', async () => {

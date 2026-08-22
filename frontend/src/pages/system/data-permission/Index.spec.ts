@@ -179,11 +179,17 @@ const TableStub = defineComponent({
   name: 'QTable',
   props: {
     rows: { type: Array, default: () => [] },
+    columns: { type: Array, default: () => [] },
   },
   setup(props, { slots }) {
     return () =>
       h('section', { 'data-testid': 'table', 'data-row-count': props.rows.length }, [
         slots.top?.(),
+        ...props.rows.flatMap((row: any) =>
+          props.columns.map((column: any) =>
+            h('span', typeof column.field === 'function' ? column.field(row) : row[column.field]),
+          ),
+        ),
         slots.bottom?.(),
       ])
   },
@@ -374,6 +380,32 @@ describe('Data permission configuration center', () => {
     expect(resourceInput.element).toHaveProperty('value', '运输')
     expect(policyInput.element).toHaveProperty('value', '组织策略')
     expect(apiMocks.queryResources).not.toHaveBeenCalled()
+  })
+
+  it('renders a grant subject name without exposing its numeric role id', async () => {
+    apiMocks.queryGrants.mockResolvedValue({
+      data: [
+        {
+          id: 77,
+          subject_type: 'role',
+          subject_id: 9527,
+          subject: { id: 9527, name: '华东只读角色', code: '' },
+          resource_id: 10,
+          operation: 'query',
+          policy_id: 20,
+          state: true,
+        },
+      ],
+      total: 1,
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.find('[data-tab="grants"]').trigger('click')
+    await flushPromises()
+
+    const table = wrapper.find('[data-panel="grants"] [data-testid="table"]')
+    expect(table.text()).toContain('华东只读角色')
+    expect(table.text()).not.toContain('#9527')
   })
 
   it('stops submission when the common form validation fails', async () => {

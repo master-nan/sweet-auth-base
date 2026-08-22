@@ -19,7 +19,7 @@ const (
 	reportExportPath = "/admin/report/:id/export"
 )
 
-var reportManagementMenuNames = []string{"report_manage", "report_v2_workbench"}
+var reportManagementMenuNames = []string{"report_manage"}
 
 type reportRoutePermission struct {
 	Path   string

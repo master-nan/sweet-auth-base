@@ -112,6 +112,7 @@ func organizationDictionarySeeds() []systemDictSeed {
 			name: "任职类型",
 			code: "org_assignment_type",
 			items: []systemDictItemSeed{
+				{name: "标准任职", code: "org_assignment_type_standard", value: "standard"},
 				{name: "主任职", code: "org_assignment_type_primary", value: "primary"},
 				{name: "兼职", code: "org_assignment_type_part_time", value: "part_time"},
 				{name: "临时", code: "org_assignment_type_temporary", value: "temporary"},

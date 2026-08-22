@@ -106,6 +106,23 @@ func TestHighRiskResponseSensitiveFieldsAreNotSerialized(t *testing.T) {
 	}
 }
 
+func TestSysUserResponseKeepsNeverLoggedInAsNull(t *testing.T) {
+	data, err := json.Marshal(SysUserResponse(model.SysUser{UserName: "new-user"}))
+	if err != nil {
+		t.Fatalf("marshal user response: %v", err)
+	}
+	if string(data) == "" || !json.Valid(data) {
+		t.Fatalf("invalid user response JSON: %s", data)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("decode user response: %v", err)
+	}
+	if payload["gmt_last_login"] != nil {
+		t.Fatalf("never-logged-in timestamp = %#v, want null", payload["gmt_last_login"])
+	}
+}
+
 func TestHighRiskListAndDetailWhitelists(t *testing.T) {
 	report := model.ReportDefinition{
 		Basic:        model.Basic{Id: 11, State: true},

@@ -107,6 +107,12 @@ func TestOrganizationQueryDTOValidation(t *testing.T) {
 		t.Fatalf("expected valid assignment query to pass: %v", err)
 	}
 	if err := validate.Struct(request.OrgAssignmentQueryReq{
+		EmployeeId:     &employeeID,
+		AssignmentType: "standard",
+	}); err != nil {
+		t.Fatalf("expected canonical standard assignment type: %v", err)
+	}
+	if err := validate.Struct(request.OrgAssignmentQueryReq{
 		EmployeeId: &employeeID,
 		TimeScope:  "primary",
 	}); err == nil {

@@ -89,6 +89,7 @@ export interface DataPolicy extends Basic {
 export interface DataGrant extends Basic {
   subject_type: DataPermissionSubjectType
   subject_id: number
+  subject?: DataPermissionReferenceSummary
   resource_id: number
   operation: DataPermissionOperation
   policy_id: number

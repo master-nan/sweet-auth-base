@@ -9,13 +9,13 @@ import "backend/model"
 
 type SysUserRes struct {
 	BasicRes
-	UserName     string           `json:"user_name"`
-	Email        string           `json:"email"`
-	PhoneNumber  string           `json:"phone_number"`
-	GmtLastLogin model.CustomTime `json:"gmt_last_login"`
-	Language     string           `json:"language"`
-	IsReset      bool             `json:"is_reset"`
-	Roles        []RoleSimpleRes  `json:"roles"`
+	UserName     string            `json:"user_name"`
+	Email        string            `json:"email"`
+	PhoneNumber  string            `json:"phone_number"`
+	GmtLastLogin *model.CustomTime `json:"gmt_last_login"`
+	Language     string            `json:"language"`
+	IsReset      bool              `json:"is_reset"`
+	Roles        []RoleSimpleRes   `json:"roles"`
 }
 
 type RoleSimpleRes struct {

@@ -1,11 +1,12 @@
 import { defineComponent, h } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
 import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
 
 vi.mock('src/stores/dict', () => ({ useDictStore: () => ({ getDictLabel: () => '异常' }) }))
 vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
 import QuerySchemePreview from './QuerySchemePreview.vue'
 
 const BadgeStub = defineComponent({ props: { label: String }, setup(props) { return () => h('span', props.label) } })
@@ -32,5 +33,49 @@ describe('QuerySchemePreview', () => {
     })
 
     expect(wrapper.text()).toContain('未设置高级查询条件')
+  })
+
+  it('resolves relation values through selected_values for the preview', async () => {
+    vi.mocked(queryRuntimeRelationOptions).mockResolvedValue({
+      items: [{ value: '9527', label: '华东客户' }],
+      total: 1,
+    })
+    const wrapper = mount(QuerySchemePreview, {
+      props: {
+        menuId: 205,
+        fields: [
+          {
+            id: 9,
+            field_code: 'customer_id',
+            field_name: '客户',
+            field_type: SysTableFieldType.BIGINT,
+            relation: { target_table_code: 'customer', value_field: 'id', display_field: 'name' },
+          },
+        ] as never,
+        payload: {
+          expressions: [
+            {
+              logic: ExpressionLogic.AND,
+              rules: [
+                { field: 'customer_id', expression_type: ExpressionType.EQ, value: '9527' },
+              ],
+              nested: [],
+            },
+          ],
+          quick_query: { keyword: '' },
+          order: { field: '', is_asc: false },
+          bindings: [],
+        },
+      },
+      global: { stubs: { QBadge: BadgeStub } },
+    })
+    await flushPromises()
+
+    expect(queryRuntimeRelationOptions).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({ menu_id: 205, selected_values: ['9527'] }),
+    )
+    expect(wrapper.text()).toContain('客户 等于 华东客户')
+    expect(wrapper.text()).not.toContain('9527')
   })
 })

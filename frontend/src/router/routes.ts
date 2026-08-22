@@ -424,36 +424,12 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/report-v2/workbench/ReportWorkbenchPage.vue'),
-        path: 'workbench',
-        name: 'report_v2_workbench',
-        meta: {
-          title: 'Report V2 Workbench',
-          icon: 'dashboard',
-          keepAlive: false,
-          isHidden: true,
-          showTag: true,
-        },
-      },
-      {
         component: () => import('pages/report-v2/runtime/ReportRuntimePage.vue'),
         path: 'runtime/:id',
         name: 'report_v2_runtime',
         meta: {
           title: 'Report V2 Runtime',
           icon: 'play_circle',
-          keepAlive: false,
-          isHidden: true,
-          showTag: true,
-        },
-      },
-      {
-        component: () => import('pages/report-v2/designer/ReportDesignerPage.vue'),
-        path: 'designer/:id',
-        name: 'report_v2_designer',
-        meta: {
-          title: 'Report V2 Designer',
-          icon: 'design_services',
           keepAlive: false,
           isHidden: true,
           showTag: true,

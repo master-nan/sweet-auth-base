@@ -43,6 +43,7 @@ func migrationSteps() []migrationStep {
 		migrateCanonicalRuntimeContract,
 		applyOrganizationDatabaseComments,
 		ensureAccessLogOperationalIndexes,
+		migrateProductWalkthroughCorrections,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -59,6 +60,52 @@ func migrationSteps() []migrationStep {
 		})
 	}
 	return steps
+}
+
+func migrateProductWalkthroughCorrections(db *gorm.DB) error {
+	var menuIDs []int
+	if err := db.Model(&model.SysMenu{}).
+		Where("name = ?", "report_v2_workbench").
+		Pluck("id", &menuIDs).Error; err != nil {
+		return fmt.Errorf("query obsolete report workbench menu: %w", err)
+	}
+	if len(menuIDs) > 0 {
+		var buttonIDs []int
+		if err := db.Model(&model.SysMenuButton{}).
+			Where("menu_id IN ?", menuIDs).
+			Pluck("id", &buttonIDs).Error; err != nil {
+			return fmt.Errorf("query obsolete report workbench buttons: %w", err)
+		}
+		if len(buttonIDs) > 0 {
+			if err := db.Where("button_id IN ?", buttonIDs).Delete(&model.SysRoleMenuButton{}).Error; err != nil {
+				return fmt.Errorf("delete obsolete report workbench button grants: %w", err)
+			}
+		}
+		if err := db.Where("menu_id IN ?", menuIDs).Delete(&model.SysRoleMenu{}).Error; err != nil {
+			return fmt.Errorf("delete obsolete report workbench menu grants: %w", err)
+		}
+		if err := db.Where("menu_id IN ?", menuIDs).Delete(&model.SysMenuButton{}).Error; err != nil {
+			return fmt.Errorf("delete obsolete report workbench buttons: %w", err)
+		}
+		if err := db.Where("id IN ?", menuIDs).Delete(&model.SysMenu{}).Error; err != nil {
+			return fmt.Errorf("delete obsolete report workbench menu: %w", err)
+		}
+		if err := rebuildFunctionalPermissionPolicies(db); err != nil {
+			return fmt.Errorf("rebuild permissions after report workbench cleanup: %w", err)
+		}
+	}
+	userTables := db.Model(&model.SysTable{}).Select("id").Where("table_code = ?", "sys_user")
+	if err := db.Model(&model.SysTableField{}).
+		Where("table_id IN (?) AND field_code = ?", userTables, "gmt_last_login").
+		Where("is_insert_show = ? OR is_update_show = ?", true, true).
+		Updates(map[string]interface{}{
+			"is_insert_show": false,
+			"is_update_show": false,
+			"gmt_modify":     model.Now(),
+		}).Error; err != nil {
+		return fmt.Errorf("hide last login from user mutations: %w", err)
+	}
+	return nil
 }
 
 func ensureAccessLogOperationalIndexes(db *gorm.DB) error {

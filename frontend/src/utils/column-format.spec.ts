@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { buildColumnFormat, resolveRuntimeColumns } from 'src/utils/column-format'
+import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+import {
+  buildColumnFormat,
+  buildRelationLookups,
+  formatDateTime,
+  hydrateRelationLookups,
+  resolveRuntimeColumns,
+} from 'src/utils/column-format'
 
 vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
 vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [] }) }))
@@ -35,6 +42,12 @@ const field = (overrides: Partial<TableField>): TableField =>
   }) as TableField
 
 describe('resolveRuntimeColumns', () => {
+  it('renders only the Go zero timestamp as never occurred', () => {
+    expect(formatDateTime(null)).toBe('-')
+    expect(formatDateTime('0001-01-01T00:00:00Z')).toBe('-')
+    expect(formatDateTime('1970-01-01T00:00:00Z')).not.toBe('-')
+  })
+
   it('combines metadata, typed overrides and virtual columns in stable order', () => {
     const result = resolveRuntimeColumns<{ name: string; status: string }>(
       [
@@ -111,5 +124,74 @@ describe('resolveRuntimeColumns', () => {
       relationLookups: { customer_id: {} },
     })
     expect(format?.(9527)).toBe('关联值未解析')
+  })
+
+  it('hydrates a relation value that is outside the first options page', async () => {
+    const relationField = field({
+      field_code: 'customer_id',
+      linkage_config: JSON.stringify({
+        linkage: {
+          enabled: true,
+          mode: 'relation',
+          tableCode: 'customer',
+          valueKey: 'id',
+          labelKey: 'name',
+        },
+      }),
+    })
+    const queryOptions = vi.mocked(queryRuntimeRelationOptions)
+    queryOptions
+      .mockResolvedValueOnce({ items: [], total: 80 })
+      .mockResolvedValueOnce({ items: [{ value: '9527', label: '华东客户' }], total: 1 })
+
+    const lookups = await buildRelationLookups([relationField], 205)
+    const hydrated = await hydrateRelationLookups(
+      [relationField],
+      [{ customer_id: 9527 }],
+      lookups,
+      205,
+    )
+
+    expect(queryOptions).toHaveBeenLastCalledWith(
+      relationField.id,
+      expect.objectContaining({ menu_id: 205, selected_values: ['9527'] }),
+    )
+    const format = buildColumnFormat(relationField, {
+      getDictLabel: () => '',
+      relationLookups: hydrated,
+    })
+    expect(hydrated).not.toBe(lookups)
+    expect(hydrated.customer_id).not.toBe(lookups.customer_id)
+    expect(format?.(9527)).toBe('华东客户')
+  })
+
+  it('hydrates a relation used only by detail without loading an unrelated first page', async () => {
+    const relationField = field({
+      field_code: 'customer_id',
+      is_list_show: false,
+      linkage_config: JSON.stringify({
+        linkage: {
+          enabled: true,
+          mode: 'relation',
+          tableCode: 'customer',
+          valueKey: 'id',
+          labelKey: 'name',
+        },
+      }),
+    })
+    const queryOptions = vi.mocked(queryRuntimeRelationOptions)
+    queryOptions.mockResolvedValueOnce({
+      items: [{ value: '9527', label: '华东客户' }],
+      total: 1,
+    })
+
+    const lookups = await buildRelationLookups([relationField], 205)
+    expect(queryOptions).not.toHaveBeenCalled()
+    await hydrateRelationLookups([relationField], [{ customer_id: 9527 }], lookups, 205)
+
+    expect(queryOptions).toHaveBeenCalledWith(
+      relationField.id,
+      expect.objectContaining({ selected_values: ['9527'] }),
+    )
   })
 })

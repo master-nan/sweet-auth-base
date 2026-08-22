@@ -210,7 +210,7 @@ type OrgAssignmentQueryReq struct {
 	LegalEntityId  *int   `form:"legal_entity_id" json:"legal_entity_id" binding:"omitempty,gt=0"`
 	OrgUnitId      *int   `form:"org_unit_id" json:"org_unit_id" binding:"omitempty,gt=0"`
 	PositionId     *int   `form:"position_id" json:"position_id" binding:"omitempty,gt=0"`
-	AssignmentType string `form:"assignment_type" json:"assignment_type" binding:"omitempty,oneof=primary part_time temporary project"`
+	AssignmentType string `form:"assignment_type" json:"assignment_type" binding:"omitempty,oneof=standard primary part_time temporary project"`
 	IsPrimary      *bool  `form:"is_primary" json:"is_primary"`
 	IsManager      *bool  `form:"is_manager" json:"is_manager"`
 	Status         string `form:"status" json:"status" binding:"omitempty,oneof=enabled disabled"`

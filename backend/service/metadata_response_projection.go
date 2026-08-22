@@ -148,7 +148,7 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 			DefaultValue: field.DefaultValue, DictCode: field.DictionaryCode,
 			IsPrimaryKey: field.PrimaryKey, IsIndex: field.Indexed,
 			IsQuickSearch: field.QuickQuery, IsAdvancedSearch: field.AdvancedQuery, IsSort: field.Sortable,
-			IsNull: field.Nullable, IsListShow: field.ListVisible,
+			IsNull: field.Nullable, IsListShow: field.ListVisible, DetailVisible: field.DetailVisible,
 			IsInsertShow: field.InsertVisible, IsUpdateShow: field.UpdateVisible,
 			Sequence: field.Sequence, OriginalFieldId: field.OriginalFieldID,
 			Binding: field.Binding, FieldCategory: field.Category,

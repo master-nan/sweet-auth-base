@@ -63,5 +63,7 @@ export const getFieldDetailSpan = (field: TableField) => {
   }
 }
 
+export const isDetailFieldVisible = (field: TableField) => field.detail_visible !== false
+
 export const getFieldFormGridClass = (field: TableField) =>
   getFieldFormSpan(field) >= 2 ? 'col-12' : 'col-12 col-sm-6'

@@ -108,7 +108,12 @@ func TestRuntimeRelationOptionsReturnDisplayValues(t *testing.T) {
 	if err := db.Exec(`CREATE TABLE pfcr_runtime_customers (id bigint PRIMARY KEY, customer_name varchar(64) NOT NULL)`).Error; err != nil {
 		t.Fatalf("create relation target: %v", err)
 	}
-	if err := db.Exec(`INSERT INTO pfcr_runtime_customers (id, customer_name) VALUES (7001, '华东客户')`).Error; err != nil {
+	for index := 1; index <= 25; index++ {
+		if err := db.Exec(`INSERT INTO pfcr_runtime_customers (id, customer_name) VALUES (?, ?)`, 7100+index, fmt.Sprintf("Customer %02d", index)).Error; err != nil {
+			t.Fatalf("seed paged relation target %d: %v", index, err)
+		}
+	}
+	if err := db.Exec(`INSERT INTO pfcr_runtime_customers (id, customer_name) VALUES (7001, 'ZZZ Selected Customer')`).Error; err != nil {
 		t.Fatalf("seed relation target: %v", err)
 	}
 
@@ -116,8 +121,23 @@ func TestRuntimeRelationOptionsReturnDisplayValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query runtime relation options: %v", err)
 	}
-	if result.Total != 1 || len(result.Data) != 1 || result.Data[0].Value != "7001" || result.Data[0].Label != "华东客户" {
+	if result.Total != 26 || len(result.Data) != 20 {
 		t.Fatalf("unexpected runtime relation result: %+v", result)
+	}
+	for _, item := range result.Data {
+		if item.Value == "7001" {
+			t.Fatalf("selected relation value unexpectedly appeared on first page: %+v", result)
+		}
+	}
+
+	selected, err := svc.metadataRuntime.QueryRelationOptions(context.Background(), 603, request.RuntimeRelationOptionsReq{
+		Page: 1, Num: 20, SelectedValues: []string{"7001"},
+	})
+	if err != nil {
+		t.Fatalf("query selected runtime relation option: %v", err)
+	}
+	if selected.Total != 1 || len(selected.Data) != 1 || selected.Data[0].Value != "7001" || selected.Data[0].Label != "ZZZ Selected Customer" {
+		t.Fatalf("selected relation value was not resolved: %+v", selected)
 	}
 }
 

@@ -323,6 +323,16 @@ func assertOrganizationSeedCatalog(t *testing.T, db *gorm.DB) {
 	if got := countWhere(t, db, &model.OrgStructure{}, "code IN ?", []string{"hr_management", "hr_legal"}); got != 2 {
 		t.Fatalf("controlled organization structure count = %d, want 2", got)
 	}
+	var standardAssignment model.SysDictItem
+	if err := db.Model(&model.SysDictItem{}).
+		Joins("JOIN sys_dict ON sys_dict.id = sys_dict_item.dict_id").
+		Where("sys_dict.dict_code = ? AND sys_dict_item.item_value = ?", "org_assignment_type", "standard").
+		First(&standardAssignment).Error; err != nil {
+		t.Fatalf("query standard assignment dictionary item: %v", err)
+	}
+	if standardAssignment.ItemName != "标准任职" {
+		t.Fatalf("standard assignment label = %q, want 标准任职", standardAssignment.ItemName)
+	}
 	var legalStructure model.OrgStructure
 	if err := db.Where("code = ?", "hr_legal").First(&legalStructure).Error; err != nil || legalStructure.StructureType != model.OrgStructureTypeLegal {
 		t.Fatalf("legal structure=%+v err=%v", legalStructure, err)

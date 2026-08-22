@@ -33,6 +33,8 @@ func TestDataGrantConfigServiceCreateRoleAndUserGrant(t *testing.T) {
 	}
 	if roleResult.SubjectType != model.DataGrantSubjectTypeRole ||
 		roleResult.SubjectId != fixtures.role.Id ||
+		roleResult.Subject == nil ||
+		roleResult.Subject.Name != fixtures.role.Name ||
 		roleResult.Operation != model.DataPermissionOperationQuery ||
 		roleResult.Resource == nil ||
 		roleResult.Resource.Code != fixtures.resource.ResourceCode ||
@@ -49,7 +51,9 @@ func TestDataGrantConfigServiceCreateRoleAndUserGrant(t *testing.T) {
 		t.Fatalf("create user grant: %v", err)
 	}
 	if userResult.SubjectType != model.DataGrantSubjectTypeUser ||
-		userResult.SubjectId != fixtures.user.Id {
+		userResult.SubjectId != fixtures.user.Id ||
+		userResult.Subject == nil ||
+		userResult.Subject.Name != fixtures.user.UserName {
 		t.Fatalf("unexpected user grant response: %+v", userResult)
 	}
 
@@ -69,6 +73,11 @@ func TestDataGrantConfigServiceCreateRoleAndUserGrant(t *testing.T) {
 	)
 	if err != nil || page.Total != 2 || len(page.Data) != 2 {
 		t.Fatalf("page grants = %+v, err=%v", page, err)
+	}
+	for _, item := range page.Data {
+		if item.Subject == nil || item.Subject.Name == "" {
+			t.Fatalf("grant subject display was not projected: %+v", item)
+		}
 	}
 
 	payload, err := json.Marshal(roleResult)
@@ -396,6 +405,8 @@ func newDataGrantConfigTestSubject(
 		impl.NewDataDimensionDefinitionRepositoryImpl(primaryDB),
 		impl.NewDataPolicyRepositoryImpl(primaryDB),
 		impl.NewDataPolicyRuleRepositoryImpl(primaryDB),
+		impl.NewSysRoleRepositoryImpl(primaryDB),
+		impl.NewSysUserRepositoryImpl(primaryDB),
 		registry,
 		sf,
 		auditWriter,

@@ -30,8 +30,8 @@ func TestMigrationLedgerPostgreSQLFreshAndRerun(t *testing.T) {
 	if err := migrationstate.ValidateLedger(first, migrationstate.Catalog(), true); err != nil {
 		t.Fatalf("validate fresh ledger: %v", err)
 	}
-	if len(first) != 15 {
-		t.Fatalf("fresh ledger has %d entries, want 15", len(first))
+	if len(first) != len(migrationstate.Catalog()) {
+		t.Fatalf("fresh ledger has %d entries, want %d", len(first), len(migrationstate.Catalog()))
 	}
 	assertAllManagedTablesExist(t, db)
 	assertAccessLogOperationalIndexes(t, db)

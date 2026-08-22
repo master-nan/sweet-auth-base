@@ -69,6 +69,7 @@ export interface TableField extends Basic {
   is_sort: boolean
   is_null: boolean
   is_list_show: boolean
+  detail_visible?: boolean
   is_insert_show: boolean
   is_update_show: boolean
   sequence: number
@@ -78,6 +79,7 @@ export interface TableField extends Basic {
   expression?: string
   tag?: string
   linkage_config?: string
+  system_managed?: boolean
 }
 
 export interface TableIndex extends Basic {

@@ -35,7 +35,6 @@ export default {
       center: 'Report Center',
       manage: 'Report Management',
       design: 'Report Designer',
-      workbench: 'Report Workbench',
     },
     system: {
       default: 'System Management',

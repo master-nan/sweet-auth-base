@@ -46,7 +46,8 @@ VALUES ($1, $2, $3)
 	if len(complete.Problems) != 0 || len(complete.Warnings) != 0 {
 		t.Fatalf("complete ledger report problems=%#v warnings=%#v", complete.Problems, complete.Warnings)
 	}
-	if complete.Metrics["schema_migration.applied"] != 15 || complete.Metrics["schema_migration.expected"] != 15 {
+	expected := int64(len(definitions))
+	if complete.Metrics["schema_migration.applied"] != expected || complete.Metrics["schema_migration.expected"] != expected {
 		t.Fatalf("complete ledger metrics = %#v", complete.Metrics)
 	}
 

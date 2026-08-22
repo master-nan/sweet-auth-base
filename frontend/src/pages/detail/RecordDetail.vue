@@ -19,8 +19,8 @@
             <div class="record-detail-title">{{ pageTitle }}</div>
             <div class="record-detail-subtitle">
               {{ sourceLabel }}
-              <q-chip dense square color="primary" text-color="white">{{ tableCode }}</q-chip>
-              <span v-if="recordId">#{{ recordId }}</span>
+              <q-chip v-if="isAudit" dense square color="primary" text-color="white">{{ tableCode }}</q-chip>
+              <span v-if="isAudit && recordId">#{{ recordId }}</span>
             </div>
           </div>
         </div>
@@ -223,7 +223,11 @@ import {
   type LookupMap,
 } from 'src/utils/column-format'
 import { hydrateRichTextFileUrls } from 'src/utils/rich-text-files'
-import { getFieldDetailSpan, normalizeFieldLabel } from 'src/utils/field-layout'
+import {
+  getFieldDetailSpan,
+  isDetailFieldVisible,
+  normalizeFieldLabel,
+} from 'src/utils/field-layout'
 import { parseParamsSchema } from 'src/utils/params-schema'
 
 interface DetailField {
@@ -331,7 +335,9 @@ const pageTitle = computed(() => {
   return label && label !== '-' ? `${tableName.value}详情：${label}` : `${tableName.value}详情`
 })
 
-const displayFields = computed(() => buildDisplayFields(record.value, tableFields.value))
+const displayFields = computed(() =>
+  buildDisplayFields(record.value, tableFields.value, isAudit.value),
+)
 
 const compactFields = computed(() => displayFields.value.filter((field) => !isLongField(field)))
 
@@ -343,7 +349,7 @@ const longSections = computed<LongSection[]>(() =>
     .map((field) => ({
       key: field.key,
       label: field.label,
-      caption: field.meta || field.key,
+      caption: isAudit.value ? field.meta || field.key : '',
       value: stringifyValue(field.rawValue),
     })),
 )
@@ -483,13 +489,17 @@ function toDetailField(key: string, row: Record<string, any>, field?: TableField
           : isCodeLike(key, rawValue)
             ? 'code'
             : 'text',
-    meta: fieldTypeLabel(field),
+    meta: isAudit.value ? fieldTypeLabel(field) : '',
     wide: !field && !isFile && value.length > 42,
     span: field ? getFieldDetailSpan(field) : isRichText ? 4 : !isFile && value.length > 42 ? 2 : 1,
   }
 }
 
-function buildDisplayFields(row: Record<string, any> | null, fields: TableField[]) {
+function buildDisplayFields(
+  row: Record<string, any> | null,
+  fields: TableField[],
+  includeTechnicalFields: boolean,
+) {
   if (!row) return []
   const sortedFields = fields.slice().sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
   const keys = new Set<string>()
@@ -497,10 +507,12 @@ function buildDisplayFields(row: Record<string, any> | null, fields: TableField[
 
   sortedFields.forEach((field) => {
     const key = field.field_code
-    if (!key || !(key in row)) return
+    if (!key || !(key in row) || (!includeTechnicalFields && !isDetailFieldVisible(field))) return
     keys.add(key)
     result.push(toDetailField(key, row, field))
   })
+
+  if (!includeTechnicalFields) return result
 
   preferredSystemKeys.forEach((key) => {
     if (!(key in row) || keys.has(key)) return

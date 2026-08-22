@@ -9,7 +9,7 @@
       <q-icon name="error_outline" color="negative" size="40px" />
       <div class="text-subtitle1 text-weight-medium">报表加载失败</div>
       <div class="text-body2 text-grey-7">{{ loadError }}</div>
-      <q-btn outline color="primary" icon="arrow_back" label="返回工作台" @click="goWorkbench" />
+      <q-btn outline color="primary" icon="arrow_back" label="返回" @click="goBack" />
     </q-card>
 
     <report-runtime-shell
@@ -36,7 +36,7 @@
       :page-size="pageSize"
       :loading="loading"
       :exporting="exporting"
-      @back="goWorkbench"
+      @back="goBack"
       @run="handleSearch"
       @reset="handleReset"
       @export="handleExport"
@@ -220,8 +220,8 @@ function updatePageSize(value: number) {
   void handleRun()
 }
 
-function goWorkbench() {
-  router.push({ name: 'report_v2_workbench' })
+function goBack() {
+  router.back()
 }
 
 function firstNumber(...values: unknown[]): number | undefined {

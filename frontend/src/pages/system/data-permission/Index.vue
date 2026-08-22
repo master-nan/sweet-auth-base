@@ -508,7 +508,9 @@ const grantColumns: QTableProps['columns'] = [
   {
     name: 'subject',
     label: '授权主体',
-    field: (row) => `${row.subject_type === 'role' ? '角色' : '用户'} #${row.subject_id}`,
+    field: (row) =>
+      row.subject?.name ||
+      (row.subject_type === 'role' ? '角色已停用或不可用' : '用户已停用或不可用'),
     align: 'left',
   },
   {
@@ -856,12 +858,12 @@ const targetOptions = (keyword = '') => {
   }
   return preflightGrants.value
     .filter((item) =>
-      `${item.subject_type} ${item.subject_id} ${resourceLabel(item.resource_id)}`
+      `${item.subject?.name || ''} ${item.subject?.code || ''} ${resourceLabel(item.resource_id)}`
         .toLowerCase()
         .includes(normalized),
     )
     .map((item) => ({
-      label: `${item.subject_type} #${item.subject_id} · ${resourceLabel(item.resource_id)}`,
+      label: `${item.subject?.name || (item.subject_type === 'role' ? '角色不可用' : '用户不可用')} · ${resourceLabel(item.resource_id)}`,
       value: item.id,
     }))
 }

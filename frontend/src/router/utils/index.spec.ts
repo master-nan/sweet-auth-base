@@ -110,4 +110,16 @@ describe('permission route construction', () => {
     expect(routes[0]?.children?.map((item) => item.name)).toEqual(['integration_credential'])
     expect(routes[0]?.children?.[0]?.meta?.title).toBe('router.integration.credential')
   })
+
+  it('keeps one formal Report entry set and only the published runtime hidden route', () => {
+    const report = asyncRoutesChildren.find((item) => item.name === 'report')
+    const reportRuntime = asyncRoutesChildren.find((item) => item.name === 'report_v2')
+
+    expect(report?.children?.map((item) => item.name)).toEqual([
+      'report_center',
+      'report_manage',
+      'report_design',
+    ])
+    expect(reportRuntime?.children?.map((item) => item.name)).toEqual(['report_v2_runtime'])
+  })
 })

@@ -35,7 +35,6 @@ export default {
       center: '报表中心',
       manage: '报表管理',
       design: '报表设计器',
-      workbench: '报表工作台',
     },
     system: {
       default: '系统管理',

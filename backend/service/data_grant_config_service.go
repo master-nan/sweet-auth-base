@@ -41,6 +41,8 @@ type DataGrantConfigService struct {
 	dimensionRepo          repository.DataDimensionDefinitionRepository
 	policyRepo             repository.DataPolicyRepository
 	ruleRepo               repository.DataPolicyRuleRepository
+	roleRepo               repository.SysRoleRepository
+	userRepo               repository.SysUserRepository
 	registeredFieldChecker datapermission.OwnershipFieldOperationValidator
 	sf                     *utils.Snowflake
 	auditWriter            TransactionalAuditWriter
@@ -54,6 +56,8 @@ func NewDataGrantConfigService(
 	dimensionRepo repository.DataDimensionDefinitionRepository,
 	policyRepo repository.DataPolicyRepository,
 	ruleRepo repository.DataPolicyRuleRepository,
+	roleRepo repository.SysRoleRepository,
+	userRepo repository.SysUserRepository,
 	registeredFieldChecker datapermission.OwnershipFieldOperationValidator,
 	sf *utils.Snowflake,
 	auditWriter TransactionalAuditWriter,
@@ -66,6 +70,8 @@ func NewDataGrantConfigService(
 		dimensionRepo:          dimensionRepo,
 		policyRepo:             policyRepo,
 		ruleRepo:               ruleRepo,
+		roleRepo:               roleRepo,
+		userRepo:               userRepo,
 		registeredFieldChecker: registeredFieldChecker,
 		sf:                     sf,
 		auditWriter:            auditWriter,
@@ -91,7 +97,7 @@ func (s *DataGrantConfigService) CreateGrants(
 	if err != nil {
 		return nil, err
 	}
-	return dataGrantListResponses(created), nil
+	return s.dataGrantListResponses(ctx, created)
 }
 
 func (s *DataGrantConfigService) GetGrant(
@@ -122,7 +128,10 @@ func (s *DataGrantConfigService) PageGrants(
 		return result, myerrors.WrapDatabaseError(err)
 	}
 	result.Total = rows.Total
-	result.Data = dataGrantListResponses(rows.Data)
+	result.Data, err = s.dataGrantListResponses(ctx, rows.Data)
+	if err != nil {
+		return result, err
+	}
 	return result, nil
 }
 
@@ -431,6 +440,11 @@ func (s *DataGrantConfigService) grantDetail(
 		return response.DataGrantDetailRes{}, mapDataPolicyReadError(err)
 	}
 	result := response.NewDataGrantDetailRes(grant)
+	subjects, err := s.resolveGrantSubjects(ctx, []model.DataGrant{grant})
+	if err != nil {
+		return response.DataGrantDetailRes{}, err
+	}
+	result.Subject = subjects[dataGrantSubjectKey(grant)]
 	result.Resource = &response.DataPermissionReferenceSummaryRes{
 		Id:   resource.Id,
 		Code: resource.ResourceCode,
@@ -484,12 +498,71 @@ func mapDataGrantReadError(err error) error {
 	return myerrors.WrapDatabaseError(err)
 }
 
-func dataGrantListResponses(values []model.DataGrant) []response.DataGrantListRes {
+func (s *DataGrantConfigService) dataGrantListResponses(
+	ctx context.Context,
+	values []model.DataGrant,
+) ([]response.DataGrantListRes, error) {
+	subjects, err := s.resolveGrantSubjects(ctx, values)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]response.DataGrantListRes, 0, len(values))
 	for _, value := range values {
-		result = append(result, response.NewDataGrantListRes(value))
+		item := response.NewDataGrantListRes(value)
+		item.Subject = subjects[dataGrantSubjectKey(value)]
+		result = append(result, item)
+	}
+	return result, nil
+}
+
+func (s *DataGrantConfigService) resolveGrantSubjects(
+	ctx context.Context,
+	values []model.DataGrant,
+) (map[string]*response.DataPermissionReferenceSummaryRes, error) {
+	roleIDs := make(map[int]struct{})
+	userIDs := make(map[int]struct{})
+	for _, value := range values {
+		switch value.SubjectType {
+		case model.DataGrantSubjectTypeRole:
+			roleIDs[value.SubjectId] = struct{}{}
+		case model.DataGrantSubjectTypeUser:
+			userIDs[value.SubjectId] = struct{}{}
+		}
+	}
+	result := make(map[string]*response.DataPermissionReferenceSummaryRes, len(values))
+	if len(roleIDs) > 0 {
+		roles, err := s.roleRepo.WithContext(ctx).FindListByFieldIn("id", mapIntKeys(roleIDs))
+		if err != nil {
+			return nil, myerrors.WrapDatabaseError(err)
+		}
+		for _, role := range roles {
+			key := dataGrantSubjectKey(model.DataGrant{SubjectType: model.DataGrantSubjectTypeRole, SubjectId: role.Id})
+			result[key] = &response.DataPermissionReferenceSummaryRes{Id: role.Id, Name: role.Name}
+		}
+	}
+	if len(userIDs) > 0 {
+		users, err := s.userRepo.WithContext(ctx).FindListByFieldIn("id", mapIntKeys(userIDs))
+		if err != nil {
+			return nil, myerrors.WrapDatabaseError(err)
+		}
+		for _, user := range users {
+			key := dataGrantSubjectKey(model.DataGrant{SubjectType: model.DataGrantSubjectTypeUser, SubjectId: user.Id})
+			result[key] = &response.DataPermissionReferenceSummaryRes{Id: user.Id, Code: user.UserName, Name: user.UserName}
+		}
+	}
+	return result, nil
+}
+
+func mapIntKeys(values map[int]struct{}) []int {
+	result := make([]int, 0, len(values))
+	for value := range values {
+		result = append(result, value)
 	}
 	return result
+}
+
+func dataGrantSubjectKey(grant model.DataGrant) string {
+	return grant.SubjectType + ":" + strconv.Itoa(grant.SubjectId)
 }
 
 func dataGrantStableKey(grant model.DataGrant) string {

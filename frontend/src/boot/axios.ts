@@ -1,8 +1,8 @@
 import { defineBoot } from '#q-app/wrappers'
 import axios, { type AxiosInstance } from 'axios'
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from 'axios'
-import { useUserStore } from 'src/stores/user'
-import { Notify } from 'quasar'
+import { isStaleSessionSnapshot, useUserStore } from 'src/stores/user'
+import { LocalStorage, Notify } from 'quasar'
 import type { ResponseData } from 'src/types/global'
 import { useLoadingStore } from 'src/stores/loading'
 
@@ -28,6 +28,38 @@ const instance = axios.create({
   timeout: 300000,
   timeoutErrorMessage: '请求超时，请检查网络连接',
 })
+
+type SessionBoundRequestConfig = InternalAxiosRequestConfig & {
+  sweetSessionToken?: string
+  sweetSessionGeneration?: number
+}
+
+export class StaleSessionResponseError extends Error {
+  constructor() {
+    super('请求所属登录会话已切换')
+    this.name = 'StaleSessionResponseError'
+  }
+}
+
+function persistedAccessToken() {
+  return String(LocalStorage.getItem('access_token') || '')
+}
+
+export function isStaleSessionResponse(
+  config: SessionBoundRequestConfig | undefined,
+  currentToken: string,
+  currentGeneration: number,
+  storedToken: string,
+) {
+  if (!config) return false
+  return isStaleSessionSnapshot(
+    config.sweetSessionToken,
+    config.sweetSessionGeneration,
+    currentToken,
+    currentGeneration,
+    storedToken,
+  )
+}
 
 Notify.setDefaults({
   position: 'top-right',
@@ -70,6 +102,11 @@ instance.interceptors.request.use(
     const loadingStore = useLoadingStore()
     const userStore = useUserStore()
 
+    const storedToken = persistedAccessToken()
+    if (storedToken !== userStore.getLoginToken) {
+      userStore.syncPersistedSession(storedToken)
+    }
+
     const skipGlobalLoading = config.headers?.['X-Skip-Global-Loading'] === 'true'
     if (skipGlobalLoading) {
       delete config.headers['X-Skip-Global-Loading']
@@ -77,6 +114,9 @@ instance.interceptors.request.use(
       loadingStore.setLoading(true)
     }
     const token = userStore.getLoginToken
+    const sessionConfig = config as SessionBoundRequestConfig
+    sessionConfig.sweetSessionToken = token
+    sessionConfig.sweetSessionGeneration = userStore.session_generation
     if (token) {
       if (!config.headers) {
         config.headers = {} as AxiosRequestHeaders
@@ -146,10 +186,19 @@ instance.interceptors.response.use(
 
     loadingStore.setLoading(false)
     const res = error.response
+    if (
+      isStaleSessionResponse(
+        error.config as SessionBoundRequestConfig | undefined,
+        userStore.getLoginToken,
+        userStore.session_generation,
+        persistedAccessToken(),
+      )
+    ) {
+      return Promise.reject(new StaleSessionResponseError())
+    }
     if (typeof error.response === 'undefined') {
       error.message = '网络异常'
       notifyRequestError(error.message || 'Request Error', 'network:error')
-      userStore.setLogout()
       return Promise.reject(error instanceof Error ? error : new Error(error.message || '网络异常'))
     }
     if (error.config?.responseType === 'blob') {
@@ -189,7 +238,7 @@ instance.interceptors.response.use(
       res.data.error_message || error.message || 'Request Error',
       `http:${res.status}:${res.config?.method || 'get'}:${res.config?.url || ''}:${res.data.error_code || ''}:${res.data.error_message || ''}`,
     )
-    if (res.status === 403 || res.status === 401) {
+    if (res.status === 401) {
       userStore.setLogout()
     }
 

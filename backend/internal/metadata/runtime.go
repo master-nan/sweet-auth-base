@@ -66,6 +66,7 @@ type FieldMetadata struct {
 	Sortable           bool
 	Nullable           bool
 	ListVisible        bool
+	DetailVisible      bool
 	InsertVisible      bool
 	UpdateVisible      bool
 	Sequence           uint8
@@ -204,6 +205,7 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		Sortable:           source.IsSort,
 		Nullable:           source.IsNull,
 		ListVisible:        source.IsListShow && !managed,
+		DetailVisible:      !managed || source.IsListShow,
 		InsertVisible:      source.IsInsertShow && !managed,
 		UpdateVisible:      source.IsUpdateShow && !managed,
 		Sequence:           source.Sequence,

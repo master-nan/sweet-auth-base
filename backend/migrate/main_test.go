@@ -107,6 +107,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"canonical_runtime_contract",
 		"organization_database_comments",
 		"access_log_operational_indexes",
+		"product_walkthrough_corrections",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)
@@ -221,8 +222,19 @@ func TestPlatformSeedStepsAreIdempotentForFoundationData(t *testing.T) {
 	assertNoDuplicateGroups(t, db, "sys_role_menu_button", []string{"role_id", "menu_id", "button_id"})
 	assertNoDuplicateGroups(t, db, "casbin_rule", []string{"ptype", "v0", "v1", "v2"})
 	assertMenuTitle(t, db, "system_data_permission", "router.system.dataPermission")
-	assertMenuTitle(t, db, "report_v2_workbench", "router.report.workbench")
+	assertMenuAbsent(t, db, "report_v2_workbench")
 	assertSeedUserMaintainedFieldsPreserved(t, db, whether.Id)
+}
+
+func assertMenuAbsent(t *testing.T, db *gorm.DB, name string) {
+	t.Helper()
+	var count int64
+	if err := db.Model(&model.SysMenu{}).Where("name = ?", name).Count(&count).Error; err != nil {
+		t.Fatalf("count menu %s: %v", name, err)
+	}
+	if count != 0 {
+		t.Fatalf("menu %s must not be seeded", name)
+	}
 }
 
 func assertMenuTitle(t *testing.T, db *gorm.DB, name string, expected string) {
@@ -653,63 +665,48 @@ func TestSeedSystemTableMetadataConfiguresReportDefinition(t *testing.T) {
 	assertReportField("layout_config", false, false, false, "")
 }
 
-func TestSeedReportV2WorkbenchMenuButtons(t *testing.T) {
+func TestMigrateProductWalkthroughCorrections(t *testing.T) {
 	db := migrateTestDB(t)
-	if err := db.AutoMigrate(&model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.CasbinRule{}); err != nil {
-		t.Fatalf("migrate report workbench buttons: %v", err)
+	if err := db.AutoMigrate(
+		&model.SysMenu{},
+		&model.SysMenuButton{},
+		&model.SysRole{},
+		&model.SysRoleMenu{},
+		&model.SysRoleMenuButton{},
+		&model.CasbinRule{},
+		&model.SysTable{},
+		&model.SysTableField{},
+	); err != nil {
+		t.Fatalf("migrate walkthrough correction fixtures: %v", err)
 	}
-
-	sf := newMigrationTestSnowflake(t)
-	if err := seedReportV2WorkbenchMenuButtons(db, sf, 1, "super_admin", 904); err != nil {
-		t.Fatalf("seed report workbench buttons: %v", err)
-	}
-	if err := seedReportV2WorkbenchMenuButtons(db, sf, 1, "super_admin", 904); err != nil {
-		t.Fatalf("seed report workbench buttons twice: %v", err)
-	}
-
-	expected := map[string]string{
-		"report_v2_workbench_query":          string(enum.ButtonActionQuery),
-		"report_v2_workbench_create":         string(enum.ButtonActionCreate),
-		"report_v2_workbench_refresh":        string(enum.ButtonActionRefresh),
-		"report_v2_workbench_design":         string(enum.ButtonActionUpdate),
-		"report_v2_workbench_run":            string(enum.ButtonActionRun),
-		"report_v2_workbench_publish":        string(enum.ButtonActionPublish),
-		"report_v2_workbench_publish_menu":   string(enum.ButtonActionPublishMenu),
-		"report_v2_workbench_unpublish_menu": string(enum.ButtonActionUnpublishMenu),
-		"report_v2_workbench_version":        string(enum.ButtonActionVersion),
-		"report_v2_workbench_disable":        string(enum.ButtonActionDisable),
-		"report_v2_workbench_delete":         string(enum.ButtonActionDelete),
-	}
-
-	for code, action := range expected {
-		var button model.SysMenuButton
-		if err := db.Where("menu_id = ? AND code = ?", 904, code).First(&button).Error; err != nil {
-			t.Fatalf("query report workbench button %s: %v", code, err)
-		}
-		if button.EventAction != action {
-			t.Fatalf("expected %s action %s, got %s", code, action, button.EventAction)
-		}
-		var count int64
-		if err := db.Model(&model.SysRoleMenuButton{}).Where("role_id = ? AND menu_id = ? AND button_id = ?", 1, 904, button.Id).Count(&count).Error; err != nil {
-			t.Fatalf("count report workbench role binding %s: %v", code, err)
-		}
-		if count != 1 {
-			t.Fatalf("expected one role binding for %s, got %d", code, count)
+	menu := model.SysMenu{Basic: model.Basic{Id: 904, State: true}, Name: "report_v2_workbench"}
+	button := model.SysMenuButton{Basic: model.Basic{Id: 740, State: true}, MenuId: menu.Id, Code: "report_v2_workbench_query", Path: "/admin/report/query", Method: "POST"}
+	role := model.SysRole{Basic: model.Basic{Id: 1, State: true}, Name: "super_admin"}
+	table := model.SysTable{Basic: model.Basic{Id: 205, State: true}, TableCode: "sys_user", TableName: "用户"}
+	field := model.SysTableField{Basic: model.Basic{Id: 206, State: true}, TableId: table.Id, FieldCode: "gmt_last_login", FieldName: "最后登录时间", IsInsertShow: true, IsUpdateShow: true}
+	for _, value := range []interface{}{&menu, &button, &role, &model.SysRoleMenu{RoleId: role.Id, MenuId: menu.Id}, &model.SysRoleMenuButton{RoleId: role.Id, MenuId: menu.Id, ButtonId: button.Id}, &table, &field} {
+		if err := db.Create(value).Error; err != nil {
+			t.Fatalf("create walkthrough correction fixture %T: %v", value, err)
 		}
 	}
-
+	if err := migrateProductWalkthroughCorrections(db); err != nil {
+		t.Fatalf("migrate product walkthrough corrections: %v", err)
+	}
+	if err := migrateProductWalkthroughCorrections(db); err != nil {
+		t.Fatalf("rerun product walkthrough corrections: %v", err)
+	}
 	var count int64
-	if err := db.Model(&model.SysMenuButton{}).Where("menu_id = ? AND code = ?", 904, "report_v2_workbench_run").Count(&count).Error; err != nil {
-		t.Fatalf("count report workbench run button: %v", err)
+	if err := db.Model(&model.SysMenu{}).Where("name = ?", menu.Name).Count(&count).Error; err != nil {
+		t.Fatalf("count obsolete report workbench: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("expected idempotent run button seed, got %d", count)
+	if count != 0 {
+		t.Fatalf("obsolete report workbench remains: %d", count)
 	}
-	if err := db.Model(&model.CasbinRule{}).Where("ptype = ? AND v0 = ? AND v1 = ? AND v2 = ?", "p", "super_admin", "/admin/report/:id/run", "POST").Count(&count).Error; err != nil {
-		t.Fatalf("count run casbin policy: %v", err)
+	if err := db.First(&field, field.Id).Error; err != nil {
+		t.Fatalf("reload last login metadata: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("expected run casbin policy, got %d", count)
+	if field.IsInsertShow || field.IsUpdateShow {
+		t.Fatalf("last login remains editable: insert=%v update=%v", field.IsInsertShow, field.IsUpdateShow)
 	}
 }
 

@@ -133,7 +133,7 @@ func InitializeApp() (*App, error) {
 	dataPolicyRepositoryImpl := impl.NewDataPolicyRepositoryImpl(primaryDB)
 	dataPolicyRuleRepositoryImpl := impl.NewDataPolicyRuleRepositoryImpl(primaryDB)
 	dataPolicyConfigService := service.NewDataPolicyConfigService(dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataOwnershipFieldRepositoryImpl, snowflake, logService)
-	dataGrantConfigService := service.NewDataGrantConfigService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, ownershipFieldRegistry, snowflake, logService)
+	dataGrantConfigService := service.NewDataGrantConfigService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, sysRoleRepositoryImpl, sysUserRepositoryImpl, ownershipFieldRegistry, snowflake, logService)
 	dataPermissionConfigPreflightService := service.NewDataPermissionConfigPreflightService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, ownershipFieldRegistry, logService)
 	dataPermissionConfigController := controller.NewDataPermissionConfigController(dataResourceConfigService, dataOwnershipConfigService, dataPolicyConfigService, dataGrantConfigService, dataPermissionConfigPreflightService, v2)
 	externalSystemRepositoryImpl := impl.NewExternalSystemRepositoryImpl(primaryDB)

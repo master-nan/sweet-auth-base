@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { LocalStorage } from 'quasar'
 import { useTagViewStore } from './tagView'
 import { useConfigureStore } from './configure'
+import { useRouterStore } from './permission'
+import { useKeepAliveStore } from './keep-alive'
+import { useBreadcrumbsStore } from './breadcrumbs'
 import { Router as router } from 'src/router/index'
 import type { Role } from 'src/api/services/sys-role'
 import type { Menu } from 'src/api/services/sys-menu'
@@ -14,6 +17,20 @@ const authSessionStorageKeys = [
 
 const clearAuthSessionStorage = () => {
   authSessionStorageKeys.forEach((key) => LocalStorage.remove(key))
+}
+
+export function isStaleSessionSnapshot(
+  requestToken: string | undefined,
+  requestGeneration: number | undefined,
+  currentToken: string,
+  currentGeneration: number,
+  storedToken: string,
+) {
+  return (
+    requestToken !== currentToken ||
+    requestToken !== storedToken ||
+    requestGeneration !== currentGeneration
+  )
 }
 
 interface User {
@@ -30,6 +47,7 @@ interface User {
   buttons: string[]
   menu_names: string[]
   menus: Menu[]
+  session_generation: number
 }
 
 export const useUserStore = defineStore('user', {
@@ -47,6 +65,7 @@ export const useUserStore = defineStore('user', {
     buttons: [],
     menu_names: [],
     menus: [],
+    session_generation: 0,
   }),
 
   getters: {
@@ -81,8 +100,13 @@ export const useUserStore = defineStore('user', {
 
   actions: {
     setLoginToken(access_token: string) {
+      if (this.access_token !== access_token) {
+        clearAuthSessionStorage()
+        this.resetUserScopedState()
+      }
       LocalStorage.set('access_token', access_token)
       this.access_token = access_token
+      this.session_generation += 1
     },
     setPasswordChangeRequirement(required: boolean, reason = '') {
       this.must_change_password = required
@@ -106,14 +130,42 @@ export const useUserStore = defineStore('user', {
     setUserRoles(roles: Role[]) {
       this.roles = roles
     },
+    resetUserScopedState() {
+      this.roles = []
+      this.user_name = ''
+      this.email = ''
+      this.phone_number = ''
+      this.gmt_last_login = null
+      this.is_reset = false
+      this.language = ''
+      this.must_change_password = false
+      this.password_change_reason = ''
+      this.buttons = []
+      this.menu_names = []
+      this.menus = []
+
+      useTagViewStore().removeAllTagView()
+      useConfigureStore().$reset()
+      useRouterStore().$reset()
+      useKeepAliveStore().$reset()
+      useBreadcrumbsStore().$reset()
+      if (router.hasRoute('admin')) {
+        router.removeRoute('admin')
+      }
+    },
+    syncPersistedSession(accessToken: string) {
+      if (accessToken === this.access_token) return
+      if (!accessToken) {
+        this.setLogout()
+        return
+      }
+      this.setLoginToken(accessToken)
+    },
     setLogout() {
       clearAuthSessionStorage()
-      this.$reset()
-      const tagViewStore = useTagViewStore()
-      tagViewStore.removeAllTagView()
-
-      const configureStore = useConfigureStore()
-      configureStore.$reset()
+      this.access_token = ''
+      this.resetUserScopedState()
+      this.session_generation += 1
 
       router.push({ name: 'Login' })
     },

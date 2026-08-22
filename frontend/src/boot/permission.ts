@@ -7,6 +7,7 @@ import constructionRouters from 'src/router/utils'
 import type { RouteRecordRaw } from 'vue-router'
 import { useSysUserApi } from 'src/api/services/sys-user'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
+import { LocalStorage } from 'quasar'
 
 function collectButtonCodes(menus: Menu[]): string[] {
   const codes: string[] = []
@@ -42,6 +43,13 @@ export default defineBoot(({ router }) => {
   const { me } = useSysUserApi()
   const menuApi = useMenuApi()
 
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+      if (event.key !== 'access_token') return
+      userStore.syncPersistedSession(String(LocalStorage.getItem('access_token') || ''))
+    })
+  }
+
   // 设置全局路由守卫
   router.beforeEach(async (to, from, next) => {
     // 检查用户是否已登录
@@ -69,10 +77,15 @@ export default defineBoot(({ router }) => {
       if (userStore.getUserName !== '' && routerStore.getPermissionRoutes.length) {
         next()
       } else {
+        const sessionGeneration = userStore.session_generation
         try {
           // 如果没有用户信息，获取用户信息
           if (userStore.getUserName === '') {
             const res = await me()
+            if (sessionGeneration !== userStore.session_generation) {
+              next(false)
+              return
+            }
             if (res.success) {
               userStore.setUserInfo(res.data)
             }
@@ -84,6 +97,10 @@ export default defineBoot(({ router }) => {
           if (!userStore.menus.length || !userStore.menu_names.length) {
             // 获取权限菜单，收集按钮编码和菜单名称
             const menuRes = await menuApi.queryMyMenu()
+            if (sessionGeneration !== userStore.session_generation) {
+              next(false)
+              return
+            }
             if (menuRes.success && menuRes.data) {
               userStore.buttons = collectButtonCodes(menuRes.data)
               userStore.menu_names = collectMenuNames(menuRes.data)
@@ -106,6 +123,13 @@ export default defineBoot(({ router }) => {
             replace: true,
           })
         } catch (error) {
+          if (
+            (error instanceof Error && error.name === 'StaleSessionResponseError') ||
+            sessionGeneration !== userStore.session_generation
+          ) {
+            next(false)
+            return
+          }
           console.error('路由权限初始化失败:', error)
           next('/login')
         }

@@ -20,8 +20,9 @@ export { parseLinkageConfig } from 'src/utils/field-metadata'
  * "2025-03-24T20:57:58+08:00" → "2025-03-24 20:57:58"
  */
 export const formatDateTime = (val: any): string => {
-  if (!val) return ''
+  if (!val) return '-'
   const str = String(val)
+  if (/^0001-01-01(?:T|\s|$)/.test(str)) return '-'
   // 处理 ISO 格式: 2025-03-24T20:57:58+08:00 或 2025-03-24T20:57:58Z
   if (str.includes('T')) {
     try {
@@ -97,9 +98,9 @@ const currentRelationMenuId = (fallbackMenuId = 0) => {
   return findMenuByName(userStore.menus, String(Router?.currentRoute.value.name || ''))?.id || 0
 }
 
-const relationLookupFields = (fields: TableField[]) => {
+const relationLookupFields = (fields: TableField[], listOnly = false) => {
   return fields
-    .filter((field) => field.is_list_show && !field.dict_code)
+    .filter((field) => !field.dict_code && (!listOnly || field.is_list_show))
     .map((field) => ({ field, linkage: parseLinkageConfig(field) }))
     .filter(
       (item): item is { field: TableField; linkage: Record<string, any> } =>
@@ -118,7 +119,7 @@ export const buildRelationLookups = async (
   fallbackMenuId = 0,
 ): Promise<Record<string, LookupMap>> => {
   const lookups: Record<string, LookupMap> = {}
-  const tasks = relationLookupFields(fields).map(({ field, linkage }) => ({
+  const tasks = relationLookupFields(fields, true).map(({ field, linkage }) => ({
     fieldCode: field.field_code,
     cfg: linkage,
   }))
@@ -160,11 +161,15 @@ export const hydrateRelationLookups = async (
   const menuId = currentRelationMenuId(fallbackMenuId)
   if (menuId <= 0) return existingLookups
 
+  const hydratedLookups = Object.fromEntries(
+    Object.entries(existingLookups).map(([fieldCode, lookup]) => [fieldCode, { ...lookup }]),
+  )
+
   await Promise.all(
     tasks.map(async ({ field }) => {
       const fieldCode = field.field_code
-      const lookup = existingLookups[fieldCode] || {}
-      existingLookups[fieldCode] = lookup
+      const lookup = hydratedLookups[fieldCode] || {}
+      hydratedLookups[fieldCode] = lookup
 
       const missingValues = new Map<string, unknown>()
       rows.forEach((row) => {
@@ -192,7 +197,7 @@ export const hydrateRelationLookups = async (
     }),
   )
 
-  return existingLookups
+  return hydratedLookups
 }
 
 // ─── 列格式化器构建 ───────────────────────────────────

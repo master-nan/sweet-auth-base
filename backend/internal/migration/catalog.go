@@ -31,6 +31,7 @@ var catalog = []Definition{
 	{Version: 13, Key: "canonical_runtime_contract", Contract: "v1|canonical-runtime-contract|organization-selector-aliases|legacy-low-code-buttons", Checksum: "987f5fe06134ff1ac52f62954efcdaa40829089cb5f17274983d90829cadf313"},
 	{Version: 14, Key: "organization_database_comments", Contract: "v1|organization-database-comments|nine-tables|all-model-columns", Checksum: "9bfa1afbc61d20fda1789c4a97d071160f0118cc912c66d00c654073c6e212a7"},
 	{Version: 15, Key: "access_log_operational_indexes", Contract: "v1|access-log-operational-indexes|time|action-time|resource-time|success-time", Checksum: "8123677a52299c64b11482c4b74e7625f34ba3b83b257227d093148d1ac840f0"},
+	{Version: 16, Key: "product_walkthrough_corrections", Contract: "v1|product-walkthrough-corrections|remove-report-workbench|protect-last-login-metadata", Checksum: "a7ce186463fa53bfe21cbbb8b7e4b6ca4977995124d613486401ebdf05e61e23"},
 }
 
 var managedTables = []string{

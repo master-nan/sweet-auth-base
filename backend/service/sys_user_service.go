@@ -337,13 +337,9 @@ func SysUserResponse(data model.SysUser) response.SysUserRes {
 	for _, role := range data.Roles {
 		roles = append(roles, response.RoleSimpleRes{Id: role.Id, Name: role.Name, Memo: role.Memo})
 	}
-	lastLogin := model.CustomTime{}
-	if data.GmtLastLogin != nil {
-		lastLogin = *data.GmtLastLogin
-	}
 	return response.SysUserRes{
 		BasicRes: response.NewBasicRes(data.Basic), UserName: data.UserName,
-		Email: data.Email, PhoneNumber: data.PhoneNumber, GmtLastLogin: lastLogin,
+		Email: data.Email, PhoneNumber: data.PhoneNumber, GmtLastLogin: data.GmtLastLogin,
 		Language: data.Language, IsReset: data.IsReset, Roles: roles,
 	}
 }
