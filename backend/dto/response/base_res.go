@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdminError is the HTTP error response DTO. Application failures live in internal/errors.
+// AdminError 是HTTP错误Response DTO；应用失败语义由internal/errors维护。
 type AdminError struct {
 	StatusCode   int    `json:"status_code"`
 	ErrorCode    int    `json:"error_code"`

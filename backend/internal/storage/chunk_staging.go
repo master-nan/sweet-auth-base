@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// LocalChunkStaging owns temporary chunk paths. It is staging for the existing
-// upload protocol, not a second durable Storage implementation.
+// LocalChunkStaging 只管理现有上传协议的受控分片暂存目录，
+// 不得访问持久文件路径，也不是第二套持久Storage实现。
 type LocalChunkStaging struct {
 	baseDir string
 	mu      sync.RWMutex
@@ -138,9 +138,8 @@ func (s *LocalChunkStaging) Cleanup(uploadID string) error {
 	return os.RemoveAll(fullPath)
 }
 
-// CleanupExpired removes only inactive upload-session directories under the
-// controlled chunks staging root. Persistent uploaded files outside that root
-// are never considered.
+// CleanupExpired 只删除受控分片根目录下已过期的Upload Session，
+// 根目录外的持久文件不属于清理范围。
 func (s *LocalChunkStaging) CleanupExpired(now time.Time, ttl time.Duration) (int, error) {
 	if ttl <= 0 {
 		return 0, fmt.Errorf("chunk staging TTL must be positive")

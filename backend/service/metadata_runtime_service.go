@@ -20,9 +20,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// MetadataRuntimeService is the single runtime read boundary for platform
-// table metadata. Configuration services may use its cache lifecycle methods,
-// but runtime consumers never receive SysTable models or administration DTOs.
+// MetadataRuntimeService 是平台表Metadata的唯一运行时读取边界。
+// 配置Service可以调用其缓存生命周期方法，但运行时消费者不会取得SysTable模型或管理DTO。
 type MetadataRuntimeService struct {
 	tables     repository.SysTableRepository
 	fields     repository.SysTableFieldRepository
@@ -30,6 +29,8 @@ type MetadataRuntimeService struct {
 	fieldCache *cache.SysTableFieldCache
 }
 
+// MetadataSecurityReader 只暴露Data Permission校验安全字段所需的窄接口，
+// 调用方不能借此取得完整Metadata管理模型。
 type MetadataSecurityReader interface {
 	FindMetadataSecurityField(context.Context, *gorm.DB, int) (datapermission.MetadataFieldRecord, error)
 	HasPhysicalColumn(context.Context, *gorm.DB, int, string) (bool, error)
@@ -195,8 +196,7 @@ func (s *MetadataRuntimeService) QueryRelationOptions(
 	return response.ListResult[response.RuntimeRelationOptionRes]{Data: result, Total: total}, nil
 }
 
-// listConfigTables supports the metadata administration page. It intentionally
-// returns persistence models only inside the service package.
+// listConfigTables 仅服务Metadata管理页，持久化模型不会离开service包。
 func (s *MetadataRuntimeService) listConfigTables(
 	ctx context.Context,
 	basic *request.Basic,
@@ -295,8 +295,8 @@ func (s *MetadataRuntimeService) configFieldByID(
 	return data, nil
 }
 
-// FindMetadataTable and FindMetadataField implement the Data Permission
-// MetadataFieldReader without exposing repositories to Data Permission.
+// FindMetadataTable和FindMetadataField实现Data Permission所需的MetadataFieldReader，
+// 避免Data Permission直接依赖Metadata Repository。
 func (s *MetadataRuntimeService) FindMetadataTable(
 	ctx context.Context,
 	tableID int,

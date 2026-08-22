@@ -47,7 +47,7 @@ const { login } = useBasicApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 
-// Login data and configuration
+// 登录表单只保存用户输入；Token和当前用户状态由User Store接管。
 const loginData: SignInReq = reactive({
   user_name: '',
   password: '',

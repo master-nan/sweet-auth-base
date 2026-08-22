@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-// toClientError is the single HTTP adapter for stable application errors.
+// toClientError 是稳定Application Error到HTTP响应的唯一转换边界。
 func toClientError(err error) (*response.AdminError, bool) {
 	applicationErr, classified := apperrors.Classify(err)
 	if applicationErr == nil {

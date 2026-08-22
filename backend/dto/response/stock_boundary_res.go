@@ -17,8 +17,7 @@ type SysDictItemRes struct {
 	ItemValue string `json:"item_value"`
 }
 
-// RuntimeDictRes is the read-only dictionary shape used by authenticated pages.
-// Administration audit fields and internal identifiers are intentionally absent.
+// RuntimeDictRes 是已认证页面使用的只读字典结构，不包含管理审计字段和内部标识。
 type RuntimeDictRes struct {
 	DictName  string               `json:"dict_name"`
 	DictCode  string               `json:"dict_code"`
@@ -39,8 +38,7 @@ type SmsTemplateRes struct {
 	TemplateParams json.RawMessage `json:"template_params"`
 }
 
-// AccessLogRes deliberately excludes request/response payloads and internal
-// relation IDs. Audit pages only receive the stable, non-payload summary.
+// AccessLogRes 排除请求/响应Payload及内部关系ID，审计页面只接收稳定的非Payload摘要。
 type AccessLogRes struct {
 	BasicRes
 	UserName     string `json:"user_name"`

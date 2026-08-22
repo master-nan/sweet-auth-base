@@ -1,4 +1,4 @@
-// app global css in SCSS form
+// 平台全局字体和Semantic Token。
 $font-family_1:
   'Roboto',
   '-apple-system',
@@ -6,10 +6,8 @@ $font-family_1:
   Helvetica,
   Arial sans-serif;
 
-// app global css in SCSS form
 html {
-  // Theme stores overwrite these values when preferences are applied. Keeping
-  // defaults here prevents missing styles before the runtime theme is ready.
+  // Theme Store应用用户偏好后会覆盖这些值；默认值防止Runtime Theme就绪前样式缺失。
   --app-primary-soft: rgba(115, 103, 240, 0.08);
   --app-primary-soft-strong: rgba(115, 103, 240, 0.16);
   --app-primary-border: rgba(115, 103, 240, 0.28);
@@ -1067,7 +1065,7 @@ input[type='number']::-webkit-inner-spin-button {
     z-index: 1;
   }
   thead tr:last-child th {
-    /* height of all previous header rows */
+    /* 避开前一行表头高度。 */
     top: 40px;
   }
   thead tr:first-child th {
@@ -1099,11 +1097,11 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .sticky-header-table.q-table--loading thead tr:last-child th {
-  /* height of all previous header rows */
+  /* 避开加载状态表头高度。 */
   top: 48px;
 }
 
-/* resolve width issue on mobile */
+/* 防止滚动容器内容在窄屏撑破父级。 */
 .q-scrollarea__content {
   max-width: 100%;
 }

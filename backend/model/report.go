@@ -5,7 +5,7 @@ import "gorm.io/datatypes"
 // ReportDefinition 保存可复用的报表定义。
 //
 // 标准报表模型通过 query_config/layout_config 保存数据集、参数和工作表布局。
-// SourceCode 和 SourceType 从主表数据集冗余，以兼容列表和搜索。
+// SourceCode和SourceType是列表与搜索所需的受控冗余，权威配置仍来自主表Dataset。
 // SQL 数据集只能通过报表 Service 的只读预览守卫执行。
 type ReportDefinition struct {
 	Basic

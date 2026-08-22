@@ -60,8 +60,8 @@ func NewFileUploadService(
 	}
 }
 
-// CleanupExpiredChunks is the runtime maintenance boundary for abandoned
-// local upload sessions. It does not add a client cancellation protocol.
+// CleanupExpiredChunks 是清理本地废弃Upload Session的运行时维护边界，
+// 不因此引入新的客户端取消协议。
 func (f *FileUploadService) CleanupExpiredChunks(now time.Time, ttl time.Duration) (int, error) {
 	return f.staging.CleanupExpired(now, ttl)
 }

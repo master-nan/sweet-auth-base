@@ -13,8 +13,8 @@ var (
 	ErrTransactionCallbackRequired = errors.New("service transaction callback is required")
 )
 
-// RunInTransaction 是新代码使用的 Service 层事务入口。
-// 传入已有事务时会有意创建嵌套保存点。
+// RunInTransaction 是Application Service的统一事务入口；
+// 传入已有事务时会有意创建嵌套保存点，调用方必须显式传递请求Context。
 func RunInTransaction(ctx context.Context, db *gorm.DB, fn func(tx *gorm.DB) error) error {
 	if ctx == nil {
 		return ErrTransactionContextRequired

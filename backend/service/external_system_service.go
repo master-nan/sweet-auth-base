@@ -29,6 +29,7 @@ const (
 
 var externalSystemCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
 
+// ExternalSystemService 管理外部系统配置与启停，并在变更前校验运行时引用关系。
 type ExternalSystemService struct {
 	repository repository.ExternalSystemRepository
 	sf         *utils.Snowflake

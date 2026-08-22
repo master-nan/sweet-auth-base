@@ -52,6 +52,7 @@ const (
 	maxReportExportRows        = 10000
 )
 
+// ReportExecutionSnapshot 固定一次Preview、Run或Export使用的发布版本和非敏感运行事实。
 type ReportExecutionSnapshot struct {
 	ReportId            int
 	VersionId           int
@@ -67,6 +68,7 @@ type ReportExecutionSnapshot struct {
 	RuntimeType         string
 }
 
+// ReportExecutionOptions 是服务端运行预算，不接受客户端直接覆盖。
 type ReportExecutionOptions struct {
 	MaxRows              int
 	PageSizeLimit        int
@@ -76,6 +78,8 @@ type ReportExecutionOptions struct {
 	DataPermissionAction enum.SysMenuButtonEventAction
 }
 
+// ReportService 编排定义、发布版本、菜单绑定、运行、导出和执行日志；
+// 配置结构由reportconfig校验，运行读取仍受菜单与Data Permission约束。
 type ReportService struct {
 	reportRepo            repository.ReportDefinitionRepository
 	reportVersionRepo     repository.ReportDefinitionVersionRepository
@@ -716,8 +720,7 @@ func (s *ReportService) loadPublishedReportSnapshot(ctx *gin.Context, reportId i
 		return snapshot, myerrors.NewValidationError("报表发布版本状态不可运行")
 	}
 	snapshot = reportSnapshotFromVersion(version, runtimeType)
-	// Menu publication is a runtime assignment made after version publication.
-	// Authorization must follow the current report-menu binding, not a stale snapshot value.
+	// 菜单发布是版本发布后的运行时绑定；授权必须依据当前Report与菜单关系，不能使用过期快照值。
 	snapshot.PermissionMenuId = report.PermissionMenuId
 	return snapshot, nil
 }

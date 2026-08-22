@@ -7,8 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// CloseRuntimeResources closes external clients after HTTP and background
-// work have stopped. Duplicate SQL pools are closed only once.
+// CloseRuntimeResources 只在HTTP和后台任务停止后关闭外部客户端，
+// 重复引用的SQL连接池只关闭一次。
 func CloseRuntimeResources(app *App) error {
 	if app == nil {
 		return nil

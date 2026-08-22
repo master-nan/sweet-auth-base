@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-// Kind describes a stable application failure without coupling it to HTTP.
+// Kind 描述稳定的应用失败类别，不与HTTP状态码直接耦合。
 type Kind string
 
 const (
@@ -26,7 +26,7 @@ const (
 	KindInternal         Kind = "internal"
 )
 
-// Category separates stable application failures from their internal source.
+// Category 区分应用失败所属边界，不暴露内部技术原因。
 type Category string
 
 const (
@@ -37,8 +37,7 @@ const (
 	CategorySystem     Category = "system"
 )
 
-// ApplicationError is the stable error exchanged across application boundaries.
-// Cause is intentionally private and must only be used for internal diagnostics.
+// ApplicationError 是跨应用边界传递的稳定错误；Cause保持私有，仅用于内部诊断。
 type ApplicationError struct {
 	Kind        Kind
 	Code        int
@@ -65,7 +64,7 @@ func newApplicationError(kind Kind, category Category, code int, message string)
 	return &ApplicationError{Kind: kind, Category: category, Code: code, SafeMessage: message}
 }
 
-// WrapApplicationError converts a technical cause at an application boundary.
+// WrapApplicationError 在应用边界把技术原因转换为稳定错误。
 func WrapApplicationError(cause error, kind Kind, category Category, code int, message string) error {
 	return &ApplicationError{Kind: kind, Category: category, Code: code, SafeMessage: message, cause: cause}
 }
@@ -110,8 +109,7 @@ func AsApplicationError(err error) (*ApplicationError, bool) {
 	return applicationErr, true
 }
 
-// Classify returns a stable application error. Unknown technical failures are
-// converted to the generic internal error without exposing their cause.
+// Classify 返回稳定Application Error；未知技术失败统一转换为内部错误且不泄漏Cause。
 func Classify(err error) (*ApplicationError, bool) {
 	if err == nil {
 		return nil, false
@@ -155,7 +153,7 @@ func SafeMessageOf(err error) string {
 	return applicationErr.SafeMessage
 }
 
-// IsParameterParsingError recognizes adapter-level decoding errors only.
+// IsParameterParsingError 只识别Adapter层的参数解码错误。
 func IsParameterParsingError(err error) bool {
 	if err == nil {
 		return false

@@ -91,6 +91,8 @@ func run() error {
 	})
 }
 
+// runRuntime 统一管理HTTP、Runner、Cron和Chunk清理的生命周期；
+// 只有在所有在途工作停止后才关闭Redis、DB和Logger。
 func runRuntime(parent context.Context, listener net.Listener, server *http.Server, dependencies runtimeDependencies) error {
 	runtimeCtx, cancelRuntime := context.WithCancel(parent)
 	defer cancelRuntime()
@@ -176,6 +178,7 @@ func runRuntime(parent context.Context, listener net.Listener, server *http.Serv
 	return errors.Join(runtimeError, errors.Join(shutdownErrors...))
 }
 
+// maintainExpiredChunks 在启动时及固定周期清理废弃分片，并以返回通道参与Shutdown等待。
 func maintainExpiredChunks(ctx context.Context, cleaner expiredChunkCleaner, upload config.Upload) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {

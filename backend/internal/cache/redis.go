@@ -150,14 +150,14 @@ func (r *RedisUtil) Expire(key string, expiration time.Duration) (bool, error) {
 	return val, nil
 }
 
-// SetIfAbsent atomically reserves a cache key for one-time security state.
+// SetIfAbsent 原子占用一次性安全状态的缓存键。
 func (r *RedisUtil) SetIfAbsent(key string, value interface{}, expiration time.Duration) (bool, error) {
 	ctx, cancel := withTimeout(2 * time.Second)
 	defer cancel()
 	return r.client.SetNX(ctx, key, value, expiration).Result()
 }
 
-// ConsumeCode atomically verifies a one-time code and limits guessing.
+// ConsumeCode 原子校验并消费一次性验证码，同时限制猜测次数。
 func (r *RedisUtil) ConsumeCode(key, attemptKey, expected string, maxAttempts int, ttl time.Duration) (int64, error) {
 	ctx, cancel := withTimeout(2 * time.Second)
 	defer cancel()
@@ -181,8 +181,7 @@ func (r *RedisUtil) ConsumeCode(key, attemptKey, expected string, maxAttempts in
 	`, []string{key, attemptKey}, expected, maxAttempts, ttl.Milliseconds()).Int64()
 }
 
-// RecordLoginFailure atomically increments an attempt counter and creates the
-// lock at the configured boundary.
+// RecordLoginFailure 原子增加失败计数，并在配置阈值处创建锁定状态。
 func (r *RedisUtil) RecordLoginFailure(attemptKey, lockKey string, maxAttempts int, ttl time.Duration) (bool, error) {
 	ctx, cancel := withTimeout(2 * time.Second)
 	defer cancel()
@@ -201,7 +200,7 @@ func (r *RedisUtil) RecordLoginFailure(attemptKey, lockKey string, maxAttempts i
 	return result == 1, err
 }
 
-// CompleteLoginSuccess closes the password-success/lock-creation race.
+// CompleteLoginSuccess 关闭密码校验成功与并发创建锁定状态之间的竞态窗口。
 func (r *RedisUtil) CompleteLoginSuccess(attemptKey, lockKey string) (bool, error) {
 	ctx, cancel := withTimeout(2 * time.Second)
 	defer cancel()

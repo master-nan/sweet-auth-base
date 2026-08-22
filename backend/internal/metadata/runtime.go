@@ -10,9 +10,8 @@ import (
 	"strings"
 )
 
-// LogicalFieldType is the source-independent value type exposed to runtime
-// metadata consumers. It deliberately does not describe the physical SQL
-// column or the frontend component used to edit the value.
+// LogicalFieldType 表示Runtime Metadata向消费者暴露的逻辑值类型，
+// 与底层SQL列类型及前端编辑组件保持解耦。
 type LogicalFieldType = enum.SysTableFieldLogicalType
 
 const (
@@ -27,8 +26,7 @@ const (
 	LogicalFieldTypeJSON     = enum.LogicalTypePlain
 )
 
-// TableMetadata is the stable runtime projection. Administration-only facts
-// such as view SQL, edit audit fields and physical DDL details are excluded.
+// TableMetadata 是稳定的运行时投影，不包含View SQL、管理审计字段和物理DDL细节。
 type TableMetadata struct {
 	ID               int
 	Code             string
@@ -41,8 +39,8 @@ type TableMetadata struct {
 	Relations        []RelationMetadata
 }
 
-// FieldMetadata keeps storage, logical and UI concerns separate even though
-// the current persistence model stores them on one row.
+// FieldMetadata 将存储类型、逻辑类型和UI组件分开表达，
+// 即使当前持久化模型把这些配置保存在同一行中也不混淆其职责。
 type FieldMetadata struct {
 	ID                 int
 	TableID            int
@@ -80,6 +78,7 @@ type FieldMetadata struct {
 	Relation           *RelationDisplayMetadata
 }
 
+// RelationDisplayMetadata 描述关系字段的值和展示合同，供列表、详情、表单及查询共同使用。
 type RelationDisplayMetadata struct {
 	TargetTableCode string
 	ValueField      string
@@ -88,6 +87,7 @@ type RelationDisplayMetadata struct {
 	FilterMapping   map[string]string
 }
 
+// RelationMetadata 是运行时可见的表关系投影，不暴露管理和DDL内部状态。
 type RelationMetadata struct {
 	ID             int
 	TableID        int
@@ -98,6 +98,7 @@ type RelationMetadata struct {
 	ManyTableCode  string
 }
 
+// QueryFieldMetadata 只保留查询和列表解析需要的字段能力。
 type QueryFieldMetadata struct {
 	ID            int
 	TableCode     string
@@ -112,8 +113,8 @@ type QueryFieldMetadata struct {
 	Sequence      uint8
 }
 
-// RuntimeReader is the stable read-only boundary used by platform runtime
-// consumers. Cache lifecycle and configuration models are deliberately absent.
+// RuntimeReader 是平台运行时消费者使用的稳定只读边界，
+// 不暴露缓存生命周期方法和Metadata管理模型。
 type RuntimeReader interface {
 	GetTable(context.Context, string) (TableMetadata, error)
 	GetTableByID(context.Context, int) (TableMetadata, error)
@@ -239,10 +240,8 @@ func (table TableMetadata) QueryFields() []QueryFieldMetadata {
 	return result
 }
 
-// QueryModel is the only compatibility bridge into the existing dynamic query
-// engine. Its production use is intentionally limited to Generalization and
-// the deferred Report module; new Runtime Metadata consumers must not depend on
-// this legacy model projection.
+// QueryModel 是Runtime Metadata进入现有动态查询引擎的唯一技术桥接。
+// 生产调用方仅限Generalization和当前Report模块；新的运行时消费者不得依赖该持久化模型投影。
 func (table TableMetadata) QueryModel() model.SysTable {
 	result := model.SysTable{
 		Basic:            model.Basic{Id: table.ID, State: true},

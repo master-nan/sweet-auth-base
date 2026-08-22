@@ -25,6 +25,8 @@ const (
 
 var ErrOrganizationHRSyncInvalid = errors.New("organization hr sync context invalid")
 
+// OrganizationHRSyncService 接收Canonical HR输入，按SourceKey和来源版本幂等写入Organization事实，
+// 同时记录批次摘要与安全错误，不负责解析外部HR原始协议。
 type OrganizationHRSyncService struct {
 	repository repository.OrganizationHRSyncRepository
 	sf         *utils.Snowflake
@@ -597,8 +599,7 @@ func (s *OrganizationHRSyncService) upsertEmployee(tx *gorm.DB, batch organizati
 			if input.EmploymentStatus == "active" {
 				return failedOutcome(input.Key, hrsync.ObjectKindEmployee, hrsync.ReasonEmploymentStateConflict), nil
 			}
-			// A non-active employee event may refresh source-owned profile fields,
-			// but it cannot reverse an explicit resignation fact.
+			// 非在职事件可以刷新来源拥有的档案字段，但不能撤销已经明确记录的离职事实。
 			input.EmploymentStatus = "resigned"
 		}
 		equal := employeeFactsEqual(existing, input)
@@ -1650,8 +1651,8 @@ func employeeFactsEqual(existing model.OrgEmployee, input hrsync.EmployeeSyncInp
 		existing.Email == input.Email && existing.EmploymentStatus == input.EmploymentStatus && !existing.SourceDeleted
 }
 
-// compareOrganizationSourceVersion compares the incoming source fact with the persisted RFC3339Nano version.
-// It returns -1 for stale input, 0 for the same source instant, and 1 for a newer input.
+// compareOrganizationSourceVersion 比较输入事实和已持久化的RFC3339Nano来源版本：
+// -1表示过期输入，0表示同一来源时刻，1表示更新输入。
 func compareOrganizationSourceVersion(existing string, incoming time.Time) (int, error) {
 	existing = strings.TrimSpace(existing)
 	if existing == "" {

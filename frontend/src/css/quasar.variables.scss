@@ -1,16 +1,6 @@
-// Quasar SCSS (& Sass) Variables
+// Quasar SCSS变量
 // --------------------------------------------------
-// To customize the look and feel of this app, you can override
-// the Sass/SCSS variables found in Quasar's source Sass/SCSS files.
-
-// Check documentation for full list of Quasar variables
-
-// Your own variables (that are declared here) and Quasar's own
-// ones will be available out of the box in your .vue/.scss/.sass files
-
-// It's highly recommended to change the default colors
-// to match your app's branding.
-// Tip: Use the "Theme Builder" on Quasar's documentation website.
+// 这里只维护构建期品牌变量；运行时明暗主题使用app.scss中的Semantic Token。
 
 $primary   : #7367F0;
 $secondary : #8A8D93;

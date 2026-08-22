@@ -109,6 +109,8 @@ func newDataPermissionPolicyResolver(
 	}
 }
 
+// Resolve 从服务端Repository加载有效授权事实并计算DataScopeResult，
+// 同一Policy内Rule按AND组合，不同Grant按OR组合，依赖失败时默认拒绝。
 func (resolver *DataPermissionPolicyResolver) Resolve(
 	ctx context.Context,
 	input datapermission.ResolverInput,

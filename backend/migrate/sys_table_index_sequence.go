@@ -2,8 +2,8 @@ package main
 
 import "gorm.io/gorm"
 
-// backfillSysTableIndexFieldSequence aligns legacy metadata with PostgreSQL's
-// physical composite-index order. New writes persist sequence directly.
+// backfillSysTableIndexFieldSequence 将旧Metadata顺序对齐PostgreSQL复合索引的物理顺序；
+// 新写入会直接持久化sequence。
 func backfillSysTableIndexFieldSequence(db *gorm.DB) error {
 	if db.Dialector.Name() != "postgres" {
 		return nil

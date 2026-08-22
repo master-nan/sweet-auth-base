@@ -21,6 +21,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// QuerySchemeService 负责查询方案管理写入与运行时读取编排，
+// 在持久化前统一执行Scope授权、Metadata校验、可见性和revision检查。
 type QuerySchemeService struct {
 	repository repository.QuerySchemeRepository
 	scopes     queryscheme.ScopeReader

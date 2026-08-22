@@ -17,8 +17,8 @@ import (
 
 const lowCodeCrudButtonTemplateScene = "lowcode_crud"
 
-// LowCodePublicationService publishes configured metadata into the platform menu
-// and permission projection. Schema lifecycle remains owned by SysTableService.
+// LowCodePublicationService 将已配置Metadata发布为平台菜单和权限投影，
+// Schema生命周期仍由SysTableService负责。
 type LowCodePublicationService struct {
 	sysTableRepo          repository.SysTableRepository
 	sysMenuRepo           repository.SysMenuRepository

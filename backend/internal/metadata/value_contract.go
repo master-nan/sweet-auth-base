@@ -65,8 +65,7 @@ func StorageTypesCompatible(left, right enum.SysTableFieldType) bool {
 	return leftValid && rightValid && leftDescriptor.Integer && rightDescriptor.Integer
 }
 
-// NormalizeDecimal validates an exact base-10 value without converting it to
-// float64. Exponent syntax is deliberately excluded from the V1 contract.
+// NormalizeDecimal 校验十进制精确值且不经过float64；协议不接受指数形式。
 func NormalizeDecimal(value any, precision, scale int) (string, error) {
 	if precision <= 0 || precision > MaxNumericPrecision || scale < 0 || scale > precision {
 		return "", fmt.Errorf("invalid numeric precision or scale")
@@ -81,9 +80,8 @@ func NormalizeDecimal(value any, precision, scale int) (string, error) {
 	return normalized, nil
 }
 
-// NormalizeDecimalValue validates the protocol representation before field
-// metadata is available. Field precision/scale is enforced by application
-// validation before persistence.
+// NormalizeDecimalValue 在尚未取得字段Metadata时校验协议表示；
+// 写入前再由Application Service按具体字段校验precision和scale。
 func NormalizeDecimalValue(value any) (string, error) {
 	normalized, integerDigits, fractionDigits, err := normalizeDecimalSyntax(value)
 	if err != nil {

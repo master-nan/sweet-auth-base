@@ -77,7 +77,7 @@ func (t *DictController) GetSysDictByCode(ctx *gin.Context) {
 	resp.SetData(data)
 }
 
-// GetRuntimeDictByCode returns safe dictionary facts used to render authenticated pages.
+// GetRuntimeDictByCode 返回已认证页面渲染所需的安全字典事实。
 func (t *DictController) GetRuntimeDictByCode(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)

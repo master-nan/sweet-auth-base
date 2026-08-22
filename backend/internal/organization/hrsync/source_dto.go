@@ -33,7 +33,7 @@ func (value *SourceEnableStatus) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-// 源 DTO 只描述 HR V1 映射需要的字段。未知 JSON 字段由 encoding/json 忽略。
+// 源DTO只描述当前HR映射需要的字段；未知JSON字段由encoding/json忽略。
 type HRCompanySourceDTO struct {
 	SourceID       string             `json:"zjkid_ignore"`
 	SourceRecordID string             `json:"id"`
@@ -89,7 +89,7 @@ type HRResignedEmployeeSourceDTO struct {
 	ResignedAt string `json:"lzdate"`
 }
 
-// HRAssignmentSourceDTO 仅冻结结构边界；P0 关闭前不提供落库 Normalizer。
+// HRAssignmentSourceDTO 仅定义来源结构；任职来源合同未确认，因此不提供落库Normalizer。
 type HRAssignmentSourceDTO struct {
 	SourceID         string `json:"ID"`
 	LegalEntityID    string `json:"公司ID"`

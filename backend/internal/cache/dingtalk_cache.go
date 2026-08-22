@@ -29,7 +29,7 @@ func NewDingTalkUserIDCache(cacher Cacher) *DingTalkUserIDCache {
 	return &DingTalkUserIDCache{BasicCache: NewBasicCache[string](cacher, DingTalkUserIDCacheKey)}
 }
 
-// Set caches a DingTalk user ID for seven days.
+// Set缓存DingTalk用户ID七天，避免每次认证重复调用远端接口。
 func (d *DingTalkUserIDCache) Set(key string, code string) error {
 	return d.SetExpiration(key, code, 60*60*24*7)
 }

@@ -36,8 +36,8 @@ type AssignmentPeriod struct {
 	State     AssignmentPeriodState
 }
 
-// AssignmentSourceCandidate is source-adapter output only. It is deliberately
-// not a persistable Organization assignment input while source gates remain open.
+// AssignmentSourceCandidate 只表示Source Adapter输出；
+// 在来源合同未确认前不能作为可持久化的Organization任职输入。
 type AssignmentSourceCandidate struct {
 	RelationID      string
 	LegalEntityNCID string
@@ -87,8 +87,8 @@ func (p AssignmentSourceParser) Parse(raw string) ([]AssignmentSourceCandidate, 
 	return result, nil
 }
 
-// ParseAssignmentSourceDTOs performs only bounded JSON shape validation. Period
-// and cross-reference semantics remain separate, explicit normalization steps.
+// ParseAssignmentSourceDTOs 只执行有界JSON结构校验；
+// 任职周期和交叉引用语义由独立、显式的规范化步骤处理。
 func ParseAssignmentSourceDTOs(raw string) ([]HRAssignmentSourceDTO, error) {
 	if len(raw) > MaxAssignmentSourceBytes {
 		return nil, ErrAssignmentSourceInvalid
@@ -191,8 +191,8 @@ type OrganizationSourceReference struct {
 	NCID             string
 }
 
-// OrganizationSourceCrosswalkResolver is an explicit adapter port. V1 ships no
-// production NCID-to-BIP data source, so the default resolver always rejects.
+// OrganizationSourceCrosswalkResolver 是显式Adapter端口。
+// 当前没有生产可用的NCID到BIP映射来源，因此默认实现始终拒绝解析。
 type OrganizationSourceCrosswalkResolver interface {
 	Resolve(context.Context, OrganizationSourceReference) (SourceKey, error)
 }

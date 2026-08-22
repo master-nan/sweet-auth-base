@@ -120,7 +120,7 @@ func (al *asyncLog) processLogEntries() {
 
 // 写入日志（确保每日只更新一次日志文件）
 func (al *asyncLog) writeLog(logEntry []byte) {
-	// updateLogFile is idempotent and keeps the date check under the file lock.
+	// updateLogFile保持幂等，并在文件锁内完成日期检查与切换。
 	al.updateLogFile()
 	al.mu.Lock()
 	defer al.mu.Unlock()

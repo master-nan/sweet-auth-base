@@ -12,9 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisOptions is the shared runtime, migration, and preflight Redis
-// connection contract. Certificate verification is always enabled when TLS is
-// configured.
+// RedisOptions 是Runtime、Migration和Preflight共享的Redis连接合同；
+// 配置TLS时始终启用证书校验。
 func RedisOptions(cfg config.Redis) (*redis.Options, error) {
 	options := &redis.Options{
 		Addr:            fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),

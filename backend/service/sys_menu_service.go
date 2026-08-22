@@ -25,6 +25,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// SysMenuService 管理菜单树、MenuButton和用户页面Capability，
+// 同时提供已发布低代码页面与query_scope_code的权威解析。
 type SysMenuService struct {
 	sysMenuRepo           repository.SysMenuRepository
 	sysRoleMenuRepo       repository.SysRoleMenuRepository

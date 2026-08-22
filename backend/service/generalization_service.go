@@ -29,6 +29,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// GeneralizationService 是已发布低代码页面的CRUD和查询应用边界，
+// 每次操作都必须组合页面Capability、Runtime Metadata与Data Permission。
 type GeneralizationService struct {
 	generalizationRepo repository.GeneralizationRepository
 	permissionRepo     repository.GeneralizationPermissionRepository
@@ -48,9 +50,8 @@ func NewGeneralizationServiceWithRuntimeAndDataPermission(
 	return service
 }
 
-// ResolveRuntimeTable is the compatibility edge between stable platform
-// metadata and the existing dynamic query engine. Controllers and runtime
-// consumers do not load SysTable persistence models themselves.
+// ResolveRuntimeTable 是稳定Runtime Metadata与现有动态查询引擎之间的技术边界，
+// Controller和其他运行时消费者不得自行加载SysTable持久化模型。
 func (gs *GeneralizationService) ResolveRuntimeTable(
 	ctx context.Context,
 	tableCode string,

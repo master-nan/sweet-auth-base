@@ -26,6 +26,8 @@ type AuthTokenPair struct {
 	SessionID    string
 }
 
+// AuthTokenService 管理Token签发、校验、刷新和撤销，
+// 不负责Credential校验或业务权限判断。
 type AuthTokenService struct {
 	codec token.JWTToken
 	state *cache.TokenBlackCache

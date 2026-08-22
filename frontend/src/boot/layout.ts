@@ -41,7 +41,7 @@ export default defineBoot(async ({ router }) => {
     LoadingBar.start()
 
     if (to.name != null && to.path.startsWith('/admin')) {
-      // is a public route
+      // 静态公开路由不进入动态页签与KeepAlive处理。
       if (Array.isArray(constantRoutes)) {
         for (let i = 0; i < constantRoutes.length; i++) {
           if (constantRoutes[i]?.path === to.path) {
@@ -69,11 +69,7 @@ export default defineBoot(async ({ router }) => {
   })
 })
 
-/**
- * Handle redundant layout: router-view and keep the current component under the first layer index <router-view>
- * This method cannot filter the on-demand loading <layout> used for nested routing
- * @param to
- */
+// 动态嵌套路由可能重复包含Layout层；移除中间Layout后，KeepAlive只跟踪实际页面组件。
 function handleKeepAlive(to: RouteLocationNormalized) {
   if (to.matched && to.matched.length > 2) {
     for (let i = 0; i < to.matched.length; i++) {

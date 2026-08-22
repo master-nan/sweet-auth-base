@@ -19,6 +19,8 @@ import (
 
 const passwordChangedAtFutureTolerance = 5 * time.Minute
 
+// AuthApplicationService 编排登录、刷新、登出和Access Token认证，
+// Credential校验、登录状态、Token生命周期与审计仍由各自安全边界负责。
 type AuthApplicationService struct {
 	users      repository.AuthenticationUserRepository
 	configure  *SysConfigureService
@@ -235,8 +237,7 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "login_state_failed", HTTPStatus: authAuditHTTPStatus(err)})
 		return AuthenticationResult{}, err
 	}
-	// Close the logout/refresh race after the local login-state write. A logout
-	// deactivates the session shared by the old and newly issued token pair.
+	// 在登录状态写入后关闭Logout与Refresh竞态：Logout会停用旧Token和新Token共享的Session。
 	if _, err := s.tokens.ValidateAccess(ctx, pair.AccessToken); err != nil {
 		s.tokens.RevokePair(pair)
 		_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)

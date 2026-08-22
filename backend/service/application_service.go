@@ -22,6 +22,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// ApplicationService 管理平台Application及其AppKey/Secret生命周期，
+// 认证读取会绕过普通配置缓存以保证停用和轮换立即生效。
 type ApplicationService struct {
 	applicationRepo  repository.ApplicationRepository
 	applicationCache *cache.ApplicationCache
@@ -58,8 +60,8 @@ func (a *ApplicationService) getApplicationByID(id int) (model.Application, erro
 	return result, nil
 }
 
-// GetApplicationForAuthentication bypasses cached snapshots so application
-// disablement and secret rotation take effect for already issued AppTokens.
+// GetApplicationForAuthentication 绕过缓存快照，确保应用停用或Secret轮换后，
+// 已签发AppToken的后续认证也立即使用数据库当前事实。
 func (a *ApplicationService) GetApplicationForAuthentication(ctx context.Context, id int) (model.Application, error) {
 	result, err := a.applicationRepo.FindByIdWithDB(a.applicationRepo.DBWithContext(ctx), id)
 	if err != nil {

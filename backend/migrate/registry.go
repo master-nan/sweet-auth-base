@@ -113,6 +113,7 @@ func runMigrationStepsWithMode(db *gorm.DB, steps []migrationStep, managedTables
 		if err := migrationstate.ValidateLedger(entries, definitions, false); err != nil {
 			return err
 		}
+		// 每一步Schema变更和Ledger写入处于同一事务；失败时两者一起回滚。
 		for _, step := range steps[len(entries):] {
 			transactionDB := lockedDB.Session(&gorm.Session{NewDB: true, DisableNestedTransaction: true})
 			if err := transactionDB.Transaction(func(tx *gorm.DB) error {

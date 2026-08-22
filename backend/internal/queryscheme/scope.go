@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// Subject 是Resolve时使用的可信身份快照，由服务端从当前会话和组织绑定事实构造。
 type Subject struct {
 	UserID     int
 	RoleIDs    []int
@@ -20,6 +21,8 @@ type QuickPreset struct {
 	Payload QuerySchemePayloadV1 `json:"payload"`
 }
 
+// ScopeConfig 声明固定页面可使用的表、Preset、虚拟排序字段和动态Binding。
+// Scope身份仍由菜单query_scope_code提供，本配置不构成第二套身份来源。
 type ScopeConfig struct {
 	TableCode                string
 	QuickDateField           string
@@ -46,10 +49,12 @@ func (config ScopeConfig) AllowsSort(field string) bool {
 	return false
 }
 
+// ScopeReader 是Query Scheme Runtime读取固定Scope配置的只读边界。
 type ScopeReader interface {
 	Get(context.Context, string) (ScopeConfig, bool)
 }
 
+// Registry 保存进程内固定Scope声明；注册重复或不合法配置时失败关闭。
 type Registry struct {
 	mu      sync.RWMutex
 	configs map[string]ScopeConfig

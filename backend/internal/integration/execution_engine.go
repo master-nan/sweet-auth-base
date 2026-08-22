@@ -60,8 +60,8 @@ type AttemptResult struct {
 	SyncBusinessReference        string
 }
 
-// IntegrationExecutionEngine 负责编排领取、凭证解析、HTTP 调用和原子状态收敛。
-// 它不启动常驻循环；应用生命周期接入由后续任务完成。
+// IntegrationExecutionEngine 负责编排领取、凭证解析、HTTP调用和原子状态收敛。
+// 它不启动常驻循环；应用生命周期由IntegrationWorkerRunner负责。
 type IntegrationExecutionEngine struct {
 	executions    repository.IntegrationExecutionRepository
 	systems       repository.ExternalSystemRepository

@@ -24,6 +24,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// FileAccessPurpose 把Preview与Download签名用途分离，任一用途的Token不能用于另一用途。
 type FileAccessPurpose string
 
 const (
@@ -60,6 +61,8 @@ type signedFileAccessClaims struct {
 	Purpose   FileAccessPurpose `json:"purpose"`
 }
 
+// FileAccessService 负责文件Actor授权、用途签名和安全响应Header，
+// 不负责上传事务或文件Metadata删除生命周期。
 type FileAccessService struct {
 	files   repository.FileRepository
 	storage storage.Storage
@@ -97,6 +100,7 @@ func (s *FileAccessService) PublicPreviewEnabled() bool {
 	return s.config != nil && s.config.Upload.PublicPreview
 }
 
+// IssueSignedURL 将文件UUID、用途和过期时间一起签名，避免Preview Token被复用于Download。
 func (s *FileAccessService) IssueSignedURL(resource FileAccessResource, purpose FileAccessPurpose, rawTTL string) (response.FileAccessURLRes, error) {
 	ttl, err := parseFileAccessTTL(rawTTL, s.config.Upload)
 	if err != nil {
@@ -110,6 +114,7 @@ func (s *FileAccessService) IssueSignedURL(resource FileAccessResource, purpose 
 	return response.FileAccessURLRes{URL: signedFileAccessURL(s.config, purpose, resource.file.FileUuid, token), ExpiresAt: expiresAt}, nil
 }
 
+// ResolveSigned 同时校验签名、过期时间、URL中的UUID及请求用途。
 func (s *FileAccessService) ResolveSigned(ctx context.Context, uuid, token string, purpose FileAccessPurpose) (FileAccessResource, error) {
 	claims, err := s.verifyForPurpose(token, purpose)
 	if err != nil {

@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// FileMetadataService 管理文件Metadata读取与删除补偿，
+// 所有权和签名访问仍由FileAccessService负责。
 type FileMetadataService struct {
 	files   repository.FileRepository
 	storage storage.Storage

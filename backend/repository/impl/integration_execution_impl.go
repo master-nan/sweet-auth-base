@@ -220,8 +220,7 @@ func integrationDatabaseNow(tx *gorm.DB) (time.Time, error) {
 	if err := tx.Raw("SELECT CURRENT_TIMESTAMP AS now").Scan(&value).Error; err != nil {
 		return time.Time{}, err
 	}
-	// Runtime timestamp columns are UTC-naive. Convert the database instant to
-	// UTC before writing it back so the driver cannot persist a local wall clock.
+	// Runtime时间列不携带时区；回写前统一转换为UTC，避免驱动保存本地墙上时间。
 	return time.Time(value.Now).UTC(), nil
 }
 

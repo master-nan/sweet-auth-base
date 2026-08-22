@@ -35,6 +35,8 @@ const (
 	integrationExecutionAuditCancel       = "integration.execution.cancel"
 )
 
+// IntegrationExecutionService 负责创建Execution并冻结接口、输入、Retry和同步来源快照，
+// Worker状态机的领取与Attempt推进仍由ExecutionEngine负责。
 type IntegrationExecutionService struct {
 	executions repository.IntegrationExecutionRepository
 	logs       repository.IntegrationLogRepository

@@ -33,6 +33,8 @@ const (
 
 var interfaceCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
 
+// InterfaceDefinitionService 管理接口版本、输入合同和启停状态，
+// 已启用版本保持不可变以确保Execution快照可解释。
 type InterfaceDefinitionService struct {
 	repository  repository.InterfaceDefinitionRepository
 	systems     repository.ExternalSystemRepository

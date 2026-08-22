@@ -141,8 +141,7 @@ func parseSourceLocalDate(value string, location *time.Location) (time.Time, err
 	if value == "" {
 		return time.Time{}, ErrSourceDateInvalid
 	}
-	// The source field is a LocalDate, not an instant. UTC midnight is the
-	// canonical storage carrier and must not be shifted through source timezone.
+	// 来源字段是LocalDate而非时间点；Canonical存储使用UTC零点载体，不经过来源时区偏移。
 	parsed, err := time.Parse(time.DateOnly, value)
 	if err != nil || parsed.Year() < 1900 || parsed.Year() > 9998 {
 		return time.Time{}, ErrSourceDateInvalid

@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// GetScopeConfig 在当前用户拥有页面权限时返回Scope运行配置和菜单展示名称。
 func (service *QuerySchemeService) GetScopeConfig(
 	ctx context.Context,
 	scopeCode string,
@@ -28,6 +29,7 @@ func (service *QuerySchemeService) GetScopeConfig(
 	return scopeConfigResponse(menu.Id, strings.TrimSpace(scopeCode), menu.Title, config), nil
 }
 
+// Available 只返回当前用户可见的方案摘要，不加载完整Query Payload。
 func (service *QuerySchemeService) Available(
 	ctx context.Context,
 	scopeCode string,
@@ -62,6 +64,8 @@ func (service *QuerySchemeService) Available(
 	return result, nil
 }
 
+// Resolve 重新校验可见性、revision、Metadata和Binding；
+// DEGRADED或INVALID方案不会返回可执行Query。
 func (service *QuerySchemeService) Resolve(
 	ctx context.Context,
 	id int,

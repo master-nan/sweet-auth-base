@@ -73,7 +73,7 @@ export function useQuerySchemePage<TQuery extends Query>(
       await runtime.savePersonal(value.name, value.isDefault, value.saveAs)
       showSaveDialog.value = false
     } catch {
-      // The shared HTTP interceptor owns the safe user-facing error message.
+      // 安全的用户提示由共享HTTP拦截器统一处理，页面不展示后端技术正文。
     } finally {
       saving.value = false
     }

@@ -6,9 +6,8 @@ import (
 	"backend/model"
 )
 
-// Supports is the backend truth for persisted Query Scheme authoring. The
-// historical query builder separately uses SupportsExecution to reject
-// unknown operators while preserving its existing execution contract.
+// Supports 是持久化Query Scheme编辑时的后端Operator安全真值。
+// 现有查询执行引擎另由SupportsExecution拒绝未知Operator，并保持其执行合同。
 func Supports(fieldType enum.SysTableFieldType, operator enum.ExpressionType, optionBacked bool) bool {
 	if optionBacked || fieldType == enum.BooleanFieldType || fieldType == enum.JsonFieldType {
 		return equalityOperator(operator)
@@ -36,9 +35,8 @@ func AllowedMetadataOperators(field metadata.FieldMetadata) []enum.ExpressionTyp
 	return operators
 }
 
-// SupportsExecution preserves the historical query engine contract. The
-// builder accepts every known operator and lets typed value parsing fail
-// closed; Scheme authoring uses the stricter SupportsMetadata policy.
+// SupportsExecution 保持现有查询引擎合同：已知Operator可以进入构建流程，
+// 字段和值组合不合法时由类型化解析失败关闭；Scheme编辑使用更严格的SupportsMetadata策略。
 func SupportsExecution(operator enum.ExpressionType) bool {
 	return operator >= enum.Gt && operator <= enum.NotBetween
 }

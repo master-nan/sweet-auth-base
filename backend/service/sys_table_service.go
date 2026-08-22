@@ -26,6 +26,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// SysTableService 管理Table、Field、Relation、Index及其DDL/View生命周期。
+// Runtime读取由MetadataRuntimeService负责，低代码菜单发布由LowCodePublicationService负责。
 type SysTableService struct {
 	sysTableRepo           repository.SysTableRepository
 	sysTableFieldRepo      repository.SysTableFieldRepository
@@ -1010,6 +1012,7 @@ func (s *SysTableService) GetTableRelationById(id int) (model.SysTableRelation, 
 	return data, nil
 }
 
+// CreateTableRelation 校验目标表、关系字段和类型兼容性；M:N只创建不存在的中间表。
 func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.TableRelationCreateReq) error {
 	var err error
 	if req.ReferenceKey, err = normalizeDBIdentifier("主表字段", req.ReferenceKey); err != nil {
@@ -1095,6 +1098,8 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 	return nil
 }
 
+// UpdateTableRelation 只允许不改变物理签名的Metadata更新；
+// Relation类型、两端Key或中间表变化必须通过显式Migration处理。
 func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.TableRelationUpdateReq) error {
 	oldRelation, err := s.sysTableRelationRepo.FindByIdWithDB(s.sysTableRelationRepo.DBWithContext(ctx), req.Id)
 	if err != nil {
@@ -1156,6 +1161,7 @@ func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableC
 	return nil
 }
 
+// validatePhysicalRelationFields 确认关系两端字段存在、类型兼容，并满足value field唯一性要求。
 func (s *SysTableService) validatePhysicalRelationFields(
 	ctx context.Context,
 	tableID, relatedTableID int,
@@ -1180,6 +1186,7 @@ func (s *SysTableService) validatePhysicalRelationFields(
 	return nil
 }
 
+// DeleteTableRelationById 只删除Metadata关系，不自动删除可能包含业务数据的中间表。
 func (s *SysTableService) DeleteTableRelationById(ctx context.Context, id int) error {
 	relation, err := s.sysTableRelationRepo.FindByIdWithDB(s.sysTableRelationRepo.DBWithContext(ctx), id)
 	if err != nil {

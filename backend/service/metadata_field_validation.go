@@ -17,8 +17,8 @@ const (
 	maxMetadataTagLength   = 128
 )
 
-// validateMetadataFieldDefinition is the single server-side validation
-// boundary shared by field create and update operations.
+// validateMetadataFieldDefinition 是字段新增与更新共用的服务端校验边界，
+// 统一约束Storage Type、Logical Type、Display Format和Input Type组合。
 func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) error {
 	if field == nil {
 		return myerrors.ErrParamInvalid

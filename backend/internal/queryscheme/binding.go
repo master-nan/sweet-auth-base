@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// BindingKind 是后端允许持久化的动态值种类，不接受任意客户端扩展字符串。
 type BindingKind string
 
 const (
@@ -41,6 +42,7 @@ func (kind BindingKind) Valid() bool {
 	return false
 }
 
+// Clock 使日期Binding可使用确定时间进行测试，同时避免业务代码直接读取全局时钟。
 type Clock interface {
 	Now() time.Time
 }
@@ -51,6 +53,8 @@ func (systemClock) Now() time.Time { return model.Now() }
 
 func SystemClock() Clock { return systemClock{} }
 
+// BindingResolver 在Resolve阶段复制表达式并替换Binding目标值，
+// 不查询Employee Repository，也不会修改已保存的Scheme Payload。
 type BindingResolver struct {
 	clock    Clock
 	location *time.Location
@@ -66,6 +70,8 @@ func NewBindingResolver(clock Clock, location *time.Location) *BindingResolver {
 	return &BindingResolver{clock: clock, location: location}
 }
 
+// Resolve 只处理Scope允许的Binding，并在表达式副本上按JSON Pointer写值；
+// CURRENT_EMPLOYEE仅使用Subject中的服务端解析结果，未绑定时失败关闭。
 func (resolver *BindingResolver) Resolve(
 	_ context.Context,
 	payload QuerySchemePayloadV1,

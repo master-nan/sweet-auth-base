@@ -25,6 +25,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// SysUserService 管理平台账号、密码、角色绑定和Token失效；
+// Employee档案及账号绑定关系由Organization模块维护。
 type SysUserService struct {
 	sysUserRepo     repository.SysUserRepository
 	sysUserRoleRepo repository.SysUserRoleRepository

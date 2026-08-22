@@ -36,7 +36,7 @@ type atomicCodeCacher interface {
 	ConsumeCode(key, attemptKey, expected string, maxAttempts int, ttl time.Duration) (int64, error)
 }
 
-// Consume verifies and deletes a code in one cache operation.
+// Consume 在一次缓存操作中校验并删除验证码。
 func (s *SendCodeCache) Consume(key, expected string) (bool, error) {
 	atomic, ok := s.cacher.(atomicCodeCacher)
 	if !ok {

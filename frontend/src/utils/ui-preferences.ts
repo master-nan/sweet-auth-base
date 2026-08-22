@@ -65,7 +65,7 @@ export const writeUIPreferences = (patch: Partial<Omit<UIPreferences, 'version'>
 
   LocalStorage.set(UI_PREFERENCES_KEY, next)
 
-  // Keep the existing keys readable while older entry points are phased out.
+  // 同步写入Theme和语言Store仍在读取的独立键，保持当前多个入口使用同一偏好值。
   LocalStorage.set('dark', next.dark)
   LocalStorage.set('lang', next.locale)
 

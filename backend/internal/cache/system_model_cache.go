@@ -9,8 +9,7 @@ const (
 	TableFieldCacheKey = "TABLE_FIELD_CACHE_KEY_"
 	UserCacheKey       = "USER_CACHE_KEY_"
 
-	// The remaining prefixes are migration-only identifiers for removing keys
-	// written by cache wrappers that are no longer part of the runtime graph.
+	// 以下前缀仅供Migration清理已经退出Runtime依赖图的旧缓存键。
 	MenuButtonCacheKey     = "MENU_BUTTON_CACHE_KEY_"
 	MenuCacheKey           = "MENU_CACHE_KEY_"
 	RoleCacheKey           = "ROLE_CACHE_KEY_"

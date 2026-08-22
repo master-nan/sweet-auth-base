@@ -13,7 +13,7 @@ import (
 
 const bearerLength = len("Bearer ")
 
-// AuthHandler is the HTTP adapter for the unified authentication chain.
+// AuthHandler 是统一认证链的HTTP Adapter，只把校验后的可信身份写入请求上下文。
 func AuthHandler(authService *service.AuthApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorization := c.GetHeader("Authorization")

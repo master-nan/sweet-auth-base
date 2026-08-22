@@ -33,6 +33,8 @@ const (
 
 var credentialCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,63}$`)
 
+// CredentialService 管理Credential加密、轮换、启停和吊销；
+// 读取DTO只包含脱敏摘要，明文仅在Integration Provider调用栈内出现。
 type CredentialService struct {
 	repository repository.CredentialRepository
 	systems    repository.ExternalSystemRepository

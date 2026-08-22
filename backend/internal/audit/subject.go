@@ -5,8 +5,7 @@ import "context"
 
 type auditSubjectContextKey struct{}
 
-// AuditSubjectValueKey is the transitional string key used by HTTP adapters
-// whose context.Context implementation exposes request-scoped values by name.
+// AuditSubjectValueKey 供按名称暴露请求值的HTTP Adapter向context.Context传递审计主体。
 const AuditSubjectValueKey = "sweet_platform_audit_subject"
 
 // AuditSubject 表示一次操作的审计主体，不包含 HTTP 或 Gin 相关对象。

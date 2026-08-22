@@ -37,12 +37,6 @@ export const useTagViewStore = defineStore('tagView', {
         return
       }
 
-      // if (getFirst(to.query)) {
-      //   tag.title += '：' + getFirst(to.query)
-      // } else if (getFirst(to.params)) {
-      //   tag.title += '：' + getFirst(to.params)
-      // }
-
       if (
         tag.title !== null &&
         tag.title !== undefined &&
@@ -50,17 +44,17 @@ export const useTagViewStore = defineStore('tagView', {
         tag.fullPath.indexOf('#') === -1
       ) {
         const size = this.tagView.length
-        // When entering or refreshing the page for the first time & the current route is not the root route
+        // 首次进入或刷新非首页路由时建立第一个页签。
         if (!size && tag.fullPath !== '/admin/home') {
           this.tagView.push(tag)
           return
         }
-        // To avoid adding tagView repeatedly. Construct an array t[] identified by fullPath
+        // fullPath是页签唯一身份，避免同一路由被重复加入。
         const t = []
         for (let i = 0; i < size; i++) {
           t.push(this.tagView[i]!.fullPath)
         }
-        // If there is no current route in t[]
+        // 只有当前fullPath尚不存在时才追加页签。
         if (t.indexOf(tag.fullPath) === -1) {
           this.tagView.push(tag)
         }
@@ -129,26 +123,22 @@ function resolveRouteTitle(to: RouteLocationNormalized): string {
   return baseTitle
 }
 
-/**
- * Only remove one tagView
- * @param state
- * @param payload
- */
+// 删除单个页签时，若删除的是当前页签，则选择相邻页面作为稳定回退目标。
 export function removeATagView(state: any, index: any) {
-  // Record removed routes
+  // 删除前保存fullPath，用于判断当前浏览器地址是否需要跳转。
   const removedTagView = state.tagView[index].fullPath
   state.tagView.splice(index, 1)
-  // If tagView is empty
+  // 无剩余页签时回到首页。
   if (state.tagView.length === 0) {
     LocalStorage.set('tagView', [])
     router.push({ name: 'home' })
   } else {
-    // If the last tagView is removed, the route jumps to the current last tagView
+    // 删除末尾当前页签时跳到新的末尾页签。
     if (index === state.tagView.length && window.location.href.indexOf(removedTagView) !== -1) {
       router.push(state.tagView[index - 1].fullPath)
       return
     }
-    // If the first tagView is removed, the route jumps to the next tagView
+    // 删除首个当前页签时跳到新的首个页签。
     if (index === 0 && window.location.href.indexOf(removedTagView) !== -1) {
       router.push(state.tagView[0].fullPath)
       return
@@ -159,11 +149,7 @@ export function removeATagView(state: any, index: any) {
   }
 }
 
-/**
- * Remove one side of tagView
- * @param state
- * @param payload
- */
+// 按当前位置关闭左侧、右侧或其他页签，并保持当前路由可达。
 export function removeOnSide(state: any, type: removeType, index: number) {
   switch (type) {
     case removeType.Right:

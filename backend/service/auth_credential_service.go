@@ -33,7 +33,7 @@ func (p *PasswordCredentialProvider) Verify(ctx context.Context, req Authenticat
 	user, err := p.users.FindAuthenticationByPrincipal(ctx, principal)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) || stderrors.Is(err, repository.ErrAmbiguousAuthenticationPrincipal) {
-			// Keep password work on the unknown-user path without retaining the secret.
+			// 未知用户路径仍执行等价密码计算以降低时序泄漏，但不保留输入Secret。
 			_ = utils.Encryption(req.Secret, "0"+p.serverConfig.Conf.Salt)
 			return result, nil
 		}

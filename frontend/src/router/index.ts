@@ -9,14 +9,6 @@ import {
 // import routes from './routes'
 
 import constantRoutes from './constantRoutes'
-/*
- * If not building with SSR mode, you can
- * directly export the Router instantiation;
- *
- * The function below can be async too; either use
- * async/await or return a Promise which resolves
- * with the Router instance.
- */
 let Router: ReturnType<typeof createRouter>
 const chunkReloadFlag = 'sweet-admin:chunk-reload'
 
@@ -49,9 +41,7 @@ export default route(function (/* { store, ssrContext } */) {
     }),
     routes: constantRoutes,
 
-    // Leave this as is and make changes in quasar.conf.js instead!
-    // quasar.conf.js -> build -> vueRouterMode
-    // quasar.conf.js -> build -> publicPath
+    // Router模式和publicPath由Quasar构建配置统一决定。
     history: createHistory(process.env.VUE_ROUTER_BASE)
   })
   Router.onError((error) => {

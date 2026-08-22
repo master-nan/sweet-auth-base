@@ -23,8 +23,7 @@ type atomicLoginAttemptCacher interface {
 	CompleteLoginSuccess(attemptKey, lockKey string) (bool, error)
 }
 
-// CompleteSuccess atomically refuses a success that raced with account lock
-// creation, otherwise clearing only the failure counter.
+// CompleteSuccess 原子拒绝与账号锁定并发发生的登录成功；未锁定时只清理失败计数。
 func (c *LoginAttemptCache) CompleteSuccess(principal string) (bool, error) {
 	key := normalizeLoginPrincipal(principal)
 	if key == "" {

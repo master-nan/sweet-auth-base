@@ -338,6 +338,7 @@ type QSelectFilterAbort = () => void
 type VirtualScrollDetails = {
   to?: number
 }
+// 业务查询会立即触发列表查询；方案条件编辑只确认表达式并返回上层保存流程。
 type AdvancedQueryUsage = 'business-query' | 'scheme-condition-editor'
 
 const props = defineProps({

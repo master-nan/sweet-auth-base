@@ -39,6 +39,8 @@ const (
 
 var syncTaskCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
+// SyncTaskService 管理SyncTask版本和启停，并为手工执行创建Batch；
+// Execution生成由Sync Runner与Coordinator负责。
 type SyncTaskService struct {
 	tasks      repository.IntegrationSyncTaskRepository
 	batches    repository.IntegrationSyncBatchRepository
@@ -384,8 +386,8 @@ func (s *SyncTaskService) DisableSyncTask(ctx context.Context, id, revision int)
 	return s.taskDetail(ctx, updated)
 }
 
-// RunSyncTask creates one manual Batch from the current server-owned checkpoint.
-// Execution generation remains the Sync Runner/Coordinator's responsibility.
+// RunSyncTask 基于服务端持有的当前Checkpoint创建一个手工Batch，
+// Execution生成仍由Sync Runner与Coordinator负责。
 func (s *SyncTaskService) RunSyncTask(ctx context.Context, id, revision int) (response.SyncBatchDetailRes, error) {
 	var created model.IntegrationSyncBatch
 	err := RunInTransaction(ctx, s.batches.DBWithContext(ctx), func(tx *gorm.DB) error {
@@ -467,6 +469,7 @@ func (s *SyncTaskService) ListSyncConsumers(context.Context) []response.SyncCons
 	return result
 }
 
+// SyncBatchService 提供Batch列表和详情读取，不推进同步状态。
 type SyncBatchService struct {
 	repository repository.IntegrationSyncBatchRepository
 }

@@ -25,8 +25,8 @@ type SyncBusinessResultProvider interface {
 	Result(context.Context, model.IntegrationExecution) (SyncBusinessResult, error)
 }
 
-// PendingSyncBusinessResultProvider 是生产默认边界。INT-005C-2 接入真实 Consumer 前，
-// 技术成功不会被伪造为业务成功，也不会推进 Checkpoint。
+// PendingSyncBusinessResultProvider 用于尚未注册业务Consumer的同步类型，
+// 技术成功不会被伪造为业务成功，也不会推进Checkpoint。
 type PendingSyncBusinessResultProvider struct{}
 
 func NewPendingSyncBusinessResultProvider() *PendingSyncBusinessResultProvider {

@@ -57,6 +57,8 @@ var retryPolicyAllowedHTTPStatuses = map[int]struct{}{
 	504: {},
 }
 
+// RetryPolicyService 管理Retry策略版本、退避参数、错误分类和启停状态；
+// Execution创建时会冻结策略快照，运行中不回读可变配置。
 type RetryPolicyService struct {
 	repository repository.RetryPolicyRepository
 	sf         *utils.Snowflake

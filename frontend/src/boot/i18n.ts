@@ -5,19 +5,13 @@ import messages from 'src/i18n'
 import { readUIPreferences } from 'src/utils/ui-preferences'
 
 export type MessageLanguages = keyof typeof messages
-// Type-define 'en-US' as the master schema for the resource
+// 以当前中文资源定义消息Schema，其他语言必须保持相同键结构。
 export type MessageSchema = (typeof messages)['zh-CN']
 
-// See https://vue-i18n.intlify.dev/guide/advanced/typescript.html#global-resource-schema-type-definition
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 declare module 'vue-i18n' {
-  // define the locale messages schema
   export interface DefineLocaleMessage extends MessageSchema {}
-
-  // define the datetime format schema
   export interface DefineDateTimeFormat {}
-
-  // define the number format schema
   export interface DefineNumberFormat {}
 }
 /* eslint-enable @typescript-eslint/no-empty-object-type */
@@ -30,6 +24,5 @@ export default defineBoot(({ app }) => {
     messages,
   })
 
-  // Set i18n instance on app
   app.use(i18n)
 })

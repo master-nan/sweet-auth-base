@@ -1,7 +1,7 @@
 package service
 
-// FileAccessActor is the minimum caller snapshot needed for file resource and
-// upload-session authorization. It contains no HTTP request state.
+// FileAccessActor 是文件资源和Upload Session授权所需的最小调用者快照，
+// 不携带HTTP请求状态。
 type FileAccessActor struct {
 	UserID       int
 	IsSuperAdmin bool

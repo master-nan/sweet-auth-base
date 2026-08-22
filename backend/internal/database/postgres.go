@@ -15,9 +15,7 @@ const (
 	PostgresTLSVerifyFull = "verify-full"
 )
 
-// PostgresDSN is the single boundary for constructing PostgreSQL connection
-// strings. URL encoding prevents configuration values from injecting extra
-// driver parameters.
+// PostgresDSN 是构造PostgreSQL连接参数的唯一边界；URL编码可防止配置值注入额外驱动参数。
 func PostgresDSN(cfg config.DB) (string, error) {
 	mode := strings.ToLower(strings.TrimSpace(cfg.TLS.Mode))
 	if !SupportedPostgresTLSMode(mode) {

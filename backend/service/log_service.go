@@ -51,6 +51,8 @@ type StandardContextAuditWriter interface {
 	RecordTransactionalAuditContext(context.Context, *gorm.DB, TransactionalAuditRecord) error
 }
 
+// LogService 统一写入LoginLog、AccessLog和事务内Audit，
+// 管理端读取只投影非Payload安全摘要。
 type LogService struct {
 	loginLogRepository  repository.LoginLogRepository
 	accessLogRepository repository.AccessLogRepository
@@ -100,8 +102,7 @@ func (ls *LogService) RecordTransactionalAudit(
 	return ls.recordTransactionalAudit(ctx, tx, record)
 }
 
-// RecordTransactionalAuditContext keeps the standard-context audit contract
-// used by Integration and other non-HTTP services.
+// RecordTransactionalAuditContext 为Integration等非HTTP Service提供标准context审计合同。
 func (ls *LogService) RecordTransactionalAuditContext(
 	ctx context.Context,
 	tx *gorm.DB,

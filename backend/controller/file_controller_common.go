@@ -21,8 +21,8 @@ type fileBusinessContext struct {
 	Action    enum.SysMenuButtonEventAction
 }
 
-// FileBusinessAccessAdapter connects HTTP file requests to the low-code
-// data-permission API. Gin does not cross into File services or repositories.
+// FileBusinessAccessAdapter 把HTTP文件请求连接到低代码Data Permission API，
+// Gin对象不会进入File Service或Repository。
 type FileBusinessAccessAdapter struct {
 	files          *service.FileAccessService
 	generalization *service.GeneralizationService

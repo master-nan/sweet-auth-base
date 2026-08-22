@@ -56,6 +56,8 @@ type ValidationResult struct {
 	Issues []ValidationIssue `json:"issues"`
 }
 
+// QuerySchemePayloadV1 是查询方案持久化协议，只保存查询、排序和动态Binding，
+// 不包含分页、列偏好或业务列表结果。
 type QuerySchemePayloadV1 struct {
 	Expressions []request.ExpressionGroup `json:"expressions"`
 	QuickQuery  request.QuickQuery        `json:"quick_query"`
@@ -63,6 +65,7 @@ type QuerySchemePayloadV1 struct {
 	Bindings    []Binding                 `json:"bindings"`
 }
 
+// Binding 使用受控JSON Pointer把动态语义绑定到表达式值，持久化时不解析为真实用户或日期值。
 type Binding struct {
 	Pointer string        `json:"pointer"`
 	Kind    BindingKind   `json:"kind"`
@@ -75,6 +78,7 @@ type BindingParams struct {
 	MonthOffset *int `json:"month_offset,omitempty"`
 }
 
+// ResolvedQuery 是Binding解析后的可执行查询状态，仍需由业务列表叠加Data Permission。
 type ResolvedQuery struct {
 	Expressions []request.ExpressionGroup `json:"expressions"`
 	QuickQuery  request.QuickQuery        `json:"quick_query"`

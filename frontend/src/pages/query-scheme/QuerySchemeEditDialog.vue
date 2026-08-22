@@ -148,7 +148,7 @@ const submit = async () => {
     visible.value = false
     emit('saved')
   } catch {
-    // The shared HTTP interceptor owns the safe user-facing error message.
+    // 安全的用户提示由共享HTTP拦截器统一处理，Dialog不展示后端技术正文。
   } finally {
     loading.value = false
   }

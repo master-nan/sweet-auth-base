@@ -290,8 +290,7 @@ const (
 	IntFieldType      SysTableFieldType = 11
 )
 
-// SysTableFieldLogicalType describes business value semantics independently
-// from physical storage and frontend input components.
+// SysTableFieldLogicalType 描述业务值语义，与物理存储和前端输入组件相互独立。
 type SysTableFieldLogicalType string
 
 const (
@@ -322,8 +321,7 @@ func NormalizeSysTableFieldLogicalType(value string) (SysTableFieldLogicalType, 
 	}
 }
 
-// SysTableFieldDisplayFormat is a controlled presentation hint. It never
-// contains executable code, CSS, templates or formatter names.
+// SysTableFieldDisplayFormat 是受控展示提示，不允许包含可执行代码、CSS、模板或格式化函数名。
 type SysTableFieldDisplayFormat string
 
 const (

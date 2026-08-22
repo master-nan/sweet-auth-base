@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// LedgerEntry 记录一个已成功提交的Migration版本及其不可变Checksum。
 type LedgerEntry struct {
 	Version   int64
 	Key       string
@@ -18,15 +19,18 @@ type LedgerEntry struct {
 	AppliedAt time.Time
 }
 
+// Queryer 是Ledger只读操作需要的最小数据库端口。
 type Queryer interface {
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
 }
 
+// Execer 是Ledger建表等写操作需要的最小数据库端口。
 type Execer interface {
 	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 }
 
+// EnsureLedger 幂等创建正式Migration账本；测试Fixture的AutoMigrate不写入该表。
 func EnsureLedger(ctx context.Context, execer Execer) error {
 	_, err := execer.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS schema_migration (
@@ -111,6 +115,7 @@ ORDER BY table_name
 	return existing, nil
 }
 
+// ValidateLedger 按顺序核对Version、Key和Checksum；任何已执行版本漂移都失败关闭。
 func ValidateLedger(entries []LedgerEntry, definitions []Definition, requireComplete bool) error {
 	if err := ValidateCatalog(definitions); err != nil {
 		return err
@@ -136,6 +141,8 @@ func ValidateLedger(entries []LedgerEntry, definitions []Definition, requireComp
 	return nil
 }
 
+// WithAdvisoryLock 以数据库和Schema为范围串行化Migration，
+// 解锁使用有界的脱离Context，避免请求取消后遗留会话锁。
 func WithAdvisoryLock(ctx context.Context, db *gorm.DB, fn func(*gorm.DB) error) error {
 	if db.Dialector.Name() != "postgres" {
 		return fn(db.WithContext(ctx))

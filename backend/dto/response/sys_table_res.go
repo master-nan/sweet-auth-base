@@ -82,9 +82,8 @@ type SysTableDetailRes struct {
 	TableIndexes   []SysTableIndexRes     `json:"table_indexes"`
 }
 
-// RuntimeTableMetadataRes is the safe read model used by dynamic pages and
-// other runtime consumers. DDL SQL, indexes, audit facts and internal tags are
-// intentionally absent.
+// RuntimeTableMetadataRes 是动态页面和其他运行时消费者使用的安全读模型，
+// 不包含DDL SQL、索引、审计事实和内部标签。
 type RuntimeTableMetadataRes struct {
 	Id               int                       `json:"id"`
 	TableName        string                    `json:"table_name"`

@@ -22,6 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// SysRoleService 管理Role及菜单、按钮授权事务，不以角色名称代替Capability判断。
 type SysRoleService struct {
 	sysMenuButtonRepo     repository.SysMenuButtonRepository
 	sysRoleRepo           repository.SysRoleRepository

@@ -27,6 +27,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// SmsService 编排短信发送、供应商状态查询和模板管理，
+// 对外只返回平台稳定状态与安全错误。
 type SmsService struct {
 	smsLogRepo      repository.SmsLogRepository
 	smsTemplateRepo repository.SmsTemplateRepository

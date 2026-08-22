@@ -26,8 +26,7 @@ func InitCron(app *App) {
 	}
 }
 
-// StopCron stops scheduling new jobs and waits for active jobs within the
-// caller's shutdown budget.
+// StopCron 停止调度新任务，并在调用方提供的Context期限内等待在途任务结束。
 func StopCron(ctx context.Context) error {
 	if c == nil {
 		return nil

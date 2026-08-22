@@ -132,8 +132,7 @@ func (s *ReportService) AuthorizeReportDetail(ctx context.Context, user model.Sy
 	}
 	return s.authorizePublishedReportObject(ctx, user, report.PermissionMenuId, requestedMenuID,
 		reportRoutePermission{Path: reportDetailPath, Method: "GET"},
-		// Historical report menus did not project a detail button. Requiring the
-		// existing run capability keeps those menus usable without widening access.
+		// 部分现有Report菜单没有详情按钮投影；复用既有run能力可保持可用且不扩大访问范围。
 		reportRoutePermission{Path: reportRunPath, Method: "POST"},
 	)
 }

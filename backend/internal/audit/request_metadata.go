@@ -8,8 +8,8 @@ import (
 
 type requestMetadataContextKey struct{}
 
-// RequestMetadataValueKey supports HTTP adapter contexts during the migration
-// to request.Context. The value contains no HTTP request or framework object.
+// RequestMetadataValueKey 供HTTP Adapter向request.Context传递安全请求元数据；
+// 其中不包含HTTP Request或框架对象。
 const RequestMetadataValueKey = "sweet_platform_request_metadata"
 
 type accessAuditState struct {
@@ -18,7 +18,7 @@ type accessAuditState struct {
 
 type accessAuditStateContextKey struct{}
 
-// RequestMetadata contains the safe request facts needed by transactional audit.
+// RequestMetadata 只包含事务审计需要的安全请求事实。
 type RequestMetadata struct {
 	Method    string
 	Path      string

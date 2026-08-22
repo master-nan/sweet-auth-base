@@ -16,9 +16,8 @@ var (
 	readOnlySQLForbiddenPhrase  = regexp.MustCompile(`(?i)\bexplain\s+analyze\b`)
 )
 
-// ValidateReadOnlyQuery accepts one SELECT/WITH statement and rejects SQL
-// capable of changing database state. Callers still apply their own field and
-// row authorization when executing the returned query.
+// ValidateReadOnlyQuery 只接受单条SELECT/WITH语句，并拒绝任何可能改变数据库状态的SQL。
+// 调用方执行查询时仍须自行应用字段白名单和行级权限。
 func ValidateReadOnlyQuery(raw string) (string, error) {
 	query := strings.TrimSpace(raw)
 	if query == "" {

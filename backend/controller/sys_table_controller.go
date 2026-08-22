@@ -85,13 +85,13 @@ func (t *TableController) GetTableByCode(ctx *gin.Context) {
 	resp.SetData(data)
 }
 
-// GetRuntimeTableByCode exposes safe metadata independently from SysTable administration.
+// GetRuntimeTableByCode 独立于SysTable管理接口暴露安全Runtime Metadata。
 func (t *TableController) GetRuntimeTableByCode(ctx *gin.Context) {
 	t.GetTableByCode(ctx)
 }
 
-// QueryRuntimeRelationOptions resolves a configured relation by source field.
-// The client cannot select an arbitrary target table or display column.
+// QueryRuntimeRelationOptions 按源字段解析已配置Relation；
+// 客户端不能任意指定目标表或展示列。
 // @Summary 查询运行时关系字段选项
 // @Description 按源字段元数据中受控的关系展示配置查询选项
 // @Tags 运行时元数据
