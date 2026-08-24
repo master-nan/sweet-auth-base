@@ -1,24 +1,44 @@
 <template>
-  <div class="column q-gutter-sm">
-    <div v-if="!lines.length" class="text-grey-7">未设置高级查询条件</div>
-    <div v-for="line in lines" :key="line.key" class="row items-start no-wrap q-gutter-sm">
-      <q-badge outline color="primary" :label="line.logic" />
-      <span :style="{ paddingLeft: `${line.depth * 12}px` }">{{ line.text }}</span>
+  <div class="query-preview">
+    <div v-if="!treeLines.length" class="query-preview__empty">未设置高级查询条件</div>
+    <div v-else class="query-preview-tree" role="tree" aria-label="查询条件层级">
+      <div
+        v-for="line in treeLines"
+        :key="line.key"
+        :class="[
+          'query-preview-tree__line',
+          `query-preview-tree__line--${line.kind}`,
+        ]"
+        role="treeitem"
+        :aria-level="line.depth + 1"
+      >
+        <span class="query-preview-tree__branch" aria-hidden="true">{{ line.branch }}</span>
+        <q-badge
+          v-if="line.logic"
+          outline
+          :color="line.logic === 'OR' ? 'warning' : 'primary'"
+          :label="line.logic"
+          class="query-preview-tree__logic"
+        />
+        <span class="query-preview-tree__text">{{ line.text }}</span>
+      </div>
     </div>
-    <div v-if="payload.quick_query.keyword" class="row q-gutter-sm">
-      <q-badge outline color="secondary" label="快捷" />
-      <span>关键词包含“{{ payload.quick_query.keyword }}”</span>
-    </div>
-    <div v-if="payload.order.field" class="row q-gutter-sm">
-      <q-badge outline color="secondary" label="排序" />
-      <span>{{ fieldLabel(payload.order.field) }} {{ payload.order.is_asc ? '升序' : '降序' }}</span>
+    <div v-if="payload.quick_query.keyword || payload.order.field" class="query-preview-meta">
+      <div v-if="payload.quick_query.keyword" class="query-preview-meta__item">
+        <q-badge outline color="secondary" label="关键词" />
+        <span>包含“{{ payload.quick_query.keyword }}”</span>
+      </div>
+      <div v-if="payload.order.field" class="query-preview-meta__item">
+        <q-badge outline color="secondary" label="排序" />
+        <span>{{ fieldLabel(payload.order.field) }} {{ payload.order.is_asc ? '升序' : '降序' }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { ExpressionLogic, ExpressionLogicMap, ExpressionTypeMap } from 'src/types/enum'
+import { ExpressionLogic, ExpressionTypeMap } from 'src/types/enum'
 import { useDictStore } from 'src/stores/dict'
 import type { ExpressionGroup, QueryRule } from 'src/types/global'
 import type { TableField } from 'src/api/services/sys-table'
@@ -113,25 +133,153 @@ watch(
   { deep: true, immediate: true },
 )
 
-type PreviewLine = { key: string; logic: string; text: string; depth: number }
-const collectLines = (group: ExpressionGroup, path: string, depth: number): PreviewLine[] => {
-  const logic = ExpressionLogicMap[group.logic ?? ExpressionLogic.AND]
-  const rules = group.rules.map((rule, index) => ({
-    key: `${path}/rules/${index}`,
-    logic: index === 0 ? logic : ExpressionLogicMap[group.logic ?? ExpressionLogic.AND],
-    depth,
-    text: `${fieldLabel(rule.field)} ${ExpressionTypeMap[rule.expression_type!] || '匹配'} ${valueLabel(rule, `${path}/rules/${index}/value`)}`,
-  }))
-  return rules.concat(
-    (group.nested || []).flatMap((nested, index) =>
-      collectLines(nested, `${path}/nested/${index}`, depth + 1),
-    ),
-  )
+type PreviewTreeNode = {
+  key: string
+  kind: 'group' | 'rule'
+  logic?: 'AND' | 'OR'
+  text: string
+  children: PreviewTreeNode[]
 }
 
-const lines = computed(() =>
-  (props.payload.expressions || []).flatMap((group, index) =>
-    collectLines(group, `/expressions/${index}`, 0),
-  ),
-)
+type PreviewTreeLine = {
+  key: string
+  kind: PreviewTreeNode['kind']
+  logic: PreviewTreeNode['logic'] | undefined
+  text: string
+  branch: string
+  depth: number
+}
+
+const groupLogic = (group: ExpressionGroup): 'AND' | 'OR' =>
+  (group.logic ?? ExpressionLogic.AND) === ExpressionLogic.OR ? 'OR' : 'AND'
+
+const buildGroupNode = (group: ExpressionGroup, path: string): PreviewTreeNode | null => {
+  const children: PreviewTreeNode[] = group.rules.map((rule, index) => ({
+    key: `${path}/rules/${index}`,
+    kind: 'rule',
+    text: `${fieldLabel(rule.field)} ${ExpressionTypeMap[rule.expression_type!] || '匹配'} ${valueLabel(rule, `${path}/rules/${index}/value`)}`,
+    children: [],
+  }))
+  ;(group.nested || []).forEach((nested, index) => {
+    const nestedNode = buildGroupNode(nested, `${path}/nested/${index}`)
+    if (nestedNode) children.push(nestedNode)
+  })
+  if (!children.length) return null
+  const logic = groupLogic(group)
+  return {
+    key: path,
+    kind: 'group',
+    logic,
+    text: logic === 'AND' ? '满足全部条件' : '满足任一条件',
+    children,
+  }
+}
+
+const treeRoots = computed<PreviewTreeNode[]>(() => {
+  const groups = (props.payload.expressions || [])
+    .map((group, index) => buildGroupNode(group, `/expressions/${index}`))
+    .filter((group): group is PreviewTreeNode => !!group)
+  if (groups.length <= 1) return groups
+  return [
+    {
+      key: '/expressions',
+      kind: 'group',
+      logic: 'AND',
+      text: '满足全部表达式组',
+      children: groups,
+    },
+  ]
+})
+
+const flattenTree = (
+  nodes: PreviewTreeNode[],
+  prefix = '',
+  depth = 0,
+  roots = true,
+): PreviewTreeLine[] =>
+  nodes.flatMap((node, index) => {
+    const isLast = index === nodes.length - 1
+    const branch = roots ? '' : `${prefix}${isLast ? '└─ ' : '├─ '}`
+    const childPrefix = roots ? '' : `${prefix}${isLast ? '   ' : '│  '}`
+    return [
+      {
+        key: node.key,
+        kind: node.kind,
+        logic: node.logic,
+        text: node.text,
+        branch,
+        depth,
+      },
+      ...flattenTree(node.children, childPrefix, depth + 1, false),
+    ]
+  })
+
+const treeLines = computed(() => flattenTree(treeRoots.value))
 </script>
+
+<style scoped lang="scss">
+.query-preview {
+  color: var(--app-text-strong);
+}
+
+.query-preview__empty {
+  padding: 6px 8px;
+  color: var(--app-text-muted);
+}
+
+.query-preview-tree {
+  padding: 6px 10px;
+  border: 1px solid var(--app-border);
+  border-left: 3px solid $primary;
+  border-radius: 6px;
+  background: var(--app-surface);
+}
+
+.query-preview-tree__line {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  line-height: 1.4;
+}
+
+.query-preview-tree__line--group {
+  font-weight: 600;
+}
+
+.query-preview-tree__branch {
+  flex: 0 0 auto;
+  color: var(--app-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre;
+}
+
+.query-preview-tree__logic {
+  min-width: 38px;
+  margin-right: 8px;
+  justify-content: center;
+}
+
+.query-preview-tree__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.query-preview-tree__line--rule .query-preview-tree__text {
+  font-weight: 400;
+}
+
+.query-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 8px;
+  padding: 0 10px;
+}
+
+.query-preview-meta__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+</style>

@@ -30,6 +30,13 @@ export function useRuntimeTableMetadata(
   const fields = computed(() => sortFields(metadata.value?.table_fields || []))
   const listFields = computed(() => fields.value.filter((field) => field.is_list_show))
   const quickSearchFields = computed(() => fields.value.filter((field) => field.is_quick_search))
+  const quickSearchPlaceholder = computed(() => {
+    const labels = Array.from(
+      new Set(quickSearchFields.value.map((field) => field.field_name.trim()).filter(Boolean)),
+    )
+    if (!labels.length) return '搜索关键词'
+    return `搜索${labels.slice(0, 3).join('、')}${labels.length > 3 ? '等' : ''}`
+  })
   const advancedSearchFields = computed(() =>
     fields.value.filter((field) => field.is_advanced_search),
   )
@@ -72,6 +79,7 @@ export function useRuntimeTableMetadata(
     fields,
     listFields,
     quickSearchFields,
+    quickSearchPlaceholder,
     advancedSearchFields,
     formFields,
     detailFields,

@@ -5,6 +5,8 @@ import { useQuerySchemes, type SchemeAwareQueryState } from 'src/composables/que
 import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
 import type { Query } from 'src/types/global'
 
+export const QUERY_SCHEME_NAVIGATION_STATE_KEY = 'query_scheme_id'
+
 export function useQuerySchemePage<TQuery extends Query>(
   routeName: string,
   queryState: SchemeAwareQueryState<TQuery>,
@@ -28,11 +30,33 @@ export function useQuerySchemePage<TQuery extends Query>(
   }
 
   const initialize = async (options: { preserveInitialQuery?: boolean } = {}) => {
-    const requestedID = Number(route.query.query_scheme_id)
-    return runtime.initialize(
-      Number.isSafeInteger(requestedID) && requestedID > 0 ? requestedID : undefined,
-      options,
+    const routeRequestedID = Number(route.query[QUERY_SCHEME_NAVIGATION_STATE_KEY])
+    const stateRequestedID = Number(
+      typeof window === 'undefined'
+        ? undefined
+        : window.history.state?.[QUERY_SCHEME_NAVIGATION_STATE_KEY],
     )
+    const requestedID =
+      Number.isSafeInteger(routeRequestedID) && routeRequestedID > 0
+        ? routeRequestedID
+        : Number.isSafeInteger(stateRequestedID) && stateRequestedID > 0
+          ? stateRequestedID
+          : undefined
+    try {
+      return await runtime.initialize(requestedID, options)
+    } finally {
+      if (
+        typeof window !== 'undefined' &&
+        Object.prototype.hasOwnProperty.call(
+          window.history.state || {},
+          QUERY_SCHEME_NAVIGATION_STATE_KEY,
+        )
+      ) {
+        const nextState = { ...(window.history.state || {}) }
+        delete nextState[QUERY_SCHEME_NAVIGATION_STATE_KEY]
+        window.history.replaceState(nextState, '')
+      }
+    }
   }
 
   const selectScheme = async (scheme: QuerySchemeSummary) => {

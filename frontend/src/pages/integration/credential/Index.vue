@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索凭证编码或名称"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
@@ -198,6 +198,7 @@ const currentDetailId = ref(0)
 const currentEditData = ref<CredentialDetail | null>(null)
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: metadataAdvancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('integration_credential')

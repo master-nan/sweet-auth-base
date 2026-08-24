@@ -30,7 +30,7 @@
                   outlined
                   debounce="300"
                   v-model="keyword"
-                  placeholder="搜索角色名称/备注"
+                  :placeholder="quickSearchPlaceholder"
                 >
                   <template v-slot:append>
                     <q-icon name="search" />
@@ -203,6 +203,7 @@ const currentRole = ref<Role>({
 const columns = ref<QTableProps['columns']>([])
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: table_fields_advanced,
   formFields: tableFields,
   loadMetadata,

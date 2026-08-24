@@ -100,87 +100,54 @@
             :color="props.row.enabled ? 'positive' : 'grey'" /></q-td
       ></template>
       <template #body-cell-actions="props">
-        <q-td :props="props" class="q-gutter-xs no-wrap">
-          <span class="query-scheme-use-action">
+        <q-td :props="props" class="no-wrap">
+          <span
+            v-for="action in inlineSchemeActions(props.row)"
+            :key="action.key"
+            class="query-scheme-row-action"
+          >
             <q-btn
               flat
+              round
               dense
-              no-caps
-              icon="open_in_new"
-              label="使用方案"
-              color="primary"
-              aria-label="使用方案"
-              :disable="!canUseScheme(props.row)"
-              @click="useScheme(props.row)"
+              size="sm"
+              :icon="action.icon"
+              :color="action.color"
+              :aria-label="action.label"
+              :disable="action.disabled"
+              @click="action.handler"
             />
-            <q-tooltip>{{ useSchemeTooltip(props.row) }}</q-tooltip>
+            <q-tooltip>{{ action.tooltip }}</q-tooltip>
           </span>
           <q-btn
-            v-if="canEdit(props.row)"
+            v-if="overflowSchemeActions(props.row).length"
             flat
             round
             dense
-            icon="edit"
+            size="sm"
+            icon="more_horiz"
             color="primary"
-            aria-label="编辑方案"
-            @click="openEdit(props.row)"
-            ><q-tooltip>编辑</q-tooltip></q-btn
+            aria-label="更多方案操作"
           >
-          <q-btn
-            flat
-            round
-            dense
-            icon="visibility"
-            aria-label="查看方案详情"
-            @click="openDetail(props.row)"
-            ><q-tooltip>详情</q-tooltip></q-btn
-          >
-          <q-btn flat round dense icon="more_horiz" aria-label="更多方案操作">
             <q-tooltip>更多操作</q-tooltip>
             <q-menu auto-close>
               <q-list dense style="min-width: 180px">
-                <q-item
-                  v-if="props.row.type !== QuerySchemeType.PERSONAL"
-                  clickable
-                  @click="copyScheme(props.row)"
+                <template
+                  v-for="(action, index) in overflowSchemeActions(props.row)"
+                  :key="action.key"
                 >
-                  <q-item-section avatar><q-icon name="content_copy" /></q-item-section>
-                  <q-item-section>复制为我的方案</q-item-section>
-                </q-item>
-                <q-item
-                  v-if="props.row.type === QuerySchemeType.PERSONAL"
-                  clickable
-                  @click="setPersonalDefault(props.row)"
-                >
-                  <q-item-section avatar
-                    ><q-icon :name="props.row.is_default ? 'star_border' : 'star'" color="amber-8"
-                  /></q-item-section>
-                  <q-item-section>{{
-                    props.row.is_default ? '取消默认' : '设为默认'
-                  }}</q-item-section>
-                </q-item>
-                <q-item
-                  v-if="canManageShared && props.row.type !== QuerySchemeType.PERSONAL"
-                  clickable
-                  @click="toggleEnabled(props.row)"
-                >
-                  <q-item-section avatar
-                    ><q-icon
-                      :name="props.row.enabled ? 'toggle_off' : 'toggle_on'"
-                      :color="props.row.enabled ? 'warning' : 'positive'"
-                  /></q-item-section>
-                  <q-item-section>{{ props.row.enabled ? '停用方案' : '启用方案' }}</q-item-section>
-                </q-item>
-                <q-separator v-if="canEdit(props.row)" />
-                <q-item
-                  v-if="canEdit(props.row)"
-                  clickable
-                  class="text-negative"
-                  @click="deleteScheme(props.row)"
-                >
-                  <q-item-section avatar><q-icon name="delete" color="negative" /></q-item-section>
-                  <q-item-section>删除方案</q-item-section>
-                </q-item>
+                  <q-separator v-if="action.destructive && index > 0" />
+                  <q-item
+                    clickable
+                    :class="action.destructive ? 'text-negative' : ''"
+                    @click="action.handler"
+                  >
+                    <q-item-section avatar>
+                      <q-icon :name="action.icon" :color="action.color" />
+                    </q-item-section>
+                    <q-item-section>{{ action.label }}</q-item-section>
+                  </q-item>
+                </template>
               </q-list>
             </q-menu>
           </q-btn>
@@ -238,6 +205,7 @@ import QuerySchemeDetailDrawer from './QuerySchemeDetailDrawer.vue'
 import QuerySchemeEditDialog from './QuerySchemeEditDialog.vue'
 import { useQuerySchemeApi } from 'src/api/services/query-scheme'
 import { collectQueryScopes } from 'src/composables/query-scope'
+import { QUERY_SCHEME_NAVIGATION_STATE_KEY } from 'src/composables/query-scheme-page'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useUserStore } from 'src/stores/user'
 import { hasGrantedActionCapability } from 'src/utils/menu-button'
@@ -324,6 +292,90 @@ const useSchemeTooltip = (row: QuerySchemeListItem) => {
   if (row.status === QuerySchemeValidationStatus.INVALID) return '方案校验未通过，无法使用'
   return '进入所属页面并使用此方案'
 }
+type SchemeRowAction = {
+  key: string
+  label: string
+  tooltip: string
+  icon: string
+  color: string
+  disabled?: boolean
+  destructive?: boolean
+  handler: () => void
+}
+const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
+  const actions: SchemeRowAction[] = [
+    {
+      key: 'use',
+      label: '使用方案',
+      tooltip: useSchemeTooltip(row),
+      icon: 'open_in_new',
+      color: 'primary',
+      disabled: !canUseScheme(row),
+      handler: () => useScheme(row),
+    },
+  ]
+  if (canEdit(row)) {
+    actions.push({
+      key: 'edit',
+      label: '编辑方案',
+      tooltip: '编辑方案',
+      icon: 'edit',
+      color: 'primary',
+      handler: () => void openEdit(row),
+    })
+  }
+  actions.push({
+    key: 'detail',
+    label: '查看方案详情',
+    tooltip: '查看方案详情',
+    icon: 'visibility',
+    color: 'primary',
+    handler: () => openDetail(row),
+  })
+  if (row.type === QuerySchemeType.PERSONAL) {
+    actions.push({
+      key: 'default',
+      label: row.is_default ? '取消默认' : '设为默认',
+      tooltip: row.is_default ? '取消默认方案' : '设为默认方案',
+      icon: row.is_default ? 'star_border' : 'star',
+      color: 'amber-8',
+      handler: () => setPersonalDefault(row),
+    })
+  } else {
+    actions.push({
+      key: 'copy',
+      label: '复制为我的方案',
+      tooltip: '复制为我的方案',
+      icon: 'content_copy',
+      color: 'primary',
+      handler: () => copyScheme(row),
+    })
+    if (canManageShared.value) {
+      actions.push({
+        key: 'toggle',
+        label: row.enabled ? '停用方案' : '启用方案',
+        tooltip: row.enabled ? '停用方案' : '启用方案',
+        icon: row.enabled ? 'toggle_off' : 'toggle_on',
+        color: row.enabled ? 'warning' : 'positive',
+        handler: () => toggleEnabled(row),
+      })
+    }
+  }
+  if (canEdit(row)) {
+    actions.push({
+      key: 'delete',
+      label: '删除方案',
+      tooltip: '删除方案',
+      icon: 'delete',
+      color: 'negative',
+      destructive: true,
+      handler: () => deleteScheme(row),
+    })
+  }
+  return actions
+}
+const inlineSchemeActions = (row: QuerySchemeListItem) => schemeRowActions(row).slice(0, 3)
+const overflowSchemeActions = (row: QuerySchemeListItem) => schemeRowActions(row).slice(3)
 const updateNameFilter = (value: string | number | null) => {
   nameFilter.value = truncateQuerySchemeName(String(value ?? ''))
 }
@@ -370,7 +422,10 @@ const useScheme = (row: QuerySchemeListItem) => {
     $q.notify({ type: 'warning', message: '当前账号无法进入该方案所属页面' })
     return
   }
-  void router.push({ name: target.route_name, query: { query_scheme_id: String(row.id) } })
+  void router.push({
+    name: target.route_name,
+    state: { [QUERY_SCHEME_NAVIGATION_STATE_KEY]: String(row.id) },
+  })
 }
 const openCreate = () => {
   editValue.value = null
@@ -446,7 +501,7 @@ onMounted(fetchData)
   white-space: nowrap;
 }
 
-.query-scheme-use-action {
+.query-scheme-row-action {
   display: inline-flex;
 }
 </style>

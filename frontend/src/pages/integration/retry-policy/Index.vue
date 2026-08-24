@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索策略编码或名称"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                 >
                   <template #append><q-icon name="search" /></template>
@@ -180,6 +180,7 @@ const currentDetailId = ref(0)
 const currentEditData = ref<RetryPolicyDetail | null>(null)
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: advancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('integration_retry_policy')

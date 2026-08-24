@@ -99,6 +99,7 @@ const AdvancedQueryRuleRowStub = defineComponent({
       type: Function,
       required: true,
     },
+    showLogic: Boolean,
   },
   emits: ['update:logic'],
   setup() {
@@ -248,6 +249,29 @@ describe('AdvancedQuery organization selector integration', () => {
     expect(expressionOptions(rule).map((option) => option.value)).toContain(
       ExpressionType.LIKE,
     )
+  })
+
+  it('uses one advanced editor and always exposes the expression logic', async () => {
+    const { wrapper } = await mountQuery()
+    const row = wrapper.findComponent({ name: 'AdvancedQueryRuleRow' })
+
+    expect(wrapper.text()).not.toContain('简单模式')
+    expect(wrapper.text()).not.toContain('高级模式')
+    expect(wrapper.text()).toContain('条件预览')
+    expect(row.props('showLogic')).toBe(true)
+  })
+
+  it('initializes new nested groups with an explicit AND relation', async () => {
+    const { wrapper } = await mountQuery()
+    const addNested = wrapper
+      .findAllComponents(QBtnStub)
+      .find((button) => button.text().includes('添加嵌套组'))
+
+    await addNested!.trigger('click')
+    await nextTick()
+
+    const updated = wrapper.emitted('update:queryModel')?.at(-1)?.[0] as Query
+    expect(updated.expressions[0]?.nested?.[0]?.logic).toBe(ExpressionLogic.AND)
   })
 
   it('uses reset and search actions for immediate business queries', async () => {

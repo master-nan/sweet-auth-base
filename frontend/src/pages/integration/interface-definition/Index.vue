@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索接口编码、名称或路径"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                 >
                   <template #append><q-icon name="search" /></template>
@@ -206,6 +206,7 @@ const currentDetailId = ref(0)
 const currentEditData = ref<InterfaceDefinitionDetail | null>(null)
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: metadataAdvancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('integration_interface_definition')

@@ -78,4 +78,47 @@ describe('QuerySchemePreview', () => {
     expect(wrapper.text()).toContain('客户 等于 华东客户')
     expect(wrapper.text()).not.toContain('9527')
   })
+
+  it('renders nested boolean expressions as group and condition tree nodes', () => {
+    const wrapper = mount(QuerySchemePreview, {
+      props: {
+        fields: [
+          { field_code: 'username', field_name: '用户名' },
+          { field_code: 'language', field_name: '语言' },
+          { field_code: 'status', field_name: '状态' },
+        ] as never,
+        payload: {
+          expressions: [
+            {
+              logic: ExpressionLogic.OR,
+              rules: [
+                { field: 'username', expression_type: ExpressionType.LIKE, value: 'admin' },
+                { field: 'language', expression_type: ExpressionType.EQ, value: 'zh-CN' },
+              ],
+              nested: [
+                {
+                  logic: ExpressionLogic.AND,
+                  rules: [
+                    { field: 'status', expression_type: ExpressionType.EQ, value: 'enabled' },
+                  ],
+                  nested: [],
+                },
+              ],
+            },
+          ],
+          quick_query: { keyword: '' },
+          order: { field: '', is_asc: false },
+          bindings: [],
+        },
+      },
+      global: { stubs: { QBadge: BadgeStub } },
+    })
+
+    expect(wrapper.findAll('.query-preview-tree__line--group')).toHaveLength(2)
+    expect(wrapper.findAll('.query-preview-tree__line--rule')).toHaveLength(3)
+    expect(wrapper.text()).toContain('OR满足任一条件')
+    expect(wrapper.text()).toContain('AND满足全部条件')
+    expect(wrapper.text()).toContain('用户名 包含 admin')
+    expect(wrapper.findAll('.query-preview-tree__branch').some((branch) => branch.text().includes('└─'))).toBe(true)
+  })
 })

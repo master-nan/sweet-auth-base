@@ -25,7 +25,13 @@
               :fields="table_fields_advanced"
             >
               <template #quick-search>
-                <q-input dense outlined debounce="300" v-model="keyword" placeholder="搜索关键词">
+                <q-input
+                  dense
+                  outlined
+                  debounce="300"
+                  v-model="keyword"
+                  :placeholder="quickSearchPlaceholder"
+                >
                   <template v-slot:append>
                     <q-icon name="search" />
                   </template>
@@ -176,6 +182,7 @@ const currentEditData = ref<SmsTemplate | null>(null)
 const columns = ref<QTableProps['columns']>([])
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: table_fields_advanced,
   formFields: tableFields,
   loadMetadata,

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
 import {
-  isSimpleQueryExpression,
   normalizeQuerySchemePayload,
   normalizeQueryValueByFieldType,
   queryExpressionDepth,
@@ -9,12 +8,6 @@ import {
 import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
 
 describe('query scheme expression modes', () => {
-  it('allows lossless simple mode only for one AND group without nesting', () => {
-    expect(isSimpleQueryExpression([{ logic: ExpressionLogic.AND, rules: [], nested: [] }])).toBe(true)
-    expect(isSimpleQueryExpression([{ logic: ExpressionLogic.OR, rules: [], nested: [] }])).toBe(false)
-    expect(isSimpleQueryExpression([{ logic: ExpressionLogic.AND, rules: [], nested: [{ logic: ExpressionLogic.AND, rules: [], nested: [] }] }])).toBe(false)
-  })
-
   it('detects schema depth three for read-only UI handling', () => {
     const groups = [{ logic: ExpressionLogic.AND, rules: [], nested: [{ logic: ExpressionLogic.AND, rules: [], nested: [{ logic: ExpressionLogic.AND, rules: [], nested: [] }] }] }]
     expect(queryExpressionDepth(groups)).toBe(3)

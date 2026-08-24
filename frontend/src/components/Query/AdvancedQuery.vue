@@ -13,23 +13,8 @@
         </q-btn>
       </q-card-section>
 
-      <q-tabs
-        :model-value="queryMode"
-        dense
-        active-color="primary"
-        indicator-color="primary"
-        @update:model-value="changeQueryMode"
-      >
-        <q-tab name="simple" label="简单模式" :disable="!simpleModeAvailable || readOnlyDepth" />
-        <q-tab name="advanced" label="高级模式" />
-      </q-tabs>
-      <q-separator />
-
       <q-banner v-if="sourceName" dense class="bg-primary-1 text-primary q-mx-md q-mt-sm rounded-borders">
         当前方案：{{ sourceName }}<span v-if="dirty">（已修改）</span>
-      </q-banner>
-      <q-banner v-if="!simpleModeAvailable && queryMode === 'advanced'" dense class="bg-grey-2 text-grey-8 q-mx-md q-mt-sm rounded-borders">
-        当前条件包含 OR 或分组结构，只能在高级模式编辑。
       </q-banner>
       <q-banner v-if="readOnlyDepth" dense class="bg-warning text-dark q-mx-md q-mt-sm rounded-borders">
         当前方案包含第三层条件。本版本会完整保留并展示，但不能编辑或覆盖该结构。
@@ -44,10 +29,10 @@
               <div
                 v-for="(expression, eIndex) in queryModel.expressions"
                 :key="eIndex"
-                class="q-mb-md"
+                class="expression-group"
               >
                 <q-card flat class="expression-card">
-                  <q-card-section v-if="queryMode === 'advanced'" class="expression-card-head">
+                  <q-card-section class="expression-card-head">
                     <div class="row items-center">
                       <div class="text-subtitle2 text-weight-medium text-primary">
                         表达式组 {{ eIndex + 1 }}
@@ -84,7 +69,7 @@
                       :rule="rule"
                       :is-first="rIndex === 0"
                       :can-remove="expression.rules.length > 1"
-                      :show-logic="queryMode === 'advanced'"
+                      :show-logic="true"
                       :binding-labels="bindingLabelsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)"
                       :fields="fields"
                       :field-label-key="fieldLabelKey"
@@ -120,7 +105,7 @@
                     />
 
                     <!-- 嵌套查询区域 -->
-                    <div v-if="enableNested && queryMode === 'advanced'" class="nested-section q-ml-sm">
+                    <div v-if="enableNested" class="nested-section">
                       <q-card flat class="nested-card">
                         <q-card-section class="nested-section-head">
                           <div class="row items-center">
@@ -233,19 +218,15 @@
             </div>
           </div>
         </q-form>
-        <query-scheme-preview
-          v-else
-          :payload="previewPayload"
-          :fields="previewFields"
-          :menu-id="currentMenuId"
-        />
-        <q-separator v-if="!readOnlyDepth" class="q-my-md" />
-        <query-scheme-preview
-          v-if="!readOnlyDepth"
-          :payload="previewPayload"
-          :fields="previewFields"
-          :menu-id="currentMenuId"
-        />
+        <q-separator v-if="!readOnlyDepth" class="q-my-sm" />
+        <section class="advanced-query-preview" aria-label="条件预览">
+          <div class="advanced-query-preview__title">条件预览</div>
+          <query-scheme-preview
+            :payload="previewPayload"
+            :fields="previewFields"
+            :menu-id="currentMenuId"
+          />
+        </section>
       </q-card-section>
 
       <!-- 固定底部按钮区域 -->
@@ -297,7 +278,6 @@ import {
   isRangeExpressionType,
   isTextMultiKeywordExpressionType,
   splitMultiValueText,
-  isSimpleQueryExpression,
   normalizeQuerySchemePayload,
   queryExpressionDepth,
 } from 'src/utils/query-state'
@@ -418,8 +398,6 @@ const booleanOptions = [
   { label: '否', value: false },
 ]
 
-const queryMode = ref<'simple' | 'advanced'>('simple')
-const simpleModeAvailable = computed(() => isSimpleQueryExpression(props.queryModel.expressions))
 const readOnlyDepth = computed(() => queryExpressionDepth(props.queryModel.expressions) > 2)
 const isSchemeConditionEditor = computed(() => props.usage === 'scheme-condition-editor')
 const previewPayload = computed(() => normalizeQuerySchemePayload(props.queryModel, props.bindings))
@@ -446,20 +424,6 @@ const updateRuleFieldAt = (rule: QueryRule, value: unknown, pointer: string) => 
 const updateRuleExpressionTypeAt = (rule: QueryRule, pointer: string) => {
   clearBindingsForRule(pointer)
   updateRuleExpressionType(rule)
-}
-
-const changeQueryMode = (mode: 'simple' | 'advanced') => {
-  if (mode === 'simple' && !simpleModeAvailable.value) {
-    $q.notify({ type: 'warning', message: '当前条件包含复杂逻辑，只能在高级模式编辑' })
-    return
-  }
-  queryMode.value = mode
-  if (mode === 'simple' && props.queryModel.expressions[0]) {
-    const expressions = props.queryModel.expressions.map((group, index) =>
-      index === 0 ? { ...group, logic: ExpressionLogic.AND } : group,
-    )
-    emit('update:queryModel', { ...props.queryModel, expressions })
-  }
 }
 
 const relationOptionsMap = ref<Record<string, RelationOption[]>>({})
@@ -1025,6 +989,7 @@ const hasIncompleteExpressionRules = (expressions: Query['expressions']): boolea
 }
 
 const emptyExpressionGroup = () => ({
+  logic: ExpressionLogic.AND,
   rules: [
     {
       field: '',
@@ -1065,7 +1030,6 @@ watch(
   () => props.modelValue,
   (visible) => {
     if (!visible) return
-    queryMode.value = simpleModeAvailable.value ? 'simple' : 'advanced'
     if (readOnlyDepth.value) return
     normalizeQueryExpressionTypes()
     props.queryModel.expressions.forEach((expression) => {
@@ -1094,6 +1058,7 @@ const addExpression = (eIndex: number) => {
   clearAllBindings()
   const newQuery = { ...props.queryModel }
   newQuery.expressions.splice(eIndex + 1, 0, {
+    logic: ExpressionLogic.AND,
     rules: [
       {
         field: '',
@@ -1140,6 +1105,7 @@ const addNestedGroup = (eIndex: number) => {
     newQuery.expressions[eIndex]!.nested = []
   }
   newQuery.expressions[eIndex]!.nested!.push({
+    logic: ExpressionLogic.AND,
     rules: [
       {
         field: '',
@@ -1226,7 +1192,7 @@ defineExpose({
 }
 
 .advanced-search-header {
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   background: linear-gradient(180deg, rgba(25, 118, 210, 0.05), rgba(255, 255, 255, 0));
 }
@@ -1234,21 +1200,21 @@ defineExpose({
 .advanced-search-title {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: $primary;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .advanced-search-content {
   overflow-y: auto;
   flex: 1;
-  padding: 16px;
+  padding: 12px 14px;
   background: #f8fafc;
 }
 
 .advanced-search-footer {
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   background: #fff;
 }
@@ -1261,14 +1227,18 @@ defineExpose({
   overflow: hidden;
 }
 
+.expression-group + .expression-group {
+  margin-top: 8px;
+}
+
 .expression-card-head,
 .nested-section-head {
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: rgba(115, 103, 240, 0.04);
 }
 
 .expression-card-body {
-  padding: 14px 16px;
+  padding: 8px 10px;
 }
 
 .nested-card {
@@ -1279,9 +1249,9 @@ defineExpose({
 }
 
 .nested-section {
-  margin-top: 16px;
+  margin-top: 8px;
   border-top: 1px dashed rgba(15, 23, 42, 0.12);
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 .nested-groups {
@@ -1292,6 +1262,17 @@ defineExpose({
   background-color: #f8fbff;
   border-radius: 8px;
   border: 1px solid rgba(25, 118, 210, 0.24);
+}
+
+.advanced-query-preview {
+  padding: 2px 4px 4px;
+}
+
+.advanced-query-preview__title {
+  margin-bottom: 6px;
+  color: var(--app-text-strong);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 1023px) {

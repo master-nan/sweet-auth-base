@@ -27,7 +27,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索执行编号、系统或接口"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="search"
                   ><template #append><q-icon name="search" /></template></q-input
                 ><q-btn
@@ -218,7 +218,7 @@ const queryState = useTableQueryState<IntegrationLogQuery>({
   }),
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
-const { advancedSearchFields: advancedFields, loadMetadata } =
+const { quickSearchPlaceholder, advancedSearchFields: advancedFields, loadMetadata } =
   useRuntimeTableMetadata('integration_log')
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>

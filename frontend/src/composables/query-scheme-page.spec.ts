@@ -3,6 +3,7 @@ import type { Query } from 'src/types/global'
 
 const notify = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const route = vi.hoisted(() => ({ query: {} as Record<string, unknown> }))
 const runtime = vi.hoisted(() => ({
   issues: { value: [] as Array<{ message: string }> },
   error: { value: '' },
@@ -16,7 +17,7 @@ const runtime = vi.hoisted(() => ({
 
 vi.mock('quasar', () => ({ useQuasar: () => ({ notify }) }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { query_scheme_id: '17' } }),
+  useRoute: () => route,
   useRouter: () => ({ push }),
 }))
 vi.mock('src/composables/query-schemes', () => ({ useQuerySchemes: () => runtime }))
@@ -28,6 +29,8 @@ const createState = () => ({ query: { value: { page: 1 } } }) as never
 describe('useQuerySchemePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    route.query = { query_scheme_id: '17' }
+    window.history.replaceState({}, '')
     runtime.issues.value = []
     runtime.error.value = ''
   })
@@ -51,6 +54,17 @@ describe('useQuerySchemePage', () => {
     await page.initialize({ preserveInitialQuery: true })
 
     expect(runtime.initialize).toHaveBeenCalledWith(17, { preserveInitialQuery: true })
+  })
+
+  it('consumes a transient navigation state without leaving it in the URL contract', async () => {
+    route.query = {}
+    window.history.replaceState({ query_scheme_id: '23' }, '')
+    const page = useQuerySchemePage('system_user', createState(), vi.fn())
+
+    await page.initialize()
+
+    expect(runtime.initialize).toHaveBeenCalledWith(23, {})
+    expect(window.history.state.query_scheme_id).toBeUndefined()
   })
 
   it('reports a blocked scheme without refreshing business data', async () => {

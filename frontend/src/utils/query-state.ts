@@ -299,8 +299,3 @@ export const queryExpressionDepth = (groups: ExpressionGroup[]): number => {
     1 + Math.max(0, ...(group.nested || []).map(groupDepth))
   return Math.max(0, ...groups.map(groupDepth))
 }
-
-export const isSimpleQueryExpression = (groups: ExpressionGroup[]) =>
-  groups.length <= 1 &&
-  (groups[0]?.logic ?? ExpressionLogic.AND) === ExpressionLogic.AND &&
-  (groups[0]?.nested?.length || 0) === 0

@@ -30,7 +30,7 @@
                   outlined
                   debounce="300"
                   v-model="query.quick_query!.keyword"
-                  placeholder="搜索关键词"
+                  :placeholder="quickSearchPlaceholder"
                 >
                   <template v-slot:append>
                     <q-icon name="search" />
@@ -227,6 +227,7 @@ const visibleColumns = ref<string[]>([])
 const sortableFields = ref<ReadonlySet<string>>(new Set())
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: table_fields_advanced,
   formFields: tableFields,
   loadMetadata,

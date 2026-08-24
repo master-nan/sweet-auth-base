@@ -29,7 +29,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索关键词"
+                  placeholder="搜索来源编码、错误编码"
                   @keyup.enter="search"
                 >
                   <template #append><q-icon name="search" /></template>

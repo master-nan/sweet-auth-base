@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索批次编号或任务"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                 >
                   <template #append><q-icon name="search" /></template>
@@ -213,7 +213,7 @@ const canQueryBatches = computed(() => hasGrantedCapability('integration_sync_ba
 const canDetail = computed(() => hasGrantedCapability('integration_sync_batch_detail'))
 const canQueryExecutions = computed(() => hasGrantedCapability('integration_execution_query'))
 const canViewExecutionDetail = computed(() => hasGrantedCapability('integration_execution_detail'))
-const { advancedSearchFields: advancedFields, loadMetadata } =
+const { quickSearchPlaceholder, advancedSearchFields: advancedFields, loadMetadata } =
   useRuntimeTableMetadata('integration_sync_batch')
 const statusMeta = {
   created: { label: '待运行', color: 'grey-7' },

@@ -170,6 +170,7 @@ const mountManager = () => mount(QuerySchemeManager, { global: { stubs: managerS
 describe('QuerySchemeManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    user.menus[0]!.menu_buttons[0]!.state = true
     quasar.dialog.mockReturnValue({ onOk: quasar.dialogOnOk })
     api.copyToPersonal.mockResolvedValue({ data: { id: 9 } })
     api.list.mockResolvedValue({
@@ -212,9 +213,54 @@ describe('QuerySchemeManager', () => {
       ),
     ).toBe(true)
     expect(wrapper.find('[aria-label="更多方案操作"]').exists()).toBe(true)
+    expect(wrapper.findAll('.query-scheme-row-action')).toHaveLength(3)
+    expect(
+      wrapper
+        .findAll('.query-scheme-row-action button')
+        .every((button) => button.text().trim() === ''),
+    ).toBe(true)
     expect(wrapper.text()).toContain('取消默认')
     expect(wrapper.text()).toContain('删除方案')
     expect(wrapper.find('[aria-label="使用方案"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('navigates with transient state instead of creating a query-string tag', async () => {
+    const wrapper = mountManager()
+    await flushPromises()
+
+    await wrapper.find('[aria-label="使用方案"]').trigger('click')
+
+    expect(router.push).toHaveBeenCalledWith({
+      name: 'system_user',
+      state: { query_scheme_id: '1' },
+    })
+  })
+
+  it('only shows more when a fourth available action exists', async () => {
+    user.menus[0]!.menu_buttons[0]!.state = false
+    api.list.mockResolvedValueOnce({
+      data: [
+        {
+          id: 4,
+          name: '公共只读方案',
+          scope_code: 'system.user.list',
+          scope_label: 'router.system.user',
+          type: QuerySchemeType.PUBLIC,
+          is_default: false,
+          enabled: true,
+          revision: 1,
+          status: QuerySchemeValidationStatus.VALID,
+          creator_display_name: '管理员',
+          updated_at: '2026-08-19 10:00:00',
+        },
+      ],
+      total: 1,
+    })
+    const wrapper = mountManager()
+    await flushPromises()
+
+    expect(wrapper.findAll('.query-scheme-row-action')).toHaveLength(3)
+    expect(wrapper.find('[aria-label="更多方案操作"]').exists()).toBe(false)
   })
 
   it('disables use for stopped or invalid schemes and explains why', async () => {

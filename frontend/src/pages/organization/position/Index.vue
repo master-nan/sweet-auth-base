@@ -30,7 +30,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索关键词"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="search"
                 >
                   <template #append><q-icon name="search" /></template>
@@ -207,6 +207,7 @@ const sortableFields = ref<ReadonlySet<string>>(new Set())
 const pagination = ref({ page: 1, rowsPerPage: 0, sortBy: '', descending: false })
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: advancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('org_position')

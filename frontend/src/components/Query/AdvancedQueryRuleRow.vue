@@ -484,26 +484,26 @@ watch(
 <style scoped lang="scss">
 .rule-item {
   position: relative;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   background: #ffffff;
 }
 
 .rule-item + .rule-item {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .rule-actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .range-inputs {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .range-input {

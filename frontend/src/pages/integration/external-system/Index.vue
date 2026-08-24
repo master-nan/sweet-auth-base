@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索关键词"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                 >
                   <template #append><q-icon name="search" /></template>
@@ -190,6 +190,7 @@ const currentDetailId = ref(0)
 const currentEditData = ref<ExternalSystemDetail | null>(null)
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: advancedFields,
   formFields,
   loadMetadata,

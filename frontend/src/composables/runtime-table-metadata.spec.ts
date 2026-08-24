@@ -21,6 +21,11 @@ describe('useRuntimeTableMetadata', () => {
         is_update_show: true, detail_span: 2,
       },
       {
+        field_code: 'code', field_name: '编码', sequence: 3, is_list_show: true,
+        is_quick_search: true, is_advanced_search: false, is_insert_show: true,
+        is_update_show: true, detail_span: 1,
+      },
+      {
         field_code: 'status', field_name: '状态', sequence: 1, is_list_show: true,
         is_quick_search: false, is_advanced_search: true, is_insert_show: false,
         is_update_show: false, detail_span: 1,
@@ -43,10 +48,11 @@ describe('useRuntimeTableMetadata', () => {
     await state.loadMetadata()
 
     expect(loader).toHaveBeenCalledWith('demo')
-    expect(state.fields.value.map((field) => field.field_code)).toEqual(['status', 'name'])
-    expect(state.quickSearchFields.value.map((field) => field.field_code)).toEqual(['name'])
+    expect(state.fields.value.map((field) => field.field_code)).toEqual(['status', 'name', 'code'])
+    expect(state.quickSearchFields.value.map((field) => field.field_code)).toEqual(['name', 'code'])
+    expect(state.quickSearchPlaceholder.value).toBe('搜索名称、编码')
     expect(state.advancedSearchFields.value.map((field) => field.field_code)).toEqual(['status'])
-    expect(state.formFields.value.map((field) => field.field_code)).toEqual(['name'])
-    expect(state.detailFields.value.map((field) => field.field_code)).toEqual(['status', 'name'])
+    expect(state.formFields.value.map((field) => field.field_code)).toEqual(['name', 'code'])
+    expect(state.detailFields.value.map((field) => field.field_code)).toEqual(['status', 'name', 'code'])
   })
 })

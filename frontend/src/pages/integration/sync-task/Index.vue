@@ -28,7 +28,7 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索任务编码或名称"
+                  :placeholder="quickSearchPlaceholder"
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
@@ -197,6 +197,7 @@ const interfaces = ref<InterfaceDefinitionListItem[]>([])
 const consumers = ref<SyncConsumerMetadata[]>([])
 const {
   fields: metadataFields,
+  quickSearchPlaceholder,
   advancedSearchFields: advancedFields,
   loadMetadata,
 } = useRuntimeTableMetadata('integration_sync_task')
