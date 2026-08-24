@@ -724,3 +724,426 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 - 部署、环境和排错：[平台部署运维指南](../operations/PlatformOperationsGuide.md)
 
 本文是当前长期工程架构真值。如果代码和本文不一致，应先核实当前实现，再更新代码或文档，不能让两套规则长期并存。
+
+## 32. Notification Center 设计冻结
+
+本节定义尚未实现的“消息通知中心”合同，供后续实现直接执行。它不是当前能力声明；在对应数据库、后端和前端实现完成前，Header 铃铛仍只是静态占位。实现时如需改变本节的安全边界、数据模型或 API 语义，应先更新设计，不能在代码中另造一套通知协议。
+
+### 32.1 现状与产品边界
+
+当前代码核对结果如下：
+
+| 对象 | 当前事实 | 对通知中心的结论 |
+| --- | --- | --- |
+| `ToolbarItem.vue` | Header 已有 `notifications` 图标，Badge 固定为 `2`，没有点击行为、API 或状态 | 实现时替换静态 Badge，保留现有 Header 控件尺寸和主题语义 |
+| `stores/user.ts` | 认证主体是 `SysUser`；Logout/换号会清理用户态，并通过 `session_generation` 隔离旧请求 | 通知收件主体固定为 `SysUser`；通知 Store 必须纳入用户态清理 |
+| `boot/axios.ts` | 每个请求携带 Token 与 Session Generation 快照，旧 Session 响应会转成 `StaleSessionResponseError` | 轮询结果必须复用该边界，禁止旧用户未读数写入新用户状态 |
+| Router / TagView | 静态 Hidden Route 可注册且可显示 Tag；动态菜单用于裁剪正式菜单路由 | `/admin/notifications` 使用 Hidden Route，不增加左侧菜单；`showTag=true` |
+| Casbin | `/admin` 路由先认证再执行严格策略覆盖；少量 Runtime API 被列为已登录公共入口 | 自有收件箱 API 必须加入受控的 authenticated common route，并在 Service 内按当前用户隔离 |
+| SMS | 管理短信模板、发送和发送日志，是外部通道 | 不复用其模板、Provider 或发送记录模型 |
+| Integration | 管理外部系统、执行、重试、同步和 Consumer 状态机 | 可作为通知生产者，但 Notification 不进入 Integration 状态机 |
+| Audit / AccessLog | 记录请求、安全主体和受控摘要 | Send 记录安全业务摘要；MarkRead 不产生重型审计事件 |
+| User / Role / Organization | 登录主体是 `SysUser`；Employee 可选绑定 User，Position/Role 语义不同 | Recipient 只保存 `user_id`，不保存 Role、Employee、Position 或 OrgUnit |
+| Query / Pagination | 已有显式分页 DTO、`TablePagination` 和 `StandardTableToolbar` | 页面复用分页与工具栏，不接 Query Center |
+| Runtime Metadata | 服务低代码、动态表单、查询和跨模块字段事实 | 通知中心是显式平台 Runtime 页面，不由 Metadata 驱动 |
+| 现有残留 | 除 Toolbar 固定 Badge 和 i18n 的“通知”文本外，没有 notification/message/inbox 领域实现 | 无兼容数据和兼容 API 需要保留 |
+
+正式产品名为“消息通知中心”，英文领域名为 `Notification`。它是平台级站内消息基础设施：业务模块产生“某些用户需要被提醒”的事实，Notification 负责消息持久化、收件人分发、用户可见性、已读状态、未读数量、受控跳转和消息生命周期。
+
+Notification 不是短信、邮件、聊天、待办流程引擎或系统日志。V1 只提供站内通知、未读数、消息列表、单条/全部已读、点击跳转、用户隔离和程序化发送。
+
+### 32.2 核心对象与受控枚举
+
+V1 使用 `Notification` 与 `NotificationRecipient` 两个对象，不能合并为一张表：
+
+- `Notification` 保存一次发送共享的不可变消息事实。标题、内容、来源、级别和 Action 不应为每个用户复制。
+- `NotificationRecipient` 保存每个用户自己的投递和阅读状态。同一消息对用户 A 已读、对用户 B 未读，属于两条独立收件状态。
+- 两表分离后，单次发送一千名用户不会复制一千份长内容，主消息也不会因某个用户已读而影响其他用户。
+
+受控 Category：
+
+| 值 | 用途 |
+| --- | --- |
+| `SYSTEM` | 平台配置、维护和通用系统事实 |
+| `BUSINESS` | 一般业务事实，如计划发布、成绩发布 |
+| `TASK` | 明确需要用户处理的事项，但不承担工作流状态 |
+| `REMINDER` | 截止时间、开始时间等提醒 |
+| `SECURITY` | 登录、凭据或账号安全事实 |
+| `INTEGRATION` | 外部系统执行、同步等运行事实 |
+
+`SECURITY` 和 `INTEGRATION` 保留，是因为它们具有稳定的平台展示语义和安全处置差异；它们不控制权限、重试或优先级。学习和考试不得新增专属 Category，应通过 `source_module` 区分。
+
+受控 Level 为 `INFO`、`SUCCESS`、`WARNING`、`ERROR`。Level 只控制图标、颜色和辅助文案，不控制投递顺序、权限、业务状态或调度。
+
+### 32.3 数据库合同
+
+V1 不使用 `expires_at`、`action_label`、附件、富文本、任意 JSON 业务快照或用户删除字段。消息长期保留；未来归档策略另行增加 Migration，不能在 V1 暗藏 Cleanup Worker。
+
+建议 PostgreSQL 16 DDL 合同如下，最终实现应使用正式 Migration Ledger 的下一个版本，而不是修改已有版本：
+
+```sql
+CREATE TABLE notification (
+    id               bigint PRIMARY KEY,
+    category         varchar(24)  NOT NULL,
+    level            varchar(16)  NOT NULL,
+    title            varchar(160) NOT NULL,
+    content          text         NOT NULL,
+    source_module    varchar(64)  NOT NULL,
+    source_type      varchar(64)  NOT NULL,
+    source_id        varchar(128),
+    action_path      varchar(512),
+    action_menu_name varchar(128),
+    sender_type      varchar(16)  NOT NULL DEFAULT 'SYSTEM',
+    created_by       bigint REFERENCES sys_user(id) ON DELETE SET NULL,
+    dedup_key        varchar(128),
+    state            boolean      NOT NULL DEFAULT true,
+    created_at       timestamptz  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_notification_category
+        CHECK (category IN ('SYSTEM','BUSINESS','TASK','REMINDER','SECURITY','INTEGRATION')),
+    CONSTRAINT chk_notification_level
+        CHECK (level IN ('INFO','SUCCESS','WARNING','ERROR')),
+    CONSTRAINT chk_notification_sender_type
+        CHECK (sender_type IN ('SYSTEM','USER')),
+    CONSTRAINT chk_notification_title
+        CHECK (char_length(btrim(title)) BETWEEN 1 AND 160),
+    CONSTRAINT chk_notification_content
+        CHECK (char_length(content) BETWEEN 1 AND 4000),
+    CONSTRAINT chk_notification_action_pair
+        CHECK ((action_path IS NULL) = (action_menu_name IS NULL))
+);
+
+CREATE UNIQUE INDEX uni_notification_dedup
+    ON notification (source_module, dedup_key)
+    WHERE dedup_key IS NOT NULL;
+
+CREATE INDEX idx_notification_created
+    ON notification (created_at DESC, id DESC);
+
+CREATE TABLE notification_recipient (
+    notification_id bigint      NOT NULL REFERENCES notification(id) ON DELETE CASCADE,
+    user_id          bigint      NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
+    read_at          timestamptz,
+    created_at       timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (notification_id, user_id)
+);
+
+CREATE INDEX idx_notification_recipient_user_created
+    ON notification_recipient (user_id, created_at DESC, notification_id DESC);
+
+CREATE INDEX idx_notification_recipient_user_unread
+    ON notification_recipient (user_id, created_at DESC, notification_id DESC)
+    WHERE read_at IS NULL;
+```
+
+字段归属：
+
+| 对象 | 字段 | 语义 |
+| --- | --- | --- |
+| Notification | `id` | Snowflake bigint 消息身份 |
+| Notification | `category` / `level` | 受控展示分类和级别 |
+| Notification | `title` / `content` | 纯文本共享消息事实 |
+| Notification | `source_module` / `source_type` / `source_id` | 产生消息的业务对象身份，不保存对象快照 |
+| Notification | `action_path` / `action_menu_name` | 受控内部路径及其所属菜单权限身份，两者同时为空或同时有值 |
+| Notification | `sender_type` / `created_by` | 系统任务或已认证用户产生的消息；后台任务的 `created_by` 为空 |
+| Notification | `dedup_key` | 由来源模块定义的可选幂等身份 |
+| Notification | `state` | 平台内部有效状态；V1 不提供普通用户修改入口 |
+| Notification | `created_at` | 消息事实创建时间和默认排序时间 |
+| Recipient | `notification_id` / `user_id` | 消息和最终认证主体的复合身份 |
+| Recipient | `read_at` | 首次阅读时间；为空表示未读 |
+| Recipient | `created_at` | 投递时间，用于当前用户列表和未读索引 |
+
+不嵌入完整 `model.Basic`：Notification 是近似不可变消息事实，不需要修改人、删除人和软删除全套字段；Recipient 使用复合主键，也不应伪装成普通 CRUD 实体。
+
+### 32.4 来源、Action 与收件人合同
+
+`source_module`、`source_type`、`source_id` 只保存稳定来源身份。例如 `learning / learning_plan / 123`。`source_module` 和 `source_type` 必填，`source_id` 对无法落到单个业务对象的系统消息可为空。禁止把完整业务对象、Credential、Token、考试答案或用户隐私放入自由 JSON。
+
+Action 冻结为“受控内部路径 + 所属菜单身份”：
+
+```go
+type NotificationAction struct {
+    Path     string // 规范化后的 /admin/... 路径，不含 origin、query 或 fragment
+    MenuName string // 用户必须拥有的目标页面菜单 name
+}
+```
+
+约束如下：
+
+1. `Path` 必须以 `/admin/` 开头，最大 512 字符；拒绝 scheme、host、`//`、反斜线、控制字符、query 和 fragment。
+2. `MenuName` 必须是发送时已存在的有效页面菜单；Hidden Detail Route 使用其业务归属页面的菜单 name。
+3. Recent/List 返回 Action 时批量计算 `allowed`，不逐条查询菜单。
+4. 消息内容始终可查看；`allowed=false` 时前端明确提示“暂无目标页面访问权限”，不得导航。
+5. `allowed=true` 只是用户体验预检，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
+6. V1 不接受外部 URL。未来外链需求必须新增受控 Action 类型，不能放宽本字段。
+
+V1 不保存 `action_label`。Popover 通过点击整行执行 Action，详情 Dialog 使用固定“前往相关页面”文案，避免业务模块产生不一致按钮语言。
+
+收件主体固定为 `SysUser`。唯一发送命令接受单个或多个 `user_id`，但持久化模型不支持 Role、OrgUnit、Position、Employee 等多态 Subject。按 Role/Organization 发消息时，由产生消息的 Application Service 使用其既有授权/组织能力先解析并去重为用户集合，再调用 Notification。
+
+Employee 未绑定 User 时不创建 Recipient，也绝不自动创建账号。上游业务必须把“未绑定账号”作为可观测的分发结果处理；若最终收件集合为空，`Send` 返回稳定校验错误。
+
+### 32.5 发送、幂等与事务
+
+V1 只暴露一个正式 Go Application 入口，不提供普通管理员 HTTP Send API：
+
+```go
+type NotificationCommand struct {
+    RecipientUserIDs []int
+    Category         NotificationCategory
+    Level            NotificationLevel
+    Title            string
+    Content          string
+    SourceModule     string
+    SourceType       string
+    SourceID         string
+    Action           *NotificationAction
+    DedupKey         string
+}
+
+type NotificationSender interface {
+    Send(context.Context, NotificationCommand) (NotificationSendResult, error)
+}
+```
+
+不再建立 `SendToUser`、`SendToUsers` 两套平行逻辑。单用户发送也传一个元素的 `RecipientUserIDs`。
+
+输入上限：
+
+- 收件人去重后 1 到 1000 个，所有 ID 必须对应有效 `SysUser`；任一无效时整条命令失败。
+- Title 为 1 到 160 个 Unicode 字符。
+- Content 为 1 到 4000 个 Unicode 字符且 UTF-8 字节数不超过 16 KiB。
+- Source Module/Type 各 1 到 64 字符，Source ID 不超过 128 字符。
+- Dedup Key 为空表示每次创建新消息；非空最大 128 字符。
+
+幂等由 `uni_notification_dedup(source_module, dedup_key)` 保证，不使用 Redis 锁。首次 Send 在短事务中创建主消息和所有 Recipient。重复 Send：
+
+1. 读取唯一约束对应的既有消息；
+2. 比较 Category、Level、Title、Content、Source 和 Action 等不可变事实；
+3. 事实不一致时返回 Dedup Conflict，禁止静默覆盖；
+4. 事实一致时复用原消息，仅以 `ON CONFLICT DO NOTHING` 补齐缺少的 Recipient；
+5. 返回 `deduplicated`、`created_recipient_count` 和 `existing_recipient_count`，不重复投递已有用户。
+
+主消息与 Recipient 写入必须在一个 `RunInTransaction` 短事务内完成。有效用户批量校验、主消息写入、Dedup 冲突处理和 Recipient 批量写入均使用同一 `context.Context`；不在事务中执行外部 IO。
+
+跨模块业务事务采用：
+
+```text
+业务事务提交
+  -> NotificationSender.Send
+  -> 发送失败记录安全摘要并由调用方决定重试
+```
+
+Notification 失败不能回滚已经成功的学习、考试、审批或集成业务事实。V1 不建设 Outbox，因此承认“业务提交后进程崩溃、通知尚未发送”的小窗口；需要可靠异步投递时再建设通用 Outbox，不能用跨模块大事务掩盖。
+
+### 32.6 Runtime API 与 DTO
+
+所有 API 必须经过 `AuthHandler`。它们是登录用户基础能力，不要求 MenuButton，但实现时必须显式加入 `allowAuthenticatedIdentityRoute`；Service 只从可信 Audit Subject 取得用户 ID，Request/Path 中不允许出现可选择的 `user_id`。
+
+| Method | Path | 用途 |
+| --- | --- | --- |
+| GET | `/admin/runtime/notifications/unread-count` | 当前用户未读总数 |
+| GET | `/admin/runtime/notifications/recent?limit=8` | 当前用户最近通知，limit 默认 8，范围 1 到 10 |
+| POST | `/admin/runtime/notifications/:id/read` | 幂等标记当前用户的一条消息已读 |
+| POST | `/admin/runtime/notifications/read-all` | 标记当前用户全部有效未读消息已读 |
+| POST | `/admin/notifications/query` | 当前用户完整消息分页查询 |
+| GET | `/admin/notifications/:id` | 当前用户消息详情和完整纯文本内容 |
+
+Unread Count 响应只返回真实整数 `count`；`99+` 是前端展示规则。查询必须使用 `notification_recipient` 的未读 partial index，并联结有效 Notification，不拉取列表后计数。
+
+Recent 默认按“未读优先，再按投递时间倒序”返回最多 8 条；完整页面默认严格按投递时间倒序，可切换最早优先，不因 MarkRead 使页面行突然移动。
+
+分页 Query Request：
+
+```text
+page: 1..n，默认 1
+num: 1..50，默认 15
+keyword: 标题/内容受控模糊查询，最大 100 字符
+read_status: ALL | UNREAD | READ
+category: 可选受控 Category
+created_from / created_to: 可选 RFC3339 时间，服务端校验区间
+sort: NEWEST | OLDEST，默认 NEWEST
+```
+
+Summary DTO 只包含：
+
+```text
+id, title, content_preview, category, level,
+read, read_at, created_at,
+action { path, allowed }
+```
+
+`content_preview` 由后端按 Unicode 安全截取并规范换行，最大 120 字符。Detail DTO 增加完整 `content` 和受控 `source { module, type, id }`。任何 DTO 都不得返回 Recipient User ID、Dedup Key、Created By、内部状态字段或 GORM Model。
+
+MarkRead 只执行：
+
+```sql
+UPDATE notification_recipient
+SET read_at = CURRENT_TIMESTAMP
+WHERE notification_id = $1 AND user_id = $2 AND read_at IS NULL;
+```
+
+重复调用不更新时间，首次 `read_at` 保持不变。目标消息不属于当前用户时统一返回 Not Found，不能区分“存在但属于别人”。MarkAllRead 只更新当前用户、`read_at IS NULL` 且主消息有效的记录；与单条 MarkRead 并发时依靠幂等条件收敛，不加 Redis 锁。
+
+### 32.7 前端状态、轮询与会话隔离
+
+建议新增 `stores/notification.ts` 作为唯一前端状态所有者，保存 unread count、recent、loading/error、popover open 状态和轮询句柄。`ToolbarItem` 只渲染并触发 Store，不自行拼 API 或维护第二份计数。
+
+刷新规则：
+
+1. 登录成功且 Header 挂载后立即读取未读数。
+2. 页面可见时每 60 秒轮询一次未读数；`document.hidden=true` 时不发请求。
+3. Tab 从后台恢复、用户打开通知 Popover 时立即刷新未读数和 Recent。
+4. Logout、Token 更换或组件卸载时停止定时器并 `$reset`。
+5. 每个请求沿用 Axios 的 Token/Session Generation 快照；`StaleSessionResponseError` 只丢弃，不改新 Session 状态。
+6. 后台轮询失败保留最后一次成功计数并暂停连续轮询，等待用户 Retry、重新打开 Popover 或 Tab 再激活，避免每分钟重复错误提示。
+
+成功 MarkRead 后先本地幂等更新对应行和计数，再以后台刷新校正；失败则恢复原状态。MarkAllRead 成功后 unread count 立即置零，Recent 和当前页面记录同步为已读。
+
+### 32.8 UI 详细合同
+
+临时原型已按当前 Header、TagView、Semantic Token 和 Quasar 密度核验两个视图；原型不进入 tracked 仓库。实现不新增营销式页面标题或卡片堆叠。
+
+**Header Popover**
+
+- 使用 `q-menu`，从铃铛右下方展开，建议宽度 380px、最大高度 480px。
+- Header 显示“通知”、未读摘要和“全部已读”；主体显示最近 8 条；Footer 只有“查看全部通知”。
+- 每行包含未读点、Category/Level 图标、单行标题、两行纯文本摘要和相对时间。
+- 未读行使用现有 primary soft surface，已读行使用普通 surface；不靠粗大彩色卡片表达状态。
+- Badge 为 0 时不渲染，1 到 99 显示数字，大于 99 显示 `99+`。
+- Loading 使用固定高度 Skeleton，Empty 显示 `notifications_none` 与“暂无通知”，Error 显示简短错误和 Retry，不关闭 Popover。
+- 长标题 Ellipsis + Tooltip，长内容两行截断；完整内容进入详情 Dialog。
+
+**消息中心页面**
+
+- Hidden Route：`/admin/notifications`，Tag 标题“消息通知中心”，不建立左侧一级菜单。
+- 使用 `BaseContent`、`StandardTableToolbar` 和 `TablePagination`，不接 Query Scheme、AdvancedQuery 或 Runtime Metadata。
+- 顶部保持单行紧凑布局：全部/未读/已读分段控件、关键词、Category、时间区间、搜索；“全部已读”位于右侧动作区。
+- 主体使用无额外卡片嵌套的 `q-list` 收件箱行，而不是普通 CRUD 表格。行展示状态、标题与摘要、Category、时间和打开图标。
+- 默认时间倒序；点击行标记已读并打开详情 Dialog。Dialog 展示纯文本完整内容、Category、时间和固定 Action 按钮。
+- Action 无权限时 Dialog 保留内容并显示“暂无相关页面访问权限”，按钮 Disabled。
+
+**适配与主题**
+
+- 1366 宽度下 Popover 不遮住头像或超出屏幕；页面 Toolbar 不换成两行，必要时先收缩日期和关键词宽度。
+- 常用宽屏保持内容全宽工作台，不人为放大标题或增加装饰空白。
+- 亮色使用 `--app-surface`、`--app-surface-muted`、`--app-border`、`--app-text-*`；深色复用现有 Token，不在页面新增 `body--dark` 色值补丁。
+- Loading、Empty 和 Error 的容器尺寸稳定，避免 Popover 开合跳动。
+- 所有图标按钮提供 `aria-label` 和 `q-tooltip`；Popover、Dialog 支持 Escape 关闭和明确关闭按钮。
+
+### 32.9 权限、Data Permission、Audit 与内容安全
+
+Notification 的读取所有权是 `recipient.user_id = 当前认证 user_id`，不经过 Data Permission Resolver。Data Permission 继续保护 Action 指向页面的数据；消息里出现某业务对象 ID 不代表用户可以读取该对象。
+
+程序化 Send 记录结构化安全日志：Notification ID、Source Identity、Recipient Count、Dedup Outcome、Request/Trace ID；不记录 Content、完整 Recipient 列表、Token、Credential 或业务 Payload。普通 MarkRead/MarkAllRead 不写平台重审计日志，避免制造高频 AccessLog 之外的噪声。未来管理员公告能力再独立设计审计。
+
+Title 和 Content 全程按纯文本处理。前端使用文本插值或 `white-space: pre-wrap`，禁止 `v-html`、Markdown HTML passthrough、Script、Style 和任意模板表达式。数据库与 Service 同时限制长度，避免巨型 Payload。
+
+Notification 与外部通道的边界固定为：
+
+```text
+Notification = 消息事实 + 站内收件人 + 已读状态
+SMS / Email / DingTalk = 外部 Delivery Channel
+Integration = 外部系统配置、执行和状态机
+```
+
+V1 三者不联动，也不预建 `notification_delivery`、Channel、Provider 或 Template 表。
+
+### 32.10 学习与考试复用示例
+
+| 场景 | Category | Source | Action | Recipients | Dedup Key 示例 |
+| --- | --- | --- | --- | --- | --- |
+| 学习计划发布 | `BUSINESS` | `learning / learning_plan / {planId}` | `/admin/learning/plans/{planId}` | 计划分配对象最终绑定的用户 | `plan:{planId}:published:{version}` |
+| 学习任务即将截止 | `REMINDER` | `learning / learning_task / {taskId}` | `/admin/learning/tasks/{taskId}` | 尚未完成任务的用户 | `task:{taskId}:due:24h` |
+| 考试即将开始 | `REMINDER` | `exam / exam / {examId}` | `/admin/exam/exams/{examId}` | 已安排且可登录的考生用户 | `exam:{examId}:starts:{startAt}` |
+| 考试即将截止 | `REMINDER` | `exam / exam / {examId}` | `/admin/exam/exams/{examId}` | 尚未交卷用户 | `exam:{examId}:closes:{endAt}` |
+| 补考通知 | `TASK` | `exam / exam_retake / {retakeId}` | `/admin/exam/retakes/{retakeId}` | 获得补考资格的用户 | `retake:{retakeId}:assigned` |
+| 成绩发布 | `BUSINESS` | `exam / exam_result / {resultId}` | `/admin/exam/results/{resultId}` | 成绩所属用户 | `result:{resultId}:published:{revision}` |
+
+这些示例只验证通用合同；Notification 不新增 Learning/Exam 枚举，也不负责计算完成状态、考生资格或组织分配。
+
+### 32.11 容量、性能与生命周期
+
+- 单次 Command 最多 1000 名用户，Repository 使用批量查询和批量 Insert，不逐用户 N+1。
+- 十万人广播超出 V1 同步 Fan-out 边界；未来采用异步分片/Outbox，不把单次上限简单调大。
+- Unread Count 只做当前用户 partial index count；Recent 只读取当前用户最多 10 条，不 Join `sys_user`。
+- Action Menu 权限对当前批次的不同 Menu Name 一次批量解析，不能每条消息查一次权限。
+- 页面单页最大 50，默认 15；Keyword 最大 100 字符。若数据规模证明 `ILIKE` 成为瓶颈，再评审受控全文索引，不在 V1预建搜索引擎。
+- 消息和 Recipient V1 长期保留。Operations 后续可按 90/180/365 天策略设计归档 Migration 或维护命令，但当前不运行自动删除 Worker。
+- Redis 不保存未读真值，不新增 Notification Cache；PostgreSQL 是唯一读写真值。
+
+### 32.12 文件与 Migration 实施计划
+
+后端最小文件计划：
+
+```text
+backend/model/notification.go
+backend/dto/request/notification_req.go
+backend/dto/response/notification_res.go
+backend/repository/notification.go
+backend/repository/impl/notification_impl.go
+backend/service/notification_service.go
+backend/controller/notification_controller.go
+```
+
+`NotificationCommand`、`NotificationSender`、校验和应用用例留在 `notification_service.go`；只有出现可独立复用且可测试的复杂规则时才考虑 `internal/notification`。禁止一开始拆成 sender/reader/runtime/mapper/validator/manager 多套文件。
+
+前端最小文件计划：
+
+```text
+frontend/src/api/services/notification.ts
+frontend/src/stores/notification.ts
+frontend/src/components/Toolbar/NotificationPopover.vue
+frontend/src/pages/notification/Index.vue
+```
+
+简单详情 Dialog 直接放在 `Index.vue`，不新增 Detail Route 或 MessageItem/Badge/Empty 子组件。类型可随 API Service 和 Store 放置，除非实现后证明存在跨三个以上消费者的稳定领域合同。
+
+实现阶段新增 Migration Ledger Version 17，例如 key `notification_center_schema`，同时将两张表加入 Managed Tables。该 Migration 创建表、CHECK、FK 和索引；不得改写现有 Version 1 AutoMigrate Checksum。V1 不需要字典 Seed、可见菜单 Seed、MenuButton Seed 或管理员权限 Seed；只新增静态 Hidden Route、Router 注册和 Casbin authenticated common route 清单。
+
+Wire 只增加 Repository、Service、Controller provider 和 interface binding。业务模块通过注入窄 `NotificationSender` 调用，不直接操作 Repository。
+
+### 32.13 测试与安全矩阵
+
+长期测试矩阵：
+
+| 层级 | 必须保护的行为 |
+| --- | --- |
+| Backend Unit | Category/Level、长度、Recipient 去重、Action Path、纯文本、Dedup Conflict |
+| Repository PostgreSQL | 两表 FK、partial unique、批量 Recipient、用户索引查询、并发 Dedup、并发 MarkRead/MarkAllRead |
+| Service | 用户隔离、无效用户整单失败、首次 read_at 不变、Action 权限批量解析、后台发送主体 |
+| Controller | 未登录拒绝、伪造 user_id 无入口、跨用户 ID 返回 Not Found、分页/时间参数校验 |
+| Frontend Store | 首次加载、60 秒可见轮询、暂停/恢复、Logout 停止、Session 切换丢弃旧响应、乐观已读回滚 |
+| Frontend Component | Badge 0/99/99+、Loading/Empty/Error/Retry、长标题、全部已读、详情 Dialog、Action Disabled |
+| Browser | Header Popover、完整页面、1366/宽屏、亮色/深色、键盘关闭、无权限 Action、Console 无异常 |
+
+安全矩阵：
+
+| 风险 | 防线 |
+| --- | --- |
+| IDOR / 跨用户读写 | User ID 只取 Audit Subject；Recipient 条件写入每条查询和更新；不存在与无权统一 Not Found |
+| 伪造 `user_id` | Runtime Request/Path/Query 不提供该字段 |
+| Open Redirect | Action 只允许规范化 `/admin/...` Path，拒绝 Origin、Query、Fragment、Scheme 和协议相对路径 |
+| 无权限 Action | Action 绑定 Menu Name，服务端批量判定；目标 API 继续 Casbin/Data Permission |
+| HTML/XSS | Content 纯文本，禁止 `v-html`，长度双重校验 |
+| 巨型 Content/Recipient | 4000 字符/16 KiB、1000 Recipient 硬上限 |
+| Dedup 竞态 | PostgreSQL partial unique + 同事务冲突读取 + 不可变字段比较 |
+| 已归档消息 | V1 无归档入口，不存在半实现语义 |
+| 旧 Session 返回 | Axios Session Generation + Notification Store Generation 检查和 Reset |
+| 敏感信息泄漏 | DTO 不返回用户 ID/Dedup/审计字段；日志不记录 Content、Recipient 列表和业务 Payload |
+
+### 32.14 明确不做与实现门禁
+
+V1 明确不做：WebSocket、SSE、MQ、邮件、短信、钉钉、企业微信、移动 Push、模板中心、变量渲染、订阅偏好、广播后台、公告管理、审批、群组、多态 Recipient、附件、富文本、评论/回复、聊天、物理删除、自动过期、归档 Worker 和管理员全站消息管理。
+
+关键取舍已经冻结：
+
+- Action 选择受控内部 Path + Menu Identity，不使用自由外链、Route Params JSON 或开放 Action Registry。
+- Role/Organization 不进入 Recipient；上游先解析为 User。
+- V1 不保留 `expires_at`、`action_label`、`archived_at`，避免半成品生命周期。
+- 保留 `SECURITY`、`INTEGRATION` Category，但它们只表达展示语义。
+- 保留 Detail GET 和 Dialog，用于长纯文本及 Action 权限结果；不增加 Detail Route。
+- Programmatic Send 不开放 HTTP Admin API。
+- Popover 未读优先，完整页面时间倒序；两者排序语义有意不同。
+- Notification 不接 Query Center、Runtime Metadata 或 Data Permission。
+
+进入实现任务前必须确认：Migration Version 17 未被其他能力占用，Action Path 对应的目标菜单身份可由当前权限模型批量判定，通知 Store 能纳入 Logout/换号清理，且本节未被新的正式产品需求扩展为外部渠道或工作流系统。
