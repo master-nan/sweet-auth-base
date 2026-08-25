@@ -32,6 +32,7 @@ var catalog = []Definition{
 	{Version: 14, Key: "organization_database_comments", Contract: "v1|organization-database-comments|nine-tables|all-model-columns", Checksum: "9bfa1afbc61d20fda1789c4a97d071160f0118cc912c66d00c654073c6e212a7"},
 	{Version: 15, Key: "access_log_operational_indexes", Contract: "v1|access-log-operational-indexes|time|action-time|resource-time|success-time", Checksum: "8123677a52299c64b11482c4b74e7625f34ba3b83b257227d093148d1ac840f0"},
 	{Version: 16, Key: "product_walkthrough_corrections", Contract: "v1|product-walkthrough-corrections|remove-report-workbench|protect-last-login-metadata", Checksum: "a7ce186463fa53bfe21cbbb8b7e4b6ca4977995124d613486401ebdf05e61e23"},
+	{Version: 17, Key: "notification_center_schema", Contract: "v1|notification-center-schema|notifications-recipients|checks-fks-partial-indexes-dedup", Checksum: "6ade5286bb2206c70d21c8d76bd67c69784acba3ade29ec3141f10f78f4aa8c6"},
 }
 
 var managedTables = []string{
@@ -88,6 +89,8 @@ var managedTables = []string{
 	"sys_data_policy",
 	"sys_data_policy_rule",
 	"sys_data_grant",
+	"notification",
+	"notification_recipient",
 }
 
 func Catalog() []Definition {

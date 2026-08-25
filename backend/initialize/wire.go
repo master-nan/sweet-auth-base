@@ -53,6 +53,7 @@ type App struct {
 	IntegrationSyncController      *controller.IntegrationSyncController
 	IntegrationExecutionController *controller.IntegrationExecutionController
 	QuerySchemeController          *controller.QuerySchemeController
+	NotificationController         *controller.NotificationController
 	ApplicationController          *controller.ApplicationController
 	GeneralizationController       *controller.GeneralizationController
 	ReportController               *controller.ReportController
@@ -135,6 +136,7 @@ var RepositoryProvider = wire.NewSet(
 	impl.NewFileRepositoryImpl,
 	impl.NewFileChunkRepositoryImpl,
 	impl.NewQuerySchemeRepositoryImpl,
+	impl.NewNotificationRepositoryImpl,
 	wire.Bind(new(repository.AccessLogRepository), new(*impl.AccessLogRepositoryImpl)),
 	wire.Bind(new(repository.LoginLogRepository), new(*impl.LoginLogRepositoryImpl)),
 	wire.Bind(new(repository.SysConfigureRepository), new(*impl.SysConfigureRepositoryImpl)),
@@ -190,6 +192,7 @@ var RepositoryProvider = wire.NewSet(
 	wire.Bind(new(repository.FileRepository), new(*impl.FileRepositoryImpl)),
 	wire.Bind(new(repository.FileChunkRepository), new(*impl.FileChunkRepositoryImpl)),
 	wire.Bind(new(repository.QuerySchemeRepository), new(*impl.QuerySchemeRepositoryImpl)),
+	wire.Bind(new(repository.NotificationRepository), new(*impl.NotificationRepositoryImpl)),
 )
 
 // Cache 提供者
@@ -279,6 +282,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewFileMetadataService,
 	queryscheme.NewRegistry,
 	service.NewQuerySchemeService,
+	service.NewNotificationService,
 )
 
 // Controller 提供者
@@ -306,6 +310,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewFileMetadataController,
 	controller.NewFileAccessController,
 	controller.NewQuerySchemeController,
+	controller.NewNotificationController,
 )
 
 // API 提供者

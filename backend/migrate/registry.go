@@ -44,6 +44,7 @@ func migrationSteps() []migrationStep {
 		applyOrganizationDatabaseComments,
 		ensureAccessLogOperationalIndexes,
 		migrateProductWalkthroughCorrections,
+		migrateNotificationCenterSchema,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -60,6 +61,68 @@ func migrationSteps() []migrationStep {
 		})
 	}
 	return steps
+}
+
+func migrateNotificationCenterSchema(db *gorm.DB) error {
+	if db.Dialector.Name() != "postgres" {
+		return db.AutoMigrate(&model.Notification{}, &model.NotificationRecipient{})
+	}
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS notification (
+			id bigint PRIMARY KEY,
+			category varchar(24) NOT NULL,
+			level varchar(16) NOT NULL,
+			title varchar(160) NOT NULL,
+			content text NOT NULL,
+			source_module varchar(64) NOT NULL,
+			source_type varchar(64) NOT NULL,
+			source_id varchar(128) NOT NULL DEFAULT '',
+			action_menu_name varchar(32) NOT NULL DEFAULT '',
+			action_path varchar(512) NOT NULL DEFAULT '',
+			dedup_key varchar(128),
+			created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			CONSTRAINT chk_notification_category CHECK (category IN ('SYSTEM','BUSINESS','TASK','REMINDER','SECURITY','INTEGRATION')),
+			CONSTRAINT chk_notification_level CHECK (level IN ('INFO','SUCCESS','WARNING','ERROR')),
+			CONSTRAINT chk_notification_title CHECK (char_length(btrim(title)) BETWEEN 1 AND 160),
+			CONSTRAINT chk_notification_content CHECK (
+				char_length(content) BETWEEN 1 AND 4000 AND octet_length(content) <= 16384
+			),
+			CONSTRAINT chk_notification_source CHECK (
+				char_length(btrim(source_module)) BETWEEN 1 AND 64
+				AND char_length(btrim(source_type)) BETWEEN 1 AND 64
+			),
+			CONSTRAINT chk_notification_action CHECK (
+				action_path = '' OR action_menu_name <> ''
+			)
+		)`,
+		`CREATE TABLE IF NOT EXISTS notification_recipient (
+			notification_id bigint NOT NULL,
+			user_id bigint NOT NULL,
+			read_at timestamptz,
+			created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (notification_id, user_id),
+			CONSTRAINT fk_notification_recipient_notification
+				FOREIGN KEY (notification_id) REFERENCES notification(id) ON DELETE RESTRICT,
+			CONSTRAINT fk_notification_recipient_user
+				FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE RESTRICT
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_notification_source_dedup
+			ON notification (source_module, dedup_key)
+			WHERE dedup_key IS NOT NULL AND dedup_key <> ''`,
+		`CREATE INDEX IF NOT EXISTS idx_notification_created
+			ON notification (created_at DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_notification_recipient_user_created
+			ON notification_recipient (user_id, created_at DESC, notification_id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_notification_recipient_user_unread
+			ON notification_recipient (user_id, created_at DESC, notification_id DESC)
+			WHERE read_at IS NULL`,
+	}
+	for _, statement := range statements {
+		if err := db.Exec(statement).Error; err != nil {
+			return fmt.Errorf("migrate notification center schema: %w", err)
+		}
+	}
+	return nil
 }
 
 func migrateProductWalkthroughCorrections(db *gorm.DB) error {

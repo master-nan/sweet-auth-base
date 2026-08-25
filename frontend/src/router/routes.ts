@@ -23,6 +23,18 @@ declare module 'vue-router' {
 
 const asyncRoutesChildren: Route[] = [
   {
+    component: () => import('pages/notification/Index.vue'),
+    path: 'notifications',
+    name: 'notification_center',
+    meta: {
+      title: '消息通知中心',
+      icon: 'notifications',
+      keepAlive: false,
+      isHidden: true,
+      showTag: true,
+    },
+  },
+  {
     component: () => import('pages/query-scheme/Index.vue'),
     path: 'query-schemes',
     name: 'query_scheme_manager',

@@ -37,10 +37,7 @@
     >
       <q-tooltip>{{ t('layout.refresh') }}</q-tooltip>
     </q-btn>
-    <q-btn class="toolbar-actions__btn" round dense flat icon="notifications">
-      <q-badge color="red" text-color="" floating> 2 </q-badge>
-      <q-tooltip>{{ t('layout.notification') }}</q-tooltip>
-    </q-btn>
+    <notification-popover />
     <q-btn class="toolbar-actions__avatar-btn" round flat>
       <q-avatar class="toolbar-actions__avatar" color="primary" text-color="white">
         <q-icon name="admin_panel_settings" size="20px" />
@@ -55,14 +52,14 @@
             </q-item-section>
           </q-item>
           <q-separator />
-<!--          <q-item clickable>-->
-<!--            <q-item-section>-->
-<!--              <div>-->
-<!--                <q-icon name="tag_faces" color="blue-9" size="18px" />-->
-<!--                Set your status-->
-<!--              </div>-->
-<!--            </q-item-section>-->
-<!--          </q-item>-->
+          <!--          <q-item clickable>-->
+          <!--            <q-item-section>-->
+          <!--              <div>-->
+          <!--                <q-icon name="tag_faces" color="blue-9" size="18px" />-->
+          <!--                Set your status-->
+          <!--              </div>-->
+          <!--            </q-item-section>-->
+          <!--          </q-item>-->
           <q-separator />
 
           <q-item clickable>
@@ -73,7 +70,6 @@
 
       <q-tooltip>{{ t('layout.user') }}</q-tooltip>
     </q-btn>
-
   </div>
 </template>
 
@@ -86,6 +82,7 @@ import DarkMode from 'src/components/Toolbar/DarkMode.vue'
 import { useAppStore } from 'src/stores/app'
 import LangSelector from 'src/components/Toolbar/LangSelector.vue'
 import { useQuasar } from 'quasar'
+import NotificationPopover from 'src/components/Notification/NotificationPopover.vue'
 
 const $q = useQuasar()
 const emit = defineEmits<{ 'open-settings': [] }>()

@@ -1,9 +1,5 @@
 <template>
-  <q-layout
-    :view="layoutView"
-    class="app-layout"
-    :class="`app-layout--${layoutMode}`"
-  >
+  <q-layout :view="layoutView" class="app-layout" :class="`app-layout--${layoutMode}`">
     <q-header v-if="!isFullscreenRoute" class="app-header">
       <q-toolbar class="app-header__toolbar">
         <q-btn
@@ -17,7 +13,11 @@
         >
           <q-tooltip>{{ drawerMenuLabel }}</q-tooltip>
         </q-btn>
-        <breadcrumbs class="app-header__breadcrumbs text-weight-bold" :show-icon="false" v-if="$q.screen.gt.sm" />
+        <breadcrumbs
+          class="app-header__breadcrumbs text-weight-bold"
+          :show-icon="false"
+          v-if="$q.screen.gt.sm"
+        />
         <q-space />
         <toolbar-item @open-settings="openThemeSettings" />
       </q-toolbar>
@@ -34,7 +34,11 @@
       :logo="systemLogo"
     />
     <theme-setting v-if="!isFullscreenRoute" ref="settingRef" />
-    <q-page-container class="app-main" :class="{ 'app-main--fullscreen': isFullscreenRoute }" style="height: 100vh">
+    <q-page-container
+      class="app-main"
+      :class="{ 'app-main--fullscreen': isFullscreenRoute }"
+      style="height: 100vh"
+    >
       <router-view v-if="appStore.reload_flag" v-slot="{ Component }">
         <keep-alive :include="keepAliveStore.getKeepAliveList">
           <component :is="Component" />
@@ -50,7 +54,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'MainLayout' })
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { storeToRefs } from 'pinia'
@@ -72,18 +76,20 @@ import { useKeepAliveStore } from 'src/stores/keep-alive'
 import { useThemeStore } from 'src/stores/theme'
 import { useConfigureStore } from 'stores/configure'
 import TagView from 'components/TagView/TagView.vue'
+import { useNotificationStore } from 'src/stores/notification'
+import { useUserStore } from 'src/stores/user'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
 const keepAliveStore = useKeepAliveStore()
 const configureStore = useConfigureStore()
+const notificationStore = useNotificationStore()
+const userStore = useUserStore()
 const { layoutMode } = storeToRefs(themeStore)
 themeStore.applyPreferences()
 const route = useRoute()
 const isFullscreenRoute = computed(() => route.meta.fullscreen === true)
-const layoutView = computed(() =>
-  layoutMode.value === 'full' ? 'hHh LpR lFr' : 'lHr LpR lFr',
-)
+const layoutView = computed(() => (layoutMode.value === 'full' ? 'hHh LpR lFr' : 'lHr LpR lFr'))
 const drawerMenuIcon = computed(() => {
   if (!isDrawerOpen.value) return 'menu'
   return appStore.is_drawer_mini ? 'keyboard_double_arrow_right' : 'menu_open'
@@ -99,7 +105,16 @@ const systemLogo = computed(() => configureStore.getSystemLogo || '')
 const $q = useQuasar()
 onMounted(() => {
   void configureStore.fetchConfigure()
+  notificationStore.startPolling()
 })
+watch(
+  () => userStore.session_generation,
+  () => {
+    notificationStore.reset()
+    if (userStore.isLogin) notificationStore.startPolling()
+  },
+)
+onBeforeUnmount(() => notificationStore.reset())
 // const rightDrawerOpen = ref(false)
 
 // function headerClassActive (path: string) {

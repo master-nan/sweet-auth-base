@@ -9,8 +9,14 @@ vi.mock('src/stores/user', () => ({
 vi.mock('src/stores/app', () => ({ useAppStore: () => ({ reloadPage: vi.fn() }) }))
 vi.mock('src/components/Toolbar/DarkMode.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('src/components/Toolbar/LangSelector.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('src/components/Notification/NotificationPopover.vue', () => ({
+  default: { name: 'NotificationPopover', template: '<div data-notification-popover />' },
+}))
 vi.mock('quasar', () => ({
-  useQuasar: () => ({ fullscreen: { isActive: false, toggle: vi.fn() }, screen: { gt: { sm: true } } }),
+  useQuasar: () => ({
+    fullscreen: { isActive: false, toggle: vi.fn() },
+    screen: { gt: { sm: true } },
+  }),
 }))
 
 import ToolbarItem from './ToolbarItem.vue'
@@ -19,8 +25,9 @@ const QBtnStub = defineComponent({
   name: 'QBtn',
   props: { icon: String },
   emits: ['click'],
-  setup(props, { emit }) {
-    return () => h('button', { 'data-icon': props.icon, onClick: () => emit('click') })
+  setup(props, { emit, slots }) {
+    return () =>
+      h('button', { 'data-icon': props.icon, onClick: () => emit('click') }, slots.default?.())
   },
 })
 
@@ -33,5 +40,12 @@ describe('ToolbarItem settings entry', () => {
     expect(button.exists()).toBe(true)
     await button.trigger('click')
     expect(wrapper.emitted('open-settings')).toHaveLength(1)
+  })
+
+  it('hosts the notification entry without owning notification state', () => {
+    const wrapper = shallowMount(ToolbarItem, {
+      global: { stubs: { QBtn: QBtnStub } },
+    })
+    expect(wrapper.findComponent({ name: 'NotificationPopover' }).exists()).toBe(true)
   })
 })

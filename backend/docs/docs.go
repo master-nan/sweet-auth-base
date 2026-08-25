@@ -2662,6 +2662,160 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/runtime/notifications/query": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "分页查询当前用户通知",
+                "parameters": [
+                    {
+                        "description": "查询参数",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.NotificationQueryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/notifications/read-all": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "标记当前用户全部通知已读",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/notifications/recent": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "获取当前用户最近通知",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "返回条数，默认8，最大10",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/notifications/unread-count": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "获取当前用户通知未读数",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/notifications/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "获取当前用户通知详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "通知ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/runtime/notifications/{id}/read": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "消息通知中心"
+                ],
+                "summary": "标记当前用户的一条通知已读",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "通知ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/runtime/query-schemes/available": {
             "get": {
                 "produces": [
@@ -5168,6 +5322,7 @@ const docTemplate = `{
     "definitions": {
         "enum.ExpressionLogic": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2
@@ -5179,6 +5334,7 @@ const docTemplate = `{
         },
         "enum.ExpressionType": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2,
@@ -5200,6 +5356,22 @@ const docTemplate = `{
                 "Gte": "Gte",
                 "Lt": "Lt"
             },
+            "x-enum-descriptions": [
+                "Gt",
+                "Lt",
+                "Gte",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
+            ],
             "x-enum-varnames": [
                 "Gt",
                 "Lt",
@@ -5275,6 +5447,7 @@ const docTemplate = `{
         },
         "enum.SysMenuButtonPosition": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2,
@@ -5293,6 +5466,15 @@ const docTemplate = `{
                 "Line": "行按钮",
                 "Top": "表格顶部"
             },
+            "x-enum-descriptions": [
+                "行按钮",
+                "表格顶部",
+                "表格底部",
+                "表单顶部",
+                "表单底部",
+                "详情顶部",
+                "详情底部"
+            ],
             "x-enum-varnames": [
                 "Line",
                 "Top",
@@ -5330,6 +5512,11 @@ const docTemplate = `{
                 "NormalField": "默认字段",
                 "VirtualField": "虚拟列"
             },
+            "x-enum-descriptions": [
+                "默认字段",
+                "虚拟列",
+                "计算字段"
+            ],
             "x-enum-varnames": [
                 "NormalField",
                 "VirtualField",
@@ -5363,6 +5550,7 @@ const docTemplate = `{
         },
         "enum.SysTableFieldInputType": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2,
@@ -5429,6 +5617,7 @@ const docTemplate = `{
         },
         "enum.SysTableFieldType": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2,
@@ -5458,6 +5647,7 @@ const docTemplate = `{
         },
         "enum.SysTableRelationType": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2,
@@ -5473,6 +5663,7 @@ const docTemplate = `{
         },
         "enum.SysTableType": {
             "type": "integer",
+            "format": "int32",
             "enum": [
                 1,
                 2
@@ -5481,9 +5672,45 @@ const docTemplate = `{
                 "System": "系统表",
                 "View": "视图"
             },
+            "x-enum-descriptions": [
+                "系统表",
+                "视图"
+            ],
             "x-enum-varnames": [
                 "System",
                 "View"
+            ]
+        },
+        "model.NotificationCategory": {
+            "type": "string",
+            "enum": [
+                "SYSTEM",
+                "BUSINESS",
+                "TASK",
+                "REMINDER",
+                "SECURITY",
+                "INTEGRATION"
+            ],
+            "x-enum-varnames": [
+                "NotificationCategorySystem",
+                "NotificationCategoryBusiness",
+                "NotificationCategoryTask",
+                "NotificationCategoryReminder",
+                "NotificationCategorySecurity",
+                "NotificationCategoryIntegration"
+            ]
+        },
+        "model.NotificationReadStatus": {
+            "type": "string",
+            "enum": [
+                "ALL",
+                "UNREAD",
+                "READ"
+            ],
+            "x-enum-varnames": [
+                "NotificationReadAll",
+                "NotificationReadUnread",
+                "NotificationReadRead"
             ]
         },
         "model.QuerySchemeType": {
@@ -6171,6 +6398,30 @@ const docTemplate = `{
                 "ActionCardType"
             ]
         },
+        "request.NotificationQueryReq": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/model.NotificationCategory"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "num": {
+                    "type": "integer",
+                    "maximum": 50,
+                    "minimum": 1
+                },
+                "page": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "read_status": {
+                    "$ref": "#/definitions/model.NotificationReadStatus"
+                }
+            }
+        },
         "request.Order": {
             "type": "object",
             "properties": {
@@ -6194,6 +6445,7 @@ const docTemplate = `{
                 "assignment_type": {
                     "type": "string",
                     "enum": [
+                        "standard",
                         "primary",
                         "part_time",
                         "temporary",

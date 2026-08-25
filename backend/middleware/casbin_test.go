@@ -64,14 +64,23 @@ func TestCasbinHandlerCompatibilityModeAllowsRouteWithoutPolicy(t *testing.T) {
 }
 
 func TestCasbinHandlerAllowsAuthenticatedCommonRouteWithoutPolicy(t *testing.T) {
-	for _, route := range []string{
-		"/admin/menu/my",
-		"/admin/runtime/dict/:code",
-		"/admin/runtime/table/:code",
-		"/admin/runtime/query-scopes/:scope",
-		"/admin/runtime/query-schemes/available",
+	for _, route := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodGet, path: "/admin/menu/my"},
+		{method: http.MethodGet, path: "/admin/runtime/dict/:code"},
+		{method: http.MethodGet, path: "/admin/runtime/table/:code"},
+		{method: http.MethodGet, path: "/admin/runtime/query-scopes/:scope"},
+		{method: http.MethodGet, path: "/admin/runtime/query-schemes/available"},
+		{method: http.MethodGet, path: "/admin/runtime/notifications/unread-count"},
+		{method: http.MethodGet, path: "/admin/runtime/notifications/recent"},
+		{method: http.MethodPost, path: "/admin/runtime/notifications/query"},
+		{method: http.MethodGet, path: "/admin/runtime/notifications/:id"},
+		{method: http.MethodPost, path: "/admin/runtime/notifications/:id/read"},
+		{method: http.MethodPost, path: "/admin/runtime/notifications/read-all"},
 	} {
-		t.Run(route, func(t *testing.T) {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
 			enforcer := newTestEnforcer(t)
 			called := false
 			router := gin.New()
@@ -80,16 +89,17 @@ func TestCasbinHandlerAllowsAuthenticatedCommonRouteWithoutPolicy(t *testing.T) 
 				ctx.Next()
 			})
 			router.Use(CasbinHandler(enforcer, CasbinOptions{EnforcePolicyCoverage: true}))
-			router.GET(route, func(ctx *gin.Context) {
+			router.Handle(route.method, route.path, func(ctx *gin.Context) {
 				called = true
 				ctx.Status(http.StatusNoContent)
 			})
 
-			requestPath := strings.Replace(strings.Replace(route, ":code", "example", 1), ":scope", "system.user.list", 1)
-			req := httptest.NewRequest(http.MethodGet, requestPath, nil)
+			requestPath := strings.Replace(strings.Replace(route.path, ":code", "example", 1), ":scope", "system.user.list", 1)
+			requestPath = strings.Replace(requestPath, ":id", "17", 1)
+			req := httptest.NewRequest(route.method, requestPath, nil)
 			router.ServeHTTP(httptest.NewRecorder(), req)
 			if !called {
-				t.Fatalf("expected authenticated common route %s to pass without policy", route)
+				t.Fatalf("expected authenticated common route %s %s to pass without policy", route.method, route.path)
 			}
 		})
 	}

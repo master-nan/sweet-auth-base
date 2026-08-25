@@ -138,10 +138,13 @@ func allowAuthenticatedIdentityRoute(obj, act string) bool {
 		return act == "POST"
 	case "/admin/user/me", "/admin/menu/my", "/admin/runtime/dict/:code", "/admin/runtime/table/:code",
 		"/admin/runtime/query-scopes/:scope", "/admin/runtime/query-schemes/available",
-		"/admin/query-schemes/:id":
+		"/admin/query-schemes/:id", "/admin/runtime/notifications/unread-count",
+		"/admin/runtime/notifications/recent", "/admin/runtime/notifications/:id":
 		return act == "GET"
 	case "/admin/runtime/query-schemes/:id/resolve", "/admin/query-schemes/query",
-		"/admin/query-schemes/personal", "/admin/query-schemes/:id/copy-to-personal":
+		"/admin/query-schemes/personal", "/admin/query-schemes/:id/copy-to-personal",
+		"/admin/runtime/notifications/query", "/admin/runtime/notifications/:id/read",
+		"/admin/runtime/notifications/read-all":
 		return act == "POST"
 	case "/admin/query-schemes/personal/:id", "/admin/query-schemes/personal/:id/default":
 		return act == "PUT" || act == "DELETE"

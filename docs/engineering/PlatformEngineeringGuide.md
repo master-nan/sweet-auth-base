@@ -725,28 +725,26 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 
 本文是当前长期工程架构真值。如果代码和本文不一致，应先核实当前实现，再更新代码或文档，不能让两套规则长期并存。
 
-## 32. Notification Center 设计冻结
+## 32. Notification Center
 
-本节定义尚未实现的“消息通知中心”合同，供后续实现直接执行。它不是当前能力声明；在对应数据库、后端和前端实现完成前，Header 铃铛仍只是静态占位。实现时如需改变本节的安全边界、数据模型或 API 语义，应先更新设计，不能在代码中另造一套通知协议。
+消息通知中心是当前已实现的平台级站内消息基础能力。本节记录数据模型、发送入口、Runtime API、前端生命周期和安全边界的当前真值。
 
-### 32.1 现状与产品边界
-
-当前代码核对结果如下：
+### 32.1 实现边界
 
 | 对象 | 当前事实 | 对通知中心的结论 |
 | --- | --- | --- |
-| `ToolbarItem.vue` | Header 已有 `notifications` 图标，Badge 固定为 `2`，没有点击行为、API 或状态 | 实现时替换静态 Badge，保留现有 Header 控件尺寸和主题语义 |
-| `stores/user.ts` | 认证主体是 `SysUser`；Logout/换号会清理用户态，并通过 `session_generation` 隔离旧请求 | 通知收件主体固定为 `SysUser`；通知 Store 必须纳入用户态清理 |
+| `ToolbarItem.vue` | Header 铃铛读取 `notificationStore.unreadCount`，0 不显示，超过 99 显示 `99+` | 铃铛只承载入口和 Badge，列表交互由 `NotificationPopover` 承担 |
+| `stores/user.ts` | 认证主体是 `SysUser`；Logout/换号通过 `session_generation` 隔离旧请求 | `stores/notification.ts` 复用该代次，停止轮询并清理旧用户状态 |
 | `boot/axios.ts` | 每个请求携带 Token 与 Session Generation 快照，旧 Session 响应会转成 `StaleSessionResponseError` | 轮询结果必须复用该边界，禁止旧用户未读数写入新用户状态 |
-| Router / TagView | 静态 Hidden Route 可注册且可显示 Tag；动态菜单用于裁剪正式菜单路由 | `/admin/notifications` 使用 Hidden Route，不增加左侧菜单；`showTag=true` |
-| Casbin | `/admin` 路由先认证再执行严格策略覆盖；少量 Runtime API 被列为已登录公共入口 | 自有收件箱 API 必须加入受控的 authenticated common route，并在 Service 内按当前用户隔离 |
+| Router / TagView | `/admin/notifications` 是 `showTag=true` 的静态 Hidden Route | 从 Header 进入，不增加左侧菜单或 MenuButton Seed |
+| Casbin | Notification Runtime API 是 authenticated common route | 不要求 MenuButton，Service 仍必须按当前 Audit Subject 隔离收件箱 |
 | SMS | 管理短信模板、发送和发送日志，是外部通道 | 不复用其模板、Provider 或发送记录模型 |
 | Integration | 管理外部系统、执行、重试、同步和 Consumer 状态机 | 可作为通知生产者，但 Notification 不进入 Integration 状态机 |
 | Audit / AccessLog | 记录请求、安全主体和受控摘要 | Send 记录安全业务摘要；MarkRead 不产生重型审计事件 |
 | User / Role / Organization | 登录主体是 `SysUser`；Employee 可选绑定 User，Position/Role 语义不同 | Recipient 只保存 `user_id`，不保存 Role、Employee、Position 或 OrgUnit |
 | Query / Pagination | 已有显式分页 DTO、`TablePagination` 和 `StandardTableToolbar` | 页面复用分页与工具栏，不接 Query Center |
 | Runtime Metadata | 服务低代码、动态表单、查询和跨模块字段事实 | 通知中心是显式平台 Runtime 页面，不由 Metadata 驱动 |
-| 现有残留 | 除 Toolbar 固定 Badge 和 i18n 的“通知”文本外，没有 notification/message/inbox 领域实现 | 无兼容数据和兼容 API 需要保留 |
+| Migration | Ledger Version 17 `notification_center_schema` 创建两张表、CHECK、FK 和索引 | PostgreSQL 是通知真值，不使用 AutoMigrate 代替正式升级 |
 
 正式产品名为“消息通知中心”，英文领域名为 `Notification`。它是平台级站内消息基础设施：业务模块产生“某些用户需要被提醒”的事实，Notification 负责消息持久化、收件人分发、用户可见性、已读状态、未读数量、受控跳转和消息生命周期。
 
@@ -779,7 +777,7 @@ V1 使用 `Notification` 与 `NotificationRecipient` 两个对象，不能合并
 
 V1 不使用 `expires_at`、`action_label`、附件、富文本、任意 JSON 业务快照或用户删除字段。消息长期保留；未来归档策略另行增加 Migration，不能在 V1 暗藏 Cleanup Worker。
 
-建议 PostgreSQL 16 DDL 合同如下，最终实现应使用正式 Migration Ledger 的下一个版本，而不是修改已有版本：
+当前 PostgreSQL 16 DDL 由 Migration Ledger Version 17 维护，核心合同如下：
 
 ```sql
 CREATE TABLE notification (
@@ -790,38 +788,38 @@ CREATE TABLE notification (
     content          text         NOT NULL,
     source_module    varchar(64)  NOT NULL,
     source_type      varchar(64)  NOT NULL,
-    source_id        varchar(128),
-    action_path      varchar(512),
-    action_menu_name varchar(128),
-    sender_type      varchar(16)  NOT NULL DEFAULT 'SYSTEM',
-    created_by       bigint REFERENCES sys_user(id) ON DELETE SET NULL,
+    source_id        varchar(128) NOT NULL DEFAULT '',
+    action_menu_name varchar(32)  NOT NULL DEFAULT '',
+    action_path      varchar(512) NOT NULL DEFAULT '',
     dedup_key        varchar(128),
-    state            boolean      NOT NULL DEFAULT true,
     created_at       timestamptz  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_notification_category
         CHECK (category IN ('SYSTEM','BUSINESS','TASK','REMINDER','SECURITY','INTEGRATION')),
     CONSTRAINT chk_notification_level
         CHECK (level IN ('INFO','SUCCESS','WARNING','ERROR')),
-    CONSTRAINT chk_notification_sender_type
-        CHECK (sender_type IN ('SYSTEM','USER')),
     CONSTRAINT chk_notification_title
         CHECK (char_length(btrim(title)) BETWEEN 1 AND 160),
-    CONSTRAINT chk_notification_content
-        CHECK (char_length(content) BETWEEN 1 AND 4000),
-    CONSTRAINT chk_notification_action_pair
-        CHECK ((action_path IS NULL) = (action_menu_name IS NULL))
+    CONSTRAINT chk_notification_content CHECK (
+        char_length(content) BETWEEN 1 AND 4000 AND octet_length(content) <= 16384
+    ),
+    CONSTRAINT chk_notification_source CHECK (
+        char_length(btrim(source_module)) BETWEEN 1 AND 64
+        AND char_length(btrim(source_type)) BETWEEN 1 AND 64
+    ),
+    CONSTRAINT chk_notification_action
+        CHECK (action_path = '' OR action_menu_name <> '')
 );
 
-CREATE UNIQUE INDEX uni_notification_dedup
+CREATE UNIQUE INDEX ux_notification_source_dedup
     ON notification (source_module, dedup_key)
-    WHERE dedup_key IS NOT NULL;
+    WHERE dedup_key IS NOT NULL AND dedup_key <> '';
 
 CREATE INDEX idx_notification_created
     ON notification (created_at DESC, id DESC);
 
 CREATE TABLE notification_recipient (
-    notification_id bigint      NOT NULL REFERENCES notification(id) ON DELETE CASCADE,
-    user_id          bigint      NOT NULL REFERENCES sys_user(id) ON DELETE CASCADE,
+    notification_id bigint      NOT NULL REFERENCES notification(id) ON DELETE RESTRICT,
+    user_id          bigint      NOT NULL REFERENCES sys_user(id) ON DELETE RESTRICT,
     read_at          timestamptz,
     created_at       timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (notification_id, user_id)
@@ -843,16 +841,14 @@ CREATE INDEX idx_notification_recipient_user_unread
 | Notification | `category` / `level` | 受控展示分类和级别 |
 | Notification | `title` / `content` | 纯文本共享消息事实 |
 | Notification | `source_module` / `source_type` / `source_id` | 产生消息的业务对象身份，不保存对象快照 |
-| Notification | `action_path` / `action_menu_name` | 受控内部路径及其所属菜单权限身份，两者同时为空或同时有值 |
-| Notification | `sender_type` / `created_by` | 系统任务或已认证用户产生的消息；后台任务的 `created_by` 为空 |
+| Notification | `action_menu_name` / `action_path` | 菜单 name 是稳定权限身份；Path 是该页面下的受控内部跳转信息 |
 | Notification | `dedup_key` | 由来源模块定义的可选幂等身份 |
-| Notification | `state` | 平台内部有效状态；V1 不提供普通用户修改入口 |
 | Notification | `created_at` | 消息事实创建时间和默认排序时间 |
 | Recipient | `notification_id` / `user_id` | 消息和最终认证主体的复合身份 |
 | Recipient | `read_at` | 首次阅读时间；为空表示未读 |
 | Recipient | `created_at` | 投递时间，用于当前用户列表和未读索引 |
 
-不嵌入完整 `model.Basic`：Notification 是近似不可变消息事实，不需要修改人、删除人和软删除全套字段；Recipient 使用复合主键，也不应伪装成普通 CRUD 实体。
+两个模型都不嵌入完整 `model.Basic`：Notification 是不可变消息事实，Recipient 使用复合主键表达用户投递。V1 不建设 Sender 产品体系，也不暴露草稿、发布、撤回或禁用状态机。
 
 ### 32.4 来源、Action 与收件人合同
 
@@ -861,16 +857,14 @@ CREATE INDEX idx_notification_recipient_user_unread
 Action 冻结为“受控内部路径 + 所属菜单身份”：
 
 ```go
-type NotificationAction struct {
-    Path     string // 规范化后的 /admin/... 路径，不含 origin、query 或 fragment
-    MenuName string // 用户必须拥有的目标页面菜单 name
-}
+menu_name = 稳定页面/权限身份
+action_path = 该页面下的受控内部跳转信息
 ```
 
 约束如下：
 
-1. `Path` 必须以 `/admin/` 开头，最大 512 字符；拒绝 scheme、host、`//`、反斜线、控制字符、query 和 fragment。
-2. `MenuName` 必须是发送时已存在的有效页面菜单；Hidden Detail Route 使用其业务归属页面的菜单 name。
+1. `ActionPath` 非空时必须以 `/admin/` 开头，最大 512 字符；拒绝 scheme、host、`//`、反斜线、控制字符、query 和 fragment。
+2. 有 Action 时 `ActionMenuName` 必须是发送时已存在的活动菜单；Hidden Detail Route 使用其业务归属页面的菜单 name。`ActionPath` 可为空，表示只有消息内容而无跳转。
 3. Recent/List 返回 Action 时批量计算 `allowed`，不逐条查询菜单。
 4. 消息内容始终可查看；`allowed=false` 时前端明确提示“暂无目标页面访问权限”，不得导航。
 5. `allowed=true` 只是用户体验预检，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
@@ -888,24 +882,21 @@ V1 只暴露一个正式 Go Application 入口，不提供普通管理员 HTTP S
 
 ```go
 type NotificationCommand struct {
-    RecipientUserIDs []int
-    Category         NotificationCategory
-    Level            NotificationLevel
-    Title            string
-    Content          string
-    SourceModule     string
-    SourceType       string
-    SourceID         string
-    Action           *NotificationAction
-    DedupKey         string
-}
-
-type NotificationSender interface {
-    Send(context.Context, NotificationCommand) (NotificationSendResult, error)
+    Recipients     []int
+    Category       NotificationCategory
+    Level          NotificationLevel
+    Title          string
+    Content        string
+    SourceModule   string
+    SourceType     string
+    SourceId       string
+    ActionMenuName string
+    ActionPath     string
+    DedupKey       string
 }
 ```
 
-不再建立 `SendToUser`、`SendToUsers` 两套平行逻辑。单用户发送也传一个元素的 `RecipientUserIDs`。
+业务模块直接注入 `*NotificationService` 并调用 `Send(ctx, command)`。不建立 `NotificationSender`、Manager、Facade 或对管理员开放的 Send HTTP API；单用户发送也传一个元素的 `Recipients`。
 
 输入上限：
 
@@ -915,7 +906,7 @@ type NotificationSender interface {
 - Source Module/Type 各 1 到 64 字符，Source ID 不超过 128 字符。
 - Dedup Key 为空表示每次创建新消息；非空最大 128 字符。
 
-幂等由 `uni_notification_dedup(source_module, dedup_key)` 保证，不使用 Redis 锁。首次 Send 在短事务中创建主消息和所有 Recipient。重复 Send：
+幂等由 `ux_notification_source_dedup(source_module, dedup_key)` 部分唯一索引保证，不使用 Redis 锁。首次 Send 在短事务中创建主消息和所有 Recipient。重复 Send：
 
 1. 读取唯一约束对应的既有消息；
 2. 比较 Category、Level、Title、Content、Source 和 Action 等不可变事实；
@@ -929,7 +920,7 @@ type NotificationSender interface {
 
 ```text
 业务事务提交
-  -> NotificationSender.Send
+  -> NotificationService.Send
   -> 发送失败记录安全摘要并由调用方决定重试
 ```
 
@@ -937,7 +928,7 @@ Notification 失败不能回滚已经成功的学习、考试、审批或集成�
 
 ### 32.6 Runtime API 与 DTO
 
-所有 API 必须经过 `AuthHandler`。它们是登录用户基础能力，不要求 MenuButton，但实现时必须显式加入 `allowAuthenticatedIdentityRoute`；Service 只从可信 Audit Subject 取得用户 ID，Request/Path 中不允许出现可选择的 `user_id`。
+所有 API 经过 `AuthHandler`。它们是登录用户基础能力，不要求 MenuButton，并已纳入 `allowAuthenticatedIdentityRoute`；Service 只从可信 Audit Subject 取得用户 ID，Request/Path 中不允许出现可选择的 `user_id`。
 
 | Method | Path | 用途 |
 | --- | --- | --- |
@@ -945,12 +936,12 @@ Notification 失败不能回滚已经成功的学习、考试、审批或集成�
 | GET | `/admin/runtime/notifications/recent?limit=8` | 当前用户最近通知，limit 默认 8，范围 1 到 10 |
 | POST | `/admin/runtime/notifications/:id/read` | 幂等标记当前用户的一条消息已读 |
 | POST | `/admin/runtime/notifications/read-all` | 标记当前用户全部有效未读消息已读 |
-| POST | `/admin/notifications/query` | 当前用户完整消息分页查询 |
-| GET | `/admin/notifications/:id` | 当前用户消息详情和完整纯文本内容 |
+| POST | `/admin/runtime/notifications/query` | 当前用户完整消息分页查询 |
+| GET | `/admin/runtime/notifications/:id` | 当前用户消息详情和完整纯文本内容 |
 
-Unread Count 响应只返回真实整数 `count`；`99+` 是前端展示规则。查询必须使用 `notification_recipient` 的未读 partial index，并联结有效 Notification，不拉取列表后计数。
+Unread Count 响应只返回真实整数 `unread_count`；`99+` 是前端展示规则。查询使用 `notification_recipient` 的未读 partial index，不拉取列表后计数。
 
-Recent 默认按“未读优先，再按投递时间倒序”返回最多 8 条；完整页面默认严格按投递时间倒序，可切换最早优先，不因 MarkRead 使页面行突然移动。
+Recent 默认按“未读优先，再按投递时间倒序”返回 8 条，上限 10；完整页面固定按投递时间倒序，不接受任意排序字段。
 
 分页 Query Request：
 
@@ -960,8 +951,6 @@ num: 1..50，默认 15
 keyword: 标题/内容受控模糊查询，最大 100 字符
 read_status: ALL | UNREAD | READ
 category: 可选受控 Category
-created_from / created_to: 可选 RFC3339 时间，服务端校验区间
-sort: NEWEST | OLDEST，默认 NEWEST
 ```
 
 Summary DTO 只包含：
@@ -986,16 +975,16 @@ WHERE notification_id = $1 AND user_id = $2 AND read_at IS NULL;
 
 ### 32.7 前端状态、轮询与会话隔离
 
-建议新增 `stores/notification.ts` 作为唯一前端状态所有者，保存 unread count、recent、loading/error、popover open 状态和轮询句柄。`ToolbarItem` 只渲染并触发 Store，不自行拼 API 或维护第二份计数。
+`stores/notification.ts` 是 Header 通知状态的唯一所有者，保存 unread count、recent、loading/error 和轮询句柄。完整页的分页、筛选和 Dialog 状态仍属于页面。`ToolbarItem` 只渲染 Badge 和 Popover，不自行拼 API。
 
 刷新规则：
 
 1. 登录成功且 Header 挂载后立即读取未读数。
 2. 页面可见时每 60 秒轮询一次未读数；`document.hidden=true` 时不发请求。
 3. Tab 从后台恢复、用户打开通知 Popover 时立即刷新未读数和 Recent。
-4. Logout、Token 更换或组件卸载时停止定时器并 `$reset`。
+4. Logout、Token 更换或 `MainLayout` 卸载时调用 `reset`，停止定时器并清空用户通知态。
 5. 每个请求沿用 Axios 的 Token/Session Generation 快照；`StaleSessionResponseError` 只丢弃，不改新 Session 状态。
-6. 后台轮询失败保留最后一次成功计数并暂停连续轮询，等待用户 Retry、重新打开 Popover 或 Tab 再激活，避免每分钟重复错误提示。
+6. 后台轮询失败保留最后一次成功计数，错误保存在 Store 中，不由定时任务弹出高频通知。
 
 成功 MarkRead 后先本地幂等更新对应行和计数，再以后台刷新校正；失败则恢复原状态。MarkAllRead 成功后 unread count 立即置零，Recent 和当前页面记录同步为已读。
 
@@ -1017,7 +1006,7 @@ WHERE notification_id = $1 AND user_id = $2 AND read_at IS NULL;
 
 - Hidden Route：`/admin/notifications`，Tag 标题“消息通知中心”，不建立左侧一级菜单。
 - 使用 `BaseContent`、`StandardTableToolbar` 和 `TablePagination`，不接 Query Scheme、AdvancedQuery 或 Runtime Metadata。
-- 顶部保持单行紧凑布局：全部/未读/已读分段控件、关键词、Category、时间区间、搜索；“全部已读”位于右侧动作区。
+- 顶部保持单行紧凑布局：全部/未读/已读分段控件、关键词、Category 和搜索；“全部已读”位于右侧动作区。
 - 主体使用无额外卡片嵌套的 `q-list` 收件箱行，而不是普通 CRUD 表格。行展示状态、标题与摘要、Category、时间和打开图标。
 - 默认时间倒序；点击行标记已读并打开详情 Dialog。Dialog 展示纯文本完整内容、Category、时间和固定 Action 按钮。
 - Action 无权限时 Dialog 保留内容并显示“暂无相关页面访问权限”，按钮 Disabled。
@@ -1071,9 +1060,9 @@ V1 三者不联动，也不预建 `notification_delivery`、Channel、Provider �
 - 消息和 Recipient V1 长期保留。Operations 后续可按 90/180/365 天策略设计归档 Migration 或维护命令，但当前不运行自动删除 Worker。
 - Redis 不保存未读真值，不新增 Notification Cache；PostgreSQL 是唯一读写真值。
 
-### 32.12 文件与 Migration 实施计划
+### 32.12 文件与 Migration
 
-后端最小文件计划：
+后端实现文件：
 
 ```text
 backend/model/notification.go
@@ -1085,22 +1074,22 @@ backend/service/notification_service.go
 backend/controller/notification_controller.go
 ```
 
-`NotificationCommand`、`NotificationSender`、校验和应用用例留在 `notification_service.go`；只有出现可独立复用且可测试的复杂规则时才考虑 `internal/notification`。禁止一开始拆成 sender/reader/runtime/mapper/validator/manager 多套文件。
+`NotificationCommand`、校验、发送和收件箱用例均位于 `notification_service.go`；没有 `internal/notification`、sender、reader、runtime、mapper、validator 或 manager 附加层。
 
-前端最小文件计划：
+前端实现文件：
 
 ```text
 frontend/src/api/services/notification.ts
 frontend/src/stores/notification.ts
-frontend/src/components/Toolbar/NotificationPopover.vue
+frontend/src/components/Notification/NotificationPopover.vue
 frontend/src/pages/notification/Index.vue
 ```
 
-简单详情 Dialog 直接放在 `Index.vue`，不新增 Detail Route 或 MessageItem/Badge/Empty 子组件。类型可随 API Service 和 Store 放置，除非实现后证明存在跨三个以上消费者的稳定领域合同。
+详情 Dialog 直接位于 Popover 和 `Index.vue`，不新增 Detail Route 或 MessageItem/Badge/Empty 子组件。类型与展示 Map 由 API Service 集中维护。
 
-实现阶段新增 Migration Ledger Version 17，例如 key `notification_center_schema`，同时将两张表加入 Managed Tables。该 Migration 创建表、CHECK、FK 和索引；不得改写现有 Version 1 AutoMigrate Checksum。V1 不需要字典 Seed、可见菜单 Seed、MenuButton Seed 或管理员权限 Seed；只新增静态 Hidden Route、Router 注册和 Casbin authenticated common route 清单。
+Migration Ledger Version 17，key 为 `notification_center_schema`，已将两张表加入 Managed Tables。该 Migration 创建表、CHECK、FK 和索引；V1 没有字典 Seed、可见菜单 Seed、MenuButton Seed 或管理员权限 Seed。
 
-Wire 只增加 Repository、Service、Controller provider 和 interface binding。业务模块通过注入窄 `NotificationSender` 调用，不直接操作 Repository。
+Wire 只增加 Repository、Service、Controller provider 和 interface binding。业务模块注入 `*NotificationService` 调用 `Send`，不直接操作 Repository。
 
 ### 32.13 测试与安全矩阵
 
@@ -1131,11 +1120,11 @@ Wire 只增加 Repository、Service、Controller provider 和 interface binding�
 | 旧 Session 返回 | Axios Session Generation + Notification Store Generation 检查和 Reset |
 | 敏感信息泄漏 | DTO 不返回用户 ID/Dedup/审计字段；日志不记录 Content、Recipient 列表和业务 Payload |
 
-### 32.14 明确不做与实现门禁
+### 32.14 明确不做
 
 V1 明确不做：WebSocket、SSE、MQ、邮件、短信、钉钉、企业微信、移动 Push、模板中心、变量渲染、订阅偏好、广播后台、公告管理、审批、群组、多态 Recipient、附件、富文本、评论/回复、聊天、物理删除、自动过期、归档 Worker 和管理员全站消息管理。
 
-关键取舍已经冻结：
+当前实现边界：
 
 - Action 选择受控内部 Path + Menu Identity，不使用自由外链、Route Params JSON 或开放 Action Registry。
 - Role/Organization 不进入 Recipient；上游先解析为 User。
@@ -1145,5 +1134,3 @@ V1 明确不做：WebSocket、SSE、MQ、邮件、短信、钉钉、企业微信
 - Programmatic Send 不开放 HTTP Admin API。
 - Popover 未读优先，完整页面时间倒序；两者排序语义有意不同。
 - Notification 不接 Query Center、Runtime Metadata 或 Data Permission。
-
-进入实现任务前必须确认：Migration Version 17 未被其他能力占用，Action Path 对应的目标菜单身份可由当前权限模型批量判定，通知 Store 能纳入 Logout/换号清理，且本节未被新的正式产品需求扩展为外部渠道或工作流系统。

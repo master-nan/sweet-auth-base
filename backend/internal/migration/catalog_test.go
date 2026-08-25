@@ -8,8 +8,8 @@ import (
 
 func TestCatalogContractsAndChecksums(t *testing.T) {
 	definitions := Catalog()
-	if len(definitions) != 16 {
-		t.Fatalf("catalog has %d definitions, want 16", len(definitions))
+	if len(definitions) != 17 {
+		t.Fatalf("catalog has %d definitions, want 17", len(definitions))
 	}
 	if err := ValidateCatalog(definitions); err != nil {
 		t.Fatalf("validate catalog: %v", err)
@@ -18,8 +18,8 @@ func TestCatalogContractsAndChecksums(t *testing.T) {
 
 func TestManagedTablesHasCompleteUniqueCatalog(t *testing.T) {
 	tables := ManagedTables()
-	if len(tables) != 53 {
-		t.Fatalf("managed table catalog has %d tables, want 53", len(tables))
+	if len(tables) != 55 {
+		t.Fatalf("managed table catalog has %d tables, want 55", len(tables))
 	}
 	seen := make(map[string]struct{}, len(tables))
 	for _, table := range tables {

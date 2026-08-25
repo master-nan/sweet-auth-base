@@ -548,7 +548,50 @@ Order和Binding，不保存分页或列偏好；业务查询仍由所属页面�
 - 新Binding Kind必须进入后端白名单、Scope声明、Validator、Resolver和前端受控标签，不能保存解析后的真实用户ID。
 - Resolve只返回查询状态，不调用业务列表API；Data Permission在业务查询阶段继续AND叠加。
 
-### 6.10 Report
+### 6.10 Notification
+
+**模块功能与用户能力**
+
+Notification 是平台级站内消息基础能力。业务模块可以向单个或多个有效 `SysUser` 程序化发送纯文本通知；登录用户可从 Header 查看未读数、最近通知、消息详情和完整收件箱，并执行单条或全部已读。
+
+**核心入口与文件职责**
+
+| 入口 | 职责 |
+| --- | --- |
+| `model/notification.go` | 定义不可变消息事实、用户投递/已读状态以及 Category、Level、ReadStatus 合同 |
+| `repository/notification.go` | 定义通知事务写入、幂等查找、当前用户查询和批量 Action 可用性读取合同 |
+| `repository/impl/notification_impl.go` | 实现 PostgreSQL 批量 Recipient、partial index 查询、复合所有权更新和菜单 name 批量解析 |
+| `service/notification_service.go` | 唯一应用入口；校验 `NotificationCommand`、完成幂等发送短事务，并从 Audit Subject 读取当前用户收件箱 |
+| `controller/notification_controller.go` | 提供认证用户的 Unread、Recent、Query、Detail、MarkRead 和 MarkAll Runtime API，不暴露 Send HTTP API |
+| `migrate/registry.go` | Migration Version 17 创建两张通知表、CHECK、FK、未读索引和幂等部分唯一索引 |
+| `frontend/src/api/services/notification.ts` | 集中 Runtime DTO、Category/Level 展示 Map 和全部通知 API |
+| `frontend/src/stores/notification.ts` | 维护 Header 未读数、Recent、60 秒可见轮询及 Session Generation 隔离 |
+| `frontend/src/components/Notification/NotificationPopover.vue` | Header 最近通知、已读操作、纯文本详情与安全 Action 跳转 |
+| `frontend/src/pages/notification/Index.vue` | Hidden Route 消息收件箱，承担关键词、已读状态、Category 和分页，不接 Query Center |
+
+**典型链路**
+
+`业务事实提交 -> NotificationService.Send -> 校验有效User/菜单Action -> 短事务写Notification+Recipients -> 安全Audit摘要`
+
+`Header铃铛 -> Notification Store -> Runtime Controller -> NotificationService -> recipient.user_id=当前Audit Subject -> Repository -> PostgreSQL`
+
+**核心对象、权限与扩展**
+
+- `Notification` 保存共享消息事实，`NotificationRecipient` 以 `notification_id + user_id` 保存投递和首次已读时间。
+- 幂等身份是 `source_module + dedup_key`；发送上限 1000 个去重后的活动用户，任一无效则整体失败。
+- Runtime API 只依赖登录身份，不接收 `user_id`、不依赖 MenuButton 或 Data Permission；Action 目标页的 Router、Casbin 和 Data Permission 仍然正常执行。
+- 新业务模块注入 `*NotificationService`，在自身事务成功后调用 `Send`；按 Role、Organization 或 Employee 发送时，上游先解析为绑定的 `SysUser` 集合。
+- V1 不支持 WebSocket/SSE、MQ、外部渠道、模板、多态 Recipient、附件、富文本、归档、过期或管理员广播。
+
+```text
+Business Module -> NotificationService.Send -> Notification / Recipient
+                                                   |
+Authenticated User -> Runtime API -> User Inbox ---+
+                                      |
+                                      `-> Menu Identity -> Authorized Action
+```
+
+### 6.11 Report
 
 **模块功能与用户能力**
 
@@ -582,7 +625,7 @@ Order和Binding，不保存分页或列偏好；业务查询仍由所属页面�
 - 扩展应围绕现有sheet/cell/binding、发布隔离、导出和日志演进，不另建数据源或设计器体系。
 - 当前暂不支持外部数据库数据源、自由画布、图表大屏、打印分页、填报、调度订阅和多数据集复杂联动。
 
-### 6.11 Migration与Seed
+### 6.12 Migration与Seed
 
 **模块功能与用户能力**
 
@@ -612,7 +655,7 @@ Migration在应用发布前把数据库升级到当前Canonical Schema；Seed补
 - 新Migration只追加Catalog与Runner，不改已发布Migration合同；SQLite测试不能证明PostgreSQL DDL正确。
 - Seed必须幂等并使用稳定code，不能依赖本地自增ID或覆盖管理员业务数据。
 
-### 6.12 Cache与Redis
+### 6.13 Cache与Redis
 
 **模块功能与用户能力**
 
@@ -642,7 +685,7 @@ Cache为配置读取、Token撤销、验证码、登录锁定和第三方身份�
 - Token黑名单、验证码和登录锁定具有专属TTL与原子语义，不能合并成通用Key操作。
 - 新缓存必须先证明重复读取价值，并定义Key、TTL、失效所有者和Redis不可用时的失败策略。
 
-### 6.13 Audit与Request Metadata
+### 6.14 Audit与Request Metadata
 
 **模块功能与用户能力**
 
@@ -671,7 +714,7 @@ Audit记录登录、访问、管理变更和关键状态操作；Request Metadat
 - 不记录密码、Token、Credential、原始HR响应或完整请求/响应Payload。
 - 新审计动作使用稳定resource/action和安全changes摘要，不从`err.Error()`构造客户端内容。
 
-### 6.14 Runtime Lifecycle与Shutdown
+### 6.15 Runtime Lifecycle与Shutdown
 
 **模块功能与用户能力**
 
@@ -700,7 +743,7 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 - DB/Redis只能在HTTP和后台任务停止后关闭；不能依赖进程退出让OS代为回收。
 - 新后台任务必须进入统一生命周期和关闭等待，不允许裸goroutine永久运行。
 
-### 6.15 Preflight、Backup与Release
+### 6.16 Preflight、Backup与Release
 
 **模块功能与用户能力**
 
@@ -730,7 +773,7 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 - Restore先验证Manifest和目标环境，再恢复并运行Preflight；备份文件不进入Git。
 - CI和本地必须复用Makefile目标，不能维护两套不同门禁。
 
-### 6.16 Frontend公共能力
+### 6.17 Frontend公共能力
 
 **模块功能与用户能力**
 
@@ -793,6 +836,7 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 16. **高级查询**：`AdvancedQuery -> ExpressionGroup -> normalize/sanitize -> 页面Query State -> 后端Query Capability校验 -> Query Builder -> PostgreSQL`。
 17. **Report运行**：`Runtime页面 -> ReportController -> ReportAccess -> 发布版本 -> reportconfig -> Dataset Query/Data Permission -> Budget -> Preview/Export + ExecutionLog`。
 18. **Migration启动与应用Shutdown**：`Container entrypoint -> migrate/ledger/preflight -> main.runRuntime`；停止时执行`Signal -> stop HTTP intake -> cancel Runner -> wait in-flight -> close Redis/DB -> flush logger`。
+19. **通知发送与读取**：`业务Service -> NotificationService.Send -> NotificationRepository -> Notification/Recipient短事务`；读取执行`Header/消息中心 -> Runtime API -> Audit Subject -> Recipient所有权查询`。
 
 ## 8. 我要改什么，先看哪里
 
@@ -810,6 +854,8 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 | 修改部署配置 | config、Compose、entrypoint、Operations Guide | TLS、Secret、health/readiness、shutdown |
 | 修改Query Scheme | internal/queryscheme、Service、前端模块 | Scope、权限、Metadata、Dirty、Data Permission |
 | 修改Report | Report Service、reportconfig、Report模块 | 发布隔离、SQL安全、权限、Deadline、执行日志 |
+| 业务发送站内通知 | `service/notification_service.go`、`model/notification.go` | User解析、Dedup Key、Menu Action、业务事务提交时机 |
+| 修改通知收件箱 | Notification API/Store/Popover/Page | 用户隔离、Session Race、轮询、XSS、Hidden Route |
 
 ## 9. 修改后的验证
 

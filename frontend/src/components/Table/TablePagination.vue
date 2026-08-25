@@ -16,7 +16,7 @@
       outlined
       :dense="true"
       :options-dense="true"
-      :options="pageSizeOptions"
+      :options="resolvedPageSizeOptions"
       class="q-ml-md"
       @update:model-value="onPageSizeChange"
     >
@@ -41,6 +41,7 @@ const props = defineProps<{
   page: number
   pageSize: number
   total: number
+  pageSizeOptions?: number[]
 }>()
 
 const emit = defineEmits<{
@@ -48,7 +49,7 @@ const emit = defineEmits<{
   'update:pageSize': [value: number]
 }>()
 
-const pageSizeOptions = [15, 20, 30, 50, 100]
+const resolvedPageSizeOptions = computed(() => props.pageSizeOptions || [15, 20, 30, 50, 100])
 
 const currentPage = ref(props.page)
 const currentPageSize = ref(props.pageSize)
