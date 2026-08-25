@@ -1,120 +1,171 @@
 <template>
-  <base-content class="notification-center q-pa-sm column no-wrap">
-    <div class="notification-center__surface column no-wrap">
-      <standard-table-toolbar :refreshing="loading" @refresh="loadPage">
-        <template #quick-search>
-          <q-btn-toggle
-            v-model="readStatus"
-            dense
-            no-caps
-            unelevated
-            toggle-color="primary"
-            :options="readStatusOptions"
-            @update:model-value="search"
-          />
-          <q-input
-            v-model="keyword"
-            dense
-            outlined
-            clearable
-            debounce="250"
-            placeholder="搜索通知标题或内容"
-            class="notification-center__keyword"
-            @keyup.enter="search"
-          >
-            <template #append><q-icon name="search" /></template>
-          </q-input>
-          <q-select
-            v-model="category"
-            dense
-            outlined
-            clearable
-            emit-value
-            map-options
-            :options="categoryOptions"
-            label="通知类型"
-            class="notification-center__category"
-            @update:model-value="search"
-          />
-          <q-btn color="primary" icon="search" label="查询" @click="search" />
-        </template>
-        <template #right-actions>
-          <q-btn
-            outline
-            color="primary"
-            icon="done_all"
-            label="全部已读"
-            :disable="notificationStore.unreadCount === 0"
-            @click="markAllRead"
-          />
-        </template>
-      </standard-table-toolbar>
+  <base-content class="notification-center q-pa-sm">
+    <q-table
+      class="notification-center__table fit sticky-header-table"
+      :class="{
+        'app-table--empty': !loading && (Boolean(error) || items.length === 0),
+      }"
+      color="primary"
+      flat
+      bordered
+      separator="cell"
+      row-key="id"
+      :dense="$q.screen.lt.md"
+      :rows="error ? [] : items"
+      :columns="columns"
+      :loading="loading"
+      :pagination="tableState"
+    >
+      <template #top>
+        <standard-table-toolbar :refreshing="loading" @refresh="loadPage">
+          <template #quick-search>
+            <q-tabs
+              v-model="readStatus"
+              class="notification-center__read-tabs"
+              dense
+              no-caps
+              narrow-indicator
+              active-color="primary"
+              indicator-color="primary"
+              @update:model-value="search"
+            >
+              <q-tab name="ALL" label="全部" />
+              <q-tab name="UNREAD" label="未读" />
+              <q-tab name="READ" label="已读" />
+            </q-tabs>
+            <q-input
+              v-model="keyword"
+              dense
+              outlined
+              clearable
+              debounce="250"
+              placeholder="搜索通知标题或内容"
+              class="notification-center__keyword"
+              @keyup.enter="search"
+            >
+              <template #append><q-icon name="search" /></template>
+            </q-input>
+            <q-select
+              v-model="category"
+              dense
+              outlined
+              clearable
+              emit-value
+              map-options
+              :options="categoryOptions"
+              label="通知类型"
+              class="notification-center__category"
+              @update:model-value="search"
+            />
+            <q-btn color="primary" icon="search" label="查询" @click="search" />
+          </template>
+          <template #right-actions>
+            <q-btn
+              outline
+              color="primary"
+              icon="done_all"
+              label="全部已读"
+              :disable="notificationStore.unreadCount === 0"
+              @click="markAllRead"
+            />
+          </template>
+        </standard-table-toolbar>
+      </template>
 
-      <q-separator class="q-mt-sm" />
-      <div v-if="loading" class="notification-center__state q-pa-md q-gutter-sm">
-        <q-skeleton v-for="index in 6" :key="index" type="QToolbar" />
-      </div>
-      <div v-else-if="error" class="notification-center__state column flex-center q-gutter-md">
-        <q-icon name="cloud_off" color="grey-6" size="42px" />
-        <div class="text-grey-7">{{ error }}</div>
-        <q-btn outline color="primary" icon="refresh" label="重试" @click="loadPage" />
-      </div>
-      <div
-        v-else-if="items.length === 0"
-        class="notification-center__state column flex-center q-gutter-sm"
-      >
-        <q-icon name="notifications_none" color="grey-5" size="48px" />
-        <div class="text-body1 text-grey-7">暂无符合条件的通知</div>
-      </div>
-      <q-list v-else separator class="notification-center__list col">
-        <q-item
-          v-for="item in items"
-          :key="item.id"
-          clickable
-          class="notification-center__item"
-          :class="{ 'notification-center__item--unread': !item.read }"
-          @click="openNotification(item)"
+      <template #body="props">
+        <q-tr
+          :props="props"
+          data-notification-row
+          class="notification-center__row cursor-pointer"
+          :class="{ 'notification-center__row--unread': !props.row.read }"
+          tabindex="0"
+          @click="openNotification(props.row)"
+          @keyup.enter="openNotification(props.row)"
+          @keyup.space.prevent="openNotification(props.row)"
         >
-          <q-item-section avatar>
-            <q-avatar :color="levelColor(item.level)" text-color="white" size="36px">
-              <q-icon :name="levelIcon(item.level)" size="20px" />
-            </q-avatar>
-          </q-item-section>
-          <q-item-section>
-            <div class="row items-center no-wrap q-gutter-sm">
-              <div class="ellipsis text-subtitle2" :class="{ 'text-weight-bold': !item.read }">
-                {{ item.title }}
-              </div>
-              <status-chip
-                :label="categoryLabel(item.category)"
-                color="primary"
-                class="notification-center__category-chip"
+          <q-td key="message" :props="props">
+            <div class="notification-center__message row items-center no-wrap">
+              <q-icon
+                :name="levelIcon(props.row.level)"
+                :color="levelColor(props.row.level)"
+                size="22px"
+                class="notification-center__level-icon"
               />
+              <div class="notification-center__message-body col">
+                <div class="row items-center no-wrap q-gutter-xs">
+                  <span
+                    v-if="!props.row.read"
+                    class="notification-center__unread-dot"
+                    aria-label="未读"
+                  />
+                  <span
+                    class="ellipsis"
+                    :class="!props.row.read ? 'text-weight-bold' : 'text-weight-medium'"
+                  >
+                    {{ props.row.title }}
+                  </span>
+                  <q-icon v-if="props.row.action" name="open_in_new" color="primary" size="16px">
+                    <q-tooltip>
+                      {{ props.row.action.available ? '可打开相关页面' : '当前无目标页面权限' }}
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div class="notification-center__preview ellipsis text-caption q-mt-xs">
+                  {{ props.row.content_preview }}
+                </div>
+              </div>
             </div>
-            <q-item-label caption lines="2" class="q-mt-xs">{{
-              item.content_preview
-            }}</q-item-label>
-          </q-item-section>
-          <q-item-section side class="notification-center__meta">
-            <span class="text-caption text-grey-7">{{ formatTime(item.created_at) }}</span>
-            <q-icon v-if="item.action" name="open_in_new" color="primary" size="18px">
-              <q-tooltip>{{
-                item.action.available ? '打开相关页面' : '当前无目标页面权限'
-              }}</q-tooltip>
-            </q-icon>
-          </q-item-section>
-        </q-item>
-      </q-list>
+          </q-td>
+          <q-td key="category" :props="props">
+            <status-chip :label="categoryLabel(props.row.category)" color="primary" />
+          </q-td>
+          <q-td key="read" :props="props">
+            <status-chip
+              :label="props.row.read ? '已读' : '未读'"
+              :color="props.row.read ? 'grey-7' : 'primary'"
+            />
+          </q-td>
+          <q-td key="created_at" :props="props">
+            <span class="text-caption text-no-wrap">{{ formatTime(props.row.created_at) }}</span>
+          </q-td>
+          <q-td key="actions" :props="props">
+            <q-btn
+              flat
+              round
+              dense
+              color="primary"
+              icon="visibility"
+              aria-label="查看通知"
+              @click.stop="openNotification(props.row)"
+            >
+              <q-tooltip>查看通知</q-tooltip>
+            </q-btn>
+          </q-td>
+        </q-tr>
+      </template>
 
-      <div class="notification-center__pagination row justify-end q-pa-sm">
-        <table-pagination
-          v-model:page="page"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-size-options="[15, 20, 30, 50]"
-        />
-      </div>
-    </div>
+      <template #no-data>
+        <div class="app-table-empty-state full-width column flex-center q-gutter-sm">
+          <template v-if="error">
+            <q-icon name="cloud_off" color="grey-6" size="42px" />
+            <div class="text-grey-7">{{ error }}</div>
+            <q-btn outline color="primary" icon="refresh" label="重试" @click="loadPage" />
+          </template>
+          <template v-else>
+            <q-icon name="inbox" color="grey-5" size="48px" />
+            <div class="text-body1 text-grey-7">暂无符合条件的通知</div>
+          </template>
+        </div>
+      </template>
+
+      <template #bottom>
+        <div class="full-width row items-center no-wrap">
+          <div class="text-caption text-grey-7">共 {{ total }} 条通知</div>
+          <q-space />
+          <table-pagination v-model:page="page" v-model:page-size="pageSize" :total="total" />
+        </div>
+      </template>
+    </q-table>
 
     <q-dialog v-model="showDetail">
       <q-card class="notification-center__dialog">
@@ -168,13 +219,14 @@ import {
   type NotificationSummary,
 } from 'src/api/services/notification'
 import { useNotificationStore } from 'src/stores/notification'
+import type { TableColumn } from 'src/types/global'
 
 const api = useNotificationApi()
 const notificationStore = useNotificationStore()
 const router = useRouter()
 const $q = useQuasar()
 const page = ref(1)
-const pageSize = ref(15)
+const pageSize = ref(20)
 const total = ref(0)
 const keyword = ref('')
 const readStatus = ref<NotificationReadStatus>('ALL')
@@ -184,16 +236,31 @@ const loading = ref(false)
 const error = ref('')
 const detail = ref<NotificationDetail | null>(null)
 const showDetail = ref(false)
+const tableState = { rowsPerPage: 0 }
 
-const readStatusOptions = [
-  { label: '全部', value: 'ALL' },
-  { label: '未读', value: 'UNREAD' },
-  { label: '已读', value: 'READ' },
-]
 const categoryOptions = Object.entries(NOTIFICATION_CATEGORY_LABELS).map(([value, label]) => ({
   value,
   label,
 }))
+const columns: TableColumn<NotificationSummary>[] = [
+  { name: 'message', label: '通知内容', field: 'title', align: 'left' },
+  {
+    name: 'category',
+    label: '类型',
+    field: 'category',
+    align: 'center',
+    headerStyle: 'width: 110px',
+  },
+  { name: 'read', label: '状态', field: 'read', align: 'center', headerStyle: 'width: 90px' },
+  {
+    name: 'created_at',
+    label: '时间',
+    field: 'created_at',
+    align: 'left',
+    headerStyle: 'width: 180px',
+  },
+  { name: 'actions', label: '操作', field: 'id', align: 'center', headerStyle: 'width: 72px' },
+]
 const categoryLabel = (value: NotificationCategory) => NOTIFICATION_CATEGORY_LABELS[value]
 const levelColor = (value: NotificationLevel) => NOTIFICATION_LEVEL_COLORS[value]
 const levelIcon = (value: NotificationLevel) =>
@@ -261,56 +328,67 @@ onMounted(() => {
   min-height: 0;
 }
 
-.notification-center__surface {
-  min-height: 0;
-  height: 100%;
-  border: 1px solid var(--app-border);
-  background: var(--app-surface);
+.notification-center__table :deep(.q-table__top) {
+  padding: 10px 12px;
 }
 
-.notification-center__surface > :first-child {
-  padding: 10px 12px 0;
+.notification-center__read-tabs {
+  flex: none;
+  min-width: 184px;
+  min-height: 40px;
+}
+
+.notification-center__read-tabs :deep(.q-tab) {
+  min-height: 40px;
+  padding: 0 14px;
+  color: var(--app-text-muted);
+  font-weight: 500;
+}
+
+.notification-center__read-tabs :deep(.q-tab--active) {
+  font-weight: 600;
 }
 
 .notification-center__keyword {
-  width: 260px;
+  width: 280px;
 }
 
 .notification-center__category {
   width: 150px;
 }
 
-.notification-center__list {
-  min-height: 0;
-  overflow-y: auto;
+.notification-center__row {
+  height: 68px;
 }
 
-.notification-center__item {
-  min-height: 84px;
-  padding: 12px 16px;
-}
-
-.notification-center__item--unread {
+.notification-center__row--unread > td {
   background: var(--app-primary-soft);
 }
 
-.notification-center__category-chip {
+.notification-center__message {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.notification-center__message-body {
+  min-width: 0;
+}
+
+.notification-center__level-icon {
   flex: none;
+  margin-right: 12px;
 }
 
-.notification-center__meta {
-  min-width: 150px;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.notification-center__state {
-  min-height: 280px;
-}
-
-.notification-center__pagination {
+.notification-center__unread-dot {
+  width: 7px;
+  height: 7px;
   flex: none;
-  border-top: 1px solid var(--app-border);
+  border-radius: 50%;
+  background: var(--q-primary);
+}
+
+.notification-center__preview {
+  color: var(--app-text-muted);
 }
 
 .notification-center__dialog {

@@ -765,7 +765,7 @@ const normalizeBooleanValue = (value: unknown, fallback = false): boolean => {
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
-  num: 15,
+  num: 20,
   expressions: [
     {
       rules: [{ field: '', value: null }],
@@ -777,7 +777,7 @@ const emptyAdvancedQuery = (): Query => ({
 // 查询参数
 const query = ref<Query>({
   page: 1,
-  num: 15,
+  num: 20,
   order: {
     field: 'sequence',
     is_asc: true,

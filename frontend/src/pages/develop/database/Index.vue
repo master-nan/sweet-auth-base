@@ -1016,7 +1016,7 @@ const initLoading = ref(false)
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
-  num: 15,
+  num: 20,
   expressions: [
     {
       rules: [{ field: '', value: null }],
@@ -1028,7 +1028,7 @@ const emptyAdvancedQuery = (): Query => ({
 // 实际的查询条件对象
 const query = ref<Query>({
   page: 1,
-  num: 15,
+  num: 20,
   order: {
     field: '',
     is_asc: true,

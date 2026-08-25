@@ -117,10 +117,8 @@ body {
   display: block;
 }
 
-.q-table__container[data-app-table-overlay-host]:hover
-  > .app-table-overlay-scrollbar--scrollable,
-.q-table__container[data-app-table-overlay-active]
-  > .app-table-overlay-scrollbar--scrollable {
+.q-table__container[data-app-table-overlay-host]:hover > .app-table-overlay-scrollbar--scrollable,
+.q-table__container[data-app-table-overlay-active] > .app-table-overlay-scrollbar--scrollable {
   opacity: 1;
   pointer-events: auto;
 }
@@ -247,7 +245,11 @@ input[type='number']::-webkit-inner-spin-button {
 
   .master-detail-head,
   .detail-context {
-    background: linear-gradient(180deg, var(--app-dark-surface-raised), var(--app-dark-surface)) !important;
+    background: linear-gradient(
+      180deg,
+      var(--app-dark-surface-raised),
+      var(--app-dark-surface)
+    ) !important;
   }
 
   .master-detail-title {
@@ -441,7 +443,8 @@ input[type='number']::-webkit-inner-spin-button {
 
   .configure-page .configure-hero {
     border-color: var(--app-dark-border) !important;
-    background: linear-gradient(135deg, rgba(115, 103, 240, 0.2), rgba(20, 184, 166, 0.1)),
+    background:
+      linear-gradient(135deg, rgba(115, 103, 240, 0.2), rgba(20, 184, 166, 0.1)),
       var(--app-dark-surface) !important;
   }
 
@@ -518,7 +521,11 @@ input[type='number']::-webkit-inner-spin-button {
   }
 
   .configure-page .system-brand-row {
-    background: linear-gradient(135deg, rgba(115, 103, 240, 0.18), rgba(49, 204, 236, 0.08)) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(115, 103, 240, 0.18),
+      rgba(49, 204, 236, 0.08)
+    ) !important;
   }
 
   .configure-page .configure-actions {
@@ -554,7 +561,11 @@ input[type='number']::-webkit-inner-spin-button {
   .dictionary-page .dictionary-row--active {
     color: var(--app-dark-heading) !important;
     border-left-color: var(--q-primary) !important;
-    background: linear-gradient(90deg, rgba(115, 103, 240, 0.24), rgba(115, 103, 240, 0.08)) !important;
+    background: linear-gradient(
+      90deg,
+      rgba(115, 103, 240, 0.24),
+      rgba(115, 103, 240, 0.08)
+    ) !important;
   }
 
   .dictionary-page .dictionary-name,
@@ -575,7 +586,11 @@ input[type='number']::-webkit-inner-spin-button {
 
   .dictionary-page .dictionary-context-card {
     border-color: var(--app-dark-border) !important;
-    background: linear-gradient(90deg, var(--app-dark-surface-raised), var(--app-dark-surface)) !important;
+    background: linear-gradient(
+      90deg,
+      var(--app-dark-surface-raised),
+      var(--app-dark-surface)
+    ) !important;
   }
 
   .dictionary-page .dictionary-context-code {
@@ -971,7 +986,11 @@ input[type='number']::-webkit-inner-spin-button {
   }
 
   .permission-selected-head {
-    background: linear-gradient(180deg, var(--app-dark-surface-raised), var(--app-dark-surface)) !important;
+    background: linear-gradient(
+      180deg,
+      var(--app-dark-surface-raised),
+      var(--app-dark-surface)
+    ) !important;
   }
 
   .structure-table thead tr th,
@@ -1099,6 +1118,46 @@ input[type='number']::-webkit-inner-spin-button {
 .sticky-header-table.q-table--loading thead tr:last-child th {
   /* 避开加载状态表头高度。 */
   top: 48px;
+}
+
+/* 标准表格为空时隐藏无内容的表头滚动区，让提示完整居中。 */
+.app-table--empty > .q-table__middle,
+.sticky-header-table:has(> .q-table__bottom--nodata) > .q-table__middle {
+  display: none;
+}
+
+.app-table--empty > .q-table__bottom,
+.sticky-header-table > .q-table__bottom--nodata {
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  color: var(--app-text-muted);
+  font-size: 16px;
+}
+
+.sticky-header-table > .q-table__bottom--nodata .q-table__bottom-nodata-icon {
+  display: inline-flex;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  margin-right: 0;
+  margin-bottom: 8px;
+  color: var(--app-text-muted);
+  font-size: 0;
+  opacity: 0.55;
+}
+
+.sticky-header-table > .q-table__bottom--nodata .q-table__bottom-nodata-icon::before {
+  content: 'inbox';
+  font-family: 'Material Icons';
+  font-size: 48px;
+  line-height: 1;
+}
+
+.app-table-empty-state {
+  min-height: 220px;
 }
 
 /* 防止滚动容器内容在窄屏撑破父级。 */

@@ -155,6 +155,7 @@
       </template>
       <template #no-data>
         <div class="full-width column flex-center q-gutter-sm q-pa-xl text-grey-7">
+          <q-icon :name="error ? 'cloud_off' : 'inbox'" color="grey-5" size="48px" />
           <div>{{ emptyMessage }}</div>
           <q-btn
             v-if="error"
@@ -240,7 +241,7 @@ const activeType = ref<SchemeType>(QuerySchemeType.PERSONAL)
 const nameFilter = ref('')
 const scopeFilter = ref<string | null>(null)
 const page = ref(1)
-const pageSize = ref(15)
+const pageSize = ref(20)
 const total = ref(0)
 const rows = ref<QuerySchemeListItem[]>([])
 const loading = ref(false)

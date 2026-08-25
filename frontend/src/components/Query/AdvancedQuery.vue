@@ -13,10 +13,18 @@
         </q-btn>
       </q-card-section>
 
-      <q-banner v-if="sourceName" dense class="bg-primary-1 text-primary q-mx-md q-mt-sm rounded-borders">
+      <q-banner
+        v-if="sourceName"
+        dense
+        class="bg-primary-1 text-primary q-mx-md q-mt-sm rounded-borders"
+      >
         当前方案：{{ sourceName }}<span v-if="dirty">（已修改）</span>
       </q-banner>
-      <q-banner v-if="readOnlyDepth" dense class="bg-warning text-dark q-mx-md q-mt-sm rounded-borders">
+      <q-banner
+        v-if="readOnlyDepth"
+        dense
+        class="bg-warning text-dark q-mx-md q-mt-sm rounded-borders"
+      >
         当前方案包含第三层条件。本版本会完整保留并展示，但不能编辑或覆盖该结构。
       </q-banner>
 
@@ -70,7 +78,9 @@
                       :is-first="rIndex === 0"
                       :can-remove="expression.rules.length > 1"
                       :show-logic="true"
-                      :binding-labels="bindingLabelsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)"
+                      :binding-labels="
+                        bindingLabelsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)
+                      "
                       :fields="fields"
                       :field-label-key="fieldLabelKey"
                       :field-value-key="fieldValueKey"
@@ -97,11 +107,26 @@
                       :filter-relation-options="filterRelationOptions"
                       :preload-relation-options="preloadRelationOptions"
                       :load-more-relation-options="loadMoreRelationOptions"
-                      @update-field="(value) => updateRuleFieldAt(rule, value, `/expressions/${eIndex}/rules/${rIndex}/value`)"
-                      @update-expression-type="() => updateRuleExpressionTypeAt(rule, `/expressions/${eIndex}/rules/${rIndex}/value`)"
+                      @update-field="
+                        (value) =>
+                          updateRuleFieldAt(
+                            rule,
+                            value,
+                            `/expressions/${eIndex}/rules/${rIndex}/value`,
+                          )
+                      "
+                      @update-expression-type="
+                        () =>
+                          updateRuleExpressionTypeAt(
+                            rule,
+                            `/expressions/${eIndex}/rules/${rIndex}/value`,
+                          )
+                      "
                       @remove="() => removeRule(eIndex, rIndex)"
                       @add="() => addRule(eIndex)"
-                      @clear-bindings="() => clearBindingsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)"
+                      @clear-bindings="
+                        () => clearBindingsForRule(`/expressions/${eIndex}/rules/${rIndex}/value`)
+                      "
                     />
 
                     <!-- 嵌套查询区域 -->
@@ -169,7 +194,11 @@
                                   :is-first="rIndex === 0"
                                   :can-remove="nest.rules.length > 1"
                                   :show-logic="true"
-                                  :binding-labels="bindingLabelsForRule(`/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
+                                  :binding-labels="
+                                    bindingLabelsForRule(
+                                      `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`,
+                                    )
+                                  "
                                   :fields="fields"
                                   :field-label-key="fieldLabelKey"
                                   :field-value-key="fieldValueKey"
@@ -200,11 +229,29 @@
                                   :filter-relation-options="filterRelationOptions"
                                   :preload-relation-options="preloadRelationOptions"
                                   :load-more-relation-options="loadMoreRelationOptions"
-                                  @update-field="(value) => updateRuleFieldAt(rule, value, `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
-                                  @update-expression-type="() => updateRuleExpressionTypeAt(rule, `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
+                                  @update-field="
+                                    (value) =>
+                                      updateRuleFieldAt(
+                                        rule,
+                                        value,
+                                        `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`,
+                                      )
+                                  "
+                                  @update-expression-type="
+                                    () =>
+                                      updateRuleExpressionTypeAt(
+                                        rule,
+                                        `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`,
+                                      )
+                                  "
                                   @remove="() => removeNestRule(eIndex, nIndex, rIndex)"
                                   @add="() => addNestRule(eIndex, nIndex)"
-                                  @clear-bindings="() => clearBindingsForRule(`/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`)"
+                                  @clear-bindings="
+                                    () =>
+                                      clearBindingsForRule(
+                                        `/expressions/${eIndex}/nested/${nIndex}/rules/${rIndex}/value`,
+                                      )
+                                  "
                                 />
                               </q-card-section>
                             </q-card>
@@ -231,12 +278,7 @@
 
       <!-- 固定底部按钮区域 -->
       <q-card-actions align="right" class="advanced-search-footer">
-        <q-btn
-          v-if="isSchemeConditionEditor"
-          flat
-          label="取消"
-          @click="cancelConditionEdit"
-        />
+        <q-btn v-if="isSchemeConditionEditor" flat label="取消" @click="cancelConditionEdit" />
         <q-btn v-else-if="!readOnlyDepth" outline color="secondary" @click="resetFilter">
           <q-icon left size="sm" name="restart_alt" />
           重置
@@ -498,7 +540,7 @@ const updateRuleField = (rule: QueryRule, fieldCode: unknown) => {
   } else {
     delete rule.type
   }
-  rule.expression_type = recommendedExpressionTypeForField(field)
+  delete rule.expression_type
   rule.value = null
   void loadRelationOptionsForField(field)
 }
@@ -582,21 +624,6 @@ const updateRuleExpressionType = (rule: QueryRule) => {
   }
 }
 
-const recommendedExpressionTypeForField = (field?: FieldRecord) => {
-  if (!field) return ExpressionType.EQ
-  if (organizationSelectorConfigForField(field)) return ExpressionType.EQ
-  if (field.dict_code || isBooleanFieldMetadata(field) || parseLinkageConfig(field as TableField)) {
-    return ExpressionType.EQ
-  }
-  if (
-    field.field_type === SysTableFieldType.VARCHAR ||
-    field.field_type === SysTableFieldType.TEXT
-  ) {
-    return ExpressionType.LIKE
-  }
-  return ExpressionType.EQ
-}
-
 const expressionTypesForField = (field?: FieldRecord) => {
   if (!field) return Object.values(ExpressionType).filter((value) => typeof value === 'number')
   if (organizationSelectorConfigForField(field)) return organizationSelectorExpressionTypes
@@ -618,11 +645,12 @@ const normalizeRuleExpressionType = (rule: QueryRule) => {
   }
 
   const availableTypes = expressionTypesForField(field)
-  if (
-    rule.expression_type === undefined ||
-    !availableTypes.includes(rule.expression_type as ExpressionType)
-  ) {
-    rule.expression_type = recommendedExpressionTypeForField(field)
+  if (rule.expression_type === undefined) {
+    rule.value = null
+    return
+  }
+  if (!availableTypes.includes(rule.expression_type as ExpressionType)) {
+    delete rule.expression_type
     rule.value = null
     return
   }
@@ -634,8 +662,10 @@ const normalizeRuleExpressionType = (rule: QueryRule) => {
 
 const normalizeQueryExpressionTypes = () => {
   props.queryModel.expressions.forEach((expression) => {
+    expression.logic ??= ExpressionLogic.AND
     expression.rules.forEach(normalizeRuleExpressionType)
     expression.nested?.forEach((nested) => {
+      nested.logic ??= ExpressionLogic.AND
       nested.rules.forEach(normalizeRuleExpressionType)
     })
   })

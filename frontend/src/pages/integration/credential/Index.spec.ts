@@ -151,7 +151,7 @@ describe('credential management page', () => {
       apiMocks.queryCredentials.mock.invocationCallOrder[0]!,
     )
     expect(apiMocks.queryCredentials).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1, num: 15 }),
+      expect.objectContaining({ page: 1, num: 20 }),
     )
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).not.toContain('secret')

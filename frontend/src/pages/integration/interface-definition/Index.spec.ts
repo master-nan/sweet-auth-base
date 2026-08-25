@@ -183,7 +183,7 @@ describe('interface definition management page', () => {
       apiMocks.queryInterfaceDefinitions.mock.invocationCallOrder[0]!,
     )
     expect(apiMocks.queryInterfaceDefinitions).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1, num: 15 }),
+      expect.objectContaining({ page: 1, num: 20 }),
     )
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).toContain('新增')

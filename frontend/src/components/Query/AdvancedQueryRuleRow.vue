@@ -67,9 +67,13 @@
           options-dense
           emit-value
           map-options
+          option-label="label"
+          option-value="value"
           :options="expressionTypeOptionsForRule(rule)"
           label="操作符"
           class="field-select"
+          :disable="!rule.field"
+          clearable
           :rules="[(val: any) => hasValue(val) || '请选择操作符']"
           hide-bottom-space
           @update:model-value="() => emit('update-expression-type')"
@@ -116,7 +120,9 @@
           :selector-type="requireOrganizationSelectorConfig(rule).selectorType"
           :multiple="isMultiValueRule(rule)"
           :include-history="requireOrganizationSelectorConfig(rule).includeHistory"
-          :disabled="requireOrganizationSelectorConfig(rule).disabled"
+          :disabled="
+            rule.expression_type === undefined || requireOrganizationSelectorConfig(rule).disabled
+          "
           clearable
           label="值"
           class="field-input"
@@ -139,6 +145,7 @@
           emit-value
           map-options
           clearable
+          :disable="rule.expression_type === undefined"
           label="值"
           class="field-input"
           :rules="valueRules(rule)"
@@ -169,6 +176,7 @@
           emit-value
           map-options
           clearable
+          :disable="rule.expression_type === undefined"
           label="值"
           class="field-input"
           :rules="valueRules(rule)"
@@ -237,6 +245,7 @@
           emit-value
           map-options
           clearable
+          :disable="rule.expression_type === undefined"
           label="值"
           class="field-input"
           :rules="valueRules(rule)"
@@ -254,7 +263,10 @@
           :type="isFreeInputMultiValueRule(rule) ? 'text' : inputTypeForRule(rule)"
           label="值"
           class="field-input"
-          :placeholder="valuePlaceholderForRule(rule)"
+          :disable="rule.expression_type === undefined"
+          :placeholder="
+            rule.expression_type === undefined ? '请先选择操作符' : valuePlaceholderForRule(rule)
+          "
           :rules="valueRules(rule)"
           hide-bottom-space
         />

@@ -13,6 +13,7 @@
       :visible-columns="visibleColumns"
       row-key="id"
       :loading="loading"
+      :no-data-label="emptyMessage"
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
@@ -112,9 +113,6 @@
       <template #bottom>
         <q-space />
         <table-pagination v-model:page="query.page" v-model:page-size="query.num" :total="total" />
-      </template>
-      <template #no-data>
-        <div class="full-width row flex-center q-pa-xl text-grey-7">{{ emptyMessage }}</div>
       </template>
     </q-table>
 
@@ -217,7 +215,7 @@ const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [
 const queryState = useTableQueryState<ExternalSystemQuery>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: '', is_asc: false },
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),

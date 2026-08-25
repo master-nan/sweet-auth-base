@@ -415,7 +415,7 @@ const totals = ref<Record<ListTabName, number>>({
 
 const newQuery = (): DataPermissionConfigQuery => ({
   page: 1,
-  num: 15,
+  num: 20,
   order: { field: '', is_asc: false },
   expressions: [{ rules: [{ field: '', value: null }], nested: [] }],
   quick_query: { keyword: '' },

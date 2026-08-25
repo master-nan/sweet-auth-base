@@ -101,7 +101,7 @@ const AdvancedQueryRuleRowStub = defineComponent({
     },
     showLogic: Boolean,
   },
-  emits: ['update:logic'],
+  emits: ['update:logic', 'update-field', 'update-expression-type'],
   setup() {
     return () => h('div', { 'data-testid': 'advanced-query-rule-row' })
   },
@@ -246,9 +246,28 @@ describe('AdvancedQuery organization selector integration', () => {
     const { rule, resolveConfig, expressionOptions } = ruleRowFunctions(wrapper)
 
     expect(resolveConfig(rule)).toBeNull()
-    expect(expressionOptions(rule).map((option) => option.value)).toContain(
-      ExpressionType.LIKE,
-    )
+    expect(expressionOptions(rule).map((option) => option.value)).toContain(ExpressionType.LIKE)
+  })
+
+  it('does not choose an operator when the user selects a field', async () => {
+    const { wrapper } = await mountQuery()
+    const row = wrapper.findComponent({ name: 'AdvancedQueryRuleRow' })
+    const rule = row.props('rule') as QueryRule
+    rule.value = 'previous value'
+
+    row.vm.$emit('update-field', 'remark')
+    await nextTick()
+
+    expect(rule.expression_type).toBeUndefined()
+    expect(rule.value).toBeNull()
+  })
+
+  it('clears an operator that is not allowed by the selected field', async () => {
+    const { wrapper } = await mountQuery(undefined, ExpressionType.BETWEEN)
+    const { rule } = ruleRowFunctions(wrapper)
+
+    expect(rule.expression_type).toBeUndefined()
+    expect(rule.value).toBeNull()
   })
 
   it('uses one advanced editor and always exposes the expression logic', async () => {
@@ -284,7 +303,11 @@ describe('AdvancedQuery organization selector integration', () => {
   })
 
   it('uses cancel and confirm actions when editing scheme conditions', async () => {
-    const { wrapper, query } = await mountQuery(undefined, ExpressionType.EQ, 'scheme-condition-editor')
+    const { wrapper, query } = await mountQuery(
+      undefined,
+      ExpressionType.EQ,
+      'scheme-condition-editor',
+    )
     query.expressions[0]!.rules[0]!.value = 'ready'
 
     expect(wrapper.text()).toContain('取消')

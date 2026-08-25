@@ -13,6 +13,7 @@
       :visible-columns="visibleColumns"
       row-key="id"
       :loading="loading"
+      :no-data-label="emptyMessage"
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
@@ -125,11 +126,6 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
-      <template #no-data
-        ><div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div></template
-      >
     </q-table>
     <sync-task-form-dialog
       v-model="showForm"
@@ -215,7 +211,7 @@ const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [
 const queryState = useTableQueryState<SyncTaskQuery>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: '', is_asc: false },
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),

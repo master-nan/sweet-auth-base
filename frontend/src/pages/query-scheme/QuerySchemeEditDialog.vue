@@ -86,7 +86,7 @@ const scopeError = ref('')
 const loading = ref(false)
 const showQuery = ref(false)
 const bindings = ref<QuerySchemeBinding[]>([])
-const query = ref<Query>({ page: 1, num: 15, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] })
+const query = ref<Query>({ page: 1, num: 20, order: { field: '', is_asc: false }, quick_query: { keyword: '' }, expressions: [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] })
 const conditionDraft = ref<Query>(cloneDeep(query.value))
 const conditionBindingDraft = ref<QuerySchemeBinding[]>([])
 const payload = computed(() => normalizeQuerySchemePayload(query.value, bindings.value))
@@ -116,7 +116,7 @@ const reset = async () => {
   isDefault.value = detail?.is_default ?? props.schemeType === QuerySchemeType.PAGE_DEFAULT
   roleIds.value = [...(detail?.role_ids || [])]
   const source = detail?.query_payload
-  query.value = { page: 1, num: 15, order: source?.order || { field: '', is_asc: false }, quick_query: source?.quick_query || { keyword: '' }, expressions: source?.expressions || [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] }
+  query.value = { page: 1, num: 20, order: source?.order || { field: '', is_asc: false }, quick_query: source?.quick_query || { keyword: '' }, expressions: source?.expressions || [{ logic: ExpressionLogic.AND, rules: [{ field: '', value: null }], nested: [] }] }
   bindings.value = [...(source?.bindings || [])]
   await loadScope()
 }

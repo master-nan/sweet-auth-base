@@ -224,7 +224,7 @@ describe('external system management page', () => {
       apiMocks.queryExternalSystems.mock.invocationCallOrder[0]!,
     )
     expect(apiMocks.queryExternalSystems).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1, num: 15, quick_query: { keyword: '' } }),
+      expect.objectContaining({ page: 1, num: 20, quick_query: { keyword: '' } }),
     )
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.text()).toContain('新增')

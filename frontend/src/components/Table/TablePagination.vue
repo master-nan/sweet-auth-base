@@ -49,7 +49,7 @@ const emit = defineEmits<{
   'update:pageSize': [value: number]
 }>()
 
-const resolvedPageSizeOptions = computed(() => props.pageSizeOptions || [15, 20, 30, 50, 100])
+const resolvedPageSizeOptions = computed(() => props.pageSizeOptions || [20, 30, 50, 100, 200, 500])
 
 const currentPage = ref(props.page)
 const currentPageSize = ref(props.pageSize)

@@ -15,6 +15,7 @@
       row-key="id"
       v-model:pagination="pagination"
       :loading="loading"
+      :no-data-label="emptyMessage"
     >
       <template v-slot:top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
@@ -90,11 +91,6 @@
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
       </template>
-      <template #no-data
-        ><div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div></template
-      >
     </q-table>
 
     <dynamic-form-dialog
@@ -300,7 +296,7 @@ const sortableFields = ref<ReadonlySet<string>>(new Set())
 
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
-  num: 15,
+  num: 20,
   expressions: [
     {
       rules: [{ field: '', value: null }],
@@ -312,7 +308,7 @@ const emptyAdvancedQuery = (): Query => ({
 const queryState = useTableQueryState<Query>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: '', is_asc: false },
     table_code: 'sys_user',
     expressions: emptyAdvancedQuery().expressions,

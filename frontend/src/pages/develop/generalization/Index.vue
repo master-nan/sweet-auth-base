@@ -133,6 +133,7 @@
           <template v-slot:no-data>
             <div class="full-width row flex-center q-pa-lg">
               <div class="column items-center">
+                <q-icon :name="loadError ? 'cloud_off' : 'inbox'" color="grey-5" size="48px" />
                 <div v-if="loadError" class="text-negative q-mb-sm">
                   {{ loadErrorMessage || t('generalization.loadFailed') }}
                 </div>
@@ -147,6 +148,7 @@
 
         <q-scroll-area v-else class="fit generalization-master-scroll">
           <div v-if="loadError" class="generalization-empty-state">
+            <q-icon name="cloud_off" color="grey-5" size="48px" />
             <div class="text-negative q-mb-sm">
               {{ loadErrorMessage || t('generalization.loadFailed') }}
             </div>
@@ -155,6 +157,7 @@
             </q-btn>
           </div>
           <div v-else-if="rows.length === 0" class="generalization-empty-state">
+            <q-icon name="inbox" color="grey-5" size="48px" />
             <div class="text-grey-7 q-mb-sm">{{ t('generalization.noData') }}</div>
             <q-btn outline color="primary" size="sm" :disable="loading" @click="fetchData">
               {{ t('generalization.retry') }}
@@ -345,6 +348,11 @@
           <template v-slot:no-data>
             <div class="full-width row flex-center q-pa-lg">
               <div class="column items-center">
+                <q-icon
+                  :name="detailLoadError ? 'cloud_off' : 'inbox'"
+                  color="grey-5"
+                  size="48px"
+                />
                 <div v-if="detailLoadError" class="text-negative q-mb-sm">
                   {{ detailLoadErrorMessage || t('generalization.loadFailed') }}
                 </div>
@@ -512,6 +520,7 @@
       <template v-slot:no-data>
         <div class="full-width row flex-center q-pa-lg">
           <div class="column items-center">
+            <q-icon :name="loadError ? 'cloud_off' : 'inbox'" color="grey-5" size="48px" />
             <div v-if="loadError" class="text-negative q-mb-sm">
               {{ loadErrorMessage || t('generalization.loadFailed') }}
             </div>
@@ -594,9 +603,9 @@ import Ajv from 'ajv'
 
 import type { Query } from 'src/types/global'
 import {
-	useTableApi,
-	type RuntimeTableMetadata,
-	type Table,
+  useTableApi,
+  type RuntimeTableMetadata,
+  type Table,
   type TableField,
   type TableRelation,
 } from 'src/api/services/sys-table'
@@ -683,7 +692,7 @@ const ajv = new Ajv({ allErrors: true })
 
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
-  num: 15,
+  num: 20,
   expressions: [
     {
       rules: [{ field: '', value: null }],
@@ -694,7 +703,7 @@ const emptyAdvancedQuery = (): Query => ({
 
 const query = ref<Query>({
   page: 1,
-  num: 15,
+  num: 20,
   order: {
     field: '',
     is_asc: false,
@@ -723,7 +732,7 @@ const detailFormReadonly = ref(false)
 const detailEditData = ref<Record<string, any> | null>(null)
 const detailQuery = ref<Query>({
   page: 1,
-  num: 15,
+  num: 20,
   order: {
     field: '',
     is_asc: false,
@@ -902,9 +911,7 @@ const handleBasicSearch = () => {
 }
 
 const handleAdvancedSearch = () => {
-  query.value.expressions = sanitizeQueryExpressions(
-    cloneDeep(tempAdvancedQuery.value.expressions),
-  )
+  query.value.expressions = sanitizeQueryExpressions(cloneDeep(tempAdvancedQuery.value.expressions))
   appliedAdvancedQuery.value = cloneDeep({
     expressions: query.value.expressions,
     page: query.value.page,
@@ -1421,14 +1428,14 @@ const resetPageState = () => {
   showDetailFormDialog.value = false
 
   query.value.page = 1
-  query.value.num = 15
+  query.value.num = 20
   query.value.order = { field: '', is_asc: false }
   query.value.expressions = []
   query.value.quick_query = { keyword: '' }
   query.value.include_deleted = false
 
   detailQuery.value.page = 1
-  detailQuery.value.num = 15
+  detailQuery.value.num = 20
   detailQuery.value.order = { field: '', is_asc: false }
   detailQuery.value.expressions = []
   detailQuery.value.quick_query = { keyword: '' }
@@ -1781,7 +1788,7 @@ const handleFormButtonClick = (button: MenuButton, formData: Record<string, any>
 const fetchTableMeta = async (tableCode: string) => {
   const res = await tableApi.queryRuntimeTableByCode(tableCode)
   if (res.data && res.data.table_fields) {
-		currentTable.value = res.data
+    currentTable.value = res.data
     tableFields.value = res.data.table_fields
     const dictCodes = res.data.table_fields
       .map((field) => field.dict_code)

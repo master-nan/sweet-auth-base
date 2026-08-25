@@ -11,6 +11,7 @@
       :columns="columns"
       :visible-columns="visibleColumns"
       :loading="loading"
+      :no-data-label="emptyMessage"
       v-model:pagination="pagination"
       hide-pagination
     >
@@ -99,12 +100,6 @@
         </q-td>
       </template>
 
-      <template #no-data>
-        <div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div>
-      </template>
-
       <template #bottom>
         <q-space />
         <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
@@ -166,7 +161,10 @@
               </q-td>
             </template>
             <template #no-data>
-              <div class="full-width text-center text-grey-7 q-pa-lg">当前范围暂无任职记录</div>
+              <div class="full-width column flex-center q-gutter-sm q-pa-lg text-grey-7">
+                <q-icon name="inbox" color="grey-5" size="48px" />
+                <span>当前范围暂无任职记录</span>
+              </div>
             </template>
           </q-table>
         </template>

@@ -6,9 +6,7 @@
       :subtitle="batchDetail ? dictLabel('org_sync_type', batchDetail.sync_type) : ''"
       :sections="detailSections"
       icon="sync"
-      :status-label="
-        batchDetail ? dictLabel('org_sync_record_status', batchDetail.status) : ''
-      "
+      :status-label="batchDetail ? dictLabel('org_sync_record_status', batchDetail.status) : ''"
       :status-color="batchDetail ? organizationStatusColor(batchDetail.status) : 'positive'"
       :loading="loading"
       :error="loadError"
@@ -43,8 +41,14 @@
             </q-td>
           </template>
           <template #no-data>
-            <div class="full-width text-center text-grey-7 q-pa-lg">
-              {{ recordsLoadError || (canQueryRecords ? '暂无对象处理记录' : '无业务同步记录查看权限') }}
+            <div class="full-width column flex-center q-gutter-sm q-pa-lg text-grey-7">
+              <q-icon :name="recordsLoadError ? 'cloud_off' : 'inbox'" color="grey-5" size="48px" />
+              <span>
+                {{
+                  recordsLoadError ||
+                  (canQueryRecords ? '暂无对象处理记录' : '无业务同步记录查看权限')
+                }}
+              </span>
             </div>
           </template>
         </q-table>
@@ -102,9 +106,8 @@ const emit = defineEmits<{
 }>()
 
 const dictStore = useDictStore()
-const { record_detail_top_buttons, record_detail_bottom_buttons, hasGrantedCapability } = usePageButtons(
-  'organization_sync_batch',
-)
+const { record_detail_top_buttons, record_detail_bottom_buttons, hasGrantedCapability } =
+  usePageButtons('organization_sync_batch')
 
 const loading = ref(false)
 const loadError = ref('')
@@ -118,9 +121,7 @@ const errorSummary = ref('')
 const canQueryRecords = computed(() => hasGrantedCapability('organization_sync_error_query'))
 
 const title = computed(() =>
-  batchDetail.value
-    ? `同步批次详情：${batchDetail.value.batch_no}`
-    : '同步批次详情',
+  batchDetail.value ? `同步批次详情：${batchDetail.value.batch_no}` : '同步批次详情',
 )
 
 const errorItems = computed<OrganizationDetailItem[]>(() => [
@@ -187,19 +188,15 @@ const loadDetail = async () => {
   batchDetail.value = null
   batchRecords.value = []
   try {
-    await dictStore.loadDicts([
-      'org_sync_type',
-      'org_sync_action',
-      'org_sync_record_status',
-    ])
+    await dictStore.loadDicts(['org_sync_type', 'org_sync_action', 'org_sync_record_status'])
     batchDetail.value = await getSyncBatchDetail(props.recordId)
     if (canQueryRecords.value) {
       try {
         const records = await querySyncRecords({
-        ...createOrganizationQuery('org_sync_record'),
-        batch_id: props.recordId,
-        order: { field: 'gmt_create', is_asc: true },
-        num: 100,
+          ...createOrganizationQuery('org_sync_record'),
+          batch_id: props.recordId,
+          order: { field: 'gmt_create', is_asc: true },
+          num: 100,
         })
         batchRecords.value = records.items
       } catch {
@@ -239,9 +236,5 @@ watch(
   { immediate: true },
 )
 
-watch(
-  title,
-  (value) => emit('title-change', value),
-  { immediate: true },
-)
+watch(title, (value) => emit('title-change', value), { immediate: true })
 </script>

@@ -11,6 +11,7 @@
       :columns="columns"
       :visible-columns="visibleColumns"
       :loading="loading"
+      :no-data-label="emptyMessage"
       v-model:pagination="pagination"
       hide-pagination
     >
@@ -94,11 +95,6 @@
             <q-tooltip>{{ button.name }}</q-tooltip>
           </q-btn>
         </q-td>
-      </template>
-      <template #no-data>
-        <div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div>
       </template>
       <template #bottom>
         <q-space />

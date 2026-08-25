@@ -11,6 +11,7 @@
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :no-data-label="emptyMessage"
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
@@ -76,11 +77,6 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
-      <template #no-data
-        ><div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div></template
-      >
     </q-table>
     <q-dialog v-model="showDetail"
       ><q-card style="min-width: min(720px, 92vw)"
@@ -198,7 +194,7 @@ const routeExecutionNo =
 const queryState = useTableQueryState<IntegrationLogQuery>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: 'started_at', is_asc: false },
     quick_query: { keyword: routeExecutionNo },
     expressions: hasRouteExecutionContext

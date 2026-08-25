@@ -175,6 +175,9 @@
             flat
             :dark="$q.dark.isActive"
             :loading="itemsLoading"
+            :no-data-label="
+              !currentDict ? '请先选择左侧字典' : itemsLoading ? '加载中...' : '暂无字典项'
+            "
             :pagination="{ rowsPerPage: 0 }"
             hide-pagination
             virtual-scroll
@@ -198,11 +201,6 @@
               </q-td>
             </template>
 
-            <template v-slot:no-data>
-              <div class="full-width text-center q-py-md">
-                {{ !currentDict ? '请先选择左侧字典' : itemsLoading ? '加载中...' : '暂无字典项' }}
-              </div>
-            </template>
           </q-table>
         </template>
       </master-detail-page>
@@ -389,7 +387,7 @@ const dictItemFields = computed(() =>
 // 默认空查询
 const emptyAdvancedQuery = (): Query => ({
   page: 1,
-  num: 15,
+  num: 20,
   expressions: [
     {
       rules: [{ field: '', value: null }],
@@ -402,7 +400,7 @@ const emptyAdvancedQuery = (): Query => ({
 const queryState = useTableQueryState<Query>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: '', is_asc: false },
     table_code: 'sys_dict',
     expressions: emptyAdvancedQuery().expressions,

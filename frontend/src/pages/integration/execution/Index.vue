@@ -44,6 +44,7 @@
       :rows="rows"
       :columns="columns"
       :loading="loading"
+      :no-data-label="emptyMessage"
     >
       <template #top>
         <standard-table-toolbar :refreshing="loading" @refresh="refresh">
@@ -158,11 +159,6 @@
           v-model:page-size="query.num"
           :total="total"
       /></template>
-      <template #no-data
-        ><div class="full-width row flex-center q-pa-xl text-grey-7">
-          {{ emptyMessage }}
-        </div></template
-      >
     </q-table>
   </base-content>
 </template>
@@ -214,7 +210,7 @@ const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [
 const queryState = useTableQueryState<IntegrationExecutionQuery>({
   createInitialQuery: () => ({
     page: 1,
-    num: 15,
+    num: 20,
     order: { field: 'gmt_create', is_asc: false },
     quick_query: { keyword: '' },
     expressions: emptyExpressions(),

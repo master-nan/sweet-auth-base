@@ -16,7 +16,7 @@ const store = reactive({
 })
 
 vi.mock('quasar', () => ({
-  useQuasar: () => ({ notify }),
+  useQuasar: () => ({ notify, screen: { lt: { md: false } } }),
   date: { formatDate: (value: string) => value },
 }))
 vi.mock('vue-router', () => ({ useRouter: () => router }))
@@ -81,16 +81,28 @@ const SlotStub = (name: string, tag = 'div') =>
     },
   })
 
-const QItemStub = defineComponent({
-  name: 'QItem',
-  emits: ['click'],
-  setup(_, { slots, emit }) {
+const QTableStub = defineComponent({
+  name: 'QTable',
+  props: {
+    rows: { type: Array, default: () => [] },
+  },
+  setup(props, { slots }) {
     return () =>
-      h(
-        'button',
-        { 'data-notification-row': true, onClick: () => emit('click') },
-        slots.default?.(),
-      )
+      h('section', {}, [
+        slots.top?.(),
+        ...props.rows.map((row) => slots.body?.({ row })),
+        ...(props.rows.length === 0 ? [slots['no-data']?.()] : []),
+        slots.bottom?.(),
+      ])
+  },
+})
+
+const QTrStub = defineComponent({
+  name: 'QTr',
+  props: ['props'],
+  emits: ['click'],
+  setup(_, { attrs, slots, emit }) {
+    return () => h('button', { ...attrs, onClick: () => emit('click') }, slots.default?.())
   },
 })
 
@@ -108,12 +120,13 @@ const stubs = {
         )
     },
   }),
-  QBtnToggle: defineComponent({
-    name: 'QBtnToggle',
+  QTabs: defineComponent({
+    name: 'QTabs',
     props: ['modelValue'],
     emits: ['update:modelValue'],
-    template: '<div data-read-status />',
+    template: '<div data-read-status><slot /></div>',
   }),
+  QTab: SlotStub('QTab'),
   QInput: defineComponent({
     name: 'QInput',
     props: ['modelValue'],
@@ -128,11 +141,10 @@ const stubs = {
     emits: ['update:modelValue'],
     template: '<div data-category />',
   }),
-  QItem: QItemStub,
-  QList: SlotStub('QList'),
-  QItemSection: SlotStub('QItemSection'),
-  QItemLabel: SlotStub('QItemLabel'),
-  QAvatar: SlotStub('QAvatar'),
+  QTable: QTableStub,
+  QTr: QTrStub,
+  QTd: SlotStub('QTd'),
+  QSpace: SlotStub('QSpace'),
   QIcon: SlotStub('QIcon'),
   QTooltip: SlotStub('QTooltip'),
   QSeparator: SlotStub('QSeparator'),
@@ -177,20 +189,20 @@ describe('NotificationCenterPage', () => {
     await flushPromises()
     expect(api.query).toHaveBeenLastCalledWith({
       page: 1,
-      num: 15,
+      num: 20,
       keyword: '',
       read_status: 'ALL',
     })
     expect(wrapper.text()).toContain('一条很长但不会破坏列表布局')
 
     wrapper.findComponent({ name: 'QInput' }).vm.$emit('update:modelValue', '  学习任务  ')
-    wrapper.findComponent({ name: 'QBtnToggle' }).vm.$emit('update:modelValue', 'UNREAD')
+    wrapper.findComponent({ name: 'QTabs' }).vm.$emit('update:modelValue', 'UNREAD')
     wrapper.findComponent({ name: 'QSelect' }).vm.$emit('update:modelValue', 'REMINDER')
     await wrapper.find('[data-label="查询"]').trigger('click')
     await flushPromises()
     expect(api.query).toHaveBeenLastCalledWith({
       page: 1,
-      num: 15,
+      num: 20,
       keyword: '学习任务',
       read_status: 'UNREAD',
       category: 'REMINDER',
@@ -198,7 +210,7 @@ describe('NotificationCenterPage', () => {
 
     wrapper.findComponent({ name: 'TablePagination' }).vm.$emit('update:page', 2)
     await flushPromises()
-    expect(api.query).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, num: 15 }))
+    expect(api.query).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, num: 20 }))
   })
 
   it('marks one notification and all notifications through the owner store', async () => {

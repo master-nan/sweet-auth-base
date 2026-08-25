@@ -205,7 +205,7 @@ const { loading } = storeToRefs(loadingStore)
 
 const query = ref<Query>({
   page: 1,
-  num: 15,
+  num: 20,
   order: { field: 'gmt_modify', is_asc: false },
   expressions: [],
   quick_query: { keyword: '' },
