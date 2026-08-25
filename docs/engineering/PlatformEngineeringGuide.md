@@ -864,11 +864,12 @@ action_path = 该页面下的受控内部跳转信息
 约束如下：
 
 1. `ActionPath` 非空时必须以 `/admin/` 开头，最大 512 字符；拒绝 scheme、host、`//`、反斜线、控制字符、query 和 fragment。
-2. 有 Action 时 `ActionMenuName` 必须是发送时已存在的活动菜单；Hidden Detail Route 使用其业务归属页面的菜单 name。`ActionPath` 可为空，表示只有消息内容而无跳转。
-3. Recent/List 返回 Action 时批量计算 `allowed`，不逐条查询菜单。
-4. 消息内容始终可查看；`allowed=false` 时前端明确提示“暂无目标页面访问权限”，不得导航。
-5. `allowed=true` 只是用户体验预检，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
-6. V1 不接受外部 URL。未来外链需求必须新增受控 Action 类型，不能放宽本字段。
+2. 有 Action 时 `ActionMenuName` 与 `ActionPath` 必须同时非空。服务端按活动菜单的父子树拼出正式 `/admin/...` 路径，`ActionPath` 必须与该路径一致；菜单路径自身的动态参数可以替换为具体值。
+3. 没有持久化菜单身份的静态 Hidden Detail Route 不自动继承父页面权限，也不接受仅凭路径前缀推断归属；消息应跳转到正式业务页面。已有独立活动菜单记录的隐藏页面使用自己的菜单 name 和正式路径。
+4. Recent/List 返回 Action 时批量计算 `allowed`，不逐条查询菜单；读取历史异常数据时，菜单与路径不匹配则 `allowed=false` 且不返回 Path。
+5. 消息内容始终可查看；`allowed=false` 时前端明确提示“暂无目标页面访问权限”，不得导航。
+6. `allowed=true` 只是用户体验预检，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
+7. V1 不接受外部 URL。未来外链需求必须新增受控 Action 类型，不能放宽本字段。
 
 V1 不保存 `action_label`。Popover 通过点击整行执行 Action，详情 Dialog 使用固定“前往相关页面”文案，避免业务模块产生不一致按钮语言。
 
@@ -910,9 +911,9 @@ type NotificationCommand struct {
 
 1. 读取唯一约束对应的既有消息；
 2. 比较 Category、Level、Title、Content、Source 和 Action 等不可变事实；
-3. 事实不一致时返回 Dedup Conflict，禁止静默覆盖；
-4. 事实一致时复用原消息，仅以 `ON CONFLICT DO NOTHING` 补齐缺少的 Recipient；
-5. 返回 `deduplicated`、`created_recipient_count` 和 `existing_recipient_count`，不重复投递已有用户。
+3. 在短事务内读取既有 Recipient 用户集合，并与规范化后的命令收件人集合精确比较；
+4. 消息事实或 Recipient 集合不一致时返回 Dedup Conflict，禁止覆盖、补齐、扩大或缩小首次投递范围；
+5. 两者完全一致时复用原消息，返回 `deduplicated=true`、`created_recipient_count=0` 和完整 `existing_recipient_count`。
 
 主消息与 Recipient 写入必须在一个 `RunInTransaction` 短事务内完成。有效用户批量校验、主消息写入、Dedup 冲突处理和 Recipient 批量写入均使用同一 `context.Context`；不在事务中执行外部 IO。
 

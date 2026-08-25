@@ -66,7 +66,7 @@ func NewNotificationService(
 }
 
 // Send 在一个短事务中创建不可变消息事实及全部收件人。
-// dedup_key 重复时复用既有消息，只补齐缺少的收件人。
+// dedup_key 重复时，消息事实和收件人集合都必须与首次发送完全一致。
 func (service *NotificationService) Send(
 	ctx context.Context,
 	command NotificationCommand,
@@ -98,7 +98,7 @@ func (service *NotificationService) Send(
 			return err
 		}
 		recipients := notificationRecipients(value.Id, normalized.Recipients)
-		created, err := service.repository.CreateRecipients(tx, recipients, false)
+		created, err := service.repository.CreateRecipients(tx, recipients)
 		if err != nil {
 			return err
 		}
@@ -136,30 +136,14 @@ func (service *NotificationService) sendDeduplicated(
 	}
 	result := NotificationSendResult{NotificationId: existing.Id, Deduplicated: true}
 	err := RunInTransaction(ctx, service.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
-		if err := service.validateReferences(tx, command); err != nil {
-			return err
-		}
 		currentIds, err := service.repository.RecipientUserIDs(tx, existing.Id)
 		if err != nil {
 			return err
 		}
-		current := make(map[int]struct{}, len(currentIds))
-		for _, userId := range currentIds {
-			current[userId] = struct{}{}
+		if !equalIntSets(currentIds, command.Recipients) {
+			return myerrors.ErrNotificationDedupConflict
 		}
-		missing := make([]int, 0, len(command.Recipients))
-		for _, userId := range command.Recipients {
-			if _, exists := current[userId]; exists {
-				result.ExistingRecipientCount++
-			} else {
-				missing = append(missing, userId)
-			}
-		}
-		created, err := service.repository.CreateRecipients(tx, notificationRecipients(existing.Id, missing), true)
-		if err != nil {
-			return err
-		}
-		result.CreatedRecipientCount = int(created)
+		result.ExistingRecipientCount = len(command.Recipients)
 		return service.writeSendAudit(ctx, tx, existing, len(command.Recipients), true)
 	})
 	if err != nil {
@@ -311,6 +295,10 @@ func (service *NotificationService) summaries(
 	if err != nil {
 		return nil, myerrors.WrapDatabaseError(err)
 	}
+	menuPaths, err := service.repository.ActiveMenuRoutePaths(service.repository.DBWithContext(ctx), menuNames)
+	if err != nil {
+		return nil, myerrors.WrapDatabaseError(err)
+	}
 	result := make([]response.NotificationSummaryRes, 0, len(values))
 	for _, value := range values {
 		item := response.NotificationSummaryRes{
@@ -319,7 +307,8 @@ func (service *NotificationService) summaries(
 			Read: value.ReadAt != nil, ReadAt: value.ReadAt, CreatedAt: value.CreatedAt,
 		}
 		if value.ActionMenuName != "" {
-			allowed := accessible[value.ActionMenuName]
+			allowed := accessible[value.ActionMenuName] &&
+				notificationActionMatchesMenuPath(menuPaths[value.ActionMenuName], value.ActionPath)
 			item.Action = &response.NotificationActionRes{Available: allowed}
 			if allowed {
 				item.Action.Path = value.ActionPath
@@ -341,11 +330,11 @@ func (service *NotificationService) validateReferences(db *gorm.DB, command Noti
 	if command.ActionMenuName == "" {
 		return nil
 	}
-	exists, err := service.repository.ActiveMenuExists(db, command.ActionMenuName)
+	menuPaths, err := service.repository.ActiveMenuRoutePaths(db, []string{command.ActionMenuName})
 	if err != nil {
 		return err
 	}
-	if !exists {
+	if !notificationActionMatchesMenuPath(menuPaths[command.ActionMenuName], command.ActionPath) {
 		return myerrors.ErrNotificationInvalidAction
 	}
 	return nil
@@ -430,11 +419,8 @@ func validateNotificationAction(menuName, actionPath string) error {
 	if menuName == "" && actionPath == "" {
 		return nil
 	}
-	if menuName == "" || !validRuneLength(actionPath, 0, 512) {
+	if menuName == "" || actionPath == "" || !validRuneLength(actionPath, 1, 512) {
 		return myerrors.ErrNotificationInvalidAction
-	}
-	if actionPath == "" {
-		return nil
 	}
 	if !strings.HasPrefix(actionPath, "/admin/") || strings.HasPrefix(actionPath, "//") ||
 		strings.ContainsAny(actionPath, "?#\\") || path.Clean(actionPath) != actionPath {
@@ -446,6 +432,29 @@ func validateNotificationAction(menuName, actionPath string) error {
 		}
 	}
 	return nil
+}
+
+func notificationActionMatchesMenuPath(menuPath, actionPath string) bool {
+	if menuPath == "" || actionPath == "" {
+		return false
+	}
+	menuSegments := strings.Split(strings.Trim(menuPath, "/"), "/")
+	actionSegments := strings.Split(strings.Trim(actionPath, "/"), "/")
+	if len(menuSegments) != len(actionSegments) {
+		return false
+	}
+	for index, menuSegment := range menuSegments {
+		if strings.HasPrefix(menuSegment, ":") {
+			if actionSegments[index] == "" {
+				return false
+			}
+			continue
+		}
+		if menuSegment != actionSegments[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func validRuneLength(value string, min, max int) bool {
@@ -470,6 +479,20 @@ func sortedUniquePositiveInts(values []int) []int {
 	}
 	sort.Ints(result)
 	return result
+}
+
+func equalIntSets(left, right []int) bool {
+	left = sortedUniquePositiveInts(left)
+	right = sortedUniquePositiveInts(right)
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func notificationFromCommand(id int, command NotificationCommand) model.Notification {

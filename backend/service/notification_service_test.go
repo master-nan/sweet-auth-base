@@ -35,7 +35,7 @@ func TestNotificationServiceSendDedupIsolationAndRead(t *testing.T) {
 	ctxA := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(101, "user-a"))
 	ctxB := audit.WithAuditSubject(context.Background(), audit.NewAuditSubject(102, "user-b"))
 	command := NotificationCommand{
-		Recipients: []int{101, 101}, Category: model.NotificationCategoryReminder,
+		Recipients: []int{101, 102, 101}, Category: model.NotificationCategoryReminder,
 		Level: model.NotificationLevelInfo, Title: "学习计划已发布", Content: "请按时完成学习任务。",
 		SourceModule: "learning", SourceType: "learning_plan", SourceId: "9001",
 		DedupKey: "learning-plan-9001-published",
@@ -45,17 +45,32 @@ func TestNotificationServiceSendDedupIsolationAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("send notification: %v", err)
 	}
-	if first.Deduplicated || first.CreatedRecipientCount != 1 {
+	if first.Deduplicated || first.CreatedRecipientCount != 2 {
 		t.Fatalf("unexpected first send result: %+v", first)
 	}
-	command.Recipients = []int{101, 102}
+	command.Recipients = []int{102, 101, 102}
 	second, err := service.Send(ctxA, command)
 	if err != nil {
 		t.Fatalf("deduplicated send: %v", err)
 	}
 	if !second.Deduplicated || second.NotificationId != first.NotificationId ||
-		second.CreatedRecipientCount != 1 || second.ExistingRecipientCount != 1 {
+		second.CreatedRecipientCount != 0 || second.ExistingRecipientCount != 2 {
 		t.Fatalf("unexpected deduplicated result: %+v", second)
+	}
+	moreRecipients := command
+	moreRecipients.Recipients = []int{101, 102, 103}
+	if _, err := service.Send(ctxA, moreRecipients); !errors.Is(err, myerrors.ErrNotificationDedupConflict) {
+		t.Fatalf("expanded recipient set error=%v", err)
+	}
+	fewerRecipients := command
+	fewerRecipients.Recipients = []int{101}
+	if _, err := service.Send(ctxA, fewerRecipients); !errors.Is(err, myerrors.ErrNotificationDedupConflict) {
+		t.Fatalf("reduced recipient set error=%v", err)
+	}
+	changedContent := command
+	changedContent.Content = "已变更的学习任务内容。"
+	if _, err := service.Send(ctxA, changedContent); !errors.Is(err, myerrors.ErrNotificationDedupConflict) {
+		t.Fatalf("changed notification content error=%v", err)
 	}
 	var notificationCount int64
 	var recipientCount int64
@@ -105,16 +120,21 @@ func TestNotificationServiceSendDedupIsolationAndRead(t *testing.T) {
 	if err != nil || unreadC.UnreadCount != 0 {
 		t.Fatalf("cross-user unread=%+v err=%v", unreadC, err)
 	}
-	if len(writer.records) != 2 || writer.records[0].Changes["recipient_count"].NewValue != 1 {
+	if len(writer.records) != 2 || writer.records[0].Changes["recipient_count"].NewValue != 2 ||
+		writer.records[1].Changes["deduplicated"].NewValue != true {
 		t.Fatalf("unexpected safe audit records: %+v", writer.records)
 	}
 }
 
 func TestNotificationServiceActionAvailabilityAndDTO(t *testing.T) {
 	service, db, _ := newNotificationTestSubject(t)
-	menu := model.SysMenu{Basic: model.Basic{Id: 201, State: true}, Name: "integration_execution", Path: "/admin/integration/execution"}
+	rootMenu := model.SysMenu{Basic: model.Basic{Id: 200, State: true}, Name: "integration", Path: "integration"}
+	menu := model.SysMenu{Basic: model.Basic{Id: 201, State: true}, Pid: rootMenu.Id, Name: "integration_execution", Path: "execution"}
+	otherMenu := model.SysMenu{Basic: model.Basic{Id: 202, State: true}, Pid: rootMenu.Id, Name: "integration_credential", Path: "credential"}
 	role := model.SysRole{Basic: model.Basic{Id: 301, State: true}, Name: "notification-reader"}
+	testutil.MustCreate(t, db, &rootMenu)
 	testutil.MustCreate(t, db, &menu)
+	testutil.MustCreate(t, db, &otherMenu)
 	testutil.MustCreate(t, db, &role)
 	testutil.MustCreate(t, db, &model.SysRoleMenu{RoleId: role.Id, MenuId: menu.Id})
 	testutil.MustCreate(t, db, &model.SysUserRole{UserId: 101, RoleId: role.Id})
@@ -122,7 +142,7 @@ func TestNotificationServiceActionAvailabilityAndDTO(t *testing.T) {
 		Recipients: []int{101, 102}, Category: model.NotificationCategoryIntegration,
 		Level: model.NotificationLevelWarning, Title: "同步执行失败", Content: "<script>alert('xss')</script>\n请检查执行日志。",
 		SourceModule: "integration", SourceType: "execution", SourceId: "7001",
-		ActionMenuName: menu.Name, ActionPath: "/admin/integration/execution/7001",
+		ActionMenuName: menu.Name, ActionPath: "/admin/integration/execution",
 		DedupKey: "exam-7001-result",
 	}
 	result, err := service.Send(context.Background(), command)
@@ -142,6 +162,39 @@ func TestNotificationServiceActionAvailabilityAndDTO(t *testing.T) {
 	if detailA.Content != command.Content || !strings.Contains(detailA.Content, "<script>") {
 		t.Fatalf("content must remain plain DTO text: %q", detailA.Content)
 	}
+
+	invalidCases := []struct {
+		name     string
+		menuName string
+		path     string
+	}{
+		{name: "missing menu", menuName: "missing_menu", path: "/admin/integration/execution"},
+		{name: "another menu path", menuName: menu.Name, path: "/admin/integration/credential"},
+		{name: "unbound hidden detail", menuName: menu.Name, path: "/admin/detail/integration/execution/7001"},
+	}
+	for _, testCase := range invalidCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			invalid := command
+			invalid.ActionMenuName = testCase.menuName
+			invalid.ActionPath = testCase.path
+			invalid.DedupKey = ""
+			if _, err := service.Send(context.Background(), invalid); !errors.Is(err, myerrors.ErrNotificationInvalidAction) {
+				t.Fatalf("invalid action error=%v", err)
+			}
+		})
+	}
+
+	invalidStored := model.Notification{
+		Id: 9901, Category: model.NotificationCategoryIntegration, Level: model.NotificationLevelWarning,
+		Title: "异常历史跳转", Content: "内容仍然可见。", SourceModule: "integration", SourceType: "execution",
+		ActionMenuName: menu.Name, ActionPath: "/admin/integration/credential",
+	}
+	testutil.MustCreate(t, db, &invalidStored)
+	testutil.MustCreate(t, db, &model.NotificationRecipient{NotificationId: invalidStored.Id, UserId: 101})
+	storedDetail, err := service.Detail(ctxA, invalidStored.Id)
+	if err != nil || storedDetail.Action == nil || storedDetail.Action.Available || storedDetail.Action.Path != "" {
+		t.Fatalf("invalid stored action was exposed: detail=%+v err=%v", storedDetail, err)
+	}
 }
 
 func TestNotificationServiceValidationAndExamContract(t *testing.T) {
@@ -158,6 +211,20 @@ func TestNotificationServiceValidationAndExamContract(t *testing.T) {
 	invalidAction.ActionPath = "https://example.com/exam"
 	if _, err := normalizeNotificationCommand(invalidAction); !errors.Is(err, myerrors.ErrNotificationInvalidAction) {
 		t.Fatalf("external action error=%v", err)
+	}
+	for _, invalidPath := range []string{
+		"/admin/exam/exams/456?source=notification",
+		"/admin/exam/exams/456#detail",
+	} {
+		invalidAction.ActionPath = invalidPath
+		if _, err := normalizeNotificationCommand(invalidAction); !errors.Is(err, myerrors.ErrNotificationInvalidAction) {
+			t.Fatalf("query or fragment action %q error=%v", invalidPath, err)
+		}
+	}
+	missingPath := valid
+	missingPath.ActionPath = ""
+	if _, err := normalizeNotificationCommand(missingPath); !errors.Is(err, myerrors.ErrNotificationInvalidAction) {
+		t.Fatalf("menu without action path error=%v", err)
 	}
 	tooMany := valid
 	tooMany.Recipients = make([]int, notificationRecipientLimit+1)

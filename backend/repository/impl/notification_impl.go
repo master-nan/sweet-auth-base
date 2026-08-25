@@ -5,10 +5,10 @@ import (
 	"backend/model"
 	"backend/repository"
 	"context"
+	"path"
 	"strings"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type NotificationRepositoryImpl struct {
@@ -30,16 +30,11 @@ func (repositoryImpl *NotificationRepositoryImpl) CreateNotification(db *gorm.DB
 func (repositoryImpl *NotificationRepositoryImpl) CreateRecipients(
 	db *gorm.DB,
 	values []model.NotificationRecipient,
-	ignoreConflicts bool,
 ) (int64, error) {
 	if len(values) == 0 {
 		return 0, nil
 	}
-	query := db
-	if ignoreConflicts {
-		query = query.Clauses(clause.OnConflict{DoNothing: true})
-	}
-	result := query.CreateInBatches(&values, 500)
+	result := db.CreateInBatches(&values, 500)
 	return result.RowsAffected, result.Error
 }
 
@@ -71,12 +66,88 @@ func (repositoryImpl *NotificationRepositoryImpl) CountActiveUsers(db *gorm.DB, 
 	return count, err
 }
 
-func (repositoryImpl *NotificationRepositoryImpl) ActiveMenuExists(db *gorm.DB, name string) (bool, error) {
-	var count int64
-	err := db.Model(&model.SysMenu{}).
-		Where("name = ? AND state = TRUE AND gmt_delete IS NULL", name).
-		Count(&count).Error
-	return count > 0, err
+type notificationMenuRouteRow struct {
+	Id   int
+	Pid  int
+	Name string
+	Path string
+}
+
+func (repositoryImpl *NotificationRepositoryImpl) ActiveMenuRoutePaths(
+	db *gorm.DB,
+	names []string,
+) (map[string]string, error) {
+	result := make(map[string]string, len(names))
+	if len(names) == 0 {
+		return result, nil
+	}
+	var menus []notificationMenuRouteRow
+	if err := db.Model(&model.SysMenu{}).
+		Select("id", "pid", "name", "path").
+		Where("state = TRUE AND gmt_delete IS NULL").
+		Scan(&menus).Error; err != nil {
+		return nil, err
+	}
+	byId := make(map[int]notificationMenuRouteRow, len(menus))
+	byName := make(map[string]notificationMenuRouteRow, len(menus))
+	duplicateNames := make(map[string]bool)
+	for _, menu := range menus {
+		byId[menu.Id] = menu
+		if _, exists := byName[menu.Name]; exists {
+			duplicateNames[menu.Name] = true
+		}
+		byName[menu.Name] = menu
+	}
+	for _, name := range names {
+		menu, exists := byName[name]
+		if !exists || duplicateNames[name] {
+			continue
+		}
+		if routePath, ok := notificationMenuRoutePath(menu, byId); ok {
+			result[name] = routePath
+		}
+	}
+	return result, nil
+}
+
+func notificationMenuRoutePath(
+	menu notificationMenuRouteRow,
+	byId map[int]notificationMenuRouteRow,
+) (string, bool) {
+	chain := make([]notificationMenuRouteRow, 0, 4)
+	visited := make(map[int]struct{}, 4)
+	for {
+		if _, exists := visited[menu.Id]; exists {
+			return "", false
+		}
+		visited[menu.Id] = struct{}{}
+		chain = append(chain, menu)
+		if menu.Pid == 0 {
+			break
+		}
+		parent, exists := byId[menu.Pid]
+		if !exists {
+			return "", false
+		}
+		menu = parent
+	}
+	routePath := "/admin"
+	for index := len(chain) - 1; index >= 0; index-- {
+		segment := strings.TrimSpace(chain[index].Path)
+		if segment == "" {
+			return "", false
+		}
+		if strings.HasPrefix(segment, "/") {
+			routePath = segment
+		} else {
+			routePath = strings.TrimRight(routePath, "/") + "/" + strings.Trim(segment, "/")
+		}
+	}
+	cleaned := path.Clean(routePath)
+	if cleaned != routePath || !strings.HasPrefix(cleaned, "/admin/") {
+		return "", false
+	}
+	return cleaned, true
 }
 
 func (repositoryImpl *NotificationRepositoryImpl) UnreadCount(ctx context.Context, userId int) (int64, error) {

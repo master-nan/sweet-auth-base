@@ -18,6 +18,6 @@ var (
 	ErrNotificationInvalidAction     = newApplicationError(KindInvalidArgument, CategoryBusiness, ErrorCodeNotificationInvalidAction, "通知跳转目标不合法")
 	ErrNotificationNotVisible        = newApplicationError(KindNotFound, CategoryBusiness, ErrorCodeNotificationNotVisible, "通知不存在")
 	ErrNotificationPayloadTooLarge   = newApplicationError(KindPayloadTooLarge, CategoryBusiness, ErrorCodeNotificationPayloadTooLarge, "通知内容过大")
-	ErrNotificationDedupConflict     = newApplicationError(KindConflict, CategoryBusiness, ErrorCodeNotificationDedupConflict, "通知幂等身份与既有消息事实冲突")
+	ErrNotificationDedupConflict     = newApplicationError(KindConflict, CategoryBusiness, ErrorCodeNotificationDedupConflict, "通知幂等身份与既有消息事实或收件人集合冲突")
 	ErrNotificationRecipientLimit    = newApplicationError(KindInvalidArgument, CategoryBusiness, ErrorCodeNotificationRecipientLimit, "通知收件人数超出允许范围")
 )

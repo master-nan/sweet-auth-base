@@ -39,11 +39,11 @@ type NotificationPage struct {
 type NotificationRepository interface {
 	DBWithContext(context.Context) *gorm.DB
 	CreateNotification(*gorm.DB, *model.Notification) error
-	CreateRecipients(*gorm.DB, []model.NotificationRecipient, bool) (int64, error)
+	CreateRecipients(*gorm.DB, []model.NotificationRecipient) (int64, error)
 	FindByDedup(context.Context, string, string) (model.Notification, error)
 	RecipientUserIDs(*gorm.DB, int) ([]int, error)
 	CountActiveUsers(*gorm.DB, []int) (int64, error)
-	ActiveMenuExists(*gorm.DB, string) (bool, error)
+	ActiveMenuRoutePaths(*gorm.DB, []string) (map[string]string, error)
 	UnreadCount(context.Context, int) (int64, error)
 	Recent(context.Context, int, int) ([]NotificationRecord, error)
 	Query(context.Context, NotificationListFilter) (NotificationPage, error)
