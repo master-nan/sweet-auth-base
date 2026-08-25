@@ -45,19 +45,7 @@
           </template>
 
           <template #column-selector>
-            <q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              emit-value
-              map-options
-              :options="columns"
-              option-value="name"
-              options-cover
-            />
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
           </template>
         </standard-table-toolbar>
       </template>
@@ -109,6 +97,7 @@ import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
@@ -121,7 +110,6 @@ import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { hasEffectiveQueryRules } from 'src/utils/query-state'
 import { metadataDictDefault } from 'src/utils/field-metadata'
-import { compactSelectionDisplay } from 'src/utils/select-display'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'

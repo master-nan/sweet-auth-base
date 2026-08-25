@@ -41,19 +41,7 @@
             </query-scheme-controls>
           </template>
           <template #column-selector>
-            <q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              emit-value
-              map-options
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              :options="columns"
-              option-value="name"
-              options-cover
-            />
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
           </template>
         </standard-table-toolbar>
       </template>
@@ -129,6 +117,7 @@ import { useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import {
@@ -158,7 +147,6 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import type { TableColumn } from 'src/types/global'
-import { compactSelectionDisplay } from 'src/utils/select-display'
 
 const router = useRouter()
 const dictStore = useDictStore()

@@ -41,20 +41,9 @@
             </query-scheme-controls>
           </template>
 
-          <template #column-selector
-            ><q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              emit-value
-              map-options
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              :options="columns"
-              option-value="name"
-              options-cover
-          /></template>
+          <template #column-selector>
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
+          </template>
         </standard-table-toolbar>
       </template>
 
@@ -228,6 +217,7 @@ import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import TablePagination from 'src/components/Table/TablePagination.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   bindEmployeeUser,
@@ -251,7 +241,6 @@ import { useTableQueryState } from 'src/composables/table-query-state'
 import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import { useDictStore } from 'src/stores/dict'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { compactSelectionDisplay } from 'src/utils/select-display'
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import type { TableColumn } from 'src/types/global'

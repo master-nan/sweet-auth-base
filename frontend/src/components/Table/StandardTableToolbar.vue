@@ -62,10 +62,6 @@ defineEmits<{
 }
 
 .standard-table-toolbar__column-selector {
-  width: 150px;
-}
-
-.standard-table-toolbar__column-selector :deep(.q-field) {
-  width: 100%;
+  flex: none;
 }
 </style>

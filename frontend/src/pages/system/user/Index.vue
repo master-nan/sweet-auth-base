@@ -43,19 +43,7 @@
           </template>
 
           <template #column-selector>
-            <q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              emit-value
-              map-options
-              :options="columns"
-              option-value="name"
-              options-cover
-            />
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
           </template>
 
           <template #right-actions>
@@ -195,6 +183,7 @@ import TablePagination from 'components/Table/TablePagination.vue'
 import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
 
 import { computed, ref, watch, onMounted } from 'vue'
 import { copyToClipboard, type QTableProps, useQuasar } from 'quasar'
@@ -217,7 +206,6 @@ import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { hasEffectiveQueryRules } from 'src/utils/query-state'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
