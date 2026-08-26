@@ -3,6 +3,7 @@ package main
 import (
 	"backend/config"
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"sync"
@@ -33,6 +34,18 @@ type testChunkCleaner struct{}
 
 func (testChunkCleaner) CleanupExpiredChunks(time.Time, time.Duration) (int, error) { return 0, nil }
 
+type shutdownErrorListener struct {
+	net.Listener
+	closeErr error
+}
+
+func (l *shutdownErrorListener) Close() error {
+	if err := l.Listener.Close(); err != nil {
+		return err
+	}
+	return l.closeErr
+}
+
 func TestRunRuntimeStopsAcceptingRequestsBeforeClosingResources(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -49,6 +62,7 @@ func TestRunRuntimeStopsAcceptingRequestsBeforeClosingResources(t *testing.T) {
 	defer cancel()
 
 	events := make([]string, 0, 8)
+	resourcesClosed := make(chan struct{})
 	worker := &testRunner{events: &events}
 	syncRunner := &testRunner{events: &events}
 	done := make(chan error, 1)
@@ -61,6 +75,7 @@ func TestRunRuntimeStopsAcceptingRequestsBeforeClosingResources(t *testing.T) {
 				return nil
 			},
 			closeResources: func() error {
+				close(resourcesClosed)
 				events = append(events, "resources-close")
 				return nil
 			},
@@ -97,6 +112,11 @@ func TestRunRuntimeStopsAcceptingRequestsBeforeClosingResources(t *testing.T) {
 	if !listenerClosed {
 		t.Fatal("HTTP listener continued accepting connections after shutdown began")
 	}
+	select {
+	case <-resourcesClosed:
+		t.Fatal("runtime resources closed before the in-flight HTTP request completed")
+	default:
+	}
 	close(releaseRequest)
 	<-responseDone
 	if err := <-done; err != nil {
@@ -114,5 +134,39 @@ func TestRunRuntimeStopsAcceptingRequestsBeforeClosingResources(t *testing.T) {
 	}
 	if resourceIndex < 0 || loggerIndex <= resourceIndex {
 		t.Fatalf("unexpected shutdown order: %v", events)
+	}
+}
+
+func TestRunRuntimePropagatesHTTPShutdownError(t *testing.T) {
+	baseListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shutdownErr := errors.New("listener shutdown failed")
+	listener := &shutdownErrorListener{Listener: baseListener, closeErr: shutdownErr}
+	server := &http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusNoContent)
+	})}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	events := make([]string, 0, 4)
+	done := make(chan error, 1)
+	go func() {
+		done <- runRuntime(ctx, listener, server, runtimeDependencies{
+			worker: &testRunner{events: &events}, syncRunner: &testRunner{events: &events},
+			chunkCleaner: testChunkCleaner{},
+			uploadConfig: config.Upload{ChunkTTLHours: 24, ChunkCleanupMinutes: 60},
+		})
+	}()
+
+	response, err := http.Get("http://" + listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	cancel()
+	if err := <-done; !errors.Is(err, shutdownErr) {
+		t.Fatalf("runRuntime error = %v, want shutdown error", err)
 	}
 }

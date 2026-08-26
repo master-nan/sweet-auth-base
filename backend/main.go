@@ -121,27 +121,32 @@ func runRuntime(parent context.Context, listener net.Listener, server *http.Serv
 	}()
 
 	var runtimeError error
+	serveStopped := false
 	select {
 	case <-parent.Done():
 		zap.L().Info("shutdown signal received")
 	case err := <-serveError:
+		serveStopped = true
 		if err != nil {
 			runtimeError = fmt.Errorf("serve HTTP: %w", err)
 		}
 	}
 
 	var shutdownErrors []error
-	if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-		shutdownErrors = append(shutdownErrors, fmt.Errorf("stop accepting HTTP requests: %w", err))
-	}
-	cancelRuntime()
-
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), runtimeShutdownTimeout)
 	defer cancelShutdown()
 	httpShutdown := make(chan error, 1)
 	go func() {
 		httpShutdown <- server.Shutdown(shutdownCtx)
 	}()
+	// Shutdown 负责关闭 Server 管理的 listener。等待 Serve 返回后再取消后台 Runtime，
+	// 确保停止接入新请求先于停止 Runner，同时避免同一 listener 被重复关闭。
+	if !serveStopped {
+		if err := <-serveError; err != nil {
+			runtimeError = fmt.Errorf("serve HTTP: %w", err)
+		}
+	}
+	cancelRuntime()
 
 	if dependencies.stopCron != nil {
 		if err := dependencies.stopCron(shutdownCtx); err != nil {
