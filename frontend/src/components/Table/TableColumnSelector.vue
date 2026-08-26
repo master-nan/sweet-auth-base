@@ -77,7 +77,6 @@ const props = withDefaults(
     disabled?: boolean
   }>(),
   {
-    columns: () => [],
     disabled: false,
   },
 )
@@ -90,7 +89,7 @@ const keyword = ref('')
 const defaultVisibleColumns = ref<string[]>([])
 
 const columnOptions = computed(() =>
-  props.columns.map((column) => ({
+  (props.columns ?? []).map((column) => ({
     label: String(column.label || column.name),
     value: column.name,
   })),
