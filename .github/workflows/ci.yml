@@ -1,0 +1,14 @@
+name: CI Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci-check:
+    name: Run CI checks
+    uses: ./.github/workflows/shared-checks.yml
+    with:
+      make-target: ci-check

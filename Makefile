@@ -1,4 +1,4 @@
-.PHONY: help verify release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-prepare-local-database docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
+.PHONY: help verify ci-check release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-prepare-local-database docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
 EXTERNAL_ENV_FILE ?= .env.external
@@ -19,8 +19,10 @@ help:
 	@printf '%s\n' '  make backend-test                         只跑 Go 测试'
 	@printf '%s\n' '  make frontend-ci                          只跑前端 lint/typecheck/build'
 	@printf '%s\n' '  make verify                               快速验证，不含 Race/PostgreSQL/Vitest'
+	@printf '%s\n' '  SWEET_TEST_POSTGRES_DSN=postgres://... make ci-check'
+	@printf '%s\n' '                                            PR 日常检查，使用真实 PostgreSQL'
 	@printf '%s\n' '  SWEET_TEST_POSTGRES_DSN=postgres://... make release-check'
-	@printf '%s\n' '                                            完整发布门禁，强制真实 PostgreSQL'
+	@printf '%s\n' '                                            发布前完整检查，增加重复测试和 Race'
 	@printf '%s\n' ''
 	@printf '%s\n' '数据库：'
 	@printf '%s\n' '  make db-migrate                           执行结构迁移'
@@ -44,17 +46,19 @@ help:
 
 verify: docs-check backend-test frontend-ci
 
-release-check:
-	@test -n "$${SWEET_TEST_POSTGRES_DSN}" || (printf '%s\n' 'SWEET_TEST_POSTGRES_DSN is required for release-check' >&2; exit 1)
-	@case "$${SWEET_TEST_POSTGRES_DSN}" in postgres://*|postgresql://*) ;; *) printf '%s\n' 'SWEET_TEST_POSTGRES_DSN must be a postgres:// or postgresql:// URL' >&2; exit 1;; esac
+ci-check:
+	@test -n "$${SWEET_TEST_POSTGRES_DSN}" || (printf '%s\n' 'PostgreSQL 测试环境未配置：缺少 SWEET_TEST_POSTGRES_DSN' >&2; exit 1)
+	@case "$${SWEET_TEST_POSTGRES_DSN}" in postgres://*|postgresql://*) ;; *) printf '%s\n' 'PostgreSQL 测试地址无效：SWEET_TEST_POSTGRES_DSN 必须使用 postgres:// 或 postgresql:// URL' >&2; exit 1;; esac
 	$(MAKE) secret-scan
 	$(MAKE) docs-check
 	$(MAKE) scripts-test
 	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test ./... -count=1
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -p=1 ./... -count=3
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -race -p=1 ./... -count=1
 	cd frontend && yarn quasar prepare && yarn test
 	$(MAKE) frontend-ci
+
+release-check: ci-check
+	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -p=1 ./... -count=3
+	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -race -p=1 ./... -count=1
 
 secret-scan:
 	node scripts/check-tracked-secrets.mjs

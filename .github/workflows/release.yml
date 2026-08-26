@@ -3,63 +3,13 @@ name: Release Check
 on:
   push:
     branches: [main, master]
-  pull_request:
 
 permissions:
   contents: read
 
 jobs:
   release-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      SWEET_REQUIRE_POSTGRES_TESTS: "true"
-      SWEET_TEST_POSTGRES_DSN: postgresql://sweet_admin@127.0.0.1:5432/sweet_admin?sslmode=disable
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: sweet_admin
-          POSTGRES_USER: sweet_admin
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U sweet_admin -d sweet_admin"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-      redis:
-        image: redis:6.2.7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-          cache-dependency-path: frontend/yarn.lock
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: yarn install --frozen-lockfile
-
-      - name: Run release gate
-        run: make release-check
+    name: Run full release checks
+    uses: ./.github/workflows/shared-checks.yml
+    with:
+      make-target: release-check
