@@ -65,16 +65,16 @@ const actualDocs = new Set(
 )
 const missing = [...expectedDocs].filter((file) => !actualDocs.has(file)).sort()
 const unexpected = [...actualDocs].filter((file) => !expectedDocs.has(file)).sort()
-if (missing.length) errors.push(`missing required docs: ${missing.join(', ')}`)
-if (unexpected.length) errors.push(`unexpected docs files: ${unexpected.join(', ')}`)
+if (missing.length) errors.push(`缺少必需文档：${missing.join(', ')}`)
+if (unexpected.length) errors.push(`docs 中存在未登记文件：${unexpected.join(', ')}`)
 
 const markdownFiles = [path.join(root, 'README.md'), ...walkFiles(docs).filter((file) => file.endsWith('.md'))]
 for (const file of [...new Set(markdownFiles)].sort()) {
   if (!fs.existsSync(file)) {
-    errors.push(`missing documentation entry: ${path.relative(root, file)}`)
+    errors.push(`文档入口不存在：${path.relative(root, file)}`)
     continue
   }
-  if (fs.statSync(file).size === 0) errors.push(`empty documentation file: ${path.relative(root, file)}`)
+  if (fs.statSync(file).size === 0) errors.push(`文档内容为空：${path.relative(root, file)}`)
   const text = withoutCode(fs.readFileSync(file, 'utf8'))
   for (const rawTarget of linkTargets(text)) {
     let target
@@ -82,17 +82,17 @@ for (const file of [...new Set(markdownFiles)].sort()) {
       target = localTarget(file, rawTarget)
     } catch (error) {
       if (error instanceof URIError) {
-        errors.push(`invalid encoded link: ${path.relative(root, file)} -> ${rawTarget}`)
+        errors.push(`链接编码无效：${path.relative(root, file)} -> ${rawTarget}`)
         continue
       }
       throw error
     }
     if (target && !fs.existsSync(target)) {
-      errors.push(`broken link: ${path.relative(root, file)} -> ${rawTarget}`)
+      errors.push(`相对链接指向不存在：${path.relative(root, file)} -> ${rawTarget}`)
     }
   }
   for (const forbidden of forbiddenReferences) {
-    if (text.includes(forbidden)) errors.push(`forbidden path: ${path.relative(root, file)} -> ${forbidden}`)
+    if (text.includes(forbidden)) errors.push(`文档仍引用已删除路径：${path.relative(root, file)} -> ${forbidden}`)
   }
 }
 
@@ -101,14 +101,14 @@ for (const relative of ['Makefile', 'AGENTS.md']) {
   if (!fs.existsSync(file)) continue
   const text = withoutCode(fs.readFileSync(file, 'utf8'))
   for (const forbidden of forbiddenReferences) {
-    if (text.includes(forbidden)) errors.push(`forbidden path: ${relative} -> ${forbidden}`)
+    if (text.includes(forbidden)) errors.push(`文件仍引用已删除路径：${relative} -> ${forbidden}`)
   }
 }
 
 if (errors.length) {
-  console.error('Documentation check failed:')
+  console.error('文档检查失败：')
   for (const error of errors) console.error(`- ${error}`)
   process.exit(1)
 }
 
-console.log(`Documentation check passed: ${markdownFiles.length} Markdown files checked.`)
+console.log(`文档检查通过：已检查 ${markdownFiles.length} 个 Markdown 文件。`)

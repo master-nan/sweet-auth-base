@@ -1,6 +1,6 @@
 package errors
 
-// Configuration application errors.
+// 数据权限配置错误。
 const (
 	ErrorCodeDataResourceNotFound                 = 120001
 	ErrorCodeDataResourceCodeDuplicate            = 120002
@@ -288,11 +288,11 @@ var (
 	)
 	ErrDataPermissionPreflightFailed = newApplicationError(KindConflict, CategoryBusiness,
 		ErrorCodeDataPermissionPreflightFailed,
-		"数据权限配置预检未通过",
+		"数据权限配置检查未通过",
 	)
 )
 
-// Adapter application errors.
+// 数据权限适配错误。
 const (
 	ErrorCodeDataPermissionAdapterInputInvalid      = 120088
 	ErrorCodeDataPermissionAdapterTypeUnsupported   = 120089
@@ -444,7 +444,7 @@ var (
 	)
 )
 
-// Resolution application errors.
+// 数据范围解析错误。
 const (
 	ErrorCodeDataPermissionSubjectUserNotFound      = 120059
 	ErrorCodeDataPermissionRoleContextMissing       = 120060
@@ -596,7 +596,7 @@ var (
 	)
 )
 
-// Runtime application errors.
+// 数据权限执行错误。
 const (
 	ErrorCodeDataPermissionRuntimeRouteConflict  = 120117
 	ErrorCodeDataPermissionRuntimeFailed         = 120118

@@ -15,7 +15,7 @@ type HTTPRequest struct {
 	Header http.Header
 }
 
-// Eventually waits for an asynchronous test condition without open-coded sleep loops.
+// Eventually 在超时前轮询异步条件，避免测试散落固定时长的 Sleep。
 func Eventually(timeout, interval time.Duration, condition func() bool) bool {
 	if condition == nil || timeout <= 0 {
 		return false

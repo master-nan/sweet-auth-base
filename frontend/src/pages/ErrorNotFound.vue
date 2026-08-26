@@ -5,7 +5,6 @@
 
       <div class="text-h2" style="opacity: 0.4">
         哎呀，这里什么都没有...
-        <!--        Oops. Nothing here...-->
       </div>
 
       <q-btn

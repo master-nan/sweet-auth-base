@@ -1,6 +1,6 @@
 package errors
 
-// Configuration application errors.
+// 集成配置错误。
 const (
 	ErrorCodeExternalSystemNotFound          = 130001
 	ErrorCodeExternalSystemCodeDuplicate     = 130002
@@ -161,7 +161,7 @@ var (
 	ErrSyncBusinessProcessingFailed    = newApplicationError(KindUnprocessable, CategoryBusiness, ErrorCodeSyncBusinessProcessingFailed, "同步业务处理失败")
 )
 
-// Execution application errors.
+// 集成执行错误。
 const (
 	ErrorCodeIntegrationExecutionNotFound                = 130301
 	ErrorCodeIntegrationExecutionIdempotencyConflict     = 130302
@@ -449,6 +449,6 @@ var (
 	)
 	ErrIntegrationRetryExecutionCompleteFailed = newApplicationError(KindInternal, CategoryBusiness,
 		ErrorCodeIntegrationRetryExecutionCompleteFailed,
-		"集成重试执行结果收敛失败",
+		"保存集成重试执行结果失败",
 	)
 )

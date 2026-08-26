@@ -198,7 +198,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/user/:id", app.UserController.UpdateUser)
 		adminGroup.DELETE("/user/:id", app.UserController.DeleteUser)
 
-		// 数据权限配置查询和预检
+		// 数据权限配置与保存前检查
 		adminGroup.POST("/data-permission/config/dimension/query", app.DataPermissionConfigController.QueryDimensions)
 		adminGroup.POST("/data-permission/config/resource", app.DataPermissionConfigController.CreateResource)
 		adminGroup.POST("/data-permission/config/resource/query", app.DataPermissionConfigController.QueryResources)
@@ -277,7 +277,7 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.POST("/integration/sync-batch/query", app.IntegrationSyncController.QueryBatches)
 		adminGroup.GET("/integration/sync-batch/:id", app.IntegrationSyncController.BatchDetail)
 
-		// 集成执行与调用日志只暴露管理查询、提交和安全取消；状态收敛由 Worker 与 Engine 完成。
+		// 此处只开放执行记录的查询、提交和安全取消；Worker 与 Engine 负责推进执行状态。
 		adminGroup.POST("/integration/execution/query", app.IntegrationExecutionController.Query)
 		adminGroup.GET("/integration/execution/:id", app.IntegrationExecutionController.Detail)
 		adminGroup.POST("/integration/execution", app.IntegrationExecutionController.Create)

@@ -8,7 +8,6 @@
         :key="item.meta.itemLabel as string"
         >{{ item.meta.itemLabel }}</q-item-label
       >
-      <!-- no children -->
       <q-item
         v-if="!item.children"
         :exact="item.path === '/'"
@@ -32,7 +31,6 @@
           {{ item.meta ? displayTitle(item.meta?.title) : item.name }}
         </q-tooltip>
       </q-item>
-      <!-- has children -->
       <template v-else>
         <q-expansion-item
           v-if="!isMiniMode"
@@ -48,7 +46,7 @@
           :label="item.meta ? displayTitle(item.meta?.title) : ''"
           :model-value="expansionItemOpen(basePath as string, item)"
         >
-          <!-- MenuItem initlevl + 0.2 ; concat parent path if router is existed -->
+          <!-- Quasar 用小数 inset 层级控制子菜单缩进；递归时同时拼接父路由。 -->
           <base-menu-item
             :my-router="item.children"
             :init-level="(initLevel as number) + 0.2"
@@ -58,7 +56,6 @@
             :force-expand="forceExpand"
           />
         </q-expansion-item>
-        <!-- mini mode -->
         <q-item v-else :style="expansionHeaderStyle(basePath as string, item)" clickable v-ripple>
           <q-item-section avatar>
             <q-icon :name="item.meta?.icon as string" />

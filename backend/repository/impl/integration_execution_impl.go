@@ -274,7 +274,7 @@ func closeUnrunnableRetry(
 	return nil
 }
 
-// CompleteAttemptAndExecution 在新的短事务内验证租约并原子收敛 Attempt 和 Execution。
+// CompleteAttemptAndExecution 在短事务内验证租约，并同时保存 Attempt 和 Execution 的最终状态。
 func (r *IntegrationExecutionRepositoryImpl) CompleteAttemptAndExecution(
 	ctx context.Context,
 	completion repository.IntegrationAttemptCompletion,
@@ -418,7 +418,7 @@ func (r *IntegrationExecutionRepositoryImpl) FindExpiredRunningExecutions(
 	return values, err
 }
 
-// RecoverExpiredExecution 不重新发起远端调用，只将遗留 Attempt 和 Execution 收敛为未知失败。
+// RecoverExpiredExecution 不重新调用远端接口，只把遗留的 Attempt 和 Execution 标记为未知失败。
 func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 	ctx context.Context,
 	recovery repository.ExpiredExecutionRecovery,

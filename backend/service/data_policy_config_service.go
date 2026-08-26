@@ -55,7 +55,7 @@ var dataPolicyOperatorSet = map[string]struct{}{
 }
 
 // DataPolicyConfigService 负责可复用 Policy 和结构化 Rule 配置。
-// Policy 不保存 resource_id，因此资源级 Ownership 匹配仍由 Grant 预检负责。
+// Policy 不保存 resource_id，因此写入 Grant 前仍需检查资源级 Ownership 是否匹配。
 type DataPolicyConfigService struct {
 	policyRepo    repository.DataPolicyRepository
 	ruleRepo      repository.DataPolicyRuleRepository

@@ -16,7 +16,7 @@ var (
 	ErrIntegrationExecutionClaimUnavailable = errors.New("integration execution claim unavailable")
 	// ErrIntegrationExecutionLeaseLost 表示完成阶段已不再持有有效租约。
 	ErrIntegrationExecutionLeaseLost = errors.New("integration execution lease lost")
-	// ErrIntegrationAttemptAlreadyCompleted 表示 Attempt 已经被其他流程收敛。
+	// ErrIntegrationAttemptAlreadyCompleted 表示其他流程已经完成该 Attempt。
 	ErrIntegrationAttemptAlreadyCompleted = errors.New("integration attempt already completed")
 	// ErrIntegrationRetryAttemptCreateFailed 表示重试领取事务未能原子追加 Attempt。
 	ErrIntegrationRetryAttemptCreateFailed = errors.New("integration retry attempt create failed")
@@ -72,7 +72,7 @@ type IntegrationAttemptCompletion struct {
 	SyncBusinessReference        string
 }
 
-// ExpiredExecutionRecovery 用于将已过期租约的执行安全收敛为未知失败。
+// ExpiredExecutionRecovery 指定需要标记为未知失败的过期执行记录。
 type ExpiredExecutionRecovery struct {
 	ExecutionID int
 }

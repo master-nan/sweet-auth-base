@@ -134,7 +134,7 @@ onBeforeUnmount(() => notificationStore.reset())
 
 <style scoped lang="scss">
 :global(:root) {
-  // Theme Store应用用户偏好后会覆盖这些默认值。
+  // Theme Store 加载用户偏好后会覆盖这些默认颜色。
   --app-primary-soft: rgba(115, 103, 240, 0.08);
   --app-primary-soft-strong: rgba(115, 103, 240, 0.16);
   --app-primary-border: rgba(115, 103, 240, 0.28);

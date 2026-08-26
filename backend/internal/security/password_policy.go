@@ -155,7 +155,7 @@ func GeneratePasswordByConfigure(cfg model.SysConfigure) (string, error) {
 
 	pwd := string(buf)
 	if err := ValidatePasswordByConfigure(pwd, cfg); err != nil {
-		// 极小概率（比如 minLen 很小且复杂度很高时），兜底重试
+		// 随机结果在极端长度配置下仍可能不满足组合规则，此时重新生成。
 		return GeneratePasswordByConfigure(cfg)
 	}
 	return pwd, nil

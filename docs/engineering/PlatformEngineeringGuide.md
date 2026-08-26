@@ -118,7 +118,7 @@ middleware -> HTTP-facing service ports and context helpers
 | `backend/migrate/` | Schema 演进、幂等回填和 Seed | Model、GORM、受控配置 | 在线请求处理、长期业务调度 |
 | `backend/config/` | 配置结构 | 纯配置类型 | 读取业务数据、运行流程 |
 | `backend/enum/` | 共享稳定枚举 | 轻量类型和常量 | 模块内部 Reason Code、大型领域逻辑 |
-| `backend/cmd/` | 容器入口、健康检查、预检、静态文件服务等独立程序 | 必要基础设施 | 主应用业务副本 |
+| `backend/cmd/` | 容器入口、健康检查、运行前检查、静态文件服务等独立程序 | 必要基础设施 | 主应用业务副本 |
 | `backend/docs/` | `swag` 生成的 API 文档代码 | 生成结果 | 手工维护的架构文档 |
 
 ### 3.3 前端目录
@@ -307,7 +307,7 @@ safe HTTP status + error_code + error_message
 1. **Technical Error**：数据库、Redis、OS、第三方 HTTP、JSON 等底层失败。允许内部传播和结构化日志，不直接成为客户端消息。
 2. **Application Error**：用户锁定、资源不存在、状态冲突等稳定业务/应用结果。共享定义位于 `backend/internal/errors`。
 3. **HTTP Error**：Middleware 将 Application Error 的 `Kind` 映射为 HTTP status 和 `AdminError`；它不是领域真值。
-4. **Reason Code**：Audit、Attempt、SyncRecord 或状态收敛的诊断分类，不等于 HTTP Error，也不一定需要构造 Go error。
+4. **Reason Code**：Audit、Attempt、SyncRecord 或状态处理结果的诊断分类，不等于 HTTP Error，也不一定需要构造 Go error。
 
 `internal/errors` 按稳定业务域组织：`common.go`、`auth.go`、`file.go`、`metadata.go`、`organization.go`、`data_permission.go`、`integration.go`，基础类型在 `errors.go`。不得再按 adapter、resolver、runtime、repository、service 等技术层增加错误文件。
 
@@ -644,7 +644,7 @@ SQLite 用于普通业务和边界单测；以下语义必须使用 PostgreSQL�
 
 运维 Node 脚本使用 `node:test`，通过 `make scripts-test` 执行；tracked 凭据扫描通过 `make secret-scan` 执行，只输出规则和位置，不回显命中值。提交前按改动范围执行 `yarn test`、`yarn lint`、`yarn typecheck`、`yarn build`；文档修改运行 `make docs-check`。浏览器验收用于主题、真实权限、Console、布局和跨页面流程，不由 source-string 页面测试替代。
 
-当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试。它不能单独代表完整发布回归。`make release-check` 是唯一发布门禁，包含 secret scan、docs、scripts、强制 PostgreSQL、Race、Frontend Vitest、lint、typecheck 和 build；`.github/workflows/release.yml` 提供 PostgreSQL 16/Redis health service 并直接调用该目标，本地与 CI 不复制步骤。Node 版本只从根 `.nvmrc` 读取，`package.json` 仅允许 Node 22 major。
+当前 `make verify` 只组合 docs-check、`go test ./...` 和前端 lint/typecheck/build，不包含 Race、强制 PostgreSQL、前端 Vitest或 Node 运维脚本测试，不能代替CI检查。`make ci-check`用于Pull Request：包含敏感信息、文档和Node脚本检查，使用真实PostgreSQL运行一次后端测试，并执行前端Vitest、lint、typecheck和build。`make release-check`用于main/master：先完成`ci-check`，再增加后端`count=3`和全仓Race。`.github/workflows/shared-checks.yml`统一准备PostgreSQL 16、Redis、Go和Node环境，两个入口不复制安装与服务配置。Node版本只从根`.nvmrc`读取，`package.json`仅允许Node 22 major。当前不设置Nightly；需要更高频的重复测试时再增加定时任务。
 
 ## 27. 关键文件职责与修改风险
 
@@ -868,7 +868,7 @@ action_path = 该页面下的受控内部跳转信息
 3. 没有持久化菜单身份的静态 Hidden Detail Route 不自动继承父页面权限，也不接受仅凭路径前缀推断归属；消息应跳转到正式业务页面。已有独立活动菜单记录的隐藏页面使用自己的菜单 name 和正式路径。
 4. Recent/List 返回 Action 时批量计算 `allowed`，不逐条查询菜单；读取历史异常数据时，菜单与路径不匹配则 `allowed=false` 且不返回 Path。
 5. 消息内容始终可查看；`allowed=false` 时前端明确提示“暂无目标页面访问权限”，不得导航。
-6. `allowed=true` 只是用户体验预检，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
+6. `allowed=true` 只用于在前端提前提示，目标页面和 API 仍执行 Router、Menu、Casbin 和 Data Permission；通知不能成为授权凭证。
 7. V1 不接受外部 URL。未来外链需求必须新增受控 Action 类型，不能放宽本字段。
 
 V1 不保存 `action_label`。Popover 通过点击整行执行 Action，详情 Dialog 使用固定“前往相关页面”文案，避免业务模块产生不一致按钮语言。
@@ -972,7 +972,7 @@ SET read_at = CURRENT_TIMESTAMP
 WHERE notification_id = $1 AND user_id = $2 AND read_at IS NULL;
 ```
 
-重复调用不更新时间，首次 `read_at` 保持不变。目标消息不属于当前用户时统一返回 Not Found，不能区分“存在但属于别人”。MarkAllRead 只更新当前用户、`read_at IS NULL` 且主消息有效的记录；与单条 MarkRead 并发时依靠幂等条件收敛，不加 Redis 锁。
+重复调用不更新时间，首次 `read_at` 保持不变。目标消息不属于当前用户时统一返回 Not Found，不能区分“存在但属于别人”。MarkAllRead 只更新当前用户、`read_at IS NULL` 且主消息有效的记录；与单条 MarkRead 并发时，由 `read_at IS NULL` 条件避免重复更新，不加 Redis 锁。
 
 ### 32.7 前端状态、轮询与会话隔离
 
@@ -1108,7 +1108,7 @@ Wire 只增加 Repository、Service、Controller provider 和 interface binding�
 
 安全矩阵：
 
-| 风险 | 防线 |
+| 风险 | 控制措施 |
 | --- | --- |
 | IDOR / 跨用户读写 | User ID 只取 Audit Subject；Recipient 条件写入每条查询和更新；不存在与无权统一 Not Found |
 | 伪造 `user_id` | Runtime Request/Path/Query 不提供该字段 |

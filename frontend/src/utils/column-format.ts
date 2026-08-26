@@ -264,7 +264,7 @@ export const buildColumnFormat = (
     return formatTime
   }
 
-  // 文件字段由表格/详情里的 FileDisplay 组件展示文件名和访问入口，这里只保留兜底文本。
+  // 表格和详情由 FileDisplay 展示文件名与访问入口；无法解析文件信息时这里只显示安全占位文本。
   if (field.input_type === SysTableFieldInputType.FILE_PICKER) {
     return (val: any) => {
       if (val == null || val === '' || val === '0') return ''
@@ -275,7 +275,7 @@ export const buildColumnFormat = (
   return undefined
 }
 
-// ─── 高级封装：自动构建列数组 ─────────────────────────
+// 根据 Runtime Metadata 构建表格列。
 
 export interface RuntimeColumnOverride<Row extends object> {
   fieldCode: string

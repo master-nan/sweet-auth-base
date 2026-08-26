@@ -56,7 +56,6 @@
           <!--            <q-item-section>-->
           <!--              <div>-->
           <!--                <q-icon name="tag_faces" color="blue-9" size="18px" />-->
-          <!--                Set your status-->
           <!--              </div>-->
           <!--            </q-item-section>-->
           <!--          </q-item>-->

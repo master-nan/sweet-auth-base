@@ -42,8 +42,7 @@ func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 	return db
 }
 
-// OpenSQLiteWithConfig creates an isolated SQLite database for tests that need
-// DryRun, multiple connections, or another explicit GORM configuration.
+// OpenSQLiteWithConfig 为需要 DryRun、多连接或自定义 GORM 配置的测试创建隔离数据库。
 func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface{}) *gorm.DB {
 	t.Helper()
 	if config == nil {
@@ -62,9 +61,8 @@ func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface
 	return db
 }
 
-// OpenPostgres opens a caller-configured PostgreSQL test database and closes
-// its connection pool after the test. Schema and fixture ownership stay with
-// the domain test that requested the connection.
+// OpenPostgres 打开调用方配置的 PostgreSQL 测试数据库，并在测试结束后关闭连接池。
+// Schema 和测试数据仍由发起连接的领域测试负责。
 func OpenPostgres(t testing.TB, dialector gorm.Dialector, opts ...gorm.Option) (*gorm.DB, error) {
 	t.Helper()
 	db, err := gorm.Open(dialector, opts...)

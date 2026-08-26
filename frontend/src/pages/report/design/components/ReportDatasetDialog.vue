@@ -82,7 +82,7 @@
             dense
             class="manual-fields"
             icon="edit_note"
-            label="手工字段兜底"
+            label="手动填写字段"
             caption="只有 SQL 无法解析时才需要填写"
           >
             <q-input

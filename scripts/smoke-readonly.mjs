@@ -17,7 +17,7 @@ export function loadOptionalEnvFile(envPath, targetEnv = process.env) {
   if (!envPath) return
   const resolvedPath = path.resolve(envPath)
   if (!fs.existsSync(resolvedPath)) {
-    throw new Error(`readonly smoke env file not found: ${resolvedPath}`)
+    throw new Error(`只读基础可用性测试的环境文件不存在：${resolvedPath}`)
   }
   const env = parseEnvContent(fs.readFileSync(resolvedPath, 'utf8'))
   for (const [key, value] of Object.entries(env)) {
@@ -118,7 +118,7 @@ function assert(condition, message) {
 function assertNoSecretFields(value, context) {
   const rendered = JSON.stringify(value || {})
   for (const key of ['app_secret', 'ding_secret', 'sender_password']) {
-    assert(!new RegExp(`"${key}"\\s*:\\s*"[^"]+`).test(rendered), `${context} leaked ${key}: ${rendered}`)
+    assert(!new RegExp(`"${key}"\\s*:\\s*"[^"]+`).test(rendered), `${context} 返回了敏感字段 ${key}：${rendered}`)
   }
 }
 
@@ -133,26 +133,26 @@ function findMenuByOption(menus, option) {
 
 async function assertHealth() {
   const health = await requestRaw('/healthz')
-  assert(health.status === 200 && health.body?.status === 'ok', `healthz failed: ${JSON.stringify(health.body)}`)
+  assert(health.status === 200 && health.body?.status === 'ok', `healthz 检查失败：${JSON.stringify(health.body)}`)
   const ready = await requestRaw('/readyz')
-  assert(ready.status === 200 && ready.body?.status === 'ready', `readyz failed: ${JSON.stringify(ready.body)}`)
+  assert(ready.status === 200 && ready.body?.status === 'ready', `readyz 检查失败：${JSON.stringify(ready.body)}`)
   assert(
     ready.body?.components?.db_primary?.ok || ready.body?.components?.db?.ok,
-    `readyz primary database missing or unhealthy: ${JSON.stringify(ready.body)}`,
+    `readyz 未返回可用的主数据库状态：${JSON.stringify(ready.body)}`,
   )
   assert(
     ready.body?.components?.redis?.ok,
-    `readyz dependencies missing or unhealthy: ${JSON.stringify(ready.body)}`,
+    `readyz 未返回可用的 Redis 状态：${JSON.stringify(ready.body)}`,
   )
-  console.log('OK health readiness')
+  console.log('通过：healthz 与 readyz')
 }
 
 async function assertPublicConfigure() {
   const configure = await request('/admin/configure')
-  assert(configure.status === 200 && configure.body?.success, `configure endpoint failed: ${JSON.stringify(configure.body)}`)
+  assert(configure.status === 200 && configure.body?.success, `公开配置接口检查失败：${JSON.stringify(configure.body)}`)
   assertNoSecretFields(configure.body?.data, 'public configure')
   runtime.captcha.enabled = Boolean(configure.body?.data?.enable_captcha)
-  console.log(`OK configure redaction${runtime.captcha.enabled ? ' (captcha enabled)' : ''}`)
+  console.log(`通过：公开配置未泄露秘密${runtime.captcha.enabled ? '（已启用验证码）' : ''}`)
 }
 
 function decodeCaptchaImage(image) {
@@ -165,15 +165,15 @@ function decodeCaptchaImage(image) {
 
 async function fetchCaptchaChallenge() {
   const captcha = await request('/admin/captcha')
-  assert(captcha.status === 200 && captcha.body?.success, `captcha endpoint failed: ${JSON.stringify(captcha.body)}`)
-  assert(captcha.body?.data?.captcha_id, `captcha response missing captcha_id: ${JSON.stringify(captcha.body)}`)
+  assert(captcha.status === 200 && captcha.body?.success, `验证码接口检查失败：${JSON.stringify(captcha.body)}`)
+  assert(captcha.body?.data?.captcha_id, `验证码响应缺少 captcha_id：${JSON.stringify(captcha.body)}`)
   return captcha.body.data
 }
 
 function saveCaptchaImageIfRequested(challenge) {
   if (!runtime.captcha.imageFile) return ''
   const image = decodeCaptchaImage(challenge.image)
-  assert(image.length > 0, `captcha response missing image data: ${JSON.stringify(challenge)}`)
+  assert(image.length > 0, `验证码响应缺少图片数据：${JSON.stringify(challenge)}`)
   const imagePath = path.resolve(runtime.captcha.imageFile)
   fs.mkdirSync(path.dirname(imagePath), { recursive: true })
   fs.writeFileSync(imagePath, image)
@@ -186,9 +186,9 @@ async function resolveLoginCaptcha() {
 
   const challenge = await fetchCaptchaChallenge()
   const imagePath = saveCaptchaImageIfRequested(challenge)
-  const imageHint = imagePath ? ` Captcha image saved to ${imagePath}.` : ''
+  const imageHint = imagePath ? ` 验证码图片已保存到 ${imagePath}。` : ''
   throw new Error(
-    `captcha is enabled; provide SWEET_ADMIN_SMOKE_CAPTCHA_ID=${challenge.captcha_id} and SWEET_ADMIN_SMOKE_CAPTCHA=<code> before running readonly smoke again.${imageHint}`,
+    `登录已启用验证码；请设置 SWEET_ADMIN_SMOKE_CAPTCHA_ID=${challenge.captcha_id} 和 SWEET_ADMIN_SMOKE_CAPTCHA=<code>，再重新运行只读基础可用性测试。${imageHint}`,
   )
 }
 
@@ -202,33 +202,33 @@ async function assertLogin() {
       ...captchaFields,
     }),
   })
-  assert(login.status === 200 && login.body?.success, `login failed: ${JSON.stringify(login.body)}`)
+  assert(login.status === 200 && login.body?.success, `登录检查失败：${JSON.stringify(login.body)}`)
   accessToken = login.body.data?.access_token || ''
-  assert(accessToken, 'login response did not include access_token')
-  assert(login.body.data?.must_change_password === false, `admin requires password change: ${JSON.stringify(login.body.data)}`)
-  console.log('OK login')
+  assert(accessToken, '登录响应缺少 access_token')
+  assert(login.body.data?.must_change_password === false, `测试管理员需要先修改密码：${JSON.stringify(login.body.data)}`)
+  console.log('通过：登录')
 }
 
 async function assertUserAndMenu() {
   const me = await request('/admin/user/me')
-  assert(me.status === 200 && me.body?.success && me.body?.data?.id, `current user failed: ${JSON.stringify(me.body)}`)
+  assert(me.status === 200 && me.body?.success && me.body?.data?.id, `当前用户接口检查失败：${JSON.stringify(me.body)}`)
 
   const menus = await request('/admin/menu/my')
-  assert(menus.status === 200 && menus.body?.success && Array.isArray(menus.body?.data), `menu query failed: ${JSON.stringify(menus.body)}`)
-  assert(menus.body.data.length > 0, 'current user has no visible menus')
-  console.log('OK user menus')
+  assert(menus.status === 200 && menus.body?.success && Array.isArray(menus.body?.data), `菜单查询失败：${JSON.stringify(menus.body)}`)
+  assert(menus.body.data.length > 0, '当前用户没有可见菜单')
+  console.log('通过：当前用户与菜单')
 }
 
 async function assertTableMetadata() {
   const tableCode = runtime.tableCode
   const table = await request(`/admin/table/code/${tableCode}`)
-  assert(table.status === 200 && table.body?.success && table.body?.data?.id, `table metadata missing: ${JSON.stringify(table.body)}`)
-  assert(Array.isArray(table.body.data?.table_fields), `table fields missing: ${JSON.stringify(table.body.data)}`)
+  assert(table.status === 200 && table.body?.success && table.body?.data?.id, `找不到表 Metadata：${JSON.stringify(table.body)}`)
+  assert(Array.isArray(table.body.data?.table_fields), `表 Metadata 缺少字段：${JSON.stringify(table.body.data)}`)
 
   const menus = await request('/admin/menu/my')
   const menu = findMenuByOption(menus.body?.data, tableCode)
-  assert(menu?.id || tableCode === 'sys_user', `published menu not visible for ${tableCode}`)
-  console.log(`OK metadata ${tableCode}`)
+  assert(menu?.id || tableCode === 'sys_user', `已发布表 ${tableCode} 没有可见菜单`)
+  console.log(`通过：Metadata ${tableCode}`)
 }
 
 async function assertApplicationRedaction() {
@@ -242,16 +242,16 @@ async function assertApplicationRedaction() {
       expressions: [],
     }),
   })
-  assert(query.status === 200 && query.body?.success, `application query failed: ${JSON.stringify(query.body)}`)
+  assert(query.status === 200 && query.body?.success, `应用查询失败：${JSON.stringify(query.body)}`)
   assertNoSecretFields(query.body?.data, 'application query')
   const rows = query.body?.data || []
   const application = rows.find((item) => item.app_key === 'sweet-admin') || rows[0]
   if (application?.id) {
     const detail = await request(`/admin/application/${application.id}`)
-    assert(detail.status === 200 && detail.body?.success, `application detail failed: ${JSON.stringify(detail.body)}`)
+    assert(detail.status === 200 && detail.body?.success, `应用详情检查失败：${JSON.stringify(detail.body)}`)
     assertNoSecretFields(detail.body?.data, 'application detail')
   }
-  console.log('OK application redaction')
+  console.log('通过：应用列表和详情未泄露秘密')
 }
 
 async function assertAuditQuery() {
@@ -265,10 +265,10 @@ async function assertAuditQuery() {
       expressions: [],
     }),
   })
-  assert(audit.status === 200 && audit.body?.success, `audit query failed: ${JSON.stringify(audit.body)}`)
-  assert(Array.isArray(audit.body?.data), `audit query returned invalid data: ${JSON.stringify(audit.body)}`)
+  assert(audit.status === 200 && audit.body?.success, `审计日志查询失败：${JSON.stringify(audit.body)}`)
+  assert(Array.isArray(audit.body?.data), `审计日志返回格式错误：${JSON.stringify(audit.body)}`)
   assertNoSecretFields(audit.body?.data, 'audit query')
-  console.log('OK audit query')
+  console.log('通过：审计日志查询')
 }
 
 async function main() {
@@ -276,8 +276,8 @@ async function main() {
   runtime = createSmokeRuntime(process.env)
   accessToken = ''
 
-  console.log(`Readonly smoke target: ${runtime.baseUrl}`)
-  console.log(`Health target: ${runtime.healthBaseUrl}`)
+  console.log(`只读基础可用性测试地址：${runtime.baseUrl}`)
+  console.log(`健康检查地址：${runtime.healthBaseUrl}`)
 
   await assertHealth()
   await assertPublicConfigure()
@@ -287,7 +287,7 @@ async function main() {
   await assertApplicationRedaction()
   await assertAuditQuery()
 
-  console.log('Readonly smoke passed')
+  console.log('只读基础可用性测试通过。')
 }
 
 const currentFile = fileURLToPath(import.meta.url)

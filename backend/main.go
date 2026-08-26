@@ -139,8 +139,8 @@ func runRuntime(parent context.Context, listener net.Listener, server *http.Serv
 	go func() {
 		httpShutdown <- server.Shutdown(shutdownCtx)
 	}()
-	// Shutdown 负责关闭 Server 管理的 listener。等待 Serve 返回后再取消后台 Runtime，
-	// 确保停止接入新请求先于停止 Runner，同时避免同一 listener 被重复关闭。
+	// Shutdown 是 listener 的唯一关闭者。先等 Serve 返回，确认不再接收新请求，
+	// 再停止后台任务；不要在这里调用 listener.Close，否则 Linux 可能因重复关闭报错。
 	if !serveStopped {
 		if err := <-serveError; err != nil {
 			runtimeError = fmt.Errorf("serve HTTP: %w", err)

@@ -740,8 +740,8 @@ function main() {
         force:
           runtimeBoolean(['SWEET_ADMIN_EXTERNAL_ENV_INIT_FORCE']) === true,
       })
-      console.log(`External env file initialized: ${result.path}`)
-      console.log(`Fill real staging/production values, then run node scripts/preflight-external.mjs ${result.path}.`)
+      console.log(`外部部署环境文件已创建：${result.path}`)
+      console.log(`请填写真实的预发或生产配置，再运行 node scripts/preflight-external.mjs ${result.path}。`)
     } catch (error) {
       console.error(error.message)
       process.exitCode = 1
@@ -752,20 +752,20 @@ function main() {
   if (command === 'template-check') {
     const templatePath = path.resolve(process.argv[3] || '.env.external.example')
     if (!fs.existsSync(templatePath)) {
-      console.error(`External env template not found: ${templatePath}`)
+      console.error(`外部部署环境模板不存在：${templatePath}`)
       process.exitCode = 1
       return
     }
     const result = validateExternalEnvTemplate(parseEnvContentWithLines(fs.readFileSync(templatePath, 'utf8')))
     if (!result.ok) {
-      console.error(`External env template check failed for ${templatePath}:`)
+      console.error(`外部部署环境模板检查失败：${templatePath}`)
       for (const problem of result.problems) {
         console.error(`- ${problem}`)
       }
       process.exitCode = 1
       return
     }
-    console.log(`External env template check passed for ${templatePath}`)
+    console.log(`外部部署环境模板检查通过：${templatePath}`)
     return
   }
 
@@ -776,8 +776,8 @@ function main() {
   const writeOperation = process.argv[3] || ''
   const resolvedPath = path.resolve(envPath)
   if (!fs.existsSync(resolvedPath)) {
-    console.error(`External env file not found: ${resolvedPath}`)
-    console.error('Copy .env.external.example to .env.external and fill real staging/production values first.')
+    console.error(`外部部署环境文件不存在：${resolvedPath}`)
+    console.error('请先复制 .env.external.example 为 .env.external，并填写真实的预发或生产配置。')
     process.exitCode = 1
     return
   }
@@ -805,7 +805,7 @@ function main() {
     : []
 
   if (!result.ok || fileProblems.length > 0 || writeProblems.length > 0) {
-    console.error(`External deploy preflight failed for ${resolvedPath}:`)
+    console.error(`外部部署运行前检查失败：${resolvedPath}`)
     for (const problem of fileProblems) {
       console.error(`- ${problem}`)
     }
@@ -819,9 +819,9 @@ function main() {
     return
   }
 
-  console.log(`External deploy preflight passed for ${resolvedPath}`)
+  console.log(`外部部署运行前检查通过：${resolvedPath}`)
   for (const warning of result.warnings) {
-    console.warn(`Warning: ${warning}`)
+    console.warn(`警告：${warning}`)
   }
 }
 

@@ -60,8 +60,8 @@ type AttemptResult struct {
 	SyncBusinessReference        string
 }
 
-// IntegrationExecutionEngine 负责编排领取、凭证解析、HTTP调用和原子状态收敛。
-// 它不启动常驻循环；应用生命周期由IntegrationWorkerRunner负责。
+// IntegrationExecutionEngine 领取待执行记录、解析凭证并调用远端接口，
+// 然后在短事务内同时保存 Attempt 与 Execution 的最终状态。常驻循环由 IntegrationWorkerRunner 启动。
 type IntegrationExecutionEngine struct {
 	executions    repository.IntegrationExecutionRepository
 	systems       repository.ExternalSystemRepository
@@ -172,7 +172,7 @@ func (e *IntegrationExecutionEngine) RunOnce(ctx context.Context) (int, error) {
 	return len(claimed), nil
 }
 
-// RunExecution 在领取事务之外调用 Provider 和 Transport，然后以新短事务收敛状态。
+// RunExecution 在数据库事务之外调用远端接口，收到结果后再开启短事务更新 Attempt 和 Execution。
 func (e *IntegrationExecutionEngine) RunExecution(
 	ctx context.Context,
 	claimed repository.ClaimedIntegrationExecution,
@@ -222,7 +222,7 @@ func (e *IntegrationExecutionEngine) RunExecution(
 	}
 	e.applyRetryDecision(claimed, &result)
 	if err := e.completeClaim(ctx, claimed, result); err != nil {
-		// 远端调用完成后若持久化失败，不能宣称成功；后续仅能通过租约恢复收敛为 unknown。
+		// 远端调用完成但结果保存失败时不能宣称成功；租约到期后，恢复任务会把结果标记为 unknown。
 		e.logAttempt(ctx, claimed, result, "complete_failed")
 		return result, myerrors.ErrIntegrationExecutionResultUnknown
 	}
@@ -575,7 +575,7 @@ func withCredentialSummary(result AttemptResult, resolution CredentialResolution
 	return result
 }
 
-// RecoverExpiredLease 将超时 running Execution 收敛为失败且结果 unknown，不会自动重发远端请求。
+// RecoverExpiredLease 把租约过期的 running Execution 标记为失败且结果 unknown，不会重发远端请求。
 func (e *IntegrationExecutionEngine) RecoverExpiredLease(ctx context.Context, limit int) (int, error) {
 	if e == nil || limit <= 0 || limit > maxExecutionBatchSize {
 		return 0, myerrors.ErrIntegrationLeaseRecoveryFailed

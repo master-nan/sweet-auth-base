@@ -444,7 +444,6 @@ const { t } = useI18n()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 
-// API 和工具
 const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)
 const route = useRoute()

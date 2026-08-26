@@ -19,7 +19,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 
-// TypeScript 类型方式定义 props
 interface JsonEditorProps {
   modelValue?: string | object | null
   label?: string

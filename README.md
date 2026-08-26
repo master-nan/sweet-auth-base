@@ -2,7 +2,7 @@
 
 Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字典、审计日志、文件上传和低代码 CRUD 能力。后端使用 Go/Gin/Gorm，前端使用 Vue 3 + Quasar，默认数据库为 PostgreSQL，缓存为 Redis。
 
-本地与 CI 的前端 Node.js 版本以仓库根 `.nvmrc` 为唯一真值。完整发布门禁使用带真实 PostgreSQL 16 DSN 的 `make release-check`；部署、Migration Ledger、TLS、备份恢复和优雅关闭规则见平台部署运维指南。
+本地与 CI 的前端 Node.js 版本以仓库根 `.nvmrc` 为唯一真值。发布前使用带真实 PostgreSQL 16 DSN 的 `make release-check` 运行完整测试；部署、Migration Ledger、TLS、备份恢复和优雅关闭规则见平台部署运维指南。
 
 常用入口：
 
@@ -13,6 +13,12 @@ Sweet Admin 是一个通用后台底座，包含权限、菜单、配置、字�
 - 字段输入类型：[字段类型指南](docs/user-guide/FieldTypeGuide.md)
 - 字段联动配置：[联动配置说明](docs/user-guide/LinkageConfig.md)
 - 数据权限使用：[管理员手册](docs/user-guide/DataPermissionUserGuide.md)
+
+## 开发检查
+
+Pull Request 会运行 `make ci-check`：检查敏感信息和文档，测试 Node 运维脚本，使用真实 PostgreSQL 运行一次后端测试，并执行前端 test、lint、typecheck 和 build。
+
+代码推送到 `main` 或 `master` 后会运行 `make release-check`。它先完成上述日常检查，再增加后端 `count=3` 重复测试和全仓 Go race 检查。任意一步失败，GitHub Actions 都会失败。当前不另设 Nightly；如果以后出现仅靠多次重复运行才能稳定发现的问题，再增加定时检查。
 
 ## 快速启动
 

@@ -11,9 +11,9 @@
 sweet-auth-base/
 |- backend/                 Go后端、Migration和Swagger
 |- frontend/                Vue 3 + Quasar前端
-|- scripts/                 发布、预检、备份、只读Smoke和安全扫描
+|- scripts/                 发布、运行前检查、备份、只读基础可用性测试和敏感信息检查
 |- docs/                    用户、工程和运维长期文档
-|- .github/workflows/       GitHub发布门禁
+|- .github/workflows/       Pull Request日常检查和main/master发布前完整检查
 |- Makefile                 本地与CI共享命令
 |- docker-compose.yml       本地完整环境
 |- docker-compose.external.yml  连接外部PostgreSQL/Redis的环境
@@ -41,7 +41,7 @@ backend/
 |- migrate/                 Migration Registry、Schema步骤和Seed
 |- middleware/              认证、Casbin、日志和错误转换
 |- config/                  配置结构与解析
-|- cmd/                     容器入口、Preflight、Health和静态服务
+|- cmd/                     容器入口、运行前检查、Health和静态服务
 `- docs/                    生成的Swagger资产
 ```
 
@@ -131,9 +131,9 @@ frontend/src/
 | --- | --- |
 | `check-tracked-secrets.mjs` | 扫描Git tracked秘密和敏感配置 |
 | `check-docs.mjs` | 检查最终docs结构、空文档和相对链接 |
-| `preflight-external.mjs` | 外部环境配置和目标安全预检 |
+| `preflight-external.mjs` | 检查外部部署配置和目标环境是否允许操作 |
 | `db-backup-external.mjs` | 外部PostgreSQL备份、Manifest、Checksum和恢复验证 |
-| `smoke-readonly.mjs` | 发布后只读HTTP Smoke |
+| `smoke-readonly.mjs` | 发布后的只读HTTP基础可用性测试 |
 
 每个Node脚本旁保留对应`node:test`。脚本属于发布链路时，由`make scripts-test`和
 `make release-check`执行。
@@ -149,8 +149,11 @@ frontend/src/
 
 ### 4.3 GitHub Workflow
 
-`.github/workflows/release.yml`是PR/main发布门禁，直接调用`make release-check`。CI提供
-PostgreSQL 16和Redis health service，本地与CI不维护两套测试清单。
+- `.github/workflows/ci.yml`只在Pull Request运行，调用`make ci-check`完成日常检查。
+- `.github/workflows/release.yml`只在代码推送到`main`或`master`时运行，调用`make release-check`完成发布前完整检查。
+- `.github/workflows/shared-checks.yml`集中配置Node、Go、PostgreSQL 16和Redis，两个入口只传入不同的Make目标。
+
+`release-check`保留`ci-check`的全部内容，并增加后端`count=3`重复测试和全仓Race。当前不运行Nightly；如果以后出现main检查难以复现的间歇性问题，再增加定时重复测试。
 
 ## 5. 配置与Compose
 
@@ -452,7 +455,7 @@ File提供普通上传、分片上传、合并、进度查询、详情、删除�
 - `File`保存稳定UUID、路径、大小、类型和创建者；Upload Session保存分片归属和状态。
 - Preview与Download签名purpose不可互换；签名不等于业务记录授权，私有文件仍需Actor检查。
 - 新Storage实现只实现既有接口，不绕过路径安全、补偿和Metadata事务。
-- 本地分片暂存依赖实例粘性；当前不提供共享Chunk Storage或大型取消协议，放弃会话由TTL清理兜底。
+- 本地分片暂存依赖实例粘性；当前不提供共享Chunk Storage或大型取消协议，放弃的会话由TTL定期清理。
 
 ### 6.8 Integration
 
@@ -714,11 +717,11 @@ Audit记录登录、访问、管理变更和关键状态操作；Request Metadat
 - 不记录密码、Token、Credential、原始HR响应或完整请求/响应Payload。
 - 新审计动作使用稳定resource/action和安全changes摘要，不从`err.Error()`构造客户端内容。
 
-### 6.15 Runtime Lifecycle与Shutdown
+### 6.15 程序启动与关闭
 
 **模块功能与用户能力**
 
-Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清理和外部连接的启动与有序关闭。
+本模块负责启动HTTP、Cron、Integration Worker、Sync Runner和Chunk清理任务，并在程序退出时按顺序停止这些任务、Redis和数据库。
 用户只感知服务可用性；运维通过日志、healthz和readyz判断状态。
 
 **核心入口与文件职责**
@@ -735,20 +738,20 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 
 **典型链路**
 
-`启动 -> InitializeApp -> Cron/Worker/SyncRunner -> HTTP Serve -> Signal -> 停止接收HTTP -> cancel Runtime -> 停Cron/Runner -> HTTP Shutdown -> 等Chunk清理 -> 关Redis/DB -> flush日志`
+`启动 -> InitializeApp -> Cron/Worker/SyncRunner -> HTTP Serve -> 收到退出信号 -> HTTP Shutdown停止接收新请求 -> Serve返回 -> 停止Cron/Runner -> 等待HTTP与Chunk任务完成 -> 关闭Redis/DB -> flush日志`
 
 **核心对象、权限与扩展**
 
-- Runner必须在Context取消后停止Claim，并在Shutdown timeout内收敛在途任务。
+- Runner必须在Context取消后停止Claim，并在Shutdown timeout内等待正在执行的任务完成。
 - DB/Redis只能在HTTP和后台任务停止后关闭；不能依赖进程退出让OS代为回收。
 - 新后台任务必须进入统一生命周期和关闭等待，不允许裸goroutine永久运行。
 
-### 6.16 Preflight、Backup与Release
+### 6.16 运行前检查、备份与发布
 
 **模块功能与用户能力**
 
-发布链路在启动前验证配置、数据库、Ledger和关键Seed，提供外部数据库备份/恢复闭环，并由本地与CI共享
-同一`release-check`门禁。该模块面向开发和运维，不向业务用户暴露页面。
+服务启动前会检查配置、数据库、Ledger和关键Seed；外部数据库脚本负责备份、校验、恢复和恢复后检查。
+本地与CI调用同一组Make目标，避免两处维护不同命令。该模块面向开发和运维，不向业务用户暴露页面。
 
 **核心入口与文件职责**
 
@@ -756,11 +759,13 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 | --- | --- |
 | `cmd/db-preflight/main.go` | 检查核心表、列、索引、约束、Seed、Ledger与TLS配置，输出脱敏问题 |
 | `scripts/preflight-external.mjs` | 校验外部部署变量和目标环境安全条件 |
-| `scripts/db-backup-external.mjs` | 生成/校验Manifest与Checksum，编排备份和恢复后Preflight |
-| `scripts/smoke-readonly.mjs` | 对已部署服务执行不改数据的health、ready和只读Smoke |
+| `scripts/db-backup-external.mjs` | 生成并校验Manifest与Checksum，执行备份、恢复和恢复后检查 |
+| `scripts/smoke-readonly.mjs` | 对已部署服务执行不改数据的health、ready和只读基础可用性测试 |
 | `scripts/check-tracked-secrets.mjs` | 扫描tracked文件中的Secret和本机敏感配置 |
 | `Makefile` | 本地与CI共享的test、docs、scripts和release命令真值 |
-| `.github/workflows/release.yml` | 提供PostgreSQL 16/Redis并调用共享发布门禁 |
+| `.github/workflows/ci.yml` | Pull Request入口，调用`make ci-check` |
+| `.github/workflows/release.yml` | main/master入口，调用`make release-check` |
+| `.github/workflows/shared-checks.yml` | 统一准备PostgreSQL 16、Redis、Go和Node环境 |
 | `docker-compose.yml`、`docker-compose.external.yml` | 本地完整环境和外部基础设施部署拓扑 |
 
 **典型链路**
@@ -769,9 +774,9 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 
 **核心对象、权限与扩展**
 
-- Preflight只检查，不修Schema；错误可说明缺失对象，但不能输出DSN、密码或Credential。
-- Restore先验证Manifest和目标环境，再恢复并运行Preflight；备份文件不进入Git。
-- CI和本地必须复用Makefile目标，不能维护两套不同门禁。
+- 运行前检查只报告问题，不修改Schema；错误可说明缺失对象，但不能输出DSN、密码或Credential。
+- Restore先验证Manifest和目标环境，再恢复并运行数据库检查；备份文件不进入Git。
+- CI和本地必须复用Makefile目标，不能维护两套不同的检查命令。
 
 ### 6.17 Frontend公共能力
 
@@ -859,7 +864,13 @@ Runtime Lifecycle负责HTTP、Cron、Integration Worker、Sync Runner、Chunk清
 
 ## 9. 修改后的验证
 
-按风险选择测试，提交前至少执行相关单元测试。完整发布门禁：
+按风险选择测试，提交前至少执行相关单元测试。Pull Request日常检查：
+
+```bash
+SWEET_TEST_POSTGRES_DSN=postgresql://... make ci-check
+```
+
+发布前完整检查：
 
 ```bash
 SWEET_TEST_POSTGRES_DSN=postgresql://... make release-check

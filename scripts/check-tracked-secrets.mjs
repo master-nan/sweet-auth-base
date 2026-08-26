@@ -134,21 +134,21 @@ function main() {
   try {
     findings = runTrackedSecretScan()
   } catch (error) {
-    console.error(`Tracked secret scan could not run: ${error.message}`)
+    console.error(`无法扫描 Git tracked 文件中的敏感信息：${error.message}`)
     process.exitCode = 1
     return
   }
 
   if (findings.length === 0) {
-    console.log('Tracked secret scan passed.')
+    console.log('敏感信息检查通过。')
     return
   }
 
-  console.error(`Tracked secret scan found ${findings.length} potential secret(s):`)
+  console.error(`敏感信息检查发现 ${findings.length} 处疑似凭据：`)
   for (const finding of findings) {
     console.error(`- ${finding.path}:${finding.line} [${finding.rule}] ${finding.description}`)
   }
-  console.error('Remove the credential or add a narrowly scoped "secret-scan: allow <rule>" comment with justification.')
+  console.error('请移除凭据；确认是测试数据时，可添加范围明确且说明原因的 "secret-scan: allow <rule>" 注释。')
   process.exitCode = 1
 }
 

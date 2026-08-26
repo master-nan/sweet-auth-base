@@ -325,7 +325,7 @@ import type { resolveOrganizationSelectorConfig } from 'src/utils/field-metadata
 
 type OrganizationSelectorConfig = NonNullable<ReturnType<typeof resolveOrganizationSelectorConfig>>
 
-// DynamicFieldControlContext 由DynamicFormDialog集中解析，单字段控件不重复判断Metadata合同。
+// DynamicFormDialog 统一准备字段上下文，单字段控件不再重复解析 Metadata 规则。
 export interface DynamicFieldControlContext {
   role: 'standard' | 'dict-code' | 'linkage-config'
   controlType: string

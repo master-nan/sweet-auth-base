@@ -7,7 +7,7 @@ $font-family_1:
   Arial sans-serif;
 
 html {
-  // Theme Store应用用户偏好后会覆盖这些值；默认值防止Runtime Theme就绪前样式缺失。
+  // Theme Store 加载用户偏好后会覆盖这些值；加载完成前先使用这里的默认颜色。
   --app-primary-soft: rgba(115, 103, 240, 0.08);
   --app-primary-soft-strong: rgba(115, 103, 240, 0.16);
   --app-primary-border: rgba(115, 103, 240, 0.28);

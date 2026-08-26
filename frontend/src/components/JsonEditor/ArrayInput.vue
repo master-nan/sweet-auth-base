@@ -63,7 +63,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 
-// TypeScript 类型方式定义 props
 interface ArrayInputProps {
   modelValue?: string[] | string | null
   label?: string

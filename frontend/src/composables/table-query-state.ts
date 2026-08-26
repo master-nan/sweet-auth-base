@@ -33,7 +33,7 @@ export function useTableQueryState<TQuery extends Query>(options: TableQueryStat
   }
 
   const submitQuickSearch = () => {
-    // Quick Search只提交keyword并回到第一页；Expression、Binding、Order和Scheme来源保持不变。
+    // 关键词搜索只回到第一页，不清除高级条件、动态绑定、排序或当前查询方案。
     resetPage()
   }
 
@@ -85,7 +85,7 @@ export function useTableQueryState<TQuery extends Query>(options: TableQueryStat
     resolved: QuerySchemeResolvedQuery,
     sourceBindings: QuerySchemeBinding[] = [],
   ) => {
-    // Baseline在Resolve结果完整写入后建立，后续Dirty比较不包含分页和列偏好。
+    // 完整应用方案后再记录比较基准；分页和列显示偏好不参与“方案已修改”判断。
     query.value.expressions = cloneDeep(resolved.expressions)
     query.value.quick_query = cloneDeep(resolved.quick_query)
     query.value.order = cloneDeep(resolved.order)

@@ -367,7 +367,7 @@ HR Source DTO
 
 测试文件按长期回归价值保留：安全、事务、状态机、权限、Migration、数据库约束和产品交互优先；重复 GORM CRUD、第三方库透传、文件拆分和源码字符串测试应删除。前端页面只测试页面自己的业务组合，公共组件行为由组件测试覆盖。跨端枚举、Operator 和 Permission Contract Guard 可以保留，但同一契约不得复制多份。
 
-`make verify` 只执行 docs-check、后端测试以及前端 lint/typecheck/build，适合日常快速验证。发布使用 `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check`；该唯一门禁包含 tracked secret scan、docs、Node 运维脚本测试、强制 PostgreSQL、Race、前端 Vitest 和前端构建，并在 DSN 缺失或不是 PostgreSQL URL 时失败。GitHub Actions 提供 PostgreSQL 16/Redis service 后直接调用同一 Make 目标，不复制门禁步骤。
+`make verify`只执行docs-check、后端测试以及前端lint/typecheck/build，适合本地快速验证。Pull Request运行`make ci-check`，使用真实PostgreSQL执行一次后端测试，并完成敏感信息、文档、Node脚本和全部前端检查。代码推送到main/master后运行`make release-check`，在日常检查之外增加后端`count=3`和全仓Race。两个GitHub Actions入口复用`.github/workflows/shared-checks.yml`准备PostgreSQL 16、Redis、Go和Node环境，具体测试顺序由Makefile维护。
 
 ## 18. 常见反例
 

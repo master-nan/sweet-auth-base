@@ -71,7 +71,6 @@ interface KeyValueEntry {
   value: string
 }
 
-// TypeScript 类型方式定义 props
 interface KeyValueEditorProps {
   modelValue?: Record<string, any> | string | null
   label?: string

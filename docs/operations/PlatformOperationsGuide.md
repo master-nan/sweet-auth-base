@@ -63,7 +63,7 @@ chmod 600 .env.external
 node scripts/preflight-external.mjs .env.external
 ```
 
-`docker-compose.external.yml` 对所有安全关键变量采用必填插值，不提供数据库口令、Session/Salt、Bootstrap secret，也不默认关闭或开启 secure config、Migration、Seed。`.env.external.example` 明确选择 development，仅用于复制后填写；生产必须改为 `APP_ENV=production`，启用 `APP_REQUIRE_SECURE_CONFIG`，设置 PostgreSQL/Redis TLS 和独立强秘密。development 预检需要显式设置 `SWEET_ADMIN_PREFLIGHT_ALLOW_NON_PRODUCTION=true`。
+`docker-compose.external.yml` 对所有安全关键变量采用必填插值，不提供数据库口令、Session/Salt、Bootstrap secret，也不默认关闭或开启 secure config、Migration、Seed。`.env.external.example` 明确选择 development，仅用于复制后填写；生产必须改为 `APP_ENV=production`，启用 `APP_REQUIRE_SECURE_CONFIG`，设置 PostgreSQL/Redis TLS 和独立强秘密。development 环境检查需要显式设置 `SWEET_ADMIN_PREFLIGHT_ALLOW_NON_PRODUCTION=true`。
 
 生产写操作还会检查 `SWEET_ADMIN_EXTERNAL_TARGET_PURPOSE` 和显式确认。不要把 `.env.external` 放入仓库，也不要在工单、聊天或日志中粘贴完整文件。
 
@@ -142,7 +142,7 @@ make docker-down
 
 1. 从模板初始化 `.env.external`，填写目标和强秘密。
 2. 设置 `SWEET_ADMIN_EXTERNAL_TARGET_PURPOSE` 为真实用途。
-3. 先做只读预检，不要一上来执行 Migration。
+3. 先执行只读环境检查，不要一上来执行 Migration。
 4. 备份并验证备份证据。
 5. 显式执行 Migration、Seed。
 6. 启动 backend/frontend。
@@ -200,7 +200,7 @@ make db-migrate-external EXTERNAL_ENV_FILE=.env.external
 make db-seed-external EXTERNAL_ENV_FILE=.env.external
 ```
 
-迁移和 Seed 后执行结构/依赖预检：
+迁移和 Seed 后检查数据库结构与依赖：
 
 ```bash
 docker compose --env-file .env.external -f docker-compose.external.yml \
@@ -262,7 +262,7 @@ Redis 不是业务数据库真值，但它是当前应用必需依赖。Redis �
 
 `upload.driver` 当前支持 `local` 和阿里云 OSS。两种模式都必须配置允许扩展名、MIME、单文件大小、Chunk 大小和访问 URL；生产保持 `public_preview=false`。
 
-未完成分片只存在于受控 `upload.dir/chunks/<upload_id>` 暂存目录。应用启动时立即清理一次，并按 `chunk_cleanup_minutes` 周期删除最近活动时间超过 `chunk_ttl_hours` 的会话；合并成功会立即清理。当前没有正式客户端 cancel API，用户放弃、断连或进程崩溃由 TTL 兜底。清理器跳过 symlink，且不会扫描或删除持久文件目录。
+未完成分片只存在于受控 `upload.dir/chunks/<upload_id>` 暂存目录。应用启动时立即清理一次，并按 `chunk_cleanup_minutes` 周期删除最近活动时间超过 `chunk_ttl_hours` 的会话；合并成功会立即清理。当前没有正式客户端 cancel API，用户放弃、断连或进程崩溃后遗留的分片由 TTL 定期清理。清理器跳过 symlink，且不会扫描或删除持久文件目录。
 
 ### 8.1 Local
 
@@ -332,7 +332,7 @@ Worker / Runner 配置
 | 429/503 | 外部限流/暂时故障 | Attempt、RetryPolicy、Retry-After |
 | 超时或地址拒绝 | 接口超时、HTTPS/SSRF 安全校验 | InterfaceDefinition、IntegrationLog |
 | HTTP 200 但 Execution 失败 | Consumer 业务校验失败 | Consumer result、业务 Batch/Record |
-| Checkpoint 不推进 | Slice 失败、Retry 未收敛或业务失败 | SyncBatch、Execution、业务结果 |
+| Checkpoint 不推进 | Slice 失败、Retry 尚未完成或业务失败 | SyncBatch、Execution、业务结果 |
 | response too large | Body 超 Interface/Consumer/Transport 限制 | Execution reason、接口响应策略 |
 
 业务处理失败不会进入 Integration Retry。Transport 上限为 64 MiB，Consumer 可设置更低限制；不要提高上限、保存 Response Artifact 或落地临时 Payload 绕过失败。
@@ -381,7 +381,7 @@ Logout 会更新 Login State 并撤销相关 Token。不要因为 JWT 可离线�
 
 排错时先选正确记录。HTTP 503 应查看 Integration Attempt；HTTP 200 后的组织引用失败应查看 OrgSyncRecord；登录锁定应查看 Auth/Login Audit。
 
-## 14. 预检与只读 Smoke
+## 14. 运行前检查与只读基础可用性测试
 
 本地Docker运行检查：
 
@@ -392,20 +392,20 @@ curl -fsS http://127.0.0.1:9009/healthz
 curl -fsS http://127.0.0.1:9009/readyz
 ```
 
-外部配置预检：
+检查外部部署配置：
 
 ```bash
 node scripts/preflight-external.mjs template-check .env.external.example
 node scripts/preflight-external.mjs .env.external
 ```
 
-只读 Smoke 会检查 health/readiness、公开配置脱敏、登录、菜单、Metadata、Application 脱敏和 Audit 查询：
+只读基础可用性测试会检查health/readiness、公开配置脱敏、登录、菜单、Metadata、Application脱敏和Audit查询：
 
 ```bash
 SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 ```
 
-若启用验证码，第一次运行可通过 `SWEET_ADMIN_SMOKE_CAPTCHA_IMAGE_FILE` 保存本次图片，再显式提供配对的 captcha id/code 重跑。Smoke 账号应使用专门的受控管理员账号，不要复用个人密码。
+若启用验证码，第一次运行可通过`SWEET_ADMIN_SMOKE_CAPTCHA_IMAGE_FILE`保存本次图片，再显式提供配对的captcha id/code重跑。测试账号应使用专门的受控管理员账号，不要复用个人密码。
 
 ## 15. 测试与发布验证矩阵
 
@@ -420,9 +420,10 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 | 文档 | `make docs-check` |
 | Git tracked secret/static scan | `make secret-scan` |
 | 基础聚合 | `make verify` |
-| 完整发布门禁 | `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check` |
+| Pull Request日常检查 | `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make ci-check` |
+| 发布前完整检查 | `SWEET_TEST_POSTGRES_DSN='postgres://<user>:<password>@<host>:<port>/<database>?sslmode=<mode>' make release-check` |
 
-`make verify` 是快速验证，不包含前端 Vitest、Race 和强制 PostgreSQL 测试。`make release-check` 是 CI 与本地发布的共同真值，包含 tracked secret/static scan、docs、Node scripts、强制 PostgreSQL、Race、前端 Vitest 和前端构建；缺少 PostgreSQL DSN 或 DSN scheme 不正确时直接失败。GitHub Actions 只保留 `.github/workflows/release.yml`：它读取根 `.nvmrc`，提供带 healthcheck 的 PostgreSQL 16 与 Redis service，设置 `SWEET_REQUIRE_POSTGRES_TESTS=true` 后直接调用该 Make 目标。
+`make verify`是本地快速验证，不包含前端Vitest、Race和强制PostgreSQL测试。Pull Request通过`.github/workflows/ci.yml`调用`make ci-check`；main/master通过`.github/workflows/release.yml`调用`make release-check`。`release-check`先完成全部日常检查，再增加后端`count=3`和全仓Race。两个workflow复用`.github/workflows/shared-checks.yml`读取根`.nvmrc`并准备PostgreSQL 16与Redis，具体命令只在Makefile维护。缺少PostgreSQL DSN或URL格式错误时，检查会直接失败。
 
 ## 16. 发布 Checklist
 
@@ -435,7 +436,7 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - [ ] `make docs-check` 通过。
 - [ ] `make secret-scan` 通过，DSN、token、私钥和 production secret fallback 未进入 tracked 文件。
 - [ ] Migration/Seed 在等价环境验证幂等。
-- [ ] `.env.external` 通过预检，权限为 600，秘密未进入 Git/日志。
+- [ ] `.env.external` 通过运行前检查，权限为600，秘密未进入Git或日志。
 - [ ] 数据库备份、manifest 和恢复演练证据可用。
 - [ ] CORS、上传 allowlist、Casbin coverage 和 `public_preview=false` 已确认。
 - [ ] 多实例 Worker/Runner ID 唯一。
@@ -450,7 +451,7 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 
 ### 发布后
 
-- [ ] 执行只读 Smoke。
+- [ ] 执行只读基础可用性测试。
 - [ ] 用有权限和无权限账号检查关键页面/API。
 - [ ] 检查 Access/Auth/Integration Audit 是否正常且无秘密。
 - [ ] 检查 Runner/Worker 和 Checkpoint 是否按预期运行。
