@@ -222,7 +222,9 @@ func (s *OrgService) QueryStructures(
 	if err != nil {
 		return result, err
 	}
-	req.StructureType = model.OrgStructureTypeManagement
+	if req.StructureType == "" {
+		req.StructureType = model.OrgStructureTypeManagement
+	}
 	table.TableCode = "org_structure"
 	rows, err := s.structureRepo.QueryForRead(ctx, &req, table, scope)
 	if err != nil {
@@ -258,7 +260,8 @@ func (s *OrgService) GetStructureDetail(
 	if !orgStructureVisible(structure, scope) {
 		return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureInactive
 	}
-	if structure.StructureType != model.OrgStructureTypeManagement {
+	if structure.StructureType != model.OrgStructureTypeManagement &&
+		structure.StructureType != model.OrgStructureTypeLegal {
 		return response.OrgStructureDetailRes{}, myerrors.ErrOrgStructureNotFound
 	}
 	return response.NewOrgStructureDetailRes(structure), nil
@@ -832,7 +835,7 @@ func (s *OrgService) GetPositionDetail(
 	unit, unitErr := s.orgUnitRepo.FindByIdForRead(ctx, position.OrgUnitId)
 	switch {
 	case unitErr == nil:
-		unitSummary := response.NewOrgReferenceSummaryRes(unit.Id, unit.Code, unit.Name)
+		unitSummary := response.NewOrgUnitReferenceSummaryRes(unit)
 		result.OrgUnit = &unitSummary
 		if unit.PrimaryLegalEntityId != nil {
 			legalEntity, legalErr := s.legalEntityRepo.FindByIdForRead(
@@ -1216,7 +1219,8 @@ func (s *OrgService) getStructureOrgTreeForRead(
 	if !orgStructureVisible(structure, scope) {
 		return nil, myerrors.ErrOrgStructureInactive
 	}
-	if structure.StructureType != model.OrgStructureTypeManagement {
+	if structure.StructureType != model.OrgStructureTypeManagement &&
+		structure.StructureType != model.OrgStructureTypeLegal {
 		return nil, myerrors.ErrOrgStructureNotFound
 	}
 
@@ -1419,15 +1423,11 @@ func (s *OrgService) attachAssignmentReferences(
 	}
 	unitById := make(map[int]response.OrgReferenceSummaryRes, len(orgUnits))
 	for _, unit := range orgUnits {
-		unitById[unit.Id] = response.NewOrgReferenceSummaryRes(unit.Id, unit.Code, unit.Name)
+		unitById[unit.Id] = response.NewOrgUnitReferenceSummaryRes(unit)
 	}
 	positionById := make(map[int]response.OrgReferenceSummaryRes, len(positions))
 	for _, position := range positions {
-		positionById[position.Id] = response.NewOrgReferenceSummaryRes(
-			position.Id,
-			position.Code,
-			position.Name,
-		)
+		positionById[position.Id] = response.NewOrgPositionReferenceSummaryRes(position)
 	}
 
 	for index := range assignments {

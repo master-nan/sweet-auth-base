@@ -116,6 +116,7 @@ export interface StructureOrgTreeNode {
   structure_node_id: number
   structure_id: number
   org_unit_id: number
+  primary_legal_entity_id?: number | null
   parent_node_id?: number | null
   code: string
   name: string
@@ -175,8 +176,8 @@ export interface EmployeeListItem extends OrganizationBaseRecord {
   employee_no: string
   name: string
   employment_status: string
-	primary_legal_entity_id?: number | null
-	primary_legal_entity?: OrganizationReferenceSummary | null
+  primary_legal_entity_id?: number | null
+  primary_legal_entity?: OrganizationReferenceSummary | null
   user_id?: number | null
   binding_status: string
   bound_account?: BoundUserSummary | null

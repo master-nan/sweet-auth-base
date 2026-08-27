@@ -57,7 +57,7 @@ func TestSourceDTOAndNormalizersKeepSourceFieldsAtAdapterBoundary(t *testing.T) 
 		SourceID: "position-1", SourceCode: "POST-001", Name: "同名岗位", OrgUnitSourceID: "unit-1",
 		JobLevel: "L1", Enabled: SourceEnableEnabled, ChangeTime: "2026-08-12T10:31:00",
 	})
-	if err != nil || position.Key.ObjectKind() != ObjectKindPosition || position.Code != "POST-001" || position.OrgUnitSourceID != "unit-1" {
+	if err != nil || position.Key.ObjectKind() != ObjectKindPosition || position.Code != "position-1" || position.SourceCode != "POST-001" || position.OrgUnitSourceID != "unit-1" {
 		t.Fatalf("position normalized=%+v err=%v", position, err)
 	}
 	var invalidPosition HRPositionSourceDTO
@@ -156,10 +156,31 @@ func TestOrganizationHRConsumerRegistrationsStayGatedUntilSourceContractIsExplic
 	metadata, err := enabled.ValidateReference(integration.SyncConsumerReference{
 		Code: ConsumerCodeEmployee, Version: ConsumerVersionV1, ContentType: "application/json",
 		ResponseLimit: maxEmployeeResponseBytes, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
-		RequestTimeout: time.Second, LeaseDuration: 180 * time.Second,
+		RequestTimeout: time.Second, LeaseDuration: 10 * time.Minute,
 	})
-	if err != nil || metadata.MaxResponseBytes != maxEmployeeResponseBytes {
+	if err != nil || metadata.MaxResponseBytes != maxEmployeeResponseBytes || metadata.MaxDuration != bulkConsumerDuration {
 		t.Fatalf("employee metadata=%+v err=%v", metadata, err)
+	}
+	departmentMetadata, err := enabled.ValidateReference(integration.SyncConsumerReference{
+		Code: ConsumerCodeLegalDepartment, Version: ConsumerVersionV1, ContentType: "application/json",
+		ResponseLimit: maxDepartmentResponseBytes, CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
+		RequestTimeout: time.Second, LeaseDuration: 10 * time.Minute,
+	})
+	if err != nil || departmentMetadata.MaxResponseBytes != maxDepartmentResponseBytes || departmentMetadata.MaxDuration != bulkConsumerDuration {
+		t.Fatalf("department metadata=%+v err=%v", departmentMetadata, err)
+	}
+}
+
+func TestNormalizeOrgUnitAcceptsMissingDisplayCode(t *testing.T) {
+	normalizer := Normalizer{SourceSystemCode: OrganizationHRSourceSystemCode, SourceLocation: time.UTC}
+	input, err := normalizer.NormalizeOrgUnitSource(HRDepartmentSourceDTO{
+		SourceID: "department-root", Name: "已停用部门根节点", Enabled: SourceEnableDisabled, ChangeTime: "2026-08-27T10:00:00",
+	}, ObjectKindLegalUnit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if input.SourceCode != "" || input.Code != "legal_unit:department-root" || input.Status != CanonicalStatusDisabled {
+		t.Fatalf("input=%+v", input)
 	}
 }
 

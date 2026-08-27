@@ -7,6 +7,7 @@ import (
 	"backend/service"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 // ProvideOrganizationSyncConsumerRegistry 默认隐藏 HR Consumer；只有服务端明确启用并配置来源时区后才开放。

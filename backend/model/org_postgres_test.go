@@ -52,16 +52,29 @@ func TestOrganizationPostgreSQLPartialUniqueConstraints(t *testing.T) {
 	for _, indexName := range []string{
 		"uni_org_legal_entity_source_code",
 		"uni_org_legal_entity_credit",
-		"uni_org_unit_source_code",
 		"uni_org_structure_source",
 		"uni_org_structure_node_current",
-		"uni_org_position_source_code",
 		"uni_org_position_unit_code",
 		"uni_org_employee_source_code",
 		"uni_org_employee_user",
 		"uni_org_assignment_current_primary",
 	} {
 		assertPostgreSQLPartialIndex(t, db, schemaName, indexName)
+	}
+
+	units := []model.OrgUnit{
+		{Basic: model.Basic{Id: 6001}, SourceSystemCode: "master", SourceId: "unit-pg-1", SourceCode: "SHARED", Code: "unit-pg-1", Name: "Unit 1"},
+		{Basic: model.Basic{Id: 6002}, SourceSystemCode: "master", SourceId: "unit-pg-2", SourceCode: "SHARED", Code: "unit-pg-2", Name: "Unit 2"},
+	}
+	if err := db.Create(&units).Error; err != nil {
+		t.Fatalf("duplicate organization source code should be allowed: %v", err)
+	}
+	positions := []model.OrgPosition{
+		{Basic: model.Basic{Id: 6101}, SourceSystemCode: "master", SourceId: "position-pg-1", SourceCode: "SHARED", Code: "position-pg-1", Name: "Position 1", OrgUnitId: 6001},
+		{Basic: model.Basic{Id: 6102}, SourceSystemCode: "master", SourceId: "position-pg-2", SourceCode: "SHARED", Code: "position-pg-2", Name: "Position 2", OrgUnitId: 6002},
+	}
+	if err := db.Create(&positions).Error; err != nil {
+		t.Fatalf("duplicate position source code should be allowed: %v", err)
 	}
 
 	userId := 9001

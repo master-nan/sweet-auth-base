@@ -27,6 +27,7 @@ type OrgUnitSyncInput struct {
 	Name                string
 	ParentSourceID      string
 	LegalEntitySourceID string
+	LegalEntityCode     string
 	Status              CanonicalStatus
 	SourceChangedAt     time.Time
 	Level               int
@@ -35,6 +36,7 @@ type OrgUnitSyncInput struct {
 
 type PositionSyncInput struct {
 	Key             SourceKey
+	SourceCode      string
 	Code            string
 	Name            string
 	OrgUnitSourceID string

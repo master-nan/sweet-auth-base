@@ -5,7 +5,7 @@
         <q-card-section class="row items-center justify-between q-gutter-md q-py-sm">
           <div class="organization-page-heading">
             <h1 class="text-h6 text-weight-bold q-my-none">组织架构</h1>
-            <p class="text-caption text-grey-7 q-my-none">统一浏览管理组织与法人主体镜像</p>
+            <p class="text-caption text-grey-7 q-my-none">浏览法人架构与管理架构两棵组织树</p>
           </div>
 
           <div class="row items-center justify-end q-gutter-sm">
@@ -208,6 +208,22 @@ import {
 import { useDictStore } from 'src/stores/dict'
 
 type ArchitectureMode = 'management' | 'legal'
+type LegalArchitectureNodeKind = 'legal_entity' | 'legal_unit'
+
+interface LegalArchitectureNode {
+  id: number
+  kind: LegalArchitectureNodeKind
+  code: string
+  name: string
+  shortName?: string
+  status: string
+  disabled: boolean
+  legalEntityId?: number
+  orgUnitId?: number
+  entityType?: string
+  unitType?: string
+  children: LegalArchitectureNode[]
+}
 
 interface SelectionSummary {
   name: string
@@ -222,13 +238,15 @@ const dictStore = useDictStore()
 
 const architectureMode = ref<ArchitectureMode>('management')
 const structures = ref<OrganizationStructure[]>([])
+const legalStructure = ref<OrganizationStructure | null>(null)
 const selectedStructureCode = ref<string | null>(null)
 const managementTree = ref<StructureOrgTreeNode[]>([])
-const legalTree = ref<LegalEntityTreeNode[]>([])
+const legalTree = ref<LegalArchitectureNode[]>([])
 const selectedManagementNode = ref<StructureOrgTreeNode | null>(null)
-const selectedLegalNode = ref<LegalEntityTreeNode | null>(null)
+const selectedLegalNode = ref<LegalArchitectureNode | null>(null)
 const managementDetail = ref<OrgUnitDetail | null>(null)
 const legalDetail = ref<LegalEntityDetail | null>(null)
+const legalUnitDetail = ref<OrgUnitDetail | null>(null)
 const treeKeyword = ref('')
 const structureLoading = ref(false)
 const treeLoading = ref(false)
@@ -250,46 +268,41 @@ const selectedStructure = computed(
 const showStructureSwitcher = computed(() => structures.value.length > 1)
 const pageError = computed(() => structureError.value || treeError.value)
 const filteredLegalTree = computed(() =>
-  filterLegalEntityTree(legalTree.value, treeKeyword.value),
+  filterLegalArchitectureTree(legalTree.value, treeKeyword.value),
 )
 const displayTree = computed<OrganizationReadOnlyTreeNode[]>(() =>
   architectureMode.value === 'management'
     ? mapStructureTree(managementTree.value)
-    : mapLegalEntityTree(filteredLegalTree.value),
+    : mapLegalArchitectureTree(filteredLegalTree.value),
 )
 const selectedTreeNodeId = computed(() =>
   architectureMode.value === 'management'
-    ? selectedManagementNode.value?.structure_node_id ?? null
-    : selectedLegalNode.value?.legal_entity_id ?? null,
+    ? (selectedManagementNode.value?.structure_node_id ?? null)
+    : (selectedLegalNode.value?.id ?? null),
 )
 const treeTitle = computed(() =>
-  architectureMode.value === 'management' ? '管理组织树' : '法人树',
+  architectureMode.value === 'management' ? '管理架构' : '法人架构',
 )
 const treeSummary = computed(() => {
   if (architectureMode.value === 'legal') {
-    return `法人主体镜像 · ${countLegalEntityNodes(legalTree.value)} 个法人主体`
+    const counts = countLegalArchitectureNodes(legalTree.value)
+    return `${counts.legalEntities} 个法人 · ${counts.legalUnits} 个部门`
   }
-  if (!selectedStructure.value) return '管理组织镜像 · 暂无管理视图'
-  return `管理组织镜像 · ${selectedStructure.value.name} · ${countStructureNodes(
-    managementTree.value,
-  )} 个组织`
+  if (!selectedStructure.value) return '暂无管理架构数据'
+  return `${selectedStructure.value.name} · ${countStructureNodes(managementTree.value)} 个组织`
 })
 const searchPlaceholder = computed(() =>
-  architectureMode.value === 'management'
-    ? '搜索组织编码或名称'
-    : '搜索法人编码、名称或简称',
+  architectureMode.value === 'management' ? '搜索组织编码或名称' : '搜索法人或部门编码、名称',
 )
 const treeEmptyText = computed(() => {
   if (architectureMode.value === 'legal') {
-    return treeKeyword.value ? '没有匹配的法人主体' : '暂无法人主体数据'
+    return treeKeyword.value ? '没有匹配的法人或部门' : '暂无法人架构数据'
   }
   if (!selectedStructure.value) return '暂无可用管理视图'
   return treeKeyword.value ? '当前视图没有匹配的组织' : '当前视图暂无组织数据'
 })
 const detailEmptyText = computed(() =>
-  architectureMode.value === 'management'
-    ? '请选择左侧管理组织'
-    : '请选择左侧法人主体',
+  architectureMode.value === 'management' ? '请选择左侧管理组织' : '请选择左侧法人或部门',
 )
 const selectionSummary = computed<SelectionSummary | null>(() => {
   if (architectureMode.value === 'legal') {
@@ -298,10 +311,13 @@ const selectionSummary = computed<SelectionSummary | null>(() => {
     return {
       name: node.name,
       code: node.code,
-      typeLabel: legalEntityTypeLabel(node.entity_type),
+      typeLabel:
+        node.kind === 'legal_entity'
+          ? legalEntityTypeLabel(node.entityType || '')
+          : unitTypeLabel(node.unitType || ''),
       status: node.status,
       disabled: node.disabled,
-      icon: 'account_balance',
+      icon: node.kind === 'legal_entity' ? 'account_balance' : 'corporate_fare',
     }
   }
 
@@ -319,7 +335,9 @@ const selectionSummary = computed<SelectionSummary | null>(() => {
 const detailGroups = computed<OrganizationDetailGroup[]>(() =>
   architectureMode.value === 'management'
     ? managementDetailGroups(managementDetail.value)
-    : legalEntityDetailGroups(legalDetail.value),
+    : selectedLegalNode.value?.kind === 'legal_unit'
+      ? legalUnitDetailGroups(legalUnitDetail.value)
+      : legalEntityDetailGroups(legalDetail.value),
 )
 
 const loadStructures = async () => {
@@ -327,13 +345,22 @@ const loadStructures = async () => {
   structureError.value = ''
   try {
     const previousCode = selectedStructureCode.value
-    const result = await queryStructures({
-      page: 1,
-      num: 100,
-      only_effective: true,
-      structure_type: 'management',
-    })
-    structures.value = result.items
+    const [managementResult, legalResult] = await Promise.all([
+      queryStructures({
+        page: 1,
+        num: 100,
+        only_effective: true,
+        structure_type: 'management',
+      }),
+      queryStructures({
+        page: 1,
+        num: 100,
+        only_effective: true,
+        structure_type: 'legal',
+      }),
+    ])
+    structures.value = managementResult.items
+    legalStructure.value = legalResult.items.find((item) => item.structure_type === 'legal') || null
 
     if (previousCode && structures.value.some((item) => item.code === previousCode)) {
       selectedStructureCode.value = previousCode
@@ -341,10 +368,10 @@ const loadStructures = async () => {
     }
 
     const defaultStructure = structures.value.find((item) => item.is_default)
-    selectedStructureCode.value =
-      defaultStructure?.code || structures.value[0]?.code || null
+    selectedStructureCode.value = defaultStructure?.code || structures.value[0]?.code || null
   } catch (error) {
     structures.value = []
+    legalStructure.value = null
     selectedStructureCode.value = null
     structureError.value = errorMessage(error, '管理视图加载失败')
   } finally {
@@ -371,10 +398,7 @@ const loadManagementTree = async () => {
       ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     })
     const current = selectedManagementNode.value
-      ? findStructureNode(
-          managementTree.value,
-          selectedManagementNode.value.structure_node_id,
-        )
+      ? findStructureNode(managementTree.value, selectedManagementNode.value.structure_node_id)
       : null
     const next = current || firstStructureNode(managementTree.value)
     if (next) {
@@ -398,23 +422,35 @@ const loadLegalTree = async () => {
   treeLoading.value = true
   treeError.value = ''
   try {
-    legalTree.value = await getLegalEntityTree({ only_effective: true })
+    if (!legalStructure.value) await loadStructures()
+    const [legalEntities, legalUnits] = await Promise.all([
+      getLegalEntityTree({ only_effective: true }),
+      legalStructure.value
+        ? getStructureOrgTree({
+            structure_id: legalStructure.value.id,
+            only_effective: true,
+          })
+        : Promise.resolve([]),
+    ])
+    legalTree.value = buildLegalArchitectureTree(legalEntities, legalUnits)
     legalTreeLoaded.value = true
     const current = selectedLegalNode.value
-      ? findLegalEntityNode(legalTree.value, selectedLegalNode.value.legal_entity_id)
+      ? findLegalArchitectureNode(legalTree.value, selectedLegalNode.value.id)
       : null
-    const next = current || firstLegalEntityNode(legalTree.value)
+    const next = current || firstLegalArchitectureNode(legalTree.value)
     if (next) {
       await selectLegalNode(next)
     } else {
       selectedLegalNode.value = null
       legalDetail.value = null
+      legalUnitDetail.value = null
       detailError.value = ''
     }
   } catch (error) {
     legalTree.value = []
     selectedLegalNode.value = null
     legalDetail.value = null
+    legalUnitDetail.value = null
     legalTreeLoaded.value = false
     treeError.value = errorMessage(error, '法人架构加载失败')
   } finally {
@@ -468,7 +504,7 @@ const handleSearch = async () => {
 
 const handleNodeSelectedById = async (nodeId: number) => {
   if (architectureMode.value === 'legal') {
-    const node = findLegalEntityNode(filteredLegalTree.value, nodeId)
+    const node = findLegalArchitectureNode(filteredLegalTree.value, nodeId)
     if (node) await selectLegalNode(node)
     return
   }
@@ -498,21 +534,29 @@ const selectManagementNode = async (node: StructureOrgTreeNode) => {
   }
 }
 
-const selectLegalNode = async (node: LegalEntityTreeNode) => {
+const selectLegalNode = async (node: LegalArchitectureNode) => {
   selectedLegalNode.value = node
   legalDetail.value = null
+  legalUnitDetail.value = null
   detailError.value = ''
 
   const sequence = ++detailRequestSequence
   detailLoading.value = true
   try {
-    const result = await getLegalEntityDetail(node.legal_entity_id, {
-      only_effective: true,
-    })
-    if (sequence === detailRequestSequence) legalDetail.value = result
+    if (node.kind === 'legal_entity' && node.legalEntityId) {
+      const result = await getLegalEntityDetail(node.legalEntityId, {
+        only_effective: true,
+      })
+      if (sequence === detailRequestSequence) legalDetail.value = result
+    } else if (node.kind === 'legal_unit' && node.orgUnitId) {
+      const result = await getOrgUnitDetail(node.orgUnitId, {
+        only_effective: true,
+      })
+      if (sequence === detailRequestSequence) legalUnitDetail.value = result
+    }
   } catch (error) {
     if (sequence === detailRequestSequence) {
-      detailError.value = errorMessage(error, '法人详情加载失败')
+      detailError.value = errorMessage(error, '法人架构详情加载失败')
     }
   } finally {
     if (sequence === detailRequestSequence) detailLoading.value = false
@@ -529,11 +573,7 @@ const statusLabel = (value: string) =>
   dictStore.getDictLabel('org_object_status', value) || displayValue(value)
 
 onMounted(async () => {
-  await dictStore.loadDicts([
-    'org_unit_type',
-    'org_legal_entity_type',
-    'org_object_status',
-  ])
+  await dictStore.loadDicts(['org_unit_type', 'org_legal_entity_type', 'org_object_status'])
   if (architectureMode.value === 'legal') {
     await loadLegalTree()
     return
@@ -542,9 +582,7 @@ onMounted(async () => {
   await loadManagementTree()
 })
 
-function managementDetailGroups(
-  detail: OrgUnitDetail | null,
-): OrganizationDetailGroup[] {
+function managementDetailGroups(detail: OrgUnitDetail | null): OrganizationDetailGroup[] {
   if (!detail) return []
   const primaryLegalEntity = detail.primary_legal_entity
     ? `${detail.primary_legal_entity.code} - ${detail.primary_legal_entity.name}`
@@ -612,12 +650,10 @@ function managementDetailGroups(
   ]
 }
 
-function legalEntityDetailGroups(
-  detail: LegalEntityDetail | null,
-): OrganizationDetailGroup[] {
+function legalEntityDetailGroups(detail: LegalEntityDetail | null): OrganizationDetailGroup[] {
   if (!detail) return []
   const parent = detail.parent_id
-    ? findLegalEntityNode(legalTree.value, detail.parent_id)
+    ? findLegalArchitectureNode(legalTree.value, detail.parent_id)
     : null
 
   return [
@@ -692,9 +728,64 @@ function legalEntityDetailGroups(
   ]
 }
 
-function mapStructureTree(
-  nodes: StructureOrgTreeNode[],
-): OrganizationReadOnlyTreeNode[] {
+function legalUnitDetailGroups(detail: OrgUnitDetail | null): OrganizationDetailGroup[] {
+  if (!detail) return []
+  const legalEntity = detail.primary_legal_entity
+    ? `${detail.primary_legal_entity.code} - ${detail.primary_legal_entity.name}`
+    : '-'
+
+  return [
+    {
+      key: 'legal-unit-detail',
+      title: '法人部门详情',
+      fields: [
+        { key: 'name', label: '部门名称', value: displayValue(detail.name) },
+        {
+          key: 'code',
+          label: '部门编码',
+          value: displayValue(detail.code),
+          kind: 'code',
+        },
+        {
+          key: 'unit_type',
+          label: '组织类型',
+          value: unitTypeLabel(detail.unit_type),
+        },
+        { key: 'legal_entity', label: '所属法人', value: legalEntity },
+        {
+          key: 'status',
+          label: '状态',
+          value: statusLabel(detail.status),
+          kind: 'status',
+          color: statusColor(detail.status, false),
+        },
+        {
+          key: 'valid_from',
+          label: '有效期开始',
+          value: formatDate(detail.valid_from),
+        },
+        {
+          key: 'valid_to',
+          label: '有效期结束',
+          value: formatDate(detail.valid_to, '长期有效'),
+        },
+        {
+          key: 'gmt_modify',
+          label: '更新时间',
+          value: formatDateTime(detail.gmt_modify),
+        },
+        {
+          key: 'local_note',
+          label: '平台备注',
+          value: displayValue(detail.local_note),
+          wide: true,
+        },
+      ],
+    },
+  ]
+}
+
+function mapStructureTree(nodes: StructureOrgTreeNode[]): OrganizationReadOnlyTreeNode[] {
   return nodes.map((node) => ({
     id: node.structure_node_id,
     code: node.code,
@@ -708,31 +799,81 @@ function mapStructureTree(
   }))
 }
 
-function mapLegalEntityTree(
-  nodes: LegalEntityTreeNode[],
-): OrganizationReadOnlyTreeNode[] {
+function mapLegalArchitectureTree(nodes: LegalArchitectureNode[]): OrganizationReadOnlyTreeNode[] {
   return nodes.map((node) => ({
-    id: node.legal_entity_id,
+    id: node.id,
     code: node.code,
     name: node.name,
-    icon: 'account_balance',
+    icon: node.kind === 'legal_entity' ? 'account_balance' : 'corporate_fare',
+    typeLabel:
+      node.kind === 'legal_entity'
+        ? legalEntityTypeLabel(node.entityType || '')
+        : unitTypeLabel(node.unitType || ''),
     statusLabel: statusLabel(node.status),
     statusColor: statusColor(node.status, node.disabled),
     muted: node.disabled,
-    children: mapLegalEntityTree(node.children || []),
+    children: mapLegalArchitectureTree(node.children || []),
   }))
 }
 
-function filterLegalEntityTree(
-  nodes: LegalEntityTreeNode[],
+function buildLegalArchitectureTree(
+  legalEntities: LegalEntityTreeNode[],
+  legalUnits: StructureOrgTreeNode[],
+): LegalArchitectureNode[] {
+  const entitiesById = new Map<number, LegalArchitectureNode>()
+  const mapLegalEntity = (source: LegalEntityTreeNode): LegalArchitectureNode => {
+    const node: LegalArchitectureNode = {
+      id: source.legal_entity_id,
+      kind: 'legal_entity',
+      legalEntityId: source.legal_entity_id,
+      code: source.code,
+      name: source.name,
+      shortName: source.short_name,
+      entityType: source.entity_type,
+      status: source.status,
+      disabled: source.disabled,
+      children: [],
+    }
+    entitiesById.set(source.legal_entity_id, node)
+    node.children = (source.children || []).map(mapLegalEntity)
+    return node
+  }
+  const roots = legalEntities.map(mapLegalEntity)
+
+  const mapLegalUnit = (source: StructureOrgTreeNode): LegalArchitectureNode => ({
+    id: source.structure_node_id,
+    kind: 'legal_unit',
+    orgUnitId: source.org_unit_id,
+    code: source.code,
+    name: source.name,
+    unitType: source.unit_type,
+    status: source.status,
+    disabled: source.disabled,
+    children: (source.children || []).map(mapLegalUnit),
+  })
+
+  const detachedUnits: LegalArchitectureNode[] = []
+  for (const unitRoot of legalUnits) {
+    const unitNode = mapLegalUnit(unitRoot)
+    const legalEntity = unitRoot.primary_legal_entity_id
+      ? entitiesById.get(unitRoot.primary_legal_entity_id)
+      : null
+    if (legalEntity) legalEntity.children.push(unitNode)
+    else detachedUnits.push(unitNode)
+  }
+  return [...roots, ...detachedUnits]
+}
+
+function filterLegalArchitectureTree(
+  nodes: LegalArchitectureNode[],
   rawKeyword: string,
-): LegalEntityTreeNode[] {
+): LegalArchitectureNode[] {
   const normalized = rawKeyword.trim().toLocaleLowerCase()
   if (!normalized) return nodes
 
   return nodes.flatMap((node) => {
-    const children = filterLegalEntityTree(node.children || [], normalized)
-    const matched = [node.code, node.name, node.short_name].some((value) =>
+    const children = filterLegalArchitectureTree(node.children || [], normalized)
+    const matched = [node.code, node.name, node.shortName].some((value) =>
       String(value || '')
         .toLocaleLowerCase()
         .includes(normalized),
@@ -741,9 +882,7 @@ function filterLegalEntityTree(
   })
 }
 
-function firstStructureNode(
-  nodes: StructureOrgTreeNode[],
-): StructureOrgTreeNode | null {
+function firstStructureNode(nodes: StructureOrgTreeNode[]): StructureOrgTreeNode | null {
   for (const node of nodes) {
     if (!node.disabled) return node
     const child = firstStructureNode(node.children || [])
@@ -764,50 +903,51 @@ function findStructureNode(
   return null
 }
 
-function firstLegalEntityNode(
-  nodes: LegalEntityTreeNode[],
-): LegalEntityTreeNode | null {
+function firstLegalArchitectureNode(nodes: LegalArchitectureNode[]): LegalArchitectureNode | null {
   for (const node of nodes) {
     if (!node.disabled) return node
-    const child = firstLegalEntityNode(node.children || [])
+    const child = firstLegalArchitectureNode(node.children || [])
     if (child) return child
   }
   return nodes[0] || null
 }
 
-function findLegalEntityNode(
-  nodes: LegalEntityTreeNode[],
-  legalEntityId: number,
-): LegalEntityTreeNode | null {
+function findLegalArchitectureNode(
+  nodes: LegalArchitectureNode[],
+  id: number,
+): LegalArchitectureNode | null {
   for (const node of nodes) {
-    if (node.legal_entity_id === legalEntityId) return node
-    const child = findLegalEntityNode(node.children || [], legalEntityId)
+    if (node.id === id) return node
+    const child = findLegalArchitectureNode(node.children || [], id)
     if (child) return child
   }
   return null
 }
 
 function countStructureNodes(nodes: StructureOrgTreeNode[]): number {
-  return nodes.reduce(
-    (total, node) => total + 1 + countStructureNodes(node.children || []),
-    0,
-  )
+  return nodes.reduce((total, node) => total + 1 + countStructureNodes(node.children || []), 0)
 }
 
-function countLegalEntityNodes(nodes: LegalEntityTreeNode[]): number {
+function countLegalArchitectureNodes(nodes: LegalArchitectureNode[]): {
+  legalEntities: number
+  legalUnits: number
+} {
   return nodes.reduce(
-    (total, node) => total + 1 + countLegalEntityNodes(node.children || []),
-    0,
+    (total, node) => {
+      const children = countLegalArchitectureNodes(node.children || [])
+      return {
+        legalEntities:
+          total.legalEntities + children.legalEntities + (node.kind === 'legal_entity' ? 1 : 0),
+        legalUnits: total.legalUnits + children.legalUnits + (node.kind === 'legal_unit' ? 1 : 0),
+      }
+    },
+    { legalEntities: 0, legalUnits: 0 },
   )
 }
 
 function displayValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-'
-  if (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
-  ) {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value)
   }
   return '-'

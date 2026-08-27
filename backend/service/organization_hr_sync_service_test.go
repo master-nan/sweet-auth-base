@@ -65,6 +65,17 @@ func TestOrganizationHRConsumersMapLegalAndIndependentStructures(t *testing.T) {
 		t.Fatalf("legal company leaked into org_unit: count=%d err=%v", legalUnitCount, err)
 	}
 
+	seedOrganizationHRSyncContext(t, db, "EXEC-LEGAL-SUPERSEDED", "SYNC-LEGAL-SUPERSEDED", "task_legal_superseded", hrsync.ConsumerCodeLegalEntity, 1)
+	result = consumeOrganizationHRBody(t, legal, "EXEC-LEGAL-SUPERSEDED", "SYNC-LEGAL-SUPERSEDED", "task_legal_superseded", start, end,
+		`{"success":true,"data":[{"zjkid_ignore":"legal-old","pk_corp":"LEGAL-CURRENT","name":"旧法人","isenable":0,"changeTime":"2026-08-12T10:12:00"},{"zjkid_ignore":"legal-current","pk_corp":"LEGAL-CURRENT","name":"当前法人","isenable":1,"changeTime":"2026-08-12T10:13:00"}]}`)
+	if !result.Success() || result.BusinessSuccessCount() != 1 {
+		t.Fatalf("superseded legal entity result=%+v", result)
+	}
+	var currentLegalEntity model.OrgLegalEntity
+	if err := db.Where("code = ?", "LEGAL-CURRENT").First(&currentLegalEntity).Error; err != nil || currentLegalEntity.SourceId != "legal-current" || currentLegalEntity.Status != "enabled" {
+		t.Fatalf("current legal entity=%+v err=%v", currentLegalEntity, err)
+	}
+
 	management := hrsync.NewManagementCompanyConsumer(service, contract)
 	seedOrganizationHRSyncContext(t, db, "EXEC-MGMT", "SYNC-MGMT", "task_management", hrsync.ConsumerCodeManagementCompany, 1)
 	result = consumeOrganizationHRBody(t, management, "EXEC-MGMT", "SYNC-MGMT", "task_management", start, end,
@@ -73,7 +84,7 @@ func TestOrganizationHRConsumersMapLegalAndIndependentStructures(t *testing.T) {
 		t.Fatalf("management result=%+v", result)
 	}
 	var unit model.OrgUnit
-	if err := db.Where("code = ?", "ORG-001").First(&unit).Error; err != nil || unit.UnitType != "business_unit" {
+	if err := db.Where("source_id = ?", "management_company:company-1").First(&unit).Error; err != nil || unit.SourceCode != "ORG-001" || unit.UnitType != "business_unit" {
 		t.Fatalf("management unit=%+v err=%v", unit, err)
 	}
 	assertOrganizationStructureNode(t, db, "hr_management", unit.Id, nil, "enabled")
@@ -81,15 +92,29 @@ func TestOrganizationHRConsumersMapLegalAndIndependentStructures(t *testing.T) {
 	legalDepartment := hrsync.NewLegalDepartmentConsumer(service, contract)
 	seedOrganizationHRSyncContext(t, db, "EXEC-LEGAL-DEPT", "SYNC-LEGAL-DEPT", "task_legal_department", hrsync.ConsumerCodeLegalDepartment, 1)
 	result = consumeOrganizationHRBody(t, legalDepartment, "EXEC-LEGAL-DEPT", "SYNC-LEGAL-DEPT", "task_legal_department", start, end,
-		`{"success":true,"data":[{"zjkid_ignore":"dept-1","code":"DEPT-SAME","name":"同名部门","pk_fathedeptzjkid_ignore":"","orgidzjkid_ignore":"legal-1","isenable":1,"changeTime":"2026-08-12T10:12:00"}]}`)
-	if !result.Success() {
+		`{"success":true,"data":[{"zjkid_ignore":"dept-1","code":"DEPT-SAME","name":"同名部门","pk_fathedeptzjkid_ignore":"legal-1","orgidzjkid_ignore":"legal-1","isenable":1,"changeTime":"2026-08-12T10:12:00"},{"zjkid_ignore":"dept-2","code":"DEPT-SAME","name":"另一法人同编码部门","pk_fathedeptzjkid_ignore":"legal-2","orgidzjkid_ignore":"legal-2","isenable":1,"changeTime":"2026-08-12T10:13:00"}]}`)
+	if !result.Success() || result.BusinessSuccessCount() != 2 {
 		t.Fatalf("legal department result=%+v", result)
 	}
 	var legalUnit model.OrgUnit
 	if err := db.Where("source_id = ?", "legal_unit:dept-1").First(&legalUnit).Error; err != nil || legalUnit.PrimaryLegalEntityId == nil || *legalUnit.PrimaryLegalEntityId != legalEntity.Id {
 		t.Fatalf("legal unit=%+v err=%v", legalUnit, err)
 	}
+	var duplicateCodeCount int64
+	if err := db.Model(&model.OrgUnit{}).Where("source_code = ?", "DEPT-SAME").Count(&duplicateCodeCount).Error; err != nil || duplicateCodeCount != 2 {
+		t.Fatalf("same source code departments: count=%d err=%v", duplicateCodeCount, err)
+	}
 	assertOrganizationStructureNode(t, db, "hr_legal", legalUnit.Id, nil, "enabled")
+	seedOrganizationHRSyncContext(t, db, "EXEC-LEGAL-DEPT-OLD-REF", "SYNC-LEGAL-DEPT-OLD-REF", "task_legal_department_old_ref", hrsync.ConsumerCodeLegalDepartment, 1)
+	result = consumeOrganizationHRBody(t, legalDepartment, "EXEC-LEGAL-DEPT-OLD-REF", "SYNC-LEGAL-DEPT-OLD-REF", "task_legal_department_old_ref", start, end,
+		`{"success":true,"data":[{"zjkid_ignore":"dept-old-company-ref","code":"DEPT-OLD-REF","name":"历史引用部门","pk_fathedeptzjkid_ignore":"legal-old","orgidzjkid_ignore":"legal-old","pk_corp":"LEGAL-CURRENT","isenable":1,"changeTime":"2026-08-12T10:14:00"}]}`)
+	if !result.Success() {
+		t.Fatalf("legal department old company reference result=%+v", result)
+	}
+	var oldReferenceUnit model.OrgUnit
+	if err := db.Where("source_id = ?", "legal_unit:dept-old-company-ref").First(&oldReferenceUnit).Error; err != nil || oldReferenceUnit.PrimaryLegalEntityId == nil || *oldReferenceUnit.PrimaryLegalEntityId != currentLegalEntity.Id {
+		t.Fatalf("legal department old company reference=%+v err=%v", oldReferenceUnit, err)
+	}
 	var managementNodeCount int64
 	if err := db.Model(&model.OrgStructureNode{}).Joins("JOIN org_structures ON org_structures.id = org_structure_nodes.structure_id").Where("org_structures.code = ? AND org_structure_nodes.org_unit_id = ?", "hr_management", legalUnit.Id).Count(&managementNodeCount).Error; err != nil || managementNodeCount != 0 {
 		t.Fatalf("legal unit mixed into management tree: count=%d err=%v", managementNodeCount, err)
@@ -98,9 +123,15 @@ func TestOrganizationHRConsumersMapLegalAndIndependentStructures(t *testing.T) {
 	seedOrganizationHRSyncContext(t, db, "EXEC-CROSS", "SYNC-CROSS", "task_management_department", hrsync.ConsumerCodeManagementDepartment, 1)
 	result = consumeOrganizationHRBody(t, managementDepartment, "EXEC-CROSS", "SYNC-CROSS", "task_management_department", start, end,
 		`{"success":true,"data":[{"zjkid_ignore":"management-cross","code":"MGMT-CROSS","name":"同名部门","pk_fathedeptzjkid_ignore":"dept-1","isenable":1,"changeTime":"2026-08-12T10:40:00"}]}`)
-	if result.Success() || result.ReasonCode() != string(hrsync.ReasonParentInvalid) {
+	if !result.Success() {
 		t.Fatalf("cross-structure parent result=%+v", result)
 	}
+	var managementCross model.OrgUnit
+	if err := db.Where("source_id = ?", "management_unit:management-cross").First(&managementCross).Error; err != nil {
+		t.Fatal(err)
+	}
+	managementLegalBridge := assertOrganizationStructureNode(t, db, "hr_management", legalUnit.Id, nil, "enabled")
+	assertOrganizationStructureNode(t, db, "hr_management", managementCross.Id, &managementLegalBridge.Id, "enabled")
 	var sameNameCount int64
 	if err := db.Model(&model.OrgUnit{}).Where("name = ?", "同名部门").Count(&sameNameCount).Error; err != nil || sameNameCount != 2 {
 		t.Fatalf("same-name units were merged: count=%d err=%v", sameNameCount, err)
@@ -273,8 +304,12 @@ func TestOrganizationHRPositionConsumerIdentityReferenceStateAndIdempotency(t *t
 	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-CODE", "SYNC-POSITION-CODE", "task_position", hrsync.ConsumerCodePosition, 1)
 	result = consumeOrganizationHRBody(t, consumer, "EXEC-POSITION-CODE", "SYNC-POSITION-CODE", "task_position", start, end,
 		`{"success":true,"data":[{"postidzjkid_ignore":"position-code-conflict","postCode":"POST-B","postname":"编码冲突","deptidzjkid_ignore":"dept-a","isenable":1,"changeTime":"2026-08-12T10:41:00"}]}`)
-	if result.Success() || result.ReasonCode() != string(hrsync.ReasonBusinessConflict) {
-		t.Fatalf("position code conflict=%+v", result)
+	if !result.Success() {
+		t.Fatalf("same source code position=%+v", result)
+	}
+	var duplicatePositionCodeCount int64
+	if err := db.Model(&model.OrgPosition{}).Where("source_code = ?", "POST-B").Count(&duplicatePositionCodeCount).Error; err != nil || duplicatePositionCodeCount != 2 {
+		t.Fatalf("same source code positions: count=%d err=%v", duplicatePositionCodeCount, err)
 	}
 
 	seedOrganizationHRSyncContext(t, db, "EXEC-POSITION-MISSING", "SYNC-POSITION-MISSING", "task_position", hrsync.ConsumerCodePosition, 1)

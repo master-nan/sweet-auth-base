@@ -59,9 +59,9 @@ type OrgUnit struct {
 	Basic
 
 	// 外部来源管理字段。
-	SourceSystemCode     string     `gorm:"size:64;not null;uniqueIndex:uni_org_unit_source,priority:1;uniqueIndex:uni_org_unit_code,priority:1;uniqueIndex:uni_org_unit_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
+	SourceSystemCode     string     `gorm:"size:64;not null;uniqueIndex:uni_org_unit_source,priority:1;uniqueIndex:uni_org_unit_code,priority:1" json:"source_system_code"`
 	SourceId             string     `gorm:"size:128;not null;uniqueIndex:uni_org_unit_source,priority:2" json:"source_id"`
-	SourceCode           string     `gorm:"size:128;uniqueIndex:uni_org_unit_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_unit_source_code" json:"source_code"`
+	SourceCode           string     `gorm:"size:128;index:idx_org_unit_source_code" json:"source_code"`
 	Code                 string     `gorm:"size:128;not null;uniqueIndex:uni_org_unit_code,priority:2" json:"code"`
 	Name                 string     `gorm:"size:255;not null;index:idx_org_unit_name" json:"name"`
 	UnitType             string     `gorm:"size:32;not null;default:department;index:idx_org_unit_type" json:"unit_type"`
@@ -136,9 +136,9 @@ type OrgPosition struct {
 	Basic
 
 	// 外部来源管理字段。
-	SourceSystemCode  string     `gorm:"size:64;not null;uniqueIndex:uni_org_position_source,priority:1;uniqueIndex:uni_org_position_code,priority:1;uniqueIndex:uni_org_position_source_code,priority:1,where:source_code IS NOT NULL AND source_code <> ''" json:"source_system_code"`
+	SourceSystemCode  string     `gorm:"size:64;not null;uniqueIndex:uni_org_position_source,priority:1;uniqueIndex:uni_org_position_code,priority:1" json:"source_system_code"`
 	SourceId          string     `gorm:"size:128;not null;uniqueIndex:uni_org_position_source,priority:2" json:"source_id"`
-	SourceCode        string     `gorm:"size:128;uniqueIndex:uni_org_position_source_code,priority:2,where:source_code IS NOT NULL AND source_code <> '';index:idx_org_position_source_code" json:"source_code"`
+	SourceCode        string     `gorm:"size:128;index:idx_org_position_source_code" json:"source_code"`
 	Code              string     `gorm:"size:128;not null;uniqueIndex:uni_org_position_code,priority:2;uniqueIndex:uni_org_position_unit_code,priority:2,where:status = 'enabled' AND source_deleted = false AND valid_to IS NULL" json:"code"`
 	Name              string     `gorm:"size:255;not null;index:idx_org_position_name" json:"name"`
 	OrgUnitId         int        `gorm:"type:bigint;not null;index:idx_org_position_org_unit;uniqueIndex:uni_org_position_unit_code,priority:1,where:status = 'enabled' AND source_deleted = false AND valid_to IS NULL" json:"org_unit_id"`

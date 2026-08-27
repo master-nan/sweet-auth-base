@@ -109,6 +109,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"access_log_operational_indexes",
 		"product_walkthrough_corrections",
 		"notification_center_schema",
+		"organization_source_code_indexes",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)

@@ -196,13 +196,31 @@ func TestSyncWindowAndSliceBoundaries(t *testing.T) {
 		t.Fatalf("slice count=%d", got)
 	}
 	batch := model.IntegrationSyncBatch{CheckpointMode: model.IntegrationSyncCheckpointTimestamp, WindowStart: &start, WindowEnd: &end, WindowSliceSeconds: 3600, LookbackSeconds: 60}
-	logicalStart, logicalEnd, requestStart, err := syncSliceWindow(batch, 1)
+	logicalStart, logicalEnd, requestStart, err := syncSliceWindow(batch, 1, integration.SyncWindowModeBoundedWindow)
 	if err != nil || !logicalStart.Equal(start) || !logicalEnd.Equal(start.Add(time.Hour)) || !requestStart.Equal(start.Add(-time.Minute)) {
 		t.Fatalf("first window start=%v end=%v request=%v err=%v", logicalStart, logicalEnd, requestStart, err)
 	}
-	_, logicalEnd, requestStart, err = syncSliceWindow(batch, 2)
+	_, logicalEnd, requestStart, err = syncSliceWindow(batch, 2, integration.SyncWindowModeBoundedWindow)
 	if err != nil || !logicalEnd.Equal(end) || !requestStart.Equal(start.Add(time.Hour)) {
 		t.Fatalf("second window end=%v request=%v err=%v", logicalEnd, requestStart, err)
+	}
+}
+
+func TestLowerBoundOnlySyncUsesOneWindowAndAdvancesToRunEnd(t *testing.T) {
+	start := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 28, 0, 0, 0, 0, time.UTC)
+	plan := datatypes.JSON([]byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"query","code":"time","format":"rfc3339"}}`))
+	task := model.IntegrationSyncTask{
+		CheckpointMode: model.IntegrationSyncCheckpointTimestamp,
+		CheckpointAt:   &start, WindowSliceSeconds: 604800, InputPlan: plan,
+	}
+	batch, err := newSyncBatchSnapshot(task, model.ExternalSystem{}, model.InterfaceDefinition{}, 1, syncBatchTrigger{}, end)
+	if err != nil || batch.PlannedSliceCount != 1 {
+		t.Fatalf("lower-bound batch=%+v err=%v", batch, err)
+	}
+	logicalStart, logicalEnd, requestStart, err := syncSliceWindow(batch, 1, integration.SyncWindowModeLowerBoundOnly)
+	if err != nil || !logicalStart.Equal(start) || !logicalEnd.Equal(end) || !requestStart.Equal(start) {
+		t.Fatalf("lower-bound window start=%v end=%v request=%v err=%v", logicalStart, logicalEnd, requestStart, err)
 	}
 }
 

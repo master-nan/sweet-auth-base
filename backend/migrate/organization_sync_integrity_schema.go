@@ -70,3 +70,21 @@ func migrateOrganizationSyncIntegritySchema(db *gorm.DB) error {
 		})
 	})
 }
+
+// migrateOrganizationSourceCodeIndexes 允许不同法人或部门使用相同业务编码。
+// 来源 ID 仍是同步身份，业务编码只用于查询和展示。
+func migrateOrganizationSourceCodeIndexes(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, statement := range []string{
+			`DROP INDEX IF EXISTS uni_org_unit_source_code`,
+			`DROP INDEX IF EXISTS uni_org_position_source_code`,
+			`CREATE INDEX IF NOT EXISTS idx_org_unit_source_code ON org_unit (source_code)`,
+			`CREATE INDEX IF NOT EXISTS idx_org_position_source_code ON org_position (source_code)`,
+		} {
+			if err := tx.Exec(statement).Error; err != nil {
+				return fmt.Errorf("update organization source code indexes: %w", err)
+			}
+		}
+		return nil
+	})
+}

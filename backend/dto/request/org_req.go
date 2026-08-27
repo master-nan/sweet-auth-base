@@ -74,7 +74,7 @@ type OrgUnitOptionsReq struct {
 	StructureId   *int `form:"structure_id" json:"structure_id" binding:"omitempty,gt=0"`
 }
 
-// OrgStructureQueryReq 定义管理架构的 Repository 安全查询字段。
+// OrgStructureQueryReq 定义法人架构和管理架构的 Repository 安全查询字段。
 type OrgStructureQueryReq struct {
 	Basic
 	OrgReadScopeReq
@@ -100,7 +100,7 @@ type OrgStructureOptionsReq struct {
 	SelectedIds   []int  `form:"selected_ids" json:"selected_ids" binding:"omitempty,max=100,dive,gt=0"`
 }
 
-// OrgStructureOrgTreeReq 请求管理组织树。
+// OrgStructureOrgTreeReq 请求法人组织树或管理组织树。
 // RootNodeId 标识架构中的一个节点；RootOrgUnitId 用于按业务组织便捷查找，
 // 且必须精确解析为一个可见节点。
 type OrgStructureOrgTreeReq struct {

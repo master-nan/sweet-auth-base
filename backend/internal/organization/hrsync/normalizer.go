@@ -25,11 +25,12 @@ func (n Normalizer) NormalizeLegalEntitySource(source HRCompanySourceDTO) (Legal
 
 func (n Normalizer) NormalizeManagementCompanySource(source HRCompanySourceDTO) (OrgUnitSyncInput, error) {
 	key, changedAt, status, err := n.common(ObjectKindManagementCompany, source.SourceID, source.ChangeTime, source.Enabled)
-	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" {
+	sourceCode := strings.TrimSpace(source.SourceCode)
+	if err != nil || sourceCode == "" || strings.TrimSpace(source.Name) == "" {
 		return OrgUnitSyncInput{}, normalizeRequiredError(err)
 	}
 	return OrgUnitSyncInput{
-		Key: key, SourceCode: strings.TrimSpace(source.SourceRecordID), Code: strings.TrimSpace(source.SourceCode),
+		Key: key, SourceCode: sourceCode, Code: key.PersistenceID(),
 		Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID),
 		Status: status, SourceChangedAt: changedAt, Level: source.Level,
 	}, nil
@@ -40,29 +41,30 @@ func (n Normalizer) NormalizeOrgUnitSource(source HRDepartmentSourceDTO, kind Ob
 		return OrgUnitSyncInput{}, ErrSourceKeyInvalid
 	}
 	key, changedAt, status, err := n.common(kind, source.SourceID, source.ChangeTime, source.Enabled)
-	if err != nil || strings.TrimSpace(source.SourceCode) == "" || strings.TrimSpace(source.Name) == "" {
+	sourceCode := strings.TrimSpace(source.SourceCode)
+	if err != nil || strings.TrimSpace(source.Name) == "" || len(sourceCode) > 128 {
 		return OrgUnitSyncInput{}, normalizeRequiredError(err)
 	}
 	sort, err := parseSourceSort(source.Sort)
 	if err != nil {
 		return OrgUnitSyncInput{}, err
 	}
-	return OrgUnitSyncInput{Key: key, SourceCode: strings.TrimSpace(source.SourceRecordID), Code: strings.TrimSpace(source.SourceCode), Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID), LegalEntitySourceID: strings.TrimSpace(source.LegalEntitySourceID), Status: status, SourceChangedAt: changedAt, Level: source.Level, Sort: sort}, nil
+	return OrgUnitSyncInput{Key: key, SourceCode: sourceCode, Code: key.PersistenceID(), Name: strings.TrimSpace(source.Name), ParentSourceID: strings.TrimSpace(source.ParentSourceID), LegalEntitySourceID: strings.TrimSpace(source.LegalEntitySourceID), LegalEntityCode: strings.TrimSpace(source.LegalEntityCode), Status: status, SourceChangedAt: changedAt, Level: source.Level, Sort: sort}, nil
 }
 
 func (n Normalizer) NormalizePositionSource(source HRPositionSourceDTO) (PositionSyncInput, error) {
 	key, changedAt, status, err := n.common(ObjectKindPosition, source.SourceID, source.ChangeTime, source.Enabled)
-	code := strings.TrimSpace(source.SourceCode)
+	sourceCode := strings.TrimSpace(source.SourceCode)
 	name := strings.TrimSpace(source.Name)
 	orgUnitSourceID := strings.TrimSpace(source.OrgUnitSourceID)
 	jobLevel := strings.TrimSpace(source.JobLevel)
-	if err != nil || code == "" || name == "" {
+	if err != nil || name == "" {
 		return PositionSyncInput{}, normalizeRequiredError(err)
 	}
-	if len(code) > 128 || len(name) > 255 || len(orgUnitSourceID) > MaxRawSourceIDLength || len(jobLevel) > 64 {
+	if len(sourceCode) > 128 || len(name) > 255 || len(orgUnitSourceID) > MaxRawSourceIDLength || len(jobLevel) > 64 {
 		return PositionSyncInput{}, ErrSourceKeyInvalid
 	}
-	return PositionSyncInput{Key: key, Code: code, Name: name, OrgUnitSourceID: orgUnitSourceID, JobLevel: jobLevel, Status: status, SourceChangedAt: changedAt}, nil
+	return PositionSyncInput{Key: key, SourceCode: sourceCode, Code: key.PersistenceID(), Name: name, OrgUnitSourceID: orgUnitSourceID, JobLevel: jobLevel, Status: status, SourceChangedAt: changedAt}, nil
 }
 
 func (n Normalizer) NormalizeEmployeeSource(source HREmployeeSourceDTO) (EmployeeSyncInput, error) {

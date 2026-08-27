@@ -290,17 +290,20 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	if err != nil {
 		return e.failureResult(startedAt, model.IntegrationErrorCategoryConfiguration, "transport_request_invalid", "集成运行配置不可用", model.IntegrationResultCertaintyConfirmed)
 	}
-	resolveRequest, err := NewCredentialResolveRequest(system.Id, definition.Id, credentialIdentity.ID, credentialIdentity.CredentialCode, credentialIdentity.CredentialType, claimed.Execution.ExecutionNo)
-	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
-	}
-	resolution, err := e.provider.Resolve(ctx, resolveRequest)
-	if err != nil {
-		return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
-	}
-	request, err = request.WithAuthentication(resolution.Authentication())
-	if err != nil {
-		return withCredentialSummary(e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_injection_invalid", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed), resolution)
+	var resolution CredentialResolution
+	if credentialIdentity.ID > 0 {
+		resolveRequest, resolveErr := NewCredentialResolveRequest(system.Id, definition.Id, credentialIdentity.ID, credentialIdentity.CredentialCode, credentialIdentity.CredentialType, claimed.Execution.ExecutionNo)
+		if resolveErr != nil {
+			return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
+		}
+		resolution, resolveErr = e.provider.Resolve(ctx, resolveRequest)
+		if resolveErr != nil {
+			return e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_resolution_failed", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed)
+		}
+		request, resolveErr = request.WithAuthentication(resolution.Authentication())
+		if resolveErr != nil {
+			return withCredentialSummary(e.failureResult(startedAt, model.IntegrationErrorCategoryCredential, "credential_injection_invalid", "集成运行凭证解析失败", model.IntegrationResultCertaintyConfirmed), resolution)
+		}
 	}
 	transportResult, transportErr := e.transport.Execute(ctx, request)
 	result := attemptResultFromTransport(startedAt, transportResult, transportErr, e.now())
@@ -308,7 +311,10 @@ func (e *IntegrationExecutionEngine) executeAttempt(ctx context.Context, claimed
 	if result.Succeeded && syncRuntime != nil {
 		result = e.consumeSyncResult(ctx, claimed.Execution, *syncRuntime, transportResult, result)
 	}
-	return withCredentialSummary(result, resolution)
+	if credentialIdentity.ID > 0 {
+		return withCredentialSummary(result, resolution)
+	}
+	return result
 }
 
 type syncExecutionRuntime struct {
@@ -454,7 +460,7 @@ func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(
 	definition, err := e.interfaces.FindByIdWithDB(e.interfaces.DBWithContext(ctx), execution.InterfaceDefinitionID)
 	if err != nil || definition.Id != execution.InterfaceDefinitionID || definition.ExternalSystemID != system.Id ||
 		definition.InterfaceCode != execution.InterfaceCode || definition.Version != execution.InterfaceVersion ||
-		definition.Status != model.InterfaceDefinitionStatusEnabled || !definition.State || definition.CredentialID == nil {
+		definition.Status != model.InterfaceDefinitionStatusEnabled || !definition.State {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationConfigurationUnavailable
 	}
 	if err := ValidateInterfaceRuntimeContract(definition.TimeoutSeconds, definition.ResponseLimit); err != nil {
@@ -463,6 +469,9 @@ func (e *IntegrationExecutionEngine) loadRuntimeConfiguration(
 	if !ValidRemoteIdempotencyContract(definition.HTTPMethod, definition.IdempotencyMode, definition.RemoteIdempotencyHeader) ||
 		definition.IdempotencyMode != execution.RemoteIdempotencyMode || definition.RemoteIdempotencyHeader != execution.RemoteIdempotencyHeader {
 		return model.ExternalSystem{}, model.InterfaceDefinition{}, repository.CredentialRuntimeIdentity{}, myerrors.ErrIntegrationExecutionRuntimeIncompatible
+	}
+	if definition.CredentialID == nil {
+		return system, definition, repository.CredentialRuntimeIdentity{}, nil
 	}
 	identity, err := e.credentials.GetRuntimeCredentialIdentity(ctx, *definition.CredentialID)
 	if err != nil || identity.ID != *definition.CredentialID || identity.ExternalSystemID != system.Id {

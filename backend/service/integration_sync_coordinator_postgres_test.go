@@ -356,8 +356,8 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 			}
 			if organizationScenario == "deferred_replay" && !organizationRepaired.Load() {
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
-					{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
 				}})
 				_, _ = writer.Write(body)
 				return
@@ -375,7 +375,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 				}
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
 					{"psnidzjkid_ignore": sourceID, "changeTime": eventTime.Format("2006-01-02T15:04:05"), "lzdate": checkpointSafeResignationDate(eventTime)},
-					{"psnidzjkid_ignore": "employee-resigned-future", "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05"), "lzdate": checkpointSafeResignationDate(eventTime)},
+					{"psnidzjkid_ignore": "employee-resigned-future", "changeTime": lower.Add(3 * time.Hour).UTC().Format("2006-01-02T15:04:05"), "lzdate": checkpointSafeResignationDate(eventTime)},
 				}})
 				_, _ = writer.Write(body)
 				return
@@ -385,18 +385,18 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 					body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{{
 						"postidzjkid_ignore": "position-deferred", "postCode": "POST-DEFERRED", "postname": "待补组织岗位",
 						"deptidzjkid_ignore": "position-dept-missing", "posLevel": "", "isenable": 1,
-						"changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05"),
+						"changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05"),
 					}}})
 					_, _ = writer.Write(body)
 					return
 				}
 				data := []map[string]any{
-					{"postidzjkid_ignore": "position-a", "postCode": "POST-A", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					{"postidzjkid_ignore": "position-b", "postCode": "POST-B", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-b", "posLevel": "L2", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					{"postidzjkid_ignore": "position-future", "postCode": "POST-FUTURE", "postname": "未来岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"postidzjkid_ignore": "position-a", "postCode": "POST-A", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"postidzjkid_ignore": "position-b", "postCode": "POST-B", "postname": "同名岗位", "deptidzjkid_ignore": "position-dept-b", "posLevel": "L2", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"postidzjkid_ignore": "position-future", "postCode": "POST-FUTURE", "postname": "未来岗位", "deptidzjkid_ignore": "position-dept-a", "posLevel": "", "isenable": 1, "changeTime": lower.Add(3 * time.Hour).UTC().Format("2006-01-02T15:04:05")},
 				}
 				if organizationScenario == "position_deferred_replay" {
-					data = []map[string]any{{"postidzjkid_ignore": "position-deferred", "postCode": "POST-DEFERRED", "postname": "待补组织岗位", "deptidzjkid_ignore": "position-dept-missing", "posLevel": "", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}
+					data = []map[string]any{{"postidzjkid_ignore": "position-deferred", "postCode": "POST-DEFERRED", "postname": "待补组织岗位", "deptidzjkid_ignore": "position-dept-missing", "posLevel": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")}}
 				} else if call > 2 {
 					data[0]["isenable"] = 0
 				}
@@ -413,10 +413,14 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 					name = "员工测试更新"
 					email = "employee-e2e@example.invalid"
 				}
+				eventOffset := 5 * time.Minute
+				if organizationScenario == "employee_rehire_conflict" {
+					eventOffset = 20 * time.Minute
+				}
 				current := map[string]any{
 					"psnidzjkid_ignore": "employee-e2e", "jhcode": "EMP-E2E-001", "name": name,
 					"mobile": nil, "email": email, "isenable": status, "sendpost": "[]",
-					"changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05"),
+					"changeTime": lower.Add(eventOffset).UTC().Format("2006-01-02T15:04:05"),
 				}
 				duplicate := current
 				if organizationScenario == "employee_conflict" {
@@ -428,31 +432,31 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 				}
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
 					current, duplicate,
-					{"psnidzjkid_ignore": fmt.Sprintf("employee-future-%d", lower.Unix()), "jhcode": fmt.Sprintf("EMP-FUTURE-%d", lower.Unix()), "name": "未来员工", "isenable": 1, "sendpost": "[]", "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"psnidzjkid_ignore": fmt.Sprintf("employee-future-%d", lower.Unix()), "jhcode": fmt.Sprintf("EMP-FUTURE-%d", lower.Unix()), "name": "未来员工", "isenable": 1, "sendpost": "[]", "changeTime": lower.Add(3 * time.Hour).UTC().Format("2006-01-02T15:04:05")},
 				}})
 				_, _ = writer.Write(body)
 				return
 			}
 			if organizationScenario == "cycle" {
 				body, _ := json.Marshal(map[string]any{"success": true, "data": []map[string]any{
-					{"zjkid_ignore": "cycle-a", "code": "CYCLE-A", "name": "A", "pk_fathedeptzjkid_ignore": "cycle-b", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					{"zjkid_ignore": "cycle-b", "code": "CYCLE-B", "name": "B", "pk_fathedeptzjkid_ignore": "cycle-a", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "cycle-a", "code": "CYCLE-A", "name": "A", "pk_fathedeptzjkid_ignore": "cycle-b", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					{"zjkid_ignore": "cycle-b", "code": "CYCLE-B", "name": "B", "pk_fathedeptzjkid_ignore": "cycle-a", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
 				}})
 				_, _ = writer.Write(body)
 				return
 			}
 			parentID := fmt.Sprintf("parent-%d", lower.Unix())
 			data := []map[string]any{
-				{"zjkid_ignore": fmt.Sprintf("child-%d", lower.Unix()), "code": fmt.Sprintf("CHILD-%d", lower.Unix()), "name": "Child", "pk_fathedeptzjkid_ignore": parentID, "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-				{"zjkid_ignore": parentID, "code": fmt.Sprintf("PARENT-%d", lower.Unix()), "name": "Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": fmt.Sprintf("child-%d", lower.Unix()), "code": fmt.Sprintf("CHILD-%d", lower.Unix()), "name": "Child", "pk_fathedeptzjkid_ignore": parentID, "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": parentID, "code": fmt.Sprintf("PARENT-%d", lower.Unix()), "name": "Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
 				{"zjkid_ignore": "lookback-shared", "code": "LOOKBACK-SHARED", "name": "Replay", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.UTC().Format("2006-01-02T15:04:05")},
-				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "code": fmt.Sprintf("FUTURE-%d", lower.Unix()), "name": "Future", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(71 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+				{"zjkid_ignore": fmt.Sprintf("future-%d", lower.Unix()), "code": fmt.Sprintf("FUTURE-%d", lower.Unix()), "name": "Future", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(3 * time.Hour).UTC().Format("2006-01-02T15:04:05")},
 			}
 			if organizationScenario == "deferred_replay" {
 				data = append(data,
-					map[string]any{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					map[string]any{"zjkid_ignore": "deferred-parent", "code": "DEFERRED-PARENT", "name": "Repaired Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(15 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
-					map[string]any{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(20 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					map[string]any{"zjkid_ignore": "deferred-stable", "code": "DEFERRED-STABLE", "name": "Stable", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					map[string]any{"zjkid_ignore": "deferred-parent", "code": "DEFERRED-PARENT", "name": "Repaired Parent", "pk_fathedeptzjkid_ignore": "", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
+					map[string]any{"zjkid_ignore": "deferred-child", "code": "DEFERRED-CHILD", "name": "Deferred", "pk_fathedeptzjkid_ignore": "deferred-parent", "isenable": 1, "changeTime": lower.Add(5 * time.Minute).UTC().Format("2006-01-02T15:04:05")},
 				)
 			}
 			body, _ := json.Marshal(map[string]any{"success": true, "data": data})
@@ -781,6 +785,18 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		}
 		return
 	}
+	if lowerBoundOnly {
+		var refreshed model.IntegrationSyncTask
+		if err := db.First(&refreshed, task.Id).Error; err != nil || refreshed.CheckpointAt == nil {
+			t.Fatalf("first lower-bound checkpoint=%v err=%v", refreshed.CheckpointAt, err)
+		}
+		nextScheduledFor := refreshed.CheckpointAt.Add(time.Minute)
+		if err := db.Model(&model.IntegrationSyncTask{}).Where("id = ?", task.Id).
+			Update("next_scheduled_at", nextScheduledFor).Error; err != nil {
+			t.Fatal(err)
+		}
+		waitForPostgreSQLSyncBatchOrdinalStatus(t, db, 2, model.IntegrationSyncBatchStatusSucceeded, 20*time.Second)
+	}
 	if err := syncRunner.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -788,19 +804,19 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 		t.Fatal(err)
 	}
 
-	for sliceNo := 1; sliceNo <= 2; sliceNo++ {
+	for requestNo := 1; requestNo <= 2; requestNo++ {
 		select {
 		case request := <-consumerCalled:
 			if request.ExecutionNo() == "" || request.SyncBatchNo() == "" || request.TaskCode() != task.TaskCode || request.TaskVersion() != task.Version ||
-				request.SliceNo() != sliceNo || (!lowerBoundOnly && !strings.Contains(string(request.Body()), "10001")) {
+				(request.SliceNo() != requestNo && !lowerBoundOnly) || (request.SliceNo() != 1 && lowerBoundOnly) || (!lowerBoundOnly && !strings.Contains(string(request.Body()), "10001")) {
 				t.Fatalf("consumer request=%s", request.String())
 			}
 		default:
-			t.Fatalf("consumer was not called for slice %d", sliceNo)
+			t.Fatalf("consumer was not called for request %d", requestNo)
 		}
 	}
 	var executionRows []model.IntegrationExecution
-	if err := db.Where("sync_batch_id IS NOT NULL").Order("sync_slice_no ASC").Find(&executionRows).Error; err != nil {
+	if err := db.Where("sync_batch_id IS NOT NULL").Order("id ASC").Find(&executionRows).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(executionRows) != 2 || executionRows[0].Status != model.IntegrationExecutionStatusSucceeded || executionRows[0].CurrentAttempt != 2 || executionRows[0].SyncBusinessStatus != model.IntegrationSyncBusinessStatusSucceeded || httpCalls.Load() != 3 {

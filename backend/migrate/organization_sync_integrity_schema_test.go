@@ -34,6 +34,41 @@ func TestOrganizationSyncIntegritySchemaSQLiteIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestOrganizationSourceCodeIndexesAllowDuplicateBusinessCodes(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.OrgUnit{}, &model.OrgPosition{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE UNIQUE INDEX uni_org_unit_source_code ON org_unit (source_system_code, source_code) WHERE source_code IS NOT NULL AND source_code <> ''`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE UNIQUE INDEX uni_org_position_source_code ON org_position (source_system_code, source_code) WHERE source_code IS NOT NULL AND source_code <> ''`).Error; err != nil {
+		t.Fatal(err)
+	}
+	for run := 0; run < 2; run++ {
+		if err := migrateOrganizationSourceCodeIndexes(db); err != nil {
+			t.Fatalf("organization source code index migration run %d: %v", run+1, err)
+		}
+	}
+	if db.Migrator().HasIndex(&model.OrgUnit{}, "uni_org_unit_source_code") || db.Migrator().HasIndex(&model.OrgPosition{}, "uni_org_position_source_code") {
+		t.Fatal("legacy unique source code index still exists")
+	}
+	units := []model.OrgUnit{
+		{Basic: model.Basic{Id: 88001}, SourceSystemCode: "hr_source", SourceId: "unit-1", SourceCode: "SHARED", Code: "unit-1", Name: "Unit 1"},
+		{Basic: model.Basic{Id: 88002}, SourceSystemCode: "hr_source", SourceId: "unit-2", SourceCode: "SHARED", Code: "unit-2", Name: "Unit 2"},
+	}
+	if err := db.Create(&units).Error; err != nil {
+		t.Fatalf("duplicate organization business code rejected: %v", err)
+	}
+	positions := []model.OrgPosition{
+		{Basic: model.Basic{Id: 88101}, SourceSystemCode: "hr_source", SourceId: "position-1", SourceCode: "SHARED", Code: "position-1", Name: "Position 1", OrgUnitId: units[0].Id},
+		{Basic: model.Basic{Id: 88102}, SourceSystemCode: "hr_source", SourceId: "position-2", SourceCode: "SHARED", Code: "position-2", Name: "Position 2", OrgUnitId: units[1].Id},
+	}
+	if err := db.Create(&positions).Error; err != nil {
+		t.Fatalf("duplicate position business code rejected: %v", err)
+	}
+}
+
 func TestOrganizationSyncIntegritySchemaPostgreSQLConstraints(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 	admin, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})

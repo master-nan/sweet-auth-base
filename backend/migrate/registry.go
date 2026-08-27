@@ -45,6 +45,7 @@ func migrationSteps() []migrationStep {
 		ensureAccessLogOperationalIndexes,
 		migrateProductWalkthroughCorrections,
 		migrateNotificationCenterSchema,
+		migrateOrganizationSourceCodeIndexes,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {

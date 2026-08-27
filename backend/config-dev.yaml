@@ -47,7 +47,7 @@ integration:
     instance_concurrency: 4
     lease_recovery_interval: 60
     shutdown_timeout: 15
-    lease_duration: 180
+    lease_duration: 600
   sync_runner:
     enabled: false
     runner_id: 'integration-sync-dev-1'

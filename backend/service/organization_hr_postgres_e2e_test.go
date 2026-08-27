@@ -35,9 +35,9 @@ func TestOrganizationHRPostgreSQLFullInitializationOrderE2E(t *testing.T) {
 	db := openSyncCoordinatorPostgreSQL(t)
 	tasks := []organizationHRAcceptanceTask{
 		{"accept_hr_legal_entity", hrsync.ConsumerCodeLegalEntity, "/legal-entities"},
+		{"accept_hr_legal_department", hrsync.ConsumerCodeLegalDepartment, "/legal-departments"},
 		{"accept_hr_management_company", hrsync.ConsumerCodeManagementCompany, "/management-companies"},
 		{"accept_hr_management_department", hrsync.ConsumerCodeManagementDepartment, "/management-departments"},
-		{"accept_hr_legal_department", hrsync.ConsumerCodeLegalDepartment, "/legal-departments"},
 		{"accept_hr_position", hrsync.ConsumerCodePosition, "/positions"},
 		{"accept_hr_employee", hrsync.ConsumerCodeEmployee, "/employees"},
 		{"accept_hr_resigned_employee", hrsync.ConsumerCodeResignedEmployee, "/resigned-employees"},
@@ -199,14 +199,15 @@ func TestOrganizationHRPostgreSQLFullInitializationOrderE2E(t *testing.T) {
 	}
 	provider := integration.NewCredentialProvider(credentials, interfaces, protector)
 	guard, _ := integration.NewInMemoryConcurrencyGuard(4, 4, 4)
+	leaseDuration := 10 * time.Minute
 	engine, err := integration.NewIntegrationExecutionEngine(executions, systems, interfaces, credentials, batches, provider, transport, guard, registry,
-		snowflake, integration.ExecutionEngineOptions{WorkerID: "hr-acceptance-worker", LeaseDuration: integration.IntegrationDefaultLeaseDuration, BatchSize: 4})
+		snowflake, integration.ExecutionEngineOptions{WorkerID: "hr-acceptance-worker", LeaseDuration: leaseDuration, BatchSize: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
 	worker, err := integration.NewIntegrationWorkerRunner(engine, integration.WorkerRunnerConfig{
 		Enabled: true, WorkerID: "hr-acceptance-worker", PollInterval: time.Second, ClaimBatchSize: 4, InstanceConcurrency: 4,
-		LeaseRecoveryInterval: 10 * time.Second, ShutdownTimeout: 5 * time.Second, LeaseDuration: integration.IntegrationDefaultLeaseDuration,
+		LeaseRecoveryInterval: 10 * time.Second, ShutdownTimeout: 5 * time.Second, LeaseDuration: leaseDuration,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +243,7 @@ func TestOrganizationHRPostgreSQLFullInitializationOrderE2E(t *testing.T) {
 	callMu.Lock()
 	gotOrder := append([]string(nil), callOrder...)
 	callMu.Unlock()
-	wantOrder := []string{"/legal-entities", "/legal-entities", "/management-companies", "/management-departments", "/legal-departments", "/positions", "/employees", "/resigned-employees"}
+	wantOrder := []string{"/legal-entities", "/legal-entities", "/legal-departments", "/management-companies", "/management-departments", "/positions", "/employees", "/resigned-employees"}
 	if !reflect.DeepEqual(gotOrder, wantOrder) {
 		t.Fatalf("HR initialization request order=%v want=%v", gotOrder, wantOrder)
 	}
@@ -303,7 +304,11 @@ func waitForOrganizationHRAcceptanceBatch(t *testing.T, db *gorm.DB, taskCode st
 			return true
 		}
 		if err == nil && batch.Status == model.IntegrationSyncBatchStatusFailed {
-			t.Fatalf("task %s failed: reason=%s summary=%s", taskCode, batch.ReasonCode, batch.ResultSummary)
+			var execution model.IntegrationExecution
+			var records []model.OrgSyncRecord
+			_ = db.Where("sync_batch_id = ?", batch.Id).Order("id DESC").First(&execution).Error
+			_ = db.Where("execution_id = ?", execution.Id).Order("id ASC").Find(&records).Error
+			t.Fatalf("task %s failed: reason=%s summary=%s execution_status=%s execution_error=%s retry_reason=%s result=%s business_reason=%s records=%+v", taskCode, batch.ReasonCode, batch.ResultSummary, execution.Status, execution.ErrorCategory, execution.RetryReasonCode, execution.ResultSummary, execution.SyncBusinessReasonCode, records)
 		}
 		return false
 	}) {

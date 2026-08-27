@@ -505,7 +505,7 @@ func (s *OrganizationHRSyncService) upsertPosition(tx *gorm.DB, batch organizati
 		}
 		value := model.OrgPosition{
 			Basic: model.Basic{Id: id, State: true}, SourceSystemCode: input.Key.SourceSystemCode(), SourceId: identity,
-			Code: input.Code, Name: input.Name, OrgUnitId: unit.Id, PositionType: "professional", JobLevel: input.JobLevel,
+			SourceCode: input.SourceCode, Code: input.Code, Name: input.Name, OrgUnitId: unit.Id, PositionType: "professional", JobLevel: input.JobLevel,
 			IsManagerPosition: false, Status: string(input.Status), SourceVersion: input.SourceChangedAt.Format(time.RFC3339Nano),
 			LastSyncAt: &batch.now, SourceDeleted: false, SyncStatus: "synced",
 		}
@@ -529,7 +529,7 @@ func (s *OrganizationHRSyncService) upsertPosition(tx *gorm.DB, batch organizati
 		return outcome, nil
 	}
 	if err := s.repository.UpdatePosition(tx, existing.Id, map[string]any{
-		"source_code": "", "code": input.Code, "name": input.Name, "org_unit_id": unit.Id,
+		"source_code": input.SourceCode, "code": input.Code, "name": input.Name, "org_unit_id": unit.Id,
 		"position_type": "professional", "job_level": input.JobLevel, "is_manager_position": false,
 		"status": string(input.Status), "source_version": input.SourceChangedAt.Format(time.RFC3339Nano),
 		"last_sync_at": batch.now, "source_deleted": false, "sync_status": "synced",
@@ -542,16 +542,18 @@ func (s *OrganizationHRSyncService) upsertPosition(tx *gorm.DB, batch organizati
 
 func (s *OrganizationHRSyncService) resolvePositionOrgUnit(tx *gorm.DB, input hrsync.PositionSyncInput) (model.OrgUnit, *organizationSyncOutcome) {
 	missing := dependencyOutcome(input.Key, hrsync.ObjectKindPosition, hrsync.ReasonReferenceMissing, "org_unit", input.OrgUnitSourceID)
+	for _, kind := range []hrsync.ObjectKind{hrsync.ObjectKindManagementUnit, hrsync.ObjectKindLegalUnit} {
+		key, err := hrsync.NewSourceKey(input.Key.SourceSystemCode(), kind, input.OrgUnitSourceID)
+		if err != nil {
+			continue
+		}
+		unit, findErr := s.repository.FindOrgUnitBySource(tx, input.Key.SourceSystemCode(), key.PersistenceID())
+		if findErr == nil && unit.UnitType == "department" && !unit.SourceDeleted && unit.SyncStatus == "synced" {
+			return unit, nil
+		}
+	}
 	missing.dependencyKey = safeDependencyDigest(input.Key.SourceSystemCode(), hrsync.ObjectKindManagementUnit, input.OrgUnitSourceID)
-	key, err := hrsync.NewSourceKey(input.Key.SourceSystemCode(), hrsync.ObjectKindManagementUnit, input.OrgUnitSourceID)
-	if err != nil {
-		return model.OrgUnit{}, &missing
-	}
-	unit, err := s.repository.FindOrgUnitBySource(tx, input.Key.SourceSystemCode(), key.PersistenceID())
-	if err != nil || unit.UnitType != "department" || unit.SourceDeleted || unit.SyncStatus != "synced" {
-		return model.OrgUnit{}, &missing
-	}
-	return unit, nil
+	return model.OrgUnit{}, &missing
 }
 
 func (s *OrganizationHRSyncService) upsertEmployeeChunk(
@@ -784,30 +786,186 @@ func assignmentSyncOutcome(assignment model.OrgAssignment) organizationSyncOutco
 }
 
 func (s *OrganizationHRSyncService) ensureStructureNodePlaceholder(tx *gorm.DB, structure model.OrgStructure, input hrsync.OrgUnitSyncInput, unit model.OrgUnit) error {
-	sourceID, err := structureNodeSourceID(input.Key.SourceSystemCode(), structure.StructureType, input.Key.PersistenceID())
+	_, err := s.ensureStructureNodeForUnit(tx, structure, input.Key.SourceSystemCode(), input.Key.PersistenceID(), input.Sort, unit)
+	return err
+}
+
+func (s *OrganizationHRSyncService) ensureStructureNodeForUnit(tx *gorm.DB, structure model.OrgStructure, sourceSystem, unitPersistenceID string, sort int, unit model.OrgUnit) (model.OrgStructureNode, error) {
+	sourceID, err := structureNodeSourceID(sourceSystem, structure.StructureType, unitPersistenceID)
 	if err != nil {
-		return err
+		return model.OrgStructureNode{}, err
 	}
-	node, err := s.repository.FindStructureNodeBySource(tx, input.Key.SourceSystemCode(), sourceID)
+	node, err := s.repository.FindStructureNodeBySource(tx, sourceSystem, sourceID)
 	if err == nil {
 		if node.StructureId != structure.Id || node.OrgUnitId != unit.Id {
-			return ErrOrganizationHRSyncInvalid
+			return model.OrgStructureNode{}, ErrOrganizationHRSyncInvalid
 		}
-		return nil
+		return node, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return model.OrgStructureNode{}, err
 	}
 	id, err := s.nextID()
 	if err != nil {
+		return model.OrgStructureNode{}, err
+	}
+	node = model.OrgStructureNode{
+		Basic: model.Basic{Id: id, State: true}, StructureId: structure.Id, OrgUnitId: unit.Id,
+		SourceSystemCode: sourceSystem, SourceId: sourceID, Path: fmt.Sprintf("/%d/", id), Level: 1,
+		Sort: sort, Status: "disabled", SourceDeleted: false, SyncStatus: "dependency_waiting",
+	}
+	if err := s.repository.CreateStructureNode(tx, &node); err != nil {
+		return model.OrgStructureNode{}, err
+	}
+	return node, nil
+}
+
+func (s *OrganizationHRSyncService) ensureManagementLegalBridgeNodes(
+	ctx context.Context,
+	managementStructure model.OrgStructure,
+	inputs []hrsync.OrgUnitSyncInput,
+) error {
+	if managementStructure.StructureType != model.OrgStructureTypeManagement {
+		return ErrOrganizationHRSyncInvalid
+	}
+	tx := s.repository.DBWithContext(ctx)
+	legalStructure, err := s.repository.FindStructureByCode(tx, organizationLegalStructureCode)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
-	value := model.OrgStructureNode{
-		Basic: model.Basic{Id: id, State: true}, StructureId: structure.Id, OrgUnitId: unit.Id,
-		SourceSystemCode: input.Key.SourceSystemCode(), SourceId: sourceID, Path: fmt.Sprintf("/%d/", id), Level: 1,
-		Sort: input.Sort, Status: "disabled", SourceDeleted: false, SyncStatus: "dependency_waiting",
+	legalNodes, err := s.repository.ListStructureNodes(tx, legalStructure.Id)
+	if err != nil {
+		return err
 	}
-	return s.repository.CreateStructureNode(tx, &value)
+	managementNodes, err := s.repository.ListStructureNodes(tx, managementStructure.Id)
+	if err != nil {
+		return err
+	}
+	units, err := s.repository.ListOrgUnits(tx, hrsync.OrganizationHRSourceSystemCode)
+	if err != nil {
+		return err
+	}
+
+	legalNodeBySource := make(map[string]model.OrgStructureNode, len(legalNodes))
+	legalNodeByID := make(map[int]model.OrgStructureNode, len(legalNodes))
+	managementNodeBySource := make(map[string]model.OrgStructureNode, len(managementNodes))
+	unitByID := make(map[int]model.OrgUnit, len(units))
+	for _, node := range legalNodes {
+		legalNodeBySource[node.SourceId] = node
+		legalNodeByID[node.Id] = node
+	}
+	for _, node := range managementNodes {
+		managementNodeBySource[node.SourceId] = node
+	}
+	for _, unit := range units {
+		unitByID[unit.Id] = unit
+	}
+
+	neededLegalNodes := make(map[int]bool)
+	for _, input := range inputs {
+		parentRawID := strings.TrimSpace(input.ParentSourceID)
+		if parentRawID == "" {
+			continue
+		}
+		managementParentExists := false
+		for _, candidateKind := range []hrsync.ObjectKind{hrsync.ObjectKindManagementCompany, hrsync.ObjectKindManagementUnit} {
+			key, keyErr := hrsync.NewSourceKey(input.Key.SourceSystemCode(), candidateKind, parentRawID)
+			if keyErr != nil {
+				continue
+			}
+			sourceID, sourceErr := structureNodeSourceID(input.Key.SourceSystemCode(), managementStructure.StructureType, key.PersistenceID())
+			if sourceErr == nil {
+				_, managementParentExists = managementNodeBySource[sourceID]
+			}
+			if managementParentExists {
+				break
+			}
+		}
+		if managementParentExists {
+			continue
+		}
+		key, keyErr := hrsync.NewSourceKey(input.Key.SourceSystemCode(), hrsync.ObjectKindLegalUnit, parentRawID)
+		if keyErr != nil {
+			continue
+		}
+		legalSourceID, sourceErr := structureNodeSourceID(input.Key.SourceSystemCode(), legalStructure.StructureType, key.PersistenceID())
+		if sourceErr != nil {
+			continue
+		}
+		if node, exists := legalNodeBySource[legalSourceID]; exists {
+			neededLegalNodes[node.Id] = true
+		}
+	}
+	if len(neededLegalNodes) == 0 {
+		return nil
+	}
+
+	return RunInTransaction(ctx, s.repository.DBWithContext(ctx), func(tx *gorm.DB) error {
+		bridged := make(map[int]model.OrgStructureNode, len(neededLegalNodes))
+		visiting := make(map[int]bool, len(neededLegalNodes))
+		var ensureBridge func(int) (model.OrgStructureNode, error)
+		ensureBridge = func(legalNodeID int) (model.OrgStructureNode, error) {
+			if node, exists := bridged[legalNodeID]; exists {
+				return node, nil
+			}
+			if visiting[legalNodeID] {
+				return model.OrgStructureNode{}, ErrOrganizationHRSyncInvalid
+			}
+			legalNode, exists := legalNodeByID[legalNodeID]
+			if !exists {
+				return model.OrgStructureNode{}, ErrOrganizationHRSyncInvalid
+			}
+			unit, exists := unitByID[legalNode.OrgUnitId]
+			if !exists {
+				return model.OrgStructureNode{}, ErrOrganizationHRSyncInvalid
+			}
+			visiting[legalNodeID] = true
+			defer delete(visiting, legalNodeID)
+
+			var parent *model.OrgStructureNode
+			if legalNode.ParentNodeId != nil {
+				parentNode, parentErr := ensureBridge(*legalNode.ParentNodeId)
+				if parentErr != nil {
+					return model.OrgStructureNode{}, parentErr
+				}
+				parent = &parentNode
+			}
+			bridge, bridgeErr := s.ensureStructureNodeForUnit(tx, managementStructure, unit.SourceSystemCode, unit.SourceId, legalNode.Sort, unit)
+			if bridgeErr != nil {
+				return model.OrgStructureNode{}, bridgeErr
+			}
+			var parentID *int
+			path, level := fmt.Sprintf("/%d/", bridge.Id), 1
+			if parent != nil {
+				parentID = &parent.Id
+				path, level = parent.Path+fmt.Sprintf("%d/", bridge.Id), parent.Level+1
+			}
+			status := unit.Status
+			if status != "enabled" {
+				status = "disabled"
+			}
+			if err := s.repository.UpdateStructureNode(tx, bridge.Id, map[string]any{
+				"parent_node_id": parentID, "source_parent_id": legalNode.SourceParentId,
+				"path": path, "level": level, "sort": legalNode.Sort, "status": status,
+				"source_deleted": legalNode.SourceDeleted, "sync_status": legalNode.SyncStatus,
+			}); err != nil {
+				return model.OrgStructureNode{}, err
+			}
+			bridge.ParentNodeId, bridge.Path, bridge.Level = parentID, path, level
+			bridge.Status, bridge.SourceDeleted, bridge.SyncStatus = status, legalNode.SourceDeleted, legalNode.SyncStatus
+			bridged[legalNodeID] = bridge
+			return bridge, nil
+		}
+		for legalNodeID := range neededLegalNodes {
+			if _, err := ensureBridge(legalNodeID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (s *OrganizationHRSyncService) ensureStructure(ctx context.Context, structureType string) (model.OrgStructure, error) {
@@ -952,6 +1110,11 @@ func (s *OrganizationHRSyncService) resolveStructureRelations(
 	if len(inputs) == 0 {
 		return nil, nil
 	}
+	if kind == hrsync.ObjectKindManagementUnit {
+		if err := s.ensureManagementLegalBridgeNodes(ctx, structure, inputs); err != nil {
+			return nil, err
+		}
+	}
 	tx := s.repository.DBWithContext(ctx)
 	nodes, err := s.repository.ListStructureNodes(tx, structure.Id)
 	if err != nil {
@@ -1009,25 +1172,39 @@ func (s *OrganizationHRSyncService) resolveStructureRelations(
 			continue
 		}
 		relation := relation{input: input, node: node}
-		if kind == hrsync.ObjectKindLegalUnit {
+		if kind == hrsync.ObjectKindLegalUnit || kind == hrsync.ObjectKindManagementUnit {
 			legalID := strings.TrimSpace(input.LegalEntitySourceID)
-			if legalID == "" {
+			if legalID == "" && kind == hrsync.ObjectKindLegalUnit {
 				relation.reason, relation.dependency = hrsync.ReasonReferenceMissing, "legal_entity"
+			} else if legalID == "" {
+				// 管理组织允许不关联法人，不能根据名称或编码猜测关系。
 			} else if legalKey, keyErr := hrsync.NewSourceKey(input.Key.SourceSystemCode(), hrsync.ObjectKindLegalEntity, legalID); keyErr != nil {
 				relation.reason, relation.dependency = hrsync.ReasonReferenceMissing, "legal_entity"
-			} else if legalEntity, findErr := s.repository.FindLegalEntityBySource(tx, input.Key.SourceSystemCode(), legalKey.PersistenceID()); findErr != nil {
-				if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-					return nil, findErr
-				}
-				relation.reason, relation.dependency = hrsync.ReasonReferenceMissing, "legal_entity"
 			} else {
-				legalEntityID := legalEntity.Id
-				relation.legalEntity = &legalEntityID
+				legalEntity, findErr := s.repository.FindLegalEntityBySource(tx, input.Key.SourceSystemCode(), legalKey.PersistenceID())
+				if kind == hrsync.ObjectKindLegalUnit && errors.Is(findErr, gorm.ErrRecordNotFound) && strings.TrimSpace(input.LegalEntityCode) != "" {
+					legalEntity, findErr = s.repository.FindLegalEntityByCode(tx, input.Key.SourceSystemCode(), strings.TrimSpace(input.LegalEntityCode))
+				}
+				if findErr != nil {
+					if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+						return nil, findErr
+					}
+					if kind == hrsync.ObjectKindLegalUnit {
+						relation.reason, relation.dependency = hrsync.ReasonReferenceMissing, "legal_entity"
+					}
+				} else {
+					legalEntityID := legalEntity.Id
+					relation.legalEntity = &legalEntityID
+				}
 			}
 		}
 		if relation.reason == "" {
-			parentID, reason, dependency := resolveStructureParent(input, kind, structure, nodeBySource, allNodeSources, currentNodeIDs)
-			relation.parentID, relation.reason, relation.dependency = parentID, reason, dependency
+			if kind == hrsync.ObjectKindManagementUnit && relation.legalEntity != nil && strings.TrimSpace(input.ParentSourceID) == strings.TrimSpace(input.LegalEntitySourceID) {
+				relation.parentID = nil
+			} else {
+				parentID, reason, dependency := resolveStructureParent(input, kind, structure, nodeBySource, allNodeSources, currentNodeIDs)
+				relation.parentID, relation.reason, relation.dependency = parentID, reason, dependency
+			}
 		}
 		unit := unitByID[node.OrgUnitId]
 		expectedParentSource := safeDependencyDigest(input.Key.SourceSystemCode(), kind, input.ParentSourceID)
@@ -1135,9 +1312,15 @@ func resolveStructureParent(
 	if parentRawID == input.Key.RawSourceID() {
 		return nil, hrsync.ReasonParentSelfReference, "structure_parent"
 	}
+	// 法人部门接口用所属法人公司的来源 ID 作为顶层部门的父 ID。
+	// 法人公司不是 org_structure_node，因此这里把该部门作为法人部门树的根节点，
+	// 页面再根据 primary_legal_entity_id 将它挂到对应法人公司下。
+	if kind == hrsync.ObjectKindLegalUnit && parentRawID == strings.TrimSpace(input.LegalEntitySourceID) {
+		return nil, "", ""
+	}
 	candidateKinds := []hrsync.ObjectKind{kind}
 	if kind == hrsync.ObjectKindManagementUnit {
-		candidateKinds = []hrsync.ObjectKind{hrsync.ObjectKindManagementUnit, hrsync.ObjectKindManagementCompany}
+		candidateKinds = []hrsync.ObjectKind{hrsync.ObjectKindManagementUnit, hrsync.ObjectKindManagementCompany, hrsync.ObjectKindLegalUnit}
 	}
 	var resolved *int
 	for _, candidateKind := range candidateKinds {
@@ -1357,7 +1540,22 @@ func dedupeLegalEntityInputs(inputs []hrsync.LegalEntitySyncInput, issues []hrsy
 			result = append(result, input)
 		}
 	}
-	return result, issues
+	activeCodes := make(map[string]struct{}, len(result))
+	for _, input := range result {
+		if input.Status == hrsync.CanonicalStatusEnabled {
+			activeCodes[input.Code] = struct{}{}
+		}
+	}
+	current := result[:0]
+	for _, input := range result {
+		if input.Status == hrsync.CanonicalStatusDisabled {
+			if _, superseded := activeCodes[input.Code]; superseded {
+				continue
+			}
+		}
+		current = append(current, input)
+	}
+	return current, issues
 }
 
 func dedupeOrgUnitInputs(inputs []hrsync.OrgUnitSyncInput, issues []hrsync.SourceIssue, kind hrsync.ObjectKind) ([]hrsync.OrgUnitSyncInput, []hrsync.SourceIssue) {
@@ -1641,7 +1839,7 @@ func orgUnitFactsEqual(existing model.OrgUnit, input hrsync.OrgUnitSyncInput, un
 }
 
 func positionFactsEqual(existing model.OrgPosition, input hrsync.PositionSyncInput, orgUnitID int) bool {
-	return existing.Code == input.Code && existing.Name == input.Name && existing.OrgUnitId == orgUnitID &&
+	return existing.SourceCode == input.SourceCode && existing.Code == input.Code && existing.Name == input.Name && existing.OrgUnitId == orgUnitID &&
 		existing.PositionType == "professional" && existing.JobLevel == input.JobLevel && !existing.IsManagerPosition &&
 		existing.Status == string(input.Status) && !existing.SourceDeleted
 }

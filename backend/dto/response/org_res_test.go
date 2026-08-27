@@ -336,6 +336,8 @@ func TestOrgStructureTreeKeepsNodeAndBusinessIdentitySeparate(t *testing.T) {
 		Status:           "enabled",
 		SyncStatus:       "synced",
 	}
+	legalEntityID := 11
+	unit.PrimaryLegalEntityId = &legalEntityID
 
 	object := marshalJSONObject(t, NewOrgStructureOrgTreeNodeRes(node, unit, false))
 	if got := int(object["structure_node_id"].(float64)); got != node.Id {
@@ -343,6 +345,9 @@ func TestOrgStructureTreeKeepsNodeAndBusinessIdentitySeparate(t *testing.T) {
 	}
 	if got := int(object["org_unit_id"].(float64)); got != unit.Id {
 		t.Fatalf("org_unit_id = %d, want %d", got, unit.Id)
+	}
+	if got := int(object["primary_legal_entity_id"].(float64)); got != legalEntityID {
+		t.Fatalf("primary_legal_entity_id = %d, want %d", got, legalEntityID)
 	}
 	assertJSONKeysAbsent(
 		t,

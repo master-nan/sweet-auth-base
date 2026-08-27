@@ -179,12 +179,12 @@ describe('Organization read-only center', () => {
 
     expect(wrapper.find('h1').text()).toBe('组织架构')
     expect(wrapper.find('.organization-page-heading p').text()).toBe(
-      '统一浏览管理组织与法人主体镜像',
+      '浏览法人架构与管理架构两棵组织树',
     )
     expect(selectByLabel(wrapper, '架构类型').text()).toContain('管理架构')
     expect(selectByLabel(wrapper, '架构类型').text()).toContain('法人架构')
     expect(wrapper.find('[data-testid="select-管理视图"]').exists()).toBe(false)
-    expect(wrapper.find('.organization-panel-title').text()).toBe('管理组织树')
+    expect(wrapper.find('.organization-panel-title').text()).toBe('管理架构')
     const refreshButton = wrapper.find('[data-icon="refresh"]')
     expect(refreshButton.exists()).toBe(true)
     expect(refreshButton.attributes('data-label')).toBe('')
@@ -197,9 +197,9 @@ describe('Organization read-only center', () => {
     expect(apiMocks.getOrgUnitDetail).toHaveBeenCalledWith(120, {
       only_effective: true,
     })
-    expect(
-      (wrapper.findComponent(OrganizationDetailStub).props('groups') as unknown[]),
-    ).toHaveLength(1)
+    expect(wrapper.findComponent(OrganizationDetailStub).props('groups') as unknown[]).toHaveLength(
+      1,
+    )
   })
 
   it('shows backend management-view names when multiple Structures exist', async () => {
@@ -253,12 +253,11 @@ describe('Organization read-only center', () => {
     expect(apiMocks.getLegalEntityDetail).toHaveBeenCalledWith(10, {
       only_effective: true,
     })
-    expect(wrapper.find('.organization-panel-title').text()).toBe('法人树')
+    expect(wrapper.find('.organization-panel-title').text()).toBe('法人架构')
     expect(wrapper.find('[data-testid="select-管理视图"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="organization-tree"]').text()).toContain('集团法人')
-    expect(wrapper.find('[data-testid="organization-detail"]').text()).toContain(
-      '统一社会信用代码',
-    )
+    expect(wrapper.find('[data-testid="organization-tree"]').text()).toContain('法人财务部')
+    expect(wrapper.find('[data-testid="organization-detail"]').text()).toContain('统一社会信用代码')
 
     wrapper.findComponent(OrganizationTreeStub).vm.$emit('select', 11)
     await flushPromises()
@@ -289,10 +288,7 @@ describe('Organization read-only center', () => {
   })
 })
 
-function selectByLabel(
-  wrapper: ReturnType<typeof mountPage>,
-  label: string,
-) {
+function selectByLabel(wrapper: ReturnType<typeof mountPage>, label: string) {
   const selector = wrapper
     .findAllComponents(QSelectStub)
     .find((select) => select.props('label') === label)
@@ -300,34 +296,50 @@ function selectByLabel(
   return selector
 }
 
-function structure(id: number, code: string, name: string, isDefault: boolean) {
+function structure(
+  id: number,
+  code: string,
+  name: string,
+  isDefault: boolean,
+  structureType: 'management' | 'legal' = 'management',
+) {
   return {
     id,
     code,
     name,
-    structure_type: 'management',
+    structure_type: structureType,
     status: 'enabled',
     is_default: isDefault,
   }
 }
 
 function mockSingleStructure() {
-  apiMocks.queryStructures.mockResolvedValue({
-    items: [structure(20, 'GROUP', '集团组织视图', true)],
-    total: 1,
-  })
+  apiMocks.queryStructures.mockImplementation(
+    ({ structure_type }: { structure_type: 'management' | 'legal' }) =>
+      structure_type === 'legal'
+        ? {
+            items: [structure(30, 'LEGAL', '法人架构', false, 'legal')],
+            total: 1,
+          }
+        : {
+            items: [structure(20, 'GROUP', '集团组织视图', true)],
+            total: 1,
+          },
+  )
 }
 
 function mockStructureTreeAndDetail() {
-  apiMocks.getStructureOrgTree.mockImplementation(
-    ({ structure_id }: { structure_id: number }) => [
+  apiMocks.getStructureOrgTree.mockImplementation(({ structure_id }: { structure_id: number }) => {
+    const legal = structure_id === 30
+    return [
       {
         id: structure_id * 10,
         structure_node_id: structure_id * 10,
         structure_id,
         org_unit_id: structure_id + 100,
-        code: `OU-${structure_id}`,
-        name: `组织-${structure_id}`,
+        primary_legal_entity_id: legal ? 10 : null,
+        code: legal ? 'LEGAL-DEPT-1' : `OU-${structure_id}`,
+        name: legal ? '法人财务部' : `组织-${structure_id}`,
         unit_type: 'department',
         status: 'enabled',
         node_status: 'enabled',
@@ -336,8 +348,8 @@ function mockStructureTreeAndDetail() {
         disabled: false,
         children: [],
       },
-    ],
-  )
+    ]
+  })
   apiMocks.getOrgUnitDetail.mockImplementation((orgUnitId: number) => ({
     id: orgUnitId,
     code: `OU-${orgUnitId}`,

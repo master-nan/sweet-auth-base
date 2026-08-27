@@ -120,20 +120,21 @@ type OrgReferenceSummaryRes struct {
 // OrgStructureOrgTreeNodeRes 将树节点身份与业务组织身份分离。
 // 消费者使用 StructureNodeId 定位节点，业务记录保存 OrgUnitId。
 type OrgStructureOrgTreeNodeRes struct {
-	StructureNodeId int                          `json:"structure_node_id"`
-	StructureId     int                          `json:"structure_id"`
-	OrgUnitId       int                          `json:"org_unit_id"`
-	ParentNodeId    *int                         `json:"parent_node_id"`
-	Code            string                       `json:"code"`
-	Name            string                       `json:"name"`
-	UnitType        string                       `json:"unit_type"`
-	Status          string                       `json:"status"`
-	NodeStatus      string                       `json:"node_status"`
-	Level           int                          `json:"level"`
-	Sort            int                          `json:"sort"`
-	Disabled        bool                         `json:"disabled"`
-	Orphan          bool                         `json:"orphan,omitempty"`
-	Children        []OrgStructureOrgTreeNodeRes `json:"children,omitempty"`
+	StructureNodeId      int                          `json:"structure_node_id"`
+	StructureId          int                          `json:"structure_id"`
+	OrgUnitId            int                          `json:"org_unit_id"`
+	PrimaryLegalEntityId *int                         `json:"primary_legal_entity_id,omitempty"`
+	ParentNodeId         *int                         `json:"parent_node_id"`
+	Code                 string                       `json:"code"`
+	Name                 string                       `json:"name"`
+	UnitType             string                       `json:"unit_type"`
+	Status               string                       `json:"status"`
+	NodeStatus           string                       `json:"node_status"`
+	Level                int                          `json:"level"`
+	Sort                 int                          `json:"sort"`
+	Disabled             bool                         `json:"disabled"`
+	Orphan               bool                         `json:"orphan,omitempty"`
+	Children             []OrgStructureOrgTreeNodeRes `json:"children,omitempty"`
 }
 
 // OrgStructureNodeListRes 有意省略 Path 和来源父级数据。
@@ -364,7 +365,7 @@ func NewOrgLegalEntityOptionRes(entity model.OrgLegalEntity, disabled bool) OrgS
 func NewOrgUnitListRes(unit model.OrgUnit) OrgUnitListRes {
 	return OrgUnitListRes{
 		OrgBaseRes:           newOrgBaseRes(unit.Basic),
-		Code:                 unit.Code,
+		Code:                 organizationSourceDisplayCode(unit.SourceCode, unit.Code),
 		Name:                 unit.Name,
 		UnitType:             unit.UnitType,
 		PrimaryLegalEntityId: unit.PrimaryLegalEntityId,
@@ -386,6 +387,14 @@ func NewOrgUnitDetailRes(unit model.OrgUnit) OrgUnitDetailRes {
 
 func NewOrgReferenceSummaryRes(id int, code, name string) OrgReferenceSummaryRes {
 	return OrgReferenceSummaryRes{Id: id, Code: code, Name: name}
+}
+
+func NewOrgUnitReferenceSummaryRes(unit model.OrgUnit) OrgReferenceSummaryRes {
+	return NewOrgReferenceSummaryRes(unit.Id, organizationSourceDisplayCode(unit.SourceCode, unit.Code), unit.Name)
+}
+
+func NewOrgPositionReferenceSummaryRes(position model.OrgPosition) OrgReferenceSummaryRes {
+	return NewOrgReferenceSummaryRes(position.Id, organizationSourceDisplayCode(position.SourceCode, position.Code), position.Name)
 }
 
 func NewOrgStructureListRes(structure model.OrgStructure) OrgStructureListRes {
@@ -416,10 +425,11 @@ func NewOrgStructureOptionRes(structure model.OrgStructure, disabled bool) OrgSe
 }
 
 func NewOrgUnitOptionRes(unit model.OrgUnit, disabled bool) OrgSelectorOptionRes {
+	code := organizationSourceDisplayCode(unit.SourceCode, unit.Code)
 	return OrgSelectorOptionRes{
 		Value:    unit.Id,
-		Label:    organizationDisplayLabel(unit.Code, unit.Name),
-		Code:     unit.Code,
+		Label:    organizationDisplayLabel(code, unit.Name),
+		Code:     code,
 		Name:     unit.Name,
 		Disabled: disabled,
 	}
@@ -430,19 +440,21 @@ func NewOrgStructureOrgTreeNodeRes(
 	unit model.OrgUnit,
 	disabled bool,
 ) OrgStructureOrgTreeNodeRes {
+	code := organizationSourceDisplayCode(unit.SourceCode, unit.Code)
 	return OrgStructureOrgTreeNodeRes{
-		StructureNodeId: node.Id,
-		StructureId:     node.StructureId,
-		OrgUnitId:       unit.Id,
-		ParentNodeId:    node.ParentNodeId,
-		Code:            unit.Code,
-		Name:            unit.Name,
-		UnitType:        unit.UnitType,
-		Status:          unit.Status,
-		NodeStatus:      node.Status,
-		Level:           node.Level,
-		Sort:            node.Sort,
-		Disabled:        disabled,
+		StructureNodeId:      node.Id,
+		StructureId:          node.StructureId,
+		OrgUnitId:            unit.Id,
+		PrimaryLegalEntityId: unit.PrimaryLegalEntityId,
+		ParentNodeId:         node.ParentNodeId,
+		Code:                 code,
+		Name:                 unit.Name,
+		UnitType:             unit.UnitType,
+		Status:               unit.Status,
+		NodeStatus:           node.Status,
+		Level:                node.Level,
+		Sort:                 node.Sort,
+		Disabled:             disabled,
 	}
 }
 
@@ -467,7 +479,7 @@ func NewOrgStructureNodeDetailRes(node model.OrgStructureNode) OrgStructureNodeD
 func NewOrgPositionListRes(position model.OrgPosition) OrgPositionListRes {
 	return OrgPositionListRes{
 		OrgBaseRes:        newOrgBaseRes(position.Basic),
-		Code:              position.Code,
+		Code:              organizationSourceDisplayCode(position.SourceCode, position.Code),
 		Name:              position.Name,
 		OrgUnitId:         position.OrgUnitId,
 		PositionType:      position.PositionType,
@@ -487,10 +499,11 @@ func NewOrgPositionDetailRes(position model.OrgPosition) OrgPositionDetailRes {
 }
 
 func NewOrgPositionOptionRes(position model.OrgPosition, disabled bool) OrgSelectorOptionRes {
+	code := organizationSourceDisplayCode(position.SourceCode, position.Code)
 	return OrgSelectorOptionRes{
 		Value:    position.Id,
-		Label:    organizationDisplayLabel(position.Code, position.Name),
-		Code:     position.Code,
+		Label:    organizationDisplayLabel(code, position.Name),
+		Code:     code,
 		Name:     position.Name,
 		Disabled: disabled,
 	}
@@ -756,6 +769,13 @@ func organizationDisplayLabel(code, name string) string {
 	default:
 		return code + " - " + name
 	}
+}
+
+func organizationSourceDisplayCode(sourceCode, code string) string {
+	if sourceCode = strings.TrimSpace(sourceCode); sourceCode != "" {
+		return sourceCode
+	}
+	return strings.TrimSpace(code)
 }
 
 func maskMobile(value string) string {

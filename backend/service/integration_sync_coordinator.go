@@ -183,7 +183,17 @@ func newSyncBatchSnapshot(task model.IntegrationSyncTask, system model.ExternalS
 			batch.ResultSummary = "同步窗口结束时间早于 Checkpoint"
 			return batch, nil
 		}
-		batch.PlannedSliceCount = syncSliceCount(start, end, time.Duration(task.WindowSliceSeconds)*time.Second)
+		plan, err := integration.DecodeSyncExecutionInputPlan(task.InputPlan)
+		if err != nil {
+			return model.IntegrationSyncBatch{}, err
+		}
+		if plan.WindowMode == integration.SyncWindowModeLowerBoundOnly {
+			if end.After(start) {
+				batch.PlannedSliceCount = 1
+			}
+		} else {
+			batch.PlannedSliceCount = syncSliceCount(start, end, time.Duration(task.WindowSliceSeconds)*time.Second)
+		}
 	} else {
 		batch.PlannedSliceCount = 1
 	}
@@ -325,7 +335,11 @@ func (s *IntegrationSyncCoordinator) createNextSlice(ctx context.Context, batch 
 	if nextSlice > batch.PlannedSliceCount {
 		return s.finishBatch(ctx, batch)
 	}
-	windowStart, windowEnd, requestStart, err := syncSliceWindow(batch, nextSlice)
+	plan, err := integration.DecodeSyncExecutionInputPlan(task.InputPlan)
+	if err != nil {
+		return s.failBatchWithoutExecution(ctx, batch, syncBatchReasonExecutionCreateFailed)
+	}
+	windowStart, windowEnd, requestStart, err := syncSliceWindow(batch, nextSlice, plan.WindowMode)
 	if err != nil {
 		return s.failBatchWithoutExecution(ctx, batch, syncBatchReasonExecutionCreateFailed)
 	}
@@ -372,7 +386,7 @@ func (s *IntegrationSyncCoordinator) createNextSlice(ctx context.Context, batch 
 	})
 }
 
-func syncSliceWindow(batch model.IntegrationSyncBatch, sliceNo int) (*time.Time, *time.Time, *time.Time, error) {
+func syncSliceWindow(batch model.IntegrationSyncBatch, sliceNo int, windowMode string) (*time.Time, *time.Time, *time.Time, error) {
 	if batch.CheckpointMode == model.IntegrationSyncCheckpointNone {
 		return nil, nil, nil, nil
 	}
@@ -380,9 +394,14 @@ func syncSliceWindow(batch model.IntegrationSyncBatch, sliceNo int) (*time.Time,
 		return nil, nil, nil, myerrors.ErrSyncCheckpointInvalid
 	}
 	start := batch.WindowStart.Add(time.Duration(sliceNo-1) * time.Duration(batch.WindowSliceSeconds) * time.Second).UTC()
-	end := start.Add(time.Duration(batch.WindowSliceSeconds) * time.Second)
-	if end.After(*batch.WindowEnd) {
-		end = batch.WindowEnd.UTC()
+	end := batch.WindowEnd.UTC()
+	if windowMode != integration.SyncWindowModeLowerBoundOnly {
+		end = start.Add(time.Duration(batch.WindowSliceSeconds) * time.Second)
+		if end.After(*batch.WindowEnd) {
+			end = batch.WindowEnd.UTC()
+		}
+	} else if sliceNo != 1 {
+		return nil, nil, nil, myerrors.ErrSyncCheckpointInvalid
 	}
 	if !end.After(start) {
 		return nil, nil, nil, myerrors.ErrSyncCheckpointInvalid

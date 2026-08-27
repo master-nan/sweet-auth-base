@@ -40,6 +40,7 @@ func TestOrgServiceStructureQueriesRespectMetadataScopeAndLegalEntity(t *testing
 	nodes := []model.OrgStructureNode{
 		managementNodeFixture(30, current.Id, unitA.Id, nil, "enabled"),
 		managementNodeFixture(31, other.Id, unitB.Id, nil, "enabled"),
+		managementNodeFixture(32, legalStructure.Id, unitA.Id, nil, "enabled"),
 	}
 	testutil.MustCreate(t, db, &nodes)
 
@@ -60,11 +61,16 @@ func TestOrgServiceStructureQueriesRespectMetadataScopeAndLegalEntity(t *testing
 	if result.Total != 1 || len(result.Data) != 1 || result.Data[0].Id != current.Id {
 		t.Fatalf("unexpected structure query result: %+v", result)
 	}
-	if _, err := orgService.QueryStructures(nil, request.OrgStructureQueryReq{StructureType: "legal"}, managementStructureTable()); err != nil {
-		t.Fatalf("management query should ignore a legal structure request hint: %v", err)
+	legalStructures, err := orgService.QueryStructures(nil, request.OrgStructureQueryReq{StructureType: "legal"}, managementStructureTable())
+	if err != nil || legalStructures.Total != 1 || legalStructures.Data[0].Id != legalStructure.Id {
+		t.Fatalf("legal structure query=%+v err=%v", legalStructures, err)
 	}
-	if _, err := orgService.GetStructureDetail(nil, legalStructure.Id, request.OrgStructureDetailReq{}); err == nil {
-		t.Fatal("management structure detail must reject legal structure records")
+	if detail, err := orgService.GetStructureDetail(nil, legalStructure.Id, request.OrgStructureDetailReq{}); err != nil || detail.Id != legalStructure.Id {
+		t.Fatalf("legal structure detail=%+v err=%v", detail, err)
+	}
+	legalTree, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{StructureId: legalStructure.Id})
+	if err != nil || len(legalTree) != 1 || legalTree[0].PrimaryLegalEntityId == nil || *legalTree[0].PrimaryLegalEntityId != legalA.Id {
+		t.Fatalf("legal structure tree=%+v err=%v", legalTree, err)
 	}
 
 	advanced, err := orgService.QueryStructures(nil, request.OrgStructureQueryReq{

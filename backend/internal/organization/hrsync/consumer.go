@@ -15,9 +15,12 @@ import (
 const (
 	maxOrganizationSourceRecords       = 100000
 	maxEmployeeSourceRecords           = 20000
+	maxDepartmentResponseBytes   int64 = 16 << 20
 	maxEmployeeResponseBytes     int64 = 16 << 20
 	maxEmbeddedAssignmentsBytes        = 256 << 10
 	maxEmbeddedAssignmentsCount        = 100
+	standardConsumerDuration           = 2 * time.Minute
+	bulkConsumerDuration               = 5 * time.Minute
 )
 
 var errEmbeddedAssignmentsInvalid = errors.New("org_sync_embedded_assignments_invalid")
@@ -161,20 +164,20 @@ func DisabledConsumerRegistrations(domain OrganizationSyncDomain) []integration.
 
 func consumerRegistrations(domain OrganizationSyncDomain, contract SourceContract, status string) []integration.SyncConsumerRegistration {
 	return []integration.SyncConsumerRegistration{
-		consumerRegistration(ConsumerCodeLegalEntity, "HR 法人公司", 4<<20, status, NewLegalEntityConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodeManagementCompany, "HR 管理公司", 4<<20, status, NewManagementCompanyConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodeManagementDepartment, "HR 管理部门", 8<<20, status, NewManagementDepartmentConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodeLegalDepartment, "HR 法人部门", 8<<20, status, NewLegalDepartmentConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodePosition, "HR 岗位", 8<<20, status, NewPositionConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodeEmployee, "HR 员工", maxEmployeeResponseBytes, status, NewEmployeeConsumer(domain, contract)),
-		consumerRegistration(ConsumerCodeResignedEmployee, "HR 离职员工", 8<<20, status, NewResignedEmployeeConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeLegalEntity, "HR 法人公司", 4<<20, standardConsumerDuration, status, NewLegalEntityConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeManagementCompany, "HR 管理公司", 4<<20, standardConsumerDuration, status, NewManagementCompanyConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeManagementDepartment, "HR 管理部门", maxDepartmentResponseBytes, bulkConsumerDuration, status, NewManagementDepartmentConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeLegalDepartment, "HR 法人部门", maxDepartmentResponseBytes, bulkConsumerDuration, status, NewLegalDepartmentConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodePosition, "HR 岗位", 8<<20, bulkConsumerDuration, status, NewPositionConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeEmployee, "HR 员工", maxEmployeeResponseBytes, bulkConsumerDuration, status, NewEmployeeConsumer(domain, contract)),
+		consumerRegistration(ConsumerCodeResignedEmployee, "HR 离职员工", 8<<20, bulkConsumerDuration, status, NewResignedEmployeeConsumer(domain, contract)),
 	}
 }
 
-func consumerRegistration(code, name string, maxResponse int64, status string, consumer integration.SyncResultConsumer) integration.SyncConsumerRegistration {
+func consumerRegistration(code, name string, maxResponse int64, maxDuration time.Duration, status string, consumer integration.SyncResultConsumer) integration.SyncConsumerRegistration {
 	return integration.SyncConsumerRegistration{Metadata: integration.SyncConsumerMetadata{
 		Code: code, Version: ConsumerVersionV1, Name: name, Status: status,
-		ContentTypes: []string{"application/json"}, MaxResponseBytes: maxResponse, MaxDuration: 60 * time.Second,
+		ContentTypes: []string{"application/json"}, MaxResponseBytes: maxResponse, MaxDuration: maxDuration,
 		CheckpointModes: []string{model.IntegrationSyncCheckpointTimestamp},
 	}, Consumer: consumer}
 }

@@ -53,6 +53,7 @@ type HRDepartmentSourceDTO struct {
 	Name                string             `json:"name"`
 	ParentSourceID      string             `json:"pk_fathedeptzjkid_ignore"`
 	LegalEntitySourceID string             `json:"orgidzjkid_ignore"`
+	LegalEntityCode     string             `json:"pk_corp"`
 	Enabled             SourceEnableStatus `json:"isenable"`
 	ChangeTime          string             `json:"changeTime"`
 	Level               int                `json:"ilevel"`

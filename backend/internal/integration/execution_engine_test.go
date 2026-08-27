@@ -292,6 +292,29 @@ func TestIntegrationExecutionEngineUsesSupportedCredentialTypes(t *testing.T) {
 	}
 }
 
+func TestIntegrationExecutionEngineAllowsInterfaceWithoutCredential(t *testing.T) {
+	engine, db, execution, closeServer := newExecutionEngineFixtureWithHandler(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if authorization := request.Header.Get("Authorization"); authorization != "" {
+			t.Errorf("anonymous interface received authorization header %q", authorization)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusOK)
+		_, _ = writer.Write([]byte(`{"result":"ok"}`))
+	}))
+	defer closeServer()
+	if err := db.Model(&model.InterfaceDefinition{}).Where("id = ?", execution.InterfaceDefinitionID).Update("credential_id", nil).Error; err != nil {
+		t.Fatalf("clear interface credential: %v", err)
+	}
+	claimed, err := engine.ClaimReadyExecutions(context.Background())
+	if err != nil || len(claimed) != 1 {
+		t.Fatalf("claim = %+v err=%v", claimed, err)
+	}
+	result, err := engine.RunExecution(context.Background(), claimed[0])
+	if err != nil || !result.Succeeded || result.CredentialCode != "" || result.CredentialFingerprintSummary != "" {
+		t.Fatalf("anonymous interface result = %+v err=%v", result, err)
+	}
+}
+
 func TestIntegrationExecutionEngineRebuildsSnapshotBeforeCredentialAndTransport(t *testing.T) {
 	core, observed := observer.New(zap.InfoLevel)
 	restoreLogger := zap.ReplaceGlobals(zap.New(core))
