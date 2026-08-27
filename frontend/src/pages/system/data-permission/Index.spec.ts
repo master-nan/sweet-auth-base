@@ -48,7 +48,14 @@ const permissionButtons = vi.hoisted(() => ({
       color: 'primary',
     },
   ],
-  line: [],
+  line: [] as Array<{
+    id: number
+    name: string
+    event_action: string
+    icon: string
+    color: string
+    position: number
+  }>,
 }))
 
 vi.mock('boot/axios', () => ({
@@ -130,14 +137,19 @@ const ButtonStub = defineComponent({
   props: {
     label: { type: String, default: '' },
     icon: { type: String, default: '' },
+    color: { type: String, default: '' },
+    disable: Boolean,
   },
   emits: ['click'],
-  setup(props, { emit }) {
+  setup(props, { attrs, emit }) {
     return () =>
       h(
         'button',
         {
           'data-icon': props.icon,
+          'data-color': props.color,
+          'aria-label': attrs['aria-label'],
+          disabled: props.disable,
           onClick: () => emit('click'),
         },
         props.label,
@@ -186,9 +198,12 @@ const TableStub = defineComponent({
       h('section', { 'data-testid': 'table', 'data-row-count': props.rows.length }, [
         slots.top?.(),
         ...props.rows.flatMap((row: any) =>
-          props.columns.map((column: any) =>
-            h('span', typeof column.field === 'function' ? column.field(row) : row[column.field]),
-          ),
+          props.columns.map((column: any) => {
+            const value =
+              typeof column.field === 'function' ? column.field(row) : row[column.field]
+            const cell = slots[`body-cell-${column.name}`]
+            return cell ? cell({ row, value }) : h('span', value)
+          }),
         ),
         slots.bottom?.(),
       ])
@@ -262,6 +277,7 @@ const emptyList = () => Promise.resolve({ data: [], total: 0 })
 describe('Data permission configuration center', () => {
   beforeEach(() => {
     Object.values(apiMocks).forEach((mock) => mock.mockReset())
+    permissionButtons.line.splice(0)
     apiMocks.queryDimensions.mockImplementation(emptyList)
     apiMocks.queryResources.mockImplementation(emptyList)
     apiMocks.queryOwnerships.mockImplementation(emptyList)
@@ -406,6 +422,48 @@ describe('Data permission configuration center', () => {
     const table = wrapper.find('[data-panel="grants"] [data-testid="table"]')
     expect(table.text()).toContain('华东只读角色')
     expect(table.text()).not.toContain('#9527')
+  })
+
+  it('shows enable and disable actions from the current row state with one permission button', async () => {
+    permissionButtons.line.push({
+      id: 3,
+      name: '启停数据权限',
+      event_action: 'toggle_permission',
+      icon: 'verified_user',
+      color: 'warning',
+      position: 1,
+    })
+    apiMocks.queryResources.mockResolvedValue({
+      data: [
+        {
+          id: 10,
+          resource_code: 'enabled_resource',
+          name: '已启用资源',
+          resource_type: 'business_service',
+          permission_enabled: true,
+          state: true,
+        },
+        {
+          id: 11,
+          resource_code: 'disabled_resource',
+          name: '未启用资源',
+          resource_type: 'business_service',
+          permission_enabled: false,
+          state: true,
+        },
+      ],
+      total: 2,
+    })
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const disableButton = wrapper.find('button[aria-label="停用数据权限"]')
+    const enableButton = wrapper.find('button[aria-label="启用数据权限"]')
+    expect(disableButton.attributes('data-icon')).toBe('pause_circle')
+    expect(disableButton.attributes('data-color')).toBe('warning')
+    expect(enableButton.attributes('data-icon')).toBe('play_circle')
+    expect(enableButton.attributes('data-color')).toBe('positive')
   })
 
   it('stops submission when the common form validation fails', async () => {

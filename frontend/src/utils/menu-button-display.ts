@@ -3,6 +3,7 @@ import { SysMenuButtonDisplayMode, SysMenuButtonPosition } from 'src/types/enum'
 
 interface MenuButtonDisplayOptions {
   label?: string
+  icon?: string | undefined
   position?: SysMenuButtonPosition
 }
 
@@ -22,7 +23,7 @@ const defaultDisplayMode = (position?: SysMenuButtonPosition) => {
 
 export const menuButtonDisplayProps = (btn: MenuButton, options: MenuButtonDisplayOptions = {}) => {
   const label = options.label || btn.name
-  const icon = btn.icon || undefined
+  const icon = (options.icon ?? btn.icon) || undefined
   const position = options.position || btn.position
   const configuredMode = normalizeDisplayMode(String(btn.display_mode || ''))
   const mode =

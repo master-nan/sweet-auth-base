@@ -163,14 +163,13 @@
                   <q-btn
                     v-for="button in lineButtonsForTab(tab)"
                     :key="button.id"
-                    v-bind="menuButtonDisplayProps(button)"
-                    :color="button.color || 'primary'"
+                    v-bind="lineButtonDisplayProps(button, props.row)"
                     flat
                     dense
                     size="sm"
                     @click.stop="handleButtonClick(button, props.row)"
                   >
-                    <q-tooltip>{{ button.name }}</q-tooltip>
+                    <q-tooltip>{{ lineButtonLabel(button, props.row) }}</q-tooltip>
                   </q-btn>
                 </q-td>
               </template>
@@ -321,6 +320,12 @@ type ActiveTabName = ListTabName | 'preflight'
 type ConfigDialogKind = 'resource' | 'ownership' | 'policy' | 'grant'
 type ConfigRow = DataResource | DataOwnership | DataPolicy | DataGrant
 type PreflightType = 'resource' | 'policy' | 'grant'
+interface LineButtonPresentation {
+  label: string
+  icon: string | undefined
+  color: string
+  disable?: boolean
+}
 
 const api = useDataPermissionConfigApi()
 const $q = useQuasar()
@@ -579,6 +584,66 @@ const topButtonsForTab = (tab: ListTabName) =>
 const lineButtonsForTab = (tab: ListTabName) =>
   lineButtons.value.filter((button) => lineActionByTab[tab].includes(button.event_action))
 const filterCountForTab = (tab: ListTabName) => countEffectiveQueryRules(queries.value[tab])
+
+const lineButtonPresentation = (
+  button: MenuButton,
+  row: ConfigRow,
+): LineButtonPresentation => {
+  if (button.event_action === 'toggle_permission') {
+    const enabled = Boolean((row as DataResource).permission_enabled)
+    return {
+      label: enabled ? '停用数据权限' : '启用数据权限',
+      icon: enabled ? 'pause_circle' : 'play_circle',
+      color: enabled ? 'warning' : 'positive',
+    }
+  }
+  if (button.event_action === 'toggle_policy') {
+    const enabled = row.state !== false
+    return {
+      label: enabled ? '停用权限策略' : '启用权限策略',
+      icon: enabled ? 'pause_circle' : 'play_circle',
+      color: enabled ? 'warning' : 'positive',
+    }
+  }
+  if (button.event_action === 'toggle_grant') {
+    const enabled = row.state !== false
+    return {
+      label: enabled ? '停用权限授权' : '启用权限授权',
+      icon: enabled ? 'pause_circle' : 'play_circle',
+      color: enabled ? 'warning' : 'positive',
+    }
+  }
+  if (button.event_action === 'update_ownership') {
+    const enabled = row.state !== false
+    return {
+      label: enabled ? '停用归属定义' : '归属定义已停用',
+      icon: enabled ? 'pause_circle' : 'block',
+      color: enabled ? 'warning' : 'grey-6',
+      disable: !enabled,
+    }
+  }
+  return {
+    label: button.name,
+    icon: button.icon || undefined,
+    color: button.color || 'primary',
+    disable: false,
+  }
+}
+
+const lineButtonDisplayProps = (button: MenuButton, row: ConfigRow) => {
+  const presentation = lineButtonPresentation(button, row)
+  return {
+    ...menuButtonDisplayProps(button, {
+      label: presentation.label,
+      icon: presentation.icon,
+    }),
+    color: presentation.color,
+    disable: presentation.disable || false,
+  }
+}
+
+const lineButtonLabel = (button: MenuButton, row: ConfigRow) =>
+  lineButtonPresentation(button, row).label
 
 const field = (
   code: string,
