@@ -78,8 +78,24 @@ type Audit struct {
 
 // Integration 仅保存集成运行时的服务端配置，不由普通请求修改。
 type Integration struct {
-	Worker     IntegrationWorker     `mapstructure:"worker"`
-	SyncRunner IntegrationSyncRunner `mapstructure:"sync_runner"`
+	Worker         IntegrationWorker         `mapstructure:"worker"`
+	SyncRunner     IntegrationSyncRunner     `mapstructure:"sync_runner"`
+	EndpointPolicy IntegrationEndpointPolicy `mapstructure:"endpoint_policy"`
+	OrganizationHR IntegrationOrganizationHR `mapstructure:"organization_hr"`
+}
+
+// IntegrationEndpointPolicy 只允许服务端显式批准内部 HTTP 地址。
+// 默认值仍拒绝 HTTP 和私网地址。
+type IntegrationEndpointPolicy struct {
+	AllowHTTP            bool     `mapstructure:"allow_http"`
+	ApprovedPrivateCIDRs []string `mapstructure:"approved_private_cidrs"`
+}
+
+// IntegrationOrganizationHR 控制内置 HR Consumer 是否可被同步任务引用。
+// 来源时区用于解析无 UTC offset 的 changeTime。
+type IntegrationOrganizationHR struct {
+	Enabled        bool   `mapstructure:"enabled"`
+	SourceTimezone string `mapstructure:"source_timezone"`
 }
 
 // IntegrationWorker 的时间字段单位均为秒，避免配置文件中使用无单位 duration。

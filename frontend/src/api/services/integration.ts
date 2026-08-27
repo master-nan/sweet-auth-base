@@ -403,7 +403,7 @@ export interface IntegrationWorkerStatus {
 export type SyncTaskStatus = 'draft' | 'enabled' | 'disabled'
 export type SyncScheduleType = 'none' | 'cron'
 export type SyncCheckpointMode = 'none' | 'timestamp'
-export type SyncTimeFormat = 'rfc3339' | 'unix_seconds' | 'unix_milliseconds'
+export type SyncTimeFormat = 'rfc3339' | 'unix_seconds' | 'unix_milliseconds' | 'local_datetime_seconds'
 export type SyncWindowMode = 'bounded_window' | 'lower_bound_only'
 
 export interface SyncWindowBinding {

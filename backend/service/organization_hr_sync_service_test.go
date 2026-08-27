@@ -32,11 +32,17 @@ func TestOrganizationHRConsumersMapLegalAndIndependentStructures(t *testing.T) {
 	legal := hrsync.NewLegalEntityConsumer(service, contract)
 	seedOrganizationHRSyncContext(t, db, "EXEC-LEGAL", "SYNC-LEGAL", "task_legal", hrsync.ConsumerCodeLegalEntity, 1)
 	result := consumeOrganizationHRBody(t, legal, "EXEC-LEGAL", "SYNC-LEGAL", "task_legal", start, end,
-		`{"success":true,"data":[{"id":"source-row-1","zjkid_ignore":"legal-1","pk_corp":"LEGAL-001","name":"法人甲","isenable":1,"changeTime":"2026-08-12T10:10:00"}]}`)
-	if !result.Success() || result.BusinessSuccessCount() != 1 {
+		`{"success":true,"data":[{"id":"source-row-1","zjkid_ignore":"legal-1","pk_corp":"LEGAL-001","name":"法人甲","fatherpkzjkid_ignore":"","isenable":1,"changeTime":"2026-08-12T10:10:00"},{"id":"source-row-2","zjkid_ignore":"legal-2","pk_corp":"LEGAL-002","name":"法人乙","fatherpkzjkid_ignore":"legal-1","isenable":1,"changeTime":"2026-08-12T10:11:00"}]}`)
+	if !result.Success() || result.BusinessSuccessCount() != 2 {
 		t.Fatalf("legal result=%+v", result)
 	}
-	var legalEntity model.OrgLegalEntity
+	var legalEntity, childLegalEntity model.OrgLegalEntity
+	if err := db.Where("source_id = ?", "legal-1").First(&legalEntity).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("source_id = ?", "legal-2").First(&childLegalEntity).Error; err != nil || childLegalEntity.ParentId == nil || *childLegalEntity.ParentId != legalEntity.Id || childLegalEntity.SyncStatus != "synced" {
+		t.Fatalf("child legal entity=%+v err=%v", childLegalEntity, err)
+	}
 	result = consumeOrganizationHRBody(t, legal, "EXEC-LEGAL", "SYNC-LEGAL", "task_legal", start, end,
 		`{"success":true,"data":[{"id":"source-row-1","zjkid_ignore":"legal-1","pk_corp":"LEGAL-001","name":"法人甲更新","isenable":0,"changeTime":"2026-08-12T10:30:00"}]}`)
 	if !result.Success() {

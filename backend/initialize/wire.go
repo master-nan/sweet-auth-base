@@ -361,6 +361,7 @@ var Providers = wire.NewSet(
 
 	storage.NewStorage,
 	ProvideIntegrationWorkerRunnerConfig,
+	ProvideIntegrationEndpointPolicy,
 	ProvideIntegrationTransportClient,
 	ProvideIntegrationConcurrencyGuard,
 	ProvideIntegrationExecutionEngine,

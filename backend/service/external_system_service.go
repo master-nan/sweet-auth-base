@@ -4,12 +4,12 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
+	"backend/internal/integration"
 	"backend/internal/utils"
 	"backend/model"
 	"backend/repository"
 	"context"
 	"errors"
-	"net"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -34,14 +34,16 @@ type ExternalSystemService struct {
 	repository repository.ExternalSystemRepository
 	sf         *utils.Snowflake
 	audit      StandardContextAuditWriter
+	policy     integration.EndpointPolicy
 }
 
 func NewExternalSystemService(
 	repository repository.ExternalSystemRepository,
 	sf *utils.Snowflake,
 	audit StandardContextAuditWriter,
+	policy integration.EndpointPolicy,
 ) *ExternalSystemService {
-	return &ExternalSystemService{repository: repository, sf: sf, audit: audit}
+	return &ExternalSystemService{repository: repository, sf: sf, audit: audit, policy: policy}
 }
 
 func (s *ExternalSystemService) Create(
@@ -52,7 +54,7 @@ func (s *ExternalSystemService) Create(
 	if !externalSystemCodePattern.MatchString(code) {
 		return response.ExternalSystemDetailRes{}, myerrors.ErrExternalSystemCodeInvalid
 	}
-	baseURL, err := normalizeExternalSystemBaseURL(req.BaseURL)
+	baseURL, err := s.validateExternalSystemBaseURL(ctx, req.BaseURL)
 	if err != nil {
 		return response.ExternalSystemDetailRes{}, err
 	}
@@ -196,7 +198,7 @@ func (s *ExternalSystemService) changeStatus(
 			if err := validateExternalSystemRequired(current); err != nil {
 				return err
 			}
-			if _, err := normalizeExternalSystemBaseURL(current.BaseURL); err != nil {
+			if _, err := s.validateExternalSystemBaseURL(ctx, current.BaseURL); err != nil {
 				return err
 			}
 		}
@@ -253,7 +255,7 @@ func (s *ExternalSystemService) externalSystemUpdates(
 		updates["system_type"] = next.SystemType
 	}
 	if req.BaseURL != nil {
-		normalized, err := normalizeExternalSystemBaseURL(*req.BaseURL)
+		normalized, err := s.validateExternalSystemBaseURL(tx.Statement.Context, *req.BaseURL)
 		if err != nil {
 			return nil, current, err
 		}
@@ -333,18 +335,23 @@ func normalizeExternalSystemBaseURL(raw string) (string, error) {
 		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", myerrors.ErrExternalSystemBaseURLInvalid
 	}
-	host := strings.ToLower(parsed.Hostname())
-	if host == "localhost" {
-		return "", myerrors.ErrExternalSystemBaseURLInvalid
-	}
-	if ip := net.ParseIP(host); ip != nil && (ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate()) {
-		return "", myerrors.ErrExternalSystemBaseURLInvalid
-	}
 	parsed.Scheme = strings.ToLower(parsed.Scheme)
 	parsed.Host = strings.ToLower(parsed.Host)
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	parsed.RawPath = ""
 	return parsed.String(), nil
+}
+
+func (s *ExternalSystemService) validateExternalSystemBaseURL(ctx context.Context, raw string) (string, error) {
+	normalized, err := normalizeExternalSystemBaseURL(raw)
+	if err != nil {
+		return "", err
+	}
+	target, err := url.Parse(normalized)
+	if err != nil || s.policy.ValidateConfiguredTarget(ctx, target) != nil {
+		return "", myerrors.ErrExternalSystemBaseURLInvalid
+	}
+	return normalized, nil
 }
 
 func isExternalSystemDuplicate(err error) bool {

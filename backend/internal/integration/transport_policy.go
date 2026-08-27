@@ -48,6 +48,12 @@ func DefaultEndpointPolicy() EndpointPolicy {
 	return policy
 }
 
+// ValidateConfiguredTarget 供配置写入阶段复用与实际请求相同的协议、DNS 和地址检查。
+func (p EndpointPolicy) ValidateConfiguredTarget(ctx context.Context, target *url.URL) error {
+	_, err := p.validateTarget(ctx, target)
+	return err
+}
+
 func (p EndpointPolicy) validateTarget(ctx context.Context, target *url.URL) ([]net.IP, error) {
 	if target == nil || target.Hostname() == "" {
 		return nil, newTransportError(TransportErrorInvalidURL)

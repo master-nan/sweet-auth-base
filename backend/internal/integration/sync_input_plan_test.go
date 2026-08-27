@@ -106,6 +106,35 @@ func TestMaterializeSyncExecutionInputPlan(t *testing.T) {
 	}
 }
 
+func TestMaterializeSyncExecutionInputPlanUsesTaskTimezoneForLocalDateTime(t *testing.T) {
+	raw := []byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"path","code":"time","format":"local_datetime_seconds"}}`)
+	start := time.Date(2026, 7, 31, 16, 0, 0, 0, time.UTC)
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err := MaterializeSyncExecutionInputPlanInLocation(raw, &start, &start, location)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if input.PathParams["time"] != "2026-08-01 00:00:00" {
+		t.Fatalf("local time=%q", input.PathParams["time"])
+	}
+}
+
+func TestNormalizeSyncExecutionInputPlanAcceptsLocalDateTimeForStringPath(t *testing.T) {
+	contract, err := json.Marshal(InterfaceInputContract{Version: 1, Parameters: []InputParameterDefinition{
+		{Code: "time", Location: InputLocationPath, DataType: InputTypeString, Required: true, MaxLength: 32},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{"version":2,"window_mode":"lower_bound_only","static_input":{},"window_start_binding":{"location":"path","code":"time","format":"local_datetime_seconds"}}`)
+	if _, _, err := NormalizeSyncExecutionInputPlan(raw, contract, "GET", "/changes/{time}", 1, "timestamp"); err != nil {
+		t.Fatalf("normalize local datetime: %v", err)
+	}
+}
+
 func TestSyncExecutionInputPlanV1RemainsBounded(t *testing.T) {
 	raw := []byte(`{"version":1,"static_input":{"json_body":{"tenant":"north"}},"window_start_binding":{"location":"query","code":"updated_from","format":"rfc3339"},"window_end_binding":{"location":"query","code":"updated_to","format":"rfc3339"}}`)
 	normalized, summary, err := NormalizeSyncExecutionInputPlan(raw, syncPlanContract(t, false), "POST", "/employees", 3, "timestamp")

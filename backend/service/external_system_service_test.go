@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/internal/audit"
 	apperrors "backend/internal/errors"
+	"backend/internal/integration"
 	testutil "backend/internal/test"
 	"backend/internal/utils"
 	"backend/model"
@@ -11,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +25,21 @@ type externalSystemAuditWriter struct {
 	mu       sync.Mutex
 	records  []TransactionalAuditRecord
 	subjects []audit.AuditSubject
+}
+
+type externalSystemTestResolver struct{}
+
+func (externalSystemTestResolver) LookupIP(context.Context, string) ([]net.IP, error) {
+	return []net.IP{net.ParseIP("93.184.216.34")}, nil
+}
+
+func externalSystemTestPolicy(t *testing.T) integration.EndpointPolicy {
+	t.Helper()
+	policy, err := integration.NewEndpointPolicy(false, nil, externalSystemTestResolver{})
+	if err != nil {
+		t.Fatalf("create endpoint policy: %v", err)
+	}
+	return policy
 }
 
 func (w *externalSystemAuditWriter) RecordTransactionalAuditContext(
@@ -121,6 +138,16 @@ func TestExternalSystemServiceValidationUniquenessAndReferences(t *testing.T) {
 	if _, err := svc.Create(ctx, invalidURL); !errors.Is(err, apperrors.ErrExternalSystemBaseURLInvalid) {
 		t.Fatalf("invalid URL error = %v", err)
 	}
+	approvedPolicy, err := integration.NewEndpointPolicy(true, []string{"172.19.14.184/32"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvedService := NewExternalSystemService(svc.repository, svc.sf, svc.audit, approvedPolicy)
+	approvedURL := externalSystemCreateRequest("approved_private_url")
+	approvedURL.BaseURL = "http://172.19.14.184:2099"
+	if _, err := approvedService.Create(ctx, approvedURL); err != nil {
+		t.Fatalf("approved private URL: %v", err)
+	}
 	if _, err := svc.Enable(ctx, created.Id, created.Revision+1); !errors.Is(err, apperrors.ErrExternalSystemRevisionConflict) {
 		t.Fatalf("revision conflict error = %v", err)
 	}
@@ -184,7 +211,7 @@ func newExternalSystemTestSubject(
 		t.Fatalf("create snowflake: %v", err)
 	}
 	repository := impl.NewExternalSystemRepositoryImpl(&database.PrimaryDB{DB: db})
-	return NewExternalSystemService(repository, sf, auditWriter), db
+	return NewExternalSystemService(repository, sf, auditWriter, externalSystemTestPolicy(t)), db
 }
 
 func externalSystemCreateRequest(code string) request.ExternalSystemCreateReq {

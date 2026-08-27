@@ -2,6 +2,8 @@ package initialize
 
 import (
 	"backend/config"
+	"backend/internal/integration"
+	"errors"
 	"testing"
 	"time"
 )
@@ -32,5 +34,26 @@ func TestProvideIntegrationWorkerRunnerConfigRejectsMissingEnabledWorkerIdentity
 	_, err := ProvideIntegrationWorkerRunnerConfig(&config.Server{Integration: config.Integration{Worker: config.IntegrationWorker{Enabled: true}}})
 	if err == nil {
 		t.Fatal("expected enabled worker without worker_id to fail")
+	}
+}
+
+func TestProvideIntegrationTransportClientUsesStrictDefaults(t *testing.T) {
+	policy, err := ProvideIntegrationEndpointPolicy(&config.Server{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := ProvideIntegrationTransportClient(policy)
+	if err != nil || client == nil {
+		t.Fatalf("provide default transport client: client=%v err=%v", client, err)
+	}
+}
+
+func TestProvideIntegrationTransportClientRejectsInvalidApprovedCIDR(t *testing.T) {
+	_, err := ProvideIntegrationEndpointPolicy(&config.Server{Integration: config.Integration{
+		EndpointPolicy: config.IntegrationEndpointPolicy{AllowHTTP: true, ApprovedPrivateCIDRs: []string{"not-a-cidr"}},
+	}})
+	var transportErr *integration.TransportError
+	if !errors.As(err, &transportErr) || transportErr.Category() != integration.TransportErrorInvalidConfig {
+		t.Fatalf("invalid CIDR error=%v", err)
 	}
 }

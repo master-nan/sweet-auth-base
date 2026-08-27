@@ -43,6 +43,7 @@ func LoadConfig() (*config.Server, error) {
 	}
 	applyUploadListEnvOverrides(&cfg)
 	applySecurityEnvOverrides(&cfg)
+	applyIntegrationEnvOverrides(&cfg)
 	if err := validateSecureConfig(environment, &cfg); err != nil {
 		return nil, err
 	}
@@ -50,6 +51,15 @@ func LoadConfig() (*config.Server, error) {
 		cfg.Security.EnforceCasbinPolicyCoverage = true
 	}
 	return &cfg, nil
+}
+
+func applyIntegrationEnvOverrides(cfg *config.Server) {
+	if cfg == nil {
+		return
+	}
+	if values := parseCSVEnv(os.Getenv("APP_INTEGRATION_ENDPOINT_POLICY_APPROVED_PRIVATE_CIDRS")); len(values) > 0 {
+		cfg.Integration.EndpointPolicy.ApprovedPrivateCIDRs = values
+	}
 }
 
 func validateSecureConfig(environment string, cfg *config.Server) error {

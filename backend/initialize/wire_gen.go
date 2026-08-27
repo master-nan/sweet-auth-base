@@ -137,7 +137,11 @@ func InitializeApp() (*App, error) {
 	dataPermissionConfigPreflightService := service.NewDataPermissionConfigPreflightService(dataGrantRepositoryImpl, dataResourceRepositoryImpl, dataResourceOperationRepositoryImpl, dataOwnershipFieldRepositoryImpl, dataDimensionDefinitionRepositoryImpl, dataPolicyRepositoryImpl, dataPolicyRuleRepositoryImpl, ownershipFieldRegistry, logService)
 	dataPermissionConfigController := controller.NewDataPermissionConfigController(dataResourceConfigService, dataOwnershipConfigService, dataPolicyConfigService, dataGrantConfigService, dataPermissionConfigPreflightService, v2)
 	externalSystemRepositoryImpl := impl.NewExternalSystemRepositoryImpl(primaryDB)
-	externalSystemService := service.NewExternalSystemService(externalSystemRepositoryImpl, snowflake, logService)
+	endpointPolicy, err := ProvideIntegrationEndpointPolicy(server)
+	if err != nil {
+		return nil, err
+	}
+	externalSystemService := service.NewExternalSystemService(externalSystemRepositoryImpl, snowflake, logService, endpointPolicy)
 	externalSystemController := controller.NewExternalSystemController(externalSystemService, v2)
 	interfaceDefinitionRepositoryImpl := impl.NewInterfaceDefinitionRepositoryImpl(primaryDB)
 	credentialRepositoryImpl := impl.NewCredentialRepositoryImpl(primaryDB)
@@ -156,7 +160,7 @@ func InitializeApp() (*App, error) {
 	integrationSyncBatchRepositoryImpl := impl.NewIntegrationSyncBatchRepositoryImpl(primaryDB)
 	organizationHRSyncRepositoryImpl := impl.NewOrganizationHRSyncRepositoryImpl(primaryDB)
 	organizationHRSyncService := service.NewOrganizationHRSyncService(organizationHRSyncRepositoryImpl, snowflake)
-	staticSyncConsumerRegistry, err := ProvideOrganizationSyncConsumerRegistry(organizationHRSyncService)
+	staticSyncConsumerRegistry, err := ProvideOrganizationSyncConsumerRegistry(organizationHRSyncService, server)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +232,7 @@ func InitializeApp() (*App, error) {
 	sysUserApi := api.NewSysUserApi(sysUserService, sysConfigureService, v2)
 	dingTalkApi := api.NewDingTalkApi(applicationService, dingTalkService, v2)
 	credentialProvider := integration.NewCredentialProvider(credentialRepositoryImpl, interfaceDefinitionRepositoryImpl, credentialSecretProtector)
-	httpTransportClient, err := ProvideIntegrationTransportClient()
+	httpTransportClient, err := ProvideIntegrationTransportClient(endpointPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +414,7 @@ var Providers = wire.NewSet(
 	InitCasbin, wire.Bind(new(repository.CasbinPolicyEnforcer), new(*casbin.SyncedEnforcer)), InitSnowflake,
 	InitValidators, cache.NewRedisUtil, wire.Bind(new(cache.Cacher), new(*cache.RedisUtil)), ProvideJWTToken,
 	ProvideHMACToken, token.NewJWTGenerator, token.NewHMACGenerator, storage.NewStorage, ProvideIntegrationWorkerRunnerConfig,
+	ProvideIntegrationEndpointPolicy,
 	ProvideIntegrationTransportClient,
 	ProvideIntegrationConcurrencyGuard,
 	ProvideIntegrationExecutionEngine,

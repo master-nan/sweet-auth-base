@@ -8,7 +8,7 @@ import (
 type SyncWindowBindingReq struct {
 	Location string `json:"location" binding:"required,oneof=path query header body"`
 	Code     string `json:"code" binding:"required,max=128"`
-	Format   string `json:"format" binding:"required,oneof=rfc3339 unix_seconds unix_milliseconds"`
+	Format   string `json:"format" binding:"required,oneof=rfc3339 unix_seconds unix_milliseconds local_datetime_seconds"`
 }
 
 type SyncStaticInputReq struct {

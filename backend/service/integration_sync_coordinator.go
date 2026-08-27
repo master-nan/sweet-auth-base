@@ -158,7 +158,7 @@ type syncBatchTrigger struct {
 func newSyncBatchSnapshot(task model.IntegrationSyncTask, system model.ExternalSystem, definition model.InterfaceDefinition, id int, trigger syncBatchTrigger, databaseNow time.Time) (model.IntegrationSyncBatch, error) {
 	batch := model.IntegrationSyncBatch{
 		Basic: model.Basic{Id: int(id), State: true}, BatchNo: fmt.Sprintf("SYNC-%d", id), SyncTaskID: task.Id,
-		TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version,
+		TaskCode: task.TaskCode, TaskName: task.TaskName, TaskVersion: task.Version, TaskRevision: task.Revision,
 		SystemCode: system.SystemCode, InterfaceCode: definition.InterfaceCode, InterfaceVersion: definition.Version,
 		ConsumerCode: task.ConsumerCode, ConsumerVersion: task.ConsumerVersion,
 		TriggerType: trigger.triggerType, TriggerKey: trigger.triggerKey, ScheduledFor: trigger.scheduledFor,
@@ -329,7 +329,11 @@ func (s *IntegrationSyncCoordinator) createNextSlice(ctx context.Context, batch 
 	if err != nil {
 		return s.failBatchWithoutExecution(ctx, batch, syncBatchReasonExecutionCreateFailed)
 	}
-	input, err := integration.MaterializeSyncExecutionInputPlan(task.InputPlan, requestStart, windowEnd)
+	location, err := time.LoadLocation(task.Timezone)
+	if err != nil {
+		return s.failBatchWithoutExecution(ctx, batch, syncBatchReasonExecutionCreateFailed)
+	}
+	input, err := integration.MaterializeSyncExecutionInputPlanInLocation(task.InputPlan, requestStart, windowEnd, location)
 	if err != nil {
 		return s.failBatchWithoutExecution(ctx, batch, syncBatchReasonExecutionCreateFailed)
 	}

@@ -22,6 +22,7 @@ const (
 	SyncTimeFormatRFC3339          = "rfc3339"
 	SyncTimeFormatUnixSeconds      = "unix_seconds"
 	SyncTimeFormatUnixMilliseconds = "unix_milliseconds"
+	SyncTimeFormatLocalDateTime    = "local_datetime_seconds"
 )
 
 type SyncWindowBinding struct {
@@ -146,6 +147,15 @@ func DecodeSyncExecutionInputPlan(raw []byte) (SyncExecutionInputPlan, error) {
 // MaterializeSyncExecutionInputPlan 将已校验的计划绑定到当前切片窗口。
 // 返回值仍需由 Integration Application Service 通过正式快照规范化器复核。
 func MaterializeSyncExecutionInputPlan(raw []byte, windowStart, windowEnd *time.Time) (ExecutionInputValues, error) {
+	return MaterializeSyncExecutionInputPlanInLocation(raw, windowStart, windowEnd, time.UTC)
+}
+
+// MaterializeSyncExecutionInputPlanInLocation 仅在计划明确选择本地日期时间格式时使用任务时区；
+// RFC3339 和 Unix 时间继续保持既有语义。
+func MaterializeSyncExecutionInputPlanInLocation(raw []byte, windowStart, windowEnd *time.Time, location *time.Location) (ExecutionInputValues, error) {
+	if location == nil {
+		return ExecutionInputValues{}, myerrors.ErrSyncInputPlanInvalid
+	}
 	plan, err := DecodeSyncExecutionInputPlan(raw)
 	if err != nil {
 		return ExecutionInputValues{}, err
@@ -173,7 +183,7 @@ func MaterializeSyncExecutionInputPlan(raw []byte, windowStart, windowEnd *time.
 		if item.binding == nil || item.value == nil {
 			return ExecutionInputValues{}, myerrors.ErrSyncInputPlanInvalid
 		}
-		value, err := formatSyncWindowValue(item.value.UTC(), item.binding.Format)
+		value, err := formatSyncWindowValue(item.value.UTC(), item.binding.Format, location)
 		if err != nil {
 			return ExecutionInputValues{}, err
 		}
@@ -206,7 +216,7 @@ func normalizeSyncWindowMode(plan SyncExecutionInputPlan) (string, error) {
 	}
 }
 
-func formatSyncWindowValue(value time.Time, format string) (any, error) {
+func formatSyncWindowValue(value time.Time, format string, location *time.Location) (any, error) {
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case SyncTimeFormatRFC3339:
 		return value.Format(time.RFC3339Nano), nil
@@ -214,6 +224,8 @@ func formatSyncWindowValue(value time.Time, format string) (any, error) {
 		return json.Number(strconv.FormatInt(value.Unix(), 10)), nil
 	case SyncTimeFormatUnixMilliseconds:
 		return json.Number(strconv.FormatInt(value.UnixMilli(), 10)), nil
+	case SyncTimeFormatLocalDateTime:
+		return value.In(location).Format("2006-01-02 15:04:05"), nil
 	default:
 		return nil, myerrors.ErrSyncInputPlanInvalid
 	}
@@ -225,6 +237,8 @@ func validSyncTimeBinding(definition InputParameterDefinition, format string) bo
 	}
 	switch format {
 	case SyncTimeFormatRFC3339:
+		return definition.DataType == InputTypeString
+	case SyncTimeFormatLocalDateTime:
 		return definition.DataType == InputTypeString
 	case SyncTimeFormatUnixSeconds, SyncTimeFormatUnixMilliseconds:
 		return definition.DataType == InputTypeString || definition.DataType == InputTypeInteger || definition.DataType == InputTypeNumber
@@ -238,6 +252,8 @@ func syncBoundaryValue(format string) any {
 	switch format {
 	case SyncTimeFormatRFC3339:
 		return boundary.Format(time.RFC3339)
+	case SyncTimeFormatLocalDateTime:
+		return boundary.Format("2006-01-02 15:04:05")
 	case SyncTimeFormatUnixSeconds:
 		return json.Number("946782245")
 	default:

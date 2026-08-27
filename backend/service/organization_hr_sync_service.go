@@ -310,7 +310,7 @@ func (s *OrganizationHRSyncService) upsertLegalEntity(tx *gorm.DB, batch organiz
 			SourceCode: input.SourceCode, Code: input.Code, Name: input.Name, ShortName: input.ShortName,
 			EntityType: "legal_company", Status: string(input.Status), SourceUpdatedAt: organizationHRTimePointer(input.SourceChangedAt),
 			SourceVersion: input.SourceChangedAt.Format(time.RFC3339Nano), LastSyncAt: &batch.now,
-			SourceStatus: string(input.Status), SourceDeleted: false, SyncStatus: "synced",
+			SourceStatus: string(input.Status), SourceDeleted: false, SyncStatus: "dependency_waiting",
 		}
 		if err := s.repository.CreateLegalEntity(tx, &value); err != nil {
 			return outcome, false, err

@@ -178,7 +178,7 @@ func TestSyncTaskServiceManualRunUsesDatabaseWindowAndAuditSubject(t *testing.T)
 	if err := db.First(&stored, batch.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if stored.ScheduledFor != nil || stored.TriggeredByUserID == nil || *stored.TriggeredByUserID != 88 || stored.TriggeredByUserName != "sync-admin" || stored.TriggerKey == "" {
+	if stored.ScheduledFor != nil || stored.TriggeredByUserID == nil || *stored.TriggeredByUserID != 88 || stored.TriggeredByUserName != "sync-admin" || stored.TriggerKey == "" || stored.TaskRevision != enabled.Revision {
 		t.Fatalf("stored manual batch=%+v", stored)
 	}
 	if _, err := svc.RunSyncTask(ctx, enabled.ID, enabled.Revision); !errors.Is(err, myerrors.ErrSyncTaskActiveBatch) {

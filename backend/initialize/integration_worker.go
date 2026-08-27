@@ -29,9 +29,20 @@ func ProvideIntegrationWorkerRunnerConfig(server *config.Server) (integration.Wo
 	})
 }
 
-// ProvideIntegrationTransportClient 使用默认 HTTPS-only 端点策略；放宽网络边界不属于 Worker 生命周期职责。
-func ProvideIntegrationTransportClient() (*integration.HTTPTransportClient, error) {
-	return integration.NewHTTPTransportClient(integration.DefaultEndpointPolicy(), integration.TransportClientOptions{})
+// ProvideIntegrationEndpointPolicy 默认只允许 HTTPS 公网地址；内部 HTTP 地址必须由服务端同时批准协议和网段。
+func ProvideIntegrationEndpointPolicy(server *config.Server) (integration.EndpointPolicy, error) {
+	if server == nil {
+		return integration.EndpointPolicy{}, myerrors.ErrIntegrationWorkerInvalidConfig
+	}
+	return integration.NewEndpointPolicy(
+		server.Integration.EndpointPolicy.AllowHTTP,
+		server.Integration.EndpointPolicy.ApprovedPrivateCIDRs,
+		nil,
+	)
+}
+
+func ProvideIntegrationTransportClient(policy integration.EndpointPolicy) (*integration.HTTPTransportClient, error) {
+	return integration.NewHTTPTransportClient(policy, integration.TransportClientOptions{})
 }
 
 // ProvideIntegrationConcurrencyGuard 将 Runner 实例配额同步传入 Engine 的三级进程内保护。

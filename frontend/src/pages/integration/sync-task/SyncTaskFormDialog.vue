@@ -120,8 +120,21 @@ const windowParameterOptions = computed(() => eligibleParameters.value.filter((i
 const selectedStaticParameters = computed(() => eligibleParameters.value.filter((item) => selectedStaticKeys.value.includes(parameterKey(item))))
 const formatOptions = (key: string) => {
   const parameter = eligibleParameters.value.find((item) => parameterKey(item) === key)
-  const values: SyncTimeFormat[] = parameter?.data_type === 'string' ? ['rfc3339', 'unix_seconds', 'unix_milliseconds'] : ['unix_seconds', 'unix_milliseconds']
-  return values.map((value) => ({ label: value === 'rfc3339' ? 'RFC 3339' : value === 'unix_seconds' ? 'Unix 秒' : 'Unix 毫秒', value }))
+  const values: SyncTimeFormat[] =
+    parameter?.data_type === 'string'
+      ? ['rfc3339', 'local_datetime_seconds', 'unix_seconds', 'unix_milliseconds']
+      : ['unix_seconds', 'unix_milliseconds']
+  return values.map((value) => ({
+    label:
+      value === 'rfc3339'
+        ? 'RFC 3339'
+        : value === 'local_datetime_seconds'
+          ? '本地日期时间（秒）'
+          : value === 'unix_seconds'
+            ? 'Unix 秒'
+            : 'Unix 毫秒',
+    value,
+  }))
 }
 
 function emptyForm(): SyncTaskCreateRequest {
