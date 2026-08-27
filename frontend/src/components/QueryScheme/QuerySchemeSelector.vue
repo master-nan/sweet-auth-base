@@ -9,14 +9,20 @@
     :title="currentLabel"
     :loading="loading"
     :disable="disabled"
+    content-class="query-scheme-selector-menu"
     no-caps
   >
-    <q-list dense style="min-width: 260px">
+    <q-list dense class="query-scheme-selector-list">
       <template v-for="group in groupedSchemes" :key="group.type">
-        <q-item-label header>{{ group.label }}</q-item-label>
+        <q-item-label header class="query-scheme-selector-group-label">
+          {{ group.label }}
+        </q-item-label>
         <q-item
           v-for="scheme in group.items"
           :key="scheme.id"
+          class="query-scheme-selector-item"
+          :active="source?.id === scheme.id"
+          active-class="query-scheme-selector-item--active"
           clickable
           v-close-popup
           @click="requestSelect(scheme)"
@@ -45,33 +51,62 @@
           </q-item-section>
         </q-item>
       </template>
-      <q-item v-if="loadError && !loading" clickable @click="$emit('retry')">
-        <q-item-section avatar><q-icon name="error_outline" color="negative" /></q-item-section>
+      <q-item
+        v-if="loadError && !loading"
+        class="query-scheme-selector-item"
+        clickable
+        @click="$emit('retry')"
+      >
+        <q-item-section avatar
+          ><q-icon name="error_outline" color="negative" size="20px"
+        /></q-item-section>
         <q-item-section>
           <q-item-label class="text-negative">查询方案加载失败</q-item-label>
           <q-item-label caption>点击重试</q-item-label>
         </q-item-section>
       </q-item>
-      <q-item v-else-if="!schemes.length && !loading">
+      <q-item v-else-if="!schemes.length && !loading" class="query-scheme-selector-empty">
         <q-item-section class="text-grey-7">
           暂无已保存方案，可保存当前查询条件以便下次使用
         </q-item-section>
       </q-item>
       <q-separator />
-      <q-item clickable v-close-popup @click="$emit('save-current')">
-        <q-item-section avatar><q-icon name="bookmark_add" /></q-item-section>
+      <q-item
+        class="query-scheme-selector-action"
+        clickable
+        v-close-popup
+        @click="$emit('save-current')"
+      >
+        <q-item-section avatar
+          ><q-icon name="bookmark_add" color="primary" size="20px"
+        /></q-item-section>
         <q-item-section>{{ saveActionLabel }}</q-item-section>
       </q-item>
-      <q-item v-if="dirty" clickable v-close-popup @click="$emit('restore-current')">
-        <q-item-section avatar><q-icon name="undo" /></q-item-section>
+      <q-item
+        v-if="dirty"
+        class="query-scheme-selector-action"
+        clickable
+        v-close-popup
+        @click="$emit('restore-current')"
+      >
+        <q-item-section avatar><q-icon name="undo" color="primary" size="20px" /></q-item-section>
         <q-item-section>撤销当前方案修改</q-item-section>
       </q-item>
-      <q-item clickable v-close-popup @click="$emit('reset-default')">
-        <q-item-section avatar><q-icon name="restart_alt" /></q-item-section>
+      <q-item
+        class="query-scheme-selector-action"
+        clickable
+        v-close-popup
+        @click="$emit('reset-default')"
+      >
+        <q-item-section avatar
+          ><q-icon name="restart_alt" color="primary" size="20px"
+        /></q-item-section>
         <q-item-section>恢复默认查询</q-item-section>
       </q-item>
-      <q-item clickable v-close-popup @click="$emit('manage')">
-        <q-item-section avatar><q-icon name="settings" /></q-item-section>
+      <q-item class="query-scheme-selector-action" clickable v-close-popup @click="$emit('manage')">
+        <q-item-section avatar
+          ><q-icon name="settings" color="primary" size="20px"
+        /></q-item-section>
         <q-item-section>管理查询方案</q-item-section>
       </q-item>
     </q-list>
@@ -182,5 +217,49 @@ const saveActionLabel = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+:global(.query-scheme-selector-menu) {
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+  box-shadow: 0 8px 24px rgba(31, 42, 68, 0.14);
+}
+
+:global(.query-scheme-selector-list) {
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 6px 0;
+}
+
+:global(.query-scheme-selector-list .q-item__section--avatar) {
+  min-width: 34px;
+}
+
+:global(.query-scheme-selector-group-label) {
+  min-height: 0;
+  padding: 8px 14px 4px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+:global(.query-scheme-selector-item),
+:global(.query-scheme-selector-action) {
+  min-height: 38px;
+  padding: 6px 14px;
+  color: var(--app-text-strong);
+}
+
+:global(.query-scheme-selector-item--active) {
+  color: var(--q-primary);
+  background: var(--app-primary-soft);
+}
+
+:global(.query-scheme-selector-empty) {
+  min-height: 54px;
+  padding: 8px 14px;
+  color: var(--app-text-muted);
+  line-height: 20px;
 }
 </style>

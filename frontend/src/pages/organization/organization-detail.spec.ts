@@ -4,6 +4,7 @@ import type { Menu } from 'src/api/services/sys-menu'
 import { SysDetailOpenMode } from 'src/types/enum'
 import { resolveOrganizationDetailMode } from './organization-detail-mode'
 import { buildOrganizationDetailRoute } from './organization-detail-route'
+import { organizationSyncObjectLabel } from './organization-list-page'
 
 const menu = (detailOpenMode?: SysDetailOpenMode): Menu =>
   ({
@@ -55,5 +56,13 @@ describe('Organization detail navigation contract', () => {
     expect(first.path).toBe('/admin/detail/organization/org_sync_batch/41')
     expect(second.path).toBe('/admin/detail/organization/org_sync_batch/42')
     expect(first.fullPath).not.toBe(second.fullPath)
+  })
+
+  it('shows organization sync object codes as business labels', () => {
+    expect(organizationSyncObjectLabel('management_company')).toBe('管理公司')
+    expect(organizationSyncObjectLabel('management_unit')).toBe('管理组织')
+    expect(organizationSyncObjectLabel('legal_unit')).toBe('法人组织')
+    expect(organizationSyncObjectLabel('employee')).toBe('人员档案')
+    expect(organizationSyncObjectLabel('unknown_kind')).toBe('unknown_kind')
   })
 })

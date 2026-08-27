@@ -585,10 +585,7 @@ const lineButtonsForTab = (tab: ListTabName) =>
   lineButtons.value.filter((button) => lineActionByTab[tab].includes(button.event_action))
 const filterCountForTab = (tab: ListTabName) => countEffectiveQueryRules(queries.value[tab])
 
-const lineButtonPresentation = (
-  button: MenuButton,
-  row: ConfigRow,
-): LineButtonPresentation => {
+const lineButtonPresentation = (button: MenuButton, row: ConfigRow): LineButtonPresentation => {
   if (button.event_action === 'toggle_permission') {
     const enabled = Boolean((row as DataResource).permission_enabled)
     return {
@@ -703,15 +700,15 @@ const preflightTargetOptions = ref<Array<{ label: string; value: number }>>([])
 
 const resourceLabel = (id: number) => {
   const resource = resourceLookup.value.find((item) => item.id === id)
-  return resource ? `${resource.resource_code} · ${resource.name}` : `#${id}`
+  return resource ? `${resource.resource_code} · ${resource.name}` : '数据资源不可用'
 }
 const policyLabel = (id: number) => {
   const policy = policyLookup.value.find((item) => item.id === id)
-  return policy ? `${policy.policy_code} · ${policy.name}` : `#${id}`
+  return policy ? `${policy.policy_code} · ${policy.name}` : '权限策略不可用'
 }
 const dimensionLabel = (id: number) => {
   const dimension = dimensions.value.find((item) => item.id === id)
-  return dimension ? `${dimension.dimension_code} · ${dimension.name}` : `#${id}`
+  return dimension ? `${dimension.dimension_code} · ${dimension.name}` : '数据维度不可用'
 }
 
 const fetchTab = async (tab: ListTabName) => {

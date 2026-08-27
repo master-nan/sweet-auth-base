@@ -63,7 +63,7 @@
             label="元数据表"
             :disable="Boolean(editData)"
             :options="tableOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @filter="filterTableOptions"
           />
           <q-input
@@ -127,7 +127,7 @@
             label="数据资源"
             :disable="Boolean(editData)"
             :options="resourceOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @filter="filterResourceOptions"
             @update:model-value="loadMetadataFields"
           />
@@ -150,7 +150,7 @@
             label="数据维度"
             :disable="Boolean(editData)"
             :options="dimensionOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @update:model-value="syncOwnershipValueType"
           />
           <q-select
@@ -177,7 +177,7 @@
             :disable="Boolean(editData)"
             :loading="metadataFieldLoading"
             :options="metadataFieldOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
           />
           <q-input
             v-else
@@ -367,7 +367,7 @@
             input-debounce="300"
             label="授权主体"
             :options="subjectOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @filter="filterSubjectOptions"
           />
           <q-select
@@ -380,7 +380,7 @@
             use-input
             label="数据资源"
             :options="resourceOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @filter="filterResourceOptions"
             @update:model-value="loadGrantOperations"
           />
@@ -405,7 +405,7 @@
             use-input
             label="权限策略"
             :options="policyOptions"
-            :rules="requiredRules"
+            :rules="selectedIdRules"
             @filter="filterPolicyOptions"
           />
           <q-input
@@ -486,6 +486,21 @@ type EditablePolicyForm = Omit<DataPolicySaveReq, 'rules'> & {
   rules: EditablePolicyRule[]
 }
 
+type EditableOwnershipForm = Omit<DataOwnershipSaveReq, 'resource_id' | 'dimension_id'> & {
+  resource_id: number | null
+  dimension_id: number | null
+}
+
+type EditableGrantForm = Omit<
+  DataGrantSaveReq,
+  'subject_id' | 'resource_id' | 'operation' | 'policy_id'
+> & {
+  subject_id: number | null
+  resource_id: number | null
+  operation: DataPermissionOperation | null
+  policy_id: number | null
+}
+
 const props = defineProps<{
   modelValue: boolean
   kind: DialogKind
@@ -514,7 +529,12 @@ const metadataFieldLoading = ref(false)
 const requiredRules = [
   (value: unknown) => (value !== null && value !== undefined && value !== '') || '必填',
 ]
-const positiveIdRules = [(value: number) => Number(value) > 0 || '请输入有效ID']
+const positiveIdRules = [
+  (value: number | null | undefined) => Number(value) > 0 || '请输入有效ID',
+]
+const selectedIdRules = [
+  (value: number | null | undefined) => Number(value) > 0 || '请选择有效项目',
+]
 const atLeastOneRules = [(value: unknown[]) => value?.length > 0 || '至少选择一项']
 
 const resourceTypeOptions: SelectOption<DataPermissionResourceType>[] = [
@@ -562,10 +582,10 @@ const resourceForm = ref<EditableResourceForm>({
   state: true,
   operations: ['query', 'detail'],
 })
-const ownershipForm = ref<DataOwnershipSaveReq>({
-  resource_id: 0,
+const ownershipForm = ref<EditableOwnershipForm>({
+  resource_id: null,
   ownership_code: '',
-  dimension_id: 0,
+  dimension_id: null,
   binding_type: 'metadata_field',
   binding_target: {},
   value_type: 'bigint',
@@ -578,12 +598,12 @@ const policyForm = ref<EditablePolicyForm>({
   state: true,
   rules: [],
 })
-const grantForm = ref<DataGrantSaveReq>({
+const grantForm = ref<EditableGrantForm>({
   subject_type: 'role',
-  subject_id: 0,
-  resource_id: 0,
-  operation: 'query',
-  policy_id: 0,
+  subject_id: null,
+  resource_id: null,
+  operation: null,
+  policy_id: null,
   valid_from: null,
   valid_to: null,
   description: '',
@@ -688,6 +708,7 @@ const filterTableOptions = (value: string, update: (callback: () => void) => voi
 
 const toResourceOptions = (items: DataResource[], keyword = '') =>
   items
+    .filter((item) => item.state !== false)
     .filter((item) =>
       `${item.resource_code} ${item.name}`.toLowerCase().includes(keyword.toLowerCase()),
     )
@@ -695,6 +716,7 @@ const toResourceOptions = (items: DataResource[], keyword = '') =>
 
 const toPolicyOptions = (items: DataPolicy[], keyword = '') =>
   items
+    .filter((item) => item.state !== false)
     .filter((item) =>
       `${item.policy_code} ${item.name}`.toLowerCase().includes(keyword.toLowerCase()),
     )
@@ -711,7 +733,7 @@ const filterPolicyOptions = (value: string, update: (callback: () => void) => vo
   })
 
 const loadSubjectOptions = async () => {
-  grantForm.value.subject_id = 0
+  grantForm.value.subject_id = null
   if (grantForm.value.subject_type === 'role') {
     const result = await roleApi.queryRole(baseQuery('', 100))
     roles.value = result.data || []
@@ -832,7 +854,7 @@ const syncPolicyRuleOperator = (rule: EditablePolicyRule) => {
 }
 
 const loadGrantOperations = async () => {
-  grantForm.value.operation = 'query'
+  grantForm.value.operation = null
   if (!grantForm.value.resource_id) {
     grantOperationOptions.value = []
     return
@@ -842,7 +864,6 @@ const loadGrantOperations = async () => {
   grantOperationOptions.value = operationOptions.filter((option) =>
     operations.some((item) => item.operation === option.value),
   )
-  grantForm.value.operation = grantOperationOptions.value[0]?.value || 'query'
 }
 
 const resetForms = () => {
@@ -857,9 +878,9 @@ const resetForms = () => {
     operations: ['query', 'detail'],
   }
   ownershipForm.value = {
-    resource_id: 0,
+    resource_id: null,
     ownership_code: '',
-    dimension_id: 0,
+    dimension_id: null,
     binding_type: 'metadata_field',
     binding_target: {},
     value_type: 'bigint',
@@ -874,10 +895,10 @@ const resetForms = () => {
   }
   grantForm.value = {
     subject_type: 'role',
-    subject_id: 0,
-    resource_id: 0,
-    operation: 'query',
-    policy_id: 0,
+    subject_id: null,
+    resource_id: null,
+    operation: null,
+    policy_id: null,
     valid_from: null,
     valid_to: null,
     description: '',
@@ -969,6 +990,31 @@ const policyRuleRequest = (rule: EditablePolicyRule): DataPolicyRuleSaveReq => {
   return request
 }
 
+const ownershipRequest = (): DataOwnershipSaveReq | null => {
+  if (ownershipForm.value.resource_id === null || ownershipForm.value.dimension_id === null) {
+    return null
+  }
+  return {
+    ...ownershipForm.value,
+    resource_id: ownershipForm.value.resource_id,
+    dimension_id: ownershipForm.value.dimension_id,
+  }
+}
+
+const grantRequest = (): DataGrantSaveReq | null => {
+  const { subject_id, resource_id, operation, policy_id } = grantForm.value
+  if (subject_id === null || resource_id === null || operation === null || policy_id === null) {
+    return null
+  }
+  return {
+    ...grantForm.value,
+    subject_id,
+    resource_id,
+    operation,
+    policy_id,
+  }
+}
+
 const submit = async () => {
   const valid = await formRef.value?.validate()
   if (!valid) return
@@ -990,8 +1036,10 @@ const submit = async () => {
         })
       }
     } else if (props.kind === 'ownership') {
-      if (props.editData) await api.updateOwnership(ownershipForm.value)
-      else await api.createOwnership(ownershipForm.value)
+      const request = ownershipRequest()
+      if (!request) return
+      if (props.editData) await api.updateOwnership(request)
+      else await api.createOwnership(request)
     } else if (props.kind === 'policy') {
       const { rules: editableRules, ...policyRequest } = policyForm.value
       const rules = editableRules.map(policyRuleRequest)
@@ -1002,7 +1050,9 @@ const submit = async () => {
         await api.createPolicy({ ...policyRequest, rules })
       }
     } else {
-      await api.createGrant(grantForm.value)
+      const request = grantRequest()
+      if (!request) return
+      await api.createGrant(request)
     }
     $q.notify({ type: 'positive', message: '保存成功' })
     visible.value = false

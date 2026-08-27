@@ -44,6 +44,9 @@
       <template #body-cell-sync_type="props">
         <q-td :props="props">{{ dictLabel('org_sync_type', props.row.sync_type) }}</q-td>
       </template>
+      <template #body-cell-object_scope="props">
+        <q-td :props="props">{{ organizationSyncObjectLabel(props.row.object_scope) }}</q-td>
+      </template>
       <template #body-cell-status="props">
         <q-td :props="props">
           <status-chip
@@ -133,6 +136,7 @@ import {
   createOrganizationQuery,
   formatOrganizationDateTime,
   formatOrganizationValue,
+  organizationSyncObjectLabel,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'

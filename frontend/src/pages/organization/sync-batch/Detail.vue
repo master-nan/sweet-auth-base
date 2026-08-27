@@ -20,6 +20,7 @@
       <template #section="{ sectionKey }">
         <q-table
           v-if="sectionKey === 'records'"
+          class="organization-sync-record-table"
           flat
           bordered
           separator="cell"
@@ -33,6 +34,11 @@
           <template #body-cell-action="slotProps">
             <q-td :props="slotProps">
               {{ dictLabel('org_sync_action', slotProps.row.action) }}
+            </q-td>
+          </template>
+          <template #body-cell-object_type="slotProps">
+            <q-td :props="slotProps">
+              {{ organizationSyncObjectLabel(slotProps.row.object_type) }}
             </q-td>
           </template>
           <template #body-cell-status="slotProps">
@@ -92,6 +98,7 @@ import {
   createOrganizationQuery,
   formatOrganizationDateTime,
   formatOrganizationValue,
+  organizationSyncObjectLabel,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
@@ -139,7 +146,7 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
       items: [
         { label: '批次号', value: detail.batch_no },
         { label: '同步类型', value: dictLabel('org_sync_type', detail.sync_type) },
-        { label: '对象范围', value: detail.object_scope },
+        { label: '对象范围', value: organizationSyncObjectLabel(detail.object_scope) },
         {
           label: '状态',
           value: dictLabel('org_sync_record_status', detail.status),
@@ -238,3 +245,10 @@ watch(
 
 watch(title, (value) => emit('title-change', value), { immediate: true })
 </script>
+
+<style scoped>
+.organization-sync-record-table :deep(.q-table__middle) {
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+</style>

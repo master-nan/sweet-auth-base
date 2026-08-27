@@ -78,10 +78,6 @@ vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
   default: { template: '<div />' },
 }))
 
-vi.mock('./components/DataPermissionDetailDialog.vue', () => ({
-  default: { template: '<div />' },
-}))
-
 vi.mock('src/api/services/data-permission-config', () => {
   return {
     useDataPermissionConfigApi: () => apiMocks,
@@ -124,6 +120,7 @@ vi.mock('src/api/services/sys-user', () => ({
 
 import DataPermissionPage from './Index.vue'
 import DataPermissionConfigDialog from './components/DataPermissionConfigDialog.vue'
+import DataPermissionDetailDialog from './components/DataPermissionDetailDialog.vue'
 
 const SlotStub = defineComponent({
   setup(_, { slots }) {
@@ -187,6 +184,36 @@ const InputStub = defineComponent({
   },
 })
 
+const SelectStub = defineComponent({
+  name: 'QSelect',
+  props: {
+    modelValue: { type: [String, Number, Boolean, Array, Object], default: null },
+    label: { type: String, default: '' },
+    options: { type: Array, default: () => [] },
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () =>
+      h('button', {
+        'data-testid': 'select',
+        'data-label': props.label,
+        'data-empty':
+          props.modelValue === null || props.modelValue === undefined ? 'true' : 'false',
+        'data-value':
+          props.modelValue === null || props.modelValue === undefined
+            ? ''
+            : ['string', 'number', 'boolean'].includes(typeof props.modelValue)
+              ? `${props.modelValue as string | number | boolean}`
+              : '',
+        onClick: () =>
+          emit(
+            'update:modelValue',
+            (props.options[0] as { value?: unknown } | undefined)?.value ?? null,
+          ),
+      })
+  },
+})
+
 const TableStub = defineComponent({
   name: 'QTable',
   props: {
@@ -199,8 +226,7 @@ const TableStub = defineComponent({
         slots.top?.(),
         ...props.rows.flatMap((row: any) =>
           props.columns.map((column: any) => {
-            const value =
-              typeof column.field === 'function' ? column.field(row) : row[column.field]
+            const value = typeof column.field === 'function' ? column.field(row) : row[column.field]
             const cell = slots[`body-cell-${column.name}`]
             return cell ? cell({ row, value }) : h('span', value)
           }),
@@ -422,6 +448,122 @@ describe('Data permission configuration center', () => {
     const table = wrapper.find('[data-panel="grants"] [data-testid="table"]')
     expect(table.text()).toContain('华东只读角色')
     expect(table.text()).not.toContain('#9527')
+  })
+
+  it('keeps unselected ownership and grant references empty instead of rendering zero', async () => {
+    const FormDialogStub = defineComponent({
+      name: 'FormDialogShell',
+      setup(_, { slots }) {
+        return () => h('section', slots.default?.())
+      },
+    })
+    const FormStub = defineComponent({
+      name: 'QForm',
+      setup(_, { expose, slots }) {
+        expose({ validate: vi.fn().mockResolvedValue(true), resetValidation: vi.fn() })
+        return () => h('form', slots.default?.())
+      },
+    })
+    const mountDialog = (kind: 'ownership' | 'grant') =>
+      shallowMount(DataPermissionConfigDialog, {
+        props: { modelValue: true, kind },
+        global: {
+          stubs: {
+            FormDialogShell: FormDialogStub,
+            QForm: FormStub,
+            QInput: InputStub,
+            QSelect: SelectStub,
+            QToggle: true,
+            QList: SlotStub,
+            QItem: SlotStub,
+            QItemSection: SlotStub,
+            QSpace: true,
+            QBtn: ButtonStub,
+          },
+        },
+      })
+
+    const ownershipDialog = mountDialog('ownership')
+    await flushPromises()
+    for (const label of ['数据资源', '数据维度']) {
+      expect(ownershipDialog.find(`[data-label="${label}"]`).attributes('data-empty')).toBe('true')
+    }
+
+    const grantDialog = mountDialog('grant')
+    await flushPromises()
+    for (const label of ['授权主体', '数据资源', '资源操作', '权限策略']) {
+      expect(grantDialog.find(`[data-label="${label}"]`).attributes('data-empty')).toBe('true')
+    }
+    expect(grantDialog.text()).not.toContain('>0<')
+  })
+
+  it('shows grant references and policy rules with business labels in detail', async () => {
+    apiMocks.getGrant.mockResolvedValue({
+      data: {
+        id: 77,
+        subject_type: 'role',
+        subject_id: 9527,
+        subject: { id: 9527, name: '华东只读角色', code: 'east_readonly' },
+        resource_id: 10,
+        resource: { id: 10, name: '运输订单', code: 'transport_order' },
+        operation: 'query',
+        policy_id: 20,
+        policy: { id: 20, name: '本组织及下级', code: 'org_descendants' },
+        state: true,
+      },
+    })
+    const detail = shallowMount(DataPermissionDetailDialog, {
+      props: { modelValue: false, kind: 'grant', id: 77 },
+      global: {
+        stubs: {
+          FormDialogShell: SlotStub,
+          QInnerLoading: true,
+          QSpinner: true,
+          QList: SlotStub,
+          QItem: SlotStub,
+          QItemSection: SlotStub,
+          QItemLabel: SlotStub,
+          QBadge: SlotStub,
+          QChip: SlotStub,
+          QTable: TableStub,
+        },
+      },
+    })
+    await detail.setProps({ modelValue: true })
+    await flushPromises()
+
+    expect(detail.text()).toContain('华东只读角色 · east_readonly')
+    expect(detail.text()).toContain('运输订单')
+    expect(detail.text()).toContain('本组织及下级')
+    expect(detail.text()).not.toContain('#9527')
+
+    apiMocks.getPolicy.mockResolvedValue({
+      data: {
+        id: 20,
+        policy_code: 'org_descendants',
+        name: '本组织及下级',
+        state: true,
+        rules: [
+          {
+            id: 21,
+            sequence: 1,
+            ownership_code: 'management_org_id',
+            dimension_id: 3,
+            dimension: { id: 3, name: '管理组织', code: 'management_org' },
+            scope_source: 'effective_org_units',
+            relation: 'self_and_descendants',
+            operator: 'in',
+          },
+        ],
+      },
+    })
+    await detail.setProps({ kind: 'policy', id: 20 })
+    await flushPromises()
+
+    expect(detail.text()).toContain('当前有效组织')
+    expect(detail.text()).toContain('本级及下级')
+    expect(detail.text()).toContain('包含于')
+    expect(detail.text()).not.toContain('effective_org_units')
   })
 
   it('shows enable and disable actions from the current row state with one permission button', async () => {

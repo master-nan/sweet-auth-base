@@ -45,6 +45,9 @@
       <template #body-cell-action="props">
         <q-td :props="props">{{ dictLabel('org_sync_action', props.row.action) }}</q-td>
       </template>
+      <template #body-cell-object_type="props">
+        <q-td :props="props">{{ organizationSyncObjectLabel(props.row.object_type) }}</q-td>
+      </template>
       <template #body-cell-status="props">
         <q-td :props="props">
           <status-chip
@@ -143,6 +146,7 @@ import {
   createOrganizationQuery,
   formatOrganizationDateTime,
   formatOrganizationValue,
+  organizationSyncObjectLabel,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
@@ -214,15 +218,6 @@ const recordError = ref<SyncRecordError | null>(null)
 const showErrorDialog = ref(false)
 const errorLoading = ref(false)
 const errorLoadError = ref('')
-
-const objectTypeOptions = [
-  { label: '法人主体', value: 'legal_entity' },
-  { label: '组织单元', value: 'org_unit' },
-  { label: '管理架构节点', value: 'structure_node' },
-  { label: '人员', value: 'employee' },
-  { label: '岗位', value: 'position' },
-  { label: '任职', value: 'assignment' },
-]
 
 const columns: QTableProps['columns'] = [
   { name: 'batch_id', field: 'batch_id', label: '批次ID', align: 'right', sortable: true },
@@ -314,8 +309,7 @@ const errorItems = computed<OrganizationDetailItem[]>(() => {
   ]
 })
 
-const objectTypeLabel = (value: string) =>
-  objectTypeOptions.find((item) => item.value === value)?.label || value || '-'
+const objectTypeLabel = (value: string) => organizationSyncObjectLabel(value)
 
 const search = () => {
   schemePage.runQueryChange(queryState.submitQuickSearch)

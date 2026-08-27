@@ -101,56 +101,59 @@
       ></template>
       <template #body-cell-actions="props">
         <q-td :props="props" class="no-wrap">
-          <span
-            v-for="action in inlineSchemeActions(props.row)"
-            :key="action.key"
-            class="query-scheme-row-action"
-          >
+          <div class="query-scheme-row-actions">
+            <span
+              v-for="action in inlineSchemeActions(props.row)"
+              :key="action.key"
+              class="query-scheme-row-action"
+            >
+              <q-btn
+                flat
+                round
+                dense
+                size="sm"
+                :icon="action.icon"
+                :color="action.color"
+                :aria-label="action.label"
+                :disable="action.disabled"
+                @click="action.handler"
+              />
+              <q-tooltip>{{ action.tooltip }}</q-tooltip>
+            </span>
             <q-btn
+              v-if="overflowSchemeActions(props.row).length"
+              class="query-scheme-row-more"
               flat
               round
               dense
               size="sm"
-              :icon="action.icon"
-              :color="action.color"
-              :aria-label="action.label"
-              :disable="action.disabled"
-              @click="action.handler"
-            />
-            <q-tooltip>{{ action.tooltip }}</q-tooltip>
-          </span>
-          <q-btn
-            v-if="overflowSchemeActions(props.row).length"
-            flat
-            round
-            dense
-            size="sm"
-            icon="more_horiz"
-            color="primary"
-            aria-label="更多方案操作"
-          >
-            <q-tooltip>更多操作</q-tooltip>
-            <q-menu auto-close>
-              <q-list dense style="min-width: 180px">
-                <template
-                  v-for="(action, index) in overflowSchemeActions(props.row)"
-                  :key="action.key"
-                >
-                  <q-separator v-if="action.destructive && index > 0" />
-                  <q-item
-                    clickable
-                    :class="action.destructive ? 'text-negative' : ''"
-                    @click="action.handler"
+              icon="more_horiz"
+              color="primary"
+              aria-label="更多方案操作"
+            >
+              <q-tooltip>更多操作</q-tooltip>
+              <q-menu auto-close>
+                <q-list dense style="min-width: 180px">
+                  <template
+                    v-for="(action, index) in overflowSchemeActions(props.row)"
+                    :key="action.key"
                   >
-                    <q-item-section avatar>
-                      <q-icon :name="action.icon" :color="action.color" />
-                    </q-item-section>
-                    <q-item-section>{{ action.label }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-list>
-            </q-menu>
-          </q-btn>
+                    <q-separator v-if="action.destructive && index > 0" />
+                    <q-item
+                      clickable
+                      :class="action.destructive ? 'text-negative' : ''"
+                      @click="action.handler"
+                    >
+                      <q-item-section avatar>
+                        <q-icon :name="action.icon" :color="action.color" />
+                      </q-item-section>
+                      <q-item-section>{{ action.label }}</q-item-section>
+                    </q-item>
+                  </template>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </div>
         </q-td>
       </template>
       <template #no-data>
@@ -504,5 +507,18 @@ onMounted(fetchData)
 
 .query-scheme-row-action {
   display: inline-flex;
+  align-items: center;
+}
+
+.query-scheme-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.query-scheme-row-more {
+  align-self: center;
 }
 </style>

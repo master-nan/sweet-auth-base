@@ -134,15 +134,11 @@
             <q-item>
               <q-item-section>
                 <q-item-label caption>授权主体</q-item-label>
-                <q-item-label>
-                  {{ subjectTypeLabel(grantDetail.subject_type) }} #{{ grantDetail.subject_id }}
-                </q-item-label>
+                <q-item-label>{{ grantSubjectLabel }}</q-item-label>
               </q-item-section>
               <q-item-section>
                 <q-item-label caption>数据资源</q-item-label>
-                <q-item-label>{{
-                  grantDetail.resource?.name || grantDetail.resource_id
-                }}</q-item-label>
+                <q-item-label>{{ grantDetail.resource?.name || '数据资源不可用' }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
@@ -152,7 +148,7 @@
               </q-item-section>
               <q-item-section>
                 <q-item-label caption>权限策略</q-item-label>
-                <q-item-label>{{ grantDetail.policy?.name || grantDetail.policy_id }}</q-item-label>
+                <q-item-label>{{ grantDetail.policy?.name || '权限策略不可用' }}</q-item-label>
               </q-item-section>
               <q-item-section>
                 <q-item-label caption>状态</q-item-label>
@@ -227,6 +223,11 @@ const resourceDetail = computed(() => detail.value as DataResource)
 const ownershipDetail = computed(() => detail.value as DataOwnership)
 const policyDetail = computed(() => detail.value as DataPolicy)
 const grantDetail = computed(() => detail.value as DataGrant)
+const grantSubjectLabel = computed(() => {
+  const subject = grantDetail.value.subject
+  if (!subject) return grantDetail.value.subject_type === 'role' ? '角色不可用' : '用户不可用'
+  return subject.code ? `${subject.name} · ${subject.code}` : subject.name
+})
 const resourcePolicyCount = computed(
   () => new Set(resourceGrants.value.map((grant) => grant.policy_id)).size,
 )
@@ -245,7 +246,7 @@ const subtitle = computed(() => {
   if (props.kind === 'resource') return resourceDetail.value.resource_code
   if (props.kind === 'ownership') return ownershipDetail.value.ownership_code
   if (props.kind === 'policy') return policyDetail.value.policy_code
-  return `${grantDetail.value.subject_type} #${grantDetail.value.subject_id}`
+  return grantSubjectLabel.value
 })
 const icon = computed(
   () =>
@@ -263,12 +264,27 @@ const ruleColumns: QTableProps['columns'] = [
   {
     name: 'dimension',
     label: '数据维度',
-    field: (row) => row.dimension?.name || row.dimension_id,
+    field: (row) => row.dimension?.name || '数据维度不可用',
     align: 'left',
   },
-  { name: 'scope_source', label: '范围来源', field: 'scope_source', align: 'left' },
-  { name: 'relation', label: '关系', field: 'relation', align: 'left' },
-  { name: 'operator', label: '操作符', field: 'operator', align: 'left' },
+  {
+    name: 'scope_source',
+    label: '范围来源',
+    field: (row) => scopeSourceLabel(row.scope_source),
+    align: 'left',
+  },
+  {
+    name: 'relation',
+    label: '关系',
+    field: (row) => relationLabel(row.relation),
+    align: 'left',
+  },
+  {
+    name: 'operator',
+    label: '操作符',
+    field: (row) => operatorLabel(row.operator),
+    align: 'left',
+  },
 ]
 
 const baseQuery = (resourceId: number): Query & { resource_id: number } => ({
@@ -326,7 +342,16 @@ const bindingTypeLabel = (value: string) =>
   ({ metadata_field: '元数据字段', registered_field: '注册字段' })[value] || value
 const valueTypeLabel = (value: string) =>
   ({ bigint: '数字ID', string: '字符串编码' })[value] || value
-const subjectTypeLabel = (value: string) => ({ role: '角色', user: '用户' })[value] || value
+const scopeSourceLabel = (value: string) =>
+  ({
+    effective_legal_entities: '当前有效法人',
+    effective_org_units: '当前有效组织',
+    current_employee: '当前员工',
+    specified_values: '指定值',
+  })[value] || value
+const relationLabel = (value: string) =>
+  ({ exact: '精确匹配', self_and_descendants: '本级及下级' })[value] || value
+const operatorLabel = (value: string) => ({ eq: '等于', in: '包含于' })[value] || value
 
 watch(
   () => [props.modelValue, props.kind, props.id],

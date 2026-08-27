@@ -54,19 +54,14 @@ export const createOrganizationField = (
   binding: '',
 })
 
-export const formatOrganizationDate = (
-  value?: string | null,
-  fallback = '-',
-): string => (value ? date.formatDate(value, 'YYYY-MM-DD') : fallback)
+export const formatOrganizationDate = (value?: string | null, fallback = '-'): string =>
+  value ? date.formatDate(value, 'YYYY-MM-DD') : fallback
 
-export const formatOrganizationDateTime = (
-  value?: string | null,
-  fallback = '-',
-): string => (value ? date.formatDate(value, 'YYYY-MM-DD HH:mm:ss') : fallback)
+export const formatOrganizationDateTime = (value?: string | null, fallback = '-'): string =>
+  value ? date.formatDate(value, 'YYYY-MM-DD HH:mm:ss') : fallback
 
-export const referenceLabel = (
-  value?: { code: string; name: string } | null,
-): string => (value ? `${value.code} - ${value.name}` : '-')
+export const referenceLabel = (value?: { code: string; name: string } | null): string =>
+  value ? `${value.code} - ${value.name}` : '-'
 
 export const formatOrganizationValue = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '-'
@@ -88,4 +83,23 @@ export const organizationStatusColor = (status?: string): string => {
     return 'warning'
   }
   return 'grey-7'
+}
+
+const organizationSyncObjectLabels: Record<string, string> = {
+  all: '全部对象',
+  legal_entity: '法人主体',
+  management_company: '管理公司',
+  management_unit: '管理组织',
+  legal_unit: '法人组织',
+  structure_node: '架构节点',
+  position: '岗位',
+  employee: '人员档案',
+  assignment: '任职',
+  resigned_employee: '离职人员',
+}
+
+export const organizationSyncObjectLabel = (value?: string | null): string => {
+  const code = String(value || '').trim()
+  if (!code) return '-'
+  return organizationSyncObjectLabels[code] || code
 }
