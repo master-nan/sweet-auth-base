@@ -61,6 +61,16 @@ const mountPage = () =>
     global: {
       plugins: [createPinia()],
       renderStubDefaultSlot: true,
+      stubs: {
+        QIcon: true,
+        QSpace: true,
+        QSpinner: true,
+        QInnerLoading: true,
+        QTd: true,
+        QTable: true,
+        QBanner: { template: '<div><slot name="avatar" /><slot /></div>' },
+        QBtn: { props: ['label'], template: '<button>{{ label }}</button>' },
+      },
     },
   })
 
@@ -134,6 +144,10 @@ describe('integration execution detail permissions', () => {
       wrapper.vm as unknown as { resultItems: Array<{ label: string; value: unknown }> }
     ).resultItems
     expect(wrapper.findComponent({ name: 'BaseContent' }).props('scrollable')).toBe(true)
+    expect(wrapper.classes()).toContain('record-detail-page')
+    expect(wrapper.findAllComponents({ name: 'DetailFieldGrid' }).every((grid) => grid.props('variant') === 'card')).toBe(
+      true,
+    )
     expect(resultItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: 'HTTP 状态', value: 200 }),
@@ -142,6 +156,16 @@ describe('integration execution detail permissions', () => {
       ]),
     )
     expect(wrapper.text()).toContain('原始响应体不作为执行详情保存')
+  })
+
+  it('shows a retryable error instead of leaving a blank detail page', async () => {
+    apiMocks.getExecution.mockRejectedValueOnce(new Error('执行记录不存在'))
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('执行记录不存在')
+    expect(wrapper.text()).toContain('重新加载')
+    expect((wrapper.vm as unknown as { detail: unknown }).detail).toBeNull()
   })
 
   it('renders the safe retry summary without exposing the policy snapshot', async () => {

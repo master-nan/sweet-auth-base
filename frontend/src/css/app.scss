@@ -1160,6 +1160,228 @@ input[type='number']::-webkit-inner-spin-button {
   min-height: 220px;
 }
 
+/* 审计、低代码记录和业务详情页共用同一套页面骨架。 */
+.record-detail-page {
+  background: #f7f8fc;
+}
+
+.record-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.record-detail-header,
+.record-detail-panel {
+  border: 1px solid #dfe6f5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.record-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 6px 18px rgba(26, 35, 58, 0.06);
+}
+
+.record-detail-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.record-detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--q-primary);
+  font-size: 28px;
+}
+
+.record-detail-title {
+  color: #172033;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.record-detail-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: #75829b;
+}
+
+.record-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.record-detail-error {
+  color: var(--q-negative);
+  background: rgba(193, 0, 21, 0.08);
+}
+
+.record-detail-panel {
+  padding: 20px 22px;
+}
+
+.record-detail-panel h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.record-detail-panel p {
+  margin: 6px 0 0;
+  color: #7a879e;
+}
+
+.record-detail-panel-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.record-detail-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.record-detail-field {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e3e9f5;
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.record-detail-field--wide {
+  grid-column: span 2;
+}
+
+.record-detail-field--full {
+  grid-column: 1 / -1;
+}
+
+.record-detail-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #7a879e;
+  font-size: 13px;
+}
+
+.record-detail-field-value {
+  margin-top: 8px;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-field-value code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: var(--q-primary);
+  background: var(--app-primary-soft);
+  white-space: pre-wrap;
+}
+
+.record-detail-rich-text {
+  min-height: 28px;
+  color: #172033;
+  font-weight: 400;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-rich-text p {
+  margin: 0 0 8px;
+}
+
+.record-detail-rich-text img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.record-detail-long-list {
+  overflow: hidden;
+  border-color: #e3e9f5;
+  border-radius: 8px;
+}
+
+.record-detail-action-panel {
+  padding-top: 16px;
+}
+
+.record-detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.record-detail-pre {
+  min-height: 88px;
+  max-height: 420px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border-top: 1px solid #e3e9f5;
+  color: #263248;
+  background: #f7f9fd;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1180px) {
+  .record-detail-field-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .record-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .record-detail-actions {
+    justify-content: flex-end;
+  }
+
+  .record-detail-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-detail-field--wide {
+    grid-column: auto;
+  }
+}
+
 /* 防止滚动容器内容在窄屏撑破父级。 */
 .q-scrollarea__content {
   max-width: 100%;

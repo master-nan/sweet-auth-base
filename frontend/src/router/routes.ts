@@ -223,6 +223,16 @@ const asyncRoutesChildren: Route[] = [
           keepAlive: true,
         },
       },
+      {
+        component: () => import('pages/develop/verification/Index.vue'),
+        path: 'verification',
+        name: 'develop_verification',
+        meta: {
+          title: 'router.develop.verification',
+          icon: 'fact_check',
+          keepAlive: true,
+        },
+      },
     ],
   },
   {

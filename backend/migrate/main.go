@@ -990,6 +990,7 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menu(302, 300, "develop_generalization", "generalization/:table_code", "pages/develop/generalization/Index.vue", "router.develop.generalization", "dynamic_form", 2),
 		menuWithOption(menu(303, 300, "develop_database", "database", "pages/develop/database/Index.vue", "router.develop.database", "storage", 3), "sys_table,sys_table_field,sys_table_index,sys_table_relation"),
 		menuWithOption(menu(304, 300, "develop_dictionary", "dictionary", "pages/develop/dictionary/Index.vue", "router.develop.dictionary", "menu_book", 4), "sys_dict,sys_dict_item"),
+		menu(305, 300, "develop_verification", "verification", "pages/develop/verification/Index.vue", "router.develop.verification", "fact_check", 5),
 		directoryMenu(menu(900, 0, "report", "report", "src/components/Layout/Layout.vue", "router.report.default", "analytics", 4)),
 		menuWithTable(menu(901, 900, "report_center", "center", "pages/report/center/Index.vue", "router.report.center", "dashboard_customize", 1), "report_definition"),
 		menuWithTable(menu(902, 900, "report_manage", "manage", "pages/report/manage/Index.vue", "router.report.manage", "build", 2), "report_definition"),

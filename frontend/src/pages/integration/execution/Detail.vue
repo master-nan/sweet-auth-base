@@ -1,62 +1,80 @@
 <template>
-  <base-content scrollable>
-    <div class="execution-detail q-pa-md">
-      <div class="execution-detail__header">
-        <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"
-          ><q-tooltip>返回</q-tooltip></q-btn
-        >
-        <div>
-          <div class="text-h5">执行详情</div>
-          <div class="text-caption text-grey-7">{{ detail?.execution_no || '-' }}</div>
+  <base-content scrollable class="q-pa-sm record-detail-page">
+    <div class="record-detail">
+      <header class="record-detail-header">
+        <div class="record-detail-title-wrap">
+          <q-icon name="play_circle" class="record-detail-icon" />
+          <div>
+            <div class="record-detail-title">执行详情</div>
+            <div class="record-detail-subtitle">{{ detail?.execution_no || '-' }}</div>
+          </div>
         </div>
         <q-space />
+        <div class="record-detail-actions">
+          <status-chip
+            v-if="detail"
+            :color="statusMeta[detail.status]?.color || 'grey'"
+            :label="statusMeta[detail.status]?.label || detail.status"
+          />
+          <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="router.back()" />
+          <q-btn
+            outline
+            color="primary"
+            icon="refresh"
+            label="刷新"
+            :loading="loading"
+            @click="loadDetail"
+          />
+        </div>
+      </header>
+
+      <q-inner-loading :showing="loading">
+        <q-spinner color="primary" size="42px" />
+      </q-inner-loading>
+
+      <q-banner v-if="loadError" rounded class="record-detail-error">
+        <template #avatar>
+          <q-icon name="error_outline" color="negative" />
+        </template>
+        {{ loadError }}
         <q-btn
           flat
-          round
-          icon="refresh"
-          color="primary"
-          aria-label="刷新执行详情"
-          :loading="loading"
+          color="negative"
+          label="重新加载"
           @click="loadDetail"
-          ><q-tooltip>刷新执行详情</q-tooltip></q-btn
-        >
-        <status-chip
-          v-if="detail"
-          :color="statusMeta[detail.status]?.color || 'grey'"
-          :label="statusMeta[detail.status]?.label || detail.status"
         />
-      </div>
-      <q-inner-loading :showing="loading" />
-      <div v-if="detail" class="execution-detail__surface">
-        <section class="execution-detail__section">
-          <div class="execution-detail__section-title">基础信息</div>
-          <detail-field-grid :items="basicItems" />
+      </q-banner>
+
+      <template v-if="detail">
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>基础信息</h3></div>
+          <detail-field-grid :items="basicItems" variant="card" />
         </section>
-        <section class="execution-detail__section">
-          <div class="execution-detail__section-title">自动重试摘要</div>
-          <detail-field-grid :items="retryItems" />
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>自动重试摘要</h3></div>
+          <detail-field-grid :items="retryItems" variant="card" />
         </section>
-        <section class="execution-detail__section">
-          <div class="execution-detail__section-title">输入快照摘要</div>
-          <detail-field-grid :items="inputItems" />
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>输入快照摘要</h3></div>
+          <detail-field-grid :items="inputItems" variant="card" />
           <div class="execution-detail__note">
             页面只展示参数数量、快照大小和
             Hash。真实请求值可能包含身份标识或凭证，不会返回管理页面。
           </div>
         </section>
-        <section class="execution-detail__section">
-          <div class="execution-detail__section-title">状态与结果摘要</div>
-          <detail-field-grid :items="resultItems" />
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>状态与结果摘要</h3></div>
+          <detail-field-grid :items="resultItems" variant="card" />
           <div class="execution-detail__note">
             原始响应体不作为执行详情保存；排查时使用安全摘要、Hash、HTTP 状态和下方 Attempt 记录。
           </div>
         </section>
-        <section v-if="detail.sync_business" class="execution-detail__section">
-          <div class="execution-detail__section-title">同步业务结果</div>
-          <detail-field-grid :items="syncItems" />
+        <section v-if="detail.sync_business" class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>同步业务结果</h3></div>
+          <detail-field-grid :items="syncItems" variant="card" />
         </section>
-        <section class="execution-detail__section">
-          <div class="execution-detail__section-title">Attempt 记录</div>
+        <section class="record-detail-panel">
+          <div class="record-detail-panel-head"><h3>Attempt 记录</h3></div>
           <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">无调用日志查看权限</div>
           <q-table
             v-else
@@ -89,7 +107,7 @@
                   " /></q-td></template
           ></q-table>
         </section>
-      </div>
+      </template>
     </div>
   </base-content>
 </template>
@@ -115,6 +133,7 @@ const route = useRoute()
 const router = useRouter()
 const api = useIntegrationApi()
 const loading = ref(false)
+const loadError = ref('')
 const detail = ref<IntegrationExecutionDetail | null>(null)
 const attempts = ref<IntegrationLogListItem[]>([])
 const attemptsLoading = ref(false)
@@ -234,6 +253,7 @@ const loadDetail = async () => {
   const id = Number(route.params.id)
   if (id > 0) {
     loading.value = true
+    loadError.value = ''
     try {
       const response = await api.getExecution(id)
       detail.value = response.data || null
@@ -250,6 +270,10 @@ const loadDetail = async () => {
         })
         attempts.value = logs.data || []
       }
+    } catch (error) {
+      detail.value = null
+      attempts.value = []
+      loadError.value = error instanceof Error && error.message ? error.message : '执行详情加载失败'
     } finally {
       attemptsLoading.value = false
       loading.value = false
@@ -262,40 +286,6 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-.execution-detail {
-  min-height: 100%;
-}
-
-.execution-detail__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.execution-detail__surface {
-  overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: 8px;
-  background: var(--app-surface);
-}
-
-.execution-detail__section {
-  padding: 22px 24px;
-  border-top: 1px solid var(--app-border);
-}
-
-.execution-detail__section:first-child {
-  border-top: 0;
-}
-
-.execution-detail__section-title {
-  margin-bottom: 18px;
-  color: var(--app-text-strong);
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .execution-detail__note {
   margin-top: 18px;
   padding: 10px 12px;
@@ -306,13 +296,4 @@ onMounted(async () => {
   line-height: 1.6;
 }
 
-@media (max-width: 700px) {
-  .execution-detail {
-    padding: 12px;
-  }
-
-  .execution-detail__section {
-    padding: 18px 16px;
-  }
-}
 </style>

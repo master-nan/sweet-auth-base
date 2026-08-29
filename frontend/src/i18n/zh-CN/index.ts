@@ -9,6 +9,7 @@ export default {
       dictionary: '字典管理',
       configure: '配置管理',
       generalization: '通用页面',
+      verification: '功能验证',
     },
     organization: {
       default: '组织管理',

@@ -9,6 +9,7 @@ export default {
       dictionary: 'Dict Management',
       configure: 'Configure Management',
       generalization: 'Generic Page',
+      verification: 'Feature Verification',
     },
     organization: {
       default: 'Organization',
