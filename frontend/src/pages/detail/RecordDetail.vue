@@ -7,27 +7,141 @@
   />
 
   <base-content v-else-if="!canLoadRecordDetail" scrollable class="q-pa-sm">
-    <q-banner rounded class="record-detail-error">无详情查看权限</q-banner>
+    <q-banner rounded class="bg-red-1 text-negative">无详情查看权限</q-banner>
   </base-content>
 
-  <base-content v-else scrollable class="q-pa-sm record-detail-page">
-    <div class="record-detail">
-      <header class="record-detail-header">
-        <div class="record-detail-title-wrap">
-          <q-icon :name="sourceIcon" class="record-detail-icon" />
+  <detail-page-shell
+    v-else
+    :title="pageTitle"
+    :icon="sourceIcon"
+    :loading="loading"
+    :error="loadError"
+    retryable
+    @retry="loadDetail"
+  >
+    <template #subtitle>
+      {{ sourceLabel }}
+      <q-chip v-if="isAudit" dense square color="primary" text-color="white">{{
+        tableCode
+      }}</q-chip>
+      <span v-if="isAudit && recordId">#{{ recordId }}</span>
+    </template>
+    <template #actions>
+      <q-btn
+        v-for="button in detailTopButtons"
+        :key="button.id || button.code"
+        v-bind="menuButtonDisplayProps(button)"
+        unelevated
+        :color="button.color || 'primary'"
+        :loading="executingButtonCode === button.code"
+        :disable="isDetailButtonDisabled(button)"
+        @click="handleDetailButtonClick(button)"
+      />
+      <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="goBackToList" />
+      <q-btn
+        outline
+        color="primary"
+        icon="refresh"
+        label="刷新"
+        :loading="loading"
+        @click="loadDetail"
+      />
+    </template>
+
+    <dynamic-form-dialog
+      v-model="showParamsDialog"
+      :edit-data="null"
+      :title="paramsDialogTitle"
+      :fields="paramsFields"
+      :menu-id="resolveDetailMenuId()"
+      :table-code="tableCode"
+      submit-btn-text="执行"
+      @submit="handleParamsSubmit"
+    />
+
+    <template v-if="record">
+      <section class="detail-page-section">
+        <div class="detail-page-section__head">
           <div>
-            <div class="record-detail-title">{{ pageTitle }}</div>
-            <div class="record-detail-subtitle">
-              {{ sourceLabel }}
-              <q-chip v-if="isAudit" dense square color="primary" text-color="white">{{ tableCode }}</q-chip>
-              <span v-if="isAudit && recordId">#{{ recordId }}</span>
-            </div>
+            <h3>基础信息</h3>
           </div>
         </div>
-        <q-space />
-        <div class="record-detail-actions">
+
+        <div class="record-detail-field-grid">
+          <article
+            v-for="field in compactFields"
+            :key="field.key"
+            class="record-detail-field"
+            :class="{
+              'record-detail-field--wide': field.span === 2 || field.wide,
+              'record-detail-field--full': (field.span || 1) >= 4,
+            }"
+          >
+            <div class="record-detail-field-label">
+              <span>{{ field.label }}</span>
+              <q-chip v-if="field.meta" dense square>{{ field.meta }}</q-chip>
+            </div>
+            <div class="record-detail-field-value">
+              <q-chip
+                v-if="field.kind === 'boolean'"
+                dense
+                square
+                :color="field.rawValue ? 'positive' : 'grey-5'"
+                text-color="white"
+              >
+                {{ field.rawValue ? '是' : '否' }}
+              </q-chip>
+              <file-display
+                v-else-if="field.kind === 'file'"
+                :model-value="field.rawValue"
+                :table-code="tableCode"
+                :record-id="recordId"
+                :menu-id="resolveDetailMenuId()"
+                access-action="detail"
+              />
+              <div
+                v-else-if="field.kind === 'rich-text'"
+                class="record-detail-rich-text"
+                v-html="richTextHtmlMap[field.key] || field.value"
+              />
+              <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
+              <span v-else>{{ field.value }}</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="longSections.length" class="detail-page-section">
+        <div class="detail-page-section__head">
+          <div>
+            <h3>{{ longPanelTitle }}</h3>
+          </div>
+        </div>
+        <q-list bordered separator class="record-detail-long-list">
+          <q-expansion-item
+            v-for="section in longSections"
+            :key="section.key"
+            :label="section.label"
+            :caption="section.caption"
+            default-opened
+          >
+            <pre class="record-detail-pre">{{ section.value }}</pre>
+          </q-expansion-item>
+        </q-list>
+      </section>
+
+      <section
+        v-if="detailBottomButtons.length"
+        class="detail-page-section record-detail-action-panel"
+      >
+        <div class="detail-page-section__head">
+          <div>
+            <h3>详情操作</h3>
+          </div>
+        </div>
+        <div class="record-detail-action-row">
           <q-btn
-            v-for="button in detailTopButtons"
+            v-for="button in detailBottomButtons"
             :key="button.id || button.code"
             v-bind="menuButtonDisplayProps(button)"
             unelevated
@@ -36,136 +150,10 @@
             :disable="isDetailButtonDisabled(button)"
             @click="handleDetailButtonClick(button)"
           />
-          <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="goBackToList" />
-          <q-btn
-            outline
-            color="primary"
-            icon="refresh"
-            label="刷新"
-            :loading="loading"
-            @click="loadDetail"
-          />
         </div>
-      </header>
-
-      <q-inner-loading :showing="loading">
-        <q-spinner color="primary" size="42px" />
-      </q-inner-loading>
-
-      <q-banner v-if="loadError" rounded class="record-detail-error">
-        <template #avatar>
-          <q-icon name="error_outline" color="negative" />
-        </template>
-        {{ loadError }}
-      </q-banner>
-
-      <dynamic-form-dialog
-        v-model="showParamsDialog"
-        :edit-data="null"
-        :title="paramsDialogTitle"
-        :fields="paramsFields"
-        :menu-id="resolveDetailMenuId()"
-        :table-code="tableCode"
-        submit-btn-text="执行"
-        @submit="handleParamsSubmit"
-      />
-
-      <template v-if="record">
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head">
-            <div>
-              <h3>基础信息</h3>
-            </div>
-          </div>
-
-          <div class="record-detail-field-grid">
-            <article
-              v-for="field in compactFields"
-              :key="field.key"
-              class="record-detail-field"
-              :class="{
-                'record-detail-field--wide': field.span === 2 || field.wide,
-                'record-detail-field--full': (field.span || 1) >= 4,
-              }"
-            >
-              <div class="record-detail-field-label">
-                <span>{{ field.label }}</span>
-                <q-chip v-if="field.meta" dense square>{{ field.meta }}</q-chip>
-              </div>
-              <div class="record-detail-field-value">
-                <q-chip
-                  v-if="field.kind === 'boolean'"
-                  dense
-                  square
-                  :color="field.rawValue ? 'positive' : 'grey-5'"
-                  text-color="white"
-                >
-                  {{ field.rawValue ? '是' : '否' }}
-                </q-chip>
-                <file-display
-                  v-else-if="field.kind === 'file'"
-                  :model-value="field.rawValue"
-                  :table-code="tableCode"
-                  :record-id="recordId"
-                  :menu-id="resolveDetailMenuId()"
-                  access-action="detail"
-                />
-                <div
-                  v-else-if="field.kind === 'rich-text'"
-                  class="record-detail-rich-text"
-                  v-html="richTextHtmlMap[field.key] || field.value"
-                />
-                <code v-else-if="field.kind === 'code'">{{ field.value }}</code>
-                <span v-else>{{ field.value }}</span>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section v-if="longSections.length" class="record-detail-panel">
-          <div class="record-detail-panel-head">
-            <div>
-              <h3>{{ longPanelTitle }}</h3>
-            </div>
-          </div>
-          <q-list bordered separator class="record-detail-long-list">
-            <q-expansion-item
-              v-for="section in longSections"
-              :key="section.key"
-              :label="section.label"
-              :caption="section.caption"
-              default-opened
-            >
-              <pre class="record-detail-pre">{{ section.value }}</pre>
-            </q-expansion-item>
-          </q-list>
-        </section>
-
-        <section
-          v-if="detailBottomButtons.length"
-          class="record-detail-panel record-detail-action-panel"
-        >
-          <div class="record-detail-panel-head">
-            <div>
-              <h3>详情操作</h3>
-            </div>
-          </div>
-          <div class="record-detail-action-row">
-            <q-btn
-              v-for="button in detailBottomButtons"
-              :key="button.id || button.code"
-              v-bind="menuButtonDisplayProps(button)"
-              unelevated
-              :color="button.color || 'primary'"
-              :loading="executingButtonCode === button.code"
-              :disable="isDetailButtonDisabled(button)"
-              @click="handleDetailButtonClick(button)"
-            />
-          </div>
-        </section>
-      </template>
-    </div>
-  </base-content>
+      </section>
+    </template>
+  </detail-page-shell>
 </template>
 
 <script setup lang="ts">
@@ -176,6 +164,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import DetailPageShell from 'src/components/Detail/DetailPageShell.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
 import OrganizationSyncBatchDetail from 'src/pages/organization/sync-batch/Detail.vue'
@@ -183,10 +172,7 @@ import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 import { useFileApi } from 'src/api/services/file'
 import { useGeneralizationApi } from 'src/api/services/generalization'
 import type { MenuButton } from 'src/api/services/sys-menu'
-import {
-  type RuntimeTableMetadata,
-  type TableField,
-} from 'src/api/services/sys-table'
+import { type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
 import { useDictStore } from 'src/stores/dict'
@@ -897,7 +883,12 @@ function buildAuditFields() {
     auditField('追踪ID', 'trace_id', SysTableFieldType.VARCHAR),
     auditField('审计结果', 'result', SysTableFieldType.VARCHAR),
     auditField('错误码', 'error_code', SysTableFieldType.VARCHAR),
-    auditField('安全错误信息', 'error_message', SysTableFieldType.TEXT, SysTableFieldInputType.TEXTAREA),
+    auditField(
+      '安全错误信息',
+      'error_message',
+      SysTableFieldType.TEXT,
+      SysTableFieldInputType.TEXTAREA,
+    ),
   ]
 }
 
@@ -918,3 +909,117 @@ watch(
   { immediate: true },
 )
 </script>
+
+<style scoped lang="scss">
+.record-detail-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 12px;
+}
+
+.record-detail-field {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface-muted);
+}
+
+.record-detail-field--wide {
+  grid-column: span 2;
+}
+
+.record-detail-field--full {
+  grid-column: 1 / -1;
+}
+
+.record-detail-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--app-text-muted);
+  font-size: 13px;
+}
+
+.record-detail-field-value {
+  margin-top: 8px;
+  color: var(--app-text-strong);
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-field-value code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: var(--q-primary);
+  background: var(--app-primary-soft);
+  white-space: pre-wrap;
+}
+
+.record-detail-rich-text {
+  min-height: 28px;
+  color: var(--app-text-strong);
+  font-weight: 400;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.record-detail-rich-text p {
+  margin: 0 0 8px;
+}
+
+.record-detail-rich-text img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.record-detail-long-list {
+  overflow: hidden;
+  border-color: var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface-muted);
+}
+
+.record-detail-action-panel {
+  padding-top: 16px;
+}
+
+.record-detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.record-detail-pre {
+  min-height: 88px;
+  max-height: 420px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text-strong);
+  background: var(--app-surface-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 1180px) {
+  .record-detail-field-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .record-detail-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-detail-field--wide {
+    grid-column: auto;
+  }
+}
+</style>

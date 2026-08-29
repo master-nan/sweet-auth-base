@@ -1,123 +1,101 @@
 <template>
-  <base-content scrollable class="q-pa-sm record-detail-page">
-    <div class="record-detail">
-      <header class="record-detail-header">
-        <div class="record-detail-title-wrap">
-          <q-icon name="play_circle" class="record-detail-icon" />
-          <div>
-            <div class="record-detail-title">执行详情</div>
-            <div class="record-detail-subtitle">{{ detail?.execution_no || '-' }}</div>
-          </div>
-        </div>
-        <q-space />
-        <div class="record-detail-actions">
-          <status-chip
-            v-if="detail"
-            :color="statusMeta[detail.status]?.color || 'grey'"
-            :label="statusMeta[detail.status]?.label || detail.status"
-          />
-          <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="router.back()" />
-          <q-btn
-            outline
-            color="primary"
-            icon="refresh"
-            label="刷新"
-            :loading="loading"
-            @click="loadDetail"
-          />
-        </div>
-      </header>
+  <detail-page-shell
+    title="执行详情"
+    :subtitle="detail?.execution_no || '-'"
+    icon="play_circle"
+    :loading="loading"
+    :error="loadError"
+    retryable
+    @retry="loadDetail"
+  >
+    <template #actions>
+      <status-chip
+        v-if="detail"
+        :color="statusMeta[detail.status]?.color || 'grey'"
+        :label="statusMeta[detail.status]?.label || detail.status"
+      />
+      <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="router.back()" />
+      <q-btn
+        outline
+        color="primary"
+        icon="refresh"
+        label="刷新"
+        :loading="loading"
+        @click="loadDetail"
+      />
+    </template>
 
-      <q-inner-loading :showing="loading">
-        <q-spinner color="primary" size="42px" />
-      </q-inner-loading>
-
-      <q-banner v-if="loadError" rounded class="record-detail-error">
-        <template #avatar>
-          <q-icon name="error_outline" color="negative" />
-        </template>
-        {{ loadError }}
-        <q-btn
+    <template v-if="detail">
+      <section class="detail-page-section">
+        <div class="detail-page-section__head"><h3>基础信息</h3></div>
+        <detail-field-grid :items="basicItems" variant="card" />
+      </section>
+      <section class="detail-page-section">
+        <div class="detail-page-section__head"><h3>自动重试摘要</h3></div>
+        <detail-field-grid :items="retryItems" variant="card" />
+      </section>
+      <section class="detail-page-section">
+        <div class="detail-page-section__head"><h3>输入快照摘要</h3></div>
+        <detail-field-grid :items="inputItems" variant="card" />
+        <div class="execution-detail__note">
+          页面只展示参数数量、快照大小和 Hash。真实请求值可能包含身份标识或凭证，不会返回管理页面。
+        </div>
+      </section>
+      <section class="detail-page-section">
+        <div class="detail-page-section__head"><h3>状态与结果摘要</h3></div>
+        <detail-field-grid :items="resultItems" variant="card" />
+        <div class="execution-detail__note">
+          原始响应体不作为执行详情保存；排查时使用安全摘要、Hash、HTTP 状态和下方 Attempt 记录。
+        </div>
+      </section>
+      <section v-if="detail.sync_business" class="detail-page-section">
+        <div class="detail-page-section__head"><h3>同步业务结果</h3></div>
+        <detail-field-grid :items="syncItems" variant="card" />
+      </section>
+      <section class="detail-page-section">
+        <div class="detail-page-section__head"><h3>Attempt 记录</h3></div>
+        <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">无调用日志查看权限</div>
+        <q-table
+          v-else
           flat
-          color="negative"
-          label="重新加载"
-          @click="loadDetail"
-        />
-      </q-banner>
-
-      <template v-if="detail">
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>基础信息</h3></div>
-          <detail-field-grid :items="basicItems" variant="card" />
-        </section>
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>自动重试摘要</h3></div>
-          <detail-field-grid :items="retryItems" variant="card" />
-        </section>
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>输入快照摘要</h3></div>
-          <detail-field-grid :items="inputItems" variant="card" />
-          <div class="execution-detail__note">
-            页面只展示参数数量、快照大小和
-            Hash。真实请求值可能包含身份标识或凭证，不会返回管理页面。
-          </div>
-        </section>
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>状态与结果摘要</h3></div>
-          <detail-field-grid :items="resultItems" variant="card" />
-          <div class="execution-detail__note">
-            原始响应体不作为执行详情保存；排查时使用安全摘要、Hash、HTTP 状态和下方 Attempt 记录。
-          </div>
-        </section>
-        <section v-if="detail.sync_business" class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>同步业务结果</h3></div>
-          <detail-field-grid :items="syncItems" variant="card" />
-        </section>
-        <section class="record-detail-panel">
-          <div class="record-detail-panel-head"><h3>Attempt 记录</h3></div>
-          <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">无调用日志查看权限</div>
-          <q-table
-            v-else
-            flat
-            bordered
-            dense
-            :loading="attemptsLoading"
-            :rows="attempts"
-            :columns="attemptColumns"
-            row-key="id"
-            ><template #body-cell-attempt_no="props"
-              ><q-td :props="props"
-                ><q-btn
-                  v-if="canViewLogDetail"
-                  flat
-                  dense
-                  color="primary"
-                  :label="`#${props.row.attempt_no}`"
-                  @click="openLog(props.row.id)"
-                />
-                <span v-else>#{{ props.row.attempt_no }}</span></q-td
-              ></template
-            ><template #body-cell-status="props"
-              ><q-td :props="props"
-                ><status-chip
-                  :color="logStatusMeta[props.row.status]?.color || 'grey'"
-                  :outline="false"
-                  :label="
-                    logStatusMeta[props.row.status]?.label || props.row.status
-                  " /></q-td></template
-          ></q-table>
-        </section>
-      </template>
-    </div>
-  </base-content>
+          bordered
+          dense
+          :loading="attemptsLoading"
+          :rows="attempts"
+          :columns="attemptColumns"
+          row-key="id"
+          ><template #body-cell-attempt_no="props"
+            ><q-td :props="props"
+              ><q-btn
+                v-if="canViewLogDetail"
+                flat
+                dense
+                color="primary"
+                :label="`#${props.row.attempt_no}`"
+                @click="openLog(props.row.id)"
+              />
+              <span v-else>#{{ props.row.attempt_no }}</span></q-td
+            ></template
+          ><template #body-cell-status="props"
+            ><q-td :props="props"
+              ><status-chip
+                :color="logStatusMeta[props.row.status]?.color || 'grey'"
+                :outline="false"
+                :label="
+                  logStatusMeta[props.row.status]?.label || props.row.status
+                " /></q-td></template
+        ></q-table>
+      </section>
+    </template>
+  </detail-page-shell>
 </template>
 
 <script setup lang="ts">
 defineOptions({ name: 'integration_execution_detail_page' })
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
+import DetailPageShell from 'src/components/Detail/DetailPageShell.vue'
 import type { DetailFieldItem } from 'src/components/Detail/types'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
@@ -295,5 +273,4 @@ onMounted(async () => {
   font-size: 13px;
   line-height: 1.6;
 }
-
 </style>

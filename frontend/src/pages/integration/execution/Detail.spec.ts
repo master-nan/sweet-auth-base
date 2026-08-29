@@ -62,13 +62,14 @@ const mountPage = () =>
       plugins: [createPinia()],
       renderStubDefaultSlot: true,
       stubs: {
+        DetailPageShell: false,
         QIcon: true,
         QSpace: true,
         QSpinner: true,
         QInnerLoading: true,
         QTd: true,
         QTable: true,
-        QBanner: { template: '<div><slot name="avatar" /><slot /></div>' },
+        QBanner: { template: '<div><slot name="avatar" /><slot /><slot name="action" /></div>' },
         QBtn: { props: ['label'], template: '<button>{{ label }}</button>' },
       },
     },
@@ -143,11 +144,19 @@ describe('integration execution detail permissions', () => {
     const resultItems = (
       wrapper.vm as unknown as { resultItems: Array<{ label: string; value: unknown }> }
     ).resultItems
-    expect(wrapper.findComponent({ name: 'BaseContent' }).props('scrollable')).toBe(true)
-    expect(wrapper.classes()).toContain('record-detail-page')
-    expect(wrapper.findAllComponents({ name: 'DetailFieldGrid' }).every((grid) => grid.props('variant') === 'card')).toBe(
-      true,
-    )
+    const shell = wrapper.findComponent({ name: 'DetailPageShell' })
+    expect(shell.exists()).toBe(true)
+    expect(shell.props()).toMatchObject({
+      title: '执行详情',
+      icon: 'play_circle',
+      subtitle: 'INT-51',
+    })
+    expect(shell.findComponent({ name: 'BaseContent' }).props('scrollable')).toBe(true)
+    expect(
+      wrapper
+        .findAllComponents({ name: 'DetailFieldGrid' })
+        .every((grid) => grid.props('variant') === 'card'),
+    ).toBe(true)
     expect(resultItems).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: 'HTTP 状态', value: 200 }),
