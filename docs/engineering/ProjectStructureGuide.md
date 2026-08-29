@@ -486,6 +486,87 @@ Integration管理外部系统、加密Credential、接口版本、RetryPolicy、
 | `frontend/src/pages/integration/` | 配置、同步、执行和日志页面 |
 | `frontend/src/api/services/integration.ts` | Integration领域API封装 |
 
+#### 配置对象：从 HTTP 到数据库
+
+下面四组文件都遵循 `Controller -> Service -> Repository -> PostgreSQL`。Controller 只处理参数和 HTTP 响应；
+Service 决定业务规则、事务和审计；Repository 只处理查询、锁和持久化。阅读时先找公开方法，不需要从文件第一行逐个阅读私有校验函数。
+
+| 对象 | Controller 方法 | Service 方法 | 实际作用 |
+| --- | --- | --- | --- |
+| 外部系统 | `Query`、`Detail` | `Page`、`Get` | 查询外部平台配置；详情返回规范化后的 Base URL、负责人和状态 |
+| 外部系统 | `Create`、`Update` | `Create`、`Update` | 校验稳定 `system_code`、系统类型和受 EndpointPolicy 允许的 Base URL；事务内保存并写审计 |
+| 外部系统 | `Enable`、`Disable` | `Enable`、`Disable` | 用 revision 防止覆盖他人修改；启用前重新检查必填配置和地址安全 |
+| 集成凭证 | `Query`、`Detail` | `Page`、`Get` | 返回凭证类型、有效状态、版本、指纹摘要和有效期；绝不返回秘密明文 |
+| 集成凭证 | `Create`、`Update` | `Create`、`Update` | 校验凭证属于当前外部系统；创建时规范化秘密并写入加密信封；普通更新不能偷偷替换秘密 |
+| 集成凭证 | `Rotate` | `Rotate` | 在 revision 锁内写入新的密文、Nonce、指纹和版本；旧秘密不会通过页面读回 |
+| 集成凭证 | `Enable`、`Disable`、`Revoke` | 同名方法 | 启用表示可被接口使用；停用可以恢复；吊销是不可恢复终态 |
+| 接口定义 | `Query`、`Detail` | `Page`、`Get` | 详情返回所属系统、HTTP 契约、参数定义、凭证摘要和重试策略摘要 |
+| 接口定义 | `Create`、`Update` | `Create`、`Update` | 规范化相对路径，校验 Method、输入契约、响应上限、凭证与外部系统的一致性 |
+| 接口定义 | `CreateVersion` | `CreateVersion` | 从既有版本复制出新草稿；不原地修改已启用版本，保证历史 Execution 可解释 |
+| 接口定义 | `Enable`、`Disable` | 同名方法 | 启用前确认系统、凭证、重试策略和 Runtime 上限都可用；同一接口编码只允许一个启用版本 |
+| 重试策略 | `Query`、`Detail` | `PageRetryPolicy`、`GetRetryPolicy` | 读取策略版本、退避参数、错误类别和 HTTP 状态白名单 |
+| 重试策略 | `Create`、`Update` | `CreateRetryPolicy`、`UpdateDraftRetryPolicy` | 校验次数、延迟、指数倍数、抖动和整体重试窗口；只允许修改草稿 |
+| 重试策略 | `CreateVersion` | `CreateRetryPolicyVersion` | 复制不可变业务身份和技术参数，生成下一版本草稿 |
+| 重试策略 | `Enable`、`Disable` | `EnableRetryPolicy`、`DisableRetryPolicy` | revision 更新；停用前检查启用中的接口引用，避免接口在运行时突然失去策略 |
+
+这些 Service 中的私有方法不是额外业务层。例如 `normalizeCredentialSecret` 负责把不同凭证类型整理成受控加密内容，
+`validateReferences` 负责确认接口、凭证和外部系统属于同一配置关系，`normalizeInterfaceRelativePath` 阻止外部地址和路径穿越。
+它们直接保护秘密或网络边界，不能为了减少方法数量合并进 Controller。
+
+#### 同步任务、批次和执行
+
+| 文件 / 方法 | 什么时候调用 | 做什么 | 不做什么 |
+| --- | --- | --- | --- |
+| `integration_sync_controller.go:CreateTask/UpdateTask/CreateTaskVersion` | 管理员维护同步任务 | 接收页面表单并调用 `SyncTaskService` | 不执行 HTTP，不推进 Checkpoint |
+| `SyncTaskService.CreateSyncTask` | 新建任务 | 固定接口版本、Consumer、Cron、时区、窗口和输入计划 | 不创建 Execution |
+| `SyncTaskService.EnableSyncTask` | 启用任务 | 校验外部系统、接口、Consumer、Checkpoint 和 Cron 均可运行 | 不直接启动 Runner |
+| `SyncTaskService.RunSyncTask` | 点击“运行一次” | 创建手工 SyncBatch，并记录本次逻辑窗口 | 不绕过 Runner/Worker 直接请求外部接口 |
+| `IntegrationSyncCoordinator.ScheduleDueTasks` | Sync Runner 轮询 | 把到期任务转换成有快照的 Batch | 不执行网络请求 |
+| `IntegrationSyncCoordinator.CoordinateBatch` | Batch 待协调或前一切片完成 | 创建下一时间片 Execution，成功后推进 Checkpoint，失败时结束 Batch | 不修改 Retry 的内部决策 |
+| `IntegrationExecutionService.CreateSyncExecution` | Coordinator 创建时间片 | 冻结系统、接口、输入和 Retry 快照，生成幂等 Execution | 不读取凭证明文 |
+| `IntegrationExecutionService.PageExecution/GetExecution` | 执行列表和详情 | 返回状态、时间、输入计数/Hash、结果大小/Hash和安全摘要 | 不返回原始请求值或响应 Body |
+| `IntegrationExecutionService.CancelExecution` | 取消待执行或等待重试的记录 | revision 更新为取消并写审计 | 不取消运行中或已终止记录 |
+| `IntegrationExecutionEngine.ClaimReadyExecutions` | Worker 轮询 | 使用 PostgreSQL 锁和 lease 领取可执行记录 | 不让两个 Worker 同时执行同一记录 |
+| `IntegrationExecutionEngine.RunExecution` | Worker 已领取记录 | 建立 Attempt，解析凭证，调用 Transport，执行 Consumer，再决定成功、失败或重试 | 不把秘密写进日志 |
+| `IntegrationExecutionEngine.RecoverExpiredLease` | Worker 恢复轮询 | 回收异常退出实例留下的过期 lease | 不回收仍有效的运行记录 |
+| `RetryDecisionService.Decide` | Attempt 完成后 | 基于冻结策略、错误分类、状态码、幂等性和 Retry-After 计算下一次执行时间 | 不读取后来被修改的策略版本 |
+| `IntegrationWorkerRunner.Start/Run/Stop` | 程序启动、运行和关闭 | 管理轮询、并发上限、活动任务与停止等待 | 不管理 SyncTask 调度 |
+| `IntegrationSyncRunner.Start/Run/Stop` | 程序启动、运行和关闭 | 管理任务到期扫描和 Batch 协调 | 不执行 HTTP Attempt |
+
+#### 外部请求和业务结果
+
+| 文件 | 关键方法 | 开发者应关注的边界 |
+| --- | --- | --- |
+| `credential_provider.go` | `Resolve` | 调用前才读取并解密指定版本凭证；返回对象的 String/JSON 均为脱敏内容，使用后清空字节缓冲 |
+| `transport_client.go` | `Execute` | 组合 Base URL 与相对路径，执行 DNS/IP、TLS、Redirect、Timeout、Content-Type 和响应大小检查 |
+| `sync_consumer_registry.go` | `Resolve`、`ValidateReference`、`Consume` | 用稳定 code/version 找到业务 Consumer；Consumer 只接收成功且受大小限制的响应，并返回成功数、失败数和业务引用 |
+| `retry_decision.go` | `Decide` | 网络、超时和受控远端错误可以重试；业务 Consumer 失败不自动当成技术重试 |
+| `internal/organization/hrsync/consumer.go` | 各领域 `Consume` | 把已验证的 HR 响应交给 Source Adapter，再写法人、管理组织、员工、岗位或离职事实 |
+
+新增外部系统接入时，通常只需要配置 `ExternalSystem -> Credential -> InterfaceDefinition -> SyncTask`；
+只有返回结构需要写入新业务模型时才新增一个 Consumer。不要复制 Worker、Transport 或 Retry 代码。
+
+#### 前端页面和“参数/返回值去哪里看”
+
+| 页面 | 文件 | 可以查看的内容 |
+| --- | --- | --- |
+| 外部系统 | `pages/integration/external-system/Index.vue` | Base URL、系统类型、负责人、状态和启停操作 |
+| 集成凭证 | `pages/integration/credential/Index.vue`、`CredentialDetailDialog.vue` | 凭证类型、版本、指纹、有效期和轮换时间；秘密不可读 |
+| 接口定义 | `pages/integration/interface-definition/Index.vue`、`InterfaceDefinitionDetailDialog.vue` | HTTP Method、相对路径、请求参数名称/位置/类型/必填规则、响应上限和引用配置 |
+| 同步任务 | `pages/integration/sync-task/Index.vue`、`SyncTaskFormDialog.vue` | 为接口参数填写静态值或时间窗口绑定，并配置 Consumer、Cron、Checkpoint 和 Lookback |
+| 执行记录 | `pages/integration/execution/Detail.vue` | 本次请求的参数数量、快照大小、输入 Hash、HTTP 状态、响应大小、结果 Hash和安全摘要 |
+| 调用日志 | `pages/integration/log/Index.vue` | 每个 Attempt 的耗时、状态码、错误分类、重试判断和安全结果摘要 |
+
+真实请求值可能包含人员标识、查询范围或认证 Header，因此不返回执行详情；原始响应 Body 也不作为管理页面资料长期保存。
+需要确认“接口允许什么参数”时看接口定义，需要确认“本次是否带了参数、结果多大、是否成功”时看执行详情和调用日志。
+
+#### 文件是否还能合并
+
+- 配置 Service、执行引擎、Worker、Sync Runner、Transport、CredentialProvider、Consumer Registry 和 RetryDecision 分别承担事务、安全或状态边界，继续保留独立文件。
+- Credential、InterfaceDefinition 和 Execution 详情已复用 `DetailFieldGrid`，避免各写一套字段栅格和暗色样式。
+- 前端各 `Index.vue` 保留页面组合，各 Form/Detail Dialog 保留独立交互语义；把它们合并成一个超大页面会增加条件分支和测试难度。
+- 以后只有“无独立规则、只有一个调用方、只是原样转发”的私有函数才考虑内联；不能用文件行数判断是否合并安全边界。
+
 **典型链路**
 
 `外部接口执行 -> IntegrationExecutionService创建冻结快照 -> Worker Claim -> ExecutionEngine -> CredentialProvider -> Transport -> Attempt结果 -> Retry/Terminal状态`

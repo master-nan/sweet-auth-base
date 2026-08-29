@@ -124,3 +124,75 @@ func migrateIntegrationConfigurationSchema(db *gorm.DB) error {
 		return nil
 	})
 }
+
+func migrateIntegrationReferenceIntegritySchema(db *gorm.DB) error {
+	if db.Dialector.Name() != "postgres" {
+		return nil
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		// 旧环境可能先删除了外部系统，却留下仍引用该系统的凭证。先解除接口引用，
+		// 再删除这些已无法使用的凭证，之后由外键阻止同类数据再次产生。
+		if err := tx.Exec(`
+			UPDATE integration_interface_definition AS definition
+			SET credential_id = NULL,
+			    status = CASE WHEN definition.status = 'enabled' THEN 'disabled' ELSE definition.status END,
+			    state = CASE WHEN definition.status = 'enabled' THEN FALSE ELSE definition.state END,
+			    revision = definition.revision + 1,
+			    gmt_modify = CURRENT_TIMESTAMP
+			WHERE definition.credential_id IN (
+				SELECT credential.id
+				FROM integration_credential AS credential
+				LEFT JOIN integration_external_system AS system
+				  ON system.id = credential.external_system_id
+				WHERE system.id IS NULL
+			)
+		`).Error; err != nil {
+			return fmt.Errorf("detach orphan integration credentials: %w", err)
+		}
+		if err := tx.Exec(`
+			DELETE FROM integration_credential AS credential
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM integration_external_system AS system
+				WHERE system.id = credential.external_system_id
+			)
+		`).Error; err != nil {
+			return fmt.Errorf("delete orphan integration credentials: %w", err)
+		}
+
+		var missingDefinitionSystems int64
+		if err := tx.Raw(`
+			SELECT COUNT(*)
+			FROM integration_interface_definition AS definition
+			LEFT JOIN integration_external_system AS system
+			  ON system.id = definition.external_system_id
+			WHERE system.id IS NULL
+		`).Scan(&missingDefinitionSystems).Error; err != nil {
+			return fmt.Errorf("inspect interface definition system references: %w", err)
+		}
+		if missingDefinitionSystems > 0 {
+			return fmt.Errorf("integration interface definitions reference %d missing external systems", missingDefinitionSystems)
+		}
+
+		constraints := []postgresForeignKeyConstraint{
+			{
+				model: &model.Credential{}, name: "fk_integration_credential_external_system",
+				columns: []string{"external_system_id"}, referenceModel: &model.ExternalSystem{}, referenceFields: []string{"id"},
+			},
+			{
+				model: &model.InterfaceDefinition{}, name: "fk_integration_interface_external_system",
+				columns: []string{"external_system_id"}, referenceModel: &model.ExternalSystem{}, referenceFields: []string{"id"},
+			},
+			{
+				model: &model.InterfaceDefinition{}, name: "fk_integration_interface_credential",
+				columns: []string{"credential_id"}, referenceModel: &model.Credential{}, referenceFields: []string{"id"},
+			},
+		}
+		for _, constraint := range constraints {
+			if err := createPostgresForeignKeyConstraint(tx, constraint); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

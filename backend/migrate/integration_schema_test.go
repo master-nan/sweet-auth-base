@@ -76,6 +76,105 @@ func TestIntegrationConfigurationSchemaIsIdempotentAndUnique(t *testing.T) {
 	}
 }
 
+func TestIntegrationReferenceIntegrityMigrationRemovesOrphanCredentialAndAddsForeignKeys(t *testing.T) {
+	dsn := testutil.PostgreSQLDSN(t)
+	adminDB, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		t.Fatalf("open PostgreSQL: %v", err)
+	}
+	schemaName := fmt.Sprintf("integration_reference_integrity_%d", time.Now().UnixNano())
+	if err := adminDB.Exec(fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)).Error; err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() { _ = adminDB.Exec(fmt.Sprintf(`DROP SCHEMA IF EXISTS "%s" CASCADE`, schemaName)).Error })
+	db, err := testutil.OpenPostgres(t, postgres.Open(postgresDSNWithSearchPath(t, dsn, schemaName)), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true}, DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Silent), NowFunc: model.Now,
+	})
+	if err != nil {
+		t.Fatalf("open isolated PostgreSQL schema: %v", err)
+	}
+	if err := migrateIntegrationConfigurationSchema(db); err != nil {
+		t.Fatalf("migrate integration configuration: %v", err)
+	}
+
+	system := model.ExternalSystem{
+		Basic: model.Basic{Id: 8101, State: true}, SystemCode: "reference_system", Name: "Reference System",
+		SystemType: model.ExternalSystemTypeERP, BaseURL: "https://reference.example.com",
+		OwnerIdentifier: "owner", OwnerName: "owner", Status: model.ExternalSystemStatusEnabled, Revision: 1,
+	}
+	if err := db.Create(&system).Error; err != nil {
+		t.Fatalf("create external system: %v", err)
+	}
+	orphan := model.Credential{
+		Basic: model.Basic{Id: 8102, State: false}, ExternalSystemID: 999999, CredentialCode: "orphan_key",
+		Name: "Orphan Key", CredentialType: model.CredentialTypeAPIKey, Status: model.CredentialStatusDisabled,
+		SecretStorageRef: "orphan-ref", SecretCiphertext: "cipher", SecretNonce: "nonce",
+		SecretFingerprint: "fingerprint", Version: 1, Revision: 1,
+	}
+	if err := db.Create(&orphan).Error; err != nil {
+		t.Fatalf("create orphan credential: %v", err)
+	}
+	definition := model.InterfaceDefinition{
+		Basic: model.Basic{Id: 8103, State: true}, ExternalSystemID: system.Id, InterfaceCode: "orphan_credential",
+		Name: "Orphan Credential", Version: 1, Protocol: model.InterfaceProtocolHTTPS,
+		HTTPMethod: model.InterfaceMethodGET, RelativePath: "/api/orphan",
+		InputContract: datatypes.JSON([]byte(`{"version":1,"parameters":[]}`)), CredentialID: &orphan.Id,
+		TimeoutSeconds: 30, ResponseLimit: 1024, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod,
+		Status: model.InterfaceDefinitionStatusEnabled, Revision: 1,
+	}
+	if err := db.Create(&definition).Error; err != nil {
+		t.Fatalf("create interface definition: %v", err)
+	}
+
+	if err := migrateIntegrationReferenceIntegritySchema(db); err != nil {
+		t.Fatalf("migrate integration reference integrity: %v", err)
+	}
+	if err := migrateIntegrationReferenceIntegritySchema(db); err != nil {
+		t.Fatalf("repeat integration reference migration: %v", err)
+	}
+	var orphanCount int64
+	if err := db.Model(&model.Credential{}).Where("id = ?", orphan.Id).Count(&orphanCount).Error; err != nil {
+		t.Fatalf("count orphan credentials: %v", err)
+	}
+	if orphanCount != 0 {
+		t.Fatalf("orphan credential still exists: %d", orphanCount)
+	}
+	var migrated model.InterfaceDefinition
+	if err := db.First(&migrated, definition.Id).Error; err != nil {
+		t.Fatalf("load migrated interface definition: %v", err)
+	}
+	if migrated.CredentialID != nil || migrated.Status != model.InterfaceDefinitionStatusDisabled || migrated.State {
+		t.Fatalf("orphan credential reference was not safely detached: %+v", migrated)
+	}
+
+	invalidCredential := orphan
+	invalidCredential.Id = 8110
+	invalidCredential.CredentialCode = "missing_system"
+	invalidCredential.SecretStorageRef = "missing-system-ref"
+	if err := db.Create(&invalidCredential).Error; err == nil {
+		t.Fatal("expected credential external-system foreign key to reject a missing system")
+	}
+	invalidDefinition := definition
+	invalidDefinition.Id = 8111
+	invalidDefinition.InterfaceCode = "missing_system"
+	invalidDefinition.ExternalSystemID = 999999
+	invalidDefinition.CredentialID = nil
+	invalidDefinition.Status = model.InterfaceDefinitionStatusDraft
+	invalidDefinition.State = false
+	if err := db.Create(&invalidDefinition).Error; err == nil {
+		t.Fatal("expected interface external-system foreign key to reject a missing system")
+	}
+	invalidDefinition.Id = 8112
+	invalidDefinition.InterfaceCode = "missing_credential"
+	invalidDefinition.ExternalSystemID = system.Id
+	missingCredentialID := 999999
+	invalidDefinition.CredentialID = &missingCredentialID
+	if err := db.Create(&invalidDefinition).Error; err == nil {
+		t.Fatal("expected interface credential foreign key to reject a missing credential")
+	}
+}
+
 func TestIntegrationRuntimeContractPostgresMigration(t *testing.T) {
 	dsn := testutil.PostgreSQLDSN(t)
 	adminDB, err := testutil.OpenPostgres(t, postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})

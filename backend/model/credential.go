@@ -32,7 +32,7 @@ type Credential struct {
 	RotatedAt         *time.Time      `json:"rotated_at"`
 	Description       string          `gorm:"size:512" json:"description"`
 	Revision          int             `gorm:"not null;default:1" json:"revision"`
-	ExternalSystem    *ExternalSystem `gorm:"foreignKey:ExternalSystemID;references:Id" json:"-"`
+	ExternalSystem    *ExternalSystem `gorm:"foreignKey:ExternalSystemID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`
 }
 
 func (Credential) TableName() string {

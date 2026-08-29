@@ -47,6 +47,7 @@ func migrationSteps() []migrationStep {
 		migrateNotificationCenterSchema,
 		migrateOrganizationSourceCodeIndexes,
 		migrateCanonicalTimeAndIDContract,
+		migrateIntegrationReferenceIntegritySchema,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {

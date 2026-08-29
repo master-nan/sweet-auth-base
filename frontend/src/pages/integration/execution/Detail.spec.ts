@@ -16,9 +16,12 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
-  default: { template: '<div><slot /></div>' },
+  default: {
+    name: 'BaseContent',
+    props: { scrollable: Boolean },
+    template: '<div><slot /></div>',
+  },
 }))
-
 import ExecutionDetailPage from './Detail.vue'
 
 const detail = {
@@ -47,7 +50,10 @@ const detail = {
     header_count: 1,
     has_body: true,
   },
-  result_size_bytes: 0,
+  result_http_status: 200,
+  result_size_bytes: 512,
+  result_hash: 'b'.repeat(64),
+  result_summary: '远端返回 2 条记录',
 }
 
 const mountPage = () =>
@@ -106,21 +112,53 @@ describe('integration execution detail permissions', () => {
     const wrapper = mountPage()
     await flushPromises()
 
+    const inputItems = (
+      wrapper.vm as unknown as { inputItems: Array<{ label: string; value: unknown }> }
+    ).inputItems
     expect(wrapper.text()).toContain('输入快照摘要')
-    expect(wrapper.text()).toContain('128 字节')
-    expect(wrapper.text()).toContain('JSON Body')
+    expect(inputItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: '快照大小', value: '128 字节' }),
+        expect.objectContaining({ label: 'JSON Body', value: '有' }),
+      ]),
+    )
     expect(wrapper.text()).not.toContain('Authorization')
     expect(wrapper.text()).not.toContain('Payload')
+  })
+
+  it('uses the shared scroll container and renders only the safe result summary', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    const resultItems = (
+      wrapper.vm as unknown as { resultItems: Array<{ label: string; value: unknown }> }
+    ).resultItems
+    expect(wrapper.findComponent({ name: 'BaseContent' }).props('scrollable')).toBe(true)
+    expect(resultItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'HTTP 状态', value: 200 }),
+        expect.objectContaining({ label: '响应大小', value: '512 字节' }),
+        expect.objectContaining({ label: '安全结果摘要', value: '远端返回 2 条记录' }),
+      ]),
+    )
+    expect(wrapper.text()).toContain('原始响应体不作为执行详情保存')
   })
 
   it('renders the safe retry summary without exposing the policy snapshot', async () => {
     const wrapper = mountPage()
     await flushPromises()
 
+    const retryItems = (
+      wrapper.vm as unknown as { retryItems: Array<{ label: string; value: unknown }> }
+    ).retryItems
     expect(wrapper.text()).toContain('自动重试摘要')
-    expect(wrapper.text()).toContain('safe_retry')
-    expect(wrapper.text()).toContain('1 / 3')
-    expect(wrapper.text()).toContain('符合自动重试条件')
+    expect(retryItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: '重试策略', value: 'safe_retry · v2' }),
+        expect.objectContaining({ label: 'Attempt', value: '1 / 3' }),
+        expect.objectContaining({ label: '重试原因', value: '符合自动重试条件' }),
+      ]),
+    )
     expect(wrapper.text()).not.toContain('retry_allowed')
     expect(wrapper.text()).not.toContain('RetryPolicySnapshot')
     expect(wrapper.text()).not.toContain('retryable_error_categories')

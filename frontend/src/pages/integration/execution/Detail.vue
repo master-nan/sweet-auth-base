@@ -1,184 +1,62 @@
 <template>
-  <base-content class="q-pa-md">
-    <div class="row items-center q-mb-md q-gutter-sm">
-      <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"
-        ><q-tooltip>返回</q-tooltip></q-btn
-      >
-      <div>
-        <div class="text-h5">执行详情</div>
-        <div class="text-caption text-grey-7">{{ detail?.execution_no || '-' }}</div>
+  <base-content scrollable>
+    <div class="execution-detail q-pa-md">
+      <div class="execution-detail__header">
+        <q-btn flat round icon="arrow_back" color="primary" aria-label="返回" @click="router.back()"
+          ><q-tooltip>返回</q-tooltip></q-btn
+        >
+        <div>
+          <div class="text-h5">执行详情</div>
+          <div class="text-caption text-grey-7">{{ detail?.execution_no || '-' }}</div>
+        </div>
+        <q-space />
+        <q-btn
+          flat
+          round
+          icon="refresh"
+          color="primary"
+          aria-label="刷新执行详情"
+          :loading="loading"
+          @click="loadDetail"
+          ><q-tooltip>刷新执行详情</q-tooltip></q-btn
+        >
+        <status-chip
+          v-if="detail"
+          :color="statusMeta[detail.status]?.color || 'grey'"
+          :label="statusMeta[detail.status]?.label || detail.status"
+        />
       </div>
-      <q-space />
-      <q-btn
-        flat
-        round
-        icon="refresh"
-        color="primary"
-        aria-label="刷新执行详情"
-        :loading="loading"
-        @click="loadDetail"
-        ><q-tooltip>刷新执行详情</q-tooltip></q-btn
-      >
-      <status-chip
-        v-if="detail"
-        :color="statusMeta[detail.status]?.color || 'grey'"
-        :label="statusMeta[detail.status]?.label || detail.status"
-      />
-    </div>
-    <q-inner-loading :showing="loading" />
-    <template v-if="detail">
-      <q-card flat bordered class="q-mb-md"
-        ><q-card-section
-          ><div class="text-subtitle1 text-weight-bold q-mb-md">基础信息</div>
-          <div class="row q-col-gutter-lg">
-            <div class="col-12 col-md-4">
-              <div class="text-caption text-grey-7">外部系统</div>
-              <div>
-                {{ detail.external_system.name }}（{{ detail.external_system.system_code }}）
-              </div>
-            </div>
-            <div class="col-12 col-md-4">
-              <div class="text-caption text-grey-7">接口</div>
-              <div>{{ detail.interface.name }} · v{{ detail.interface.version }}</div>
-            </div>
-            <div class="col-12 col-md-4">
-              <div class="text-caption text-grey-7">触发来源</div>
-              <div>{{ detail.trigger_source }}</div>
-            </div>
-          </div></q-card-section
-        ></q-card
-      >
-      <q-card flat bordered class="q-mb-md">
-        <q-card-section>
-          <div class="text-subtitle1 text-weight-bold q-mb-md">自动重试摘要</div>
-          <div class="row q-col-gutter-lg">
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">重试策略</div>
-              <div>
-                {{ detail.retry_policy?.policy_code || '未配置' }}
-                <span v-if="detail.retry_policy"> · v{{ detail.retry_policy.policy_version }}</span>
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">Attempt</div>
-              <div>{{ detail.current_attempt }} / {{ detail.max_attempts }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">剩余次数</div>
-              <div>{{ detail.attempts_remaining }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">下次重试</div>
-              <div>{{ formatDate(detail.next_run_at) }}</div>
-            </div>
-            <div class="col-12">
-              <div class="text-caption text-grey-7">重试原因</div>
-              <div>{{ formatRetryReason(detail.retry_reason_code) }}</div>
-            </div>
+      <q-inner-loading :showing="loading" />
+      <div v-if="detail" class="execution-detail__surface">
+        <section class="execution-detail__section">
+          <div class="execution-detail__section-title">基础信息</div>
+          <detail-field-grid :items="basicItems" />
+        </section>
+        <section class="execution-detail__section">
+          <div class="execution-detail__section-title">自动重试摘要</div>
+          <detail-field-grid :items="retryItems" />
+        </section>
+        <section class="execution-detail__section">
+          <div class="execution-detail__section-title">输入快照摘要</div>
+          <detail-field-grid :items="inputItems" />
+          <div class="execution-detail__note">
+            页面只展示参数数量、快照大小和
+            Hash。真实请求值可能包含身份标识或凭证，不会返回管理页面。
           </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat bordered class="q-mb-md"
-        ><q-card-section
-          ><div class="text-subtitle1 text-weight-bold q-mb-md">输入快照摘要</div>
-          <div class="row q-col-gutter-lg">
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">快照版本</div>
-              <div>v{{ detail.input_summary.snapshot_version }}</div>
-            </div>
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">快照大小</div>
-              <div>{{ detail.input_summary.size_bytes }} 字节</div>
-            </div>
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">Path 参数</div>
-              <div>{{ detail.input_summary.path_count }}</div>
-            </div>
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">Query 参数</div>
-              <div>{{ detail.input_summary.query_count }}</div>
-            </div>
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">Header 参数</div>
-              <div>{{ detail.input_summary.header_count }}</div>
-            </div>
-            <div class="col-6 col-md-2">
-              <div class="text-caption text-grey-7">JSON Body</div>
-              <div>{{ detail.input_summary.has_body ? '有' : '无' }}</div>
-            </div>
+        </section>
+        <section class="execution-detail__section">
+          <div class="execution-detail__section-title">状态与结果摘要</div>
+          <detail-field-grid :items="resultItems" />
+          <div class="execution-detail__note">
+            原始响应体不作为执行详情保存；排查时使用安全摘要、Hash、HTTP 状态和下方 Attempt 记录。
           </div>
-          <div class="q-mt-md">
-            <div class="text-caption text-grey-7">输入 Hash</div>
-            <div class="text-mono text-break">{{ detail.input_hash }}</div>
-          </div></q-card-section
-        ></q-card
-      >
-      <q-card flat bordered class="q-mb-md"
-        ><q-card-section
-          ><div class="text-subtitle1 text-weight-bold q-mb-md">状态与结果摘要</div>
-          <div class="row q-col-gutter-lg">
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">当前 Attempt</div>
-              <div>{{ detail.current_attempt }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">开始时间</div>
-              <div>{{ formatDate(detail.started_at) }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">完成时间</div>
-              <div>{{ formatDate(detail.completed_at) }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">耗时</div>
-              <div>{{ detail.duration_ms }} 毫秒</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">租约持有者</div>
-              <div>{{ detail.lease_owner_summary || '-' }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">租约到期</div>
-              <div>{{ formatDate(detail.lease_expires_at) }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">错误分类</div>
-              <div>{{ detail.error_category || '-' }}</div>
-            </div>
-          </div>
-          <div v-if="detail.result_summary" class="q-mt-md text-body2">
-            {{ detail.result_summary }}
-          </div></q-card-section
-        ></q-card
-      >
-      <q-card v-if="detail.sync_business" flat bordered class="q-mb-md">
-        <q-card-section>
-          <div class="text-subtitle1 text-weight-bold q-mb-md">同步业务结果</div>
-          <div class="row q-col-gutter-lg">
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">状态</div>
-              <div>{{ detail.sync_business.status }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">成功 / 失败</div>
-              <div>
-                {{ detail.sync_business.success_count }} / {{ detail.sync_business.failed_count }}
-              </div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">原因</div>
-              <div>{{ detail.sync_business.reason_code || '-' }}</div>
-            </div>
-            <div class="col-6 col-md-3">
-              <div class="text-caption text-grey-7">业务引用</div>
-              <div>{{ detail.sync_business.reference || '-' }}</div>
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat bordered
-        ><q-card-section
-          ><div class="text-subtitle1 text-weight-bold q-mb-sm">Attempt 记录</div>
+        </section>
+        <section v-if="detail.sync_business" class="execution-detail__section">
+          <div class="execution-detail__section-title">同步业务结果</div>
+          <detail-field-grid :items="syncItems" />
+        </section>
+        <section class="execution-detail__section">
+          <div class="execution-detail__section-title">Attempt 记录</div>
           <div v-if="!canQueryLogs" class="text-body2 text-grey-7 q-py-md">无调用日志查看权限</div>
           <q-table
             v-else
@@ -208,9 +86,11 @@
                   :outline="false"
                   :label="
                     logStatusMeta[props.row.status]?.label || props.row.status
-                  " /></q-td></template></q-table></q-card-section
-      ></q-card>
-    </template>
+                  " /></q-td></template
+          ></q-table>
+        </section>
+      </div>
+    </div>
   </base-content>
 </template>
 
@@ -219,6 +99,8 @@ defineOptions({ name: 'integration_execution_detail_page' })
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
+import type { DetailFieldItem } from 'src/components/Detail/types'
 import StatusChip from 'src/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
@@ -254,6 +136,84 @@ const logStatusMeta: Record<string, { label: string; color: string }> = {
   failed: { label: '失败', color: 'negative' },
   cancelled: { label: '已取消', color: 'grey-6' },
 }
+const formatDate = formatRuntimeDateTime
+const basicItems = computed<DetailFieldItem[]>(() => {
+  if (!detail.value) return []
+  return [
+    {
+      label: '外部系统',
+      value: `${detail.value.external_system.name}（${detail.value.external_system.system_code}）`,
+    },
+    {
+      label: '接口',
+      value: `${detail.value.interface.name} · v${detail.value.interface.version}`,
+    },
+    { label: '触发来源', value: detail.value.trigger_source },
+    { label: '执行编号', value: detail.value.execution_no },
+  ]
+})
+const retryItems = computed<DetailFieldItem[]>(() => {
+  if (!detail.value) return []
+  return [
+    {
+      label: '重试策略',
+      value: detail.value.retry_policy
+        ? `${detail.value.retry_policy.policy_code} · v${detail.value.retry_policy.policy_version}`
+        : '未配置',
+    },
+    {
+      label: 'Attempt',
+      value: `${detail.value.current_attempt} / ${detail.value.max_attempts}`,
+    },
+    { label: '剩余次数', value: detail.value.attempts_remaining },
+    { label: '下次重试', value: formatDate(detail.value.next_run_at) },
+    {
+      label: '重试原因',
+      value: formatRetryReason(detail.value.retry_reason_code),
+      fullWidth: true,
+    },
+  ]
+})
+const inputItems = computed<DetailFieldItem[]>(() => {
+  if (!detail.value) return []
+  return [
+    { label: '快照版本', value: `v${detail.value.input_summary.snapshot_version}` },
+    { label: '快照大小', value: `${detail.value.input_summary.size_bytes} 字节` },
+    { label: 'Path 参数', value: detail.value.input_summary.path_count },
+    { label: 'Query 参数', value: detail.value.input_summary.query_count },
+    { label: 'Header 参数', value: detail.value.input_summary.header_count },
+    { label: 'JSON Body', value: detail.value.input_summary.has_body ? '有' : '无' },
+    { label: '输入 Hash', value: detail.value.input_hash, fullWidth: true },
+  ]
+})
+const resultItems = computed<DetailFieldItem[]>(() => {
+  if (!detail.value) return []
+  return [
+    { label: '当前 Attempt', value: detail.value.current_attempt },
+    { label: '开始时间', value: formatDate(detail.value.started_at) },
+    { label: '完成时间', value: formatDate(detail.value.completed_at) },
+    { label: '耗时', value: `${detail.value.duration_ms} 毫秒` },
+    { label: 'HTTP 状态', value: detail.value.result_http_status || '-' },
+    { label: '响应大小', value: `${detail.value.result_size_bytes} 字节` },
+    { label: '错误分类', value: detail.value.error_category || '-' },
+    { label: '租约持有者', value: detail.value.lease_owner_summary || '-' },
+    { label: '租约到期', value: formatDate(detail.value.lease_expires_at) },
+    { label: '结果 Hash', value: detail.value.result_hash || '-', fullWidth: true },
+    { label: '安全结果摘要', value: detail.value.result_summary || '-', fullWidth: true },
+  ]
+})
+const syncItems = computed<DetailFieldItem[]>(() => {
+  if (!detail.value?.sync_business) return []
+  return [
+    { label: '状态', value: detail.value.sync_business.status },
+    {
+      label: '成功 / 失败',
+      value: `${detail.value.sync_business.success_count} / ${detail.value.sync_business.failed_count}`,
+    },
+    { label: '原因', value: detail.value.sync_business.reason_code || '-' },
+    { label: '业务引用', value: detail.value.sync_business.reference || '-' },
+  ]
+})
 const attemptColumns: QTableProps['columns'] = [
   { name: 'attempt_no', label: 'Attempt', field: 'attempt_no', align: 'left' },
   { name: 'status', label: '状态', field: 'status', align: 'center' },
@@ -262,7 +222,6 @@ const attemptColumns: QTableProps['columns'] = [
   { name: 'error_category', label: '错误分类', field: 'error_category', align: 'left' },
   { name: 'result_certainty', label: '结果确定性', field: 'result_certainty', align: 'left' },
 ]
-const formatDate = formatRuntimeDateTime
 const openLog = (logId: number) => {
   if (detail.value)
     void router.push({
@@ -301,3 +260,59 @@ onMounted(async () => {
   await loadDetail()
 })
 </script>
+
+<style scoped lang="scss">
+.execution-detail {
+  min-height: 100%;
+}
+
+.execution-detail__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.execution-detail__surface {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.execution-detail__section {
+  padding: 22px 24px;
+  border-top: 1px solid var(--app-border);
+}
+
+.execution-detail__section:first-child {
+  border-top: 0;
+}
+
+.execution-detail__section-title {
+  margin-bottom: 18px;
+  color: var(--app-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.execution-detail__note {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--q-primary);
+  background: var(--app-primary-soft);
+  color: var(--app-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+  .execution-detail {
+    padding: 12px;
+  }
+
+  .execution-detail__section {
+    padding: 18px 16px;
+  }
+}
+</style>
