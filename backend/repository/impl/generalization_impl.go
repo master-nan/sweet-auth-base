@@ -286,7 +286,7 @@ func normalizeGeneralizationRecord(record map[string]interface{}) map[string]int
 			if v.IsZero() {
 				record[key] = ""
 			} else {
-				record[key] = v.Format(time.DateTime)
+				record[key] = v.In(model.AppLocation()).Format(time.DateTime)
 			}
 		case []byte:
 			record[key] = string(v)

@@ -143,7 +143,7 @@ func TestOrganizationHRPostgreSQLFullInitializationOrderE2E(t *testing.T) {
 	}
 
 	var databaseNow time.Time
-	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
 	checkpoint := databaseNow.UTC().Add(-2 * time.Hour).Truncate(time.Second)

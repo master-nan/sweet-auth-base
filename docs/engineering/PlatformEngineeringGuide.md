@@ -247,6 +247,10 @@ Repository 可以接收调用方已有的 `*gorm.DB`，但不自行决定跨 Rep
 
 Model 是持久化结构，不是 API 契约。[model/basic.go](../../backend/model/basic.go) 中的 `Basic` 提供主键、创建/修改/软删除审计字段、状态以及 GORM Hook。Hook 只从标准 `context.Context` 读取 `AuditSubject`。
 
+平台单列 `id` 主键统一使用 Snowflake ID。Service 可以显式生成；数据库初始化还会注册 GORM Create Callback，为遗漏的零值 `id` 补齐同一 Snowflake 生成器的结果。PostgreSQL 不为这些主键保留 sequence、identity 或 `nextval` 默认值。复合主键和 Seed 中具有协议意义的固定 ID 不属于运行时 ID 生成，不应强行改写。
+
+时间以“存储时刻、东八区展示”为准：Go 写库前统一为 UTC 时刻，PostgreSQL 使用 `timestamptz`，API 的平台时间按 `Asia/Shanghai` 格式化。无时区的用户输入按东八区解释。耗时、Token 过期等只比较时刻的逻辑不依赖展示时区。
+
 Model 不得持有 Gin、Request、Service 或 Repository。数据库关联可以存在于 Model，但不能因此自动暴露到 HTTP。
 
 DTO 分三类：
@@ -562,6 +566,8 @@ File -> repository + storage + signer/access policy
 - Migration/Seed 必须可重复执行并保留 PostgreSQL 专属测试；
 - 在线业务流程、Scheduler、外部接口调用不能进入 Migration；
 - 新 Model 不能只加 `AutoMigrate`，还要评估约束、索引、数据回填和 Seed 权限。
+
+Version 19 `canonical_time_id_contract` 把历史 `timestamp without time zone` 按 `Asia/Shanghai` 墙上时间转换为 `timestamptz`，并移除单列 `id` 主键的数据库自增默认值和关联 sequence。既有主键及其外键关系不改写。
 
 Migration registry 的已应用事实写入 `schema_migration(version, key, checksum, applied_at)`。checksum 绑定已发布步骤内容，严格 db-preflight 负责检查 ledger 是否缺失、不完整、含未知版本或发生 checksum 漂移；不得手改 ledger 来绕过迁移失败。外部部署必须显式关闭启动期 Migration/Seed，再通过受控 Make 目标分别执行。
 

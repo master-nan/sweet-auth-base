@@ -123,8 +123,8 @@ func (r *IntegrationExecutionRepositoryImpl) ClaimReadyExecutions(
 		}
 		leaseDuration := request.LeaseExpiresAt.Sub(request.StartedAt)
 		leaseExpiresAt := databaseNow.Add(leaseDuration)
-		dueExpression := "next_run_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
-		leaseExpression := "lease_expires_at IS NULL OR lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+		dueExpression := "next_run_at <= CURRENT_TIMESTAMP"
+		leaseExpression := "lease_expires_at IS NULL OR lease_expires_at <= CURRENT_TIMESTAMP"
 		if tx.Dialector.Name() == "sqlite" {
 			dueExpression = "datetime(next_run_at) <= CURRENT_TIMESTAMP"
 			leaseExpression = "lease_expires_at IS NULL OR datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
@@ -220,7 +220,7 @@ func integrationDatabaseNow(tx *gorm.DB) (time.Time, error) {
 	if err := tx.Raw("SELECT CURRENT_TIMESTAMP AS now").Scan(&value).Error; err != nil {
 		return time.Time{}, err
 	}
-	// Runtime时间列不携带时区；回写前统一转换为UTC，避免驱动保存本地墙上时间。
+	// 数据库返回的是带时区时刻；Service 内统一使用 UTC，展示时再转换为平台时区。
 	return time.Time(value.Now).UTC(), nil
 }
 
@@ -408,7 +408,7 @@ func (r *IntegrationExecutionRepositoryImpl) FindExpiredRunningExecutions(
 		return []model.IntegrationExecution{}, nil
 	}
 	var values []model.IntegrationExecution
-	expiredExpression := "lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+	expiredExpression := "lease_expires_at <= CURRENT_TIMESTAMP"
 	if r.DBWithContext(ctx).Dialector.Name() == "sqlite" {
 		expiredExpression = "datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
 	}
@@ -432,7 +432,7 @@ func (r *IntegrationExecutionRepositoryImpl) RecoverExpiredExecution(
 		if err != nil {
 			return err
 		}
-		expiredExpression := "lease_expires_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+		expiredExpression := "lease_expires_at <= CURRENT_TIMESTAMP"
 		if tx.Dialector.Name() == "sqlite" {
 			expiredExpression = "datetime(lease_expires_at) <= CURRENT_TIMESTAMP"
 		}

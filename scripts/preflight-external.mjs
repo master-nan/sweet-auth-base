@@ -69,6 +69,7 @@ const DANGEROUS_MIME_TYPES = new Set([
 
 export const REQUIRED_KEYS = [
   'APP_ENV',
+  'APP_WORKER_ID',
   'APP_DBS_PRIMARY_HOST',
   'APP_DBS_PRIMARY_PORT',
   'APP_DBS_PRIMARY_NAME',
@@ -222,6 +223,7 @@ export function validateExternalEnv(env, options = {}) {
   }
 
   validateDB(env, 'APP_DBS_PRIMARY', production, problems)
+  validateSnowflakeWorkerID(env, problems)
   validateRedis(env, production, problems)
   validateSecrets(env, problems)
   validateCors(env, problems)
@@ -236,6 +238,18 @@ export function validateExternalEnv(env, options = {}) {
     ok: problems.length === 0,
     problems,
     warnings,
+  }
+}
+
+function validateSnowflakeWorkerID(env, problems) {
+  const raw = get(env, 'APP_WORKER_ID')
+  if (!/^\d+$/.test(raw)) {
+    problems.push('APP_WORKER_ID must be an integer from 0 to 15')
+    return
+  }
+  const workerID = Number(raw)
+  if (!Number.isSafeInteger(workerID) || workerID < 0 || workerID > 15) {
+    problems.push('APP_WORKER_ID must be an integer from 0 to 15')
   }
 }
 

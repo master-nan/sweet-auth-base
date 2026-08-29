@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"backend/internal/database"
+	"backend/internal/utils"
 	"backend/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -31,6 +33,7 @@ func OpenSQLite(t testing.TB, models ...interface{}) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open test sqlite database: %v", err)
 	}
+	registerSnowflakeIDs(t, db)
 
 	registerSQLiteCleanup(t, db, 1)
 
@@ -52,6 +55,7 @@ func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface
 	if err != nil {
 		t.Fatalf("open custom test sqlite database: %v", err)
 	}
+	registerSnowflakeIDs(t, db)
 	registerSQLiteCleanup(t, db, 0)
 	if len(models) > 0 {
 		if err := db.AutoMigrate(models...); err != nil {
@@ -59,6 +63,17 @@ func OpenSQLiteWithConfig(t testing.TB, config *gorm.Config, models ...interface
 		}
 	}
 	return db
+}
+
+func registerSnowflakeIDs(t testing.TB, db *gorm.DB) {
+	t.Helper()
+	sf, err := utils.NewSnowflake(0)
+	if err != nil {
+		t.Fatalf("create test snowflake generator: %v", err)
+	}
+	if err := database.RegisterSnowflakeIDs(db, sf); err != nil {
+		t.Fatalf("register test snowflake IDs: %v", err)
+	}
 }
 
 // OpenPostgres 打开调用方配置的 PostgreSQL 测试数据库，并在测试结束后关闭连接池。
@@ -69,6 +84,7 @@ func OpenPostgres(t testing.TB, dialector gorm.Dialector, opts ...gorm.Option) (
 	if err != nil {
 		return nil, err
 	}
+	registerSnowflakeIDs(t, db)
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, err

@@ -62,7 +62,7 @@ func (r *IntegrationSyncBatchRepositoryImpl) FindByTriggerKey(value string) (mod
 func (r *IntegrationSyncBatchRepositoryImpl) CurrentDatabaseTime(tx *gorm.DB) (time.Time, error) {
 	var now time.Time
 	if tx.Dialector.Name() == "postgres" {
-		err := tx.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&now).Error
+		err := tx.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
 		return now.UTC(), err
 	}
 	var epoch int64
@@ -75,7 +75,7 @@ func (r *IntegrationSyncBatchRepositoryImpl) FindScheduledCandidates(tx *gorm.DB
 	if limit <= 0 {
 		return values, nil
 	}
-	dueExpression := "next_scheduled_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+	dueExpression := "next_scheduled_at <= CURRENT_TIMESTAMP"
 	if tx.Dialector.Name() == "sqlite" {
 		dueExpression = "datetime(next_scheduled_at) <= CURRENT_TIMESTAMP"
 	}

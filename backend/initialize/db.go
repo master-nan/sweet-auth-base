@@ -8,6 +8,7 @@ package initialize
 import (
 	"backend/config"
 	"backend/internal/database"
+	"backend/internal/utils"
 	"backend/model"
 	"context"
 	"fmt"
@@ -57,7 +58,7 @@ func (c *CustomGormLogger) Trace(ctx context.Context, begin time.Time, fc func()
 	}
 }
 
-func InitDB(zapLogger *zap.Logger, serverConfig *config.Server) (map[string]*gorm.DB, error) {
+func InitDB(zapLogger *zap.Logger, serverConfig *config.Server, sf *utils.Snowflake) (map[string]*gorm.DB, error) {
 	// 配置 GORM 日志记录器
 	gormLogger := &CustomGormLogger{
 		logger: zapLogger,
@@ -96,6 +97,9 @@ func InitDB(zapLogger *zap.Logger, serverConfig *config.Server) (map[string]*gor
 		if err != nil {
 			zap.L().Error("failed to open database connection", zap.Error(err))
 			return nil, err
+		}
+		if err := database.RegisterSnowflakeIDs(db, sf); err != nil {
+			return nil, fmt.Errorf("database %s snowflake ID callback: %w", name, err)
 		}
 		sqlDB, err := db.DB()
 		if err != nil {

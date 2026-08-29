@@ -31,6 +31,7 @@ import (
 
 import (
 	_ "backend/docs"
+	_ "time/tzdata"
 )
 
 // Injectors from wire.go:
@@ -41,15 +42,15 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	logger := InitLogger()
-	v, err := InitDB(logger, server)
+	snowflake, err := InitSnowflake(server)
+	if err != nil {
+		return nil, err
+	}
+	v, err := InitDB(logger, server, snowflake)
 	if err != nil {
 		return nil, err
 	}
 	client, err := InitRedis(server, logger)
-	if err != nil {
-		return nil, err
-	}
-	snowflake, err := InitSnowflake(server)
 	if err != nil {
 		return nil, err
 	}

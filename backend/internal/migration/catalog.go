@@ -34,6 +34,7 @@ var catalog = []Definition{
 	{Version: 16, Key: "product_walkthrough_corrections", Contract: "v1|product-walkthrough-corrections|remove-report-workbench|protect-last-login-metadata", Checksum: "a7ce186463fa53bfe21cbbb8b7e4b6ca4977995124d613486401ebdf05e61e23"},
 	{Version: 17, Key: "notification_center_schema", Contract: "v1|notification-center-schema|notifications-recipients|checks-fks-partial-indexes-dedup", Checksum: "6ade5286bb2206c70d21c8d76bd67c69784acba3ade29ec3141f10f78f4aa8c6"},
 	{Version: 18, Key: "organization_source_code_indexes", Contract: "v1|organization-source-code-indexes|source-id-identity|non-unique-business-code", Checksum: "d9ae0d2b44a019fd02dcafd1da02dbadb6f363dcd4e6fc9971fa8045ab9f579c"},
+	{Version: 19, Key: "canonical_time_id_contract", Contract: "v1|canonical-time-id-contract|timestamptz-asia-shanghai-conversion|snowflake-id-no-sequences", Checksum: "1343a552cf3b7a7dd4e8eeb6df4a92e7d1ce23af8947d674c3567fa11390aa1a"},
 }
 
 var managedTables = []string{

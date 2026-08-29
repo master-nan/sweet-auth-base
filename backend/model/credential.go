@@ -27,9 +27,9 @@ type Credential struct {
 	SecretCiphertext  string          `gorm:"type:text;not null" json:"-"`
 	SecretNonce       string          `gorm:"size:64;not null" json:"-"`
 	SecretFingerprint string          `gorm:"size:64;not null" json:"-"`
-	ExpiresAt         *time.Time      `gorm:"type:timestamp;index:idx_integration_credential_expires_at" json:"expires_at"`
+	ExpiresAt         *time.Time      `gorm:"index:idx_integration_credential_expires_at" json:"expires_at"`
 	Version           int             `gorm:"not null;default:1" json:"version"`
-	RotatedAt         *time.Time      `gorm:"type:timestamp" json:"rotated_at"`
+	RotatedAt         *time.Time      `json:"rotated_at"`
 	Description       string          `gorm:"size:512" json:"description"`
 	Revision          int             `gorm:"not null;default:1" json:"revision"`
 	ExternalSystem    *ExternalSystem `gorm:"foreignKey:ExternalSystemID;references:Id" json:"-"`

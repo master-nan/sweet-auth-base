@@ -47,7 +47,11 @@ func executeMigrationCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	db, err := openPrimaryDB(cfg)
+	sf, err := initialize.InitSnowflake(cfg)
+	if err != nil {
+		return err
+	}
+	db, err := openPrimaryDB(cfg, sf)
 	if err != nil {
 		return err
 	}
@@ -72,10 +76,6 @@ func executeMigrationCommand(args []string) error {
 		log.Println("schema migration adoption completed")
 	case "seed":
 		log.Println("base seed started")
-		sf, err := initialize.InitSnowflake(cfg)
-		if err != nil {
-			return err
-		}
 		if err := seedAllData(db, cfg, sf); err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func migrationCommand(args []string) string {
 	}
 }
 
-func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
+func openPrimaryDB(cfg *config.Server, sf *utils.Snowflake) (*gorm.DB, error) {
 	dbCfg := cfg.DBS.Primary
 	dsn, err := database.PostgresDSN(dbCfg)
 	if err != nil {
@@ -122,6 +122,9 @@ func openPrimaryDB(cfg *config.Server) (*gorm.DB, error) {
 			NowFunc:                                  model.Now,
 		})
 		if err == nil {
+			if err := database.RegisterSnowflakeIDs(db, sf); err != nil {
+				return nil, err
+			}
 			sqlDB, dbErr := db.DB()
 			if dbErr != nil {
 				return nil, dbErr

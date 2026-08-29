@@ -6,6 +6,7 @@
 package initialize
 
 import (
+	"backend/model"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,7 +56,7 @@ func (al *asyncLog) updateLogFile() {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 
-	newDate := time.Now().Format(time.DateOnly)
+	newDate := time.Now().In(model.AppLocation()).Format(time.DateOnly)
 	if newDate == al.currentDate {
 		return
 	}
@@ -83,12 +84,13 @@ func (al *asyncLog) cleanupOldLogs() {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 
-	today := time.Now().Format(time.DateOnly)
+	now := time.Now().In(model.AppLocation())
+	today := now.Format(time.DateOnly)
 	if al.lastCleanupDate == today {
 		return
 	}
 
-	cutoff := time.Now().AddDate(0, 0, -90)
+	cutoff := now.AddDate(0, 0, -90)
 	pattern := filepath.Join(al.basePath, al.logPrefix+"-*.log*")
 
 	files, _ := filepath.Glob(pattern)

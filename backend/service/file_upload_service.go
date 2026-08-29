@@ -116,7 +116,7 @@ func (f *FileUploadService) Upload(ctx context.Context, actor FileAccessActor, f
 	// 生成文件信息
 	fileExt := strings.ToLower(filepath.Ext(fileHeader.Filename))
 	fileUuid := uuid.New().String()
-	datePath := time.Now().Format("2006/01/02")
+	datePath := time.Now().In(model.AppLocation()).Format("2006/01/02")
 	storedName := fileUuid + fileExt
 	storagePath := fmt.Sprintf("%s/%s", datePath, storedName)
 
@@ -430,7 +430,7 @@ func (f *FileUploadService) MergeChunks(ctx context.Context, actor FileAccessAct
 
 	fileUuid := uuid.New().String()
 	fileExt := firstChunk.FileExt
-	datePath := time.Now().Format(time.DateOnly)
+	datePath := time.Now().In(model.AppLocation()).Format(time.DateOnly)
 	storedName := fileUuid + fileExt
 	storagePath := fmt.Sprintf("%s-%s", datePath, storedName)
 

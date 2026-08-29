@@ -28,6 +28,7 @@ Browser
 后端根据 `APP_ENV` 读取 `backend/config-<env>.yaml`。仓库提供 `config-dev.yaml`、`config-docker.yaml`、`config-pro.yaml`；`prod`、`production` 等生产取值回落到生产配置。Viper 使用 `APP_` 环境变量覆盖配置，层级中的点转换为下划线，例如：
 
 ```text
+worker_id -> APP_WORKER_ID
 dbs.primary.host -> APP_DBS_PRIMARY_HOST
 integration.worker.worker_id -> APP_INTEGRATION_WORKER_WORKER_ID
 upload.oss.access_key_secret -> APP_UPLOAD_OSS_ACCESS_KEY_SECRET
@@ -187,6 +188,10 @@ SWEET_ADMIN_EXTERNAL_ENV_FILE=.env.external node scripts/smoke-readonly.mjs
 - 已有 ledger：普通 `migrate` 只执行尚未登记的后续步骤；版本/key/checksum 不匹配或出现未知版本时 fail closed。
 
 正式 Migration 与 Seed 共享数据库 advisory lock，避免多个实例并发修改 Schema/基础事实。`dbs.primary.prefix` 当前不属于生产 Migration/Preflight 契约，生产 secure config 会拒绝非空值。
+
+平台时间以 UTC 时刻写入 PostgreSQL `timestamptz`，数据库会话和页面按 `Asia/Shanghai` 显示。不要把时间列改回 `timestamp without time zone`，也不要依赖数据库客户端的本地时区猜测时间含义。Version 19 会把历史无时区列按东八区墙上时间转换，并删除单列 `id` 主键的 sequence/identity；执行前必须按本章要求备份。
+
+运行时主键由 Snowflake 生成，数据库不会为业务 `id` 自动补号。部署时通过 `APP_WORKER_ID` 配置节点编号，当前允许 `0..15`；每个同时写库的应用实例必须使用不同值，否则同一毫秒可能生成重复 ID。`APP_WORKER_ID` 与 `APP_INTEGRATION_WORKER_WORKER_ID` 无关，后者只是 Integration Worker 的实例名称。Seed 使用的固定 ID 是平台协议键，不应在生产库中重新编号。
 
 ```bash
 make db-migrate

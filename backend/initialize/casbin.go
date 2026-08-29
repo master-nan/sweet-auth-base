@@ -9,10 +9,14 @@ import (
 	"backend/internal/database"
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
+	"gorm.io/gorm"
 )
 
 func InitCasbin(PrimaryDB *database.PrimaryDB) (*casbin.SyncedEnforcer, error) {
-	adapter, err := gormadapter.NewAdapterByDB(PrimaryDB.DB) // 使用GORM适配器
+	db := PrimaryDB.DB.Session(&gorm.Session{})
+	// 正式表结构只由 Migration 管理，避免适配器在启动时重新创建自增序列。
+	gormadapter.TurnOffAutoMigrate(db)
+	adapter, err := gormadapter.NewAdapterByDB(db)
 	if err != nil {
 		return nil, err
 	}

@@ -35,11 +35,11 @@ type OrgLegalEntity struct {
 	UnifiedSocialCreditCode string     `gorm:"size:64;uniqueIndex:uni_org_legal_entity_credit,where:unified_social_credit_code IS NOT NULL AND unified_social_credit_code <> '' AND source_deleted = false" json:"unified_social_credit_code"`
 	AccountingCode          string     `gorm:"size:64;index:idx_org_legal_entity_accounting_code" json:"accounting_code"`
 	Status                  string     `gorm:"size:32;not null;default:enabled;index:idx_org_legal_entity_status" json:"status"`
-	ValidFrom               *time.Time `gorm:"type:timestamp;index:idx_org_legal_entity_valid_from" json:"valid_from"`
-	ValidTo                 *time.Time `gorm:"type:timestamp;index:idx_org_legal_entity_valid_to" json:"valid_to"`
+	ValidFrom               *time.Time `gorm:"index:idx_org_legal_entity_valid_from" json:"valid_from"`
+	ValidTo                 *time.Time `gorm:"index:idx_org_legal_entity_valid_to" json:"valid_to"`
 	SourceVersion           string     `gorm:"size:64;index:idx_org_legal_entity_source_version" json:"source_version"`
-	SourceUpdatedAt         *time.Time `gorm:"type:timestamp;index:idx_org_legal_entity_source_updated_at" json:"source_updated_at"`
-	LastSyncAt              *time.Time `gorm:"type:timestamp;index:idx_org_legal_entity_last_sync_at" json:"last_sync_at"`
+	SourceUpdatedAt         *time.Time `gorm:"index:idx_org_legal_entity_source_updated_at" json:"source_updated_at"`
+	LastSyncAt              *time.Time `gorm:"index:idx_org_legal_entity_last_sync_at" json:"last_sync_at"`
 	SourceStatus            string     `gorm:"size:32;index:idx_org_legal_entity_source_status" json:"source_status"`
 	SourceDeleted           bool       `gorm:"not null;default:false;index:idx_org_legal_entity_source_deleted" json:"source_deleted"`
 	SyncStatus              string     `gorm:"size:32;not null;default:pending;index:idx_org_legal_entity_sync_status" json:"sync_status"`
@@ -67,11 +67,11 @@ type OrgUnit struct {
 	UnitType             string     `gorm:"size:32;not null;default:department;index:idx_org_unit_type" json:"unit_type"`
 	PrimaryLegalEntityId *int       `gorm:"type:bigint;index:idx_org_unit_primary_legal_entity" json:"primary_legal_entity_id"`
 	Status               string     `gorm:"size:32;not null;default:enabled;index:idx_org_unit_status" json:"status"`
-	ValidFrom            *time.Time `gorm:"type:timestamp;index:idx_org_unit_valid_from" json:"valid_from"`
-	ValidTo              *time.Time `gorm:"type:timestamp;index:idx_org_unit_valid_to" json:"valid_to"`
+	ValidFrom            *time.Time `gorm:"index:idx_org_unit_valid_from" json:"valid_from"`
+	ValidTo              *time.Time `gorm:"index:idx_org_unit_valid_to" json:"valid_to"`
 	SourceVersion        string     `gorm:"size:64;index:idx_org_unit_source_version" json:"source_version"`
-	SourceUpdatedAt      *time.Time `gorm:"type:timestamp;index:idx_org_unit_source_updated_at" json:"source_updated_at"`
-	LastSyncAt           *time.Time `gorm:"type:timestamp;index:idx_org_unit_last_sync_at" json:"last_sync_at"`
+	SourceUpdatedAt      *time.Time `gorm:"index:idx_org_unit_source_updated_at" json:"source_updated_at"`
+	LastSyncAt           *time.Time `gorm:"index:idx_org_unit_last_sync_at" json:"last_sync_at"`
 	SourceStatus         string     `gorm:"size:32;index:idx_org_unit_source_status" json:"source_status"`
 	SourceDeleted        bool       `gorm:"not null;default:false;index:idx_org_unit_source_deleted" json:"source_deleted"`
 	SyncStatus           string     `gorm:"size:32;not null;default:pending;index:idx_org_unit_sync_status" json:"sync_status"`
@@ -98,10 +98,10 @@ type OrgStructure struct {
 	SourceId         string     `gorm:"size:128;uniqueIndex:uni_org_structure_source,priority:2,where:source_id IS NOT NULL AND source_id <> ''" json:"source_id"`
 	Status           string     `gorm:"size:32;not null;default:enabled;index:idx_org_structure_status" json:"status"`
 	IsDefault        bool       `gorm:"not null;default:false;index:idx_org_structure_default" json:"is_default"`
-	ValidFrom        *time.Time `gorm:"type:timestamp;index:idx_org_structure_valid_from" json:"valid_from"`
-	ValidTo          *time.Time `gorm:"type:timestamp;index:idx_org_structure_valid_to" json:"valid_to"`
+	ValidFrom        *time.Time `gorm:"index:idx_org_structure_valid_from" json:"valid_from"`
+	ValidTo          *time.Time `gorm:"index:idx_org_structure_valid_to" json:"valid_to"`
 	SourceVersion    string     `gorm:"size:64;index:idx_org_structure_source_version" json:"source_version"`
-	LastSyncAt       *time.Time `gorm:"type:timestamp;index:idx_org_structure_last_sync_at" json:"last_sync_at"`
+	LastSyncAt       *time.Time `gorm:"index:idx_org_structure_last_sync_at" json:"last_sync_at"`
 	SyncStatus       string     `gorm:"size:32;not null;default:pending;index:idx_org_structure_sync_status" json:"sync_status"`
 }
 
@@ -120,8 +120,8 @@ type OrgStructureNode struct {
 	Path             string     `gorm:"size:1024;not null;index:idx_org_structure_node_structure_path,priority:2" json:"path"`
 	Level            int        `gorm:"not null;default:1;index:idx_org_structure_node_level" json:"level"`
 	Sort             int        `gorm:"not null;default:0;index:idx_org_structure_node_sort" json:"sort"`
-	ValidFrom        *time.Time `gorm:"type:timestamp;index:idx_org_structure_node_valid_from" json:"valid_from"`
-	ValidTo          *time.Time `gorm:"type:timestamp;index:idx_org_structure_node_valid_to" json:"valid_to"`
+	ValidFrom        *time.Time `gorm:"index:idx_org_structure_node_valid_from" json:"valid_from"`
+	ValidTo          *time.Time `gorm:"index:idx_org_structure_node_valid_to" json:"valid_to"`
 	Status           string     `gorm:"size:32;not null;default:enabled;index:idx_org_structure_node_structure_parent,priority:3;index:idx_org_structure_node_status" json:"status"`
 	SourceDeleted    bool       `gorm:"not null;default:false;index:idx_org_structure_node_source_deleted" json:"source_deleted"`
 	SyncStatus       string     `gorm:"size:32;not null;default:pending;index:idx_org_structure_node_sync_status" json:"sync_status"`
@@ -146,10 +146,10 @@ type OrgPosition struct {
 	JobLevel          string     `gorm:"size:64;index:idx_org_position_job_level" json:"job_level"`
 	IsManagerPosition bool       `gorm:"not null;default:false;index:idx_org_position_manager" json:"is_manager_position"`
 	Status            string     `gorm:"size:32;not null;default:enabled;index:idx_org_position_status" json:"status"`
-	ValidFrom         *time.Time `gorm:"type:timestamp;index:idx_org_position_valid_from" json:"valid_from"`
-	ValidTo           *time.Time `gorm:"type:timestamp;index:idx_org_position_valid_to" json:"valid_to"`
+	ValidFrom         *time.Time `gorm:"index:idx_org_position_valid_from" json:"valid_from"`
+	ValidTo           *time.Time `gorm:"index:idx_org_position_valid_to" json:"valid_to"`
 	SourceVersion     string     `gorm:"size:64;index:idx_org_position_source_version" json:"source_version"`
-	LastSyncAt        *time.Time `gorm:"type:timestamp;index:idx_org_position_last_sync_at" json:"last_sync_at"`
+	LastSyncAt        *time.Time `gorm:"index:idx_org_position_last_sync_at" json:"last_sync_at"`
 	SourceDeleted     bool       `gorm:"not null;default:false;index:idx_org_position_source_deleted" json:"source_deleted"`
 	SyncStatus        string     `gorm:"size:32;not null;default:pending;index:idx_org_position_sync_status" json:"sync_status"`
 
@@ -174,11 +174,11 @@ type OrgEmployee struct {
 	Email                string     `gorm:"size:128;index:idx_org_employee_email" json:"email"`
 	EmploymentStatus     string     `gorm:"size:32;not null;default:active;index:idx_org_employee_employment_status" json:"employment_status"`
 	PrimaryLegalEntityId *int       `gorm:"type:bigint;index:idx_org_employee_primary_legal_entity" json:"primary_legal_entity_id"`
-	ValidFrom            *time.Time `gorm:"type:timestamp;index:idx_org_employee_valid_from" json:"valid_from"`
-	ValidTo              *time.Time `gorm:"type:timestamp;index:idx_org_employee_valid_to" json:"valid_to"`
+	ValidFrom            *time.Time `gorm:"index:idx_org_employee_valid_from" json:"valid_from"`
+	ValidTo              *time.Time `gorm:"index:idx_org_employee_valid_to" json:"valid_to"`
 	SourceVersion        string     `gorm:"size:64;index:idx_org_employee_source_version" json:"source_version"`
-	SourceUpdatedAt      *time.Time `gorm:"type:timestamp;index:idx_org_employee_source_updated_at" json:"source_updated_at"`
-	LastSyncAt           *time.Time `gorm:"type:timestamp;index:idx_org_employee_last_sync_at" json:"last_sync_at"`
+	SourceUpdatedAt      *time.Time `gorm:"index:idx_org_employee_source_updated_at" json:"source_updated_at"`
+	LastSyncAt           *time.Time `gorm:"index:idx_org_employee_last_sync_at" json:"last_sync_at"`
 	SourceDeleted        bool       `gorm:"not null;default:false;index:idx_org_employee_source_deleted" json:"source_deleted"`
 	SyncStatus           string     `gorm:"size:32;not null;default:pending;index:idx_org_employee_sync_status" json:"sync_status"`
 
@@ -205,8 +205,8 @@ type OrgAssignment struct {
 	AssignmentType   string     `gorm:"size:32;not null;default:primary;index:idx_org_assignment_type" json:"assignment_type"`
 	IsPrimary        bool       `gorm:"not null;default:false;index:idx_org_assignment_primary" json:"is_primary"`
 	IsManager        bool       `gorm:"not null;default:false;index:idx_org_assignment_manager" json:"is_manager"`
-	ValidFrom        *time.Time `gorm:"type:timestamp;index:idx_org_assignment_valid_from" json:"valid_from"`
-	ValidTo          *time.Time `gorm:"type:timestamp;index:idx_org_assignment_valid_to" json:"valid_to"`
+	ValidFrom        *time.Time `gorm:"index:idx_org_assignment_valid_from" json:"valid_from"`
+	ValidTo          *time.Time `gorm:"index:idx_org_assignment_valid_to" json:"valid_to"`
 	Status           string     `gorm:"size:32;not null;default:enabled;index:idx_org_assignment_status" json:"status"`
 	SourceVersion    string     `gorm:"size:64;index:idx_org_assignment_source_version" json:"source_version"`
 	SourceDeleted    bool       `gorm:"not null;default:false;index:idx_org_assignment_source_deleted" json:"source_deleted"`
@@ -227,8 +227,8 @@ type OrgSyncBatch struct {
 	ExecutionId  *int       `gorm:"type:bigint;index:idx_org_sync_batch_execution" json:"execution_id"`
 	SyncType     string     `gorm:"size:32;not null;default:incremental;index:idx_org_sync_batch_type" json:"sync_type"`
 	ObjectScope  string     `gorm:"size:64;not null;default:all;index:idx_org_sync_batch_scope" json:"object_scope"`
-	StartedAt    *time.Time `gorm:"type:timestamp;index:idx_org_sync_batch_started_at" json:"started_at"`
-	CompletedAt  *time.Time `gorm:"type:timestamp;index:idx_org_sync_batch_completed_at" json:"completed_at"`
+	StartedAt    *time.Time `gorm:"index:idx_org_sync_batch_started_at" json:"started_at"`
+	CompletedAt  *time.Time `gorm:"index:idx_org_sync_batch_completed_at" json:"completed_at"`
 	TotalCount   int        `gorm:"not null;default:0" json:"total_count"`
 	SuccessCount int        `gorm:"not null;default:0" json:"success_count"`
 	FailedCount  int        `gorm:"not null;default:0" json:"failed_count"`
@@ -254,7 +254,7 @@ type OrgSyncRecord struct {
 	DependencyType string     `gorm:"size:64;index:idx_org_sync_record_dependency_type" json:"dependency_type"`
 	DependencyKey  string     `gorm:"size:128;index:idx_org_sync_record_dependency_key" json:"dependency_key"`
 	RetryCount     int        `gorm:"not null;default:0;index:idx_org_sync_record_retry_count" json:"retry_count"`
-	LastRetryAt    *time.Time `gorm:"type:timestamp;index:idx_org_sync_record_last_retry_at" json:"last_retry_at"`
+	LastRetryAt    *time.Time `gorm:"index:idx_org_sync_record_last_retry_at" json:"last_retry_at"`
 
 	// 平台管理扩展字段。
 	LocalHandlingStatus string `gorm:"size:32;index:idx_org_sync_record_handling_status" json:"local_handling_status"`

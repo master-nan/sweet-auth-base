@@ -115,8 +115,8 @@ type SysUser struct {
 	Password          string      `gorm:"size:128;comment:密码" json:"password"`
 	Email             string      `gorm:"size:128;index:index_email;comment:邮箱" json:"email"`
 	PhoneNumber       string      `gorm:"size:128;index:index_phone_number;comment:电话" json:"phone_number"`
-	GmtLastLogin      *CustomTime `gorm:"type:timestamp;comment:最后登录时间" json:"gmt_last_login"`
-	PasswordChangedAt *CustomTime `gorm:"type:timestamp;comment:密码最后修改时间" json:"password_changed_at"`
+	GmtLastLogin      *CustomTime `gorm:"comment:最后登录时间" json:"gmt_last_login"`
+	PasswordChangedAt *CustomTime `gorm:"comment:密码最后修改时间" json:"password_changed_at"`
 	Language          string      `gorm:"size:32;comment:语言包" json:"language"`
 	AccessTokens      string      `gorm:"type:text;comment:用户最近5次Token" json:"access_tokens"`
 	Roles             []SysRole   `gorm:"many2many:sys_user_role;foreignKey:Id;joinForeignKey:UserId;References:Id;joinReferences:RoleId" json:"roles"`

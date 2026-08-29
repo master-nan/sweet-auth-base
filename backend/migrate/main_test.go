@@ -4,6 +4,7 @@ import (
 	"backend/config"
 	"backend/enum"
 	"backend/internal/cache"
+	"backend/internal/database"
 	"backend/internal/utils"
 	"backend/model"
 	"fmt"
@@ -110,6 +111,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"product_walkthrough_corrections",
 		"notification_center_schema",
 		"organization_source_code_indexes",
+		"canonical_time_id_contract",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)
@@ -928,6 +930,9 @@ func migrateTestDB(t *testing.T) *gorm.DB {
 	})
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
+	}
+	if err := database.RegisterSnowflakeIDs(db, newMigrationTestSnowflake(t)); err != nil {
+		t.Fatalf("register migration test snowflake IDs: %v", err)
 	}
 	if err := db.AutoMigrate(&model.AccessLog{}); err != nil {
 		t.Fatalf("migrate access log: %v", err)

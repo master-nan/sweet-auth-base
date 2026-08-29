@@ -45,7 +45,7 @@ func DescribeStorage(fieldType enum.SysTableFieldType) (StorageDescriptor, bool)
 	case enum.DateFieldType:
 		return StorageDescriptor{SQLType: "date", LogicalType: enum.LogicalTypeDate, DisplayFormat: enum.DisplayFormatDate, Ordered: true}, true
 	case enum.DatetimeFieldType:
-		return StorageDescriptor{SQLType: "timestamp", LogicalType: enum.LogicalTypeDateTime, DisplayFormat: enum.DisplayFormatDateTime, Ordered: true}, true
+		return StorageDescriptor{SQLType: "timestamptz", LogicalType: enum.LogicalTypeDateTime, DisplayFormat: enum.DisplayFormatDateTime, Ordered: true}, true
 	case enum.TimeFieldType:
 		return StorageDescriptor{SQLType: "time", LogicalType: enum.LogicalTypePlain, DisplayFormat: enum.DisplayFormatPlain, Ordered: true}, true
 	case enum.JsonFieldType:

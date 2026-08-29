@@ -42,11 +42,11 @@ type IntegrationSyncTask struct {
 	ScheduleType          string         `gorm:"size:16;not null;default:none" json:"schedule_type"`
 	CronExpression        string         `gorm:"size:128" json:"cron_expression"`
 	Timezone              string         `gorm:"size:64;not null;default:UTC" json:"timezone"`
-	NextScheduledAt       *time.Time     `gorm:"type:timestamp;index:idx_integration_sync_task_schedule,priority:2" json:"-"`
-	LastScheduledAt       *time.Time     `gorm:"type:timestamp" json:"-"`
+	NextScheduledAt       *time.Time     `gorm:"index:idx_integration_sync_task_schedule,priority:2" json:"-"`
+	LastScheduledAt       *time.Time     `json:"-"`
 	CheckpointMode        string         `gorm:"size:16;not null;default:none" json:"checkpoint_mode"`
-	InitialCheckpointAt   *time.Time     `gorm:"type:timestamp" json:"initial_checkpoint_at"`
-	CheckpointAt          *time.Time     `gorm:"type:timestamp" json:"-"`
+	InitialCheckpointAt   *time.Time     `json:"initial_checkpoint_at"`
+	CheckpointAt          *time.Time     `json:"-"`
 	LookbackSeconds       int            `gorm:"not null;default:0" json:"lookback_seconds"`
 	WindowSliceSeconds    int            `gorm:"not null;default:0" json:"window_slice_seconds"`
 	InputPlan             datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"-"`
@@ -75,16 +75,16 @@ type IntegrationSyncBatch struct {
 	ConsumerVersion       int        `gorm:"not null" json:"consumer_version"`
 	TriggerType           string     `gorm:"size:16;not null;index:idx_integration_sync_batch_trigger" json:"trigger_type"`
 	TriggerKey            string     `gorm:"size:128;not null;uniqueIndex:uni_integration_sync_batch_trigger_key" json:"trigger_key"`
-	ScheduledFor          *time.Time `gorm:"type:timestamp;index:idx_integration_sync_batch_scheduled" json:"scheduled_for"`
+	ScheduledFor          *time.Time `gorm:"index:idx_integration_sync_batch_scheduled" json:"scheduled_for"`
 	TriggeredByUserID     *int       `gorm:"type:bigint" json:"triggered_by_user_id"`
 	TriggeredByUserName   string     `gorm:"size:128" json:"triggered_by_user_name"`
 	Status                string     `gorm:"size:16;not null;default:created;index:idx_integration_sync_batch_status" json:"status"`
-	StartedAt             *time.Time `gorm:"type:timestamp;index:idx_integration_sync_batch_started" json:"started_at"`
-	CompletedAt           *time.Time `gorm:"type:timestamp" json:"completed_at"`
-	WindowStart           *time.Time `gorm:"type:timestamp" json:"window_start"`
-	WindowEnd             *time.Time `gorm:"type:timestamp" json:"window_end"`
-	CheckpointBefore      *time.Time `gorm:"type:timestamp" json:"checkpoint_before"`
-	CheckpointAfter       *time.Time `gorm:"type:timestamp" json:"checkpoint_after"`
+	StartedAt             *time.Time `gorm:"index:idx_integration_sync_batch_started" json:"started_at"`
+	CompletedAt           *time.Time `json:"completed_at"`
+	WindowStart           *time.Time `json:"window_start"`
+	WindowEnd             *time.Time `json:"window_end"`
+	CheckpointBefore      *time.Time `json:"checkpoint_before"`
+	CheckpointAfter       *time.Time `json:"checkpoint_after"`
 	CheckpointMode        string     `gorm:"size:16;not null" json:"checkpoint_mode"`
 	LookbackSeconds       int        `gorm:"not null;default:0" json:"lookback_seconds"`
 	WindowSliceSeconds    int        `gorm:"not null;default:0" json:"window_slice_seconds"`

@@ -45,7 +45,7 @@ func TestGetSQLTypeUsesPostgresTypes(t *testing.T) {
 		decimal   int
 		want      string
 	}{
-		{name: "datetime", fieldType: enum.DatetimeFieldType, want: "timestamp"},
+		{name: "datetime", fieldType: enum.DatetimeFieldType, want: "timestamptz"},
 		{name: "json", fieldType: enum.JsonFieldType, want: "jsonb"},
 		{name: "smallint", fieldType: enum.SmallIntFieldType, want: "smallint"},
 		{name: "int", fieldType: enum.IntFieldType, want: "integer"},

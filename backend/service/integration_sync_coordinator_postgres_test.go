@@ -60,7 +60,7 @@ func TestIntegrationSyncPostgreSQLSkipLockedCreatesOneBatch(t *testing.T) {
 	db := openSyncCoordinatorPostgreSQL(t)
 	first := seedPostgreSQLSyncCoordinator(t, db, "pg_schedule_once")
 	var databaseNow time.Time
-	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
 	missedSchedule := databaseNow.UTC().Add(-24 * time.Hour)
@@ -186,7 +186,7 @@ func TestIntegrationSyncPostgreSQLDueQueryUsesUTCInNonUTCSession(t *testing.T) {
 	db := openSyncCoordinatorPostgreSQL(t)
 	seedPostgreSQLSyncCoordinator(t, db, "pg_schedule_timezone")
 	var databaseNow time.Time
-	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Model(&model.IntegrationSyncTask{}).Where("task_code = ?", "pg_schedule_timezone").Update("next_scheduled_at", databaseNow.UTC().Add(time.Hour)).Error; err != nil {
@@ -559,7 +559,7 @@ func runIntegrationSyncPostgreSQLTransportConsumerE2E(t *testing.T, failSecondCo
 	}
 	definition.RetryPolicyID = &retryPolicy.Id
 	var databaseNow time.Time
-	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
 	checkpoint, due := databaseNow.UTC().Add(-90*time.Minute), databaseNow.UTC().Add(-time.Minute)
@@ -1068,7 +1068,7 @@ func seedPostgreSQLSyncCoordinator(t *testing.T, db *gorm.DB, taskCode string) *
 	}})
 	definition := model.InterfaceDefinition{Basic: model.Basic{Id: nextSyncTestID(), State: true}, ExternalSystemID: system.Id, InterfaceCode: taskCode, Name: "PG Sync", Version: 1, Protocol: model.InterfaceProtocolHTTPS, HTTPMethod: model.InterfaceMethodGET, RelativePath: "/employees", TimeoutSeconds: 30, ResponseLimit: 1024 * 1024, InputContract: contract, IdempotencyMode: model.InterfaceIdempotencyModeSafeMethod, Status: model.InterfaceDefinitionStatusEnabled, Revision: 1}
 	var databaseNow time.Time
-	if err := db.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&databaseNow).Error; err != nil {
+	if err := db.Raw("SELECT CURRENT_TIMESTAMP").Scan(&databaseNow).Error; err != nil {
 		t.Fatal(err)
 	}
 	databaseNow = databaseNow.UTC()

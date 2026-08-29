@@ -722,7 +722,7 @@ func metadataFieldTypeCompatible(fieldType int, dataType string, columnType stri
 	case int(enum.DateFieldType):
 		return dataType == "date"
 	case int(enum.DatetimeFieldType):
-		return dataType == "timestamp without time zone" || dataType == "timestamp with time zone" || dataType == "timestamp"
+		return dataType == "timestamp with time zone" || dataType == "timestamptz"
 	case int(enum.TimeFieldType):
 		return dataType == "time"
 	case int(enum.JsonFieldType):

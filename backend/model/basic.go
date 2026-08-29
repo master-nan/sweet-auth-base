@@ -26,7 +26,7 @@ func AppLocation() *time.Location {
 }
 
 func Now() time.Time {
-	return time.Now().In(AppLocation())
+	return time.Now().UTC()
 }
 
 func (t CustomTime) IsZero() bool {
@@ -34,11 +34,18 @@ func (t CustomTime) IsZero() bool {
 }
 
 func (t *CustomTime) UnmarshalJSON(data []byte) (err error) {
+	if string(data) == "null" || string(data) == `""` {
+		*t = CustomTime(time.Time{})
+		return nil
+	}
 	now, err := time.ParseInLocation(`"`+time.DateTime+`"`, string(data), AppLocation())
 	*t = CustomTime(now)
 	return
 }
 func (t CustomTime) MarshalJSON() ([]byte, error) {
+	if t.IsZero() {
+		return []byte("null"), nil
+	}
 	b := make([]byte, 0, len(time.DateTime)+2)
 	b = append(b, '"')
 	b = time.Time(t).In(AppLocation()).AppendFormat(b, time.DateTime)
@@ -46,10 +53,16 @@ func (t CustomTime) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 func (t CustomTime) String() string {
+	if t.IsZero() {
+		return ""
+	}
 	return time.Time(t).In(AppLocation()).Format(time.DateTime)
 }
 
 func (t CustomTime) Format(s string) string {
+	if t.IsZero() {
+		return ""
+	}
 	return time.Time(t).In(AppLocation()).Format(s)
 }
 
@@ -57,7 +70,7 @@ func (t CustomTime) Value() (driver.Value, error) {
 	if t.IsZero() {
 		return time.Time{}, nil
 	}
-	return time.Time(t).In(AppLocation()), nil
+	return time.Time(t).UTC(), nil
 }
 
 func (t *CustomTime) Scan(value interface{}) error {
@@ -67,19 +80,19 @@ func (t *CustomTime) Scan(value interface{}) error {
 	}
 	switch v := value.(type) {
 	case time.Time:
-		*t = CustomTime(v.In(AppLocation()))
+		*t = CustomTime(v.UTC())
 	case []byte:
 		parsedTime, err := parseCustomTimeString(string(v))
 		if err != nil {
 			return err
 		}
-		*t = CustomTime(parsedTime.In(AppLocation()))
+		*t = CustomTime(parsedTime.UTC())
 	case string:
 		parsedTime, err := parseCustomTimeString(v)
 		if err != nil {
 			return err
 		}
-		*t = CustomTime(parsedTime.In(AppLocation()))
+		*t = CustomTime(parsedTime.UTC())
 	default:
 		return fmt.Errorf("unsupported scan type for CustomTime: %T", value)
 	}
@@ -134,14 +147,14 @@ func (s *StringSlice) Scan(value interface{}) error {
 }
 
 type Basic struct {
-	Id         int            `gorm:"primaryKey;type:bigint;comment:ID" json:"id"`
-	GmtCreate  CustomTime     `gorm:"type:timestamp;autoCreateTime;comment:创建时间" json:"gmt_create"`
+	Id         int            `gorm:"primaryKey;autoIncrement:false;type:bigint;comment:ID" json:"id"`
+	GmtCreate  CustomTime     `gorm:"autoCreateTime;comment:创建时间" json:"gmt_create"`
 	CreateUser *int           `gorm:"comment:创建人ID" json:"createUser"`
 	CreateName *string        `gorm:"size:128;comment:创建人" json:"createName"`
-	GmtModify  CustomTime     `gorm:"type:timestamp;autoCreateTime;autoUpdateTime;comment:修改时间" json:"gmt_modify"`
+	GmtModify  CustomTime     `gorm:"autoCreateTime;autoUpdateTime;comment:修改时间" json:"gmt_modify"`
 	ModifyUser *int           `gorm:"column:modify_user;comment:修改人ID" json:"modify_user"`
 	ModifyName *string        `gorm:"size:128;comment:修改人" json:"modify_name"`
-	GmtDelete  gorm.DeletedAt `gorm:"type:timestamp;comment:删除时间" json:"-"`
+	GmtDelete  gorm.DeletedAt `gorm:"comment:删除时间" json:"-"`
 	DeleteUser *int           `gorm:"column:delete_user;comment:删除人ID" json:"delete_user"`
 	DeleteName *string        `gorm:"size:128;comment:删除人" json:"-"`
 	State      bool           `gorm:"default:true;comment:状态" json:"state"`

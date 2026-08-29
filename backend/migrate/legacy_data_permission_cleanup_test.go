@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -15,10 +14,7 @@ import (
 )
 
 func TestRemoveLegacyDataPermissionSchemaIsIdempotentAndPreservesNewDomain(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
+	db := testutil.OpenSQLite(t)
 	if err := db.AutoMigrate(
 		&model.SysTable{},
 		&model.SysTableField{},

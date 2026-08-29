@@ -5,7 +5,7 @@ package model
 // https://github.com/casbin/gorm-adapter
 
 type CasbinRule struct {
-	Id    uint   `gorm:"primaryKey;autoIncrement" json:"id"`
+	Id    uint   `gorm:"primaryKey;autoIncrement:false;type:bigint" json:"id"`
 	PType string `gorm:"column:ptype;size:100;index:idx_casbin_rule" json:"ptype"`
 	V0    string `gorm:"column:v0;size:100" json:"v0"`
 	V1    string `gorm:"column:v1;size:100" json:"v1"`

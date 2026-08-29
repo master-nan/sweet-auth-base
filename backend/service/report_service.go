@@ -1885,7 +1885,7 @@ func normalizeReportSQLValue(value interface{}) interface{} {
 		if v.IsZero() {
 			return ""
 		}
-		return v.Format(time.DateTime)
+		return v.In(model.AppLocation()).Format(time.DateTime)
 	default:
 		return value
 	}

@@ -71,22 +71,22 @@ type IntegrationExecution struct {
 	RemoteIdempotencyKey       string         `gorm:"size:128" json:"-"`
 	CurrentAttempt             int            `gorm:"not null;default:0" json:"current_attempt"`
 	LeaseOwner                 string         `gorm:"size:128;index:idx_integration_execution_lease_owner" json:"-"`
-	LeaseExpiresAt             *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_lease_expires_at" json:"-"`
+	LeaseExpiresAt             *time.Time     `gorm:"index:idx_integration_execution_lease_expires_at" json:"-"`
 	ResultHTTPStatus           *int           `gorm:"index:idx_integration_execution_http_status" json:"result_http_status"`
 	ResultSizeBytes            int64          `gorm:"not null;default:0" json:"result_size_bytes"`
 	ResultHash                 string         `gorm:"size:64" json:"result_hash"`
 	ResultSummary              string         `gorm:"size:1024" json:"result_summary"`
 	ErrorCategory              string         `gorm:"size:32;index:idx_integration_execution_error_category" json:"error_category"`
-	StartedAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_started_at" json:"started_at"`
-	CompletedAt                *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_completed_at" json:"completed_at"`
-	NextRunAt                  *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_next_run_at;index:idx_integration_execution_status_next_run,priority:2" json:"next_run_at"`
-	LastAttemptAt              *time.Time     `gorm:"type:timestamp;index:idx_integration_execution_last_attempt_at" json:"last_attempt_at"`
+	StartedAt                  *time.Time     `gorm:"index:idx_integration_execution_started_at" json:"started_at"`
+	CompletedAt                *time.Time     `gorm:"index:idx_integration_execution_completed_at" json:"completed_at"`
+	NextRunAt                  *time.Time     `gorm:"index:idx_integration_execution_next_run_at;index:idx_integration_execution_status_next_run,priority:2" json:"next_run_at"`
+	LastAttemptAt              *time.Time     `gorm:"index:idx_integration_execution_last_attempt_at" json:"last_attempt_at"`
 	RetryReasonCode            string         `gorm:"size:64;index:idx_integration_execution_retry_reason" json:"retry_reason_code"`
-	CancelledAt                *time.Time     `gorm:"type:timestamp" json:"cancelled_at"`
+	CancelledAt                *time.Time     `json:"cancelled_at"`
 	SyncBatchID                *int           `gorm:"type:bigint;index:idx_integration_execution_sync_batch" json:"-"`
 	SyncSliceNo                *int           `gorm:"index:idx_integration_execution_sync_slice" json:"-"`
-	SyncWindowStart            *time.Time     `gorm:"type:timestamp" json:"-"`
-	SyncWindowEnd              *time.Time     `gorm:"type:timestamp" json:"-"`
+	SyncWindowStart            *time.Time     `json:"-"`
+	SyncWindowEnd              *time.Time     `json:"-"`
 	SyncConsumerCode           string         `gorm:"size:64" json:"-"`
 	SyncConsumerVersion        *int           `json:"-"`
 	SyncBusinessStatus         string         `gorm:"size:16;index:idx_integration_execution_sync_business_status" json:"-"`
@@ -112,8 +112,8 @@ type IntegrationLog struct {
 	ExecutionID                  int        `gorm:"type:bigint;not null;index:idx_integration_log_execution;uniqueIndex:uni_integration_log_attempt,priority:1" json:"execution_id"`
 	AttemptNo                    int        `gorm:"not null;uniqueIndex:uni_integration_log_attempt,priority:2" json:"attempt_no"`
 	Status                       string     `gorm:"size:32;not null;index:idx_integration_log_status" json:"status"`
-	StartedAt                    time.Time  `gorm:"type:timestamp;not null;index:idx_integration_log_started_at" json:"started_at"`
-	EndedAt                      *time.Time `gorm:"type:timestamp" json:"ended_at"`
+	StartedAt                    time.Time  `gorm:"not null;index:idx_integration_log_started_at" json:"started_at"`
+	EndedAt                      *time.Time `json:"ended_at"`
 	DurationMs                   int64      `gorm:"not null;default:0" json:"duration_ms"`
 	HTTPStatus                   *int       `gorm:"index:idx_integration_log_http_status" json:"http_status"`
 	ErrorCategory                string     `gorm:"size:32;index:idx_integration_log_error_category" json:"error_category"`
@@ -132,7 +132,7 @@ type IntegrationLog struct {
 	Retryable                    bool       `gorm:"not null;default:false" json:"retryable"`
 	RetryReasonCode              string     `gorm:"size:64;index:idx_integration_log_retry_reason" json:"retry_reason_code"`
 	RetryDelayMs                 int64      `gorm:"not null;default:0" json:"retry_delay_ms"`
-	RetryScheduledAt             *time.Time `gorm:"type:timestamp;index:idx_integration_log_retry_scheduled" json:"retry_scheduled_at"`
+	RetryScheduledAt             *time.Time `gorm:"index:idx_integration_log_retry_scheduled" json:"retry_scheduled_at"`
 	RetryAfterSource             string     `gorm:"size:32;not null;default:none" json:"retry_after_source"`
 
 	Execution IntegrationExecution `gorm:"foreignKey:ExecutionID;references:Id;constraint:OnUpdate:RESTRICT,OnDelete:RESTRICT" json:"-"`

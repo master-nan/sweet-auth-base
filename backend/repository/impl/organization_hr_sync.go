@@ -31,7 +31,8 @@ func (r *OrganizationHRSyncRepositoryImpl) DBWithContext(ctx context.Context) *g
 func (r *OrganizationHRSyncRepositoryImpl) CurrentDatabaseTime(tx *gorm.DB) (time.Time, error) {
 	var now time.Time
 	if tx.Dialector.Name() == "postgres" {
-		return now, tx.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&now).Error
+		err := tx.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
+		return now.UTC(), err
 	}
 	return time.Now().UTC(), nil
 }

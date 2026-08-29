@@ -17,6 +17,7 @@ import {
 
 const validEnvContent = `
 APP_ENV=production
+APP_WORKER_ID=1
 APP_DBS_PRIMARY_HOST=postgres.primary.internal
 APP_DBS_PRIMARY_PORT=5432
 APP_DBS_PRIMARY_NAME=sweet_admin
@@ -96,6 +97,20 @@ test('validateExternalEnv accepts hardened external deploy settings', () => {
 
   assert.equal(result.ok, true, result.problems.join('\n'))
   assert.deepEqual(result.problems, [])
+})
+
+test('validateExternalEnv requires a valid Snowflake worker ID', () => {
+  const missing = parseEnvContent(validEnvContent)
+  delete missing.APP_WORKER_ID
+  const missingResult = validateExternalEnv(missing)
+  assert.equal(missingResult.ok, false)
+  assert.ok(missingResult.problems.some((problem) => problem.includes('APP_WORKER_ID must be set')))
+
+  const outOfRange = parseEnvContent(validEnvContent)
+  outOfRange.APP_WORKER_ID = '16'
+  const outOfRangeResult = validateExternalEnv(outOfRange)
+  assert.equal(outOfRangeResult.ok, false)
+  assert.ok(outOfRangeResult.problems.includes('APP_WORKER_ID must be an integer from 0 to 15'))
 })
 
 test('validateExternalEnvTemplate requires all template keys', () => {

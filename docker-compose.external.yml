@@ -4,6 +4,7 @@ services:
       context: ./backend
     environment:
       APP_ENV: ${APP_ENV:?APP_ENV must be set explicitly}
+      APP_WORKER_ID: ${APP_WORKER_ID:?APP_WORKER_ID must be set}
       APP_DBS_PRIMARY_HOST: ${APP_DBS_PRIMARY_HOST:?APP_DBS_PRIMARY_HOST must be set}
       APP_DBS_PRIMARY_PORT: ${APP_DBS_PRIMARY_PORT:?APP_DBS_PRIMARY_PORT must be set}
       APP_DBS_PRIMARY_NAME: ${APP_DBS_PRIMARY_NAME:?APP_DBS_PRIMARY_NAME must be set}

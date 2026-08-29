@@ -66,7 +66,7 @@ func (value NotificationReadStatus) Valid() bool {
 // Notification 保存一次发送共享且不可变的站内消息事实。
 // 用户自己的投递和已读状态由 NotificationRecipient 独立维护。
 type Notification struct {
-	Id             int                  `gorm:"primaryKey;type:bigint" json:"id"`
+	Id             int                  `gorm:"primaryKey;autoIncrement:false;type:bigint" json:"id"`
 	Category       NotificationCategory `gorm:"size:24;not null" json:"category"`
 	Level          NotificationLevel    `gorm:"size:16;not null" json:"level"`
 	Title          string               `gorm:"size:160;not null" json:"title"`
@@ -77,7 +77,7 @@ type Notification struct {
 	ActionMenuName string               `gorm:"size:32;not null;default:''" json:"action_menu_name"`
 	ActionPath     string               `gorm:"size:512;not null;default:''" json:"action_path"`
 	DedupKey       *string              `gorm:"size:128" json:"-"`
-	CreatedAt      CustomTime           `gorm:"type:timestamptz;autoCreateTime" json:"created_at"`
+	CreatedAt      CustomTime           `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (Notification) TableName() string {
@@ -88,8 +88,8 @@ func (Notification) TableName() string {
 type NotificationRecipient struct {
 	NotificationId int         `gorm:"primaryKey;type:bigint;autoIncrement:false" json:"notification_id"`
 	UserId         int         `gorm:"primaryKey;type:bigint;autoIncrement:false" json:"user_id"`
-	ReadAt         *CustomTime `gorm:"type:timestamptz" json:"read_at"`
-	CreatedAt      CustomTime  `gorm:"type:timestamptz;autoCreateTime" json:"created_at"`
+	ReadAt         *CustomTime `json:"read_at"`
+	CreatedAt      CustomTime  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (NotificationRecipient) TableName() string {

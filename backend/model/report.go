@@ -39,7 +39,7 @@ type ReportDefinitionVersion struct {
 	QueryConfig         datatypes.JSON `gorm:"type:jsonb;comment:查询配置JSON快照" json:"query_config"`
 	LayoutConfig        datatypes.JSON `gorm:"type:jsonb;comment:布局配置JSON快照" json:"layout_config"`
 	Status              string         `gorm:"size:32;default:published;index:idx_report_definition_version_status;comment:版本状态（published:当前发布,archived:历史归档）" json:"status"`
-	PublishedAt         CustomTime     `gorm:"type:timestamp;index:idx_report_definition_version_published_at;comment:发布时间" json:"published_at"`
+	PublishedAt         CustomTime     `gorm:"index:idx_report_definition_version_published_at;comment:发布时间" json:"published_at"`
 	PublishedBy         int            `gorm:"comment:发布人ID" json:"published_by"`
 	PublishedName       string         `gorm:"size:128;comment:发布人名称" json:"published_name"`
 	ChangeLog           string         `gorm:"size:512;comment:发布说明" json:"change_log"`

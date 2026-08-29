@@ -847,7 +847,7 @@ func dynamicQuery(
 					if t.IsZero() {
 						record[field.FieldCode] = ""
 					} else {
-						record[field.FieldCode] = t.Format(time.DateTime)
+						record[field.FieldCode] = t.In(model.AppLocation()).Format(time.DateTime)
 					}
 				} else {
 					record[field.FieldCode] = v
@@ -1108,6 +1108,9 @@ func BuildTag(field model.SysTableField) string {
 	}
 	if field.IsPrimaryKey {
 		gormParts = append(gormParts, `primaryKey:true`)
+		if field.FieldCode == "id" {
+			gormParts = append(gormParts, `autoIncrement:false`)
+		}
 	}
 	if !field.IsNull {
 		gormParts = append(gormParts, `notNull:true`)

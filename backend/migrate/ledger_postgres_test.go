@@ -2,8 +2,10 @@ package main
 
 import (
 	"backend/config"
+	"backend/internal/database"
 	migrationstate "backend/internal/migration"
 	testutil "backend/internal/test"
+	"backend/internal/utils"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -35,6 +37,7 @@ func TestMigrationLedgerPostgreSQLFreshAndRerun(t *testing.T) {
 	}
 	assertAllManagedTablesExist(t, db)
 	assertAccessLogOperationalIndexes(t, db)
+	assertCanonicalTimeAndIDSchema(t, db)
 
 	if err := migrateSchema(db); err != nil {
 		t.Fatalf("rerun migrate: %v", err)
@@ -64,6 +67,35 @@ WHERE schemaname = current_schema()
 	}
 	if count != 4 {
 		t.Fatalf("access log operational indexes = %d, want 4", count)
+	}
+}
+
+func assertCanonicalTimeAndIDSchema(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	var timestampCount int64
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = current_schema()
+  AND data_type = 'timestamp without time zone'
+`).Scan(&timestampCount).Error; err != nil {
+		t.Fatalf("inspect timestamp contract: %v", err)
+	}
+	if timestampCount != 0 {
+		t.Fatalf("timestamp columns without timezone = %d", timestampCount)
+	}
+	var generatedIDCount int64
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = current_schema()
+  AND column_name = 'id'
+  AND (is_identity = 'YES' OR column_default LIKE 'nextval(%')
+`).Scan(&generatedIDCount).Error; err != nil {
+		t.Fatalf("inspect generated ID contract: %v", err)
+	}
+	if generatedIDCount != 0 {
+		t.Fatalf("database-generated ID columns = %d", generatedIDCount)
 	}
 }
 
@@ -241,6 +273,13 @@ func openMigrationLedgerPostgreSQL(t *testing.T) *gorm.DB {
 	})
 	if err != nil {
 		t.Fatalf("open isolated PostgreSQL schema: %v", err)
+	}
+	sf, err := utils.NewSnowflake(4)
+	if err != nil {
+		t.Fatalf("create migration snowflake: %v", err)
+	}
+	if err := database.RegisterSnowflakeIDs(db, sf); err != nil {
+		t.Fatalf("register migration snowflake: %v", err)
 	}
 	sqlDB, err := db.DB()
 	if err != nil {

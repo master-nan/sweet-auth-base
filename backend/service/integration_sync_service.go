@@ -730,7 +730,7 @@ func syncDatabaseNow(tx *gorm.DB) (time.Time, error) {
 		return time.Unix(epoch, 0).UTC(), nil
 	}
 	var now time.Time
-	err := tx.Raw("SELECT CURRENT_TIMESTAMP AT TIME ZONE 'UTC'").Scan(&now).Error
+	err := tx.Raw("SELECT CURRENT_TIMESTAMP").Scan(&now).Error
 	return now.UTC(), err
 }
 

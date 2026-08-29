@@ -643,7 +643,9 @@ Migration在应用发布前把数据库升级到当前Canonical Schema；Seed补
 | `migrate/registry.go` | 按Catalog顺序绑定实际Migration函数，并在事务成功后写Ledger |
 | `internal/migration/catalog.go` | Version、Key、Contract、Checksum的唯一有序目录 |
 | `internal/migration/ledger.go` | Ledger建表、读取、Checksum验证和PostgreSQL advisory lock |
+| `internal/database/snowflake_callback.go` | 为零值单列`id`主键统一补Snowflake ID，防止遗漏路径退回数据库自增 |
 | `migrate/*_schema.go` | 各领域Schema与Canonical数据迁移，必须幂等且可从旧状态升级 |
+| `migrate/canonical_time_id_contract.go` | 将历史无时区时间转换为`timestamptz`，并删除`id`自增默认值和sequence |
 | `migrate/*_seed.go` | 当前字典、菜单、按钮和业务基线Seed |
 | `cmd/db-preflight/main.go` | 只读检查Schema、关键约束、Seed与Ledger完整性，不执行Migration |
 
@@ -657,6 +659,7 @@ Migration在应用发布前把数据库升级到当前Canonical Schema；Seed补
 - Fresh DB直接按Catalog执行；既有Canonical DB必须显式adopt；部分升级DB不能盲目标记完成。
 - 新Migration只追加Catalog与Runner，不改已发布Migration合同；SQLite测试不能证明PostgreSQL DDL正确。
 - Seed必须幂等并使用稳定code，不能依赖本地自增ID或覆盖管理员业务数据。
+- 新业务表的单列`id`使用Snowflake；复合主键不额外创建无意义ID。时间列使用`timestamptz`，页面按`Asia/Shanghai`展示。
 
 ### 6.13 Cache与Redis
 

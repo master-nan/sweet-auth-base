@@ -163,7 +163,7 @@ func TestIntegrationExecutionPostgreSQLRetryClaimUsesDatabaseTimeAndSkipLocked(t
 	if err := db.Create(&firstAttempt).Error; err != nil {
 		t.Fatalf("create first attempt: %v", err)
 	}
-	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP AT TIME ZONE 'UTC' WHERE id = ?", execution.Id).Error; err != nil {
+	if err := db.Exec("UPDATE integration_execution SET next_run_at = CURRENT_TIMESTAMP WHERE id = ?", execution.Id).Error; err != nil {
 		t.Fatalf("schedule retry with database time: %v", err)
 	}
 
