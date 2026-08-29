@@ -19,18 +19,6 @@
         最近轮询 {{ formatDate(workerStatus.last_poll_at) }}
       </div>
       <q-space />
-      <q-btn
-        flat
-        round
-        dense
-        icon="refresh"
-        color="primary"
-        :loading="loading"
-        @click="refresh"
-        aria-label="刷新执行状态"
-      >
-        <q-tooltip>刷新执行状态</q-tooltip>
-      </q-btn>
     </div>
 
     <q-table

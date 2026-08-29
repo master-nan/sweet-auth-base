@@ -211,7 +211,7 @@ describe('sync task page permissions', () => {
     )
   })
 
-  it('does not enable or run a task whose consumer is not open in the current service', async () => {
+  it('keeps lifecycle actions visible but disables unavailable consumer actions', async () => {
     api.listSyncConsumers.mockResolvedValue({ data: [] })
     const wrapper = shallowMount(Page, {
       global: {
@@ -236,12 +236,22 @@ describe('sync task page permissions', () => {
     await flushPromises()
     const vm = wrapper.vm as unknown as {
       availableLineButtons: (value: SyncTaskListItem) => Array<{ event_action: string }>
+      isLineButtonDisabled: (
+        button: { event_action: string },
+        value: SyncTaskListItem,
+      ) => boolean
+      lineButtonTooltip: (button: { event_action: string; name: string }, value: SyncTaskListItem) => string
       handleButtonClick: (button: { event_action: string }, value: SyncTaskListItem) => void
     }
-    expect(vm.availableLineButtons(row).map((item) => item.event_action)).not.toContain('enable')
+    expect(vm.availableLineButtons(row).map((item) => item.event_action)).toContain('enable')
     expect(
       vm.availableLineButtons({ ...row, status: 'enabled' }).map((item) => item.event_action),
-    ).not.toContain('run')
+    ).toContain('run')
+    expect(vm.isLineButtonDisabled({ event_action: 'enable' }, row)).toBe(true)
+    expect(vm.isLineButtonDisabled({ event_action: 'detail' }, row)).toBe(false)
+    expect(
+      vm.lineButtonTooltip({ event_action: 'enable', name: '启用' }, row),
+    ).toContain('当前服务未注册')
     vm.handleButtonClick({ event_action: 'run' }, { ...row, status: 'enabled' })
     await flushPromises()
     expect(api.runSyncTask).not.toHaveBeenCalled()

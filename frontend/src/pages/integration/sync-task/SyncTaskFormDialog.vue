@@ -74,9 +74,32 @@
         outlined
         dense
         label="Cron（五段式） *"
-        hint="分钟 小时 日 月 星期"
+        hint="格式：分钟 小时 日 月 星期，例如 0 */2 * * * 表示每 2 小时执行"
         :rules="[cronRule]"
-      />
+      >
+        <template #append>
+          <q-btn flat round dense icon="help_outline" aria-label="查看 Cron 示例">
+            <q-tooltip>查看 Cron 示例</q-tooltip>
+            <q-menu anchor="bottom right" self="top right">
+              <q-list dense style="min-width: 320px">
+                <q-item-label header>Cron 示例</q-item-label>
+                <q-item
+                  v-for="example in cronExamples"
+                  :key="example.value"
+                  v-close-popup
+                  clickable
+                  @click="form.cron_expression = example.value"
+                >
+                  <q-item-section>
+                    <q-item-label class="text-mono">{{ example.value }}</q-item-label>
+                    <q-item-label caption>{{ example.label }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
+        </template>
+      </q-input>
       <q-input
         v-model="form.timezone"
         outlined
@@ -175,8 +198,15 @@
         map-options
         :options="windowParameterOptions"
         label="窗口开始参数 *"
+        hint="选项来自当前接口定义的请求参数，不是字典项"
         :rules="[requiredRule]"
-      />
+      >
+        <template #no-option>
+          <q-item>
+            <q-item-section class="text-grey-7">当前接口未声明可绑定的时间参数</q-item-section>
+          </q-item>
+        </template>
+      </q-select>
       <q-select
         v-if="form.checkpoint_mode === 'timestamp'"
         v-model="windowStartFormat"
@@ -186,8 +216,15 @@
         map-options
         :options="formatOptions(windowStartKey)"
         label="窗口开始格式 *"
+        hint="格式是平台固定规则；请按外部接口实际接收格式选择"
         :rules="[requiredRule]"
-      />
+      >
+        <template #no-option>
+          <q-item>
+            <q-item-section class="text-grey-7">请先选择窗口开始参数</q-item-section>
+          </q-item>
+        </template>
+      </q-select>
       <q-select
         v-if="form.checkpoint_mode === 'timestamp' && windowMode === 'bounded_window'"
         v-model="windowEndKey"
@@ -294,6 +331,12 @@ const form = reactive<SyncTaskEditableForm>(emptyForm())
 const scheduleOptions: { label: string; value: SyncScheduleType }[] = [
   { label: '仅手工触发', value: 'none' },
   { label: 'Cron 定时', value: 'cron' },
+]
+const cronExamples = [
+  { value: '0 * * * *', label: '每小时整点' },
+  { value: '0 */2 * * *', label: '每 2 小时' },
+  { value: '0 2 * * *', label: '每天 02:00' },
+  { value: '0 2 * * 1-5', label: '工作日每天 02:00' },
 ]
 const checkpointOptions: { label: string; value: SyncCheckpointMode }[] = [
   { label: '无 Checkpoint', value: 'none' },

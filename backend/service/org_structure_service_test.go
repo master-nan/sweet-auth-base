@@ -442,6 +442,48 @@ func TestOrgServiceStructureTreeRejectsCyclesInactiveStructuresAndOversize(t *te
 		})
 		assertOrgServiceAdminError(t, err, apperrors.CategoryBusiness, apperrors.ErrorCodeOrgTreeTooLarge)
 	})
+
+	t.Run("keyword narrows a structure larger than the response limit", func(t *testing.T) {
+		orgService, db := newOrgServiceTestSubject(t)
+		structure := managementStructureFixture(10, "MGMT", "大型行政架构", "enabled")
+		testutil.MustCreate(t, db, &structure)
+
+		nodes := make([]model.OrgStructureNode, orgStructureTreeMaxNodeCount+1)
+		units := make([]model.OrgUnit, orgStructureTreeMaxNodeCount+1)
+		for index := range nodes {
+			id := index + 1
+			name := "普通部门"
+			if index == len(nodes)-1 {
+				name = "目标运营中心"
+			}
+			units[index] = managementUnitFixture(id, "OU-"+strconv.Itoa(id), name, "department", "enabled", nil)
+			nodes[index] = managementNodeFixture(id, structure.Id, id, nil, "enabled")
+		}
+
+		nodeRepo := &keywordSearchStructureNodeRepository{
+			OrgStructureNodeRepository: orgService.structureNodeRepo,
+			nodes:                      nodes,
+		}
+		orgService.structureNodeRepo = nodeRepo
+		orgService.orgUnitRepo = displayOrgUnitRepository{
+			OrgUnitRepository: orgService.orgUnitRepo,
+			units:             units,
+		}
+
+		tree, err := orgService.GetStructureOrgTree(nil, request.OrgStructureOrgTreeReq{
+			StructureId: structure.Id,
+			Keyword:     "目标运营",
+		})
+		if err != nil {
+			t.Fatalf("search large structure tree: %v", err)
+		}
+		if len(tree) != 1 || tree[0].Name != "目标运营中心" {
+			t.Fatalf("unexpected narrowed structure tree: %+v", tree)
+		}
+		if nodeRepo.limit != orgStructureTreeMaxScanCount+1 {
+			t.Fatalf("large structure scan limit = %d, want %d", nodeRepo.limit, orgStructureTreeMaxScanCount+1)
+		}
+	})
 }
 
 func TestOrgServiceStructureTreeUsesThreeReadQueries(t *testing.T) {
@@ -486,6 +528,34 @@ func (oversizedStructureNodeRepository) ListByStructureForRead(
 	int,
 ) ([]model.OrgStructureNode, error) {
 	return make([]model.OrgStructureNode, orgStructureTreeMaxNodeCount+1), nil
+}
+
+type keywordSearchStructureNodeRepository struct {
+	repository.OrgStructureNodeRepository
+	nodes []model.OrgStructureNode
+	limit int
+}
+
+func (r *keywordSearchStructureNodeRepository) ListByStructureForRead(
+	_ context.Context,
+	_ int,
+	_ repository.OrgReadScope,
+	limit int,
+) ([]model.OrgStructureNode, error) {
+	r.limit = limit
+	return r.nodes, nil
+}
+
+type displayOrgUnitRepository struct {
+	repository.OrgUnitRepository
+	units []model.OrgUnit
+}
+
+func (r displayOrgUnitRepository) FindByIdsForDisplay(
+	context.Context,
+	[]int,
+) ([]model.OrgUnit, error) {
+	return r.units, nil
 }
 
 func managementStructureFixture(id int, code, name, status string) model.OrgStructure {

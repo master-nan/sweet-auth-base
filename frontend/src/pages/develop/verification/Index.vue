@@ -50,6 +50,9 @@
       </aside>
 
       <main class="verification-detail">
+        <q-banner dense class="verification-guide-note">
+          本页是验证步骤说明，不会自动创建账号、业务数据或外部系统配置。标记为“需要配置”或“需要样例数据”的场景，请按准备项完成后再验证。
+        </q-banner>
         <q-scroll-area v-if="selectedScenario" class="verification-detail-scroll">
           <div class="verification-detail-content">
             <header class="verification-detail-header">
@@ -165,7 +168,10 @@ const scenarios: VerificationScenario[] = [
     icon: 'admin_panel_settings',
     status: 'ready',
     summary: '使用管理员、只读用户和无权限用户验证页面及业务按钮边界。',
-    prerequisites: ['准备三个测试账号，并分别分配管理员、只读和无业务菜单角色。'],
+    prerequisites: [
+      '准备三个测试账号，并分别分配管理员、只读和无业务菜单角色。',
+      '不知道测试账号原密码时，由管理员在用户管理执行“重置密码”，保存弹窗中只显示一次的临时密码。',
+    ],
     steps: [
       '管理员登录，确认可以看到用户、角色、菜单页面及其管理按钮。',
       '只读用户登录，确认页面可打开，但新增、编辑、删除等按钮不可用。',
@@ -419,6 +425,18 @@ const openScenario = async (scenario: VerificationScenario) => {
 .verification-detail {
   min-width: 0;
   min-height: 0;
+}
+
+.verification-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.verification-guide-note {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+  color: var(--app-text-secondary);
 }
 
 .verification-master {

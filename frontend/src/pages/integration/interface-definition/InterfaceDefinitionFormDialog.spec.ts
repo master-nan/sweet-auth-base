@@ -11,6 +11,11 @@ const QInputStub = defineComponent({
   props: { label: String, max: [String, Number], rules: Array, modelValue: [String, Number] },
   template: '<div />',
 })
+const QSelectStub = defineComponent({
+  name: 'QSelect',
+  props: { label: String, clearable: Boolean, modelValue: [String, Number] },
+  template: '<div />',
+})
 
 describe('interface definition runtime limits', () => {
   it('uses the transport timeout and response-size limits for create and edit forms', () => {
@@ -18,7 +23,7 @@ describe('interface definition runtime limits', () => {
       props: { modelValue: true, editData: null, systems: [], credentials: [], loading: false },
       global: { stubs: {
         FormDialogShell: { template: '<div><slot /></div>' }, QForm: { template: '<form><slot /></form>' },
-        QSelect: true, QInput: QInputStub,
+        QSelect: QSelectStub, QInput: QInputStub,
       } },
     })
     const inputs = wrapper.findAllComponents(QInputStub)
@@ -56,7 +61,7 @@ describe('interface definition runtime limits', () => {
       global: { stubs: {
         FormDialogShell: { template: '<div><slot /></div>' },
         QForm: { template: '<form><slot /></form>' },
-        QSelect: true,
+        QSelect: QSelectStub,
         QInput: QInputStub,
         QBtn: true,
         QBanner: true,
@@ -72,6 +77,9 @@ describe('interface definition runtime limits', () => {
     }
     expect(vm.credentialOptions).toEqual([{ label: '不使用认证凭证', value: null }])
     expect(vm.retryPolicyOptions).toEqual([{ label: '不自动重试', value: null }])
+    const selectors = wrapper.findAllComponents(QSelectStub)
+    expect(selectors.find((item) => item.props('label') === '认证凭证')?.props('clearable')).toBe(false)
+    expect(selectors.find((item) => item.props('label') === '重试策略')?.props('clearable')).toBe(false)
     vm.addParameter()
     expect(vm.form.input_contract).toEqual({
       version: 1,

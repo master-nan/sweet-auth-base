@@ -134,6 +134,20 @@ describe('sync task controlled form', () => {
     expect(vm.form.interface_definition_id).toBeNull()
   })
 
+  it('provides selectable five-field Cron examples', () => {
+    const wrapper = mountForm()
+    const vm = wrapper.vm as unknown as {
+      cronExamples: Array<{ value: string; label: string }>
+    }
+
+    expect(vm.cronExamples).toEqual([
+      { value: '0 * * * *', label: '每小时整点' },
+      { value: '0 */2 * * *', label: '每 2 小时' },
+      { value: '0 2 * * *', label: '每天 02:00' },
+      { value: '0 2 * * 1-5', label: '工作日每天 02:00' },
+    ])
+  })
+
   it('clears inactive schedule and checkpoint fields', async () => {
     const wrapper = mountForm()
     const vm = wrapper.vm as unknown as {

@@ -297,7 +297,7 @@ const queryState = useTableQueryState<Query>({
   createInitialQuery: () => ({
     page: 1,
     num: 20,
-    order: { field: '', is_asc: false },
+    order: { field: 'user_name', is_asc: true },
     table_code: 'sys_user',
     expressions: emptyAdvancedQuery().expressions,
     quick_query: { keyword: '' },

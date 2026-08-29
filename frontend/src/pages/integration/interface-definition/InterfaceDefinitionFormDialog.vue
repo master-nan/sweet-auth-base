@@ -29,7 +29,7 @@
       <q-input v-model="form.name" outlined dense label="接口名称 *" :rules="[(value) => Boolean(value?.trim()) || '请输入接口名称']" />
       <q-select
         v-model="form.credential_id"
-        outlined dense emit-value map-options clearable
+        outlined dense emit-value map-options
         :disable="!form.external_system_id"
         :options="credentialOptions"
         label="认证凭证"
@@ -37,7 +37,7 @@
       />
       <q-select
         v-model="form.retry_policy_id"
-        outlined dense emit-value map-options clearable
+        outlined dense emit-value map-options
         :options="retryPolicyOptions"
         label="重试策略"
         hint="无需自动重试时选择“不自动重试”"

@@ -164,6 +164,7 @@ describe('integration execution retry summary', () => {
     expect(wrapper.find('[data-testid="table"]').attributes('data-row-count')).toBe('1')
     expect(wrapper.find('.execution-page').exists()).toBe(true)
     expect(wrapper.find('.runtime-status-strip').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="刷新执行状态"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="table"]').classes()).toContain('col')
     expect(vm.columns.map((column) => column.name)).toEqual(
       expect.arrayContaining([

@@ -159,7 +159,8 @@ instance.interceptors.response.use(
       const method = (response.config.method || '').toLowerCase()
       const url = response.config.url || ''
       const isQueryApi = url.includes('/query') || url.includes('/options')
-      if (method !== 'get' && !isQueryApi) {
+      // 页面会给出具体操作结果；通用“操作成功”既没有额外信息，也容易和页面提示重复。
+      if (method !== 'get' && !isQueryApi && res.message && res.message !== '操作成功') {
         Notify.create({
           position: 'top-right',
           progress: true,

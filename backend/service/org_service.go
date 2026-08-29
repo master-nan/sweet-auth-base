@@ -21,7 +21,8 @@ import (
 
 const (
 	orgAsOfDateLayout            = time.DateOnly
-	orgStructureTreeMaxNodeCount = 5000
+	orgStructureTreeMaxNodeCount = 20000
+	orgStructureTreeMaxScanCount = 100000
 	orgAssignmentSummaryMaxCount = 5000
 	orgEmployeeBound             = "bound"
 	orgEmployeeUnbound           = "unbound"
@@ -1224,16 +1225,23 @@ func (s *OrgService) getStructureOrgTreeForRead(
 		return nil, myerrors.ErrOrgStructureNotFound
 	}
 
+	keyword := strings.TrimSpace(req.Keyword)
+	narrowedQuery := keyword != "" || req.RootNodeId != nil || req.RootOrgUnitId != nil
+	scanLimit := orgStructureTreeMaxNodeCount + 1
+	if narrowedQuery {
+		scanLimit = orgStructureTreeMaxScanCount + 1
+	}
 	nodes, err := s.structureNodeRepo.ListByStructureForRead(
 		ctx,
 		req.StructureId,
 		scope,
-		orgStructureTreeMaxNodeCount+1,
+		scanLimit,
 	)
 	if err != nil {
 		return nil, myerrors.WrapDatabaseError(err)
 	}
-	if len(nodes) > orgStructureTreeMaxNodeCount {
+	if (!narrowedQuery && len(nodes) > orgStructureTreeMaxNodeCount) ||
+		len(nodes) > orgStructureTreeMaxScanCount {
 		return nil, myerrors.ErrOrgTreeTooLarge
 	}
 
@@ -1270,7 +1278,7 @@ func (s *OrgService) getStructureOrgTreeForRead(
 		scope,
 		req.RootNodeId,
 		req.RootOrgUnitId,
-		strings.TrimSpace(req.Keyword),
+		keyword,
 	)
 }
 
@@ -1828,6 +1836,9 @@ func buildStructureOrgTree(
 			}
 		}
 		selected = matchedWithAncestors
+	}
+	if len(selected) > orgStructureTreeMaxNodeCount {
+		return nil, myerrors.ErrOrgTreeTooLarge
 	}
 
 	children := make(map[int][]int, len(selected))

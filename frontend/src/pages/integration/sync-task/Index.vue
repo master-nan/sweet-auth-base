@@ -115,8 +115,9 @@
             size="sm"
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
+            :disable="isLineButtonDisabled(button, props.row)"
             @click="handleButtonClick(button, props.row)"
-            ><q-tooltip>{{ button.name }}</q-tooltip></q-btn
+            ><q-tooltip>{{ lineButtonTooltip(button, props.row) }}</q-tooltip></q-btn
           ></q-td
         ></template
       >
@@ -347,11 +348,19 @@ const availableLineButtons = (row: SyncTaskListItem) =>
       : button.event_action === 'create_version'
         ? row.status !== 'draft'
         : button.event_action === 'enable'
-          ? row.status !== 'enabled' && (!consumerMetadataLoaded.value || isConsumerAvailable(row))
+          ? row.status !== 'enabled'
           : button.event_action === 'disable' || button.event_action === 'run'
-            ? row.status === 'enabled' && (button.event_action !== 'run' || !consumerMetadataLoaded.value || isConsumerAvailable(row))
+            ? row.status === 'enabled'
             : true,
   )
+const isLineButtonDisabled = (button: MenuButton, row: SyncTaskListItem) =>
+  consumerMetadataLoaded.value &&
+  !isConsumerAvailable(row) &&
+  (button.event_action === 'enable' || button.event_action === 'run')
+const lineButtonTooltip = (button: MenuButton, row: SyncTaskListItem) =>
+  isLineButtonDisabled(button, row)
+    ? `${button.name}不可用：当前服务未注册该 Consumer`
+    : button.name
 const openCreate = async () => {
   await fetchReferences()
   editData.value = null
