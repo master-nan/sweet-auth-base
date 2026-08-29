@@ -1,6 +1,7 @@
 # Sweet Platform 项目结构说明
 
-本文帮助开发者快速定位“应该改哪里”。它只列稳定入口和领域边界，不逐一罗列仓库文件。
+本文帮助开发者快速定位“应该改哪里”。它列出稳定入口、领域边界和主要调用关系；需要逐个查看生产文件与方法时，使用
+[生产代码文件与方法说明](CodeReferenceGuide.md)。
 工程规则见[平台工程架构指南](PlatformEngineeringGuide.md)，具体扩展步骤见
 [平台扩展开发指南](ExtensionDevelopmentGuide.md)，前端页面模式见
 [前端架构与页面模式指南](FrontendArchitectureGuide.md)。
@@ -890,6 +891,7 @@ Audit记录登录、访问、管理变更和关键状态操作；Request Metadat
 | `composables/runtime-table-metadata.ts` | 页面Runtime Metadata加载、错误和缓存状态 |
 | `utils/field-metadata.ts` | 字段类型、控件、Operator和Relation能力的前端消费入口 |
 | `stores/theme.ts`、`css/app.scss` | Theme状态和跨页面Semantic Token |
+| `pages/develop/verification/Index.vue` | 面向开发和验收人员的人工功能验证指引，列出前置数据、操作步骤、预期结果和相关页面入口；不写入测试数据 |
 
 **典型链路**
 
@@ -901,6 +903,7 @@ Audit记录登录、访问、管理变更和关键状态操作；Request Metadat
 - Query只使用`QuickQuery + ExpressionGroup + Order`；页面不能维护不进入方案Payload的隐藏字段查询。
 - Capability决定按钮显示，但后端仍必须授权；Metadata决定可呈现字段，但不授予数据访问权。
 - 新公共组件需有跨页稳定语义；单页面布局留在页面，不创建BaseCrudPage或UniversalTable。
+- “功能验证”页面是人工操作手册，不是自动化测试框架；正式防回归仍由Go/Vitest/PostgreSQL和浏览器测试负责。
 - 当前不提供移动端专属布局引擎，也不强制特殊工作台套用标准列表DOM。
 
 ## 7. 典型调用链

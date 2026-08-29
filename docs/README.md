@@ -16,6 +16,7 @@
 
 - [平台工程架构指南](engineering/PlatformEngineeringGuide.md)：后端边界、事务、权限、Metadata和测试原则。
 - [项目结构说明](engineering/ProjectStructureGuide.md)：目录、领域入口和“我要改什么”。
+- [生产代码文件与方法说明](engineering/CodeReferenceGuide.md)：逐个生产文件说明职责、使用时机、命名方法和扩展注意事项。
 - [前端架构指南](engineering/FrontendArchitectureGuide.md)：页面类型、查询、Toolbar、组件和Theme。
 - [扩展开发指南](engineering/ExtensionDevelopmentGuide.md)：新增模块、低代码、权限、数据权限和Integration扩展流程。
 

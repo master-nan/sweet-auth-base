@@ -9,6 +9,7 @@ const docs = path.join(root, 'docs')
 const expectedDocs = new Set([
   'README.md',
   'engineering/ExtensionDevelopmentGuide.md',
+  'engineering/CodeReferenceGuide.md',
   'engineering/FrontendArchitectureGuide.md',
   'engineering/PlatformEngineeringGuide.md',
   'engineering/ProjectStructureGuide.md',
