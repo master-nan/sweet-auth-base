@@ -119,11 +119,15 @@ describe('sync task controlled form', () => {
     const wrapper = mountForm()
     const vm = wrapper.vm as unknown as {
       form: { external_system_id: number | null; interface_definition_id: number | null }
+      windowStartFormat: string
+      windowEndFormat: string
       onSystemChanged: () => void
     }
 
     expect(vm.form.external_system_id).toBeNull()
     expect(vm.form.interface_definition_id).toBeNull()
+    expect(vm.windowStartFormat).toBe('')
+    expect(vm.windowEndFormat).toBe('')
     vm.form.external_system_id = 1
     vm.form.interface_definition_id = 12
     vm.onSystemChanged()
@@ -198,5 +202,42 @@ describe('sync task controlled form', () => {
       window_start_binding: { location: 'query', code: 'updated_from' },
     })
     expect(plan).not.toHaveProperty('window_end_binding')
+  })
+
+  it('selects a compatible time format when a numeric window field is chosen', async () => {
+    apiMocks.getInterfaceDefinition.mockResolvedValue({
+      data: {
+        ...interfaceDetail,
+        input_contract: {
+          version: 1,
+          parameters: [
+            {
+              code: 'changed_since',
+              location: 'query',
+              data_type: 'integer',
+              required: true,
+              allow_multiple: false,
+              sensitive: false,
+            },
+          ],
+        },
+      },
+    })
+    const wrapper = mountForm()
+    const vm = wrapper.vm as unknown as {
+      onInterfaceChanged: (id: number) => Promise<void>
+      windowStartKey: string
+      windowStartFormat: string
+      formatOptions: (key: string) => Array<{ value: string }>
+    }
+    await vm.onInterfaceChanged(12)
+    await flushPromises()
+    vm.windowStartKey = 'query:changed_since'
+    await nextTick()
+    expect(vm.windowStartFormat).toBe('unix_seconds')
+    expect(vm.formatOptions(vm.windowStartKey).map((item) => item.value)).toEqual([
+      'unix_seconds',
+      'unix_milliseconds',
+    ])
   })
 })

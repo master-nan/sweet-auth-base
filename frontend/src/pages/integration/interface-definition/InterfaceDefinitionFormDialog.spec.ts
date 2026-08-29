@@ -42,4 +42,49 @@ describe('interface definition runtime limits', () => {
     vm.updateResponseLimitKiB(65537)
     expect(responseRule()).toBeTypeOf('string')
   })
+
+  it('uses explicit empty selections and builds a structured request contract', () => {
+    const wrapper = mount(InterfaceDefinitionFormDialog, {
+      props: {
+        modelValue: true,
+        editData: null,
+        systems: [],
+        credentials: [],
+        retryPolicies: [],
+        loading: false,
+      },
+      global: { stubs: {
+        FormDialogShell: { template: '<div><slot /></div>' },
+        QForm: { template: '<form><slot /></form>' },
+        QSelect: true,
+        QInput: QInputStub,
+        QBtn: true,
+        QBanner: true,
+        QToggle: true,
+        QTooltip: true,
+      } },
+    })
+    const vm = wrapper.vm as unknown as {
+      credentialOptions: Array<{ label: string; value: number | null }>
+      retryPolicyOptions: Array<{ label: string; value: number | null }>
+      form: { input_contract: { version: number; parameters: Array<Record<string, unknown>> } }
+      addParameter: () => void
+    }
+    expect(vm.credentialOptions).toEqual([{ label: '不使用认证凭证', value: null }])
+    expect(vm.retryPolicyOptions).toEqual([{ label: '不自动重试', value: null }])
+    vm.addParameter()
+    expect(vm.form.input_contract).toEqual({
+      version: 1,
+      parameters: [
+        expect.objectContaining({
+          code: '',
+          location: 'query',
+          data_type: 'string',
+          required: false,
+          allow_multiple: false,
+          sensitive: false,
+        }),
+      ],
+    })
+  })
 })

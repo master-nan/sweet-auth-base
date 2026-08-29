@@ -206,30 +206,30 @@
           </template>
         </q-select>
         <div v-else-if="isRangeRule(rule)" class="range-inputs">
-          <q-input
-            dense
-            outlined
-            :model-value="rangeValue(rule, 0)"
-            :type="inputTypeForRule(rule)"
-            :label="rangePlaceholderForRule(rule, 0)"
-            class="field-input range-input"
-            :rules="[rangeBoundaryRule]"
-            hide-bottom-space
-            clearable
-            @update:model-value="(value) => updateRangeValue(rule, 0, value)"
-          />
-          <q-input
-            dense
-            outlined
-            :model-value="rangeValue(rule, 1)"
-            :type="inputTypeForRule(rule)"
-            :label="rangePlaceholderForRule(rule, 1)"
-            class="field-input range-input"
-            :rules="[rangeBoundaryRule]"
-            hide-bottom-space
-            clearable
-            @update:model-value="(value) => updateRangeValue(rule, 1, value)"
-          />
+          <template v-for="index in rangeIndexes" :key="index">
+            <sweet-date-time-picker
+              v-if="dateTimePickerTypeForRule(rule)"
+              :model-value="String(rangeValue(rule, index) || '')"
+              :type="dateTimePickerTypeForRule(rule) || 'date'"
+              :label="rangePlaceholderForRule(rule, index)"
+              class="field-input range-input"
+              :rules="[rangeBoundaryRule]"
+              @update:model-value="(value) => updateRangeValue(rule, index, value)"
+            />
+            <q-input
+              v-else
+              dense
+              outlined
+              :model-value="rangeValue(rule, index)"
+              :type="inputTypeForRule(rule)"
+              :label="rangePlaceholderForRule(rule, index)"
+              class="field-input range-input"
+              :rules="[rangeBoundaryRule]"
+              hide-bottom-space
+              clearable
+              @update:model-value="(value) => updateRangeValue(rule, index, value)"
+            />
+          </template>
         </div>
         <q-select
           v-else-if="isBooleanRule(rule)"
@@ -255,6 +255,15 @@
             {{ multiValueTooltip(rule.value, booleanOptions) }}
           </q-tooltip>
         </q-select>
+        <sweet-date-time-picker
+          v-else-if="dateTimePickerTypeForRule(rule) && !isFreeInputMultiValueRule(rule)"
+          v-model="rule.value"
+          :type="dateTimePickerTypeForRule(rule) || 'date'"
+          label="值"
+          class="field-input"
+          :disable="rule.expression_type === undefined"
+          :rules="valueRules(rule)"
+        />
         <q-input
           v-else
           dense
@@ -295,6 +304,7 @@ import { SysTableFieldInputTypeMap, SysTableFieldTypeMap } from 'src/types/enum'
 import type { OrganizationSelectorRuntimeConfig } from 'src/types/organization-selector'
 import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
 import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 
 defineOptions({ name: 'AdvancedQueryRuleRow' })
 
@@ -310,6 +320,7 @@ type VirtualScrollDetails = {
   to?: number
 }
 type FieldOption = Record<string, any>
+type DateTimePickerType = 'date' | 'time' | 'datetime'
 type HtmlInputType =
   | 'number'
   | 'text'
@@ -374,6 +385,13 @@ const emit = defineEmits<{
 }>()
 
 const showLogic = props.showLogic !== false
+const rangeIndexes: Array<0 | 1> = [0, 1]
+
+const dateTimePickerTypeForRule = (rule: QueryRule): DateTimePickerType | null => {
+  const inputType = props.inputTypeForRule(rule)
+  if (inputType === 'date' || inputType === 'time') return inputType
+  return inputType === 'datetime-local' ? 'datetime' : null
+}
 
 const hasValue = (value: unknown) => {
   return value !== null && value !== undefined && value !== ''

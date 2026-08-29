@@ -24,7 +24,7 @@
           :label="controlMeta(param).label"
           :options="controlMeta(param).options"
           :loading="loading"
-          :disable="disabled"
+          :disable="Boolean(disabled)"
           @update:model-value="updateValue(param.id, $event)"
         />
 
@@ -39,6 +39,15 @@
           :label="controlMeta(param).label"
           :options="controlMeta(param).options"
           :disable="disabled"
+          @update:model-value="updateValue(param.id, $event)"
+        />
+
+        <sweet-date-time-picker
+          v-else-if="['date', 'datetime'].includes(controlMeta(param).controlType)"
+          :model-value="String(inputValueOf(param.id) || '')"
+          :type="controlMeta(param).controlType === 'datetime' ? 'datetime' : 'date'"
+          :label="controlMeta(param).label"
+          :disable="Boolean(disabled)"
           @update:model-value="updateValue(param.id, $event)"
         />
 
@@ -73,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import type { ReportParameter } from 'src/api/services/report'
 import type {
   ReportParameterControlMeta,

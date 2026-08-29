@@ -185,6 +185,7 @@ export interface InterfaceDefinitionCreateRequest {
   timeout_seconds: number
   response_limit: number
   retry_policy_id?: number
+  input_contract: InterfaceInputContract
   description?: string
 }
 
@@ -199,6 +200,7 @@ export interface InterfaceDefinitionUpdateRequest {
   response_limit?: number
   retry_policy_id?: number
   clear_retry_policy?: boolean
+  input_contract?: InterfaceInputContract
   description?: string
   revision: number
 }

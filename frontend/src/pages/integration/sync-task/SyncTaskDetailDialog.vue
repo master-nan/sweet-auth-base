@@ -12,6 +12,7 @@
 import { computed, ref, watch } from 'vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import { type SyncTaskDetail, useIntegrationApi } from 'src/api/services/integration'
+import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 const props = defineProps<{ modelValue: boolean; id: number }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: boolean): void }>()
 const api = useIntegrationApi(); const detail = ref<SyncTaskDetail | null>(null); const loading = ref(false)
@@ -23,7 +24,9 @@ const items = computed(() => detail.value ? [
   { label: '接口版本', value: `${detail.value.interface_definition.name} · v${detail.value.interface_definition.version}` },
   { label: 'Consumer', value: `${detail.value.consumer.code} · v${detail.value.consumer.version}` },
   { label: '调度', value: detail.value.schedule_type === 'cron' ? `${detail.value.cron_summary} · ${detail.value.timezone}` : '仅手工触发' },
-  { label: 'Checkpoint', value: detail.value.checkpoint_mode === 'timestamp' ? detail.value.checkpoint_at || detail.value.initial_checkpoint_at || '-' : '无' },
+  { label: '下次自动执行', value: detail.value.schedule_type === 'cron' ? formatRuntimeDateTime(detail.value.next_scheduled_at) : '-' },
+  { label: '上次自动执行', value: detail.value.schedule_type === 'cron' ? formatRuntimeDateTime(detail.value.last_scheduled_at) : '-' },
+  { label: 'Checkpoint', value: detail.value.checkpoint_mode === 'timestamp' ? formatRuntimeDateTime(detail.value.checkpoint_at || detail.value.initial_checkpoint_at) : '无' },
   { label: 'Lookback / 切片', value: detail.value.checkpoint_mode === 'timestamp' ? `${detail.value.lookback_seconds} 秒 / ${detail.value.window_slice_seconds} 秒` : '-' },
 ] : [])
 watch(() => [props.modelValue, props.id] as const, async ([open, id]) => { if (!open || !id) return; loading.value = true; try { detail.value = (await api.getSyncTask(id)).data || null } finally { loading.value = false } }, { immediate: true })

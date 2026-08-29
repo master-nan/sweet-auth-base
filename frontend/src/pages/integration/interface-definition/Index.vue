@@ -402,6 +402,7 @@ const handleFormSubmit = async (form: {
   retry_policy_id: number | null
   timeout_seconds: number
   response_limit: number
+  input_contract: InterfaceDefinitionCreateRequest['input_contract']
   description: string
 }) => {
   if (currentEditData.value) {
@@ -412,6 +413,7 @@ const handleFormSubmit = async (form: {
       relative_path: form.relative_path,
       timeout_seconds: form.timeout_seconds,
       response_limit: form.response_limit,
+      input_contract: form.input_contract,
       description: form.description,
       revision: currentEditData.value.revision,
     }
@@ -431,6 +433,7 @@ const handleFormSubmit = async (form: {
       relative_path: form.relative_path,
       timeout_seconds: form.timeout_seconds,
       response_limit: form.response_limit,
+      input_contract: form.input_contract,
       description: form.description,
     }
     if (form.credential_id) request.credential_id = form.credential_id

@@ -77,10 +77,17 @@
         ></template
       >
       <template #body-cell-consumer="props"
-        ><q-td :props="props"
-          ><span class="text-mono"
-            >{{ props.row.consumer.code }}@{{ props.row.consumer.version }}</span
-          ></q-td
+        ><q-td :props="props">
+          <span class="text-mono">{{ props.row.consumer.code }}@{{ props.row.consumer.version }}</span>
+          <status-chip
+            v-if="consumerMetadataLoaded && !isConsumerAvailable(props.row)"
+            class="q-ml-sm"
+            color="negative"
+            label="当前服务未开放"
+          >
+            <q-tooltip>后端没有注册这个 Consumer，任务暂时不能启用或运行</q-tooltip>
+          </status-chip>
+        </q-td
         ></template
       >
       <template #body-cell-schedule="props"
@@ -91,7 +98,11 @@
       >
       <template #body-cell-checkpoint="props"
         ><q-td :props="props">{{
-          props.row.checkpoint_mode === 'timestamp' ? props.row.checkpoint_at || '待首次启用' : '无'
+          props.row.checkpoint_mode === 'timestamp'
+            ? props.row.checkpoint_at
+              ? formatRuntimeDateTime(props.row.checkpoint_at)
+              : '待首次启用'
+            : '无'
         }}</q-td></template
       >
       <template #body-cell-actions="props"
@@ -162,6 +173,7 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ha
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
+import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
 const $q = useQuasar()
 const api = useIntegrationApi()
@@ -180,6 +192,7 @@ const editData = ref<SyncTaskEdit | null>(null)
 const systems = ref<ExternalSystemListItem[]>([])
 const interfaces = ref<InterfaceDefinitionListItem[]>([])
 const consumers = ref<SyncConsumerMetadata[]>([])
+const consumerMetadataLoaded = ref(false)
 const {
   fields: metadataFields,
   quickSearchPlaceholder,
@@ -312,10 +325,15 @@ const fetchReferences = async () => {
     requests.push(
       api.listSyncConsumers().then((result) => {
         consumers.value = result.data || []
+        consumerMetadataLoaded.value = true
       }),
     )
   await Promise.all(requests)
 }
+const isConsumerAvailable = (row: SyncTaskListItem) =>
+  consumers.value.some(
+    (consumer) => consumer.code === row.consumer.code && consumer.version === row.consumer.version,
+  )
 const resetAndFetch = () => {
   if (query.value.page !== 1) query.value.page = 1
   else void fetchData()
@@ -329,9 +347,9 @@ const availableLineButtons = (row: SyncTaskListItem) =>
       : button.event_action === 'create_version'
         ? row.status !== 'draft'
         : button.event_action === 'enable'
-          ? row.status !== 'enabled'
+          ? row.status !== 'enabled' && (!consumerMetadataLoaded.value || isConsumerAvailable(row))
           : button.event_action === 'disable' || button.event_action === 'run'
-            ? row.status === 'enabled'
+            ? row.status === 'enabled' && (button.event_action !== 'run' || !consumerMetadataLoaded.value || isConsumerAvailable(row))
             : true,
   )
 const openCreate = async () => {
@@ -361,7 +379,11 @@ const createVersion = (row: SyncTaskListItem) =>
       }
     })()
   })
-const changeState = (row: SyncTaskListItem, enable: boolean) =>
+const changeState = (row: SyncTaskListItem, enable: boolean) => {
+  if (enable && consumerMetadataLoaded.value && !isConsumerAvailable(row)) {
+    $q.notify({ type: 'warning', message: '当前服务未开放该同步 Consumer，不能启用任务' })
+    return
+  }
   confirmAction({
     title: enable ? '确认启用' : '确认停用',
     message: `${enable ? '启用' : '停用'}任务“${row.task_name}”v${row.version}？`,
@@ -373,7 +395,12 @@ const changeState = (row: SyncTaskListItem, enable: boolean) =>
       if (result.success) await fetchData()
     })()
   })
-const runTask = (row: SyncTaskListItem) =>
+}
+const runTask = (row: SyncTaskListItem) => {
+  if (consumerMetadataLoaded.value && !isConsumerAvailable(row)) {
+    $q.notify({ type: 'warning', message: '当前服务未开放该同步 Consumer，不能运行任务' })
+    return
+  }
   confirmAction({
     title: '运行一次',
     message: `按当前 Checkpoint 运行任务“${row.task_name}”v${row.version}？`,
@@ -386,6 +413,7 @@ const runTask = (row: SyncTaskListItem) =>
       }
     })()
   })
+}
 const handlers: PageActionHandlers<SyncTaskListItem> = {
   create: () => {
     void openCreate()
@@ -419,6 +447,7 @@ const handleSubmit = async (value: SyncTaskFormValue) => {
 }
 onMounted(async () => {
   await fetchMetadata()
+  if (hasGrantedCapability('integration_sync_task_consumer_metadata')) await fetchReferences()
   await schemePage.initialize()
   await fetchData()
   initialized.value = true

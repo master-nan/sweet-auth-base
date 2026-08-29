@@ -95,6 +95,7 @@ describe('external system API', () => {
       relative_path: '/api/orders',
       timeout_seconds: 30,
       response_limit: 10485760,
+      input_contract: { version: 1, parameters: [] },
     }
 
     await api.queryInterfaceDefinitions(query)

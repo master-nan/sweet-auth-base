@@ -15,7 +15,7 @@
         <q-input v-model="form.credential_code" outlined dense :disable="Boolean(editData)" label="凭证编码 *" hint="小写字母开头，可使用数字和下划线" :rules="[(value) => /^[a-z][a-z0-9_]{1,63}$/.test(value || '') || '请输入合法凭证编码']" />
         <q-input v-model="form.name" outlined dense label="凭证名称 *" :rules="[(value) => Boolean(value?.trim()) || '请输入凭证名称']" />
         <q-select v-model="form.credential_type" outlined dense emit-value map-options :disable="Boolean(editData)" :options="typeOptions" label="凭证类型 *" />
-        <q-input v-model="form.expires_at" outlined dense type="datetime-local" label="有效期" clearable />
+        <sweet-date-time-picker v-model="form.expires_at" type="datetime" label="有效期" />
         <q-input v-model="form.description" outlined dense type="textarea" autogrow label="描述" />
       </template>
 
@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import type { CredentialDetail, CredentialSecret, CredentialType, ExternalSystemListItem } from 'src/api/services/integration'
 
@@ -80,6 +81,14 @@ function emptyForm(): CredentialFormValue {
   return { external_system_id: null, credential_code: '', name: '', credential_type: 'basic', expires_at: '', description: '', secret: {} }
 }
 
+function toLocalDateTime(value?: string) {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const pad2 = (part: number) => String(part).padStart(2, '0')
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}:${pad2(parsed.getSeconds())}`
+}
+
 watch(() => [props.modelValue, props.editData, props.rotateMode] as const, ([open, detail, rotate]) => {
   if (!open) {
     form.secret = {}
@@ -90,7 +99,7 @@ watch(() => [props.modelValue, props.editData, props.rotateMode] as const, ([ope
     credential_code: detail.credential_code,
     name: detail.name,
     credential_type: detail.credential_type,
-    expires_at: detail.expires_at ? detail.expires_at.slice(0, 16) : '',
+    expires_at: toLocalDateTime(detail.expires_at),
     description: detail.description || '',
     secret: {},
   } : emptyForm())

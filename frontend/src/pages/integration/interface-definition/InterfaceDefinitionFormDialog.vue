@@ -33,14 +33,14 @@
         :disable="!form.external_system_id"
         :options="credentialOptions"
         label="认证凭证"
-        hint="仅显示当前外部系统的受控凭证"
+        hint="不需要认证时选择“不使用认证凭证”"
       />
       <q-select
         v-model="form.retry_policy_id"
         outlined dense emit-value map-options clearable
         :options="retryPolicyOptions"
         label="重试策略"
-        hint="仅显示已启用策略，引用变更属于接口技术契约"
+        hint="无需自动重试时选择“不自动重试”"
       />
       <q-select v-model="form.protocol" outlined dense emit-value map-options :options="protocolOptions" label="协议 *" />
       <q-select v-model="form.http_method" outlined dense emit-value map-options :options="methodOptions" label="HTTP Method *" />
@@ -66,6 +66,76 @@
         :rules="[() => form.response_limit >= MIN_RESPONSE_BYTES && form.response_limit <= MAX_RESPONSE_BYTES || '响应大小必须在 1 KiB 至 64 MiB 之间']"
         @update:model-value="updateResponseLimitKiB"
       />
+      <section class="interface-form__wide input-contract-section">
+        <div class="row items-center justify-between q-col-gutter-sm">
+          <div>
+            <div class="text-subtitle2">请求参数</div>
+            <div class="text-caption text-grey-7">声明 Path、Query、Header 或 JSON Body 中允许填写的参数。</div>
+          </div>
+          <q-btn flat dense color="primary" icon="add" label="添加参数" @click="addParameter" />
+        </div>
+
+        <q-banner v-if="!form.input_contract.parameters.length" dense rounded class="input-contract-section__empty">
+          当前接口没有业务入参。认证信息由“认证凭证”注入，不要在参数中声明 Token 或密码。
+        </q-banner>
+
+        <div
+          v-for="(parameter, index) in form.input_contract.parameters"
+          :key="index"
+          class="input-parameter-row"
+        >
+          <q-select
+            v-if="parameter.location === 'header'"
+            v-model="parameter.code"
+            outlined dense emit-value map-options
+            :options="headerCodeOptions"
+            label="参数编码 *"
+            :rules="[requiredRule]"
+          />
+          <q-input
+            v-else
+            v-model="parameter.code"
+            outlined dense
+            label="参数编码 *"
+            hint="Path参数需与相对路径中的 {占位符} 同名"
+            :rules="[parameterCodeRule]"
+          />
+          <q-select
+            v-model="parameter.location"
+            outlined dense emit-value map-options
+            :options="locationOptions"
+            label="位置 *"
+            :rules="[parameterLocationRule]"
+            @update:model-value="onParameterLocationChanged(parameter)"
+          />
+          <q-select
+            v-model="parameter.data_type"
+            outlined dense emit-value map-options
+            :options="dataTypeOptions(parameter.location)"
+            label="数据类型 *"
+          />
+          <q-input
+            v-model.number="parameter.max_length"
+            outlined dense type="number" min="1" :max="maxParameterLength(parameter.location)"
+            label="最大长度 *"
+            :rules="[(value) => Number(value) >= 1 && Number(value) <= maxParameterLength(parameter.location) || `长度必须在 1 至 ${maxParameterLength(parameter.location)} 之间`]"
+          />
+          <div class="input-parameter-row__flags">
+            <q-toggle v-model="parameter.required" label="必填" :disable="parameter.location === 'path'" />
+            <q-toggle
+              v-model="parameter.allow_multiple"
+              label="允许多值"
+              :disable="parameter.location !== 'query'"
+            />
+            <q-btn flat round dense color="negative" icon="delete_outline" aria-label="删除参数" @click="removeParameter(index)">
+              <q-tooltip>删除参数</q-tooltip>
+            </q-btn>
+          </div>
+        </div>
+      </section>
+      <q-banner class="interface-form__wide interface-form__response-note" dense rounded>
+        接口定义只约束请求方法、路径和入参。HTTP 响应由同步任务选择的 Consumer 解析并写入对应业务模块。
+      </q-banner>
       <q-input v-model="form.description" outlined dense type="textarea" autogrow class="interface-form__wide" label="描述" />
     </q-form>
     <template #footer-status>
@@ -83,6 +153,10 @@ import type {
   CredentialListItem,
   InterfaceDefinitionDetail,
   InterfaceHTTPMethod,
+  InterfaceInputContract,
+  InterfaceInputDataType,
+  InterfaceInputLocation,
+  InterfaceInputParameter,
   InterfaceProtocol,
   RetryPolicyListItem,
 } from 'src/api/services/integration'
@@ -99,6 +173,7 @@ type InterfaceFormValue = {
   description: string
   credential_id: number | null
   retry_policy_id: number | null
+  input_contract: InterfaceInputContract
 }
 
 const props = withDefaults(defineProps<{
@@ -117,14 +192,30 @@ const formRef = ref<QForm | null>(null)
 const visible = computed({ get: () => props.modelValue, set: (value) => emit('update:modelValue', value) })
 const form = reactive<InterfaceFormValue>(emptyForm())
 const systemOptions = computed(() => props.systems.map((item) => ({ label: `${item.name}（${item.system_code}）`, value: item.id })))
-const credentialOptions = computed(() => props.credentials
-  .filter((item) => item.external_system.id === form.external_system_id && item.status !== 'revoked')
-  .map((item) => ({ label: `${item.name}（${item.credential_code}）`, value: item.id })))
-const retryPolicyOptions = computed(() => props.retryPolicies
-  .filter((item) => item.status === 'enabled')
-  .map((item) => ({ label: `${item.policy_name}（${item.policy_code} · v${item.version}）`, value: item.id })))
+const credentialOptions = computed(() => [
+  { label: '不使用认证凭证', value: null },
+  ...props.credentials
+    .filter((item) => item.external_system.id === form.external_system_id && item.effective_status === 'active')
+    .map((item) => ({ label: `${item.name}（${item.credential_code}）`, value: item.id })),
+])
+const retryPolicyOptions = computed(() => [
+  { label: '不自动重试', value: null },
+  ...props.retryPolicies
+    .filter((item) => item.status === 'enabled')
+    .map((item) => ({ label: `${item.policy_name}（${item.policy_code} · v${item.version}）`, value: item.id })),
+])
 const protocolOptions = [{ label: 'HTTPS', value: 'https' }, { label: 'HTTP', value: 'http' }]
 const methodOptions = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
+const locationOptions = [
+  { label: 'Path 路径', value: 'path' },
+  { label: 'Query 查询参数', value: 'query' },
+  { label: 'Header 请求头', value: 'header' },
+  { label: 'JSON Body', value: 'body' },
+]
+const headerCodeOptions = ['Accept', 'Accept-Language', 'User-Agent', 'X-Correlation-ID'].map((value) => ({ label: value, value }))
+const inputDataTypeLabels: Record<InterfaceInputDataType, string> = {
+  string: '字符串', integer: '整数', number: '数字', boolean: '布尔', object: '对象', array: '数组',
+}
 const MAX_TIMEOUT_SECONDS = 120
 const MIN_RESPONSE_BYTES = 1024
 const MAX_RESPONSE_BYTES = 64 * 1024 * 1024
@@ -138,7 +229,36 @@ function updateResponseLimitKiB(value: string | number | null) {
 }
 
 function emptyForm(): InterfaceFormValue {
-  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, retry_policy_id: null, timeout_seconds: 30, response_limit: 10485760, description: '' }
+  return { external_system_id: null, interface_code: '', name: '', protocol: 'https', http_method: 'GET', relative_path: '/', credential_id: null, retry_policy_id: null, timeout_seconds: 30, response_limit: 10485760, description: '', input_contract: { version: 1, parameters: [] } }
+}
+
+const requiredRule = (value: unknown) => Boolean(value) || '此项必填'
+const parameterCodeRule = (value: string) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value || '') || '请输入合法参数编码'
+const parameterLocationRule = (value: InterfaceInputLocation) => value !== 'body' || form.http_method !== 'GET' || 'GET接口不能声明JSON Body参数'
+const maxParameterLength = (location: InterfaceInputLocation) => location === 'path' ? 256 : location === 'query' ? 2048 : 4096
+const dataTypeOptions = (location: InterfaceInputLocation) => {
+  const values: InterfaceInputDataType[] = location === 'path' || location === 'header'
+    ? ['string']
+    : location === 'query'
+      ? ['string', 'integer', 'number', 'boolean']
+      : ['string', 'integer', 'number', 'boolean', 'object', 'array']
+  return values.map((value) => ({ label: inputDataTypeLabels[value], value }))
+}
+const defaultParameterMaxLength = (location: InterfaceInputLocation) => maxParameterLength(location)
+const emptyParameter = (): InterfaceInputParameter => ({
+  code: '', location: 'query', data_type: 'string', required: false, allow_multiple: false, sensitive: false, max_length: 2048,
+})
+const addParameter = () => form.input_contract.parameters.push(emptyParameter())
+const removeParameter = (index: number) => form.input_contract.parameters.splice(index, 1)
+const onParameterLocationChanged = (parameter: InterfaceInputParameter) => {
+  const availableTypes = dataTypeOptions(parameter.location).map((item) => item.value)
+  if (!availableTypes.includes(parameter.data_type)) parameter.data_type = availableTypes[0] || 'string'
+  parameter.max_length = defaultParameterMaxLength(parameter.location)
+  if (parameter.location === 'path') {
+    parameter.required = true
+    parameter.allow_multiple = false
+  } else if (parameter.location !== 'query') parameter.allow_multiple = false
+  if (parameter.location === 'header' && !headerCodeOptions.some((item) => item.value === parameter.code)) parameter.code = ''
 }
 
 watch(
@@ -157,6 +277,10 @@ watch(
       timeout_seconds: detail.timeout_seconds,
       response_limit: detail.response_limit,
       description: detail.description || '',
+      input_contract: {
+        version: 1,
+        parameters: (detail.input_contract?.parameters || []).map((parameter) => ({ ...parameter })),
+      },
     } : emptyForm())
   },
   { immediate: true },
@@ -180,8 +304,25 @@ const submit = async () => {
   padding: 4px 4px 18px;
 }
 .interface-form__wide { grid-column: 1 / -1; }
+.input-contract-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface-muted);
+}
+.input-contract-section__empty, .interface-form__response-note { background: var(--app-primary-soft); }
+.input-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(130px, 1fr)) minmax(250px, auto);
+  gap: 10px;
+  align-items: start;
+}
+.input-parameter-row__flags { min-height: 40px; display: flex; align-items: center; gap: 4px; }
 @media (max-width: 700px) {
   .interface-form { grid-template-columns: 1fr; }
   .interface-form__wide { grid-column: auto; }
+  .input-parameter-row { grid-template-columns: 1fr; }
 }
 </style>

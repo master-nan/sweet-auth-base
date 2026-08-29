@@ -50,7 +50,15 @@
         :options="consumerOptions"
         label="Consumer *"
         :rules="[requiredRule]"
-      />
+      >
+        <template #no-option>
+          <q-item>
+            <q-item-section class="text-grey-7">
+              当前服务未开放可用 Consumer，请先检查后端同步配置
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
       <q-select
         v-model="form.schedule_type"
         outlined
@@ -86,12 +94,10 @@
         :options="checkpointOptions"
         label="Checkpoint 模式 *"
       />
-      <q-input
+      <sweet-date-time-picker
         v-if="form.checkpoint_mode === 'timestamp'"
         v-model="initialCheckpointLocal"
-        outlined
-        dense
-        type="datetime-local"
+        type="datetime"
         label="初始 Checkpoint *"
         :rules="[requiredRule]"
       />
@@ -180,6 +186,7 @@
         map-options
         :options="formatOptions(windowStartKey)"
         label="窗口开始格式 *"
+        :rules="[requiredRule]"
       />
       <q-select
         v-if="form.checkpoint_mode === 'timestamp' && windowMode === 'bounded_window'"
@@ -201,6 +208,7 @@
         map-options
         :options="formatOptions(windowEndKey)"
         label="窗口结束格式 *"
+        :rules="[requiredRule]"
       />
       <q-input
         v-model="form.description"
@@ -224,6 +232,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import {
   type ExternalSystemListItem,
@@ -276,8 +285,8 @@ const staticValues = reactive<Record<string, string | boolean>>({})
 const consumerKey = ref('')
 const windowStartKey = ref('')
 const windowEndKey = ref('')
-const windowStartFormat = ref<SyncTimeFormat>('rfc3339')
-const windowEndFormat = ref<SyncTimeFormat>('rfc3339')
+const windowStartFormat = ref<SyncTimeFormat | ''>('')
+const windowEndFormat = ref<SyncTimeFormat | ''>('')
 const windowMode = ref<SyncWindowMode>('bounded_window')
 const initialCheckpointLocal = ref('')
 const form = reactive<SyncTaskEditableForm>(emptyForm())
@@ -342,8 +351,9 @@ const selectedStaticParameters = computed(() =>
 )
 const formatOptions = (key: string) => {
   const parameter = eligibleParameters.value.find((item) => parameterKey(item) === key)
+  if (!parameter) return []
   const values: SyncTimeFormat[] =
-    parameter?.data_type === 'string'
+    parameter.data_type === 'string'
       ? ['rfc3339', 'local_datetime_seconds', 'unix_seconds', 'unix_milliseconds']
       : ['unix_seconds', 'unix_milliseconds']
   return values.map((value) => ({
@@ -358,6 +368,20 @@ const formatOptions = (key: string) => {
     value,
   }))
 }
+const normalizeWindowFormat = (key: string, current: SyncTimeFormat | ''): SyncTimeFormat | '' => {
+  const values = formatOptions(key).map((item) => item.value)
+  return current && values.includes(current) ? current : values[0] || ''
+}
+
+const toLocalDateTime = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const pad2 = (part: number) => String(part).padStart(2, '0')
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}:${pad2(parsed.getSeconds())}`
+}
+
+const toAPIDateTime = (value: string) => new Date(value.replace(' ', 'T')).toISOString()
 
 function emptyForm(): SyncTaskEditableForm {
   return {
@@ -407,6 +431,8 @@ function resetPlan() {
   Object.keys(staticValues).forEach((key) => delete staticValues[key])
   windowStartKey.value = ''
   windowEndKey.value = ''
+  windowStartFormat.value = ''
+  windowEndFormat.value = ''
 }
 function setStaticTextValue(parameter: InterfaceInputParameter, value: string | number | null) {
   staticValues[parameterKey(parameter)] = String(value ?? '')
@@ -440,14 +466,14 @@ function buildInputPlan(): SyncExecutionInputPlan {
     plan.window_start_binding = {
       location: startLocation as InterfaceInputParameter['location'],
       code: startCode.join(':'),
-      format: windowStartFormat.value,
+      format: windowStartFormat.value as SyncTimeFormat,
     }
     if (windowMode.value === 'bounded_window') {
       const [endLocation, ...endCode] = windowEndKey.value.split(':')
       plan.window_end_binding = {
         location: endLocation as InterfaceInputParameter['location'],
         code: endCode.join(':'),
-        format: windowEndFormat.value,
+        format: windowEndFormat.value as SyncTimeFormat,
       }
     }
   }
@@ -509,9 +535,7 @@ watch(
         : emptyForm(),
     )
     consumerKey.value = form.consumer_code ? `${form.consumer_code}@${form.consumer_version}` : ''
-    initialCheckpointLocal.value = form.initial_checkpoint_at
-      ? form.initial_checkpoint_at.slice(0, 16)
-      : ''
+    initialCheckpointLocal.value = toLocalDateTime(form.initial_checkpoint_at)
     await loadDefinition(form.interface_definition_id)
     applyPlan(edit?.input_plan || emptyPlan())
   },
@@ -538,6 +562,12 @@ watch(
 watch(windowMode, (value) => {
   if (value === 'lower_bound_only') windowEndKey.value = ''
 })
+watch(windowStartKey, (key) => {
+  windowStartFormat.value = normalizeWindowFormat(key, windowStartFormat.value)
+})
+watch(windowEndKey, (key) => {
+  windowEndFormat.value = normalizeWindowFormat(key, windowEndFormat.value)
+})
 watch(consumerKey, (value) => {
   const [code, version] = value.split('@')
   form.consumer_code = code || ''
@@ -548,7 +578,7 @@ async function submit() {
   if (!(await formRef.value?.validate())) return
   if (form.external_system_id === null || form.interface_definition_id === null) return
   if (form.checkpoint_mode === 'timestamp' && initialCheckpointLocal.value)
-    form.initial_checkpoint_at = new Date(initialCheckpointLocal.value).toISOString()
+    form.initial_checkpoint_at = toAPIDateTime(initialCheckpointLocal.value)
   else delete form.initial_checkpoint_at
   emit('submit', {
     ...form,

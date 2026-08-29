@@ -299,13 +299,14 @@ defineExpose({
   gap: 0;
   overflow: hidden;
   padding: 0;
+  border: 1px solid var(--app-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--app-surface);
   box-shadow: 0 12px 34px rgba(33, 43, 72, 0.18);
 }
 
 .sweet-date-time-panel--datetime {
-  grid-template-columns: 292px auto 180px;
+  grid-template-columns: 292px auto 204px;
   align-items: stretch;
 }
 
@@ -338,18 +339,18 @@ defineExpose({
 }
 
 .sweet-date-time-clock {
-  width: 180px;
+  width: 204px;
   display: flex;
   flex-direction: column;
   padding: 14px 14px 10px;
-  background: #fbfcff;
+  background: var(--app-surface-muted);
 }
 
 .sweet-date-time-clock__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #172033;
+  color: var(--app-text-strong);
   font-size: 14px;
   font-weight: 700;
 }
@@ -357,10 +358,10 @@ defineExpose({
 .sweet-date-time-clock__value {
   margin: 10px 0 12px;
   padding: 8px 10px;
-  border: 1px solid #dfe5f1;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
-  background: #fff;
-  color: #172033;
+  background: var(--app-surface);
+  color: var(--app-text-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 18px;
   text-align: center;
@@ -383,17 +384,17 @@ defineExpose({
   height: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid #e1e6f0;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
-  background: #fff;
-  color: #172033;
+  background: var(--app-surface);
+  color: var(--app-text-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 18px;
   font-weight: 700;
 }
 
 .sweet-date-time-clock__label {
-  color: #7a869f;
+  color: var(--app-text-muted);
   font-size: 12px;
 }
 
@@ -403,7 +404,21 @@ defineExpose({
   justify-content: flex-end;
   gap: 8px;
   padding: 10px 12px;
-  border-top: 1px solid #edf0f7;
-  background: #fff;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
+}
+
+@media (max-width: 560px) {
+  .sweet-date-time-panel--datetime {
+    grid-template-columns: 292px;
+  }
+
+  .sweet-date-time-panel--datetime :deep(.q-separator--vertical) {
+    display: none;
+  }
+
+  .sweet-date-time-clock {
+    width: 292px;
+  }
 }
 </style>

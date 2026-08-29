@@ -408,21 +408,19 @@
             :rules="selectedIdRules"
             @filter="filterPolicyOptions"
           />
-          <q-input
-            v-model="grantForm.valid_from"
+          <sweet-date-time-picker
+            :model-value="grantForm.valid_from ?? null"
             class="col-12 col-md-6"
-            outlined
-            dense
             type="date"
             label="有效期开始"
+            @update:model-value="grantForm.valid_from = $event || null"
           />
-          <q-input
-            v-model="grantForm.valid_to"
+          <sweet-date-time-picker
+            :model-value="grantForm.valid_to ?? null"
             class="col-12 col-md-6"
-            outlined
-            dense
             type="date"
             label="有效期结束"
+            @update:model-value="grantForm.valid_to = $event || null"
           />
           <q-input
             v-model="grantForm.description"
@@ -442,6 +440,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { type QForm, useQuasar } from 'quasar'
+import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import {
   type DataGrant,

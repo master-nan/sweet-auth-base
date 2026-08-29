@@ -123,7 +123,9 @@ describe('sync task page permissions', () => {
     api.querySyncTasks.mockResolvedValue({ data: [row], total: 1 })
     api.queryExternalSystems.mockResolvedValue({ data: [] })
     api.queryInterfaceDefinitions.mockResolvedValue({ data: [] })
-    api.listSyncConsumers.mockResolvedValue({ data: [] })
+    api.listSyncConsumers.mockResolvedValue({
+      data: [{ code: 'org_employee', version: 1, name: '人员消费器' }],
+    })
     tableApi.queryRuntimeTableByCode.mockResolvedValue({
       success: true,
       data: { table_fields: [] },
@@ -206,6 +208,45 @@ describe('sync task page permissions', () => {
     expect(api.runSyncTask).toHaveBeenCalledWith(row.id, row.revision)
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining('SYNC-100') }),
+    )
+  })
+
+  it('does not enable or run a task whose consumer is not open in the current service', async () => {
+    api.listSyncConsumers.mockResolvedValue({ data: [] })
+    const wrapper = shallowMount(Page, {
+      global: {
+        plugins: [createPinia()],
+        stubs: {
+          BaseContent: Slot,
+          QTable: Table,
+          QInput: true,
+          QSelect: true,
+          QBtn: true,
+          QIcon: true,
+          QChip: true,
+          QTd: Slot,
+          QTooltip: true,
+          QSpace: true,
+          TablePagination: true,
+          SyncTaskFormDialog: true,
+          SyncTaskDetailDialog: true,
+        },
+      },
+    })
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      availableLineButtons: (value: SyncTaskListItem) => Array<{ event_action: string }>
+      handleButtonClick: (button: { event_action: string }, value: SyncTaskListItem) => void
+    }
+    expect(vm.availableLineButtons(row).map((item) => item.event_action)).not.toContain('enable')
+    expect(
+      vm.availableLineButtons({ ...row, status: 'enabled' }).map((item) => item.event_action),
+    ).not.toContain('run')
+    vm.handleButtonClick({ event_action: 'run' }, { ...row, status: 'enabled' })
+    await flushPromises()
+    expect(api.runSyncTask).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('未开放') }),
     )
   })
 

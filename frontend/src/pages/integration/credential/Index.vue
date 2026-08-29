@@ -370,7 +370,7 @@ const actionHandlers: PageActionHandlers<CredentialListItem> = {
 const handleButtonClick = (button: MenuButton, row?: CredentialListItem) => {
   dispatchPageAction(button, actionHandlers, row)
 }
-const toAPIDate = (value: string) => new Date(value).toISOString()
+const toAPIDate = (value: string) => new Date(value.replace(' ', 'T')).toISOString()
 const handleFormSubmit = async (form: {
   external_system_id: number | null
   credential_code: string
