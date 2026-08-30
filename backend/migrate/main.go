@@ -1422,6 +1422,9 @@ func selectReportVersionForBackfill(db *gorm.DB, reportId int) (model.ReportDefi
 }
 
 func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.Snowflake) (int, error) {
+	if desired <= 0 {
+		return newMigrationID(sf)
+	}
 	var count int64
 	// 主键约束仍包含软删除记录，因此检查编号时也必须包含它们。
 	if err := db.Unscoped().Model(modelValue).Where("id = ?", desired).Count(&count).Error; err != nil {
@@ -1854,9 +1857,9 @@ func seedDictionaryMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, rol
 
 func seedVerificationMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
-		apiPermissionWithAPI(750, menuID, "样例状态", "develop_verification_sample_status", enum.Top, "status", "fact_check", "primary", 90, "/admin/development/verification/samples", "GET"),
-		apiPermissionWithAPI(751, menuID, "准备样例", "develop_verification_sample_prepare", enum.Top, "prepare", "playlist_add_check", "primary", 91, "/admin/development/verification/samples/:scenario/prepare", "POST"),
-		apiPermissionWithAPI(752, menuID, "清理样例", "develop_verification_sample_cleanup", enum.Top, "cleanup", "delete_sweep", "negative", 92, "/admin/development/verification/samples/:scenario", "DELETE"),
+		apiPermissionWithAPI(0, menuID, "样例状态", "develop_verification_sample_status", enum.Top, "status", "fact_check", "primary", 90, "/admin/development/verification/samples", "GET"),
+		apiPermissionWithAPI(0, menuID, "准备样例", "develop_verification_sample_prepare", enum.Top, "prepare", "playlist_add_check", "primary", 91, "/admin/development/verification/samples/:scenario/prepare", "POST"),
+		apiPermissionWithAPI(0, menuID, "清理样例", "develop_verification_sample_cleanup", enum.Top, "cleanup", "delete_sweep", "negative", 92, "/admin/development/verification/samples/:scenario", "DELETE"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }

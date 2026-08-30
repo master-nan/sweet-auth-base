@@ -498,6 +498,16 @@ func TestSeedPrimaryIDSkipsSoftDeletedRecord(t *testing.T) {
 	}
 }
 
+func TestSeedPrimaryIDGeneratesSnowflakeWhenDesiredIDIsZero(t *testing.T) {
+	id, err := seedPrimaryId(migrateTestDB(t), &model.SysMenuButton{}, 0, newMigrationTestSnowflake(t))
+	if err != nil {
+		t.Fatalf("generate seed id: %v", err)
+	}
+	if id <= 0 {
+		t.Fatalf("generated seed id = %d, want positive snowflake id", id)
+	}
+}
+
 func TestRemoveLowCodeViewRefreshConfigurationIsIdempotent(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.SysMenuButtonTemplate{}); err != nil {
