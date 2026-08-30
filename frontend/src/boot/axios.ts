@@ -47,7 +47,7 @@ function persistedAccessToken() {
   return String(LocalStorage.getItem('access_token') || '')
 }
 
-const refreshClient = axios.create({
+export const refreshClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/sweet_admin',
   timeout: 30_000,
   withCredentials: true,

@@ -12,6 +12,7 @@ export default defineConfig({
       pages: fileURLToPath(new URL('./src/pages', import.meta.url)),
       layouts: fileURLToPath(new URL('./src/layouts', import.meta.url)),
       stores: fileURLToPath(new URL('./src/stores', import.meta.url)),
+      '#q-app/wrappers': fileURLToPath(new URL('./src/test/quasar-wrappers.ts', import.meta.url)),
     },
   },
   test: {
