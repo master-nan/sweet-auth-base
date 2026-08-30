@@ -162,6 +162,16 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
+        component: () => import('pages/system/online-session/Index.vue'),
+        path: 'online-session',
+        name: 'system_online_session',
+        meta: {
+          title: 'router.system.onlineSession',
+          icon: 'devices',
+          keepAlive: true,
+        },
+      },
+      {
         component: () => import('pages/system/audit/Index.vue'),
         path: 'audit',
         name: 'system_audit',

@@ -19,6 +19,21 @@ const clearAuthSessionStorage = () => {
   authSessionStorageKeys.forEach((key) => LocalStorage.remove(key))
 }
 
+const tokenSessionIdentity = (value: string) => {
+  try {
+    const payload = value.split('.')[1]
+    if (!payload) return ''
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const normalized = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+    const decoded = JSON.parse(atob(normalized)) as { sub?: string; sid?: string }
+    const subject = String(decoded.sub || '')
+    const sessionID = String(decoded.sid || '')
+    return subject && sessionID ? `${subject}:${sessionID}` : ''
+  } catch {
+    return ''
+  }
+}
+
 export function isStaleSessionSnapshot(
   requestToken: string | undefined,
   requestGeneration: number | undefined,
@@ -118,6 +133,12 @@ export const useUserStore = defineStore('user', {
         LocalStorage.remove('password_change_reason')
       }
     },
+    replaceAccessToken(accessToken: string) {
+      if (!accessToken || accessToken === this.access_token) return
+      LocalStorage.set('access_token', accessToken)
+      this.access_token = accessToken
+      this.session_generation += 1
+    },
     setUserInfo(partial: Partial<User>) {
       if (partial.roles) {
         this.roles = partial.roles as Role[]
@@ -159,7 +180,29 @@ export const useUserStore = defineStore('user', {
         this.setLogout()
         return
       }
+      if (
+        tokenSessionIdentity(accessToken) &&
+        tokenSessionIdentity(accessToken) === tokenSessionIdentity(this.access_token)
+      ) {
+        this.replaceAccessToken(accessToken)
+        return
+      }
       this.setLoginToken(accessToken)
+    },
+    async logout() {
+      const token = this.access_token
+      const baseURL = String(import.meta.env.VITE_API_URL || '/sweet_admin').replace(/\/$/, '')
+      try {
+        await fetch(`${baseURL}/admin/logout`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+      } catch {
+        // 服务不可达时仍清除本地登录状态，服务端会话由过期时间兜底。
+      } finally {
+        this.setLogout()
+      }
     },
     setLogout() {
       clearAuthSessionStorage()

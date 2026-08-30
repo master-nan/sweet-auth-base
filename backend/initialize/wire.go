@@ -45,6 +45,7 @@ type App struct {
 	MenuController                    *controller.MenuController
 	RoleController                    *controller.RoleController
 	UserController                    *controller.UserController
+	UserSessionController             *controller.UserSessionController
 	DataPermissionConfigController    *controller.DataPermissionConfigController
 	ExternalSystemController          *controller.ExternalSystemController
 	InterfaceDefinitionController     *controller.InterfaceDefinitionController
@@ -219,6 +220,7 @@ var ServiceProvider = wire.NewSet(
 	service.NewAuthAuditService,
 	wire.Bind(new(service.AuthAuditRecorder), new(*service.AuthAuditService)),
 	service.NewAuthTokenService,
+	service.NewUserSessionService,
 	service.NewAuthLoginStateService,
 	service.NewPasswordCredentialProvider,
 	service.NewSMSCredentialProvider,
@@ -295,6 +297,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewMenuController,
 	controller.NewRoleController,
 	controller.NewUserController,
+	controller.NewUserSessionController,
 	controller.NewDataPermissionConfigController,
 	controller.NewExternalSystemController,
 	controller.NewInterfaceDefinitionController,

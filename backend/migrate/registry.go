@@ -48,6 +48,7 @@ func migrationSteps() []migrationStep {
 		migrateOrganizationSourceCodeIndexes,
 		migrateCanonicalTimeAndIDContract,
 		migrateIntegrationReferenceIntegritySchema,
+		migrateUserSessionSchema,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -64,6 +65,10 @@ func migrationSteps() []migrationStep {
 		})
 	}
 	return steps
+}
+
+func migrateUserSessionSchema(db *gorm.DB) error {
+	return db.AutoMigrate(&model.SysUserSession{})
 }
 
 func migrateNotificationCenterSchema(db *gorm.DB) error {

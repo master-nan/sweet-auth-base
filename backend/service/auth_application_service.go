@@ -26,6 +26,7 @@ type AuthApplicationService struct {
 	configure  *SysConfigureService
 	attempts   *cache.LoginAttemptCache
 	tokens     *AuthTokenService
+	sessions   *UserSessionService
 	loginState *AuthLoginStateService
 	audit      AuthAuditRecorder
 	captcha    *CaptchaVerifier
@@ -38,6 +39,7 @@ func NewAuthApplicationService(
 	configure *SysConfigureService,
 	attempts *cache.LoginAttemptCache,
 	tokens *AuthTokenService,
+	sessions *UserSessionService,
 	loginState *AuthLoginStateService,
 	audit AuthAuditRecorder,
 	captchaVerifier *CaptchaVerifier,
@@ -50,7 +52,7 @@ func NewAuthApplicationService(
 		providers[provider.Type()] = provider
 	}
 	return &AuthApplicationService{
-		users: users, configure: configure, attempts: attempts, tokens: tokens,
+		users: users, configure: configure, attempts: attempts, tokens: tokens, sessions: sessions,
 		loginState: loginState, audit: audit, captcha: captchaVerifier,
 		providers: providers, now: time.Now,
 	}
@@ -160,8 +162,22 @@ func (s *AuthApplicationService) Authenticate(ctx context.Context, req Authentic
 		_ = s.recordStatus(ctx, req, verification, false, "login_state_failed", authAuditHTTPStatus(err))
 		return AuthenticationResult{}, err
 	}
+	if s.sessions != nil {
+		client := req.Client
+		if client.Channel == "" {
+			client.Channel = string(req.Channel)
+		}
+		if err := s.sessions.Open(ctx, user.Id, pair.SessionID, pair.IssuedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
+			s.tokens.RevokePair(pair)
+			s.closeIssuedSession(ctx, pair, "登录设备登记失败")
+			_ = s.loginState.RollbackLogin(ctx, user.Id, pair.AccessToken)
+			_ = s.recordStatus(ctx, req, verification, false, "session_record_failed", authAuditHTTPStatus(err))
+			return AuthenticationResult{}, err
+		}
+	}
 	if _, err := s.tokens.ValidateAccess(ctx, pair.AccessToken); err != nil {
 		s.tokens.RevokePair(pair)
+		s.closeIssuedSession(ctx, pair, "登录未完成")
 		_ = s.loginState.RollbackLogin(ctx, user.Id, pair.AccessToken)
 		_ = s.record(ctx, req, verification, false, "authentication_conflict")
 		return AuthenticationResult{}, errors.ErrAuthenticationFailed
@@ -169,6 +185,7 @@ func (s *AuthApplicationService) Authenticate(ctx context.Context, req Authentic
 	verification.Identity.Username = user.UserName
 	if err := s.record(ctx, req, verification, true, "authentication_succeeded"); err != nil {
 		s.tokens.RevokePair(pair)
+		s.closeIssuedSession(ctx, pair, "登录审计写入失败")
 		_ = s.loginState.RollbackLogin(ctx, user.Id, pair.AccessToken)
 		return AuthenticationResult{}, errors.WrapSystemError(err)
 	}
@@ -178,7 +195,7 @@ func (s *AuthApplicationService) Authenticate(ctx context.Context, req Authentic
 	}, nil
 }
 
-func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken string) (AuthenticationResult, error) {
+func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken string, clients ...UserSessionClient) (AuthenticationResult, error) {
 	startedAt := s.now().UTC()
 	claims, err := s.tokens.ValidateRefresh(ctx, refreshToken)
 	if err != nil {
@@ -237,15 +254,33 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "login_state_failed", HTTPStatus: authAuditHTTPStatus(err)})
 		return AuthenticationResult{}, err
 	}
+	if s.sessions != nil {
+		client := UserSessionClient{Channel: string(AuthChannelRefresh)}
+		if len(clients) > 0 {
+			client = clients[0]
+			if client.Channel == "" {
+				client.Channel = string(AuthChannelRefresh)
+			}
+		}
+		if err := s.sessions.Touch(ctx, userID, pair.SessionID, startedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
+			s.tokens.RevokePair(pair)
+			s.closeIssuedSession(ctx, pair, "刷新设备记录失败")
+			_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)
+			_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "session_record_failed", HTTPStatus: authAuditHTTPStatus(err)})
+			return AuthenticationResult{}, err
+		}
+	}
 	// 在登录状态写入后关闭Logout与Refresh竞态：Logout会停用旧Token和新Token共享的Session。
 	if _, err := s.tokens.ValidateAccess(ctx, pair.AccessToken); err != nil {
 		s.tokens.RevokePair(pair)
+		s.closeIssuedSession(ctx, pair, "刷新未完成")
 		_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, UserID: userID, ReasonCode: "refresh_conflict"})
 		return AuthenticationResult{}, errors.ErrInvalidRefreshToken
 	}
 	if err := s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelRefresh, CredentialType: AuthCredentialRefresh, Success: true, UserID: userID, ReasonCode: "refresh_succeeded"}); err != nil {
 		s.tokens.RevokePair(pair)
+		s.closeIssuedSession(ctx, pair, "刷新审计写入失败")
 		_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)
 		return AuthenticationResult{}, errors.WrapSystemError(err)
 	}
@@ -255,6 +290,11 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 }
 
 func (s *AuthApplicationService) Logout(ctx context.Context, accessToken string) error {
+	claims, err := s.tokens.ParseForLogout(accessToken)
+	if err != nil {
+		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialAccess, ReasonCode: "logout_token_invalid", HTTPStatus: authAuditHTTPStatus(err)})
+		return err
+	}
 	userID, err := s.tokens.RevokeAccessAndSession(accessToken)
 	if err != nil {
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialAccess, ReasonCode: "logout_token_invalid", HTTPStatus: authAuditHTTPStatus(err)})
@@ -264,7 +304,26 @@ func (s *AuthApplicationService) Logout(ctx context.Context, accessToken string)
 		_ = s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialAccess, UserID: userID, ReasonCode: "login_state_failed", HTTPStatus: authAuditHTTPStatus(err)})
 		return err
 	}
+	if s.sessions != nil {
+		if err := s.sessions.Close(ctx, userID, claims.SessionID, model.UserSessionStatusLoggedOut, "用户主动退出"); err != nil {
+			return err
+		}
+	}
 	return s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialAccess, Success: true, UserID: userID, ReasonCode: "logout_succeeded"})
+}
+
+// LogoutWithRefresh 供浏览器在 Access Token 已过期时使用 HttpOnly Refresh Cookie 退出。
+func (s *AuthApplicationService) LogoutWithRefresh(ctx context.Context, refreshToken string) error {
+	userID, sessionID, err := s.tokens.RevokeRefreshAndSession(refreshToken)
+	if err != nil {
+		return err
+	}
+	if s.sessions != nil {
+		if err := s.sessions.Close(ctx, userID, sessionID, model.UserSessionStatusLoggedOut, "用户主动退出"); err != nil {
+			return err
+		}
+	}
+	return s.audit.RecordAuthEvent(ctx, AuthAuditEvent{Channel: AuthChannelLogout, CredentialType: AuthCredentialRefresh, Success: true, UserID: userID, ReasonCode: "logout_succeeded"})
 }
 
 func (s *AuthApplicationService) AuthenticateAccessToken(ctx context.Context, accessToken string) (AuthenticatedAccess, error) {
@@ -299,7 +358,8 @@ func (s *AuthApplicationService) AuthenticateAccessToken(ctx context.Context, ac
 	}
 	mustChange, reason := PasswordChangeRequirement(user, cfg, s.now().UTC())
 	return AuthenticatedAccess{
-		User: user, Issued: claims.IssuedAt,
+		User: user, Issued: claims.IssuedAt, ExpiresAt: claims.ExpiresAt,
+		SessionID: claims.SessionID, TokenID: claims.TokenID,
 		MustChangePassword: mustChange, PasswordChangeReason: reason,
 	}, nil
 }
@@ -348,4 +408,10 @@ func TokenIssuedBeforePasswordChangeAt(issuedAt time.Time, user model.SysUser, n
 		return false
 	}
 	return issuedAt.UTC().Truncate(time.Second).Before(changedAt.UTC().Truncate(time.Second))
+}
+
+func (s *AuthApplicationService) closeIssuedSession(ctx context.Context, pair AuthTokenPair, reason string) {
+	if s.sessions != nil {
+		_ = s.sessions.Close(ctx, pair.UserID, pair.SessionID, model.UserSessionStatusLoggedOut, reason)
+	}
 }

@@ -30,6 +30,7 @@ export interface UserUpdateReq {
   user_name: string
   email: string
   phone_number: string
+  state?: boolean
 }
 
 export interface UserAssignRolesReq {

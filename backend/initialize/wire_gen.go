@@ -88,6 +88,7 @@ func InitializeApp() (*App, error) {
 	jwtToken := ProvideJWTToken()
 	tokenBlackCache := cache.NewTokenBlackCache(redisUtil)
 	authTokenService := service.NewAuthTokenService(jwtToken, tokenBlackCache, server)
+	userSessionService := service.NewUserSessionService(primaryDB, snowflake, authTokenService)
 	authLoginStateService := service.NewAuthLoginStateService(sysUserRepositoryImpl)
 	loginLogRepositoryImpl := impl.NewLoginLogRepositoryImpl(primaryDB)
 	accessLogRepositoryImpl := impl.NewAccessLogRepositoryImpl(primaryDB)
@@ -101,8 +102,8 @@ func InitializeApp() (*App, error) {
 	dingTalkUserIDCache := cache.NewDingTalkUserIDCache(redisUtil)
 	dingTalkService := service.NewDingTalkService(dingTalkCache, dingTalkUserIDCache)
 	dingTalkCredentialProvider := service.NewDingTalkCredentialProvider(dingTalkService, sysUserRepositoryImpl)
-	authApplicationService := service.NewAuthApplicationService(sysUserRepositoryImpl, sysConfigureService, loginAttemptCache, authTokenService, authLoginStateService, authAuditService, captchaVerifier, passwordCredentialProvider, smsCredentialProvider, dingTalkCredentialProvider)
-	basicController := controller.NewBasicController(authApplicationService, sysConfigureService, logService, v2)
+	authApplicationService := service.NewAuthApplicationService(sysUserRepositoryImpl, sysConfigureService, loginAttemptCache, authTokenService, userSessionService, authLoginStateService, authAuditService, captchaVerifier, passwordCredentialProvider, smsCredentialProvider, dingTalkCredentialProvider)
+	basicController := controller.NewBasicController(authApplicationService, sysConfigureService, logService, v2, server)
 	sysMenuRepositoryImpl := impl.NewSysMenuRepositoryImpl(primaryDB)
 	sysMenuButtonRepositoryImpl := impl.NewSysMenuButtonRepositoryImpl(primaryDB)
 	sysMenuButtonTemplateRepositoryImpl := impl.NewSysMenuButtonTemplateRepositoryImpl(primaryDB)
@@ -118,8 +119,9 @@ func InitializeApp() (*App, error) {
 	sysRoleService := service.NewSysRoleService(sysMenuButtonRepositoryImpl, sysRoleRepositoryImpl, sysRoleMenuRepositoryImpl, sysRoleMenuButtonRepositoryImpl, casbinRuleRepositoryImpl, snowflake)
 	roleController := controller.NewRoleController(sysRoleService, sysTableService, v2)
 	sysUserCache := cache.NewSysUserCache(redisUtil)
-	sysUserService := service.NewSysUserService(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, snowflake, sysUserCache, server)
+	sysUserService := service.NewSysUserService(sysUserRepositoryImpl, sysUserRoleRepositoryImpl, snowflake, sysUserCache, server, userSessionService)
 	userController := controller.NewUserController(sysUserService, sysConfigureService, v2, server, sysTableService, loginAttemptCache)
+	userSessionController := controller.NewUserSessionController(userSessionService, v2)
 	dataResourceRepositoryImpl := impl.NewDataResourceRepositoryImpl(primaryDB)
 	dataResourceOperationRepositoryImpl := impl.NewDataResourceOperationRepositoryImpl(primaryDB)
 	dataOwnershipFieldRepositoryImpl := impl.NewDataOwnershipFieldRepositoryImpl(primaryDB)
@@ -279,6 +281,7 @@ func InitializeApp() (*App, error) {
 		MenuController:                    menuController,
 		RoleController:                    roleController,
 		UserController:                    userController,
+		UserSessionController:             userSessionController,
 		DataPermissionConfigController:    dataPermissionConfigController,
 		ExternalSystemController:          externalSystemController,
 		InterfaceDefinitionController:     interfaceDefinitionController,
@@ -333,6 +336,7 @@ type App struct {
 	MenuController                    *controller.MenuController
 	RoleController                    *controller.RoleController
 	UserController                    *controller.UserController
+	UserSessionController             *controller.UserSessionController
 	DataPermissionConfigController    *controller.DataPermissionConfigController
 	ExternalSystemController          *controller.ExternalSystemController
 	InterfaceDefinitionController     *controller.InterfaceDefinitionController
@@ -376,7 +380,7 @@ var RepositoryProvider = wire.NewSet(impl.NewAccessLogRepositoryImpl, impl.NewLo
 var CacheProvider = wire.NewSet(cache.NewSysConfigureCache, cache.NewSysUserCache, cache.NewSysDictCache, cache.NewSysTableCache, cache.NewSysTableFieldCache, cache.NewTokenBlackCache, cache.NewLoginAttemptCache, cache.NewApplicationCache, cache.NewDingTalkCache, cache.NewSmsTemplateCache, cache.NewSendCodeCache, cache.NewDingTalkUserIDCache)
 
 // Service 提供者
-var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewAuthAuditService, wire.Bind(new(service.AuthAuditRecorder), new(*service.AuthAuditService)), service.NewAuthTokenService, service.NewAuthLoginStateService, service.NewPasswordCredentialProvider, service.NewSMSCredentialProvider, service.NewDingTalkCredentialProvider, service.NewCaptchaVerifier, service.NewAuthApplicationService, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), wire.Bind(new(service.StandardContextAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewMetadataRuntimeService, wire.Bind(new(datapermission.MetadataFieldReader), new(*service.MetadataRuntimeService)), wire.Bind(new(service.MetadataSecurityReader), new(*service.MetadataRuntimeService)), wire.Bind(new(metadata.RuntimeReader), new(*service.MetadataRuntimeService)), service.NewSysTableService, service.NewLowCodePublicationService, service.NewSysUserService, service.NewGeneralizationServiceWithRuntimeAndDataPermission, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, service.NewDataPermissionPolicyResolver, datapermission.NewMetadataFieldAdapter, service.NewLowCodeDataPermissionRuntime, wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)), wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)), ProvideOwnershipFieldRegistry, wire.Bind(
+var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewAuthAuditService, wire.Bind(new(service.AuthAuditRecorder), new(*service.AuthAuditService)), service.NewAuthTokenService, service.NewUserSessionService, service.NewAuthLoginStateService, service.NewPasswordCredentialProvider, service.NewSMSCredentialProvider, service.NewDingTalkCredentialProvider, service.NewCaptchaVerifier, service.NewAuthApplicationService, wire.Bind(new(service.TransactionalAuditWriter), new(*service.LogService)), wire.Bind(new(service.StandardContextAuditWriter), new(*service.LogService)), service.NewSysConfigureService, service.NewSysDictService, service.NewSysRoleService, service.NewSysMenuService, service.NewMetadataRuntimeService, wire.Bind(new(datapermission.MetadataFieldReader), new(*service.MetadataRuntimeService)), wire.Bind(new(service.MetadataSecurityReader), new(*service.MetadataRuntimeService)), wire.Bind(new(metadata.RuntimeReader), new(*service.MetadataRuntimeService)), service.NewSysTableService, service.NewLowCodePublicationService, service.NewSysUserService, service.NewGeneralizationServiceWithRuntimeAndDataPermission, service.NewDataResourceConfigService, service.NewDataOwnershipConfigService, service.NewDataPolicyConfigService, service.NewDataGrantConfigService, service.NewDataPermissionConfigPreflightService, service.NewSubjectContextBuilder, service.NewDimensionProviderRuntime, service.NewDataPermissionPolicyResolver, datapermission.NewMetadataFieldAdapter, service.NewLowCodeDataPermissionRuntime, wire.Bind(new(service.DimensionProvider), new(*service.DimensionProviderRuntime)), wire.Bind(new(datapermission.Resolver), new(*service.DataPermissionPolicyResolver)), ProvideOwnershipFieldRegistry, wire.Bind(
 	new(datapermission.OwnershipFieldBindingValidator),
 	new(*datapermission.OwnershipFieldRegistry),
 ), wire.Bind(
@@ -386,7 +390,7 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewAuthAuditServ
 )
 
 // Controller 提供者
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileBusinessAccessAdapter, controller.NewFileUploadController, controller.NewFileMetadataController, controller.NewFileAccessController, controller.NewQuerySchemeController, controller.NewNotificationController, controller.NewDevelopmentVerificationController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewUserSessionController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileBusinessAccessAdapter, controller.NewFileUploadController, controller.NewFileMetadataController, controller.NewFileAccessController, controller.NewQuerySchemeController, controller.NewNotificationController, controller.NewDevelopmentVerificationController)
 
 // API 提供者
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)

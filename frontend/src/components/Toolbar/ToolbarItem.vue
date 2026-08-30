@@ -91,8 +91,8 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const appStore = useAppStore()
 
-const logout = () => {
-  userStore.setLogout()
+const logout = async () => {
+  await userStore.logout()
 }
 </script>
 

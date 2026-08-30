@@ -33,6 +33,7 @@ type SysUserService struct {
 	sf              *utils.Snowflake
 	sysUserCache    *cache.SysUserCache
 	serverConfig    *config.Server
+	sessions        *UserSessionService
 }
 
 type userPasswordStateUpdate struct {
@@ -47,6 +48,7 @@ func NewSysUserService(
 	sf *utils.Snowflake,
 	sysUserCache *cache.SysUserCache,
 	serverConfig *config.Server,
+	sessions *UserSessionService,
 ) *SysUserService {
 	return &SysUserService{
 		sysUserRepo,
@@ -54,6 +56,7 @@ func NewSysUserService(
 		sf,
 		sysUserCache,
 		serverConfig,
+		sessions,
 	}
 }
 
@@ -141,10 +144,26 @@ func (s *SysUserService) Create(ctx context.Context, req request.SysUserCreateRe
 }
 
 func (s *SysUserService) Update(ctx context.Context, req request.SysUserUpdateReq, selects ...string) error {
-	tx := s.sysUserRepo.DBWithContext(ctx)
-	err := s.sysUserRepo.WithSelect(selects...).Update(tx, &req, req.Id)
+	current, err := s.GetById(req.Id)
 	if err != nil {
 		return err
+	}
+	tx := s.sysUserRepo.DBWithContext(ctx)
+	updateFields := append([]string(nil), selects...)
+	if len(updateFields) == 0 {
+		updateFields = []string{"user_name", "email", "phone_number"}
+		if req.State != nil {
+			updateFields = append(updateFields, "state")
+		}
+	}
+	err = s.sysUserRepo.WithSelect(updateFields...).Update(tx, &req, req.Id)
+	if err != nil {
+		return err
+	}
+	if s.sessions != nil && current.State && req.State != nil && !*req.State {
+		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusAccountDisabled, "账号已被停用"); err != nil {
+			return err
+		}
 	}
 	// 删除缓存
 	s.RefreshCache(req.Id)
@@ -179,6 +198,11 @@ func (s *SysUserService) UpdatePassword(ctx context.Context, req request.SysUser
 	}
 	// 删除缓存
 	s.RefreshCache(req.Id)
+	if s.sessions != nil {
+		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusPasswordChanged, "密码已修改，请重新登录"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -214,10 +238,20 @@ func (s *SysUserService) ResetPassword(ctx context.Context, id int, password str
 		return err
 	}
 	s.RefreshCache(id)
+	if s.sessions != nil {
+		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusPasswordChanged, "密码已被重置，请使用临时密码重新登录"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (s *SysUserService) Delete(ctx context.Context, id int) error {
+	if s.sessions != nil {
+		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusAccountDeleted, "账号已被删除"); err != nil {
+			return err
+		}
+	}
 	tx := s.sysUserRepo.DBWithContext(ctx)
 	err := s.sysUserRepo.DeleteById(tx, id)
 	if err != nil {

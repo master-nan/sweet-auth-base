@@ -32,6 +32,7 @@ type AuthenticationRequest struct {
 	CaptchaID      string
 	Captcha        string
 	Application    model.Application
+	Client         UserSessionClient
 }
 
 type ConfirmedIdentity struct {
@@ -62,6 +63,9 @@ type AuthenticationResult struct {
 type AuthenticatedAccess struct {
 	User                 model.SysUser
 	Issued               time.Time
+	ExpiresAt            time.Time
+	SessionID            string
+	TokenID              string
 	MustChangePassword   bool
 	PasswordChangeReason string
 }

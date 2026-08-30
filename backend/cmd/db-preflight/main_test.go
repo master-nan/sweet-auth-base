@@ -18,8 +18,8 @@ func TestMissingItemsSorted(t *testing.T) {
 
 func TestRequiredPrimaryTablesUsesCompleteManagedCatalog(t *testing.T) {
 	tables := requiredPrimaryTables()
-	if len(tables) != 55 {
-		t.Fatalf("required primary tables = %d, want 55", len(tables))
+	if len(tables) != 56 {
+		t.Fatalf("required primary tables = %d, want 56", len(tables))
 	}
 	required := map[string]bool{
 		"org_assignment":                   false,
@@ -29,6 +29,7 @@ func TestRequiredPrimaryTablesUsesCompleteManagedCatalog(t *testing.T) {
 		"sys_menu_button_template":         false,
 		"notification":                     false,
 		"notification_recipient":           false,
+		"sys_user_session":                 false,
 	}
 	for _, table := range tables {
 		if _, exists := required[table]; exists {

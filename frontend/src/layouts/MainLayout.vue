@@ -78,6 +78,7 @@ import { useConfigureStore } from 'stores/configure'
 import TagView from 'components/TagView/TagView.vue'
 import { useNotificationStore } from 'src/stores/notification'
 import { useUserStore } from 'src/stores/user'
+import { useSessionRuntimeStore } from 'src/stores/session-runtime'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
@@ -85,6 +86,7 @@ const keepAliveStore = useKeepAliveStore()
 const configureStore = useConfigureStore()
 const notificationStore = useNotificationStore()
 const userStore = useUserStore()
+const sessionRuntimeStore = useSessionRuntimeStore()
 const { layoutMode } = storeToRefs(themeStore)
 themeStore.applyPreferences()
 const route = useRoute()
@@ -106,15 +108,23 @@ const $q = useQuasar()
 onMounted(() => {
   void configureStore.fetchConfigure()
   notificationStore.startPolling()
+  sessionRuntimeStore.start()
 })
 watch(
   () => userStore.session_generation,
   () => {
     notificationStore.reset()
-    if (userStore.isLogin) notificationStore.startPolling()
+    sessionRuntimeStore.reset()
+    if (userStore.isLogin) {
+      notificationStore.startPolling()
+      sessionRuntimeStore.start()
+    }
   },
 )
-onBeforeUnmount(() => notificationStore.reset())
+onBeforeUnmount(() => {
+  notificationStore.reset()
+  sessionRuntimeStore.reset()
+})
 // const rightDrawerOpen = ref(false)
 
 // function headerClassActive (path: string) {

@@ -10,7 +10,7 @@ export interface SignInReq {
 
 export interface SignInRes {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
   must_change_password: boolean
   password_change_reason?: string
 }
@@ -57,6 +57,14 @@ export const useBasicApi = () => {
     })
   }
 
+  const refresh = async () => {
+    return instance.post<ResponseData<SignInRes>>('/admin/refresh').then((res) => res.data)
+  }
+
+  const logout = async () => {
+    return instance.post<ResponseData<null>>('/admin/logout').then((res) => res.data)
+  }
+
   const configure = async () => {
     return instance.get<ResponseData<Configure>>('/admin/configure').then((res) => {
       return res.data
@@ -87,6 +95,8 @@ export const useBasicApi = () => {
 
   return {
     login,
+    refresh,
+    logout,
     captchaImg,
     configure,
     configureDetail,

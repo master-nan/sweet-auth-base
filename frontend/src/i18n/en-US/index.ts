@@ -45,6 +45,7 @@ export default {
       role: 'Role Management',
       user: 'User Management',
       dataPermission: 'Data Permissions',
+      onlineSession: 'Online Users',
       audit: 'Audit Logs',
     },
   },

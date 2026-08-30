@@ -36,6 +36,9 @@ func AuthHandler(authService *service.AuthApplicationService) gin.HandlerFunc {
 		c.Set("user", access.User)
 		c.Set("id", access.User.Id)
 		c.Set("token_subject", strconv.Itoa(access.User.Id))
+		c.Set("auth_session_id", access.SessionID)
+		c.Set("auth_token_id", access.TokenID)
+		c.Set("token_expires_at", access.ExpiresAt)
 		InjectAuditSubject(c, audit.NewAuditSubject(access.User.Id, access.User.UserName))
 		c.Next()
 	}

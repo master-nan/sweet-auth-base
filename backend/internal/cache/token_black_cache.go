@@ -85,7 +85,14 @@ func (t *TokenBlackCache) IsSessionActive(userID int, sessionID string) (bool, e
 }
 
 func (t *TokenBlackCache) DeactivateSession(userID int, sessionID string) error {
-	err := t.cacher.Del(userSessionCacheKey(userID, sessionID))
+	return t.DeactivateSessionDigest(userID, SessionFingerprint(sessionID))
+}
+
+func (t *TokenBlackCache) DeactivateSessionDigest(userID int, sessionDigest string) error {
+	if userID <= 0 || sessionDigest == "" {
+		return ErrCacheMiss
+	}
+	err := t.cacher.Del(userSessionDigestCacheKey(userID, sessionDigest))
 	if errors.Is(err, ErrCacheMiss) {
 		return nil
 	}
@@ -114,5 +121,14 @@ func tokenDigest(value string) string {
 }
 
 func userSessionCacheKey(userID int, sessionID string) string {
-	return UserTokenSessionCacheKey + strconv.Itoa(userID) + ":" + tokenDigest(sessionID)
+	return userSessionDigestCacheKey(userID, SessionFingerprint(sessionID))
+}
+
+func userSessionDigestCacheKey(userID int, sessionDigest string) string {
+	return UserTokenSessionCacheKey + strconv.Itoa(userID) + ":" + sessionDigest
+}
+
+// SessionFingerprint 返回可持久化的 sid 摘要。原始 sid 只存在于已签名 Token 中。
+func SessionFingerprint(sessionID string) string {
+	return tokenDigest(sessionID)
 }

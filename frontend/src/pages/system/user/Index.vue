@@ -521,6 +521,7 @@ const handleFormSubmit = async (formPayload: { data: User; isEdit: boolean; id?:
         user_name: formPayload.data.user_name,
         email: formPayload.data.email,
         phone_number: formPayload.data.phone_number,
+        ...(formPayload.data.state === undefined ? {} : { state: formPayload.data.state }),
       }
       const result = await sysUserApi.updateUser(req)
       if (result.success) {

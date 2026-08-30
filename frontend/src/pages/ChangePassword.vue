@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { Notify } from 'quasar'
 import { useSysUserApi } from 'src/api/services/sys-user'
 import { useConfigureStore } from 'src/stores/configure'
 import { useUserStore } from 'src/stores/user'
@@ -60,7 +60,6 @@ import { buildPasswordRules, passwordPolicyDescription } from 'src/utils/passwor
 
 defineOptions({ name: 'ChangePassword' })
 
-const router = useRouter()
 const userStore = useUserStore()
 const configureStore = useConfigureStore()
 const loadingStore = useLoadingStore()
@@ -91,12 +90,13 @@ const submit = async () => {
   const result = await sysUserApi.updatePassword(password.value)
   if (result.success) {
     userStore.setPasswordChangeRequirement(false)
-    await router.replace('/admin/home')
+    Notify.create({ type: 'positive', position: 'top-right', message: '密码已修改，请重新登录' })
+    userStore.setLogout()
   }
 }
 
-const logout = () => {
-  userStore.setLogout()
+const logout = async () => {
+  await userStore.logout()
 }
 </script>
 

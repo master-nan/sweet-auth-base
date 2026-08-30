@@ -27,11 +27,13 @@ const instance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/sweet_admin',
   timeout: 300000,
   timeoutErrorMessage: '请求超时，请检查网络连接',
+  withCredentials: true,
 })
 
 type SessionBoundRequestConfig = InternalAxiosRequestConfig & {
   sweetSessionToken?: string
   sweetSessionGeneration?: number
+  sweetAuthRetried?: boolean
 }
 
 export class StaleSessionResponseError extends Error {
@@ -43,6 +45,36 @@ export class StaleSessionResponseError extends Error {
 
 function persistedAccessToken() {
   return String(LocalStorage.getItem('access_token') || '')
+}
+
+const refreshClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '/sweet_admin',
+  timeout: 30_000,
+  withCredentials: true,
+})
+
+let refreshPromise: Promise<string> | null = null
+
+export function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = refreshClient
+    .post<ResponseData<{ access_token: string }>>('/admin/refresh')
+    .then((response) => {
+      const accessToken = String(response.data.data?.access_token || '')
+      if (!response.data.success || !accessToken) throw new Error('登录已失效，请重新登录')
+      useUserStore().replaceAccessToken(accessToken)
+      return accessToken
+    })
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
+}
+
+function canRefreshRequest(config: SessionBoundRequestConfig | undefined) {
+  if (!config || config.sweetAuthRetried) return false
+  const url = config.url || ''
+  return !['/admin/login', '/admin/refresh', '/admin/logout'].some((path) => url.includes(path))
 }
 
 export function isStaleSessionResponse(
@@ -187,9 +219,28 @@ instance.interceptors.response.use(
 
     loadingStore.setLoading(false)
     const res = error.response
+    const requestConfig = error.config as SessionBoundRequestConfig | undefined
+    if (res?.status === 401 && canRefreshRequest(requestConfig)) {
+      if (requestConfig) requestConfig.sweetAuthRetried = true
+      const requestToken = requestConfig?.sweetSessionToken || ''
+      const currentToken = userStore.getLoginToken
+      const retry =
+        requestToken && currentToken && requestToken !== currentToken
+          ? Promise.resolve(currentToken)
+          : refreshAccessToken()
+      return retry
+        .then(() => instance.request(requestConfig!))
+        .catch((refreshError) => {
+          userStore.setLogout()
+          notifyRequestError('登录已失效，请重新登录', 'auth:expired')
+          return Promise.reject(
+            refreshError instanceof Error ? refreshError : new Error('登录已失效，请重新登录'),
+          )
+        })
+    }
     if (
       isStaleSessionResponse(
-        error.config as SessionBoundRequestConfig | undefined,
+        requestConfig,
         userStore.getLoginToken,
         userStore.session_generation,
         persistedAccessToken(),
@@ -239,10 +290,6 @@ instance.interceptors.response.use(
       res.data.error_message || error.message || 'Request Error',
       `http:${res.status}:${res.config?.method || 'get'}:${res.config?.url || ''}:${res.data.error_code || ''}:${res.data.error_message || ''}`,
     )
-    if (res.status === 401) {
-      userStore.setLogout()
-    }
-
     return Promise.reject(new Error(res.data.error_message || '未知错误'))
   },
 )

@@ -247,6 +247,7 @@ func (a *AuthApi) Login(ctx *gin.Context) {
 	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
 		Channel: service.AuthChannelAPIPassword, CredentialType: service.AuthCredentialPassword,
 		Principal: data.UserName, Secret: data.Password,
+		Client: service.UserSessionClient{IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent()},
 	})
 	if err != nil {
 		_ = ctx.Error(err)
@@ -275,7 +276,7 @@ func (a *AuthApi) RefreshToken(ctx *gin.Context) {
 		_ = ctx.Error(errors.ErrInvalidRefreshToken)
 		return
 	}
-	result, err := a.authService.Refresh(ctx.Request.Context(), refreshToken)
+	result, err := a.authService.Refresh(ctx.Request.Context(), refreshToken, service.UserSessionClient{IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent()})
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -337,6 +338,7 @@ func (a *AuthApi) SSOLogin(ctx *gin.Context) {
 	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
 		Channel: service.AuthChannelDingTalk, CredentialType: service.AuthCredentialDingTalk,
 		Secret: code, Application: application,
+		Client: service.UserSessionClient{IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent()},
 	})
 	if err != nil {
 		_ = ctx.Error(err)
@@ -378,6 +380,7 @@ func (a *AuthApi) SmsCodeLogin(ctx *gin.Context) {
 	result, err := a.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
 		Channel: service.AuthChannelSMS, CredentialType: service.AuthCredentialSMS,
 		Principal: data.Mobile, Secret: data.Code, Application: application,
+		Client: service.UserSessionClient{IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent()},
 	})
 	if err != nil {
 		_ = ctx.Error(err)

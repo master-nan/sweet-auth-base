@@ -1,13 +1,17 @@
 package controller
 
 import (
+	"backend/config"
 	"backend/dto/request"
 	"backend/dto/response"
 	myerrors "backend/internal/errors"
 	"backend/internal/utils"
 	"backend/service"
 	"bytes"
+	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/dchest/captcha"
 	"github.com/gin-gonic/gin"
@@ -19,14 +23,16 @@ type BasicController struct {
 	sysConfigureService *service.SysConfigureService
 	logService          *service.LogService
 	translators         map[string]ut.Translator
+	serverConfig        *config.Server
 }
 
-func NewBasicController(authService *service.AuthApplicationService, sysConfigureService *service.SysConfigureService, logService *service.LogService, translators map[string]ut.Translator) *BasicController {
+func NewBasicController(authService *service.AuthApplicationService, sysConfigureService *service.SysConfigureService, logService *service.LogService, translators map[string]ut.Translator, serverConfig *config.Server) *BasicController {
 	return &BasicController{
 		authService,
 		sysConfigureService,
 		logService,
 		translators,
+		serverConfig,
 	}
 }
 
@@ -52,16 +58,39 @@ func (b *BasicController) Login(ctx *gin.Context) {
 	result, err := b.authService.Authenticate(ctx.Request.Context(), service.AuthenticationRequest{
 		Channel: service.AuthChannelAdminPassword, CredentialType: service.AuthCredentialPassword,
 		Principal: data.UserName, Secret: data.Password, CaptchaID: data.CaptchaId, Captcha: data.Captcha,
+		Client: service.UserSessionClient{IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent()},
 	})
 	if err != nil {
 		_ = ctx.Error(err)
 		return
 	}
+	b.setRefreshCookie(ctx, result.RefreshToken, 30*24*time.Hour)
 	signInRes := response.SignInRes{
-		AccessToken: result.AccessToken, RefreshToken: result.RefreshToken,
+		AccessToken:        result.AccessToken,
 		MustChangePassword: result.MustChangePassword, PasswordChangeReason: result.PasswordChangeReason,
 	}
 	resp.SetData(signInRes)
+}
+
+// Refresh 使用 HttpOnly Cookie 中的 Refresh Token 换取新的 Access Token，并同时轮换 Cookie。
+func (b *BasicController) Refresh(ctx *gin.Context) {
+	resp := response.NewResponse()
+	ctx.Set("response", resp)
+	refreshToken, err := ctx.Cookie(refreshTokenCookieName)
+	if err != nil || strings.TrimSpace(refreshToken) == "" {
+		_ = ctx.Error(myerrors.ErrInvalidRefreshToken)
+		return
+	}
+	result, err := b.authService.Refresh(ctx.Request.Context(), refreshToken, service.UserSessionClient{
+		IPAddress: ctx.ClientIP(), UserAgent: ctx.Request.UserAgent(), Channel: string(service.AuthChannelRefresh),
+	})
+	if err != nil {
+		b.clearRefreshCookie(ctx)
+		_ = ctx.Error(err)
+		return
+	}
+	b.setRefreshCookie(ctx, result.RefreshToken, 30*24*time.Hour)
+	resp.SetData(response.SignInRes{AccessToken: result.AccessToken})
 }
 
 // Captcha 验证码
@@ -248,13 +277,42 @@ func (b *BasicController) GetAccessLogById(ctx *gin.Context) {
 func (b *BasicController) Logout(ctx *gin.Context) {
 	resp := response.NewResponse()
 	ctx.Set("response", resp)
+	defer b.clearRefreshCookie(ctx)
 	authorization := ctx.GetHeader("Authorization")
-	if len(authorization) < len("Bearer ") {
-		_ = ctx.Error(myerrors.ErrUserNotLogin)
-		return
+	if len(authorization) >= len("Bearer ") {
+		if err := b.authService.Logout(ctx.Request.Context(), authorization[len("Bearer "):]); err == nil {
+			return
+		}
 	}
-	if err := b.authService.Logout(ctx.Request.Context(), authorization[len("Bearer "):]); err != nil {
-		_ = ctx.Error(err)
-		return
+	if refreshToken, err := ctx.Cookie(refreshTokenCookieName); err == nil && strings.TrimSpace(refreshToken) != "" {
+		// 退出接口保持幂等：Token 已被管理员撤销时，清除浏览器 Cookie 即可。
+		_ = b.authService.LogoutWithRefresh(ctx.Request.Context(), refreshToken)
+	}
+}
+
+const refreshTokenCookieName = "sweet_refresh_token"
+
+func (b *BasicController) setRefreshCookie(ctx *gin.Context, value string, ttl time.Duration) {
+	secure := ctx.Request.TLS != nil || strings.EqualFold(ctx.GetHeader("X-Forwarded-Proto"), "https") || isProduction(b.serverConfig.Environment)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name: refreshTokenCookieName, Value: value, Path: "/" + strings.Trim(b.serverConfig.Name, "/") + "/admin",
+		MaxAge: int(ttl / time.Second), Expires: time.Now().Add(ttl), HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (b *BasicController) clearRefreshCookie(ctx *gin.Context) {
+	secure := ctx.Request.TLS != nil || strings.EqualFold(ctx.GetHeader("X-Forwarded-Proto"), "https") || isProduction(b.serverConfig.Environment)
+	http.SetCookie(ctx.Writer, &http.Cookie{
+		Name: refreshTokenCookieName, Value: "", Path: "/" + strings.Trim(b.serverConfig.Name, "/") + "/admin",
+		MaxAge: -1, Expires: time.Unix(1, 0), HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func isProduction(environment string) bool {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "pro", "prod", "production":
+		return true
+	default:
+		return false
 	}
 }

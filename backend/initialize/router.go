@@ -64,10 +64,17 @@ func InitRouter(app *App) *gin.Engine {
 	adminBaseGroup := routerGroup.Group("/admin")
 	{
 		adminBaseGroup.POST("/login", app.BasicController.Login)
+		adminBaseGroup.POST("/refresh", app.BasicController.Refresh)
 		adminBaseGroup.GET("/captcha", app.BasicController.Captcha)
 		adminBaseGroup.GET("/configure", app.BasicController.Configure)
 		adminBaseGroup.POST("/logout", app.BasicController.Logout)
 
+	}
+	adminRuntimeGroup := routerGroup.Group("/admin/runtime")
+	adminRuntimeGroup.Use(middleware.AuthHandler(app.AuthService))
+	{
+		adminRuntimeGroup.POST("/session/heartbeat", app.UserSessionController.Heartbeat)
+		adminRuntimeGroup.GET("/session/events", app.UserSessionController.Events)
 	}
 	routerGroup.GET("/files/access/preview/:uuid", app.FileAccessController.SignedPreview)
 	routerGroup.GET("/files/access/download/:uuid", app.FileAccessController.SignedDownload)
@@ -197,6 +204,11 @@ func InitRouter(app *App) *gin.Engine {
 		adminGroup.PUT("/user/:id/roles", app.UserController.AssignRoles)
 		adminGroup.PUT("/user/:id", app.UserController.UpdateUser)
 		adminGroup.DELETE("/user/:id", app.UserController.DeleteUser)
+
+		// 在线用户与登录设备
+		adminGroup.POST("/session/query", app.UserSessionController.Query)
+		adminGroup.POST("/session/:id/revoke", app.UserSessionController.Revoke)
+		adminGroup.POST("/session/user/:id/revoke", app.UserSessionController.RevokeUser)
 
 		// 数据权限配置与保存前检查
 		adminGroup.POST("/data-permission/config/dimension/query", app.DataPermissionConfigController.QueryDimensions)

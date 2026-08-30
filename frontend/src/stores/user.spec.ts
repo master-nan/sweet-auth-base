@@ -31,6 +31,12 @@ import { LocalStorage } from 'quasar'
 import { UI_PREFERENCES_KEY } from 'src/utils/ui-preferences'
 import { isStaleSessionSnapshot, useUserStore } from './user'
 
+const unsignedToken = (subject: string, sessionID: string, tokenID: string) => {
+  const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }))
+  const payload = btoa(JSON.stringify({ sub: subject, sid: sessionID, jti: tokenID }))
+  return `${header}.${payload}.signature`
+}
+
 describe('user session state', () => {
   beforeEach(() => {
     storage.clear()
@@ -104,5 +110,39 @@ describe('user session state', () => {
   it('classifies a late response from session A as stale after session B starts', () => {
     expect(isStaleSessionSnapshot('token-a', 1, 'token-b', 2, 'token-b')).toBe(true)
     expect(isStaleSessionSnapshot('token-b', 2, 'token-b', 2, 'token-b')).toBe(false)
+  })
+
+  it('keeps account-bound state when the same login session rotates its access token', () => {
+    const firstToken = unsignedToken('42', 'session-a', 'first')
+    const refreshedToken = unsignedToken('42', 'session-a', 'refreshed')
+    LocalStorage.set('access_token', firstToken)
+    const user = useUserStore()
+    user.user_name = 'admin'
+    user.buttons = ['system_user_query']
+
+    user.syncPersistedSession(refreshedToken)
+
+    expect(user.access_token).toBe(refreshedToken)
+    expect(user.user_name).toBe('admin')
+    expect(user.buttons).toEqual(['system_user_query'])
+    expect(permission.$reset).not.toHaveBeenCalled()
+    expect(tagView.removeAllTagView).not.toHaveBeenCalled()
+  })
+
+  it('resets account-bound state when the same user starts a different login session', () => {
+    const firstToken = unsignedToken('42', 'session-a', 'first')
+    const nextSessionToken = unsignedToken('42', 'session-b', 'second')
+    LocalStorage.set('access_token', firstToken)
+    const user = useUserStore()
+    user.user_name = 'admin'
+    user.buttons = ['system_user_query']
+
+    user.syncPersistedSession(nextSessionToken)
+
+    expect(user.access_token).toBe(nextSessionToken)
+    expect(user.user_name).toBe('')
+    expect(user.buttons).toEqual([])
+    expect(permission.$reset).toHaveBeenCalledOnce()
+    expect(tagView.removeAllTagView).toHaveBeenCalledOnce()
   })
 })

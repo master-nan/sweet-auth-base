@@ -45,6 +45,7 @@ export default {
       role: '角色管理',
       user: '用户管理',
       dataPermission: '数据权限',
+      onlineSession: '在线用户',
       audit: '审计日志',
     },
   },

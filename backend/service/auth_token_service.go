@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	authAccessTokenTTL  = 2 * time.Hour
+	authAccessTokenTTL  = 30 * time.Minute
 	authRefreshTokenTTL = 30 * 24 * time.Hour
 )
 
@@ -178,6 +178,36 @@ func (s *AuthTokenService) RevokeAccessAndSession(value string) (int, error) {
 		return 0, errors.WrapSystemError(err)
 	}
 	return userID, nil
+}
+
+func (s *AuthTokenService) RevokeRefreshAndSession(value string) (int, string, error) {
+	claims, err := s.ValidateRefresh(context.Background(), value)
+	if err != nil {
+		return 0, "", err
+	}
+	userID, _ := strconv.Atoi(claims.ID)
+	if err := s.state.Revoke(enum.RefreshToken, value, claims.ExpiresAt); err != nil {
+		return 0, "", errors.WrapSystemError(err)
+	}
+	if err := s.state.DeactivateSession(userID, claims.SessionID); err != nil {
+		return 0, "", errors.WrapSystemError(err)
+	}
+	return userID, claims.SessionID, nil
+}
+
+func (s *AuthTokenService) RevokeSessionDigest(userID int, sessionDigest string) error {
+	if err := s.state.DeactivateSessionDigest(userID, sessionDigest); err != nil {
+		return errors.WrapSystemError(err)
+	}
+	return nil
+}
+
+func (s *AuthTokenService) IsSessionActive(userID int, sessionID string) (bool, error) {
+	active, err := s.state.IsSessionActive(userID, sessionID)
+	if err != nil {
+		return false, errors.WrapSystemError(err)
+	}
+	return active, nil
 }
 
 func (s *AuthTokenService) validate(value string, expected enum.TokenTypeEnum) (*token.Claims, error) {

@@ -984,7 +984,8 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 		menuWithTable(menu(204, 200, "system_role", "role", "pages/system/role/Index.vue", "router.system.role", "admin_panel_settings", 4), "sys_role"),
 		menuWithTable(menu(205, 200, "system_user", "user", "pages/system/user/Index.vue", "router.system.user", "person", 5), "sys_user"),
 		menu(207, 200, "system_data_permission", "data-permission", "pages/system/data-permission/Index.vue", "router.system.dataPermission", "rule", 6),
-		menuWithTable(menu(206, 200, "system_audit", "audit", "pages/system/audit/Index.vue", "router.system.audit", "manage_search", 7), "access_log"),
+		menu(0, 200, "system_online_session", "online-session", "pages/system/online-session/Index.vue", "router.system.onlineSession", "devices", 7),
+		menuWithTable(menu(206, 200, "system_audit", "audit", "pages/system/audit/Index.vue", "router.system.audit", "manage_search", 8), "access_log"),
 		directoryMenu(menu(300, 0, "develop", "develop", "src/components/Layout/Layout.vue", "router.develop.default", "developer_mode", 3)),
 		menu(301, 300, "develop_configure", "configure", "pages/develop/configure/Index.vue", "router.develop.configure", "tune", 1),
 		menu(302, 300, "develop_generalization", "generalization/:table_code", "pages/develop/generalization/Index.vue", "router.develop.generalization", "dynamic_form", 2),
@@ -1114,6 +1115,13 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 		return fmt.Errorf("system_user menu missing after seed")
 	}
 	if err := seedUserMenuButtons(db, sf, roleID, roleName, userMenu.Id); err != nil {
+		return err
+	}
+	onlineSessionMenu, ok := menuByName["system_online_session"]
+	if !ok {
+		return fmt.Errorf("system_online_session menu missing after seed")
+	}
+	if err := seedOnlineSessionMenuButtons(db, sf, roleID, roleName, onlineSessionMenu.Id); err != nil {
 		return err
 	}
 	dataPermissionMenu, ok := menuByName["system_data_permission"]
@@ -1799,6 +1807,15 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 			buttons[i].IsButton = false
 			buttons[i].IsHidden = false
 		}
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
+}
+
+func seedOnlineSessionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		apiPermissionWithAPI(0, menuID, "查询登录设备", "system_online_session_query", enum.Top, "query", "search", "primary", 90, "/admin/session/query", "POST"),
+		menuButtonWithAPI(0, menuID, "下线此设备", "system_online_session_revoke", enum.Line, "revoke", "logout", "warning", 1, "/admin/session/:id/revoke", "POST"),
+		menuButtonWithAPI(0, menuID, "下线该用户全部设备", "system_online_session_revoke_user", enum.Line, "revoke_user", "phonelink_erase", "negative", 2, "/admin/session/user/:id/revoke", "POST"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }
