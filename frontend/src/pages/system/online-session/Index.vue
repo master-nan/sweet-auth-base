@@ -143,6 +143,7 @@
             :key="button.id"
             flat
             dense
+            size="sm"
             v-bind="menuButtonDisplayProps(button)"
             :color="button.color || 'primary'"
             :disable="loading || (isRevokeAction(button.event_action) && props.row.status !== 'active')"
