@@ -200,6 +200,11 @@ func InitRouter(app *App) *gin.Engine {
 
 		// 数据权限配置与保存前检查
 		adminGroup.POST("/data-permission/config/dimension/query", app.DataPermissionConfigController.QueryDimensions)
+
+		// 功能验证样例只在非生产环境创建和清理，接口权限跟随“功能验证”菜单。
+		adminGroup.GET("/development/verification/samples", app.DevelopmentVerificationController.Statuses)
+		adminGroup.POST("/development/verification/samples/:scenario/prepare", app.DevelopmentVerificationController.Prepare)
+		adminGroup.DELETE("/development/verification/samples/:scenario", app.DevelopmentVerificationController.Cleanup)
 		adminGroup.POST("/data-permission/config/resource", app.DataPermissionConfigController.CreateResource)
 		adminGroup.POST("/data-permission/config/resource/query", app.DataPermissionConfigController.QueryResources)
 		adminGroup.GET("/data-permission/config/resource/:id", app.DataPermissionConfigController.GetResource)

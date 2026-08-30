@@ -41,6 +41,7 @@ func LoadConfig() (*config.Server, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
+	cfg.Environment = strings.ToLower(strings.TrimSpace(environment))
 	applyUploadListEnvOverrides(&cfg)
 	applySecurityEnvOverrides(&cfg)
 	applyIntegrationEnvOverrides(&cfg)

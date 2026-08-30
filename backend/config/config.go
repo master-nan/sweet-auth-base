@@ -6,6 +6,7 @@
 package config
 
 type Server struct {
+	Environment string      `mapstructure:"-"`
 	Name        string      `mapstructure:"name"`
 	Version     string      `mapstructure:"version"`
 	Port        int         `mapstructure:"port"`

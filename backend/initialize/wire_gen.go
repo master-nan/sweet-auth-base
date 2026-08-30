@@ -199,6 +199,8 @@ func InitializeApp() (*App, error) {
 	notificationRepositoryImpl := impl.NewNotificationRepositoryImpl(primaryDB)
 	notificationService := service.NewNotificationService(notificationRepositoryImpl, snowflake, logService)
 	notificationController := controller.NewNotificationController(notificationService, v2)
+	developmentVerificationService := service.NewDevelopmentVerificationService(primaryDB, snowflake, server, sysTableService, lowCodePublicationService, sysUserService, sysRoleService, notificationService)
+	developmentVerificationController := controller.NewDevelopmentVerificationController(developmentVerificationService)
 	applicationRepositoryImpl := impl.NewApplicationRepositoryImpl(primaryDB)
 	applicationCache := cache.NewApplicationCache(redisUtil)
 	applicationService := service.NewApplicationService(applicationRepositoryImpl, applicationCache, snowflake)
@@ -264,51 +266,53 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	app := &App{
-		Config:                         server,
-		DBs:                            v,
-		Redis:                          client,
-		SF:                             snowflake,
-		JwtGenerator:                   jwtGenerator,
-		HmacGenerator:                  hmacGenerator,
-		Enforcer:                       syncedEnforcer,
-		DictController:                 dictController,
-		BasicController:                basicController,
-		TableController:                tableController,
-		MenuController:                 menuController,
-		RoleController:                 roleController,
-		UserController:                 userController,
-		DataPermissionConfigController: dataPermissionConfigController,
-		ExternalSystemController:       externalSystemController,
-		InterfaceDefinitionController:  interfaceDefinitionController,
-		CredentialController:           credentialController,
-		RetryPolicyController:          retryPolicyController,
-		IntegrationSyncController:      integrationSyncController,
-		IntegrationExecutionController: integrationExecutionController,
-		QuerySchemeController:          querySchemeController,
-		NotificationController:         notificationController,
-		ApplicationController:          applicationController,
-		GeneralizationController:       generalizationController,
-		ReportController:               reportController,
-		OrgController:                  orgController,
-		SmsController:                  smsController,
-		FileUploadController:           fileUploadController,
-		FileMetadataController:         fileMetadataController,
-		FileAccessController:           fileAccessController,
-		AuthApi:                        authApi,
-		AuthService:                    authApplicationService,
-		SysUserApi:                     sysUserApi,
-		DingTalkApi:                    dingTalkApi,
-		LogService:                     logService,
-		UserService:                    sysUserService,
-		ApplicationService:             applicationService,
-		SubjectContextBuilder:          subjectContextBuilder,
-		DimensionProviderRuntime:       dimensionProviderRuntime,
-		DataPermissionResolver:         dataPermissionPolicyResolver,
-		TokenBlackCache:                tokenBlackCache,
-		ApplicationCache:               applicationCache,
-		IntegrationWorker:              integrationWorkerRunner,
-		IntegrationSyncRunner:          integrationSyncRunner,
-		FileUploadService:              fileUploadService,
+		Config:                            server,
+		DBs:                               v,
+		Redis:                             client,
+		SF:                                snowflake,
+		JwtGenerator:                      jwtGenerator,
+		HmacGenerator:                     hmacGenerator,
+		Enforcer:                          syncedEnforcer,
+		DictController:                    dictController,
+		BasicController:                   basicController,
+		TableController:                   tableController,
+		MenuController:                    menuController,
+		RoleController:                    roleController,
+		UserController:                    userController,
+		DataPermissionConfigController:    dataPermissionConfigController,
+		ExternalSystemController:          externalSystemController,
+		InterfaceDefinitionController:     interfaceDefinitionController,
+		CredentialController:              credentialController,
+		RetryPolicyController:             retryPolicyController,
+		IntegrationSyncController:         integrationSyncController,
+		IntegrationExecutionController:    integrationExecutionController,
+		QuerySchemeController:             querySchemeController,
+		NotificationController:            notificationController,
+		DevelopmentVerificationController: developmentVerificationController,
+		ApplicationController:             applicationController,
+		GeneralizationController:          generalizationController,
+		ReportController:                  reportController,
+		OrgController:                     orgController,
+		SmsController:                     smsController,
+		FileUploadController:              fileUploadController,
+		FileMetadataController:            fileMetadataController,
+		FileAccessController:              fileAccessController,
+		AuthApi:                           authApi,
+		AuthService:                       authApplicationService,
+		SysUserApi:                        sysUserApi,
+		DingTalkApi:                       dingTalkApi,
+		LogService:                        logService,
+		UserService:                       sysUserService,
+		ApplicationService:                applicationService,
+		SubjectContextBuilder:             subjectContextBuilder,
+		DimensionProviderRuntime:          dimensionProviderRuntime,
+		DataPermissionResolver:            dataPermissionPolicyResolver,
+		TokenBlackCache:                   tokenBlackCache,
+		ApplicationCache:                  applicationCache,
+		IntegrationWorker:                 integrationWorkerRunner,
+		IntegrationSyncRunner:             integrationSyncRunner,
+		FileUploadService:                 fileUploadService,
+		DevelopmentVerificationService:    developmentVerificationService,
 	}
 	return app, nil
 }
@@ -316,51 +320,53 @@ func InitializeApp() (*App, error) {
 // wire.go:
 
 type App struct {
-	Config                         *config.Server
-	DBs                            map[string]*gorm.DB
-	Redis                          *redis.Client
-	SF                             *utils.Snowflake
-	JwtGenerator                   *token.JWTGenerator
-	HmacGenerator                  *token.HMACGenerator
-	Enforcer                       *casbin.SyncedEnforcer
-	DictController                 *controller.DictController
-	BasicController                *controller.BasicController
-	TableController                *controller.TableController
-	MenuController                 *controller.MenuController
-	RoleController                 *controller.RoleController
-	UserController                 *controller.UserController
-	DataPermissionConfigController *controller.DataPermissionConfigController
-	ExternalSystemController       *controller.ExternalSystemController
-	InterfaceDefinitionController  *controller.InterfaceDefinitionController
-	CredentialController           *controller.CredentialController
-	RetryPolicyController          *controller.RetryPolicyController
-	IntegrationSyncController      *controller.IntegrationSyncController
-	IntegrationExecutionController *controller.IntegrationExecutionController
-	QuerySchemeController          *controller.QuerySchemeController
-	NotificationController         *controller.NotificationController
-	ApplicationController          *controller.ApplicationController
-	GeneralizationController       *controller.GeneralizationController
-	ReportController               *controller.ReportController
-	OrgController                  *controller.OrgController
-	SmsController                  *controller.SmsController
-	FileUploadController           *controller.FileUploadController
-	FileMetadataController         *controller.FileMetadataController
-	FileAccessController           *controller.FileAccessController
-	AuthApi                        *api.AuthApi
-	AuthService                    *service.AuthApplicationService
-	SysUserApi                     *api.SysUserApi
-	DingTalkApi                    *api.DingTalkApi
-	LogService                     *service.LogService
-	UserService                    *service.SysUserService
-	ApplicationService             *service.ApplicationService
-	SubjectContextBuilder          *service.SubjectContextBuilder
-	DimensionProviderRuntime       *service.DimensionProviderRuntime
-	DataPermissionResolver         datapermission.Resolver
-	TokenBlackCache                *cache.TokenBlackCache
-	ApplicationCache               *cache.ApplicationCache
-	IntegrationWorker              *integration.IntegrationWorkerRunner
-	IntegrationSyncRunner          *integration.IntegrationSyncRunner
-	FileUploadService              *service.FileUploadService
+	Config                            *config.Server
+	DBs                               map[string]*gorm.DB
+	Redis                             *redis.Client
+	SF                                *utils.Snowflake
+	JwtGenerator                      *token.JWTGenerator
+	HmacGenerator                     *token.HMACGenerator
+	Enforcer                          *casbin.SyncedEnforcer
+	DictController                    *controller.DictController
+	BasicController                   *controller.BasicController
+	TableController                   *controller.TableController
+	MenuController                    *controller.MenuController
+	RoleController                    *controller.RoleController
+	UserController                    *controller.UserController
+	DataPermissionConfigController    *controller.DataPermissionConfigController
+	ExternalSystemController          *controller.ExternalSystemController
+	InterfaceDefinitionController     *controller.InterfaceDefinitionController
+	CredentialController              *controller.CredentialController
+	RetryPolicyController             *controller.RetryPolicyController
+	IntegrationSyncController         *controller.IntegrationSyncController
+	IntegrationExecutionController    *controller.IntegrationExecutionController
+	QuerySchemeController             *controller.QuerySchemeController
+	NotificationController            *controller.NotificationController
+	DevelopmentVerificationController *controller.DevelopmentVerificationController
+	ApplicationController             *controller.ApplicationController
+	GeneralizationController          *controller.GeneralizationController
+	ReportController                  *controller.ReportController
+	OrgController                     *controller.OrgController
+	SmsController                     *controller.SmsController
+	FileUploadController              *controller.FileUploadController
+	FileMetadataController            *controller.FileMetadataController
+	FileAccessController              *controller.FileAccessController
+	AuthApi                           *api.AuthApi
+	AuthService                       *service.AuthApplicationService
+	SysUserApi                        *api.SysUserApi
+	DingTalkApi                       *api.DingTalkApi
+	LogService                        *service.LogService
+	UserService                       *service.SysUserService
+	ApplicationService                *service.ApplicationService
+	SubjectContextBuilder             *service.SubjectContextBuilder
+	DimensionProviderRuntime          *service.DimensionProviderRuntime
+	DataPermissionResolver            datapermission.Resolver
+	TokenBlackCache                   *cache.TokenBlackCache
+	ApplicationCache                  *cache.ApplicationCache
+	IntegrationWorker                 *integration.IntegrationWorkerRunner
+	IntegrationSyncRunner             *integration.IntegrationSyncRunner
+	FileUploadService                 *service.FileUploadService
+	DevelopmentVerificationService    *service.DevelopmentVerificationService
 }
 
 // Repository 提供者
@@ -376,11 +382,11 @@ var ServiceProvider = wire.NewSet(service.NewLogServer, service.NewAuthAuditServ
 ), wire.Bind(
 	new(datapermission.OwnershipFieldOperationValidator),
 	new(*datapermission.OwnershipFieldRegistry),
-), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, service.NewOrganizationHRSyncService, ProvideOrganizationSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationSyncCoordinator, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileUploadService, service.NewFileAccessService, service.NewFileMetadataService, queryscheme.NewRegistry, service.NewQuerySchemeService, service.NewNotificationService,
+), service.NewReportService, service.NewOrgService, wire.Bind(new(service.OrgPermissionProvider), new(*service.OrgService)), service.NewApplicationService, service.NewExternalSystemService, service.NewInterfaceDefinitionService, security.NewCredentialSecretProtector, service.NewCredentialService, service.NewRetryPolicyService, service.NewOrganizationHRSyncService, ProvideOrganizationSyncConsumerRegistry, wire.Bind(new(integration.SyncConsumerRegistry), new(*integration.StaticSyncConsumerRegistry)), service.NewSyncTaskService, service.NewSyncBatchService, service.NewIntegrationSyncCoordinator, service.NewIntegrationExecutionService, integration.NewCredentialProvider, service.NewDingTalkService, service.NewSmsService, service.NewFileUploadService, service.NewFileAccessService, service.NewFileMetadataService, queryscheme.NewRegistry, service.NewQuerySchemeService, service.NewNotificationService, service.NewDevelopmentVerificationService,
 )
 
 // Controller 提供者
-var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileBusinessAccessAdapter, controller.NewFileUploadController, controller.NewFileMetadataController, controller.NewFileAccessController, controller.NewQuerySchemeController, controller.NewNotificationController)
+var ControllerProvider = wire.NewSet(controller.NewDictController, controller.NewTableController, controller.NewMenuController, controller.NewRoleController, controller.NewUserController, controller.NewDataPermissionConfigController, controller.NewExternalSystemController, controller.NewInterfaceDefinitionController, controller.NewCredentialController, controller.NewRetryPolicyController, controller.NewIntegrationSyncController, controller.NewIntegrationExecutionController, controller.NewBasicController, controller.NewGeneralizationController, controller.NewReportController, controller.NewOrgController, controller.NewApplicationController, controller.NewSmsController, controller.NewFileBusinessAccessAdapter, controller.NewFileUploadController, controller.NewFileMetadataController, controller.NewFileAccessController, controller.NewQuerySchemeController, controller.NewNotificationController, controller.NewDevelopmentVerificationController)
 
 // API 提供者
 var ApiProvider = wire.NewSet(api.NewAuthApi, api.NewSysUserApi, api.NewDingTalkApi)

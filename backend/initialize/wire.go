@@ -32,51 +32,53 @@ import (
 )
 
 type App struct {
-	Config                         *config.Server
-	DBs                            map[string]*gorm.DB
-	Redis                          *redis.Client
-	SF                             *utils.Snowflake
-	JwtGenerator                   *token.JWTGenerator
-	HmacGenerator                  *token.HMACGenerator
-	Enforcer                       *casbin.SyncedEnforcer
-	DictController                 *controller.DictController
-	BasicController                *controller.BasicController
-	TableController                *controller.TableController
-	MenuController                 *controller.MenuController
-	RoleController                 *controller.RoleController
-	UserController                 *controller.UserController
-	DataPermissionConfigController *controller.DataPermissionConfigController
-	ExternalSystemController       *controller.ExternalSystemController
-	InterfaceDefinitionController  *controller.InterfaceDefinitionController
-	CredentialController           *controller.CredentialController
-	RetryPolicyController          *controller.RetryPolicyController
-	IntegrationSyncController      *controller.IntegrationSyncController
-	IntegrationExecutionController *controller.IntegrationExecutionController
-	QuerySchemeController          *controller.QuerySchemeController
-	NotificationController         *controller.NotificationController
-	ApplicationController          *controller.ApplicationController
-	GeneralizationController       *controller.GeneralizationController
-	ReportController               *controller.ReportController
-	OrgController                  *controller.OrgController
-	SmsController                  *controller.SmsController
-	FileUploadController           *controller.FileUploadController
-	FileMetadataController         *controller.FileMetadataController
-	FileAccessController           *controller.FileAccessController
-	AuthApi                        *api.AuthApi
-	AuthService                    *service.AuthApplicationService
-	SysUserApi                     *api.SysUserApi
-	DingTalkApi                    *api.DingTalkApi
-	LogService                     *service.LogService
-	UserService                    *service.SysUserService
-	ApplicationService             *service.ApplicationService
-	SubjectContextBuilder          *service.SubjectContextBuilder
-	DimensionProviderRuntime       *service.DimensionProviderRuntime
-	DataPermissionResolver         datapermission.Resolver
-	TokenBlackCache                *cache.TokenBlackCache
-	ApplicationCache               *cache.ApplicationCache
-	IntegrationWorker              *integration.IntegrationWorkerRunner
-	IntegrationSyncRunner          *integration.IntegrationSyncRunner
-	FileUploadService              *service.FileUploadService
+	Config                            *config.Server
+	DBs                               map[string]*gorm.DB
+	Redis                             *redis.Client
+	SF                                *utils.Snowflake
+	JwtGenerator                      *token.JWTGenerator
+	HmacGenerator                     *token.HMACGenerator
+	Enforcer                          *casbin.SyncedEnforcer
+	DictController                    *controller.DictController
+	BasicController                   *controller.BasicController
+	TableController                   *controller.TableController
+	MenuController                    *controller.MenuController
+	RoleController                    *controller.RoleController
+	UserController                    *controller.UserController
+	DataPermissionConfigController    *controller.DataPermissionConfigController
+	ExternalSystemController          *controller.ExternalSystemController
+	InterfaceDefinitionController     *controller.InterfaceDefinitionController
+	CredentialController              *controller.CredentialController
+	RetryPolicyController             *controller.RetryPolicyController
+	IntegrationSyncController         *controller.IntegrationSyncController
+	IntegrationExecutionController    *controller.IntegrationExecutionController
+	QuerySchemeController             *controller.QuerySchemeController
+	NotificationController            *controller.NotificationController
+	DevelopmentVerificationController *controller.DevelopmentVerificationController
+	ApplicationController             *controller.ApplicationController
+	GeneralizationController          *controller.GeneralizationController
+	ReportController                  *controller.ReportController
+	OrgController                     *controller.OrgController
+	SmsController                     *controller.SmsController
+	FileUploadController              *controller.FileUploadController
+	FileMetadataController            *controller.FileMetadataController
+	FileAccessController              *controller.FileAccessController
+	AuthApi                           *api.AuthApi
+	AuthService                       *service.AuthApplicationService
+	SysUserApi                        *api.SysUserApi
+	DingTalkApi                       *api.DingTalkApi
+	LogService                        *service.LogService
+	UserService                       *service.SysUserService
+	ApplicationService                *service.ApplicationService
+	SubjectContextBuilder             *service.SubjectContextBuilder
+	DimensionProviderRuntime          *service.DimensionProviderRuntime
+	DataPermissionResolver            datapermission.Resolver
+	TokenBlackCache                   *cache.TokenBlackCache
+	ApplicationCache                  *cache.ApplicationCache
+	IntegrationWorker                 *integration.IntegrationWorkerRunner
+	IntegrationSyncRunner             *integration.IntegrationSyncRunner
+	FileUploadService                 *service.FileUploadService
+	DevelopmentVerificationService    *service.DevelopmentVerificationService
 }
 
 // Repository 提供者
@@ -283,6 +285,7 @@ var ServiceProvider = wire.NewSet(
 	queryscheme.NewRegistry,
 	service.NewQuerySchemeService,
 	service.NewNotificationService,
+	service.NewDevelopmentVerificationService,
 )
 
 // Controller 提供者
@@ -311,6 +314,7 @@ var ControllerProvider = wire.NewSet(
 	controller.NewFileAccessController,
 	controller.NewQuerySchemeController,
 	controller.NewNotificationController,
+	controller.NewDevelopmentVerificationController,
 )
 
 // API 提供者

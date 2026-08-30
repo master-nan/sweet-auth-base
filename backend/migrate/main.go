@@ -1137,6 +1137,13 @@ func seedBuiltinMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleNa
 	if err := seedDictionaryMenuButtons(db, sf, roleID, roleName, dictionaryMenu.Id); err != nil {
 		return err
 	}
+	verificationMenu, ok := menuByName["develop_verification"]
+	if !ok {
+		return fmt.Errorf("develop_verification menu missing after seed")
+	}
+	if err := seedVerificationMenuButtons(db, sf, roleID, roleName, verificationMenu.Id); err != nil {
+		return err
+	}
 	auditMenu, ok := menuByName["system_audit"]
 	if !ok {
 		return fmt.Errorf("system_audit menu missing after seed")
@@ -1840,6 +1847,15 @@ func seedDictionaryMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, rol
 		menuButtonWithAPI(465, menuID, "新增字典项", "develop_dictionary_item_create", enum.Top, "create_item", "add", "primary", 2, "/admin/dict/item", "POST"),
 		menuButtonWithAPI(466, menuID, "编辑字典项", "develop_dictionary_item_update", enum.Line, "update_item", "edit", "primary", 3, "/admin/dict/item/:id", "PUT"),
 		menuButtonWithAPI(467, menuID, "删除字典项", "develop_dictionary_item_delete", enum.Line, "delete_item", "delete", "negative", 4, "/admin/dict/item/:id", "DELETE"),
+	}
+	return seedMenuButtons(db, sf, roleID, roleName, buttons)
+}
+
+func seedVerificationMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
+	buttons := []model.SysMenuButton{
+		apiPermissionWithAPI(750, menuID, "样例状态", "develop_verification_sample_status", enum.Top, "status", "fact_check", "primary", 90, "/admin/development/verification/samples", "GET"),
+		apiPermissionWithAPI(751, menuID, "准备样例", "develop_verification_sample_prepare", enum.Top, "prepare", "playlist_add_check", "primary", 91, "/admin/development/verification/samples/:scenario/prepare", "POST"),
+		apiPermissionWithAPI(752, menuID, "清理样例", "develop_verification_sample_cleanup", enum.Top, "cleanup", "delete_sweep", "negative", 92, "/admin/development/verification/samples/:scenario", "DELETE"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }

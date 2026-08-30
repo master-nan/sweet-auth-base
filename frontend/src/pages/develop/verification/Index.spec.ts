@@ -1,17 +1,28 @@
-import { shallowMount } from '@vue/test-utils'
+import { flushPromises, shallowMount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const routerPush = vi.hoisted(() => vi.fn())
 const routerHasRoute = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
+const dialog = vi.hoisted(() => vi.fn(() => ({ onOk: vi.fn() })))
+const statusesRequest = vi.hoisted(() => vi.fn())
+const prepareRequest = vi.hoisted(() => vi.fn())
+const cleanupRequest = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, hasRoute: routerHasRoute }),
 }))
 vi.mock('quasar', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>()
-  return { ...original, useQuasar: () => ({ notify }) }
+  return { ...original, useQuasar: () => ({ notify, dialog }) }
 })
+vi.mock('src/api/services/development-verification', () => ({
+  useDevelopmentVerificationApi: () => ({
+    statuses: statusesRequest,
+    prepare: prepareRequest,
+    cleanup: cleanupRequest,
+  }),
+}))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
   default: { name: 'BaseContent', template: '<div><slot /></div>' },
 }))
@@ -28,7 +39,12 @@ describe('develop verification page', () => {
     routerPush.mockReset()
     routerHasRoute.mockReset()
     notify.mockReset()
+    dialog.mockClear()
+    statusesRequest.mockReset()
+    prepareRequest.mockReset()
+    cleanupRequest.mockReset()
     routerHasRoute.mockReturnValue(true)
+    statusesRequest.mockResolvedValue({ data: [] })
   })
 
   it('provides practical scenarios for permission, TMS, file, integration and report checks', () => {
@@ -73,5 +89,45 @@ describe('develop verification page', () => {
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'warning', message: '当前账号没有可打开的相关页面' }),
     )
+  })
+
+  it('prepares a business sample and shows its one-time accounts', async () => {
+    prepareRequest.mockResolvedValue({
+      data: {
+        status: {
+          scenario_id: 'data-permission',
+          state: 'ready',
+          available: true,
+          item_count: 3,
+          summary: '样例已准备',
+          details: [],
+        },
+        accounts: [
+          {
+            user_name: 'verify_permission_east',
+            password: 'temporary-password',
+            role: '仅华东订单',
+            expected: '只能看到 EAST 的两条订单',
+          },
+        ],
+      },
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as {
+      scenarios: Array<{ id: string }>
+      prepareSample: (scenario: { id: string }) => Promise<void>
+      accountDialog: boolean
+      preparedAccounts: Array<{ user_name: string }>
+    }
+    const scenario = vm.scenarios.find((item) => item.id === 'data-permission')
+    expect(scenario).toBeDefined()
+
+    await vm.prepareSample(scenario!)
+
+    expect(prepareRequest).toHaveBeenCalledWith('data-permission')
+    expect(vm.accountDialog).toBe(true)
+    expect(vm.preparedAccounts[0]?.user_name).toBe('verify_permission_east')
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'positive' }))
   })
 })
