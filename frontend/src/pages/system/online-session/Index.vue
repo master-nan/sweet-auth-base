@@ -127,14 +127,12 @@
 
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-chip
-            dense
-            square
+          <status-chip
+            :label="sessionStatus(props.row).label"
             :color="sessionStatus(props.row).color"
             :text-color="sessionStatus(props.row).textColor"
-          >
-            {{ sessionStatus(props.row).label }}
-          </q-chip>
+            :outline="sessionStatus(props.row).outline"
+          />
         </q-td>
       </template>
 
@@ -203,6 +201,7 @@ import TablePagination from 'components/Table/TablePagination.vue'
 import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
 import FormDialogShell from 'components/FormDialog/FormDialogShell.vue'
 import DetailFieldGrid from 'components/Detail/DetailFieldGrid.vue'
+import StatusChip from 'components/Display/StatusChip.vue'
 import type { DetailFieldItem } from 'components/Detail/types'
 import { usePageButtons } from 'src/composables/page-buttons'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
@@ -266,18 +265,20 @@ const loginTimeFilterLabel = computed(() =>
 )
 
 const sessionStatus = (row: UserSession) => {
-  if (row.online) return { label: '在线', color: 'positive', textColor: 'white' }
+  if (row.online)
+    return { label: '在线', color: 'positive', textColor: 'white', outline: false }
   if (row.status === 'active')
-    return { label: '离线，令牌仍有效', color: 'orange-2', textColor: 'orange-10' }
-  const labels: Record<string, string> = {
-    logged_out: '已退出',
-    forced_offline: '已强制下线',
-    password_changed: '密码变更失效',
-    account_disabled: '账号停用',
-    account_deleted: '账号删除',
-    expired: '已过期',
+    return { label: '离线，令牌仍有效', color: 'orange-9', textColor: '', outline: true }
+  const closedStates: Record<string, { label: string; color: string }> = {
+    logged_out: { label: '已退出', color: 'grey-7' },
+    forced_offline: { label: '已强制下线', color: 'negative' },
+    password_changed: { label: '密码变更失效', color: 'negative' },
+    account_disabled: { label: '账号停用', color: 'negative' },
+    account_deleted: { label: '账号删除', color: 'negative' },
+    expired: { label: '已过期', color: 'blue-grey-7' },
   }
-  return { label: labels[row.status] || '已结束', color: 'grey-3', textColor: 'grey-9' }
+  const state = closedStates[row.status] || { label: '已结束', color: 'grey-7' }
+  return { ...state, textColor: '', outline: true }
 }
 
 const fetchData = async () => {
@@ -396,7 +397,14 @@ const statusDetailItems = computed<DetailFieldItem[]>(() => {
   return [
     { label: '用户', value: row.user_name },
     { label: '账号状态', value: row.user_deleted ? '账号已删除' : '正常' },
-    { label: '会话状态', value: state.label, chip: true, color: state.color },
+    {
+      label: '会话状态',
+      value: state.label,
+      chip: true,
+      color: state.color,
+      textColor: state.textColor,
+      outline: state.outline,
+    },
     { label: '会话编号', value: row.id },
     { label: '登录时间', value: row.login_at },
     { label: '最后活动', value: row.last_seen_at },

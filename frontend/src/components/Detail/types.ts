@@ -4,6 +4,8 @@ export interface DetailFieldItem {
   meta?: string
   chip?: boolean
   color?: string
+  textColor?: string
+  outline?: boolean
   fullWidth?: boolean
 }
 

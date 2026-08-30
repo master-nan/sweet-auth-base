@@ -21,9 +21,11 @@
           v-if="item.chip"
           dense
           square
-          :outline="variant === 'plain'"
+          :outline="item.outline ?? variant === 'plain'"
           :color="item.color || 'primary'"
-          :text-color="variant === 'card' ? 'white' : undefined"
+          :text-color="
+            item.textColor || ((item.outline ?? variant === 'plain') ? undefined : 'white')
+          "
         >
           {{ displayValue(item.value) }}
         </q-chip>
