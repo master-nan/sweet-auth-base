@@ -1,114 +1,141 @@
 <template>
   <base-content scrollable>
-    <div class="q-pa-md column q-gutter-md">
-      <div class="row q-col-gutter-md metric-grid">
-        <div v-for="item in metricCards" :key="item.label" class="col-12 col-sm-6 col-md-3">
-          <q-card flat bordered :class="['metric-card', `metric-card--${item.tone}`]">
-            <q-card-section class="metric-card__body">
-              <div class="metric-card__icon">
-                <q-icon :name="item.icon" size="24px" />
-              </div>
-              <div class="metric-card__content">
-                <div class="metric-card__value">
-                  <count-to :start-value="0" :end-value="item.value" />
-                </div>
-                <div class="metric-card__label">{{ item.label }}</div>
-                <div class="metric-card__hint">{{ item.hint }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
+    <div class="platform-dashboard q-pa-md">
+      <header class="dashboard-header">
+        <div class="dashboard-header__mark">
+          <q-icon name="space_dashboard" size="24px" />
         </div>
+        <div class="dashboard-header__copy">
+          <h1>平台概览</h1>
+          <p>查看组织基础数据、登录会话、集成异常和最近操作。</p>
+        </div>
+        <q-space />
+        <div class="dashboard-header__meta">
+          <span>{{ userStore.user_name || '当前用户' }}</span>
+          <span>更新于 {{ refreshedAt || '-' }}</span>
+        </div>
+        <q-btn round flat icon="refresh" :loading="refreshing" @click="loadDashboard">
+          <q-tooltip>刷新概览</q-tooltip>
+        </q-btn>
+      </header>
+
+      <q-banner v-if="partialFailure" dense class="dashboard-warning">
+        <template #avatar><q-icon name="info_outline" color="warning" /></template>
+        部分概览数据暂时无法读取，其他模块仍可正常使用。
+      </q-banner>
+
+      <section class="metric-strip" aria-label="平台关键指标">
+        <article v-for="item in metrics" :key="item.label" class="metric-item">
+          <div class="metric-item__icon" :class="`metric-item__icon--${item.tone}`">
+            <q-icon :name="item.icon" size="21px" />
+          </div>
+          <div class="metric-item__body">
+            <div class="metric-item__label">{{ item.label }}</div>
+            <div class="metric-item__value">{{ displayMetric(item.value) }}</div>
+            <div class="metric-item__hint">{{ item.hint }}</div>
+          </div>
+        </article>
+      </section>
+
+      <div class="dashboard-workspace">
+        <section class="dashboard-section dashboard-section--organization">
+          <div class="section-heading">
+            <div>
+              <h2>组织基础数据</h2>
+              <p>法人架构、管理架构、人员和岗位的当前档案数量。</p>
+            </div>
+            <q-btn
+              v-if="canOpenOrganization"
+              flat
+              color="primary"
+              icon-right="arrow_forward"
+              label="查看组织架构"
+              :to="{ name: 'organization_structure' }"
+            />
+          </div>
+          <div class="organization-summary">
+            <article v-for="item in organizationItems" :key="item.label">
+              <q-icon :name="item.icon" size="22px" :color="item.color" />
+              <div>
+                <span>{{ item.label }}</span>
+                <strong>{{ displayMetric(item.value) }}</strong>
+              </div>
+              <q-btn
+                v-if="item.route && item.available"
+                round
+                dense
+                flat
+                icon="chevron_right"
+                :to="{ name: item.route }"
+              >
+                <q-tooltip>打开{{ item.label }}</q-tooltip>
+              </q-btn>
+            </article>
+          </div>
+        </section>
+
+        <section class="dashboard-section dashboard-section--attention">
+          <div class="section-heading">
+            <div>
+              <h2>需要关注</h2>
+              <p>只统计当前账号有权查看的运行异常。</p>
+            </div>
+          </div>
+          <div class="attention-list">
+            <article v-for="item in attentionItems" :key="item.label">
+              <div class="attention-list__icon" :class="{ 'is-clear': item.value === 0 }">
+                <q-icon :name="item.value === 0 ? 'check' : item.icon" />
+              </div>
+              <div class="attention-list__copy">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.description }}</span>
+              </div>
+              <q-chip
+                v-if="item.value !== null"
+                dense
+                square
+                :color="item.value ? 'negative' : 'positive'"
+                text-color="white"
+              >
+                {{ item.value }}
+              </q-chip>
+              <span v-else class="text-caption text-grey-6">无查看权限</span>
+              <q-btn
+                v-if="item.route && item.value !== null"
+                round
+                dense
+                flat
+                icon="chevron_right"
+                :to="{ name: item.route }"
+              >
+                <q-tooltip>查看详情</q-tooltip>
+              </q-btn>
+            </article>
+          </div>
+        </section>
       </div>
 
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-lg-7">
-          <q-card flat bordered>
-            <q-card-section class="row items-center justify-between">
-              <div class="text-subtitle1 text-weight-medium">权限覆盖</div>
-              <q-chip dense square color="primary" text-color="white">
-                {{ visibleActionCount }} 个可见操作
-              </q-chip>
-            </q-card-section>
-            <q-separator />
-            <q-card-section class="column q-gutter-md">
-              <div v-for="group in menuGroups" :key="group.name">
-                <div class="row items-center justify-between q-mb-xs">
-                  <div class="text-body2">{{ formatMenuTitle(group.name) }}</div>
-                  <div class="text-caption text-grey-7">
-                    {{ group.visibleMenus }} 菜单 / {{ group.actions }} 操作
-                  </div>
-                </div>
-                <q-linear-progress
-                  rounded
-                  size="10px"
-                  :value="groupRatio(group)"
-                  :color="group.color"
-                  track-color="grey-3"
-                />
-              </div>
-              <q-banner v-if="menuGroups.length === 0" rounded class="bg-grey-2 text-grey-8">
-                当前用户暂无可访问菜单。
-              </q-banner>
-            </q-card-section>
-          </q-card>
-        </div>
-
-        <div class="col-12 col-lg-5">
-          <q-card flat bordered>
-            <q-card-section class="row items-center justify-between">
-              <div class="text-subtitle1 text-weight-medium">低代码页面</div>
-              <q-chip dense square color="secondary" text-color="white">
-                {{ lowCodeMenus.length }} 个
-              </q-chip>
-            </q-card-section>
-            <q-separator />
-            <q-list separator>
-              <q-item v-for="menu in lowCodeMenus.slice(0, 6)" :key="menu.id">
-                <q-item-section avatar>
-                  <q-icon :name="menu.icon || 'dynamic_form'" color="secondary" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ formatMenuTitle(menu.title) }}</q-item-label>
-                  <q-item-label caption>{{ menu.table_code }}</q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-btn round dense flat icon="open_in_new" :to="lowCodeRoute(menu)">
-                    <q-tooltip>打开</q-tooltip>
-                  </q-btn>
-                </q-item-section>
-              </q-item>
-              <q-item v-if="lowCodeMenus.length === 0">
-                <q-item-section class="text-grey-7">暂无已发布低代码页面。</q-item-section>
-              </q-item>
-            </q-list>
-          </q-card>
-        </div>
-      </div>
-
-      <q-card flat bordered>
-        <q-card-section class="row items-center justify-between">
+      <section class="dashboard-section dashboard-section--audit">
+        <div class="section-heading">
           <div>
-            <div class="text-subtitle1 text-weight-medium">最近审计</div>
-            <div class="text-caption text-grey-7">
+            <h2>最近操作</h2>
+            <p>
               {{
                 auditAvailable
-                  ? `最近 ${recentLogs.length} 条操作，成功率 ${successRate}%`
-                  : '当前角色未开放审计概览'
+                  ? '最近发生的后台操作，便于快速发现失败请求。'
+                  : '当前账号没有审计日志查看权限。'
               }}
-            </div>
+            </p>
           </div>
           <q-btn
             v-if="auditAvailable"
-            dense
             flat
-            icon="refresh"
-            :loading="loading"
-            @click="fetchRecentAudit"
-          >
-            <q-tooltip>刷新审计</q-tooltip>
-          </q-btn>
-        </q-card-section>
-        <q-separator />
+            color="primary"
+            icon-right="arrow_forward"
+            label="查看全部"
+            :to="{ name: 'system_audit' }"
+          />
+        </div>
         <q-markup-table flat separator="horizontal" class="dashboard-table">
           <thead>
             <tr>
@@ -116,7 +143,7 @@
               <th class="text-left">用户</th>
               <th class="text-left">动作</th>
               <th class="text-left">资源</th>
-              <th class="text-left">状态</th>
+              <th class="text-left">结果</th>
               <th class="text-right">耗时</th>
             </tr>
           </thead>
@@ -124,8 +151,8 @@
             <tr v-for="log in recentLogs" :key="log.id">
               <td>{{ log.gmt_create || '-' }}</td>
               <td>{{ log.user_name || '-' }}</td>
-              <td>{{ log.action || log.method }}</td>
-              <td>{{ log.resource_code || log.url }}</td>
+              <td>{{ log.action || log.method || '-' }}</td>
+              <td>{{ log.resource_code || log.url || '-' }}</td>
               <td>
                 <q-chip
                   dense
@@ -140,272 +167,620 @@
             </tr>
             <tr v-if="recentLogs.length === 0">
               <td colspan="6" class="text-center text-grey-7 q-pa-lg">
-                {{ auditAvailable ? '暂无审计记录。' : '没有审计菜单权限。' }}
+                {{ auditAvailable ? '暂无审计记录' : '无查看权限' }}
               </td>
             </tr>
           </tbody>
         </q-markup-table>
-      </q-card>
+      </section>
+
+      <nav class="quick-entry" aria-label="常用入口">
+        <span>常用入口</span>
+        <q-btn
+          v-for="item in quickEntries"
+          :key="item.route"
+          flat
+          no-caps
+          :icon="item.icon"
+          :label="item.label"
+          :to="{ name: item.route }"
+        />
+      </nav>
     </div>
   </base-content>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
-import { storeToRefs } from 'pinia'
+import { computed, onMounted, reactive, ref } from 'vue'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import CountTo from 'src/components/CountTo/CountTo.vue'
-import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
-import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
-import { useLoadingStore } from 'src/stores/loading'
-import { isApiPermission, isPageButton } from 'src/utils/menu-button'
-import { findMenuPathByTableCode } from 'src/utils/menu-context'
+import { useUserStore } from 'src/stores/user'
 import { usePageButtons } from 'src/composables/page-buttons'
+import { queryOrganizationOptions, type OrganizationSelectorType } from 'src/api/services/org'
+import { useUserSessionApi } from 'src/api/services/user-session'
+import { useIntegrationApi } from 'src/api/services/integration'
+import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
 
 defineOptions({ name: 'DashboardIndex' })
 
-type MenuGroup = {
-  name: string
-  visibleMenus: number
-  actions: number
-  color: string
-}
+type SummaryValue = number | null
 
-const menuApi = useMenuApi()
-const accessLogApi = useAccessLogApi()
+const userStore = useUserStore()
 const { hasGrantedCapability } = usePageButtons('home')
-const loadingStore = useLoadingStore()
-const { loading } = storeToRefs(loadingStore)
+const sessionApi = useUserSessionApi()
+const integrationApi = useIntegrationApi()
+const accessLogApi = useAccessLogApi()
 
-const menus = ref<Menu[]>([])
+const refreshing = ref(false)
+const partialFailure = ref(false)
+const refreshedAt = ref('')
 const recentLogs = ref<AccessLog[]>([])
-
-const auditAvailable = computed(() => hasGrantedCapability('system_audit_query'))
-
-const flatMenus = computed(() => flattenMenus(menus.value))
-const visibleMenus = computed(() => flatMenus.value.filter((menu) => !menu.is_hidden))
-const lowCodeMenus = computed(() =>
-  visibleMenus.value.filter((menu) => menu.page_type === 'low_code' && !!menu.table_code),
-)
-const allButtons = computed(() => flatMenus.value.flatMap((menu) => menu.menu_buttons || []))
-const visibleActionCount = computed(
-  () => allButtons.value.filter((button) => isPageButton(button) && !button.is_disabled).length,
-)
-const apiPermissionCount = computed(
-  () => allButtons.value.filter(isApiPermission).length,
-)
-const successRate = computed(() => {
-  if (recentLogs.value.length === 0) return 0
-  const successCount = recentLogs.value.filter((log) => log.success).length
-  return Math.round((successCount / recentLogs.value.length) * 100)
+const summary = reactive({
+  onlineUsers: null as SummaryValue,
+  onlineSessions: null as SummaryValue,
+  legalEntities: null as SummaryValue,
+  orgUnits: null as SummaryValue,
+  employees: null as SummaryValue,
+  positions: null as SummaryValue,
+  failedExecutions: null as SummaryValue,
+  expiredCredentials: null as SummaryValue,
 })
 
-const metricCards = computed(() => [
+const auditAvailable = computed(() => hasGrantedCapability('system_audit_query'))
+const canOpenOrganization = computed(
+  () =>
+    hasGrantedCapability('organization_legal_entity_options') ||
+    hasGrantedCapability('organization_unit_options'),
+)
+
+const combinedValue = (...values: SummaryValue[]): SummaryValue => {
+  const available = values.filter((value): value is number => value !== null)
+  return available.length ? available.reduce((total, value) => total + value, 0) : null
+}
+
+const attentionSummary = computed(() => {
+  const parts: string[] = []
+  if (summary.failedExecutions !== null) parts.push(`执行失败 ${summary.failedExecutions}`)
+  if (summary.expiredCredentials !== null) parts.push(`凭证过期 ${summary.expiredCredentials}`)
+  return parts.length ? parts.join(' · ') : '无集成运行查看权限'
+})
+
+const metrics = computed(() => [
   {
-    label: '可访问菜单',
-    hint: '当前账号范围',
-    value: visibleMenus.value.length,
-    icon: 'menu',
+    label: '当前在线用户',
+    value: summary.onlineUsers,
+    hint:
+      summary.onlineSessions === null
+        ? '无登录会话查看权限'
+        : `${summary.onlineSessions} 个活跃会话`,
+    icon: 'group',
     tone: 'primary',
   },
   {
-    label: '低代码页面',
-    hint: '已发布配置',
-    value: lowCodeMenus.value.length,
-    icon: 'dynamic_form',
+    label: '法人主体',
+    value: summary.legalEntities,
+    hint: summary.orgUnits === null ? '无组织档案查看权限' : `${summary.orgUnits} 个管理组织`,
+    icon: 'corporate_fare',
     tone: 'neutral',
   },
   {
-    label: '可见操作',
-    hint: '按钮与动作权限',
-    value: visibleActionCount.value,
-    icon: 'ads_click',
+    label: '人员档案',
+    value: summary.employees,
+    hint: summary.positions === null ? '无人员档案查看权限' : `${summary.positions} 个岗位`,
+    icon: 'badge',
     tone: 'positive',
   },
   {
-    label: '接口权限',
-    hint: '后台接口权限',
-    value: apiPermissionCount.value,
-    icon: 'lock',
+    label: '待处理异常',
+    value: combinedValue(summary.failedExecutions, summary.expiredCredentials),
+    hint: attentionSummary.value,
+    icon: 'error_outline',
     tone: 'warning',
   },
 ])
 
-const menuGroups = computed<MenuGroup[]>(() => {
-  const colors = ['primary', 'secondary', 'positive', 'info', 'warning', 'deep-purple']
-  return menus.value
-    .filter((menu) => !menu.is_hidden)
-    .map((menu, index) => {
-      const descendants = flattenMenus(menu.children || [])
-      const items = [menu, ...descendants].filter((item) => !item.is_hidden)
-      const actions = items
-        .flatMap((item) => item.menu_buttons || [])
-        .filter(isPageButton).length
-      return {
-        name: menu.title || menu.name,
-        visibleMenus: items.length,
-        actions,
-        color: colors[index % colors.length] || 'primary',
-      }
-    })
+const organizationItems = computed(() => [
+  {
+    label: '法人主体',
+    value: summary.legalEntities,
+    icon: 'account_balance',
+    color: 'primary',
+    route: 'organization_structure',
+    available: hasGrantedCapability('organization_legal_entity_options'),
+  },
+  {
+    label: '管理组织',
+    value: summary.orgUnits,
+    icon: 'account_tree',
+    color: 'teal',
+    route: 'organization_structure',
+    available: hasGrantedCapability('organization_unit_options'),
+  },
+  {
+    label: '人员档案',
+    value: summary.employees,
+    icon: 'badge',
+    color: 'positive',
+    route: 'organization_employee',
+    available: hasGrantedCapability('organization_employee_options'),
+  },
+  {
+    label: '岗位档案',
+    value: summary.positions,
+    icon: 'work_outline',
+    color: 'orange-8',
+    route: 'organization_position',
+    available: hasGrantedCapability('organization_position_options'),
+  },
+])
+
+const attentionItems = computed(() => [
+  {
+    label: '失败的集成执行',
+    value: summary.failedExecutions,
+    description:
+      summary.failedExecutions === 0 ? '当前没有失败执行' : '检查接口调用和同步处理结果',
+    icon: 'sync_problem',
+    route: 'integration_execution',
+  },
+  {
+    label: '已过期集成凭证',
+    value: summary.expiredCredentials,
+    description:
+      summary.expiredCredentials === 0 ? '当前没有过期凭证' : '更新凭证后再恢复接口调用',
+    icon: 'key_off',
+    route: 'integration_credential',
+  },
+])
+
+const quickEntries = computed(() => {
+  const entries = [
+    {
+      label: '组织架构',
+      icon: 'account_tree',
+      route: 'organization_structure',
+      visible: canOpenOrganization.value,
+    },
+    {
+      label: '在线用户',
+      icon: 'devices',
+      route: 'system_online_session',
+      visible: hasGrantedCapability('system_online_session_query'),
+    },
+    {
+      label: '执行记录',
+      icon: 'play_circle',
+      route: 'integration_execution',
+      visible: hasGrantedCapability('integration_execution_query'),
+    },
+    {
+      label: '审计日志',
+      icon: 'manage_search',
+      route: 'system_audit',
+      visible: auditAvailable.value,
+    },
+  ]
+  return entries.filter((entry) => entry.visible)
 })
 
-function flattenMenus(source: Menu[]): Menu[] {
-  const result: Menu[] = []
-  for (const menu of source) {
-    result.push(menu)
-    if (menu.children?.length) {
-      result.push(...flattenMenus(menu.children))
-    }
+const displayMetric = (value: SummaryValue) => {
+  if (value !== null) return value.toLocaleString('zh-CN')
+  return refreshing.value ? '...' : '--'
+}
+
+const loadOrganizationTotal = async (
+  type: OrganizationSelectorType,
+  target: keyof typeof summary,
+) => {
+  const result = await queryOrganizationOptions(type, { page: 1, num: 1 })
+  summary[target] = result.total
+}
+
+const loadDashboard = async () => {
+  if (refreshing.value) return
+  refreshing.value = true
+  partialFailure.value = false
+  const tasks: Promise<unknown>[] = []
+
+  if (hasGrantedCapability('system_online_session_query')) {
+    tasks.push(
+      sessionApi.query({ keyword: '', status: 'online', page: 1, num: 1 }).then((response) => {
+        summary.onlineUsers = response.data?.online_users || 0
+        summary.onlineSessions =
+          response.data?.online_sessions || response.data?.online_devices || 0
+      }),
+    )
   }
-  return result
-}
-
-function groupRatio(group: MenuGroup) {
-  const max = Math.max(...menuGroups.value.map((item) => item.visibleMenus + item.actions), 1)
-  return Math.min((group.visibleMenus + group.actions) / max, 1)
-}
-
-function formatMenuTitle(title?: string) {
-  if (!title) return '-'
-  if (title.startsWith('router.')) return title.split('.').pop() || title
-  return title
-}
-
-function lowCodeRoute(menu: Menu) {
-  return {
-    path:
-      findMenuPathByTableCode(menus.value, String(menu.table_code || '')) ||
-      `/admin/develop/generalization/${menu.table_code || ''}`,
+  if (hasGrantedCapability('organization_legal_entity_options')) {
+    tasks.push(loadOrganizationTotal('legal_entity', 'legalEntities'))
   }
-}
-
-async function fetchMenus() {
-  const res = await menuApi.queryMyMenu()
-  if (res.success && res.data) {
-    menus.value = res.data
+  if (hasGrantedCapability('organization_unit_options')) {
+    tasks.push(loadOrganizationTotal('org_unit', 'orgUnits'))
   }
-}
-
-async function fetchRecentAudit() {
-  if (!auditAvailable.value) return
-  const res = await accessLogApi.queryAccessLogs({
-    page: 1,
-    num: 8,
-    expressions: [],
-  })
-  if (res.success && res.data) {
-    recentLogs.value = res.data
+  if (hasGrantedCapability('organization_employee_options')) {
+    tasks.push(loadOrganizationTotal('employee', 'employees'))
   }
+  if (hasGrantedCapability('organization_position_options')) {
+    tasks.push(loadOrganizationTotal('position', 'positions'))
+  }
+  if (hasGrantedCapability('integration_execution_query')) {
+    tasks.push(
+      integrationApi
+        .queryExecutions({ page: 1, num: 1, expressions: [], status: 'failed' })
+        .then((response) => {
+          summary.failedExecutions = response.total || 0
+        }),
+    )
+  }
+  if (hasGrantedCapability('integration_credential_query')) {
+    tasks.push(
+      integrationApi
+        .queryCredentials({ page: 1, num: 1, expressions: [], status: 'expired' })
+        .then((response) => {
+          summary.expiredCredentials = response.total || 0
+        }),
+    )
+  }
+  if (auditAvailable.value) {
+    tasks.push(
+      accessLogApi
+        .queryAccessLogs({ page: 1, num: 6, expressions: [] })
+        .then((response) => {
+          recentLogs.value = response.data || []
+        }),
+    )
+  }
+
+  const results = await Promise.allSettled(tasks)
+  partialFailure.value = results.some((result) => result.status === 'rejected')
+  refreshedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
+  refreshing.value = false
 }
 
-onMounted(async () => {
-  await fetchMenus()
-  await fetchRecentAudit()
-})
+onMounted(() => void loadDashboard())
 </script>
 
 <style scoped>
-.metric-card {
-  min-height: 116px;
-  border-radius: 8px;
-  overflow: hidden;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.metric-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-}
-
-.metric-card__body {
-  min-height: 116px;
-  display: flex;
-  align-items: center;
+.platform-dashboard {
+  display: grid;
   gap: 16px;
-  padding: 18px 20px;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
-.metric-card__icon {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+.dashboard-header {
+  min-height: 76px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface, #fff);
+}
+
+.dashboard-header__mark {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--q-primary);
+  background: var(--app-primary-soft);
+}
+
+.dashboard-header__copy h1,
+.section-heading h2 {
+  margin: 0;
+  letter-spacing: 0;
+  color: var(--app-text-strong);
+}
+
+.dashboard-header__copy h1 {
+  font-size: 21px;
+  line-height: 28px;
+}
+
+.dashboard-header__copy p,
+.section-heading p {
+  margin: 3px 0 0;
+  color: var(--app-text-muted);
+  font-size: 13px;
+}
+
+.dashboard-header__meta {
+  display: grid;
+  justify-items: end;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.dashboard-header__meta span:first-child {
+  color: var(--app-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard-warning {
+  border: 1px solid rgba(242, 192, 55, 0.45);
+  border-radius: 6px;
+  background: rgba(242, 192, 55, 0.08);
+}
+
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface, #fff);
+  overflow: hidden;
+}
+
+.metric-item {
+  min-width: 0;
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 18px;
+  border-right: 1px solid var(--app-border);
+}
+
+.metric-item:last-child {
+  border-right: 0;
+}
+
+.metric-item__icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
   border-radius: 8px;
 }
 
-.metric-card__content {
+.metric-item__icon--primary {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.metric-item__icon--neutral {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.metric-item__icon--positive {
+  color: #16803a;
+  background: #ecfdf3;
+}
+
+.metric-item__icon--warning {
+  color: #b45309;
+  background: #fff7ed;
+}
+
+.metric-item__body {
   min-width: 0;
 }
 
-.metric-card__label {
-  margin-top: 2px;
-  color: #475569;
-  font-size: 14px;
-  line-height: 18px;
-  font-weight: 500;
+.metric-item__label,
+.metric-item__hint {
+  color: var(--app-text-muted);
+  font-size: 12px;
 }
 
-.metric-card__value {
-  color: #111827;
-  font-size: 30px;
-  line-height: 34px;
+.metric-item__value {
+  margin: 2px 0;
+  color: var(--app-text-strong);
+  font-size: 26px;
+  line-height: 31px;
   font-weight: 700;
 }
 
-.metric-card__hint {
-  margin-top: 4px;
-  color: #94a3b8;
-  font-size: 12px;
-  line-height: 16px;
-  white-space: nowrap;
+.metric-item__hint {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.metric-card--primary {
-  border-left: 4px solid #1976d2;
+.dashboard-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(360px, 1fr);
+  gap: 16px;
 }
 
-.metric-card--primary .metric-card__icon {
-  color: #1976d2;
-  background: rgba(25, 118, 210, 0.1);
+.dashboard-section {
+  min-width: 0;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface, #fff);
+  overflow: hidden;
 }
 
-.metric-card--neutral {
-  border-left: 4px solid #607d8b;
+.section-heading {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--app-border);
 }
 
-.metric-card--neutral .metric-card__icon {
-  color: #455a64;
-  background: rgba(96, 125, 139, 0.1);
+.section-heading h2 {
+  font-size: 16px;
+  line-height: 22px;
 }
 
-.metric-card--positive {
-  border-left: 4px solid #21ba45;
+.organization-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.metric-card--positive .metric-card__icon {
-  color: #1b8f38;
-  background: rgba(33, 186, 69, 0.1);
+.organization-summary article {
+  min-width: 0;
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
 }
 
-.metric-card--warning {
-  border-left: 4px solid #f2c037;
+.organization-summary article:nth-child(even) {
+  border-right: 0;
 }
 
-.metric-card--warning .metric-card__icon {
-  color: #a66d00;
-  background: rgba(242, 192, 55, 0.16);
+.organization-summary article:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.organization-summary article > div {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+}
+
+.organization-summary span {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.organization-summary strong {
+  margin-top: 2px;
+  font-size: 20px;
+}
+
+.attention-list article {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.attention-list article:last-child {
+  border-bottom: 0;
+}
+
+.attention-list__icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.attention-list__icon.is-clear {
+  color: #16803a;
+  background: #ecfdf3;
+}
+
+.attention-list__copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+}
+
+.attention-list__copy strong {
+  font-size: 14px;
+}
+
+.attention-list__copy span {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.dashboard-section--audit {
+  overflow-x: auto;
+}
+
+.dashboard-table {
+  min-width: 760px;
 }
 
 .dashboard-table td,
 .dashboard-table th {
   white-space: nowrap;
+}
+
+.quick-entry {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface, #fff);
+}
+
+.quick-entry > span {
+  padding: 0 10px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-item:nth-child(2) {
+    border-right: 0;
+  }
+
+  .metric-item:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .dashboard-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .platform-dashboard {
+    padding: 8px;
+  }
+
+  .dashboard-header__meta {
+    display: none;
+  }
+
+  .metric-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-item {
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .metric-item:last-child {
+    border-bottom: 0;
+  }
+
+  .organization-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .organization-summary article {
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .organization-summary article:nth-last-child(2) {
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .quick-entry {
+    overflow-x: auto;
+  }
 }
 </style>
