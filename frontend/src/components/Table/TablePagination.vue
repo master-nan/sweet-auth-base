@@ -1,7 +1,7 @@
 <template>
   <div class="table-pagination row items-center no-wrap">
     <span class="table-pagination__total">共 {{ formattedTotal }} 条</span>
-    <q-separator vertical inset class="table-pagination__separator" />
+    <q-separator vertical class="table-pagination__separator" />
 
     <div class="table-pagination__navigation row items-center no-wrap">
       <q-btn
@@ -67,7 +67,7 @@
       </q-btn>
     </div>
 
-    <q-separator vertical inset class="table-pagination__separator" />
+    <q-separator vertical class="table-pagination__separator" />
     <q-select
       v-model="currentPageSize"
       outlined
@@ -165,7 +165,10 @@ watch(
 }
 
 .table-pagination__separator {
+  align-self: center;
+  flex: 0 0 1px;
   height: 24px;
+  min-height: 24px;
   margin: 0 2px;
 }
 
