@@ -474,6 +474,30 @@ func TestSeedAuditMenuButtonsRemovesViewRefreshCapability(t *testing.T) {
 	}
 }
 
+func TestSeedPrimaryIDSkipsSoftDeletedRecord(t *testing.T) {
+	db := migrateTestDB(t)
+	if err := db.AutoMigrate(&model.SysMenuButton{}); err != nil {
+		t.Fatalf("migrate menu button: %v", err)
+	}
+	button := model.SysMenuButton{
+		Basic: model.Basic{Id: 750, State: true}, MenuId: 1, Name: "旧按钮", Code: "retired_button",
+	}
+	if err := db.Create(&button).Error; err != nil {
+		t.Fatalf("create retired button: %v", err)
+	}
+	if err := db.Delete(&button).Error; err != nil {
+		t.Fatalf("soft delete retired button: %v", err)
+	}
+
+	id, err := seedPrimaryId(db, &model.SysMenuButton{}, button.Id, newMigrationTestSnowflake(t))
+	if err != nil {
+		t.Fatalf("choose seed id: %v", err)
+	}
+	if id == button.Id {
+		t.Fatalf("seed id reused soft-deleted primary key %d", button.Id)
+	}
+}
+
 func TestRemoveLowCodeViewRefreshConfigurationIsIdempotent(t *testing.T) {
 	db := migrateTestDB(t)
 	if err := db.AutoMigrate(&model.SysMenu{}, &model.SysMenuButton{}, &model.SysRoleMenuButton{}, &model.SysMenuButtonTemplate{}); err != nil {

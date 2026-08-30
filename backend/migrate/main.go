@@ -1423,7 +1423,8 @@ func selectReportVersionForBackfill(db *gorm.DB, reportId int) (model.ReportDefi
 
 func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.Snowflake) (int, error) {
 	var count int64
-	if err := db.Model(modelValue).Where("id = ?", desired).Count(&count).Error; err != nil {
+	// 主键约束仍包含软删除记录，因此检查编号时也必须包含它们。
+	if err := db.Unscoped().Model(modelValue).Where("id = ?", desired).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	if count == 0 {
