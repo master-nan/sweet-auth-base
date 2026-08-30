@@ -10,9 +10,25 @@ const SlotStub = defineComponent({
 })
 
 const QInputStub = defineComponent({
-  props: { modelValue: String, label: String },
-  setup(props, { slots }) {
-    return () => h('div', { 'data-value': props.modelValue }, slots.append?.())
+  inheritAttrs: false,
+  props: { modelValue: String, label: String, ariaLabel: String },
+  emits: ['update:modelValue', 'focus', 'blur'],
+  setup(props, { attrs, emit, slots }) {
+    return () => {
+      if (attrs['data-time-part']) {
+        return h('input', {
+          ...attrs,
+          value: props.modelValue,
+          'aria-label': props.ariaLabel,
+          'data-time-part': attrs['data-time-part'],
+          onInput: (event: Event) =>
+            emit('update:modelValue', (event.target as HTMLInputElement).value),
+          onFocus: (event: Event) => emit('focus', event),
+          onBlur: () => emit('blur'),
+        })
+      }
+      return h('div', { 'data-value': props.modelValue }, slots.append?.())
+    }
   },
 })
 
@@ -26,7 +42,8 @@ const QBtnStub = defineComponent({
   props: { label: String, ariaLabel: String },
   emits: ['click'],
   setup(props, { emit }) {
-    return () => h('button', { 'aria-label': props.ariaLabel, onClick: () => emit('click') }, props.label)
+    return () =>
+      h('button', { 'aria-label': props.ariaLabel, onClick: () => emit('click') }, props.label)
   },
 })
 
@@ -56,10 +73,24 @@ describe('SweetDateTimePicker', () => {
     expect(date.props('defaultView')).toBe(defaultView)
   })
 
-  it('changes datetime values through explicit hour controls', async () => {
+  it('changes datetime values through direct hour input', async () => {
     const wrapper = mountPicker('datetime', '2026-08-20 04:18:00')
-    await wrapper.get('button[aria-label="时加一"]').trigger('click')
+    await wrapper.get('input[aria-label="小时"]').setValue('05')
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['2026-08-20 05:18:00'])
+  })
+
+  it('keeps seconds and applies common time presets', async () => {
+    const wrapper = mountPicker('datetime', '2026-08-20 04:18:27')
+    expect(wrapper.get('input[aria-label="秒钟"]').element).toHaveProperty('value', '27')
+
+    await wrapper.get('button[aria-label="设为 08:30:00"]').trigger('click')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['2026-08-20 08:30:00'])
+  })
+
+  it('adjusts a focused time part with the keyboard', async () => {
+    const wrapper = mountPicker('datetime', '2026-08-20 23:59:59')
+    await wrapper.get('input[aria-label="小时"]').trigger('keydown', { key: 'ArrowUp' })
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['2026-08-20 00:59:59'])
   })
 
   it('renders time-only values without a calendar', () => {

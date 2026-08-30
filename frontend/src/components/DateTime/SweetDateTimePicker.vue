@@ -23,6 +23,10 @@
       <q-icon :name="appendIcon" class="cursor-pointer" @click.stop="openPopup">
         <q-popup-proxy
           ref="popupRef"
+          :target="popupTarget"
+          no-parent-event
+          anchor="bottom middle"
+          self="top middle"
           transition-show="scale"
           transition-hide="scale"
           :breakpoint="0"
@@ -43,42 +47,59 @@
             </div>
             <q-separator v-if="showDate && showTime" vertical />
             <div v-if="showTime" class="sweet-date-time-clock">
+              <div class="sweet-date-time-clock__selection">
+                <span>已选择</span>
+                <strong>{{ selectedValueSummary }}</strong>
+              </div>
               <div class="sweet-date-time-clock__head">
                 <span>时间</span>
                 <q-btn flat dense color="primary" label="现在" @click="setNow" />
               </div>
-              <div class="sweet-date-time-clock__value">
-                {{ normalizedTimeValue }}
+              <div class="sweet-date-time-clock__editor">
+                <template v-for="(part, index) in timeParts" :key="part.key">
+                  <div class="sweet-date-time-clock__part">
+                    <q-input
+                      :model-value="timeDraft[part.key]"
+                      :aria-label="part.inputLabel"
+                      :data-time-part="part.key"
+                      outlined
+                      dense
+                      hide-bottom-space
+                      inputmode="numeric"
+                      maxlength="2"
+                      autocomplete="off"
+                      @focus="selectTimePart"
+                      @blur="normalizeTimePart(part.key)"
+                      @update:model-value="handleTimePartInput(part.key, $event)"
+                      @keydown.up.prevent="adjustTimePart(part.key, 1)"
+                      @keydown.down.prevent="adjustTimePart(part.key, -1)"
+                      @wheel.prevent="adjustTimePart(part.key, $event.deltaY < 0 ? 1 : -1)"
+                    />
+                    <span>{{ part.label }}</span>
+                  </div>
+                  <span v-if="index < timeParts.length - 1" class="sweet-date-time-clock__colon"
+                    >:</span
+                  >
+                </template>
               </div>
-              <div class="sweet-date-time-clock__grid">
-                <div
-                  v-for="part in timeParts"
-                  :key="part.key"
-                  class="sweet-date-time-clock__part"
-                >
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="keyboard_arrow_up"
-                    :aria-label="`${part.label}加一`"
-                    @click="adjustTimePart(part.key, 1)"
-                  />
-                  <div class="sweet-date-time-clock__number">{{ timePartValue(part.key) }}</div>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="keyboard_arrow_down"
-                    :aria-label="`${part.label}减一`"
-                    @click="adjustTimePart(part.key, -1)"
-                  />
-                  <div class="sweet-date-time-clock__label">{{ part.label }}</div>
-                </div>
+              <div class="sweet-date-time-clock__hint">可直接输入，或使用方向键和滚轮调整</div>
+              <div class="sweet-date-time-clock__quick-title">常用时间</div>
+              <div class="sweet-date-time-clock__quick-list">
+                <q-btn
+                  v-for="preset in quickTimes"
+                  :key="preset"
+                  flat
+                  dense
+                  no-caps
+                  :aria-label="`设为 ${preset}`"
+                  :class="{ 'is-active': normalizedTimeValue === preset }"
+                  :label="preset"
+                  @click="applyQuickTime(preset)"
+                />
               </div>
             </div>
             <div class="sweet-date-time-actions">
-              <q-btn flat dense color="primary" label="今天" @click="setToday" />
+              <q-btn v-if="showDate" flat dense color="primary" label="今天" @click="setToday" />
               <q-btn flat dense color="grey-7" label="清空" @click="clearValue" />
               <q-btn unelevated dense color="primary" label="确定" @click="confirmValue" />
             </div>
@@ -90,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 type PickerType = 'date' | 'time' | 'datetime' | 'year' | 'year-month'
 
@@ -127,6 +148,11 @@ const popupRef = ref<any>(null)
 const dateValue = ref('')
 const timeValue = ref('')
 type TimePartKey = 'hour' | 'minute' | 'second'
+const timeDraft = reactive<Record<TimePartKey, string>>({
+  hour: '00',
+  minute: '00',
+  second: '00',
+})
 
 const showDate = computed(() => props.type !== 'time')
 const showTime = computed(() => props.type === 'time' || props.type === 'datetime')
@@ -142,11 +168,13 @@ const dateDefaultView = computed(() => {
   return 'Calendar'
 })
 const displayValue = computed(() => props.modelValue || '')
+const popupTarget = computed(() => inputRef.value?.$el || false)
 const timeParts = [
-  { key: 'hour' as const, label: '时', max: 23 },
-  { key: 'minute' as const, label: '分', max: 59 },
-  { key: 'second' as const, label: '秒', max: 59 },
+  { key: 'hour' as const, label: '时', inputLabel: '小时' },
+  { key: 'minute' as const, label: '分', inputLabel: '分钟' },
+  { key: 'second' as const, label: '秒', inputLabel: '秒钟' },
 ]
+const quickTimes = ['00:00:00', '08:30:00', '12:00:00', '18:00:00']
 
 const pad2 = (value: number) => String(value).padStart(2, '0')
 
@@ -169,21 +197,37 @@ const normalizedTimeValue = computed(() => {
   return `${pad2(parts.hour)}:${pad2(parts.minute)}:${pad2(parts.second)}`
 })
 
+const selectedValueSummary = computed(() => {
+  if (props.type === 'time') return normalizedTimeValue.value
+  if (!dateValue.value) return '请选择日期'
+  return `${dateValue.value} ${normalizedTimeValue.value}`
+})
+
+const syncTimeDraft = () => {
+  const parts = parseTime(timeValue.value)
+  timeDraft.hour = pad2(parts.hour)
+  timeDraft.minute = pad2(parts.minute)
+  timeDraft.second = pad2(parts.second)
+}
+
 const splitValue = (value: string | null | undefined) => {
   const raw = String(value || '').trim()
   if (!raw) {
     dateValue.value = ''
     timeValue.value = ''
+    syncTimeDraft()
     return
   }
   if (props.type === 'time') {
     timeValue.value = raw
+    syncTimeDraft()
     return
   }
   if (props.type === 'datetime') {
     const [datePart, timePart] = raw.split(' ')
     dateValue.value = datePart || ''
     timeValue.value = timePart || '00:00:00'
+    syncTimeDraft()
     return
   }
   dateValue.value = raw
@@ -214,22 +258,50 @@ const handleDateChange = () => {
   emitValue()
 }
 
-const timePartValue = (part: TimePartKey) => {
-  return pad2(parseTime(timeValue.value)[part])
-}
-
 const setTimePart = (part: TimePartKey, value: number) => {
   const current = parseTime(timeValue.value)
   const max = part === 'hour' ? 23 : 59
   const normalized = ((value % (max + 1)) + max + 1) % (max + 1)
   current[part] = normalized
   timeValue.value = `${pad2(current.hour)}:${pad2(current.minute)}:${pad2(current.second)}`
+  syncTimeDraft()
   emitValue()
 }
 
 const adjustTimePart = (part: TimePartKey, delta: number) => {
   const current = parseTime(timeValue.value)
   setTimePart(part, current[part] + delta)
+}
+
+const handleTimePartInput = (part: TimePartKey, value: string | number | null) => {
+  const digits = String(value ?? '')
+    .replace(/\D/g, '')
+    .slice(0, 2)
+  timeDraft[part] = digits
+  if (!digits) return
+
+  const current = parseTime(timeValue.value)
+  const max = part === 'hour' ? 23 : 59
+  current[part] = Math.min(Number(digits), max)
+  timeValue.value = `${pad2(current.hour)}:${pad2(current.minute)}:${pad2(current.second)}`
+  emitValue()
+}
+
+const normalizeTimePart = (part: TimePartKey) => {
+  const current = parseTime(timeValue.value)
+  const draftValue = Number(timeDraft[part])
+  setTimePart(part, Number.isFinite(draftValue) ? draftValue : current[part])
+}
+
+const selectTimePart = (event: Event) => {
+  const target = event.target
+  if (target instanceof HTMLInputElement) target.select()
+}
+
+const applyQuickTime = (value: string) => {
+  timeValue.value = value
+  syncTimeDraft()
+  emitValue()
 }
 
 const setToday = () => {
@@ -246,6 +318,7 @@ const setToday = () => {
       timeValue.value = '00:00:00'
     }
   }
+  syncTimeDraft()
   emitValue()
 }
 
@@ -255,12 +328,14 @@ const setNow = () => {
   if (props.type === 'datetime' && !dateValue.value) {
     dateValue.value = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
   }
+  syncTimeDraft()
   emitValue()
 }
 
 const clearValue = () => {
   dateValue.value = ''
   timeValue.value = ''
+  syncTimeDraft()
   emit('update:modelValue', '')
   emit('change', '')
   popupRef.value?.hide?.()
@@ -306,7 +381,7 @@ defineExpose({
 }
 
 .sweet-date-time-panel--datetime {
-  grid-template-columns: 292px auto 204px;
+  grid-template-columns: 292px auto 196px;
   align-items: stretch;
 }
 
@@ -339,11 +414,38 @@ defineExpose({
 }
 
 .sweet-date-time-clock {
-  width: 204px;
+  width: 196px;
   display: flex;
   flex-direction: column;
-  padding: 14px 14px 10px;
+  padding: 10px 12px;
   background: var(--app-surface-muted);
+}
+
+.sweet-date-time-clock__selection {
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+}
+
+.sweet-date-time-clock__selection span {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.sweet-date-time-clock__selection strong {
+  overflow: hidden;
+  color: var(--app-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sweet-date-time-clock__head {
@@ -355,47 +457,85 @@ defineExpose({
   font-weight: 700;
 }
 
-.sweet-date-time-clock__value {
-  margin: 10px 0 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--app-border);
-  border-radius: 6px;
-  background: var(--app-surface);
-  color: var(--app-text-strong);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 18px;
-  text-align: center;
-}
-
-.sweet-date-time-clock__grid {
+.sweet-date-time-clock__editor {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr) 6px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px;
+  margin-top: 8px;
 }
 
 .sweet-date-time-clock__part {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.sweet-date-time-clock__number {
-  width: 42px;
-  height: 36px;
+.sweet-date-time-clock__part :deep(.q-field) {
+  width: 100%;
+}
+
+.sweet-date-time-clock__part :deep(.q-field__control) {
+  height: 40px;
+  background: var(--app-surface);
+}
+
+.sweet-date-time-clock__part :deep(.q-field__native) {
+  color: var(--app-text-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sweet-date-time-clock__part > span {
+  color: var(--app-text-muted);
+  font-size: 11px;
+}
+
+.sweet-date-time-clock__colon {
+  padding-top: 5px;
+  color: var(--app-text-strong);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sweet-date-time-clock__hint {
+  margin-top: 4px;
+  color: var(--app-text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sweet-date-time-clock__quick-title {
+  margin-top: 10px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.sweet-date-time-clock__quick-list {
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sweet-date-time-clock__quick-list :deep(.q-btn) {
+  min-height: 28px;
   border: 1px solid var(--app-border);
   border-radius: 6px;
   background: var(--app-surface);
   color: var(--app-text-strong);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 18px;
-  font-weight: 700;
+  padding: 0 4px;
+  font-size: 12px;
 }
 
-.sweet-date-time-clock__label {
-  color: var(--app-text-muted);
-  font-size: 12px;
+.sweet-date-time-clock__quick-list :deep(.q-btn.is-active) {
+  border-color: var(--q-primary);
+  color: var(--q-primary);
 }
 
 .sweet-date-time-actions {
