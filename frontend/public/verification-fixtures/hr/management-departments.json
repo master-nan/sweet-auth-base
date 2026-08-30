@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": [
+    {
+      "zjkid_ignore": "verify-management-dept-rd",
+      "id": "verify-management-dept-record-rd",
+      "code": "VERIFY-MGMT-RD",
+      "name": "功能验证-管理研发部",
+      "pk_fathedeptzjkid_ignore": "verify-management-hq",
+      "orgidzjkid_ignore": "verify-legal-hq",
+      "pk_corp": "VERIFY-LEGAL-HQ",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:03:00",
+      "ilevel": 2,
+      "disorder": "20"
+    }
+  ]
+}

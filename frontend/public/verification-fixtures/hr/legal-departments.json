@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": [
+    {
+      "zjkid_ignore": "verify-legal-dept-rd",
+      "id": "verify-legal-dept-record-rd",
+      "code": "VERIFY-LEGAL-RD",
+      "name": "功能验证-法人研发部",
+      "pk_fathedeptzjkid_ignore": "",
+      "orgidzjkid_ignore": "verify-legal-hq",
+      "pk_corp": "VERIFY-LEGAL-HQ",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:02:00",
+      "ilevel": 1,
+      "disorder": "10"
+    }
+  ]
+}

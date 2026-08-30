@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "data": [
+    {
+      "psnidzjkid_ignore": "verify-employee-001",
+      "jhcode": "VERIFY-E001",
+      "name": "功能验证-员工甲",
+      "mobile": "13900009991",
+      "email": "verify-employee-001@example.invalid",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:05:00",
+      "corporationCompanyId": "verify-legal-hq",
+      "deptidzjkid_ignore": "verify-management-dept-rd",
+      "postidzjkid_ignore": "verify-position-engineer",
+      "sendpost": "[]"
+    }
+  ]
+}

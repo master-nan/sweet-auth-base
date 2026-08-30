@@ -1,0 +1,8 @@
+{
+  "success": true,
+  "message": "Sweet Admin integration verification fixture",
+  "data": {
+    "source": "development_verification",
+    "version": 1
+  }
+}

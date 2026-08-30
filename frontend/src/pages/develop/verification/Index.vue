@@ -101,6 +101,18 @@
                   @click="prepareSample(selectedScenario)"
                 />
                 <q-btn
+                  v-if="
+                    selectedScenario.id === 'integration-call' &&
+                    sampleStatus(selectedScenario)?.state === 'ready'
+                  "
+                  outline
+                  color="primary"
+                  icon="play_arrow"
+                  label="运行连通性测试"
+                  :loading="runningIntegrationSample"
+                  @click="runIntegrationSample"
+                />
+                <q-btn
                   v-if="selectedScenario.routeName"
                   unelevated
                   color="primary"
@@ -128,6 +140,27 @@
                   <span>{{ detail.label }}</span>
                   <strong>{{ detail.value }}</strong>
                 </div>
+              </div>
+            </section>
+
+            <section
+              v-if="selectedScenario.sampleFiles?.length"
+              class="verification-sample-files"
+            >
+              <div>
+                <strong>测试文件</strong>
+                <span>下载后直接按下方步骤上传，不需要自行寻找样例。</span>
+              </div>
+              <div class="verification-sample-files__actions">
+                <q-btn
+                  v-for="file in selectedScenario.sampleFiles"
+                  :key="file.fileName"
+                  outline
+                  color="primary"
+                  icon="download"
+                  :label="file.label"
+                  @click="downloadSampleFile(file)"
+                />
               </div>
             </section>
 
@@ -230,6 +263,7 @@ import {
   type VerificationSampleScenario,
   type VerificationSampleStatus,
 } from 'src/api/services/development-verification'
+import { useIntegrationApi } from 'src/api/services/integration'
 
 type ScenarioStatus = 'ready' | 'configuration' | 'data'
 
@@ -247,11 +281,20 @@ interface VerificationScenario {
   routeName?: string
   actionLabel?: string
   sampleId?: VerificationSampleScenario
+  sampleFiles?: VerificationSampleFile[]
+}
+
+interface VerificationSampleFile {
+  label: string
+  fileName: string
+  url?: string
+  generatedSizeMiB?: number
 }
 
 const router = useRouter()
 const $q = useQuasar()
 const verificationApi = useDevelopmentVerificationApi()
+const integrationApi = useIntegrationApi()
 const keyword = ref('')
 const category = ref('all')
 const selectedId = ref('permission-page')
@@ -261,6 +304,7 @@ const cleaningId = ref<VerificationSampleScenario | null>(null)
 const statuses = ref<Partial<Record<VerificationSampleScenario, VerificationSampleStatus>>>({})
 const accountDialog = ref(false)
 const preparedAccounts = ref<VerificationSampleAccount[]>([])
+const runningIntegrationSample = ref(false)
 
 const categoryOptions = [
   { label: '全部场景', value: 'all' },
@@ -392,45 +436,48 @@ const scenarios: VerificationScenario[] = [
   },
   {
     id: 'organization-sync',
+    sampleId: 'organization-sync',
     title: '组织、人事与岗位同步',
     category: 'integration',
     icon: 'account_tree',
     status: 'configuration',
-    summary: '从真实 HR 接口同步法人架构、管理架构、岗位、人员和任职。',
+    summary: '通过本地 HR 接口按真实同步链路验证法人架构、管理架构、岗位和人员。',
     prerequisites: [
-      '已配置外部系统、凭证、接口定义和同步任务。',
-      '源数据具有稳定 SourceKey、版本时间和明确的父子关系。',
+      '点击“准备样例”，系统会创建独立的 verify_hr_source、7 个接口和 7 个手工同步任务。',
+      '默认 Docker 环境会启用 Integration Worker、同步 Runner 和组织 HR Consumer。',
     ],
     steps: [
-      '先同步法人主体和法人组织，再同步管理公司、管理组织及两套架构关系。',
-      '同步岗位和人员档案，最后同步人员任职。',
-      '在同步批次查看总数、成功数、失败数和 Checkpoint。',
-      '在组织架构、人员与任职、岗位页面核对结果。',
+      '打开同步任务，按法人公司、管理公司、法人部门、管理部门、岗位、员工、离职员工的顺序逐个点击手工执行。',
+      '在同步批次等待每个任务完成，查看总数、成功数、忽略数、失败数和 Checkpoint。',
+      '在组织架构切换法人架构与管理架构，核对两棵树；再到岗位和人员页面核对档案。',
+      '重复执行一遍全部任务，确认相同 SourceKey 不产生重复组织、岗位或人员。',
     ],
     expected: [
       '法人架构和管理架构可以分别浏览。',
       '同一组织事实不会因重复同步产生重复记录。',
-      '父级晚到、旧事件和失败记录具有明确处理结果。',
+      '同步批次和执行详情能够追溯每次真实 HTTP 调用及消费结果。',
     ],
+    note: '当前 HR Consumer 合同覆盖法人公司、管理公司、两类部门、岗位、在职和离职人员。人员任职仍是独立业务合同，本样例不伪造任职关系。',
     routeName: 'organization_sync_batch',
     actionLabel: '打开同步批次',
   },
   {
     id: 'integration-call',
+    sampleId: 'integration-call',
     title: '外部接口调用',
     category: 'integration',
     icon: 'hub',
     status: 'configuration',
-    summary: '验证系统、凭证、接口、重试策略和执行记录的完整调用过程。',
+    summary: '用本地 JSON 接口验证系统、加密凭证、接口、重试策略和执行记录。',
     prerequisites: [
-      '准备不含真实生产密钥的测试接口。',
-      '按顺序配置外部系统、凭证、接口定义和重试策略。',
+      '点击“准备样例”，系统会创建 verify_integration_source 及其测试凭证、重试策略和 verify_ping 接口。',
+      '样例只连接默认 Docker 内的静态 JSON 地址，不使用真实生产地址或密钥。',
     ],
     steps: [
-      '在接口定义中配置 Method、相对路径、参数和响应约束。',
-      '发起一次手工执行，并在执行记录查看输入安全摘要和状态。',
+      '打开接口定义，搜索 verify_ping，核对 Method、相对路径、凭证和重试策略。',
+      '点击接口的手工执行按钮，并在执行记录查看输入安全摘要和状态。',
       '进入 Attempt 调用日志核对 HTTP 状态、耗时和错误分类。',
-      '制造一次可重试技术错误，确认按策略生成下一次 Attempt。',
+      '可复制接口后临时填写一个不存在的路径，验证技术错误和重试 Attempt；不要修改已启用的样例接口。',
     ],
     expected: [
       '凭证正文不会出现在列表、详情或日志。',
@@ -442,50 +489,73 @@ const scenarios: VerificationScenario[] = [
   },
   {
     id: 'file-upload',
+    sampleId: 'file-upload',
     title: '文件上传、下载与删除',
     category: 'file',
     icon: 'upload_file',
     status: 'data',
     summary: '通过低代码文件字段验证普通上传、权限访问和删除生命周期。',
-    prerequisites: [
-      '样例业务表已配置文件字段并发布。',
-      '测试账号具有该记录的新增、详情和删除权限。',
-    ],
+    prerequisites: ['点击“准备样例”，系统会发布功能验证文件页面并创建一条可编辑记录。'],
     steps: [
-      '在新增表单选择一个小文件并完成普通上传。',
+      '下载页面提供的小文件，打开样例页面并编辑“功能验证-上传测试”记录。',
+      '在普通文件字段选择该文件，保存并完成普通上传。',
       '保存记录后从详情页预览或下载文件。',
-      '使用无记录访问权限的账号尝试打开相同文件。',
-      '删除业务记录并检查文件引用和物理文件清理结果。',
+      '复制文件地址后退出登录再访问，确认不能仅凭文件地址越权读取。',
+      '删除或替换文件，确认页面引用随记录更新。',
     ],
     expected: [
       '有权限用户可以按用途预览或下载。',
       '无权限用户不能仅凭文件 ID 访问。',
-      '删除失败时数据库与存储不会留下半完成状态。',
+      '删除或替换后旧引用不再出现在记录中。',
     ],
-    routeName: 'develop_database',
-    actionLabel: '配置文件字段',
+    sampleFiles: [
+      {
+        label: '下载小文件',
+        fileName: 'sweet-admin-file-upload-sample.txt',
+        url: '/verification-fixtures/files/sample-small.txt',
+      },
+      {
+        label: '生成 6 MiB 文件',
+        fileName: 'sweet-admin-chunk-upload-sample.txt',
+        generatedSizeMiB: 6,
+      },
+    ],
+    routeName: 'lowcode_verify_file_record',
+    actionLabel: '打开文件样例',
   },
   {
     id: 'video-preview',
+    sampleId: 'video-preview',
     title: '视频与大文件预览',
     category: 'file',
     icon: 'movie',
     status: 'data',
     summary: '验证视频 Range 请求、预览权限以及大文件分片上传。',
-    prerequisites: ['准备无敏感内容的 MP4 测试文件。', '样例页面已配置文件字段。'],
+    prerequisites: [
+      '点击“准备样例”，系统会发布与普通文件共用的低代码样例页面。',
+      '下载页面提供的无敏感内容 MP4；该文件超过样例字段 0.1 MiB 的分片阈值。',
+    ],
     steps: [
-      '上传超过普通上传阈值的测试文件，观察分片、合并和进度。',
+      '下载 MP4，打开样例页面并编辑“功能验证-上传测试”记录。',
+      '在 MP4 视频字段上传该文件，观察分片、合并和进度。',
       '从详情页打开视频预览并拖动播放进度。',
       '刷新页面后再次预览，确认签名地址可按规则重新获取。',
-      '中断一次上传，确认过期分片会由清理机制处理。',
+      '重新选择文件并中断上传，确认未完成上传不会写入业务记录。',
     ],
     expected: [
       '分片只在全部上传完成后合并。',
       '视频拖动时 Range 响应正常。',
       'preview 与 download 用途不能互换。',
     ],
-    routeName: 'develop_database',
-    actionLabel: '打开数据管理',
+    sampleFiles: [
+      {
+        label: '下载 MP4 视频',
+        fileName: 'sweet-admin-video-preview-sample.mp4',
+        url: '/verification-fixtures/files/sample-video.mp4',
+      },
+    ],
+    routeName: 'lowcode_verify_file_record',
+    actionLabel: '打开视频样例',
   },
   {
     id: 'query-center',
@@ -559,22 +629,25 @@ const scenarios: VerificationScenario[] = [
     title: '报表发布与运行',
     category: 'report',
     icon: 'analytics',
-    status: 'configuration',
+    status: 'ready',
     summary: '验证当前轻量 Sheet 报表的设计、发布、运行、导出和执行日志。',
-    prerequisites: ['准备一个只读 table 或受控 SQL 数据集。', '测试角色具有对应报表和数据权限。'],
+    prerequisites: [
+      '系统初始化已内置并发布“访问日志概览”报表，不需要额外准备数据集。',
+      '先在系统中进行几次查询或保存操作，为访问日志产生可观察的数据。',
+    ],
     steps: [
-      '在报表管理新建定义并进入设计器配置数据集、单元格和绑定。',
-      '发布报表后从报表中心运行。',
+      '在报表中心打开“访问日志概览”，设置关键字后运行报表。',
       '验证运行结果、CSV 导出和执行日志。',
-      '使用受限账号确认报表查询仍受菜单和数据权限约束。',
+      '在报表管理打开该定义，对照 table 数据源、查询参数、Sheet 单元格和绑定配置。',
+      '复制一份报表进行修改并发布，确认草稿不会影响原已发布版本。',
     ],
     expected: [
       '设计版本与已发布运行版本隔离。',
       '导出内容与运行结果一致。',
       '未授权用户不能运行或读取报表数据。',
     ],
-    routeName: 'report_manage',
-    actionLabel: '打开报表管理',
+    routeName: 'report_center',
+    actionLabel: '打开报表中心',
   },
 ]
 
@@ -650,7 +723,7 @@ const confirmCleanup = (scenario: VerificationScenario) => {
   $q.dialog({
     title: '清理功能验证样例',
     message:
-      '只会删除本工作台创建的 verify_ 数据、功能验证账号和“功能验证-”TMS 数据，不会删除现有业务数据。',
+      '只会删除本工作台创建的 verify_ 配置、数据和功能验证账号，不会删除现有业务数据。文件与视频共用同一张样例表，清理其中一个会同时清理两项。',
     cancel: true,
     persistent: true,
   }).onOk(() => {
@@ -661,6 +734,76 @@ const confirmCleanup = (scenario: VerificationScenario) => {
 const copyPassword = async (account: VerificationSampleAccount) => {
   await copyToClipboard(`账号：${account.user_name}\n密码：${account.password}`)
   $q.notify({ type: 'positive', message: `已复制 ${account.user_name} 的账号和密码` })
+}
+
+const downloadSampleFile = async (file: VerificationSampleFile) => {
+  try {
+    let blob: Blob
+    if (file.generatedSizeMiB) {
+      const bytes = Math.max(1, Math.round(file.generatedSizeMiB * 1024 * 1024))
+      const marker = 'Sweet Admin chunk upload verification sample.\n'
+      blob = new Blob([marker.repeat(Math.ceil(bytes / marker.length)).slice(0, bytes)], {
+        type: 'text/plain;charset=utf-8',
+      })
+    } else if (file.url) {
+      const response = await fetch(file.url)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      blob = await response.blob()
+    } else {
+      throw new Error('样例文件地址未配置')
+    }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    $q.notify({ type: 'negative', message: '样例文件下载失败，请确认前端静态资源已更新' })
+  }
+}
+
+const runIntegrationSample = async () => {
+  runningIntegrationSample.value = true
+  try {
+    const systems = await integrationApi.queryExternalSystems({
+      page: 1,
+      num: 100,
+      expressions: [],
+    })
+    const system = systems.data?.find((item) => item.system_code === 'verify_integration_source')
+    if (!system) throw new Error('找不到功能验证外部系统')
+
+    const definitions = await integrationApi.queryInterfaceDefinitions({
+      page: 1,
+      num: 100,
+      expressions: [],
+      external_system_id: system.id,
+    })
+    const definition = definitions.data?.find((item) => item.interface_code === 'verify_ping')
+    if (!definition) throw new Error('找不到功能验证接口')
+
+    const result = await integrationApi.createExecution({
+      external_system_id: system.id,
+      interface_definition_id: definition.id,
+      trigger_source: 'manual',
+      idempotency_scope: 'development_verification',
+      idempotency_key: `verify-ping-${Date.now()}`,
+      input: { path_params: {}, query_params: {}, headers: {} },
+    })
+    if (!result.success || !result.data) throw new Error('创建执行记录失败')
+    $q.notify({ type: 'positive', message: `已创建连通性测试 ${result.data.execution_no}` })
+    await router.push({ name: 'integration_execution_detail_page', params: { id: result.data.id } })
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: error instanceof Error ? error.message : '运行连通性测试失败',
+    })
+  } finally {
+    runningIntegrationSample.value = false
+  }
 }
 
 const openScenario = async (scenario: VerificationScenario) => {
@@ -815,6 +958,33 @@ onMounted(loadSampleStatuses)
   color: var(--app-text-strong);
 }
 
+.verification-sample-files {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+}
+
+.verification-sample-files > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.verification-sample-files span {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.verification-sample-files__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .verification-sample-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -906,6 +1076,11 @@ onMounted(loadSampleStatuses)
 
   .verification-sample-facts {
     grid-template-columns: 1fr;
+  }
+
+  .verification-sample-files {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

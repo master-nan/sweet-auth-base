@@ -79,10 +79,11 @@ type Audit struct {
 
 // Integration 仅保存集成运行时的服务端配置，不由普通请求修改。
 type Integration struct {
-	Worker         IntegrationWorker         `mapstructure:"worker"`
-	SyncRunner     IntegrationSyncRunner     `mapstructure:"sync_runner"`
-	EndpointPolicy IntegrationEndpointPolicy `mapstructure:"endpoint_policy"`
-	OrganizationHR IntegrationOrganizationHR `mapstructure:"organization_hr"`
+	Worker                     IntegrationWorker         `mapstructure:"worker"`
+	SyncRunner                 IntegrationSyncRunner     `mapstructure:"sync_runner"`
+	EndpointPolicy             IntegrationEndpointPolicy `mapstructure:"endpoint_policy"`
+	OrganizationHR             IntegrationOrganizationHR `mapstructure:"organization_hr"`
+	VerificationFixtureBaseURL string                    `mapstructure:"verification_fixture_base_url"`
 }
 
 // IntegrationEndpointPolicy 只允许服务端显式批准内部 HTTP 地址。

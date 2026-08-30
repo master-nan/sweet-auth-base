@@ -39,8 +39,9 @@ security:
 audit:
   access_log_retention_days: 30
 integration:
+  verification_fixture_base_url: 'http://frontend'
   worker:
-    enabled: false
+    enabled: true
     worker_id: 'integration-docker-1'
     poll_interval: 5
     claim_batch_size: 8
@@ -49,18 +50,18 @@ integration:
     shutdown_timeout: 15
     lease_duration: 600
   sync_runner:
-    enabled: false
+    enabled: true
     runner_id: 'integration-sync-docker-1'
     poll_interval: 10
     schedule_batch_size: 8
     coordinate_batch_size: 16
     shutdown_timeout: 15
   endpoint_policy:
-    allow_http: false
-    approved_private_cidrs: []
+    allow_http: true
+    approved_private_cidrs: ['172.16.0.0/12']
   organization_hr:
-    enabled: false
-    source_timezone: ''
+    enabled: true
+    source_timezone: 'Asia/Shanghai'
 conf:
   salt: 'local-docker-sweet-admin-salt-change-me'
   enable: false
@@ -70,9 +71,9 @@ upload:
   base_url: '/sweet_admin/files'
   max_size: 50
   chunk_size: 5
-  allowed_extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx','.zip']
-  allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip']
-  inline_preview_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv']
+  allowed_extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip']
+  allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'application/pdf', 'text/plain', 'text/csv', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip']
+  inline_preview_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'application/pdf', 'text/plain', 'text/csv']
   public_preview: false
   access_ttl_minutes: 15
   max_access_ttl_minutes: 60

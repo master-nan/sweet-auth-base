@@ -8,6 +8,9 @@ const dialog = vi.hoisted(() => vi.fn(() => ({ onOk: vi.fn() })))
 const statusesRequest = vi.hoisted(() => vi.fn())
 const prepareRequest = vi.hoisted(() => vi.fn())
 const cleanupRequest = vi.hoisted(() => vi.fn())
+const queryExternalSystems = vi.hoisted(() => vi.fn())
+const queryInterfaceDefinitions = vi.hoisted(() => vi.fn())
+const createExecution = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush, hasRoute: routerHasRoute }),
@@ -21,6 +24,13 @@ vi.mock('src/api/services/development-verification', () => ({
     statuses: statusesRequest,
     prepare: prepareRequest,
     cleanup: cleanupRequest,
+  }),
+}))
+vi.mock('src/api/services/integration', () => ({
+  useIntegrationApi: () => ({
+    queryExternalSystems,
+    queryInterfaceDefinitions,
+    createExecution,
   }),
 }))
 vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
@@ -43,13 +53,20 @@ describe('develop verification page', () => {
     statusesRequest.mockReset()
     prepareRequest.mockReset()
     cleanupRequest.mockReset()
+    queryExternalSystems.mockReset()
+    queryInterfaceDefinitions.mockReset()
+    createExecution.mockReset()
     routerHasRoute.mockReturnValue(true)
     statusesRequest.mockResolvedValue({ data: [] })
   })
 
   it('provides practical scenarios for permission, TMS, file, integration and report checks', () => {
     const wrapper = mountPage()
-    const scenarios = (wrapper.vm as unknown as { scenarios: Array<{ id: string }> }).scenarios
+    const scenarios = (
+      wrapper.vm as unknown as {
+        scenarios: Array<{ id: string; sampleId?: string; status: string; sampleFiles?: unknown[] }>
+      }
+    ).scenarios
     expect(scenarios.map((item) => item.id)).toEqual(
       expect.arrayContaining([
         'permission-page',
@@ -61,6 +78,18 @@ describe('develop verification page', () => {
         'report-runtime',
       ]),
     )
+    expect(
+      scenarios
+        .filter((item) =>
+          ['organization-sync', 'integration-call', 'file-upload', 'video-preview'].includes(
+            item.id,
+          ),
+        )
+        .map((item) => item.sampleId),
+    ).toEqual(['organization-sync', 'integration-call', 'file-upload', 'video-preview'])
+    expect(scenarios.find((item) => item.id === 'file-upload')?.sampleFiles).toHaveLength(2)
+    expect(scenarios.find((item) => item.id === 'video-preview')?.sampleFiles).toHaveLength(1)
+    expect(scenarios.find((item) => item.id === 'report-runtime')?.status).toBe('ready')
   })
 
   it('filters scenarios by category and keyword', async () => {
@@ -129,5 +158,35 @@ describe('develop verification page', () => {
     expect(vm.accountDialog).toBe(true)
     expect(vm.preparedAccounts[0]?.user_name).toBe('verify_permission_east')
     expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'positive' }))
+  })
+
+  it('runs the prepared integration fixture through the real execution API', async () => {
+    queryExternalSystems.mockResolvedValue({
+      data: [{ id: 11, system_code: 'verify_integration_source' }],
+    })
+    queryInterfaceDefinitions.mockResolvedValue({
+      data: [{ id: 22, interface_code: 'verify_ping' }],
+    })
+    createExecution.mockResolvedValue({
+      success: true,
+      data: { id: 33, execution_no: 'INT-33' },
+    })
+    const wrapper = mountPage()
+    await flushPromises()
+    const vm = wrapper.vm as unknown as { runIntegrationSample: () => Promise<void> }
+
+    await vm.runIntegrationSample()
+
+    expect(createExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        external_system_id: 11,
+        interface_definition_id: 22,
+        trigger_source: 'manual',
+      }),
+    )
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'integration_execution_detail_page',
+      params: { id: 33 },
+    })
   })
 })

@@ -45,3 +45,18 @@ func TestDevelopmentVerificationServiceRejectsUnknownScenario(t *testing.T) {
 		t.Fatalf("Cleanup() error = %v, want unsupported scenario", err)
 	}
 }
+
+func TestDevelopmentVerificationServiceRequiresFixtureBaseURL(t *testing.T) {
+	service := &DevelopmentVerificationService{config: &config.Server{Environment: "development"}}
+
+	if _, err := service.requireVerificationFixtureBaseURL(); err == nil ||
+		!strings.Contains(err.Error(), "verification_fixture_base_url") {
+		t.Fatalf("requireVerificationFixtureBaseURL() error = %v, want missing fixture URL", err)
+	}
+
+	service.config.Integration.VerificationFixtureBaseURL = "http://frontend/"
+	value, err := service.requireVerificationFixtureBaseURL()
+	if err != nil || value != "http://frontend" {
+		t.Fatalf("requireVerificationFixtureBaseURL() = %q, %v", value, err)
+	}
+}

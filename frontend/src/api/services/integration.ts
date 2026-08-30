@@ -365,6 +365,20 @@ export interface IntegrationExecutionDetail extends IntegrationExecutionListItem
   last_attempt_at?: string
 }
 
+export interface IntegrationExecutionCreateRequest {
+  external_system_id: number
+  interface_definition_id: number
+  trigger_source: 'manual' | 'system_event' | 'scheduled'
+  idempotency_scope: string
+  idempotency_key: string
+  input: {
+    path_params: Record<string, string>
+    query_params: Record<string, string[]>
+    headers: Record<string, string[]>
+    json_body?: Record<string, unknown>
+  }
+}
+
 export interface IntegrationExecutionQuery extends Query {
   external_system_id?: number
   interface_definition_id?: number
@@ -728,6 +742,10 @@ export const useIntegrationApi = () => ({
       .post<
         ResponseData<IntegrationExecutionListItem[]>
       >('/admin/integration/execution/query', query)
+      .then((response) => response.data),
+  createExecution: (request: IntegrationExecutionCreateRequest) =>
+    instance
+      .post<ResponseData<IntegrationExecutionDetail>>('/admin/integration/execution', request)
       .then((response) => response.data),
   getExecution: (id: number) =>
     instance

@@ -6,6 +6,10 @@ export type VerificationSampleScenario =
   | 'data-permission'
   | 'tms-company-scope'
   | 'metadata-low-code'
+  | 'organization-sync'
+  | 'integration-call'
+  | 'file-upload'
+  | 'video-preview'
   | 'notification'
 
 export type VerificationSampleState = 'empty' | 'partial' | 'ready' | 'unavailable'

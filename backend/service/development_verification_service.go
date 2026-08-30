@@ -27,10 +27,15 @@ const (
 	verificationScenarioTMS            = "tms-company-scope"
 	verificationScenarioMetadata       = "metadata-low-code"
 	verificationScenarioNotification   = "notification"
+	verificationScenarioIntegration    = "integration-call"
+	verificationScenarioOrganization   = "organization-sync"
+	verificationScenarioFileUpload     = "file-upload"
+	verificationScenarioVideoPreview   = "video-preview"
 
 	verificationPermissionTable = "verify_permission_order"
 	verificationCategoryTable   = "verify_lowcode_category"
 	verificationRecordTable     = "verify_lowcode_record"
+	verificationFileTable       = "verify_file_record"
 	verificationSource          = "development_verification"
 )
 
@@ -39,6 +44,10 @@ var developmentVerificationScenarios = []string{
 	verificationScenarioTMS,
 	verificationScenarioMetadata,
 	verificationScenarioNotification,
+	verificationScenarioIntegration,
+	verificationScenarioOrganization,
+	verificationScenarioFileUpload,
+	verificationScenarioVideoPreview,
 }
 
 type DevelopmentVerificationService struct {
@@ -102,6 +111,12 @@ func (service *DevelopmentVerificationService) Prepare(
 		err = service.prepareMetadata(ctx)
 	case verificationScenarioNotification:
 		err = service.prepareNotifications(ctx)
+	case verificationScenarioIntegration:
+		err = service.prepareIntegrationFixture(ctx)
+	case verificationScenarioOrganization:
+		err = service.prepareOrganizationFixture(ctx)
+	case verificationScenarioFileUpload, verificationScenarioVideoPreview:
+		err = service.prepareFileFixture(ctx)
 	default:
 		return response.DevelopmentVerificationPrepareRes{}, myerrors.NewParameterError("不支持的功能验证场景")
 	}
@@ -133,6 +148,12 @@ func (service *DevelopmentVerificationService) Cleanup(
 		err = service.cleanupMetadata(ctx)
 	case verificationScenarioNotification:
 		err = service.cleanupNotifications(ctx)
+	case verificationScenarioIntegration:
+		err = service.cleanupIntegrationFixture(ctx)
+	case verificationScenarioOrganization:
+		err = service.cleanupOrganizationFixture(ctx)
+	case verificationScenarioFileUpload, verificationScenarioVideoPreview:
+		err = service.cleanupFileFixture(ctx)
 	default:
 		return response.DevelopmentVerificationStatusRes{}, myerrors.NewParameterError("不支持的功能验证场景")
 	}
@@ -173,6 +194,14 @@ func (service *DevelopmentVerificationService) status(
 		return service.metadataStatus(ctx)
 	case verificationScenarioNotification:
 		return service.notificationStatus(ctx)
+	case verificationScenarioIntegration:
+		return service.integrationFixtureStatus(ctx)
+	case verificationScenarioOrganization:
+		return service.organizationFixtureStatus(ctx)
+	case verificationScenarioFileUpload:
+		return service.fileFixtureStatus(ctx, verificationScenarioFileUpload)
+	case verificationScenarioVideoPreview:
+		return service.fileFixtureStatus(ctx, verificationScenarioVideoPreview)
 	default:
 		return response.DevelopmentVerificationStatusRes{}, myerrors.NewParameterError("不支持的功能验证场景")
 	}

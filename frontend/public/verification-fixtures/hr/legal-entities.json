@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "data": [
+    {
+      "zjkid_ignore": "verify-legal-hq",
+      "id": "verify-legal-record-hq",
+      "pk_corp": "VERIFY-LEGAL-HQ",
+      "name": "功能验证-法人总部",
+      "shortname": "验证法人总部",
+      "fatherpkzjkid_ignore": "",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:00:00",
+      "level": 1
+    }
+  ]
+}

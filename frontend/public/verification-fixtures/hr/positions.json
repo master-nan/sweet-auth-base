@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "data": [
+    {
+      "postidzjkid_ignore": "verify-position-engineer",
+      "postCode": "VERIFY-ENGINEER",
+      "postname": "功能验证-研发工程师",
+      "deptidzjkid_ignore": "verify-management-dept-rd",
+      "posLevel": "P5",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:04:00"
+    }
+  ]
+}

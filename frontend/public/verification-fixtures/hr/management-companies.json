@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "data": [
+    {
+      "zjkid_ignore": "verify-management-hq",
+      "id": "verify-management-record-hq",
+      "pk_corp": "VERIFY-MGMT-HQ",
+      "name": "功能验证-管理总部",
+      "shortname": "验证管理总部",
+      "fatherpkzjkid_ignore": "",
+      "isenable": 1,
+      "changeTime": "2026-08-01T09:01:00",
+      "level": 1
+    }
+  ]
+}
