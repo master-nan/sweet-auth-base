@@ -7,10 +7,13 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"backend/service"
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -67,9 +70,12 @@ func (u *UserSessionController) Revoke(ctx *gin.Context) {
 		_ = ctx.Error(appErrors.ErrParamInvalid)
 		return
 	}
-	operatorID, _ := ctx.Get("id")
-	reason := fmt.Sprintf("管理员 %v 已将该设备下线", operatorID)
-	if err := u.sessions.RevokeSession(ctx.Request.Context(), id, reason); err != nil {
+	data, ok := u.revokeRequest(ctx)
+	if !ok {
+		return
+	}
+	closure := sessionClosure(ctx, data.Reason, "管理员手动下线")
+	if err := u.sessions.RevokeSession(ctx.Request.Context(), id, closure); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -84,13 +90,77 @@ func (u *UserSessionController) RevokeUser(ctx *gin.Context) {
 		_ = ctx.Error(appErrors.ErrParamInvalid)
 		return
 	}
-	operatorID, _ := ctx.Get("id")
-	reason := fmt.Sprintf("管理员 %v 已将该用户的全部设备下线", operatorID)
-	if err := u.sessions.RevokeUser(ctx.Request.Context(), userID, model.UserSessionStatusForcedOffline, reason); err != nil {
+	data, ok := u.revokeRequest(ctx)
+	if !ok {
+		return
+	}
+	closure := sessionClosure(ctx, data.Reason, "管理员手动下线全部会话")
+	if err := u.sessions.RevokeUser(ctx.Request.Context(), userID, model.UserSessionStatusForcedOffline, closure); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
 	resp.SetData(true)
+}
+
+func (u *UserSessionController) Export(ctx *gin.Context) {
+	var data request.UserSessionQueryReq
+	if err := utils.ValidatorBody[request.UserSessionQueryReq](ctx, &data, u.translators["zh"]); err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	items, err := u.sessions.Export(ctx.Request.Context(), data)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	var content bytes.Buffer
+	content.WriteString("\xEF\xBB\xBF")
+	writer := csv.NewWriter(&content)
+	_ = writer.Write([]string{"会话编号", "用户", "账号已删除", "状态", "登录时间", "最后活动", "可刷新至", "退出时间", "退出原因", "结束操作人", "登录渠道", "IP 地址", "设备", "浏览器", "操作系统", "User-Agent"})
+	for _, item := range items {
+		logoutAt := ""
+		if item.LogoutAt != nil {
+			logoutAt = item.LogoutAt.String()
+		}
+		_ = writer.Write([]string{
+			strconv.Itoa(item.ID), item.UserName, strconv.FormatBool(item.UserDeleted), item.Status,
+			item.LoginAt.String(), item.LastSeenAt.String(), item.ExpiresAt.String(), logoutAt,
+			item.LogoutReason, item.ClosedByUserName, item.LoginChannel, item.IPAddress,
+			item.DeviceType, item.Browser, item.OperatingSystem, item.UserAgent,
+		})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		_ = ctx.Error(appErrors.WrapSystemError(err))
+		return
+	}
+	fileName := "login-sessions-" + time.Now().In(model.AppLocation()).Format("20060102150405") + ".csv"
+	ctx.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fileName))
+	ctx.Data(http.StatusOK, "text/csv; charset=utf-8", content.Bytes())
+}
+
+func (u *UserSessionController) revokeRequest(ctx *gin.Context) (request.UserSessionRevokeReq, bool) {
+	var data request.UserSessionRevokeReq
+	if ctx.Request.ContentLength <= 0 {
+		return data, true
+	}
+	if err := utils.ValidatorBody[request.UserSessionRevokeReq](ctx, &data, u.translators["zh"]); err != nil {
+		_ = ctx.Error(err)
+		return request.UserSessionRevokeReq{}, false
+	}
+	return data, true
+}
+
+func sessionClosure(ctx *gin.Context, reason, fallback string) service.UserSessionClosure {
+	operatorID, _ := ctx.Get("id")
+	userValue, _ := ctx.Get("user")
+	user, _ := userValue.(model.SysUser)
+	operator, _ := operatorID.(int)
+	trimmedReason := strings.TrimSpace(reason)
+	if trimmedReason == "" {
+		trimmedReason = fallback
+	}
+	return service.UserSessionClosure{Reason: trimmedReason, OperatorID: operator, OperatorName: user.UserName}
 }
 
 // Events 保持一个轻量 SSE 连接。每五秒检查共享 Redis，因此多实例部署也能收到下线结果。

@@ -37,6 +37,7 @@ var catalog = []Definition{
 	{Version: 19, Key: "canonical_time_id_contract", Contract: "v1|canonical-time-id-contract|timestamptz-asia-shanghai-conversion|snowflake-id-no-sequences", Checksum: "1343a552cf3b7a7dd4e8eeb6df4a92e7d1ce23af8947d674c3567fa11390aa1a"},
 	{Version: 20, Key: "integration_reference_integrity", Contract: "v1|integration-reference-integrity|remove-orphan-credentials|configuration-fks", Checksum: "ba55364ff685b82e3ad7549a782c282824b81247080b7ba2c0497c25887d22d1"},
 	{Version: 21, Key: "user_session_schema", Contract: "v1|user-session-schema|snowflake-primary-key|hashed-sid|online-heartbeat|revocation", Checksum: "371297457dde1c8fb5fcdd353b26726984a4d4b8724b2e5c336b83da5ec53a98"},
+	{Version: 22, Key: "user_session_audit_fields", Contract: "v1|user-session-audit-fields|username-snapshot|closure-operator|deleted-account-history|filtered-csv-export", Checksum: "3627d65700efeb1f4a395212b18c0f92960f5f5ec34eb4fb652e2280e66a5e9e"},
 }
 
 var managedTables = []string{

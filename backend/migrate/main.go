@@ -1814,8 +1814,10 @@ func seedUserMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName 
 func seedOnlineSessionMenuButtons(db *gorm.DB, sf *utils.Snowflake, roleID int, roleName string, menuID int) error {
 	buttons := []model.SysMenuButton{
 		apiPermissionWithAPI(0, menuID, "查询登录设备", "system_online_session_query", enum.Top, "query", "search", "primary", 90, "/admin/session/query", "POST"),
-		menuButtonWithAPI(0, menuID, "下线此设备", "system_online_session_revoke", enum.Line, "revoke", "logout", "warning", 1, "/admin/session/:id/revoke", "POST"),
-		menuButtonWithAPI(0, menuID, "下线该用户全部设备", "system_online_session_revoke_user", enum.Line, "revoke_user", "phonelink_erase", "negative", 2, "/admin/session/user/:id/revoke", "POST"),
+		menuButtonWithAPI(0, menuID, "导出登录记录", "system_online_session_export", enum.Top, "export", "download", "primary", 1, "/admin/session/export", "POST"),
+		menuButton(0, menuID, "查看详情", "system_online_session_detail", enum.Line, "detail", "visibility", "primary", 1),
+		menuButtonWithAPI(0, menuID, "下线此会话", "system_online_session_revoke", enum.Line, "revoke", "logout", "warning", 2, "/admin/session/:id/revoke", "POST"),
+		menuButtonWithAPI(0, menuID, "下线该用户全部会话", "system_online_session_revoke_user", enum.Line, "revoke_user", "phonelink_erase", "negative", 3, "/admin/session/user/:id/revoke", "POST"),
 	}
 	return seedMenuButtons(db, sf, roleID, roleName, buttons)
 }

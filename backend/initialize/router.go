@@ -207,6 +207,7 @@ func InitRouter(app *App) *gin.Engine {
 
 		// 在线用户与登录设备
 		adminGroup.POST("/session/query", app.UserSessionController.Query)
+		adminGroup.POST("/session/export", app.UserSessionController.Export)
 		adminGroup.POST("/session/:id/revoke", app.UserSessionController.Revoke)
 		adminGroup.POST("/session/user/:id/revoke", app.UserSessionController.RevokeUser)
 

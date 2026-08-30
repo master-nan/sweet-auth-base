@@ -49,6 +49,7 @@ func migrationSteps() []migrationStep {
 		migrateCanonicalTimeAndIDContract,
 		migrateIntegrationReferenceIntegritySchema,
 		migrateUserSessionSchema,
+		migrateUserSessionAuditFields,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -69,6 +70,21 @@ func migrationSteps() []migrationStep {
 
 func migrateUserSessionSchema(db *gorm.DB) error {
 	return db.AutoMigrate(&model.SysUserSession{})
+}
+
+func migrateUserSessionAuditFields(db *gorm.DB) error {
+	if err := db.AutoMigrate(&model.SysUserSession{}); err != nil {
+		return err
+	}
+	sessionTable := db.NamingStrategy.TableName("SysUserSession")
+	userTable := db.NamingStrategy.TableName("SysUser")
+	statement := fmt.Sprintf(`UPDATE "%s"
+		SET "user_name_snapshot" = COALESCE((
+			SELECT "user_name" FROM "%s"
+			WHERE "%s"."id" = "%s"."user_id"
+		), '')
+		WHERE "user_name_snapshot" = ''`, sessionTable, userTable, userTable, sessionTable)
+	return db.Exec(statement).Error
 }
 
 func migrateNotificationCenterSchema(db *gorm.DB) error {

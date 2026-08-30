@@ -161,7 +161,7 @@ func (s *SysUserService) Update(ctx context.Context, req request.SysUserUpdateRe
 		return err
 	}
 	if s.sessions != nil && current.State && req.State != nil && !*req.State {
-		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusAccountDisabled, "账号已被停用"); err != nil {
+		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusAccountDisabled, UserSessionClosure{Reason: "账号已被停用"}); err != nil {
 			return err
 		}
 	}
@@ -199,7 +199,7 @@ func (s *SysUserService) UpdatePassword(ctx context.Context, req request.SysUser
 	// 删除缓存
 	s.RefreshCache(req.Id)
 	if s.sessions != nil {
-		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusPasswordChanged, "密码已修改，请重新登录"); err != nil {
+		if err := s.sessions.RevokeUser(ctx, req.Id, model.UserSessionStatusPasswordChanged, UserSessionClosure{Reason: "密码已修改，请重新登录"}); err != nil {
 			return err
 		}
 	}
@@ -239,7 +239,7 @@ func (s *SysUserService) ResetPassword(ctx context.Context, id int, password str
 	}
 	s.RefreshCache(id)
 	if s.sessions != nil {
-		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusPasswordChanged, "密码已被重置，请使用临时密码重新登录"); err != nil {
+		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusPasswordChanged, UserSessionClosure{Reason: "密码已被重置，请使用临时密码重新登录"}); err != nil {
 			return err
 		}
 	}
@@ -248,7 +248,7 @@ func (s *SysUserService) ResetPassword(ctx context.Context, id int, password str
 
 func (s *SysUserService) Delete(ctx context.Context, id int) error {
 	if s.sessions != nil {
-		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusAccountDeleted, "账号已被删除"); err != nil {
+		if err := s.sessions.RevokeUser(ctx, id, model.UserSessionStatusAccountDeleted, UserSessionClosure{Reason: "账号已被删除"}); err != nil {
 			return err
 		}
 	}

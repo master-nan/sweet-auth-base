@@ -167,7 +167,7 @@ func (s *AuthApplicationService) Authenticate(ctx context.Context, req Authentic
 		if client.Channel == "" {
 			client.Channel = string(req.Channel)
 		}
-		if err := s.sessions.Open(ctx, user.Id, pair.SessionID, pair.IssuedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
+		if err := s.sessions.Open(ctx, user.Id, user.UserName, pair.SessionID, pair.IssuedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
 			s.tokens.RevokePair(pair)
 			s.closeIssuedSession(ctx, pair, "登录设备登记失败")
 			_ = s.loginState.RollbackLogin(ctx, user.Id, pair.AccessToken)
@@ -262,7 +262,7 @@ func (s *AuthApplicationService) Refresh(ctx context.Context, refreshToken strin
 				client.Channel = string(AuthChannelRefresh)
 			}
 		}
-		if err := s.sessions.Touch(ctx, userID, pair.SessionID, startedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
+		if err := s.sessions.Touch(ctx, userID, user.UserName, pair.SessionID, startedAt, pair.IssuedAt.Add(authRefreshTokenTTL), client); err != nil {
 			s.tokens.RevokePair(pair)
 			s.closeIssuedSession(ctx, pair, "刷新设备记录失败")
 			_ = s.loginState.RollbackLogin(ctx, userID, pair.AccessToken)

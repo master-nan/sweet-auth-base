@@ -11,6 +11,12 @@ type ConfirmDialogOptions = {
   className?: string
 }
 
+type ReasonDialogOptions = ConfirmDialogOptions & {
+  reasonLabel?: string
+  defaultReason?: string
+  maxLength?: number
+}
+
 export const useConfirmDialog = ($q: QVueGlobals) => {
   const confirmAction = (options: ConfirmDialogOptions) => {
     return $q.dialog({
@@ -56,8 +62,39 @@ export const useConfirmDialog = ($q: QVueGlobals) => {
     })
   }
 
+  const confirmWithReason = (options: ReasonDialogOptions) => {
+    const maxLength = options.maxLength || 160
+    return $q.dialog({
+      title: options.title || '确认操作',
+      message: options.message,
+      persistent: true,
+      class: `app-confirm-dialog app-confirm-dialog--action ${options.className || ''}`,
+      prompt: {
+        model: options.defaultReason || '',
+        type: 'textarea',
+        outlined: true,
+        label: options.reasonLabel || '操作原因',
+        maxlength: maxLength,
+        counter: true,
+        autogrow: true,
+        rules: [(value: string) => Boolean(value.trim()) || '请填写操作原因'],
+      },
+      ok: {
+        label: options.okLabel || '确认',
+        color: options.color || 'primary',
+        unelevated: true,
+      },
+      cancel: {
+        label: options.cancelLabel || '取消',
+        color: 'grey-7',
+        flat: true,
+      },
+    })
+  }
+
   return {
     confirmAction,
     confirmDanger,
+    confirmWithReason,
   }
 }

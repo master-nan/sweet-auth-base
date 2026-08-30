@@ -8,8 +8,8 @@ import (
 
 func TestCatalogContractsAndChecksums(t *testing.T) {
 	definitions := Catalog()
-	if len(definitions) != 21 {
-		t.Fatalf("catalog has %d definitions, want 21", len(definitions))
+	if len(definitions) != 22 {
+		t.Fatalf("catalog has %d definitions, want 22", len(definitions))
 	}
 	if err := ValidateCatalog(definitions); err != nil {
 		t.Fatalf("validate catalog: %v", err)

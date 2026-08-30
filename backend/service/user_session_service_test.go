@@ -33,7 +33,7 @@ func TestUserSessionLifecycleUsesSnowflakeIDAndRevokesRedisSession(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.Open(context.Background(), 1, pair.SessionID, now, now.Add(authRefreshTokenTTL), UserSessionClient{
+	if err := service.Open(context.Background(), 1, "admin", pair.SessionID, now, now.Add(authRefreshTokenTTL), UserSessionClient{
 		IPAddress: "127.0.0.1", UserAgent: "Mozilla/5.0 (Macintosh) Chrome/120.0", Channel: string(AuthChannelAdminPassword),
 	}); err != nil {
 		t.Fatal(err)
@@ -46,11 +46,16 @@ func TestUserSessionLifecycleUsesSnowflakeIDAndRevokesRedisSession(t *testing.T)
 	if len(result.Items) != 1 || result.Items[0].ID <= 0 || !result.Items[0].Current || !result.Items[0].Online {
 		t.Fatalf("unexpected online session: %+v", result)
 	}
-	if result.OnlineUsers != 1 || result.OnlineDevices != 1 {
+	if result.Items[0].UserName != "admin" || result.Items[0].UserDeleted {
+		t.Fatalf("unexpected user snapshot: %+v", result.Items[0])
+	}
+	if result.OnlineUsers != 1 || result.OnlineSessions != 1 || result.OnlineDevices != 1 {
 		t.Fatalf("unexpected online counters: %+v", result)
 	}
 
-	if err := service.RevokeSession(context.Background(), result.Items[0].ID, "管理员测试下线"); err != nil {
+	if err := service.RevokeSession(context.Background(), result.Items[0].ID, UserSessionClosure{
+		Reason: "管理员测试下线", OperatorID: 1, OperatorName: "admin",
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tokens.ValidateAccess(context.Background(), pair.AccessToken); err == nil {
@@ -60,7 +65,25 @@ func TestUserSessionLifecycleUsesSnowflakeIDAndRevokesRedisSession(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(closed.Items) != 1 || closed.Items[0].Status != model.UserSessionStatusForcedOffline || closed.Items[0].LogoutReason != "管理员测试下线" {
+	if len(closed.Items) != 1 || closed.Items[0].Status != model.UserSessionStatusForcedOffline || closed.Items[0].LogoutReason != "管理员测试下线" || closed.Items[0].ClosedByUserName != "admin" {
 		t.Fatalf("unexpected closed session: %+v", closed.Items)
+	}
+
+	if err := db.Delete(&model.SysUser{}, 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	history, err := service.Query(context.Background(), request.UserSessionQueryReq{Status: "all", Page: 1, Num: 20}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.Items) != 1 || history.Items[0].UserName != "admin" || !history.Items[0].UserDeleted {
+		t.Fatalf("deleted account history was not preserved: %+v", history.Items)
+	}
+	exported, err := service.Export(context.Background(), request.UserSessionQueryReq{Status: "all"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exported) != 1 || exported[0].ClosedByUserID != 1 {
+		t.Fatalf("unexpected exported sessions: %+v", exported)
 	}
 }
