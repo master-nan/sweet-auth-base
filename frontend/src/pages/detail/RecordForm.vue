@@ -1,5 +1,5 @@
 <template>
-  <base-content scrollable class="q-pa-sm record-form-page">
+  <base-content class="q-pa-sm record-form-page">
     <dynamic-form-dialog
       v-model="formVisible"
       embedded
@@ -257,7 +257,18 @@ function goBackToList() {
 
 <style scoped lang="scss">
 .record-form-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0 !important;
+  overflow: hidden;
   background: #f6f7fb;
+}
+
+.record-form-page :deep(.form-dialog-shell--embedded) {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  max-height: none;
 }
 
 .record-form-error {
