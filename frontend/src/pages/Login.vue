@@ -104,12 +104,7 @@ const { login } = useBasicApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 const localeOptions: Array<{ value: SupportedLocale; label: string }> = [
-  {
-    value: 'zh-CN',
-    get label() {
-      return t('ui.simplifiedChinese')
-    },
-  },
+  { value: 'zh-CN', label: '简体中文' },
   { value: 'en-US', label: 'English' },
 ]
 

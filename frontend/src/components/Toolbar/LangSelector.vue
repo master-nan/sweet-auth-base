@@ -31,12 +31,7 @@ defineOptions({ name: 'LangSelector' })
 const { locale, t } = useI18n({ useScope: 'global' })
 const localeOptions = [
   { value: 'en-US', label: 'English' },
-  {
-    value: 'zh-CN',
-    get label() {
-      return t('ui.simplifiedChinese')
-    },
-  },
+  { value: 'zh-CN', label: '简体中文' },
 ]
 
 const handleSelectLanguage = () => {

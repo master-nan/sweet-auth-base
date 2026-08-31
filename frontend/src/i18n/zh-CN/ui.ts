@@ -1925,7 +1925,6 @@ const ui = {
   signOutAllSessionsForThisUser: '下线该用户全部会话',
   signOutReason: '下线原因',
   signOutThisSession: '下线此会话',
-  simplifiedChinese: '简体中文',
   singleCompanyUsersDefaultOnlyToReturnToCompanyA: '单公司用户默认只返回公司 A。',
   sliceProgress: '切片进度',
   sliceSeconds: '切片（秒）',

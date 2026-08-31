@@ -2040,7 +2040,6 @@ const ui = {
   signOutAllSessionsForThisUser: 'Sign Out All Sessions for This User',
   signOutReason: 'Sign-out Reason',
   signOutThisSession: 'Sign Out This Session',
-  simplifiedChinese: 'Simplified Chinese',
   singleCompanyUsersDefaultOnlyToReturnToCompanyA:
     'Single-company users default only to return to Company A.',
   sliceProgress: 'Slice Progress',
