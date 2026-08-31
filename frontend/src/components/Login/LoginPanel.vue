@@ -493,6 +493,30 @@ const onLoginClick = async () => {
   }
 }
 
+@media (max-width: 599px) and (min-height: 860px) {
+  .login-mobile-brand {
+    margin-bottom: 26px;
+  }
+
+  .login-flow-visual {
+    height: 92px;
+    margin-bottom: 28px;
+  }
+
+  .login-kicker {
+    margin-bottom: 22px;
+  }
+
+  .login-welcome p {
+    margin-top: 8px;
+    margin-bottom: 34px;
+  }
+
+  .login-form {
+    gap: 20px;
+  }
+}
+
 @media (min-width: 600px) and (max-width: 1023px) {
   .login-mobile-brand {
     display: block;
