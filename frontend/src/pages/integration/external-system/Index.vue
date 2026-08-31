@@ -34,7 +34,12 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -107,9 +112,9 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData ? '编辑外部系统' : '新增外部系统'"
+      :title="currentEditData ? t('ui.editExternalSystem') : t('ui.addExternalSystem')"
       :fields="formFields"
-      :submit-btn-text="currentEditData ? '保存' : '创建'"
+      :submit-btn-text="currentEditData ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
@@ -123,6 +128,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_external_system' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -157,6 +164,8 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ha
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const router = useRouter()
 const api = useIntegrationApi()
@@ -183,16 +192,41 @@ const {
 } = useRuntimeTableMetadata('integration_external_system')
 
 const typeLabels: Record<string, string> = {
-  hr: '人力资源系统',
-  erp: '企业资源计划',
-  tms: '运输管理系统',
-  wms: '仓储管理系统',
-  other: '其他系统',
+  get hr() {
+    return t('ui.humanResourcesSystem')
+  },
+  get erp() {
+    return t('ui.enterpriseResourcePlanning')
+  },
+  get tms() {
+    return t('ui.transportationManagementSystem')
+  },
+  get wms() {
+    return t('ui.warehouseManagementSystem')
+  },
+  get other() {
+    return t('ui.otherSystem')
+  },
 }
 const statusMeta: Record<string, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'grey-7' },
-  enabled: { label: '已启用', color: 'positive' },
-  disabled: { label: '已停用', color: 'warning' },
+  draft: {
+    get label() {
+      return t('ui.draft')
+    },
+    color: 'grey-7',
+  },
+  enabled: {
+    get label() {
+      return t('ui.activatedStatus')
+    },
+    color: 'positive',
+  },
+  disabled: {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    color: 'warning',
+  },
 }
 
 const columns = ref<TableColumn<ExternalSystemListItem>[]>([])
@@ -230,7 +264,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '外部系统加载失败'
+    loadError.value = t('ui.externalSystemLoadFailed')
   } finally {
     loading.value = false
   }
@@ -241,17 +275,38 @@ const fetchMetadata = async () => {
   const resolution = resolveRuntimeColumns<ExternalSystemListItem>(metadataFields.value, {
     context: { getDictLabel: () => '' },
     overrides: [
-      { fieldCode: 'system_code', label: '外部系统', order: 1 },
+      {
+        fieldCode: 'system_code',
+        get label() {
+          return t('ui.externalSystemLabel')
+        },
+        order: 1,
+      },
       { fieldCode: 'name', visible: false, order: 2 },
-      { fieldCode: 'system_type', label: '类型', order: 3 },
+      {
+        fieldCode: 'system_type',
+        get label() {
+          return t('ui.type')
+        },
+        order: 3,
+      },
       { fieldCode: 'owner_name', order: 5 },
       { fieldCode: 'status', align: 'center', order: 6 },
     ],
     virtualColumns: [
-      { name: 'base_url_summary', label: '地址摘要', field: 'base_url_summary', order: 4 },
+      {
+        name: 'base_url_summary',
+        get label() {
+          return t('ui.addressSummary')
+        },
+        field: 'base_url_summary',
+        order: 4,
+      },
       {
         name: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         align: 'center',
         order: 100,
@@ -306,8 +361,15 @@ const openEdit = async (row: ExternalSystemListItem) => {
 
 const changeState = (row: ExternalSystemListItem, enable: boolean) => {
   confirmAction({
-    title: enable ? '确认启用' : '确认停用',
-    message: `${enable ? '启用' : '停用'}外部系统“${row.name}”？`,
+    get title() {
+      return enable ? t('ui.confirmEnable') : t('ui.confirmDisable')
+    },
+    get message() {
+      return t('ui.confirmExternalSystemAction', {
+        value1: enable ? t('ui.enabled') : t('ui.disabled'),
+        value2: row.name,
+      })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

@@ -1,8 +1,8 @@
 <template>
   <form-dialog-shell
     v-model="visible"
-    title="外部系统详情"
-    :subtitle="detail?.system_code || '正在读取配置'"
+    :title="t('ui.detailsOfTheExternalSystem')"
+    :subtitle="detail?.system_code || t('ui.readingConfiguration')"
     icon="dns"
     readonly
     :loading="loading"
@@ -10,7 +10,7 @@
   >
     <div v-if="detail" class="external-system-detail">
       <section>
-        <div class="external-system-detail__section-title">基础信息</div>
+        <div class="external-system-detail__section-title">{{ t('ui.basicInfo') }}</div>
         <div class="external-system-detail__grid">
           <div v-for="item in basicItems" :key="item.label" class="external-system-detail__item">
             <div class="external-system-detail__label">{{ item.label }}</div>
@@ -20,22 +20,22 @@
       </section>
       <q-separator />
       <section>
-        <div class="external-system-detail__section-title">连接与管理</div>
+        <div class="external-system-detail__section-title">{{ t('ui.connectAndManage') }}</div>
         <div class="external-system-detail__grid">
           <div class="external-system-detail__item external-system-detail__item--wide">
-            <div class="external-system-detail__label">基础地址</div>
+            <div class="external-system-detail__label">{{ t('ui.basicAddress') }}</div>
             <div class="external-system-detail__value text-mono">{{ detail.base_url }}</div>
           </div>
           <div class="external-system-detail__item">
-            <div class="external-system-detail__label">负责人</div>
+            <div class="external-system-detail__label">{{ t('ui.head') }}</div>
             <div class="external-system-detail__value">{{ detail.owner_name }}</div>
           </div>
           <div class="external-system-detail__item">
-            <div class="external-system-detail__label">负责人标识</div>
+            <div class="external-system-detail__label">{{ t('ui.responsibleIdentification') }}</div>
             <div class="external-system-detail__value text-mono">{{ detail.owner_identifier }}</div>
           </div>
           <div class="external-system-detail__item external-system-detail__item--wide">
-            <div class="external-system-detail__label">描述</div>
+            <div class="external-system-detail__label">{{ t('ui.description') }}</div>
             <div class="external-system-detail__value">{{ detail.description || '-' }}</div>
           </div>
         </div>
@@ -45,19 +45,34 @@
       <q-spinner-dots color="primary" size="36px" />
     </div>
     <template #footer-actions>
-      <q-btn v-if="detail" flat color="primary" icon="api" label="查看接口" @click="emit('show-interfaces', detail.id)" />
-      <q-btn v-if="detail" flat color="primary" icon="key" label="查看凭证" @click="emit('show-credentials', detail.id)" />
+      <q-btn
+        v-if="detail"
+        flat
+        color="primary"
+        icon="api"
+        :label="t('ui.viewInterfaces')"
+        @click="emit('show-interfaces', detail.id)"
+      />
+      <q-btn
+        v-if="detail"
+        flat
+        color="primary"
+        icon="key"
+        :label="t('ui.viewCertificates')"
+        @click="emit('show-credentials', detail.id)"
+      />
     </template>
   </form-dialog-shell>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import {
-  type ExternalSystemDetail,
-  useIntegrationApi,
-} from 'src/api/services/integration'
+import { type ExternalSystemDetail, useIntegrationApi } from 'src/api/services/integration'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{ modelValue: boolean; id: number }>()
 const emit = defineEmits<{
@@ -74,24 +89,70 @@ const visible = computed({
 })
 
 const typeLabels: Record<string, string> = {
-  hr: '人力资源系统',
-  erp: '企业资源计划',
-  tms: '运输管理系统',
-  wms: '仓储管理系统',
-  other: '其他系统',
+  get hr() {
+    return t('ui.humanResourcesSystem')
+  },
+  get erp() {
+    return t('ui.enterpriseResourcePlanning')
+  },
+  get tms() {
+    return t('ui.transportationManagementSystem')
+  },
+  get wms() {
+    return t('ui.warehouseManagementSystem')
+  },
+  get other() {
+    return t('ui.otherSystem')
+  },
 }
 const statusLabels: Record<string, string> = {
-  draft: '草稿',
-  enabled: '已启用',
-  disabled: '已停用',
+  get draft() {
+    return t('ui.draft')
+  },
+  get enabled() {
+    return t('ui.activatedStatus')
+  },
+  get disabled() {
+    return t('ui.deactivatedStatus')
+  },
 }
 const basicItems = computed(() => [
-  { label: '系统编码', value: detail.value?.system_code },
-  { label: '系统名称', value: detail.value?.name },
-  { label: '系统类型', value: typeLabels[detail.value?.system_type || ''] },
-  { label: '状态', value: statusLabels[detail.value?.status || ''] },
-  { label: '版本', value: detail.value?.revision },
-  { label: '更新时间', value: detail.value?.gmt_modify },
+  {
+    get label() {
+      return t('ui.systemEncoding')
+    },
+    value: detail.value?.system_code,
+  },
+  {
+    get label() {
+      return t('ui.systemName')
+    },
+    value: detail.value?.name,
+  },
+  {
+    get label() {
+      return t('ui.systemType')
+    },
+    value: typeLabels[detail.value?.system_type || ''],
+  },
+  {
+    get label() {
+      return t('ui.status')
+    },
+    value: statusLabels[detail.value?.status || ''],
+  },
+  {
+    get label() {
+      return t('ui.version')
+    },
+    value: detail.value?.revision,
+  },
+  {
+    get label() {
+      return t('ui.updatedAt')
+    },
+    value: detail.value?.gmt_modify,
+  },
 ])
 
 const load = async () => {

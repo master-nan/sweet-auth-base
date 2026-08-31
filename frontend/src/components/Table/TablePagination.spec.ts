@@ -1,11 +1,8 @@
 import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
 import TablePagination from './TablePagination.vue'
-import messages from 'src/i18n'
-
-const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages })
+import { testI18n } from 'src/test/setup'
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -69,11 +66,10 @@ const mountPagination = (
   total = 25_000,
   locale: 'en-US' | 'zh-CN' = 'zh-CN',
 ) => {
-  i18n.global.locale.value = locale
+  testI18n.global.locale.value = locale
   return mount(TablePagination, {
     props: { page, pageSize, total },
     global: {
-      plugins: [i18n],
       stubs: {
         QBtn: ButtonStub,
         QTooltip: true,

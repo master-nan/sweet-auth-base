@@ -58,9 +58,6 @@ vi.mock('./QuerySchemeEditDialog.vue', () => ({
   default: { name: 'QuerySchemeEditDialog', template: '<div />' },
 }))
 vi.mock('vue-router', () => ({ useRouter: () => router }))
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (value: string) => (value === 'router.system.user' ? '用户管理' : value) }),
-}))
 vi.mock('quasar', async (importOriginal: () => Promise<Record<string, unknown>>) => ({
   ...(await importOriginal()),
   useQuasar: () => ({ notify: quasar.notify, dialog: quasar.dialog }),

@@ -5,19 +5,25 @@
     color="primary"
     icon="view_column"
     class="table-column-selector__trigger"
-    aria-label="设置显示列"
+    :aria-label="t('ui.setShowbar')"
     :disable="disabled || !columnOptions.length"
   >
     <q-badge floating rounded color="primary" :label="modelValue.length" />
-    <q-tooltip>设置显示列</q-tooltip>
+    <q-tooltip>{{ t('ui.setShowbar') }}</q-tooltip>
 
     <q-menu anchor="bottom right" self="top right" :offset="[0, 8]">
       <div class="table-column-selector__panel q-pa-sm">
         <div class="row items-center justify-between q-px-xs q-pb-xs">
-          <div class="text-subtitle2 text-weight-medium">显示列</div>
+          <div class="text-subtitle2 text-weight-medium">{{ t('ui.showColumns') }}</div>
           <div class="row items-center q-gutter-xs">
-            <q-btn flat dense color="primary" label="全选" @click="selectAll" />
-            <q-btn flat dense color="primary" label="恢复默认" @click="restoreDefault" />
+            <q-btn flat dense color="primary" :label="t('ui.selectAll')" @click="selectAll" />
+            <q-btn
+              flat
+              dense
+              color="primary"
+              :label="t('ui.restoreDefault')"
+              @click="restoreDefault"
+            />
           </div>
         </div>
 
@@ -27,7 +33,7 @@
           outlined
           clearable
           debounce="150"
-          placeholder="搜索列"
+          :placeholder="t('ui.searchColumns')"
           class="q-mb-xs"
         >
           <template #prepend><q-icon name="search" /></template>
@@ -56,7 +62,9 @@
           </q-item>
 
           <q-item v-if="!filteredColumns.length">
-            <q-item-section class="text-grey-6 text-center q-py-sm">未找到匹配列</q-item-section>
+            <q-item-section class="text-grey-6 text-center q-py-sm">{{
+              t('ui.noMatchingColumnsFound')
+            }}</q-item-section>
           </q-item>
         </q-list>
       </div>
@@ -65,8 +73,12 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type TableColumn = NonNullable<QTableProps['columns']>[number]
 

@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="menu-route-preview"
-    :class="{ 'menu-route-preview--dark': $q.dark.isActive }"
-  >
+  <div class="menu-route-preview" :class="{ 'menu-route-preview--dark': $q.dark.isActive }">
     <div class="route-header">
       <div class="route-breadcrumbs">
         <q-breadcrumbs separator="/">
@@ -17,7 +14,7 @@
       <div class="route-placeholder">
         <q-icon :name="selectedMenu?.icon || 'article'" size="50px" color="primary" />
         <div class="text-h6 q-mt-sm">
-          {{ selectedMenu?.title ? t(selectedMenu?.title) : '页面内容' }}
+          {{ selectedMenu?.title ? t(selectedMenu?.title) : t('ui.pageContents') }}
         </div>
         <div class="route-description q-mt-xs">{{ routeDescription }}</div>
       </div>
@@ -68,13 +65,16 @@ const findBreadcrumbPath = (menuId: number, menus: Menu[], path: string[] = []):
 
 // 根据选中的菜单生成描述
 const routeDescription = computed(() => {
-  if (!props.selectedMenu) return '选择一个菜单查看预览'
+  if (!props.selectedMenu) return t('ui.selectAMenuToViewPreview')
 
   if (props.selectedMenu.children && props.selectedMenu.children.length > 0) {
-    return `这是一个父级菜单，包含 ${props.selectedMenu.children.length} 个子菜单项`
+    return t('ui.thisIsAParentMenuWithSubmenuItems', { value1: props.selectedMenu.children.length })
   }
 
-  return `路由: ${props.selectedMenu.path} | 组件: ${props.selectedMenu.component || '无组件'}`
+  return t('ui.routeComponent', {
+    value1: props.selectedMenu.path,
+    value2: props.selectedMenu.component || t('ui.noComponent'),
+  })
 })
 
 // 监听选中菜单的变化，更新面包屑
@@ -87,7 +87,7 @@ watchEffect(() => {
       breadcrumbs.value = [props.selectedMenu.title]
     }
   } else {
-    breadcrumbs.value = ['首页']
+    breadcrumbs.value = [t('ui.homePage')]
   }
 })
 </script>

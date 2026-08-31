@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type {
   ReportCellBindingType,
   ReportDatasetJoinType,
@@ -9,52 +10,189 @@ import type {
 } from './types'
 
 export const reportKindOptions: Array<{ label: string; value: ReportKind; disable?: boolean }> = [
-  { label: '明细行展开', value: 'detail' },
-  { label: '固定汇总行', value: 'summary' },
+  {
+    get label() {
+      return t('ui.lineUp')
+    },
+    value: 'detail',
+  },
+  {
+    get label() {
+      return t('ui.fixedSummaryRow')
+    },
+    value: 'summary',
+  },
 ]
 
 export const reportDatasetTypeOptions: Array<{ label: string; value: ReportDatasetType }> = [
-  { label: '现有表', value: 'table' },
+  {
+    get label() {
+      return t('ui.currentTable')
+    },
+    value: 'table',
+  },
   { label: 'SQL', value: 'sql' },
 ]
 
 export const reportBindingTypeOptions: Array<{ label: string; value: ReportCellBindingType }> = [
-  { label: '静态文本', value: 'static' },
-  { label: '明细字段', value: 'field' },
-  { label: '分组字段', value: 'group' },
-  { label: '求和', value: 'sum' },
-  { label: '计数', value: 'count' },
-  { label: '公式', value: 'formula' },
+  {
+    get label() {
+      return t('ui.staticText')
+    },
+    value: 'static',
+  },
+  {
+    get label() {
+      return t('ui.detailedFields')
+    },
+    value: 'field',
+  },
+  {
+    get label() {
+      return t('ui.groupFields')
+    },
+    value: 'group',
+  },
+  {
+    get label() {
+      return t('ui.peace')
+    },
+    value: 'sum',
+  },
+  {
+    get label() {
+      return t('ui.count')
+    },
+    value: 'count',
+  },
+  {
+    get label() {
+      return t('ui.formula')
+    },
+    value: 'formula',
+  },
 ]
 
 export const reportAlignOptions: Array<{ label: string; value: 'left' | 'center' | 'right' }> = [
-  { label: '左对齐', value: 'left' },
-  { label: '居中', value: 'center' },
-  { label: '右对齐', value: 'right' },
+  {
+    get label() {
+      return t('ui.leftAlignment')
+    },
+    value: 'left',
+  },
+  {
+    get label() {
+      return t('ui.centred')
+    },
+    value: 'center',
+  },
+  {
+    get label() {
+      return t('ui.rightAlignment')
+    },
+    value: 'right',
+  },
 ]
 
 export const reportParameterTypeOptions: Array<{ label: string; value: ReportParameterType }> = [
-  { label: '输入框', value: 'text' },
-  { label: '下拉选择', value: 'select' },
-  { label: '日期', value: 'date' },
-  { label: '日期范围', value: 'date_range' },
-  { label: '数字', value: 'number' },
+  {
+    get label() {
+      return t('ui.inputBox')
+    },
+    value: 'text',
+  },
+  {
+    get label() {
+      return t('ui.dropdownSelection')
+    },
+    value: 'select',
+  },
+  {
+    get label() {
+      return t('ui.date')
+    },
+    value: 'date',
+  },
+  {
+    get label() {
+      return t('ui.dateRange')
+    },
+    value: 'date_range',
+  },
+  {
+    get label() {
+      return t('ui.number')
+    },
+    value: 'number',
+  },
 ]
 
-export const reportParameterOperatorOptions: Array<{ label: string; value: ReportParameterOperator }> = [
-  { label: '等于', value: 'eq' },
-  { label: '包含', value: 'like' },
-  { label: '区间', value: 'between' },
-  { label: '大于等于', value: 'gte' },
-  { label: '小于等于', value: 'lte' },
+export const reportParameterOperatorOptions: Array<{
+  label: string
+  value: ReportParameterOperator
+}> = [
+  {
+    get label() {
+      return t('ui.equals')
+    },
+    value: 'eq',
+  },
+  {
+    get label() {
+      return t('ui.containsOperator')
+    },
+    value: 'like',
+  },
+  {
+    get label() {
+      return t('ui.area')
+    },
+    value: 'between',
+  },
+  {
+    get label() {
+      return t('ui.greaterThanOrEqualTo')
+    },
+    value: 'gte',
+  },
+  {
+    get label() {
+      return t('ui.lessThanOrEqualTo')
+    },
+    value: 'lte',
+  },
 ]
 
-export const reportDatasetJoinTypeOptions: Array<{ label: string; value: ReportDatasetJoinType }> = [
-  { label: '左关联', value: 'left' },
-  { label: '内关联', value: 'inner' },
-]
+export const reportDatasetJoinTypeOptions: Array<{ label: string; value: ReportDatasetJoinType }> =
+  [
+    {
+      get label() {
+        return t('ui.leftAssociation')
+      },
+      value: 'left',
+    },
+    {
+      get label() {
+        return t('ui.inline')
+      },
+      value: 'inner',
+    },
+  ]
 
-export const reportRuntimeDisplayOptions: Array<{ label: string; value: ReportRuntimeDisplayMode }> = [
-  { label: '分页展示', value: 'paged' },
-  { label: '全部展示', value: 'all' },
+export const reportRuntimeDisplayOptions: Array<{
+  label: string
+  value: ReportRuntimeDisplayMode
+}> = [
+  {
+    get label() {
+      return t('ui.pageBreakPresentation')
+    },
+    value: 'paged',
+  },
+  {
+    get label() {
+      return t('ui.showAll')
+    },
+    value: 'all',
+  },
 ]

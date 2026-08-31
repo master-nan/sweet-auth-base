@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type { ExpressionGroup, Order, QuickQuery } from 'src/types/global'
 
 export const QuerySchemeType = {
@@ -158,18 +159,40 @@ export interface SharedSchemeUpdate {
 }
 
 export const QUERY_SCHEME_TYPE_LABELS: Record<QuerySchemeType, string> = {
-  PERSONAL: '我的方案',
-  PUBLIC: '公共方案',
-  ROLE: '角色方案',
-  PAGE_DEFAULT: '页面默认',
+  get PERSONAL() {
+    return t('ui.myPlan')
+  },
+  get PUBLIC() {
+    return t('ui.publicSchemes')
+  },
+  get ROLE() {
+    return t('ui.roleProgram')
+  },
+  get PAGE_DEFAULT() {
+    return t('ui.pageDefault')
+  },
 }
 
 export const QUERY_SCHEME_BINDING_LABELS: Record<QuerySchemeBindingKind, string> = {
-  TODAY: '今天',
-  START_OF_WEEK: '本周开始',
-  END_OF_WEEK: '本周结束',
-  START_OF_MONTH: '本月开始',
-  END_OF_MONTH: '本月结束',
-  CURRENT_USER: '当前用户',
-  CURRENT_EMPLOYEE: '当前员工',
+  get TODAY() {
+    return t('ui.today')
+  },
+  get START_OF_WEEK() {
+    return t('ui.startingThisWeek')
+  },
+  get END_OF_WEEK() {
+    return t('ui.endOfTheWeek')
+  },
+  get START_OF_MONTH() {
+    return t('ui.startingThisMonth')
+  },
+  get END_OF_MONTH() {
+    return t('ui.endOfMonth')
+  },
+  get CURRENT_USER() {
+    return t('ui.currentUser')
+  },
+  get CURRENT_EMPLOYEE() {
+    return t('ui.currentEmployee')
+  },
 }

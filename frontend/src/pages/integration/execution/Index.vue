@@ -3,20 +3,30 @@
     <div class="runtime-status-strip row items-center no-wrap q-gutter-sm q-px-sm q-py-xs">
       <q-icon name="monitor_heart" size="22px" color="primary" />
       <div>
-        <div class="text-weight-medium">Worker运行状态</div>
+        <div class="text-weight-medium">{{ t('ui.workerStatus') }}</div>
         <div class="text-caption text-grey-7">
-          {{ workerStatus.worker_id || '未启用 Worker' }}
+          {{ workerStatus.worker_id || t('ui.workerNotEnabled') }}
         </div>
       </div>
       <q-separator vertical inset />
       <status-chip
         :color="workerStatus.running ? 'positive' : 'grey-6'"
-        :label="workerStatus.running ? '运行中' : workerStatus.enabled ? '已停止' : '未启用'"
+        :label="
+          workerStatus.running
+            ? t('ui.running')
+            : workerStatus.enabled
+              ? t('ui.stopped')
+              : t('ui.notEnabled')
+        "
       />
-      <div class="text-caption">活动 {{ workerStatus.active_execution_count }}</div>
-      <div class="text-caption">已完成 {{ workerStatus.completed_total }}</div>
+      <div class="text-caption">
+        {{ t('ui.activities') }} {{ workerStatus.active_execution_count }}
+      </div>
+      <div class="text-caption">
+        {{ t('ui.executionCompletedStatus') }} {{ workerStatus.completed_total }}
+      </div>
       <div class="text-caption text-grey-7">
-        最近轮询 {{ formatDate(workerStatus.last_poll_at) }}
+        {{ t('ui.queriesRecently') }} {{ formatDate(workerStatus.last_poll_at) }}
       </div>
       <q-space />
     </div>
@@ -57,7 +67,7 @@
                 <q-btn
                   color="primary"
                   icon="search"
-                  label="查询"
+                  :label="t('ui.query')"
                   :disable="loading"
                   @click="search"
                 />
@@ -152,6 +162,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_execution' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -180,6 +192,8 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ha
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const router = useRouter()
 const api = useIntegrationApi()
@@ -205,8 +219,11 @@ const queryState = useTableQueryState<IntegrationExecutionQuery>({
   }),
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
-const { quickSearchPlaceholder, advancedSearchFields: advancedFields, loadMetadata } =
-  useRuntimeTableMetadata('integration_execution')
+const {
+  quickSearchPlaceholder,
+  advancedSearchFields: advancedFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('integration_execution')
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
@@ -230,30 +247,126 @@ const workerStatus = ref<IntegrationWorkerStatus>({
   recovered_total: 0,
 })
 const statusMeta: Record<string, { label: string; color: string }> = {
-  created: { label: '待执行', color: 'grey-7' },
-  running: { label: '执行中', color: 'primary' },
-  retry_waiting: { label: '等待重试', color: 'warning' },
-  succeeded: { label: '成功', color: 'positive' },
-  failed: { label: '失败', color: 'negative' },
-  cancelled: { label: '已取消', color: 'grey-6' },
+  created: {
+    get label() {
+      return t('ui.pending')
+    },
+    color: 'grey-7',
+  },
+  running: {
+    get label() {
+      return t('ui.executionRunningStatus')
+    },
+    color: 'primary',
+  },
+  retry_waiting: {
+    get label() {
+      return t('ui.waitingToRetry')
+    },
+    color: 'warning',
+  },
+  succeeded: {
+    get label() {
+      return t('ui.success')
+    },
+    color: 'positive',
+  },
+  failed: {
+    get label() {
+      return t('ui.failed')
+    },
+    color: 'negative',
+  },
+  cancelled: {
+    get label() {
+      return t('ui.cancelled')
+    },
+    color: 'grey-6',
+  },
 }
 const columns: QTableProps['columns'] = [
-  { name: 'execution_no', label: '执行编号', field: 'execution_no', align: 'left', sortable: true },
-  { name: 'external_system', label: '外部系统', field: 'external_system', align: 'left' },
-  { name: 'interface', label: '接口', field: 'interface', align: 'left' },
-  { name: 'trigger_source', label: '触发来源', field: 'trigger_source', align: 'center' },
-  { name: 'status', label: '状态', field: 'status', align: 'center' },
+  {
+    name: 'execution_no',
+    get label() {
+      return t('ui.executionId')
+    },
+    field: 'execution_no',
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'external_system',
+    get label() {
+      return t('ui.externalSystemLabel')
+    },
+    field: 'external_system',
+    align: 'left',
+  },
+  {
+    name: 'interface',
+    get label() {
+      return t('ui.api')
+    },
+    field: 'interface',
+    align: 'left',
+  },
+  {
+    name: 'trigger_source',
+    get label() {
+      return t('ui.triggerSource')
+    },
+    field: 'trigger_source',
+    align: 'center',
+  },
+  {
+    name: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'status',
+    align: 'center',
+  },
   { name: 'current_attempt', label: 'Attempt', field: 'current_attempt', align: 'center' },
-  { name: 'next_run_at', label: '下次重试', field: 'next_run_at', align: 'left' },
+  {
+    name: 'next_run_at',
+    get label() {
+      return t('ui.nextRetry')
+    },
+    field: 'next_run_at',
+    align: 'left',
+  },
   {
     name: 'retry_reason_code',
-    label: '重试原因',
+    get label() {
+      return t('ui.retryReason')
+    },
     field: (row) => formatRetryReason(row.retry_reason_code),
     align: 'left',
   },
-  { name: 'started_at', label: '开始时间', field: 'started_at', align: 'left' },
-  { name: 'completed_at', label: '结束时间', field: 'completed_at', align: 'left' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'started_at',
+    get label() {
+      return t('ui.startTime')
+    },
+    field: 'started_at',
+    align: 'left',
+  },
+  {
+    name: 'completed_at',
+    get label() {
+      return t('ui.endTime')
+    },
+    field: 'completed_at',
+    align: 'left',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 
 const formatDate = formatRuntimeDateTime
@@ -268,7 +381,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = 'Execution 加载失败'
+    loadError.value = t('ui.failedToLoadExecutions')
   } finally {
     loading.value = false
   }
@@ -301,8 +414,12 @@ const availableButtons = (row: IntegrationExecutionListItem) =>
   )
 const cancel = (row: IntegrationExecutionListItem) => {
   confirmAction({
-    title: '取消执行',
-    message: `确认取消执行“${row.execution_no}”？`,
+    get title() {
+      return t('ui.cancelExecution')
+    },
+    get message() {
+      return t('ui.confirmThatWillBeCancelled', { value1: row.execution_no })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

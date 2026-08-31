@@ -4,13 +4,13 @@
       <q-toggle
         v-model="state.enabled"
         color="primary"
-        label="启用联动"
+        :label="t('ui.enableConnection')"
         :dark="isDarkMode"
         :disable="disable"
       />
       <q-space />
       <q-chip v-if="state.enabled" dense square color="primary" text-color="white">
-        {{ state.mode === 'cascader' ? '级联字段' : '关联字段' }}
+        {{ state.mode === 'cascader' ? t('ui.cascadeField') : t('ui.associatedFields') }}
       </q-chip>
     </div>
 
@@ -20,7 +20,7 @@
           <q-select
             v-model="state.mode"
             :options="modeOptions"
-            label="模式"
+            :label="t('ui.mode')"
             outlined
             dense
             :dark="isDarkMode"
@@ -32,7 +32,7 @@
         <div class="col-12 col-sm-8">
           <q-input
             v-model.trim="state.tableCode"
-            label="关联表编码"
+            :label="t('ui.relatedTableCode')"
             outlined
             dense
             :dark="isDarkMode"
@@ -43,7 +43,7 @@
         <div class="col-12 col-sm-4">
           <q-input
             v-model.trim="state.labelKey"
-            label="显示字段"
+            :label="t('ui.showFields')"
             outlined
             dense
             :dark="isDarkMode"
@@ -53,7 +53,7 @@
         <div class="col-12 col-sm-4">
           <q-input
             v-model.trim="state.valueKey"
-            label="取值字段"
+            :label="t('ui.valueField')"
             outlined
             dense
             :dark="isDarkMode"
@@ -63,7 +63,7 @@
         <div class="col-12 col-sm-4">
           <q-input
             v-model.number="state.pageSize"
-            label="加载数量"
+            :label="t('ui.loaded')"
             outlined
             dense
             :dark="isDarkMode"
@@ -76,7 +76,7 @@
           <div class="col-12 col-sm-4">
             <q-input
               v-model.trim="state.parentKey"
-              label="父级字段"
+              :label="t('ui.parentFields')"
               outlined
               dense
               :dark="isDarkMode"
@@ -87,7 +87,7 @@
             <q-select
               v-model="state.selectable"
               :options="selectableOptions"
-              label="可选节点"
+              :label="t('ui.optionalNodes')"
               outlined
               dense
               :dark="isDarkMode"
@@ -100,7 +100,7 @@
             <q-toggle
               v-model="state.showPath"
               color="primary"
-              label="显示完整路径"
+              :label="t('ui.showFullPath')"
               :dark="isDarkMode"
               :disable="disable"
             />
@@ -110,20 +110,20 @@
         <div class="col-12">
           <div class="mapping-box">
             <div class="row items-center q-mb-sm">
-              <div class="text-subtitle2 text-weight-medium">过滤映射</div>
+              <div class="text-subtitle2 text-weight-medium">{{ t('ui.filterMap') }}</div>
               <q-space />
               <q-btn
                 flat
                 dense
                 color="primary"
                 icon="add"
-                label="添加"
+                :label="t('ui.add')"
                 :disable="disable"
                 @click="() => addMappingRow()"
               />
             </div>
             <div v-if="mappingRows.length === 0" class="text-caption text-grey-6 q-py-xs">
-              未配置过滤字段
+              {{ t('ui.noFilterFieldConfigured') }}
             </div>
             <div
               v-for="row in mappingRows"
@@ -133,7 +133,7 @@
               <div class="col-12 col-sm-5">
                 <q-input
                   v-model.trim="row.target"
-                  label="关联表字段"
+                  :label="t('ui.relatedTableField')"
                   outlined
                   dense
                   :dark="isDarkMode"
@@ -143,7 +143,7 @@
               <div class="col-12 col-sm-5">
                 <q-input
                   v-model.trim="row.source"
-                  label="当前表字段"
+                  :label="t('ui.currentTableFields')"
                   outlined
                   dense
                   :dark="isDarkMode"
@@ -170,9 +170,13 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { decodeHtmlEntities, parseJsonSafe } from 'src/utils/field-metadata'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'LinkageConfigEditor' })
 
@@ -202,14 +206,39 @@ const $q = useQuasar()
 const isDarkMode = computed(() => Boolean($q?.dark?.isActive))
 
 const modeOptions = [
-  { label: '关联选择', value: 'relation' },
-  { label: '级联选择', value: 'cascader' },
+  {
+    get label() {
+      return t('ui.associationSelection')
+    },
+    value: 'relation',
+  },
+  {
+    get label() {
+      return t('ui.cascadeSelection')
+    },
+    value: 'cascader',
+  },
 ]
 
 const selectableOptions = [
-  { label: '任意节点', value: 'any' },
-  { label: '叶子节点', value: 'leaf' },
-  { label: '指定层级', value: 'level' },
+  {
+    get label() {
+      return t('ui.anyNode')
+    },
+    value: 'any',
+  },
+  {
+    get label() {
+      return t('ui.leafNode')
+    },
+    value: 'leaf',
+  },
+  {
+    get label() {
+      return t('ui.specifyLevel')
+    },
+    value: 'level',
+  },
 ]
 
 const state = reactive({

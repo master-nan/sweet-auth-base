@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { computed, ref, type MaybeRefOrGetter, toValue } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from 'src/stores/user'
@@ -18,7 +19,11 @@ export const collectQueryScopes = (menus: Menu[]) => {
   const visit = (items: Menu[]) => {
     items.forEach((menu) => {
       if (menu.query_scope_code) {
-        scopes.push({ scope_code: menu.query_scope_code, scope_label: menu.title, route_name: menu.name })
+        scopes.push({
+          scope_code: menu.query_scope_code,
+          scope_label: menu.title,
+          route_name: menu.name,
+        })
       }
       visit(menu.children || [])
     })
@@ -46,17 +51,17 @@ export function useQueryScope(routeName?: MaybeRefOrGetter<string>) {
     config.value = null
     error.value = ''
     if (!scopeCode.value) {
-      error.value = '当前页面未配置查询方案范围'
+      error.value = t('ui.theCurrentPageDoesNotConfigureTheQueryRange')
       return null
     }
     loading.value = true
     try {
       const response = await api.getScopeConfig(scopeCode.value)
       config.value = response.data || null
-      if (!config.value) error.value = '查询方案范围不可用'
+      if (!config.value) error.value = t('ui.queryScopeNotAvailable')
       return config.value
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '查询方案范围加载失败'
+      error.value = cause instanceof Error ? cause.message : t('ui.failedToLoadQueryProjectRange')
       return null
     } finally {
       loading.value = false

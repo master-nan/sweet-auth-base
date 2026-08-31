@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { defineStore } from 'pinia'
 import {
   useNotificationApi,
@@ -46,7 +47,7 @@ export const useNotificationStore = defineStore('notification', {
         return true
       } catch (error) {
         if (this.isStale(error, generation)) return false
-        this.error = error instanceof Error ? error.message : '未读通知加载失败'
+        this.error = error instanceof Error ? error.message : t('ui.failedToLoadUnreadNotification')
         return false
       }
     },
@@ -63,7 +64,7 @@ export const useNotificationStore = defineStore('notification', {
         return true
       } catch (error) {
         if (this.isStale(error, generation)) return false
-        this.error = error instanceof Error ? error.message : '最近通知加载失败'
+        this.error = error instanceof Error ? error.message : t('ui.recentNotificationLoadFailed')
         return false
       } finally {
         if (this.isCurrentSession(generation)) this.loading = false
@@ -83,7 +84,7 @@ export const useNotificationStore = defineStore('notification', {
         return response.data
       } catch (error) {
         if (!this.isStale(error, generation)) {
-          this.error = error instanceof Error ? error.message : '通知标记已读失败'
+          this.error = error instanceof Error ? error.message : t('ui.notificationTagReadFailed')
         }
         return null
       }
@@ -105,7 +106,7 @@ export const useNotificationStore = defineStore('notification', {
         return true
       } catch (error) {
         if (!this.isStale(error, generation)) {
-          this.error = error instanceof Error ? error.message : '全部已读操作失败'
+          this.error = error instanceof Error ? error.message : t('ui.allReadOperationsFailed')
         }
         return false
       }

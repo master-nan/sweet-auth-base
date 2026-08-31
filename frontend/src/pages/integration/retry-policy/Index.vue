@@ -34,7 +34,12 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -114,6 +119,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_retry_policy' })
 
 import { onMounted, ref, watch, computed } from 'vue'
@@ -149,6 +156,8 @@ import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const api = useIntegrationApi()
 const loading = ref(false)
@@ -169,13 +178,32 @@ const {
   loadMetadata,
 } = useRuntimeTableMetadata('integration_retry_policy')
 const statusMeta: Record<RetryPolicyStatus, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'grey-7' },
-  enabled: { label: '已启用', color: 'positive' },
-  disabled: { label: '已停用', color: 'warning' },
+  draft: {
+    get label() {
+      return t('ui.draft')
+    },
+    color: 'grey-7',
+  },
+  enabled: {
+    get label() {
+      return t('ui.activatedStatus')
+    },
+    color: 'positive',
+  },
+  disabled: {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    color: 'warning',
+  },
 }
 const backoffLabels: Record<RetryBackoffType, string> = {
-  fixed: '固定间隔',
-  exponential: '指数退避',
+  get fixed() {
+    return t('ui.fixedInterval')
+  },
+  get exponential() {
+    return t('ui.exponentialBackoff')
+  },
 }
 const columns = ref<TableColumn<RetryPolicyListItem>[]>([])
 const visibleColumns = ref<string[]>([])
@@ -203,10 +231,10 @@ const emptyMessage = computed(() =>
 
 const formatDuration = (milliseconds: number) =>
   milliseconds >= 86400000 && milliseconds % 86400000 === 0
-    ? `${milliseconds / 86400000} 天`
+    ? t('ui.day', { value1: milliseconds / 86400000 })
     : milliseconds >= 60000 && milliseconds % 60000 === 0
-      ? `${milliseconds / 60000} 分钟`
-      : `${milliseconds / 1000} 秒`
+      ? t('ui.minutes', { value1: milliseconds / 60000 })
+      : t('ui.secondsValue', { value1: milliseconds / 1000 })
 const policyStatusMeta = (row: RetryPolicyListItem) => statusMeta[row.status]
 const policyBackoffLabel = (row: RetryPolicyListItem) => backoffLabels[row.backoff_type]
 const fetchData = async () => {
@@ -219,7 +247,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '重试策略加载失败'
+    loadError.value = t('ui.retryingPolicyLoadedFailed')
   } finally {
     loading.value = false
   }
@@ -229,7 +257,13 @@ const fetchMetadata = async () => {
   const resolution = resolveRuntimeColumns<RetryPolicyListItem>(metadataFields.value, {
     context: { getDictLabel: () => '' },
     overrides: [
-      { fieldCode: 'policy_code', label: '重试策略', order: 1 },
+      {
+        fieldCode: 'policy_code',
+        get label() {
+          return t('ui.retryPolicy')
+        },
+        order: 1,
+      },
       { fieldCode: 'policy_name', visible: false, order: 2 },
       { fieldCode: 'status', align: 'center', order: 3 },
       { fieldCode: 'max_attempts', align: 'center', order: 4 },
@@ -241,7 +275,9 @@ const fetchMetadata = async () => {
     virtualColumns: [
       {
         name: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         align: 'center',
         order: 100,
@@ -277,8 +313,15 @@ const openEdit = async (row: RetryPolicyListItem) => {
 }
 const createVersion = (row: RetryPolicyListItem) => {
   confirmAction({
-    title: '创建策略版本',
-    message: `基于“${row.policy_name}”v${row.version} 创建下一草稿版本？`,
+    get title() {
+      return t('ui.createAPolicyVersion')
+    },
+    get message() {
+      return t('ui.confirmCreateNextDraft', {
+        value1: row.policy_name,
+        value2: row.version,
+      })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -296,8 +339,16 @@ const createVersion = (row: RetryPolicyListItem) => {
 }
 const changeState = (row: RetryPolicyListItem, enable: boolean) => {
   confirmAction({
-    title: enable ? '确认启用' : '确认停用',
-    message: `${enable ? '启用' : '停用'}策略“${row.policy_name}”v${row.version}？`,
+    get title() {
+      return enable ? t('ui.confirmEnable') : t('ui.confirmDisable')
+    },
+    get message() {
+      return t('ui.policyV', {
+        value1: enable ? t('ui.enabled') : t('ui.disabled'),
+        value2: row.policy_name,
+        value3: row.version,
+      })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

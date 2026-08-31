@@ -6,7 +6,7 @@
       outlined
       clearable
       class="filter-keyword"
-      placeholder="搜索报表名称、编码或负责人"
+      :placeholder="t('ui.searchForReportNameCodeOrResponsiblePerson')"
       @update:model-value="$emit('update:keyword', String($event || ''))"
       @keyup.enter="$emit('search')"
     >
@@ -21,7 +21,7 @@
       outlined
       emit-value
       map-options
-      label="状态"
+      :label="t('ui.status')"
       :options="statusOptions"
       @update:model-value="$emit('update:status', String($event || ''))"
     />
@@ -32,19 +32,34 @@
       outlined
       emit-value
       map-options
-      label="分类"
+      :label="t('ui.category')"
       :options="categoryOptions"
       @update:model-value="$emit('update:category', String($event || ''))"
     />
 
     <div class="filter-actions">
-      <q-btn outline color="primary" icon="restart_alt" label="重置" @click="$emit('reset')" />
-      <q-btn color="primary" unelevated icon="search" label="查询" @click="$emit('search')" />
+      <q-btn
+        outline
+        color="primary"
+        icon="restart_alt"
+        :label="t('ui.reset')"
+        @click="$emit('reset')"
+      />
+      <q-btn
+        color="primary"
+        unelevated
+        icon="search"
+        :label="t('ui.query')"
+        @click="$emit('search')"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n({ useScope: 'global' })
 defineProps<{
   keyword: string
   status: string

@@ -79,7 +79,7 @@ import { useUserStore } from 'src/stores/user'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
-import { applyQuasarLanguage } from 'src/i18n/quasar-language'
+import { applyQuasarLanguage } from 'src/i18n/runtime/quasar'
 import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
 import LoginPanel from 'src/components/Login/LoginPanel.vue'
 import DarkMode from 'src/components/Toolbar/DarkMode.vue'
@@ -104,7 +104,12 @@ const { login } = useBasicApi()
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
 const localeOptions: Array<{ value: SupportedLocale; label: string }> = [
-  { value: 'zh-CN', label: '简体中文' },
+  {
+    value: 'zh-CN',
+    get label() {
+      return t('ui.simplifiedChinese')
+    },
+  },
   { value: 'en-US', label: 'English' },
 ]
 
@@ -135,8 +140,9 @@ const onLoginClick = async () => {
       await router.push(response.data.must_change_password ? '/change-password' : '/admin/home')
     }
   } catch (error) {
-    const response = (error as { response?: { data?: { error_message?: string; message?: string } } })
-      .response
+    const response = (
+      error as { response?: { data?: { error_message?: string; message?: string } } }
+    ).response
     message.value = response?.data?.error_message || response?.data?.message || t('login.failed')
   }
 }

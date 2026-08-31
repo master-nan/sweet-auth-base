@@ -34,7 +34,7 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" @click="handleBasicSearch" />
+                <q-btn color="primary" :label="t('ui.search')" @click="handleBasicSearch" />
               </template>
             </query-scheme-controls>
           </template>
@@ -70,7 +70,7 @@
         ><q-td :props="props"
           >{{ formatDate(props.row.window_start) }}
           <div class="text-caption text-grey-7">
-            至 {{ formatDate(props.row.window_end) }}
+            {{ t('ui.to') }} {{ formatDate(props.row.window_end) }}
           </div></q-td
         ></template
       >
@@ -78,7 +78,7 @@
         ><q-td :props="props"
           >{{ formatDate(props.row.checkpoint_before) }}
           <div class="text-caption text-grey-7">
-            至 {{ formatDate(props.row.checkpoint_after) }}
+            {{ t('ui.to') }} {{ formatDate(props.row.checkpoint_after) }}
           </div></q-td
         ></template
       >
@@ -92,9 +92,11 @@
       >
       <template #body-cell-result="props"
         ><q-td :props="props"
-          >技术 {{ props.row.technical_success_count }} / {{ props.row.technical_failed_count }}
+          >{{ t('ui.technology') }} {{ props.row.technical_success_count }} /
+          {{ props.row.technical_failed_count }}
           <div class="text-caption text-grey-7">
-            业务 {{ props.row.business_success_count }} / {{ props.row.business_failed_count }}
+            {{ t('ui.operations') }} {{ props.row.business_success_count }} /
+            {{ props.row.business_failed_count }}
           </div></q-td
         ></template
       >
@@ -117,8 +119,8 @@
 
     <form-dialog-shell
       v-model="showDetail"
-      title="同步批次详情"
-      :subtitle="detail?.batch_no || '正在读取批次'"
+      :title="t('ui.syncBatchDetails')"
+      :subtitle="detail?.batch_no || t('ui.readingBatches')"
       icon="view_timeline"
       readonly
       :loading="detailLoading"
@@ -132,8 +134,10 @@
           </div>
         </div>
         <q-separator class="q-my-md" />
-        <div class="text-subtitle2 q-mb-sm">Execution 明细</div>
-        <div v-if="!canQueryExecutions" class="text-body2 text-grey-7">无执行记录查看权限</div>
+        <div class="text-subtitle2 q-mb-sm">{{ t('ui.executionDetails') }}</div>
+        <div v-if="!canQueryExecutions" class="text-body2 text-grey-7">
+          {{ t('ui.noExecutionRecordViewingPermission') }}
+        </div>
         <q-list v-else bordered separator>
           <q-item v-for="execution in executions" :key="execution.id">
             <q-item-section>
@@ -151,14 +155,16 @@
               </q-item-label>
               <q-item-label caption>
                 Slice {{ execution.sync_source?.slice_no || '-' }} ·
-                {{ formatDate(execution.sync_source?.window_start) }} 至
+                {{ formatDate(execution.sync_source?.window_start) }} {{ t('ui.to') }}
                 {{ formatDate(execution.sync_source?.window_end) }}
               </q-item-label>
             </q-item-section>
             <q-item-section side>{{ execution.status }}</q-item-section>
           </q-item>
           <q-item v-if="executions.length === 0"
-            ><q-item-section class="text-grey-7">暂无 Execution</q-item-section></q-item
+            ><q-item-section class="text-grey-7">{{
+              t('ui.cannotInitialiseEvolutionSMailComponent')
+            }}</q-item-section></q-item
           >
         </q-list>
       </template>
@@ -167,6 +173,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_sync_batch' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
@@ -192,6 +200,8 @@ import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const router = useRouter()
 const $q = useQuasar()
 const api = useIntegrationApi()
@@ -209,39 +219,135 @@ const canQueryBatches = computed(() => hasGrantedCapability('integration_sync_ba
 const canDetail = computed(() => hasGrantedCapability('integration_sync_batch_detail'))
 const canQueryExecutions = computed(() => hasGrantedCapability('integration_execution_query'))
 const canViewExecutionDetail = computed(() => hasGrantedCapability('integration_execution_detail'))
-const { quickSearchPlaceholder, advancedSearchFields: advancedFields, loadMetadata } =
-  useRuntimeTableMetadata('integration_sync_batch')
+const {
+  quickSearchPlaceholder,
+  advancedSearchFields: advancedFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('integration_sync_batch')
 const statusMeta = {
-  created: { label: '待运行', color: 'grey-7' },
-  running: { label: '运行中', color: 'primary' },
-  succeeded: { label: '成功', color: 'positive' },
-  failed: { label: '失败', color: 'negative' },
+  created: {
+    get label() {
+      return t('ui.toBeRun')
+    },
+    color: 'grey-7',
+  },
+  running: {
+    get label() {
+      return t('ui.running')
+    },
+    color: 'primary',
+  },
+  succeeded: {
+    get label() {
+      return t('ui.success')
+    },
+    color: 'positive',
+  },
+  failed: {
+    get label() {
+      return t('ui.failed')
+    },
+    color: 'negative',
+  },
 }
 const statusFor = (row: SyncBatchListItem) => statusMeta[row.status]
 const triggerOptions = [
-  { label: '手工', value: 'manual' },
-  { label: '定时', value: 'scheduled' },
+  {
+    get label() {
+      return t('ui.manual')
+    },
+    value: 'manual',
+  },
+  {
+    get label() {
+      return t('ui.scheduledTrigger')
+    },
+    value: 'scheduled',
+  },
 ]
 const triggerLabel = (value: string) =>
   triggerOptions.find((item) => item.value === value)?.label || value
 const formatDate = formatRuntimeDateTime
 const columns: QTableProps['columns'] = [
-  { name: 'batch_no', label: '批次', field: 'batch_no', align: 'left', sortable: true },
+  {
+    name: 'batch_no',
+    get label() {
+      return t('ui.batch')
+    },
+    field: 'batch_no',
+    align: 'left',
+    sortable: true,
+  },
   {
     name: 'trigger_type',
-    label: '触发类型',
+    get label() {
+      return t('ui.triggerType')
+    },
     field: 'trigger_type',
     align: 'center',
     sortable: true,
   },
-  { name: 'status', label: '状态', field: 'status', align: 'center', sortable: true },
-  { name: 'window', label: '逻辑窗口', field: 'window_start', align: 'left', sortable: true },
+  {
+    name: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'status',
+    align: 'center',
+    sortable: true,
+  },
+  {
+    name: 'window',
+    get label() {
+      return t('ui.logicalWindow')
+    },
+    field: 'window_start',
+    align: 'left',
+    sortable: true,
+  },
   { name: 'checkpoint', label: 'Checkpoint', field: 'checkpoint_before', align: 'left' },
-  { name: 'progress', label: '切片进度', field: 'current_slice_no', align: 'center' },
-  { name: 'result', label: '成功 / 失败', field: 'technical_success_count', align: 'center' },
-  { name: 'reason', label: '原因', field: 'reason_code', align: 'left' },
-  { name: 'started_at', label: '开始时间', field: 'started_at', align: 'left', sortable: true },
-  { name: 'completed_at', label: '结束时间', field: 'completed_at', align: 'left', sortable: true },
+  {
+    name: 'progress',
+    get label() {
+      return t('ui.sliceProgress')
+    },
+    field: 'current_slice_no',
+    align: 'center',
+  },
+  {
+    name: 'result',
+    get label() {
+      return t('ui.successFailed')
+    },
+    field: 'technical_success_count',
+    align: 'center',
+  },
+  {
+    name: 'reason',
+    get label() {
+      return t('ui.reason')
+    },
+    field: 'reason_code',
+    align: 'left',
+  },
+  {
+    name: 'started_at',
+    get label() {
+      return t('ui.startTime')
+    },
+    field: 'started_at',
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'completed_at',
+    get label() {
+      return t('ui.endTime')
+    },
+    field: 'completed_at',
+    align: 'left',
+    sortable: true,
+  },
 ]
 const emptyExpressions = () => [{ rules: [{ field: '', value: null }], nested: [] }]
 const queryState = useTableQueryState<SyncBatchQuery>({
@@ -274,7 +380,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '同步批次加载失败'
+    loadError.value = t('ui.failedToLoadSyncBatches')
   } finally {
     loading.value = false
   }
@@ -322,11 +428,28 @@ const openExecution = (id: number) => {
 const detailItems = computed(() =>
   detail.value
     ? [
-        { label: '任务版本', value: `${detail.value.task_code} · v${detail.value.task_version}` },
-        { label: '触发类型', value: triggerLabel(detail.value.trigger_type) },
-        { label: '状态', value: statusMeta[detail.value.status].label },
         {
-          label: '接口版本',
+          get label() {
+            return t('ui.taskVersion')
+          },
+          value: `${detail.value.task_code} · v${detail.value.task_version}`,
+        },
+        {
+          get label() {
+            return t('ui.triggerType')
+          },
+          value: triggerLabel(detail.value.trigger_type),
+        },
+        {
+          get label() {
+            return t('ui.status')
+          },
+          value: statusMeta[detail.value.status].label,
+        },
+        {
+          get label() {
+            return t('ui.apiVersion')
+          },
           value: `${detail.value.interface_code} · v${detail.value.interface_version}`,
         },
         {
@@ -334,31 +457,63 @@ const detailItems = computed(() =>
           value: `${detail.value.consumer_code} · v${detail.value.consumer_version}`,
         },
         {
-          label: '逻辑窗口',
-          value: `${formatDate(detail.value.window_start)} 至 ${formatDate(detail.value.window_end)}`,
+          get label() {
+            return t('ui.logicalWindow')
+          },
+          value: t('ui.rangeFromTo', {
+            value1: formatDate(detail.value.window_start),
+            value2: formatDate(detail.value.window_end),
+          }),
         },
         {
           label: 'Checkpoint',
-          value: `${formatDate(detail.value.checkpoint_before)} 至 ${formatDate(detail.value.checkpoint_after)}`,
+          value: t('ui.rangeFromTo', {
+            value1: formatDate(detail.value.checkpoint_before),
+            value2: formatDate(detail.value.checkpoint_after),
+          }),
         },
         {
-          label: '切片进度',
+          get label() {
+            return t('ui.sliceProgress')
+          },
           value: `${detail.value.current_slice_no} / ${detail.value.planned_slice_count}（Execution ${detail.value.execution_count}）`,
         },
         {
-          label: '技术结果',
-          value: `成功 ${detail.value.technical_success_count} / 失败 ${detail.value.technical_failed_count}`,
+          get label() {
+            return t('ui.technicalResults')
+          },
+          value: t('ui.successfulFailed', {
+            value1: detail.value.technical_success_count,
+            value2: detail.value.technical_failed_count,
+          }),
         },
         {
-          label: '业务结果',
-          value: `成功 ${detail.value.business_success_count} / 失败 ${detail.value.business_failed_count}`,
+          get label() {
+            return t('ui.businessResult')
+          },
+          value: t('ui.successfulFailed', {
+            value1: detail.value.business_success_count,
+            value2: detail.value.business_failed_count,
+          }),
         },
-        { label: '原因', value: detail.value.reason_code || '-' },
         {
-          label: '开始 / 完成',
+          get label() {
+            return t('ui.reason')
+          },
+          value: detail.value.reason_code || '-',
+        },
+        {
+          get label() {
+            return t('ui.startFinish')
+          },
           value: `${formatDate(detail.value.started_at)} / ${formatDate(detail.value.completed_at)}`,
         },
-        { label: '结果摘要', value: detail.value.result_summary || '-' },
+        {
+          get label() {
+            return t('ui.summaryOfResults')
+          },
+          value: detail.value.result_summary || '-',
+        },
       ]
     : [],
 )

@@ -22,7 +22,7 @@
               :controller="schemePage"
               :query-state="queryState"
               :fields="advancedFields"
-              advanced-title="人员高级查询"
+              :advanced-title="t('ui.advancedEmployeeSearch')"
               :show-filter-count="false"
             >
               <template #quick-search>
@@ -36,7 +36,7 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+                <q-btn color="primary" :label="t('ui.search')" :disable="loading" @click="search" />
               </template>
             </query-scheme-controls>
           </template>
@@ -68,8 +68,8 @@
       <template #body-cell-validity="props">
         <q-td :props="props">
           {{ formatOrganizationDate(props.row.valid_from) }}
-          <span class="text-grey-6 q-mx-xs">至</span>
-          {{ formatOrganizationDate(props.row.valid_to, '长期') }}
+          <span class="text-grey-6 q-mx-xs">{{ t('ui.to') }}</span>
+          {{ formatOrganizationDate(props.row.valid_to, t('ui.longTerm')) }}
         </q-td>
       </template>
 
@@ -97,7 +97,7 @@
 
     <organization-record-detail-dialog
       v-model="showDetailDialog"
-      :title="employeeDetail?.name || '人员详情'"
+      :title="employeeDetail?.name || t('ui.personnelDetails')"
       :subtitle="employeeDetail?.employee_no || ''"
       :sections="employeeDetailSections"
       icon="badge"
@@ -119,7 +119,9 @@
       <template #section="{ sectionKey }">
         <template v-if="sectionKey === 'assignments'">
           <div class="assignment-section-toolbar q-mb-md">
-            <div class="text-caption text-grey-7">按时间范围查看员工全部任职，不自动选取主任职</div>
+            <div class="text-caption text-grey-7">
+              {{ t('ui.viewAllStaffMembersByTimeFrameNotAutomaticallySelecting') }}
+            </div>
             <assignment-scope-switch
               v-model="assignmentScope"
               class="assignment-scope-control"
@@ -145,14 +147,14 @@
             </template>
             <template #body-cell-validity="props">
               <q-td :props="props">
-                {{ formatOrganizationDate(props.row.valid_from) }} 至
-                {{ formatOrganizationDate(props.row.valid_to, '长期') }}
+                {{ formatOrganizationDate(props.row.valid_from) }} {{ t('ui.to') }}
+                {{ formatOrganizationDate(props.row.valid_to, t('ui.longTerm')) }}
               </q-td>
             </template>
             <template #no-data>
               <div class="full-width column flex-center q-gutter-sm q-pa-lg text-grey-7">
                 <q-icon name="inbox" color="grey-5" size="48px" />
-                <span>当前范围暂无任职记录</span>
+                <span>{{ t('ui.currentRangeForTemporaryNoServiceRecord') }}</span>
               </div>
             </template>
           </q-table>
@@ -163,7 +165,7 @@
     <q-dialog v-model="showBindDialog">
       <q-card style="width: 480px; max-width: 92vw">
         <q-card-section>
-          <div class="text-h6">绑定平台账号</div>
+          <div class="text-h6">{{ t('ui.tiePlatformAccount') }}</div>
           <div class="text-caption text-grey-7">{{ currentEmployee?.name }}</div>
         </q-card-section>
         <q-separator />
@@ -182,8 +184,8 @@
             option-value="value"
             option-label="label"
             option-disable="disabled"
-            label="平台账号"
-            hint="输入账号名称搜索"
+            :label="t('ui.platformAccount')"
+            :hint="t('ui.enterAccountNameSearch')"
             :options="bindingUserOptions"
             :loading="bindingUserOptionsLoading"
             @filter="filterBindingUsers"
@@ -191,11 +193,11 @@
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn v-close-popup flat label="取消" />
+          <q-btn v-close-popup flat :label="t('ui.cancel')" />
           <q-btn
             color="primary"
             icon="link"
-            label="绑定"
+            :label="t('ui.tie')"
             :loading="bindingLoading"
             :disable="!bindingUserId || bindingUserId <= 0"
             @click="submitBinding"
@@ -207,6 +209,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'organization_employee' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -255,6 +259,8 @@ import {
   formatOrganizationValue,
   organizationStatusColor,
 } from 'src/pages/organization/organization-list-page'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const router = useRouter()
@@ -323,23 +329,43 @@ const assignmentColumns: QTableProps['columns'] = [
   {
     name: 'legal_entity',
     field: (row: AssignmentListItem) => row.legal_entity?.name || '-',
-    label: '法人主体',
+    get label() {
+      return t('ui.legalEntity')
+    },
     align: 'left',
   },
   {
     name: 'org_unit',
     field: (row: AssignmentListItem) => row.org_unit?.name || '-',
-    label: '组织',
+    get label() {
+      return t('ui.organizations')
+    },
     align: 'left',
   },
   {
     name: 'position',
     field: (row: AssignmentListItem) => row.position?.name || '-',
-    label: '岗位',
+    get label() {
+      return t('ui.positionLabel')
+    },
     align: 'left',
   },
-  { name: 'assignment_type', field: 'assignment_type', label: '任职类型', align: 'center' },
-  { name: 'validity', field: 'validity', label: '有效期', align: 'left' },
+  {
+    name: 'assignment_type',
+    field: 'assignment_type',
+    get label() {
+      return t('ui.assignmentType')
+    },
+    align: 'center',
+  },
+  {
+    name: 'validity',
+    field: 'validity',
+    get label() {
+      return t('ui.validityPeriod')
+    },
+    align: 'left',
+  },
 ]
 
 const emptyMessage = computed(() =>
@@ -367,27 +393,42 @@ const fetchMetadata = async () => {
       {
         name: 'primary_legal_entity',
         field: (row) => row.primary_legal_entity?.name || '-',
-        label: '主法人',
+        get label() {
+          return t('ui.primaryLegalEntity')
+        },
         order: 4,
       },
       {
         name: 'binding_status',
         field: 'binding_status',
-        label: '账号绑定',
+        get label() {
+          return t('ui.accountBinding')
+        },
         align: 'center',
         order: 5,
       },
       {
         name: 'bound_account',
         field: (row) => row.bound_account?.user_name || '-',
-        label: '平台账号',
+        get label() {
+          return t('ui.platformAccount')
+        },
         order: 6,
       },
-      { name: 'validity', field: 'validity', label: '有效期', order: 7 },
+      {
+        name: 'validity',
+        field: 'validity',
+        get label() {
+          return t('ui.validityPeriod')
+        },
+        order: 7,
+      },
       {
         name: 'actions',
         field: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         align: 'center',
         order: 100,
         defaultVisible: has_line_buttons.value,
@@ -406,70 +447,122 @@ const employeeDetailSections = computed<OrganizationDetailSection[]>(() => {
   const detail = employeeDetail.value
   const basicItems = detail
     ? [
-        { label: '员工编号', value: detail.employee_no },
-        { label: '姓名', value: detail.name },
-        { label: '手机号', value: detail.mobile_masked ?? null },
-        { label: '邮箱', value: detail.email_masked ?? null },
-        { label: '主法人', value: detail.primary_legal_entity?.name || '-' },
         {
-          label: '人员状态',
+          get label() {
+            return t('ui.employeeNumber')
+          },
+          value: detail.employee_no,
+        },
+        {
+          get label() {
+            return t('ui.name')
+          },
+          value: detail.name,
+        },
+        {
+          get label() {
+            return t('ui.cellPhoneNumber')
+          },
+          value: detail.mobile_masked ?? null,
+        },
+        {
+          get label() {
+            return t('ui.mailbox')
+          },
+          value: detail.email_masked ?? null,
+        },
+        {
+          get label() {
+            return t('ui.primaryLegalEntity')
+          },
+          value: detail.primary_legal_entity?.name || '-',
+        },
+        {
+          get label() {
+            return t('ui.employeeStatus')
+          },
           value: dictLabel('org_employment_status', detail.employment_status),
           chip: true,
           color: organizationStatusColor(detail.employment_status),
         },
         {
-          label: '有效期',
-          value: `${formatOrganizationDate(detail.valid_from)} 至 ${formatOrganizationDate(detail.valid_to, '长期')}`,
+          get label() {
+            return t('ui.validityPeriod')
+          },
+          value: t('ui.rangeFromTo', {
+            value1: formatOrganizationDate(detail.valid_from),
+            value2: formatOrganizationDate(detail.valid_to, t('ui.longTerm')),
+          }),
         },
       ]
     : []
   return [
     {
       key: 'basic',
-      label: '基本资料',
-      caption: '人员身份与联系方式',
+      get label() {
+        return t('ui.profileInformation')
+      },
+      get caption() {
+        return t('ui.identityAndContactInformation')
+      },
       icon: 'badge',
       items: basicItems,
     },
     {
       key: 'assignments',
-      label: '任职记录',
-      caption: '当前、历史与未来任职',
+      get label() {
+        return t('ui.jobIncumbencyRecords')
+      },
+      get caption() {
+        return t('ui.currentHistoricalAndFuturePositions')
+      },
       icon: 'work_history',
       count: assignments.value.length,
       items: [],
     },
     {
       key: 'account',
-      label: '账号信息',
-      caption: '当前平台账号绑定',
+      get label() {
+        return t('ui.accountInformation')
+      },
+      get caption() {
+        return t('ui.currentPlatformAccountBind')
+      },
       icon: 'manage_accounts',
-      items: detail
-        ? [
-            {
-              label: '绑定状态',
-              value: dictLabel('org_user_binding_status', detail.binding_status),
-              chip: true,
-              color: detail.binding_status === 'bound' ? 'positive' : 'grey-7',
-            },
-            {
-              label: '平台账号',
-              value: detail.bound_account?.user_name || '未绑定',
-            },
-          ]
-        : [],
+      get items() {
+        return detail
+          ? [
+              {
+                label: t('ui.tieStatus'),
+                value: dictLabel('org_user_binding_status', detail.binding_status),
+                chip: true,
+                color: detail.binding_status === 'bound' ? 'positive' : 'grey-7',
+              },
+              {
+                label: t('ui.platformAccount'),
+                value: detail.bound_account?.user_name || t('ui.unbound'),
+              },
+            ]
+          : []
+      },
     },
     {
       key: 'mirror',
-      label: '镜像信息',
-      caption: '同步时间与平台备注',
+      get label() {
+        return t('ui.imageInformation')
+      },
+      get caption() {
+        return t('ui.syncTimeAndPlatformRemarks')
+      },
       icon: 'sync',
-      items: detail
-        ? [
-            { label: '最近更新时间', value: formatOrganizationDateTime(detail.gmt_modify) },
-            { label: '平台备注', value: detail.local_note, fullWidth: true },
-          ]
-        : [],
+      get items() {
+        return detail
+          ? [
+              { label: t('ui.recentUpdate'), value: formatOrganizationDateTime(detail.gmt_modify) },
+              { label: t('ui.platformNotes'), value: detail.local_note, fullWidth: true },
+            ]
+          : []
+      },
     },
   ]
 })
@@ -494,7 +587,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '人员数据加载失败'
+    loadError.value = t('ui.failedToLoadEmployees')
   } finally {
     loading.value = false
   }
@@ -512,7 +605,7 @@ const openDetail = async (row: EmployeeListItem) => {
     employeeDetail.value = await getEmployeeDetail(row.id)
     await loadAssignments()
   } catch {
-    detailError.value = '人员详情加载失败'
+    detailError.value = t('ui.failedToLoadEmployeeDetails')
   } finally {
     detailLoading.value = false
   }
@@ -622,7 +715,13 @@ const submitBinding = async () => {
   try {
     await bindEmployeeUser(currentEmployee.value.id, bindingUserId.value)
     showBindDialog.value = false
-    $q.notify({ type: 'positive', position: 'top-right', message: '账号绑定成功' })
+    $q.notify({
+      type: 'positive',
+      position: 'top-right',
+      get message() {
+        return t('ui.accountBindingSuccessful')
+      },
+    })
     await fetchData()
     if (showDetailDialog.value)
       employeeDetail.value = await getEmployeeDetail(currentEmployee.value.id)
@@ -633,12 +732,22 @@ const submitBinding = async () => {
 
 const unbind = (row: Pick<EmployeeListItem, 'id' | 'name'>) => {
   confirmAction({
-    title: '解绑平台账号',
-    message: `确认解除 ${row.name} 与当前平台账号的绑定吗？`,
+    get title() {
+      return t('ui.untiePlatformAccount')
+    },
+    get message() {
+      return t('ui.confirmToUntieWithTheCurrentPlatformAccount', { value1: row.name })
+    },
   }).onOk(() => {
     void (async () => {
       await unbindEmployeeUser(row.id)
-      $q.notify({ type: 'positive', position: 'top-right', message: '账号解绑成功' })
+      $q.notify({
+        type: 'positive',
+        position: 'top-right',
+        get message() {
+          return t('ui.accountUntied')
+        },
+      })
       await fetchData()
       if (showDetailDialog.value) employeeDetail.value = await getEmployeeDetail(row.id)
     })()

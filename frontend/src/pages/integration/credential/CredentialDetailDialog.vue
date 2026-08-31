@@ -1,8 +1,11 @@
 <template>
   <form-dialog-shell
     v-model="visible"
-    title="集成凭证详情"
-    :subtitle="detail?.credential_code || (loadFailed ? '凭证详情读取失败' : '正在读取凭证元数据')"
+    :title="t('ui.integratedVoucherDetails')"
+    :subtitle="
+      detail?.credential_code ||
+      (loadFailed ? t('ui.documentDetailsFailedToRead') : t('ui.readingVoucherMetadata'))
+    "
     icon="key"
     readonly
     :loading="loading"
@@ -10,16 +13,16 @@
   >
     <div v-if="detail" class="credential-detail">
       <section>
-        <div class="credential-detail__title">基础信息</div>
+        <div class="credential-detail__title">{{ t('ui.basicInfo') }}</div>
         <detail-field-grid :items="basicItems" />
       </section>
       <q-separator />
       <section>
-        <div class="credential-detail__title">安全与轮换</div>
+        <div class="credential-detail__title">{{ t('ui.securityAndRotation') }}</div>
         <detail-field-grid :items="securityItems" />
-        <q-banner class="credential-detail__notice q-mt-md" rounded
-          >轮换历史已写入平台审计日志；本页面不保存或展示历史秘密。</q-banner
-        >
+        <q-banner class="credential-detail__notice q-mt-md" rounded>{{
+          t('ui.theRotationHistoryIsWrittenInThePlatformSAudit')
+        }}</q-banner>
       </section>
     </div>
     <div v-else-if="loading" class="credential-detail__loading">
@@ -27,19 +30,25 @@
     </div>
     <div v-else class="credential-detail__error">
       <q-icon name="error_outline" color="negative" size="42px" />
-      <div class="text-subtitle1 text-weight-bold">无法读取凭证详情</div>
-      <div class="text-body2 text-grey-7">凭证可能已失效，或其所属外部系统已被移除。</div>
-      <q-btn outline color="primary" icon="refresh" label="重新加载" @click="load" />
+      <div class="text-subtitle1 text-weight-bold">{{ t('ui.couldNotCloseTemporaryFolderS') }}</div>
+      <div class="text-body2 text-grey-7">
+        {{ t('ui.theCredentialMayHaveExpiredOrItsExternalSystemMay') }}
+      </div>
+      <q-btn outline color="primary" icon="refresh" :label="t('ui.reload')" @click="load" />
     </div>
   </form-dialog-shell>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
 import type { DetailFieldItem } from 'src/components/Detail/types'
 import { type CredentialDetail, useIntegrationApi } from 'src/api/services/integration'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{ modelValue: boolean; id: number }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: boolean): void }>()
@@ -58,41 +67,98 @@ const typeLabels: Record<string, string> = {
   oauth_client: 'OAuth Client',
 }
 const statusLabels: Record<string, string> = {
-  draft: '草稿',
-  active: '已启用',
-  disabled: '已停用',
-  revoked: '已吊销',
-  expired: '已过期',
+  get draft() {
+    return t('ui.draft')
+  },
+  get active() {
+    return t('ui.activatedStatus')
+  },
+  get disabled() {
+    return t('ui.deactivatedStatus')
+  },
+  get revoked() {
+    return t('ui.revoked')
+  },
+  get expired() {
+    return t('ui.expired')
+  },
 }
 const basicItems = computed<DetailFieldItem[]>(() =>
   detail.value
     ? [
         {
-          label: '所属系统',
+          get label() {
+            return t('ui.owningSystem')
+          },
           value: `${detail.value.external_system.name}（${detail.value.external_system.system_code}）`,
         },
-        { label: '凭证编码', value: detail.value.credential_code },
-        { label: '凭证名称', value: detail.value.name },
         {
-          label: '类型',
+          get label() {
+            return t('ui.credentialCodeLabel')
+          },
+          value: detail.value.credential_code,
+        },
+        {
+          get label() {
+            return t('ui.certificateName')
+          },
+          value: detail.value.name,
+        },
+        {
+          get label() {
+            return t('ui.type')
+          },
           value: typeLabels[detail.value.credential_type] || detail.value.credential_type,
         },
         {
-          label: '状态',
+          get label() {
+            return t('ui.status')
+          },
           value: statusLabels[detail.value.effective_status] || detail.value.effective_status,
         },
-        { label: '创建时间', value: detail.value.gmt_create },
+        {
+          get label() {
+            return t('ui.created')
+          },
+          value: detail.value.gmt_create,
+        },
       ]
     : [],
 )
 const securityItems = computed<DetailFieldItem[]>(() =>
   detail.value
     ? [
-        { label: '秘密版本', value: `v${detail.value.version}` },
-        { label: '指纹摘要', value: detail.value.fingerprint_summary || '-' },
-        { label: '有效期', value: detail.value.expires_at || '长期有效' },
-        { label: '最近轮换', value: detail.value.rotated_at || '尚未轮换' },
-        { label: '描述', value: detail.value.description || '-', fullWidth: true },
+        {
+          get label() {
+            return t('ui.secretVersion')
+          },
+          value: `v${detail.value.version}`,
+        },
+        {
+          get label() {
+            return t('ui.fingerprintSummary')
+          },
+          value: detail.value.fingerprint_summary || '-',
+        },
+        {
+          get label() {
+            return t('ui.validityPeriod')
+          },
+          value: detail.value.expires_at || t('ui.noExpiration'),
+        },
+        {
+          get label() {
+            return t('ui.recentRotation')
+          },
+          value: detail.value.rotated_at || t('ui.notYetRotated'),
+        },
+        {
+          get label() {
+            return t('ui.description')
+          },
+          value: detail.value.description || '-',
+          fullWidth: true,
+        },
       ]
     : [],
 )

@@ -33,7 +33,12 @@
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -80,7 +85,7 @@
             " /></q-td
       ></template>
       <template #body-cell-expires_at="props"
-        ><q-td :props="props">{{ props.row.expires_at || '长期有效' }}</q-td></template
+        ><q-td :props="props">{{ props.row.expires_at || t('ui.noExpiration') }}</q-td></template
       >
       <template #body-cell-version="props"
         ><q-td :props="props"
@@ -89,7 +94,7 @@
         ></template
       >
       <template #body-cell-rotated_at="props"
-        ><q-td :props="props">{{ props.row.rotated_at || '尚未轮换' }}</q-td></template
+        ><q-td :props="props">{{ props.row.rotated_at || t('ui.notYetRotated') }}</q-td></template
       >
       <template #body-cell-actions="props"
         ><q-td :props="props" class="q-gutter-xs no-wrap"
@@ -127,6 +132,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_credential' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -164,6 +171,8 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ha
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const route = useRoute()
 const api = useIntegrationApi()
@@ -194,11 +203,36 @@ const typeLabels: Record<string, string> = {
   oauth_client: 'OAuth Client',
 }
 const statusMeta: Record<string, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'grey-7' },
-  active: { label: '已启用', color: 'positive' },
-  disabled: { label: '已停用', color: 'warning' },
-  revoked: { label: '已吊销', color: 'negative' },
-  expired: { label: '已过期', color: 'negative' },
+  draft: {
+    get label() {
+      return t('ui.draft')
+    },
+    color: 'grey-7',
+  },
+  active: {
+    get label() {
+      return t('ui.activatedStatus')
+    },
+    color: 'positive',
+  },
+  disabled: {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    color: 'warning',
+  },
+  revoked: {
+    get label() {
+      return t('ui.revoked')
+    },
+    color: 'negative',
+  },
+  expired: {
+    get label() {
+      return t('ui.expired')
+    },
+    color: 'negative',
+  },
 }
 const columns = ref<TableColumn<CredentialListItem>[]>([])
 const visibleColumns = ref<string[]>([])
@@ -249,7 +283,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '集成凭证加载失败'
+    loadError.value = t('ui.failedToLoadIntegratedVoucher')
   } finally {
     loading.value = false
   }
@@ -272,7 +306,13 @@ const fetchMetadata = async () => {
       { fieldCode: 'external_system_id', visible: false },
       { fieldCode: 'name', visible: false },
       { fieldCode: 'status', visible: false },
-      { fieldCode: 'credential_code', label: '集成凭证', order: 2 },
+      {
+        fieldCode: 'credential_code',
+        get label() {
+          return t('ui.integratedCertificate')
+        },
+        order: 2,
+      },
       { fieldCode: 'credential_type', order: 3 },
       { fieldCode: 'expires_at', order: 5 },
       { fieldCode: 'rotated_at', order: 7 },
@@ -280,27 +320,35 @@ const fetchMetadata = async () => {
     virtualColumns: [
       {
         name: 'external_system',
-        label: '所属系统',
+        get label() {
+          return t('ui.owningSystem')
+        },
         field: (row) => row.external_system.name,
         order: 1,
       },
       {
         name: 'effective_status',
-        label: '状态',
+        get label() {
+          return t('ui.status')
+        },
         field: 'effective_status',
         align: 'center',
         order: 4,
       },
       {
         name: 'version',
-        label: '版本 / 指纹',
+        get label() {
+          return t('ui.versionFingerprint')
+        },
         field: 'version',
         order: 6,
         serverSortField: 'version',
       },
       {
         name: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         align: 'center',
         order: 100,
@@ -336,10 +384,29 @@ const openEdit = async (row: CredentialListItem, rotate = false) => {
   showFormDialog.value = true
 }
 const changeState = (row: CredentialListItem, target: 'active' | 'disabled' | 'revoked') => {
-  const labels = { active: '启用', disabled: '停用', revoked: '吊销' }
+  const labels = {
+    get active() {
+      return t('ui.enabled')
+    },
+    get disabled() {
+      return t('ui.disabled')
+    },
+    get revoked() {
+      return t('ui.revokeAction')
+    },
+  }
   confirmAction({
-    title: `确认${labels[target]}`,
-    message: `${labels[target]}凭证“${row.name}”${target === 'revoked' ? '？吊销后不可恢复。' : '？'}`,
+    get title() {
+      return t('ui.confirmNamedOperation', { value1: labels[target] })
+    },
+    get message() {
+      return target === 'revoked'
+        ? t('ui.confirmCredentialStateWithRevokeWarning', {
+            state: labels[target],
+            name: row.name,
+          })
+        : t('ui.confirmCredentialState', { state: labels[target], name: row.name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

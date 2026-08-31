@@ -3,10 +3,16 @@
     <section class="panel-section">
       <div class="section-head">
         <div>
-          <strong>数据集</strong>
-          <span>{{ datasets.length }} 个数据集</span>
+          <strong>{{ t('ui.dataset') }}</strong>
+          <span>{{ datasets.length }} {{ t('ui.dataSets') }}</span>
         </div>
-        <q-btn size="sm" color="primary" icon="add" label="新增" @click="$emit('openDataset')" />
+        <q-btn
+          size="sm"
+          color="primary"
+          icon="add"
+          :label="t('ui.create')"
+          @click="$emit('openDataset')"
+        />
       </div>
       <div class="dataset-tools">
         <q-input
@@ -14,7 +20,7 @@
           dense
           outlined
           clearable
-          placeholder="搜索字段名称 / 编码"
+          :placeholder="t('ui.searchFieldNameEncoding')"
         >
           <template #prepend>
             <q-icon name="search" />
@@ -27,7 +33,9 @@
           :icon="allExpanded ? 'unfold_less' : 'unfold_more'"
           @click="toggleAllDatasets"
         >
-          <q-tooltip>{{ allExpanded ? '收起全部数据集' : '展开全部数据集' }}</q-tooltip>
+          <q-tooltip>{{
+            allExpanded ? t('ui.collectAllDataSets') : t('ui.expandAllDataSets')
+          }}</q-tooltip>
         </q-btn>
       </div>
 
@@ -52,12 +60,13 @@
             <div>
               <strong>{{ dataset.name }}</strong>
               <span>
-                {{ dataset.type === 'sql' ? 'SQL 数据集' : dataset.source_code }}
-                · {{ filteredFields(dataset).length }}/{{ dataset.fields.length }} 字段
+                {{ dataset.type === 'sql' ? t('ui.sqlDataset') : dataset.source_code }}
+                · {{ filteredFields(dataset).length }}/{{ dataset.fields.length }}
+                {{ t('ui.field') }}
               </span>
             </div>
             <q-space />
-            <q-badge v-if="dataset.primary" color="primary">主</q-badge>
+            <q-badge v-if="dataset.primary" color="primary">{{ t('ui.primary') }}</q-badge>
             <q-btn
               flat
               size="sm"
@@ -79,7 +88,7 @@
 
           <div v-show="isDatasetExpanded(dataset.id)" class="field-tree">
             <div v-if="dataset.fields.length" class="field-tree__hint">
-              拖字段到画布单元格，或点击绑定当前单元格
+              {{ t('ui.dragFieldsToCanvasCellsOrClickToBindThe') }}
             </div>
             <button
               v-for="field in filteredFields(dataset)"
@@ -96,7 +105,7 @@
               <q-badge outline color="primary">{{ fieldRoleLabel(field) }}</q-badge>
             </button>
             <div v-if="dataset.fields.length && !filteredFields(dataset).length" class="empty-note">
-              没有匹配字段
+              {{ t('ui.noMatchField') }}
             </div>
           </div>
         </article>
@@ -106,10 +115,16 @@
     <section class="panel-section">
       <div class="section-head">
         <div>
-          <strong>参数</strong>
-          <span>{{ parameters.length }} 个查询参数</span>
+          <strong>{{ t('ui.parameters') }}</strong>
+          <span>{{ parameters.length }} {{ t('ui.queryParameterCountSuffix') }}</span>
         </div>
-        <q-btn size="sm" color="primary" icon="add" label="新增" @click="$emit('addParameter')" />
+        <q-btn
+          size="sm"
+          color="primary"
+          icon="add"
+          :label="t('ui.create')"
+          @click="$emit('addParameter')"
+        />
       </div>
       <div v-if="parameters.length" class="param-list">
         <div
@@ -140,15 +155,19 @@
           />
         </div>
       </div>
-      <div v-else class="empty-note">暂无参数</div>
+      <div v-else class="empty-note">{{ t('ui.noParametersForNow') }}</div>
     </section>
   </aside>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { ReportDataset, ReportField, ReportParameter } from 'src/api/services/report'
 import { reportFieldIcon } from 'src/modules/report/sheet'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   datasets: ReportDataset[]
@@ -214,16 +233,20 @@ function filteredFields(dataset: ReportDataset) {
 }
 
 function fieldRoleLabel(field: ReportField) {
-  if (field.role === 'metric') return '指标'
-  if (field.role === 'dimension') return '维度'
-  if (field.role === 'time') return '时间'
-  return '文本'
+  if (field.role === 'metric') return t('ui.indicators')
+  if (field.role === 'dimension') return t('ui.dimensions')
+  if (field.role === 'time') return t('ui.time')
+  return t('ui.text')
 }
 
 function parameterTargetLabel(param: ReportParameter) {
   const dataset = props.datasets.find((item) => item.id === param.dataset_id)
   const field = dataset?.fields.find((item) => item.code === param.field)
-  return `${dataset?.name || '未绑定'} · ${field?.name || param.field} · ${param.operator}`
+  return t('ui.resourceSummaryParts', {
+    value1: dataset?.name || t('ui.unbound'),
+    value2: field?.name || param.field,
+    value3: param.operator,
+  })
 }
 </script>
 

@@ -1,7 +1,7 @@
 <template>
   <div class="file-upload">
     <q-field
-      :label="label"
+      :label="displayLabel"
       outlined
       dense
       stack-label
@@ -36,7 +36,7 @@
                 class="q-ml-xs"
                 @click.stop="openUploadedFile(file, 'preview')"
               >
-                <q-tooltip>预览</q-tooltip>
+                <q-tooltip>{{ t('ui.preview') }}</q-tooltip>
               </q-btn>
               <q-btn
                 flat
@@ -46,7 +46,7 @@
                 icon="download"
                 @click.stop="openUploadedFile(file, 'download')"
               >
-                <q-tooltip>下载</q-tooltip>
+                <q-tooltip>{{ t('ui.download') }}</q-tooltip>
               </q-btn>
             </q-chip>
           </div>
@@ -59,7 +59,7 @@
             no-caps
             color="primary"
             icon="cloud_upload"
-            :label="uploading ? uploadStatusText || '上传中...' : '选择文件'"
+            :label="uploading ? uploadStatusText || t('ui.uploading') : t('ui.selectFile')"
             :disable="uploading || readonly"
             @click="triggerFileInput"
           />
@@ -100,11 +100,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
 import { Notify } from 'quasar'
 import SparkMD5 from 'spark-md5'
 import { parseFileIds } from 'src/utils/file-value'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type FilePreviewDialogExpose = {
   open: (file: FileInfo) => void | Promise<void>
@@ -132,7 +136,7 @@ interface FileUploadProps {
 
 const props = withDefaults(defineProps<FileUploadProps>(), {
   modelValue: null,
-  label: '文件上传',
+  label: '',
   accept: '*',
   multiple: false,
   maxSize: 50000,
@@ -145,6 +149,8 @@ const props = withDefaults(defineProps<FileUploadProps>(), {
   fieldCode: '',
   readonly: false,
 })
+
+const displayLabel = computed(() => props.label || t('ui.uploadingOfFiles'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | string[] | null]
@@ -177,7 +183,10 @@ const progressValue = computed(
 )
 const uploadStatusLabel = computed(() => {
   const name = currentUploadName.value ? ` · ${currentUploadName.value}` : ''
-  return `${uploadStatusText.value || '准备上传'}${name}`
+  return t('ui.fileStatusWithName', {
+    value1: uploadStatusText.value || t('ui.prepareUpload'),
+    name: name,
+  })
 })
 
 const clearUploadStatusLater = (delay = 1600) => {
@@ -214,7 +223,7 @@ const calculateFileMD5 = (
         resolve(spark.end())
       }
     }
-    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.onerror = () => reject(new Error(t('ui.fileReadingFailed')))
 
     const loadNext = () => {
       const start = currentChunk * chunkSize
@@ -227,17 +236,17 @@ const calculateFileMD5 = (
 
 // ─── 分片上传核心逻辑 ───
 const doChunkUpload = async (file: File): Promise<FileInfo | null> => {
-  uploadStatusText.value = '计算文件指纹...'
+  uploadStatusText.value = t('ui.calculatingFileFingerprints')
   uploadProgress.value = 1
 
   // 1. 计算文件 MD5
   const fileMd5 = await calculateFileMD5(file, (current, total) => {
-    uploadStatusText.value = `计算文件指纹 ${current}/${total}`
+    uploadStatusText.value = t('ui.computeFileFingerprints', { current: current, total: total })
     uploadProgress.value = Math.max(1, Math.round((current / total) * 8))
   })
 
   // 2. 初始化分片上传
-  uploadStatusText.value = '初始化上传...'
+  uploadStatusText.value = t('ui.initializeUpload')
   uploadProgress.value = Math.max(uploadProgress.value, 9)
   const initRes = await initChunkUpload({
     file_name: file.name,
@@ -247,13 +256,13 @@ const doChunkUpload = async (file: File): Promise<FileInfo | null> => {
   })
 
   if (!initRes.success || !initRes.data) {
-    throw new Error(initRes.message || '初始化分片上传失败')
+    throw new Error(initRes.message || t('ui.initializingFractionUploadFailed'))
   }
 
   // 秒传
   if (initRes.data.fast_upload && initRes.data.file_id) {
     uploadProgress.value = 100
-    uploadStatusText.value = '秒传完成'
+    uploadStatusText.value = t('ui.secondPassComplete')
     const fileRes = await getFileById(initRes.data.file_id)
     if (fileRes.success && fileRes.data) {
       return fileRes.data
@@ -280,9 +289,12 @@ const doChunkUpload = async (file: File): Promise<FileInfo | null> => {
 
   uploadProgress.value = Math.max(10, 10 + Math.round((completedChunks / totalChunks) * 80))
   if (completedChunks > 0) {
-    uploadStatusText.value = `断点续传，已跳过 ${completedChunks}/${totalChunks} 个分片`
+    uploadStatusText.value = t('ui.breakpointSkippingFractions', {
+      completedChunks: completedChunks,
+      totalChunks: totalChunks,
+    })
   } else {
-    uploadStatusText.value = `准备上传 ${totalChunks} 个分片`
+    uploadStatusText.value = t('ui.prepareToUploadFractions', { totalChunks: totalChunks })
   }
 
   // 构建待上传分片列表
@@ -307,7 +319,10 @@ const doChunkUpload = async (file: File): Promise<FileInfo | null> => {
             const end = Math.min(start + chunk_size, file.size)
             const blob = file.slice(start, end)
 
-            uploadStatusText.value = `分片上传 ${completedChunks + 1}/${totalChunks}`
+            uploadStatusText.value = t('ui.chunkUploadProgress', {
+              value1: completedChunks + 1,
+              totalChunks: totalChunks,
+            })
             await uploadChunk(upload_id, idx, blob, (loaded, total) => {
               const currentChunkRatio = total > 0 ? loaded / total : 0
               const nextProgress =
@@ -330,15 +345,15 @@ const doChunkUpload = async (file: File): Promise<FileInfo | null> => {
   await uploadWithConcurrency(pendingIndexes)
 
   // 5. 合并分片
-  uploadStatusText.value = '合并文件...'
+  uploadStatusText.value = t('ui.mergeFile')
   uploadProgress.value = 95
   const mergeRes = await mergeChunks(upload_id)
   if (!mergeRes.success || !mergeRes.data) {
-    throw new Error(mergeRes.message || '合并分片失败')
+    throw new Error(mergeRes.message || t('ui.failedToMergeTheFraction'))
   }
 
   uploadProgress.value = 100
-  uploadStatusText.value = '上传完成'
+  uploadStatusText.value = t('ui.uploadComplete')
   return mergeRes.data
 }
 
@@ -411,7 +426,9 @@ const handleFileChange = async (event: Event) => {
       if (file.size > props.maxSize * 1024 * 1024) {
         Notify.create({
           type: 'negative',
-          message: `文件 ${file.name} 大小超过 ${props.maxSize}MB 限制`,
+          get message() {
+            return t('ui.fileSizeExceedingMbLimit', { value1: file.name, value2: props.maxSize })
+          },
         })
         continue
       }
@@ -424,7 +441,7 @@ const handleFileChange = async (event: Event) => {
         fileInfo = await doChunkUpload(file)
       } else {
         // 小文件 → 直传
-        uploadStatusText.value = '上传中...'
+        uploadStatusText.value = t('ui.uploading')
         uploadProgress.value = 5
         const res = await uploadFile(file, (loaded, total) => {
           uploadProgress.value = Math.max(5, Math.round((loaded / total) * 95))
@@ -433,7 +450,7 @@ const handleFileChange = async (event: Event) => {
           fileInfo = res.data
         }
         uploadProgress.value = 100
-        uploadStatusText.value = '上传完成'
+        uploadStatusText.value = t('ui.uploadComplete')
       }
 
       if (fileInfo) {
@@ -441,7 +458,9 @@ const handleFileChange = async (event: Event) => {
       } else {
         Notify.create({
           type: 'negative',
-          message: `文件 ${file.name} 上传失败`,
+          get message() {
+            return t('ui.fileUploadFailed', { value1: file.name })
+          },
         })
       }
     }
@@ -449,8 +468,8 @@ const handleFileChange = async (event: Event) => {
     // 更新 modelValue
     emitValue()
   } catch (e: any) {
-    errorMessage.value = e?.message || '上传失败'
-    uploadStatusText.value = '上传失败'
+    errorMessage.value = e?.message || t('ui.uploadFailed')
+    uploadStatusText.value = t('ui.uploadFailed')
     Notify.create({
       type: 'negative',
       message: errorMessage.value,
@@ -459,7 +478,7 @@ const handleFileChange = async (event: Event) => {
     uploading.value = false
     if (!errorMessage.value) {
       uploadProgress.value = 100
-      uploadStatusText.value = '上传完成'
+      uploadStatusText.value = t('ui.uploadComplete')
       clearUploadStatusLater()
     }
     // 重置 input，允许再次选择同一文件
@@ -477,7 +496,12 @@ const removeFile = (index: number) => {
 
 const openUploadedFile = async (file: FileInfo, mode: FileAccessMode) => {
   if (!file.file_uuid) {
-    Notify.create({ type: 'warning', message: '文件缺少访问标识' })
+    Notify.create({
+      type: 'warning',
+      get message() {
+        return t('ui.fileAccessIdentifierMissing')
+      },
+    })
     return
   }
 
@@ -491,7 +515,10 @@ const openUploadedFile = async (file: FileInfo, mode: FileAccessMode) => {
       ? await getFileDownloadAccessUrl(file.file_uuid)
       : await getFilePreviewAccessUrl(file.file_uuid)
   if (!response.success || !response.data?.url) {
-    Notify.create({ type: 'negative', message: response.message || '获取文件访问地址失败' })
+    Notify.create({
+      type: 'negative',
+      message: response.message || t('ui.failedToGetFileAccessUrl'),
+    })
     return
   }
   window.open(response.data.url, '_blank', 'noopener,noreferrer')

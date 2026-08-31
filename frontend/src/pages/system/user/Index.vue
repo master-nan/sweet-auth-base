@@ -37,7 +37,12 @@
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -84,16 +89,16 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData?.id ? '编辑用户' : '新增用户'"
+      :title="currentEditData?.id ? t('ui.editUser') : t('ui.addUser')"
       :fields="tableFields"
-      :submit-btn-text="currentEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
     <q-dialog v-model="showRoleDialog" @hide="clearRoleDialog">
       <q-card style="min-width: 520px; max-width: 90vw">
         <q-card-section>
-          <div class="text-h6">分配角色</div>
+          <div class="text-h6">{{ t('ui.assignRoles') }}</div>
           <div class="text-caption text-grey-7">
             {{ currentRoleUser?.user_name || '' }}
           </div>
@@ -104,7 +109,7 @@
             v-model="selectedRoleIds"
             :options="roleOptions"
             :loading="roleDialogLoading"
-            label="角色"
+            :label="t('ui.role')"
             outlined
             dense
             multiple
@@ -114,15 +119,15 @@
             options-dense
             option-label="name"
             option-value="id"
-            :rules="[(val) => (val && val.length > 0) || '至少选择一个角色']"
+            :rules="[(val) => (val && val.length > 0) || t('ui.selectAtLeastOneCharacter')]"
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" v-close-popup />
+          <q-btn flat :label="t('ui.cancel')" v-close-popup />
           <q-btn
             color="primary"
             icon="save"
-            label="保存"
+            :label="t('ui.save')"
             :loading="roleDialogLoading"
             :disable="selectedRoleIds.length === 0"
             @click="saveUserRoles"
@@ -133,11 +138,11 @@
 
     <q-dialog v-model="showResetPasswordDialog" @hide="clearResetPassword">
       <q-card style="min-width: 520px; max-width: 90vw">
-        <q-card-section class="text-h6">临时密码已生成</q-card-section>
+        <q-card-section class="text-h6">{{ t('ui.temporaryPasswordGenerated') }}</q-card-section>
         <q-separator />
         <q-card-section>
           <div class="row items-center no-wrap q-gutter-sm q-mb-xs">
-            <div class="text-body1">临时密码：{{ resetPasswordValue }}</div>
+            <div class="text-body1">{{ t('ui.temporaryPassword') }}{{ resetPasswordValue }}</div>
             <q-btn
               flat
               dense
@@ -147,7 +152,7 @@
               :disable="!resetPasswordValue"
               @click="copyResetPassword"
             >
-              <q-tooltip>复制</q-tooltip>
+              <q-tooltip>{{ t('ui.copy') }}</q-tooltip>
             </q-btn>
           </div>
           <q-banner
@@ -164,11 +169,13 @@
             </template>
             {{ resetPasswordEmailMessage }}
           </q-banner>
-          <div class="text-caption text-grey-7">该用户下次登录必须修改密码</div>
+          <div class="text-caption text-grey-7">
+            {{ t('ui.theUserMustChangeThePasswordForNextLogin') }}
+          </div>
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn color="primary" label="关闭" v-close-popup />
+          <q-btn color="primary" :label="t('ui.close')" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -176,6 +183,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_user' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
@@ -210,6 +219,8 @@ import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const { confirmAction, confirmDanger } = useConfirmDialog($q)
@@ -339,7 +350,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '用户列表加载失败'
+    loadError.value = t('ui.loadingUserListFailed')
   } finally {
     loading.value = false
   }
@@ -371,7 +382,9 @@ const openEditDialog = async (row: User) => {
 
 const confirmDelete = (row: User) => {
   confirmDanger({
-    message: `确定要删除用户 "${row.user_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteUser', { value1: row.user_name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -386,8 +399,12 @@ const confirmDelete = (row: User) => {
 
 const confirmResetPassword = (row: User) => {
   confirmAction({
-    title: '确认重置密码',
-    message: `确定要重置用户 "${row.user_name}" 的密码吗？`,
+    get title() {
+      return t('ui.confirmThatThePasswordIsBeingReset')
+    },
+    get message() {
+      return t('ui.areYouSureYouWantToResetTheUserPassword', { value1: row.user_name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -434,24 +451,46 @@ const clearResetPassword = () => {
 const copyResetPassword = async () => {
   try {
     await copyToClipboard(resetPasswordValue.value)
-    $q.notify({ type: 'positive', position: 'top-right', message: '已复制到剪贴板' })
+    $q.notify({
+      type: 'positive',
+      position: 'top-right',
+      get message() {
+        return t('ui.copiedToClipboard')
+      },
+    })
   } catch (error) {
     console.error('复制失败', error)
-    $q.notify({ type: 'negative', position: 'top-right', message: '复制失败' })
+    $q.notify({
+      type: 'negative',
+      position: 'top-right',
+      get message() {
+        return t('ui.copyFailed')
+      },
+    })
   }
 }
 
 const confirmUnlockLogin = (row: User) => {
   confirmAction({
-    title: '解除登录锁定',
-    message: `确定要清除用户 "${row.user_name}" 的登录失败次数和锁定状态吗？`,
+    get title() {
+      return t('ui.unlockLogin')
+    },
+    get message() {
+      return t('ui.determinesTheLoginFailureAndLockStatusOfTheUserToBe', { value1: row.user_name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
     void (async () => {
       const result = await sysUserApi.unlockLogin(row.id)
       if (result.success) {
-        $q.notify({ type: 'positive', position: 'top-right', message: '登录锁定已解除' })
+        $q.notify({
+          type: 'positive',
+          position: 'top-right',
+          get message() {
+            return t('ui.loginLockedUnlocked')
+          },
+        })
         await fetchData()
       }
     })()
@@ -483,7 +522,13 @@ const openRoleDialog = async (row: User) => {
     }
   } catch (error) {
     console.error('加载用户角色失败', error)
-    $q.notify({ type: 'negative', position: 'top-right', message: '加载用户角色失败' })
+    $q.notify({
+      type: 'negative',
+      position: 'top-right',
+      get message() {
+        return t('ui.failedToLoadUserRoles')
+      },
+    })
   } finally {
     roleDialogLoading.value = false
   }
@@ -497,7 +542,13 @@ const saveUserRoles = async () => {
       role_ids: selectedRoleIds.value,
     })
     if (result.success) {
-      $q.notify({ type: 'positive', position: 'top-right', message: '角色已保存' })
+      $q.notify({
+        type: 'positive',
+        position: 'top-right',
+        get message() {
+          return t('ui.roleSaved')
+        },
+      })
       showRoleDialog.value = false
       await fetchData()
     }

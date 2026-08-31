@@ -13,23 +13,28 @@
           rounded
         />
         <div class="data-permission-hero__content">
-          <div class="data-permission-hero__title">数据权限</div>
+          <div class="data-permission-hero__title">{{ t('ui.dataPermissions') }}</div>
           <div class="data-permission-hero__subtitle">
-            维护资源、归属、策略与授权，不执行运行时数据过滤
+            {{
+              t('ui.maintainResourcesAttributionStrategyAndDelegationOfAuthorityNotImplementing')
+            }}
           </div>
         </div>
         <q-btn
           outline
           color="primary"
           icon="refresh"
-          label="刷新"
+          :label="t('ui.refresh')"
           :loading="activeLoading || preflightLoading"
           @click="refreshActiveTab"
         />
       </section>
 
       <div class="data-permission-layout">
-        <aside class="data-permission-sidebar" aria-label="数据权限配置模块">
+        <aside
+          class="data-permission-sidebar"
+          :aria-label="t('ui.dataPermissionConfigurationModule')"
+        >
           <button
             v-for="section in permissionSections"
             :key="section.name"
@@ -91,7 +96,7 @@
                       outlined
                       :dark="isDarkMode"
                       debounce="300"
-                      placeholder="搜索关键词"
+                      :placeholder="t('ui.searchKeywords')"
                       @keyup.enter="searchTab(tab)"
                     >
                       <template #append>
@@ -100,7 +105,7 @@
                     </q-input>
                     <q-btn
                       color="primary"
-                      label="搜索"
+                      :label="t('ui.search')"
                       :disable="loadingByTab[tab]"
                       @click="searchTab(tab)"
                     />
@@ -111,8 +116,8 @@
                       class="q-ml-xs"
                       :aria-label="
                         filterCountForTab(tab) > 0
-                          ? `高级查询，已启用 ${filterCountForTab(tab)} 个条件`
-                          : '高级查询'
+                          ? t('ui.advancedQueryEnabled', { count: filterCountForTab(tab) })
+                          : t('ui.advancedQuery')
                       "
                       @click="openAdvancedQuery(tab)"
                     >
@@ -122,8 +127,8 @@
                       <q-tooltip>
                         {{
                           filterCountForTab(tab) > 0
-                            ? `高级查询，已启用 ${filterCountForTab(tab)} 个条件`
-                            : '高级查询'
+                            ? t('ui.advancedQueryEnabled', { count: filterCountForTab(tab) })
+                            : t('ui.advancedQuery')
                         }}
                       </q-tooltip>
                     </q-btn>
@@ -145,7 +150,7 @@
               <template #body-cell-permission_enabled="props">
                 <q-td :props="props">
                   <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                    {{ props.value ? '已启用' : '未启用' }}
+                    {{ props.value ? t('ui.activatedStatus') : t('ui.notEnabled') }}
                   </q-badge>
                 </q-td>
               </template>
@@ -153,7 +158,7 @@
               <template #body-cell-state="props">
                 <q-td :props="props">
                   <q-badge :color="props.value ? 'positive' : 'grey-6'" outline>
-                    {{ props.value ? '启用' : '停用' }}
+                    {{ props.value ? t('ui.enabled') : t('ui.disabled') }}
                   </q-badge>
                 </q-td>
               </template>
@@ -201,7 +206,7 @@
                 :dark="isDarkMode"
                 emit-value
                 map-options
-                label="检查对象"
+                :label="t('ui.checkObject')"
                 :options="preflightTypeOptions"
                 @update:model-value="resetPreflightTarget"
               />
@@ -215,7 +220,7 @@
                 map-options
                 use-input
                 input-debounce="200"
-                label="选择配置"
+                :label="t('ui.selectConfiguration')"
                 :options="preflightTargetOptions"
                 @filter="filterPreflightOptions"
               />
@@ -243,7 +248,11 @@
               <template #avatar>
                 <q-icon :name="preflightResult.valid ? 'task_alt' : 'error_outline'" />
               </template>
-              {{ preflightResult.valid ? '配置检查通过' : '配置检查未通过' }}
+              {{
+                preflightResult.valid
+                  ? t('ui.configureCheckPassed')
+                  : t('ui.configurationCheckFailed')
+              }}
             </q-banner>
 
             <q-table
@@ -257,7 +266,7 @@
               :dark="isDarkMode"
               hide-pagination
               :pagination="{ rowsPerPage: 0 }"
-              no-data-label="请选择对象并执行配置检查"
+              :no-data-label="t('ui.selectObjectsAndPerformConfigurationChecks')"
             />
           </section>
         </main>
@@ -284,6 +293,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_data_permission' })
 
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -314,6 +325,8 @@ import { usePageButtons } from 'src/composables/page-buttons'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type ListTabName = 'resources' | 'ownerships' | 'policies' | 'grants'
 type ActiveTabName = ListTabName | 'preflight'
@@ -348,27 +361,52 @@ const permissionSections: Array<{
 }> = [
   {
     name: 'resources',
-    label: '数据资源',
-    caption: '维护需要启用数据权限的业务资源',
+    get label() {
+      return t('ui.dataResource')
+    },
+    get caption() {
+      return t('ui.maintainingOperationalResourcesThatRequireDataAccess')
+    },
     icon: 'dataset',
   },
   {
     name: 'ownerships',
-    label: '归属定义',
-    caption: '定义业务数据依据哪个维度判断归属',
+    get label() {
+      return t('ui.ownershipDefinition')
+    },
+    get caption() {
+      return t('ui.defineTheDimensionsOfTheOperationalDataToDetermineAttribution')
+    },
     icon: 'account_tree',
   },
-  { name: 'policies', label: '权限策略', caption: '组合归属、范围来源和关系规则', icon: 'policy' },
+  {
+    name: 'policies',
+    get label() {
+      return t('ui.permissionPolicy')
+    },
+    get caption() {
+      return t('ui.clusterAttributionScopeSourcesAndRelationshipRules')
+    },
+    icon: 'policy',
+  },
   {
     name: 'grants',
-    label: '权限授权',
-    caption: '将权限策略授权给角色或用户',
+    get label() {
+      return t('ui.permissionGrant')
+    },
+    get caption() {
+      return t('ui.authorizePermissionPolicyToRoleOrUser')
+    },
     icon: 'verified_user',
   },
   {
     name: 'preflight',
-    label: '配置检查',
-    caption: '启用前检查资源、策略和授权配置',
+    get label() {
+      return t('ui.configureCheck')
+    },
+    get caption() {
+      return t('ui.checkResourceStrategyAndAuthorizationConfigurationBeforeUsing')
+    },
     icon: 'fact_check',
   },
 ]
@@ -435,116 +473,281 @@ const advancedQueryTab = ref<ListTabName>('resources')
 const tempAdvancedQuery = ref<Query>(cloneDeep(queries.value.resources))
 
 const resourceTypeLabels: Record<string, string> = {
-  low_code_table: '低代码数据表',
-  business_service: '业务服务',
-  report: '报表',
+  get low_code_table() {
+    return t('ui.lowCodeDataTable')
+  },
+  get business_service() {
+    return t('ui.businessService')
+  },
+  get report() {
+    return t('ui.report')
+  },
 }
 const bindingTypeLabels: Record<string, string> = {
-  metadata_field: '元数据字段',
-  registered_field: '注册字段',
+  get metadata_field() {
+    return t('ui.metadataField')
+  },
+  get registered_field() {
+    return t('ui.registeredField')
+  },
 }
 const operationLabels: Record<string, string> = {
-  query: '查询',
-  detail: '详情',
-  create: '新增',
-  update: '修改',
-  delete: '删除',
-  export: '导出',
-  run: '运行',
+  get query() {
+    return t('ui.query')
+  },
+  get detail() {
+    return t('ui.details')
+  },
+  get create() {
+    return t('ui.create')
+  },
+  get update() {
+    return t('ui.modify')
+  },
+  get delete() {
+    return t('ui.delete')
+  },
+  get export() {
+    return t('ui.export')
+  },
+  get run() {
+    return t('ui.run')
+  },
 }
 
 const resourceColumns: QTableProps['columns'] = [
-  { name: 'resource_code', label: '资源编码', field: 'resource_code', align: 'left' },
-  { name: 'name', label: '资源名称', field: 'name', align: 'left' },
+  {
+    name: 'resource_code',
+    get label() {
+      return t('ui.resourceCode')
+    },
+    field: 'resource_code',
+    align: 'left',
+  },
+  {
+    name: 'name',
+    get label() {
+      return t('ui.resourceName')
+    },
+    field: 'name',
+    align: 'left',
+  },
   {
     name: 'resource_type',
-    label: '资源类型',
+    get label() {
+      return t('ui.resourceType')
+    },
     field: (row) => resourceTypeLabels[row.resource_type] || row.resource_type,
     align: 'left',
   },
   {
     name: 'permission_enabled',
-    label: '数据权限',
+    get label() {
+      return t('ui.dataPermissions')
+    },
     field: 'permission_enabled',
     align: 'center',
   },
-  { name: 'state', label: '状态', field: 'state', align: 'center' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'state',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'state',
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 
 const ownershipColumns: QTableProps['columns'] = [
-  { name: 'ownership_code', label: '归属编码', field: 'ownership_code', align: 'left' },
+  {
+    name: 'ownership_code',
+    get label() {
+      return t('ui.ownershipCode')
+    },
+    field: 'ownership_code',
+    align: 'left',
+  },
   {
     name: 'resource',
-    label: '数据资源',
+    get label() {
+      return t('ui.dataResource')
+    },
     field: (row) => resourceLabel(row.resource_id),
     align: 'left',
   },
   {
     name: 'dimension',
-    label: '数据维度',
+    get label() {
+      return t('ui.dataDimension')
+    },
     field: (row) => dimensionLabel(row.dimension_id),
     align: 'left',
   },
   {
     name: 'binding_type',
-    label: '绑定类型',
+    get label() {
+      return t('ui.bindingType')
+    },
     field: (row) => bindingTypeLabels[row.binding_type] || row.binding_type,
     align: 'left',
   },
-  { name: 'state', label: '状态', field: 'state', align: 'center' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'state',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'state',
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 
 const policyColumns: QTableProps['columns'] = [
-  { name: 'policy_code', label: '策略编码', field: 'policy_code', align: 'left' },
-  { name: 'name', label: '策略名称', field: 'name', align: 'left' },
+  {
+    name: 'policy_code',
+    get label() {
+      return t('ui.policyCode')
+    },
+    field: 'policy_code',
+    align: 'left',
+  },
+  {
+    name: 'name',
+    get label() {
+      return t('ui.policyNameLabel')
+    },
+    field: 'name',
+    align: 'left',
+  },
   {
     name: 'rule_count',
-    label: '规则数量',
+    get label() {
+      return t('ui.numberOfRules')
+    },
     field: (row) => policyRules.value.filter((rule) => rule.policy_id === row.id).length,
     align: 'center',
   },
-  { name: 'state', label: '状态', field: 'state', align: 'center' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'state',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'state',
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 
 const grantColumns: QTableProps['columns'] = [
   {
     name: 'subject',
-    label: '授权主体',
+    get label() {
+      return t('ui.authorisationSubject')
+    },
     field: (row) =>
       row.subject?.name ||
-      (row.subject_type === 'role' ? '角色已停用或不可用' : '用户已停用或不可用'),
+      (row.subject_type === 'role'
+        ? t('ui.roleDisabledOrNotAvailable')
+        : t('ui.userDisabledOrNotAvailable')),
     align: 'left',
   },
   {
     name: 'resource',
-    label: '数据资源',
+    get label() {
+      return t('ui.dataResource')
+    },
     field: (row) => resourceLabel(row.resource_id),
     align: 'left',
   },
   {
     name: 'operation',
-    label: '资源操作',
+    get label() {
+      return t('ui.resourceAction')
+    },
     field: (row) => operationLabels[row.operation] || row.operation,
     align: 'left',
   },
   {
     name: 'policy',
-    label: '权限策略',
+    get label() {
+      return t('ui.permissionPolicy')
+    },
     field: (row) => policyLabel(row.policy_id),
     align: 'left',
   },
-  { name: 'state', label: '状态', field: 'state', align: 'center' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'state',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'state',
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 
 const preflightColumns: QTableProps['columns'] = [
-  { name: 'code', label: '错误编码', field: 'code', align: 'left' },
-  { name: 'message', label: '说明', field: 'message', align: 'left' },
-  { name: 'object_type', label: '对象类型', field: 'object_type', align: 'left' },
-  { name: 'object_id', label: '对象ID', field: 'object_id', align: 'left' },
+  {
+    name: 'code',
+    get label() {
+      return t('ui.errorEncoding')
+    },
+    field: 'code',
+    align: 'left',
+  },
+  {
+    name: 'message',
+    get label() {
+      return t('ui.descriptionLabel')
+    },
+    field: 'message',
+    align: 'left',
+  },
+  {
+    name: 'object_type',
+    get label() {
+      return t('ui.objectType')
+    },
+    field: 'object_type',
+    align: 'left',
+  },
+  {
+    name: 'object_id',
+    get label() {
+      return t('ui.objectId')
+    },
+    field: 'object_id',
+    align: 'left',
+  },
 ]
 
 const rowsByTab = computed<Record<ListTabName, ConfigRow[]>>(() => ({
@@ -589,7 +792,9 @@ const lineButtonPresentation = (button: MenuButton, row: ConfigRow): LineButtonP
   if (button.event_action === 'toggle_permission') {
     const enabled = Boolean((row as DataResource).permission_enabled)
     return {
-      label: enabled ? '停用数据权限' : '启用数据权限',
+      get label() {
+        return enabled ? t('ui.disableDataPermission') : t('ui.enableDataPermission')
+      },
       icon: enabled ? 'pause_circle' : 'play_circle',
       color: enabled ? 'warning' : 'positive',
     }
@@ -597,7 +802,9 @@ const lineButtonPresentation = (button: MenuButton, row: ConfigRow): LineButtonP
   if (button.event_action === 'toggle_policy') {
     const enabled = row.state !== false
     return {
-      label: enabled ? '停用权限策略' : '启用权限策略',
+      get label() {
+        return enabled ? t('ui.disablePermissionPolicy') : t('ui.enablePermissionPolicy')
+      },
       icon: enabled ? 'pause_circle' : 'play_circle',
       color: enabled ? 'warning' : 'positive',
     }
@@ -605,7 +812,9 @@ const lineButtonPresentation = (button: MenuButton, row: ConfigRow): LineButtonP
   if (button.event_action === 'toggle_grant') {
     const enabled = row.state !== false
     return {
-      label: enabled ? '停用权限授权' : '启用权限授权',
+      get label() {
+        return enabled ? t('ui.disablePermissionGrant') : t('ui.enablePermissionGrant')
+      },
       icon: enabled ? 'pause_circle' : 'play_circle',
       color: enabled ? 'warning' : 'positive',
     }
@@ -613,7 +822,9 @@ const lineButtonPresentation = (button: MenuButton, row: ConfigRow): LineButtonP
   if (button.event_action === 'update_ownership') {
     const enabled = row.state !== false
     return {
-      label: enabled ? '停用归属定义' : '归属定义已停用',
+      get label() {
+        return enabled ? t('ui.disableOwnershipDefinition') : t('ui.ownershipDefinitionDisabled')
+      },
       icon: enabled ? 'pause_circle' : 'block',
       color: enabled ? 'warning' : 'grey-6',
       disable: !enabled,
@@ -657,32 +868,57 @@ const field = (
 })
 const advancedFields: Record<ListTabName, Partial<TableField>[]> = {
   resources: [
-    field('resource_code', '资源编码'),
-    field('name', '资源名称'),
-    field('resource_type', '资源类型'),
-    field('permission_enabled', '数据权限', SysTableFieldType.BOOLEAN),
-    field('state', '状态', SysTableFieldType.BOOLEAN),
+    field('resource_code', t('ui.resourceCode')),
+    field('name', t('ui.resourceName')),
+    field('resource_type', t('ui.resourceType')),
+    field('permission_enabled', t('ui.dataPermissions'), SysTableFieldType.BOOLEAN),
+    field('state', t('ui.status'), SysTableFieldType.BOOLEAN),
   ],
   ownerships: [
-    field('ownership_code', '归属编码'),
-    field('resource_id', '资源ID', SysTableFieldType.BIGINT, SysTableFieldInputType.INPUT_NUMBER),
-    field('dimension_id', '维度ID', SysTableFieldType.BIGINT, SysTableFieldInputType.INPUT_NUMBER),
-    field('binding_type', '绑定类型'),
-    field('state', '状态', SysTableFieldType.BOOLEAN),
+    field('ownership_code', t('ui.ownershipCode')),
+    field(
+      'resource_id',
+      t('ui.resourceId'),
+      SysTableFieldType.BIGINT,
+      SysTableFieldInputType.INPUT_NUMBER,
+    ),
+    field(
+      'dimension_id',
+      t('ui.dimensionId'),
+      SysTableFieldType.BIGINT,
+      SysTableFieldInputType.INPUT_NUMBER,
+    ),
+    field('binding_type', t('ui.bindingType')),
+    field('state', t('ui.status'), SysTableFieldType.BOOLEAN),
   ],
   policies: [
-    field('policy_code', '策略编码'),
-    field('name', '策略名称'),
-    field('policy_type', '策略类型'),
-    field('state', '状态', SysTableFieldType.BOOLEAN),
+    field('policy_code', t('ui.policyCode')),
+    field('name', t('ui.policyNameLabel')),
+    field('policy_type', t('ui.policyType')),
+    field('state', t('ui.status'), SysTableFieldType.BOOLEAN),
   ],
   grants: [
-    field('subject_type', '主体类型'),
-    field('subject_id', '主体ID', SysTableFieldType.BIGINT, SysTableFieldInputType.INPUT_NUMBER),
-    field('resource_id', '资源ID', SysTableFieldType.BIGINT, SysTableFieldInputType.INPUT_NUMBER),
-    field('operation', '资源操作'),
-    field('policy_id', '策略ID', SysTableFieldType.BIGINT, SysTableFieldInputType.INPUT_NUMBER),
-    field('state', '状态', SysTableFieldType.BOOLEAN),
+    field('subject_type', t('ui.subjectType')),
+    field(
+      'subject_id',
+      t('ui.subjectId'),
+      SysTableFieldType.BIGINT,
+      SysTableFieldInputType.INPUT_NUMBER,
+    ),
+    field(
+      'resource_id',
+      t('ui.resourceId'),
+      SysTableFieldType.BIGINT,
+      SysTableFieldInputType.INPUT_NUMBER,
+    ),
+    field('operation', t('ui.resourceAction')),
+    field(
+      'policy_id',
+      t('ui.policyId'),
+      SysTableFieldType.BIGINT,
+      SysTableFieldInputType.INPUT_NUMBER,
+    ),
+    field('state', t('ui.status'), SysTableFieldType.BOOLEAN),
   ],
 }
 const advancedQueryFields = computed(() => advancedFields[advancedQueryTab.value])
@@ -692,23 +928,42 @@ const preflightId = ref<number | null>(null)
 const preflightLoading = ref(false)
 const preflightResult = ref<ValidationResult | null>(null)
 const preflightTypeOptions = [
-  { label: '数据资源', value: 'resource' },
-  { label: '权限策略', value: 'policy' },
-  { label: '权限授权', value: 'grant' },
+  {
+    get label() {
+      return t('ui.dataResource')
+    },
+    value: 'resource',
+  },
+  {
+    get label() {
+      return t('ui.permissionPolicy')
+    },
+    value: 'policy',
+  },
+  {
+    get label() {
+      return t('ui.permissionGrant')
+    },
+    value: 'grant',
+  },
 ]
 const preflightTargetOptions = ref<Array<{ label: string; value: number }>>([])
 
 const resourceLabel = (id: number) => {
   const resource = resourceLookup.value.find((item) => item.id === id)
-  return resource ? `${resource.resource_code} · ${resource.name}` : '数据资源不可用'
+  return resource
+    ? `${resource.resource_code} · ${resource.name}`
+    : t('ui.dataResourcesNotAvailable')
 }
 const policyLabel = (id: number) => {
   const policy = policyLookup.value.find((item) => item.id === id)
-  return policy ? `${policy.policy_code} · ${policy.name}` : '权限策略不可用'
+  return policy ? `${policy.policy_code} · ${policy.name}` : t('ui.permissionPolicyNotAvailable')
 }
 const dimensionLabel = (id: number) => {
   const dimension = dimensions.value.find((item) => item.id === id)
-  return dimension ? `${dimension.dimension_code} · ${dimension.name}` : '数据维度不可用'
+  return dimension
+    ? `${dimension.dimension_code} · ${dimension.name}`
+    : t('ui.dataDimensionUnavailable')
 }
 
 const fetchTab = async (tab: ListTabName) => {
@@ -820,10 +1075,16 @@ const handleSaved = () => {
 const toggleResource = (row: DataResource) => {
   const enabled = !row.permission_enabled
   confirmAction({
-    title: enabled ? '启用数据权限' : '停用数据权限',
-    message: enabled
-      ? `启用前将执行完整配置检查，确认启用“${row.name}”的数据权限？`
-      : `确认停用“${row.name}”的数据权限？`,
+    get title() {
+      return enabled ? t('ui.enableDataPermission') : t('ui.disableDataPermission')
+    },
+    get message() {
+      return enabled
+        ? t('ui.beforeEnabledCompleteConfigurationChecksWillBePerformedToConfirmDataPermissions', {
+            value1: row.name,
+          })
+        : t('ui.confirmDataPermissionToDisable', { value1: row.name })
+    },
   }).onOk(async () => {
     const result = await api.setResourcePermission(row.id, enabled)
     if (!result.data.valid) {
@@ -833,26 +1094,47 @@ const toggleResource = (row: DataResource) => {
       })
       return
     }
-    $q.notify({ type: 'positive', message: enabled ? '数据权限已启用' : '数据权限已停用' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return enabled ? t('ui.dataPermissionsEnabled') : t('ui.dataPermissionsDisabled')
+      },
+    })
     await fetchTab('resources')
   })
 }
 const toggleOwnership = (row: DataOwnership) => {
   if (!row.state) return
   confirmAction({
-    title: '停用归属定义',
-    message: `确认停用“${row.ownership_code}”？`,
+    get title() {
+      return t('ui.disableOwnershipDefinition')
+    },
+    get message() {
+      return t('ui.confirmThatIsDisabled', { value1: row.ownership_code })
+    },
   }).onOk(async () => {
     await api.disableOwnership(row.id)
-    $q.notify({ type: 'positive', message: '归属定义已停用' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.ownershipDefinitionDisabled')
+      },
+    })
     await fetchTab('ownerships')
   })
 }
 const togglePolicy = (row: DataPolicy) => {
   const enabled = !row.state
   confirmAction({
-    title: enabled ? '启用权限策略' : '停用权限策略',
-    message: `确认${enabled ? '启用' : '停用'}“${row.name}”？`,
+    get title() {
+      return enabled ? t('ui.enablePermissionPolicy') : t('ui.disablePermissionPolicy')
+    },
+    get message() {
+      return t('ui.confirmNamedAction', {
+        value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+        value2: row.name,
+      })
+    },
   }).onOk(async () => {
     const result = await api.setPolicyState(row.id, enabled)
     if (!result.data.valid) {
@@ -862,15 +1144,28 @@ const togglePolicy = (row: DataPolicy) => {
       })
       return
     }
-    $q.notify({ type: 'positive', message: `权限策略已${enabled ? '启用' : '停用'}` })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.permissionPolicyActionResult', {
+          value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+        })
+      },
+    })
     await fetchTab('policies')
   })
 }
 const toggleGrant = (row: DataGrant) => {
   const enabled = !row.state
   confirmAction({
-    title: enabled ? '启用权限授权' : '停用权限授权',
-    message: `确认${enabled ? '启用' : '停用'}当前授权？`,
+    get title() {
+      return enabled ? t('ui.enablePermissionGrant') : t('ui.disablePermissionGrant')
+    },
+    get message() {
+      return t('ui.confirmSCurrentAuthorization', {
+        value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+      })
+    },
   }).onOk(async () => {
     const result = await api.setGrantState(row.id, enabled)
     if (!result.data.valid) {
@@ -880,7 +1175,12 @@ const toggleGrant = (row: DataGrant) => {
       })
       return
     }
-    $q.notify({ type: 'positive', message: `权限授权已${enabled ? '启用' : '停用'}` })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.permissionGrantActionResult', { value1: enabled ? t('ui.enabled') : t('ui.disabled') })
+      },
+    })
     await fetchTab('grants')
   })
 }
@@ -925,7 +1225,14 @@ const targetOptions = (keyword = '') => {
         .includes(normalized),
     )
     .map((item) => ({
-      label: `${item.subject?.name || (item.subject_type === 'role' ? '角色不可用' : '用户不可用')} · ${resourceLabel(item.resource_id)}`,
+      get label() {
+        return t('ui.subjectResourceSummary', {
+          value1:
+            item.subject?.name ||
+            (item.subject_type === 'role' ? t('ui.roleUnavailable') : t('ui.userUnavailable')),
+          value2: resourceLabel(item.resource_id),
+        })
+      },
       value: item.id,
     }))
 }

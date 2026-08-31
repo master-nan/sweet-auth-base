@@ -27,7 +27,7 @@
       <slot name="no-option" :failed="loadFailed">
         <q-item>
           <q-item-section class="text-grey-7">
-            {{ loadFailed ? '选项加载失败' : '暂无可选数据' }}
+            {{ loadFailed ? t('ui.failedToLoadOption') : t('ui.dataNotSelected') }}
           </q-item-section>
         </q-item>
       </slot>
@@ -36,6 +36,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, useSlots, watch } from 'vue'
 import {
   queryOrganizationOptions,
@@ -43,6 +45,8 @@ import {
   type OrganizationSelectorType,
 } from 'src/api/services/org'
 import SweetSelect from 'src/components/Select/SweetSelect.vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type OrganizationModelValue = number | number[] | null | undefined
 type FilterUpdate = (callback: () => void) => void

@@ -52,7 +52,9 @@
               <span>
                 {{
                   recordsLoadError ||
-                  (canQueryRecords ? '暂无对象处理记录' : '无业务同步记录查看权限')
+                  (canQueryRecords
+                    ? t('ui.noObjectProcessingRecords')
+                    : t('ui.noBusinessSyncRecordView'))
                 }}
               </span>
             </div>
@@ -63,11 +65,11 @@
 
     <organization-record-detail-dialog
       v-model="showErrorDialog"
-      title="同步批次错误"
+      :title="t('ui.syncBatchErrors')"
       :subtitle="batchDetail?.batch_no || ''"
       :items="errorItems"
       icon="error_outline"
-      status-label="失败"
+      :status-label="t('ui.failed')"
       status-color="negative"
       :loading="errorLoading"
       :error="errorLoadError"
@@ -76,6 +78,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
@@ -103,6 +107,8 @@ import {
 } from 'src/pages/organization/organization-list-page'
 import { useDictStore } from 'src/stores/dict'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const props = defineProps<{
   recordId: number
 }>()
@@ -128,11 +134,19 @@ const errorSummary = ref('')
 const canQueryRecords = computed(() => hasGrantedCapability('organization_sync_error_query'))
 
 const title = computed(() =>
-  batchDetail.value ? `同步批次详情：${batchDetail.value.batch_no}` : '同步批次详情',
+  batchDetail.value
+    ? t('ui.syncBatchDetailsTitle', { value1: batchDetail.value.batch_no })
+    : t('ui.syncBatchDetails'),
 )
 
 const errorItems = computed<OrganizationDetailItem[]>(() => [
-  { label: '错误摘要', value: errorSummary.value, fullWidth: true },
+  {
+    get label() {
+      return t('ui.errorSummary')
+    },
+    value: errorSummary.value,
+    fullWidth: true,
+  },
 ])
 
 const detailSections = computed<OrganizationDetailSection[]>(() => {
@@ -141,31 +155,73 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
   return [
     {
       key: 'basic',
-      label: '基础信息',
-      caption: '批次范围与执行结果',
+      get label() {
+        return t('ui.basicInfo')
+      },
+      get caption() {
+        return t('ui.bScopeOfTheInstalmentAndResultsOfTheImplementation')
+      },
       items: [
-        { label: '批次号', value: detail.batch_no },
-        { label: '同步类型', value: dictLabel('org_sync_type', detail.sync_type) },
-        { label: '对象范围', value: organizationSyncObjectLabel(detail.object_scope) },
         {
-          label: '状态',
+          get label() {
+            return t('ui.batchNumber')
+          },
+          value: detail.batch_no,
+        },
+        {
+          get label() {
+            return t('ui.syncType')
+          },
+          value: dictLabel('org_sync_type', detail.sync_type),
+        },
+        {
+          get label() {
+            return t('ui.objectScope')
+          },
+          value: organizationSyncObjectLabel(detail.object_scope),
+        },
+        {
+          get label() {
+            return t('ui.status')
+          },
           value: dictLabel('org_sync_record_status', detail.status),
           chip: true,
           color: organizationStatusColor(detail.status),
         },
-        { label: '集成执行ID', value: detail.execution_id ?? null },
-        { label: '开始时间', value: formatOrganizationDateTime(detail.started_at) },
-        { label: '完成时间', value: formatOrganizationDateTime(detail.completed_at) },
         {
-          label: '成功 / 失败 / 跳过 / 总数',
+          get label() {
+            return t('ui.integrationExecutionId')
+          },
+          value: detail.execution_id ?? null,
+        },
+        {
+          get label() {
+            return t('ui.startTime')
+          },
+          value: formatOrganizationDateTime(detail.started_at),
+        },
+        {
+          get label() {
+            return t('ui.completedAt')
+          },
+          value: formatOrganizationDateTime(detail.completed_at),
+        },
+        {
+          get label() {
+            return t('ui.successFailedSkipTotal')
+          },
           value: `${detail.success_count} / ${detail.failed_count} / ${detail.skipped_count} / ${detail.total_count}`,
         },
       ],
     },
     {
       key: 'records',
-      label: '对象处理记录',
-      caption: '本批次对象处理明细',
+      get label() {
+        return t('ui.objectProcessingRecords')
+      },
+      get caption() {
+        return t('ui.thisBatchHandlesTheDetails')
+      },
       count: batchRecords.value.length,
       items: [],
     },
@@ -173,11 +229,46 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
 })
 
 const recordColumns: QTableProps['columns'] = [
-  { name: 'object_type', field: 'object_type', label: '对象类型', align: 'left' },
-  { name: 'source_summary', field: 'source_summary', label: '来源摘要', align: 'left' },
-  { name: 'action', field: 'action', label: '动作', align: 'center' },
-  { name: 'status', field: 'status', label: '状态', align: 'center' },
-  { name: 'error_code', field: 'error_code', label: '错误码', align: 'left' },
+  {
+    name: 'object_type',
+    field: 'object_type',
+    get label() {
+      return t('ui.objectType')
+    },
+    align: 'left',
+  },
+  {
+    name: 'source_summary',
+    field: 'source_summary',
+    get label() {
+      return t('ui.sourceSummary')
+    },
+    align: 'left',
+  },
+  {
+    name: 'action',
+    field: 'action',
+    get label() {
+      return t('ui.action')
+    },
+    align: 'center',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    align: 'center',
+  },
+  {
+    name: 'error_code',
+    field: 'error_code',
+    get label() {
+      return t('ui.errorCode')
+    },
+    align: 'left',
+  },
 ]
 
 const dictLabel = (code: string, value: unknown) =>
@@ -185,7 +276,7 @@ const dictLabel = (code: string, value: unknown) =>
 
 const loadDetail = async () => {
   if (!props.recordId) {
-    loadError.value = '同步批次详情缺少记录ID'
+    loadError.value = t('ui.synchronisingBatchDetailsMissingId')
     return
   }
 
@@ -207,11 +298,11 @@ const loadDetail = async () => {
         })
         batchRecords.value = records.items
       } catch {
-        recordsLoadError.value = '对象处理记录加载失败'
+        recordsLoadError.value = t('ui.objectProcessingRecordLoadedFailed')
       }
     }
   } catch {
-    loadError.value = '同步批次详情加载失败'
+    loadError.value = t('ui.synchronisingBatchDetailsLoadedFailed')
   } finally {
     loading.value = false
   }
@@ -227,7 +318,7 @@ const openError = async () => {
     const result = await getSyncBatchError(batchDetail.value.id)
     errorSummary.value = result.error_summary
   } catch {
-    errorLoadError.value = '同步批次错误加载失败'
+    errorLoadError.value = t('ui.failedToLoadSyncBatchErrors')
   } finally {
     errorLoading.value = false
   }

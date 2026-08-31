@@ -3,7 +3,7 @@
     <q-card flat bordered class="q-pa-sm">
       <q-card-section class="q-py-xs">
         <div class="row items-center">
-          <div class="text-subtitle1">{{ label }}</div>
+          <div class="text-subtitle1">{{ displayLabel }}</div>
           <q-space />
           <q-btn
             flat
@@ -19,7 +19,7 @@
       <q-separator />
       <q-card-section>
         <div v-if="entries.length === 0" class="text-center q-py-md text-grey">
-          暂无数据，点击上方加号添加
+          {{ t('ui.noDataAvailableClickOnTheTopPlusSignTo') }}
         </div>
         <div
           v-for="(entry, index) in entries"
@@ -31,7 +31,7 @@
             outlined
             dense
             class="col-5"
-            label="键"
+            :label="t('ui.keys')"
             :disable="disabled"
             @blur="handleBlur"
           />
@@ -40,7 +40,7 @@
             outlined
             dense
             class="col-5 q-mx-sm"
-            label="值"
+            :label="t('ui.value')"
             :disable="disabled"
             @blur="handleBlur"
           />
@@ -63,7 +63,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import { computed, ref, watch, onMounted } from 'vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 // 键值对条目接口
 interface KeyValueEntry {
@@ -80,10 +84,12 @@ interface KeyValueEditorProps {
 
 const props = withDefaults(defineProps<KeyValueEditorProps>(), {
   modelValue: () => ({}),
-  label: '键值对',
+  label: '',
   rules: () => [],
   disabled: false,
 })
+
+const displayLabel = computed(() => props.label || t('ui.keyPair'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: Record<string, any>]
@@ -264,7 +270,7 @@ const validate = () => {
   for (const rule of props.rules) {
     const result = rule(currentValue())
     if (result !== true) {
-      errorMessage.value = typeof result === 'string' ? result : '字段值不合法'
+      errorMessage.value = typeof result === 'string' ? result : t('ui.invalidFieldValue')
       return false
     }
   }

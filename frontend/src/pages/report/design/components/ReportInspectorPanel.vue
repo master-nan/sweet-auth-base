@@ -7,27 +7,27 @@
       indicator-color="primary"
       @update:model-value="emitTab"
     >
-      <q-tab name="cell" icon="grid_on" label="单元格" />
-      <q-tab name="data" icon="hub" label="数据" />
-      <q-tab name="report" icon="settings" label="报表" />
+      <q-tab name="cell" icon="grid_on" :label="t('ui.cells')" />
+      <q-tab name="data" icon="hub" :label="t('ui.data')" />
+      <q-tab name="report" icon="settings" :label="t('ui.report')" />
     </q-tabs>
 
     <q-separator />
 
     <q-tab-panels :model-value="tab" animated class="inspector-tabs">
       <q-tab-panel name="cell">
-        <div class="inspector-title">单元格 {{ activeCellLabel }}</div>
+        <div class="inspector-title">{{ t('ui.cells') }} {{ activeCellLabel }}</div>
         <div v-if="hasActiveCell" class="inspector-form">
           <q-input
             :model-value="cellValue"
             dense
             outlined
-            label="标题 / 别名"
+            :label="t('ui.titleAlien')"
             @update:model-value="$emit('update:cellValue', String($event || ''))"
           />
           <div v-if="bindingPreview" class="binding-preview">
             <q-icon name="data_object" />
-            <span>绑定表达式：{{ bindingPreview }}</span>
+            <span>{{ t('ui.tieExpression') }}{{ bindingPreview }}</span>
           </div>
           <q-select
             :model-value="bindingType"
@@ -35,7 +35,7 @@
             outlined
             emit-value
             map-options
-            label="绑定类型"
+            :label="t('ui.bindingType')"
             :options="bindingTypeOptions"
             @update:model-value="emitBindingType"
           />
@@ -45,7 +45,7 @@
             outlined
             emit-value
             map-options
-            label="数据集"
+            :label="t('ui.dataset')"
             :options="datasetOptions"
             @update:model-value="$emit('update:bindingDatasetId', String($event || ''))"
           />
@@ -55,7 +55,7 @@
             outlined
             emit-value
             map-options
-            label="数据字段"
+            :label="t('ui.dataField')"
             :options="activeDatasetFieldOptions"
             @update:model-value="$emit('update:bindingField', String($event || ''))"
           />
@@ -63,13 +63,13 @@
             :model-value="formula"
             dense
             outlined
-            label="公式 / 表达式"
+            :label="t('ui.formulaExpression')"
             @update:model-value="$emit('update:formula', String($event || ''))"
           />
           <div class="style-grid">
             <q-toggle
               :model-value="cellBold"
-              label="加粗"
+              :label="t('ui.putItOn')"
               @update:model-value="$emit('update:cellBold', !!$event)"
             />
             <q-select
@@ -78,39 +78,49 @@
               outlined
               emit-value
               map-options
-              label="对齐"
+              :label="t('ui.alignment')"
               :options="alignOptions"
               @update:model-value="emitCellAlign"
             />
           </div>
         </div>
-        <div v-else class="empty-note">请选择一个单元格</div>
+        <div v-else class="empty-note">{{ t('ui.pleaseSelectACell') }}</div>
       </q-tab-panel>
 
       <q-tab-panel name="data">
-        <div class="inspector-title">数据集设置</div>
+        <div class="inspector-title">{{ t('ui.datasetSettings') }}</div>
         <div class="inspector-form" v-if="selectedDataset">
           <q-input
             :model-value="selectedDataset.name"
             dense
             outlined
-            label="数据集名称"
-            @update:model-value="$emit('updateDatasetName', selectedDataset.id, String($event || ''))"
+            :label="t('ui.datasetName')"
+            @update:model-value="
+              $emit('updateDatasetName', selectedDataset.id, String($event || ''))
+            "
           />
           <q-input
-            :model-value="selectedDataset.type === 'sql' ? selectedDataset.sql : selectedDataset.source_code"
+            :model-value="
+              selectedDataset.type === 'sql' ? selectedDataset.sql : selectedDataset.source_code
+            "
             dense
             outlined
             readonly
             autogrow
-            :label="selectedDataset.type === 'sql' ? 'SQL' : '来源表'"
+            :label="selectedDataset.type === 'sql' ? 'SQL' : t('ui.sourceTable')"
           />
           <div class="dataset-role">
             <q-icon :name="selectedDataset.primary ? 'stars' : 'dataset_linked'" />
             <div>
-              <strong>{{ selectedDataset.primary ? '运行主数据集' : '辅助数据集' }}</strong>
+              <strong>{{
+                selectedDataset.primary ? t('ui.runMainDataSet') : t('ui.secondaryDataSet')
+              }}</strong>
               <span>
-                {{ selectedDataset.primary ? '作为默认预览、数据权限和参数推荐来源' : '可通过关联配置参与报表取数' }}
+                {{
+                  selectedDataset.primary
+                    ? t('ui.recommendedSourceAsDefaultPreviewDataPrivilegesAndParameters')
+                    : t('ui.numbersCanBeObtainedFromAssociatedConfigurationParticipationReports')
+                }}
               </span>
             </div>
           </div>
@@ -119,14 +129,14 @@
             outline
             color="primary"
             icon="stars"
-            label="改为运行主数据集"
+            :label="t('ui.changeToRunMainDataSet')"
             @click="$emit('setPrimaryDataset', selectedDataset.id)"
           />
         </div>
-        <div v-else class="empty-note">请选择左侧数据集</div>
+        <div v-else class="empty-note">{{ t('ui.selectALeftDataSet') }}</div>
 
         <q-separator class="q-my-md" />
-        <div class="inspector-title">数据集关联</div>
+        <div class="inspector-title">{{ t('ui.dataSetAssociation') }}</div>
         <q-banner
           v-if="datasets.length > 1 && !datasetJoins.length"
           dense
@@ -136,33 +146,42 @@
           <template #avatar>
             <q-icon name="warning" color="warning" />
           </template>
-          已添加多个数据集，绑定到画布前需要配置关联字段。
+          {{ t('ui.multipleDataSetsHaveBeenAddedAndTheLayoutOf') }}
         </q-banner>
         <div class="join-list">
           <div v-for="join in datasetJoins" :key="join.id" class="join-row">
             <span>{{ joinLabel(join) }}</span>
-            <q-btn flat dense round color="negative" icon="delete" @click="$emit('removeJoin', join.id)" />
+            <q-btn
+              flat
+              dense
+              round
+              color="negative"
+              icon="delete"
+              @click="$emit('removeJoin', join.id)"
+            />
           </div>
-          <div v-if="!datasetJoins.length" class="empty-note">暂无关联，多个数据集无法互相取值。</div>
+          <div v-if="!datasetJoins.length" class="empty-note">
+            {{ t('ui.thereIsNoCorrelationAndMultipleDataSetsCannotBe') }}
+          </div>
         </div>
         <q-btn
           outline
           color="primary"
           icon="add_link"
-          label="新增关联"
+          :label="t('ui.addRelation')"
           :disable="datasets.length < 2"
           @click="$emit('addJoin')"
         />
       </q-tab-panel>
 
       <q-tab-panel name="report">
-        <div class="inspector-title">报表能力</div>
+        <div class="inspector-title">{{ t('ui.reportingCapacity') }}</div>
         <div class="inspector-form">
           <q-input
             :model-value="category"
             dense
             outlined
-            label="分类"
+            :label="t('ui.category')"
             @update:model-value="$emit('update:category', String($event || ''))"
           />
           <q-input
@@ -170,7 +189,7 @@
             dense
             outlined
             autogrow
-            label="说明"
+            :label="t('ui.descriptionLabel')"
             @update:model-value="$emit('update:description', String($event || ''))"
           />
           <q-input
@@ -178,7 +197,7 @@
             dense
             outlined
             readonly
-            label="运行主表"
+            :label="t('ui.runMasterTable')"
           />
           <q-select
             :model-value="reportKind"
@@ -186,13 +205,11 @@
             outlined
             emit-value
             map-options
-            label="数据展开方式"
+            :label="t('ui.dataDevelopment')"
             :options="reportKindOptions"
             @update:model-value="emitReportKind"
           >
-            <q-tooltip>
-              明细行会按数据逐行展开，固定汇总行只渲染设计好的统计行。
-            </q-tooltip>
+            <q-tooltip> {{ t('ui.theLineIsThenCarriedOutByLineByLine') }} </q-tooltip>
           </q-select>
           <div class="runtime-grid">
             <q-select
@@ -201,7 +218,7 @@
               outlined
               emit-value
               map-options
-              label="运行分页"
+              :label="t('ui.runPageBreak')"
               :options="runtimeDisplayOptions"
               @update:model-value="emitRuntimeDisplay"
             />
@@ -210,7 +227,7 @@
               dense
               outlined
               type="number"
-              label="每页条数"
+              :label="t('ui.itemsPerPage')"
               min="1"
               max="500"
               :disable="runtimeDisplay !== 'paged'"
@@ -218,10 +235,16 @@
             />
           </div>
           <div class="capability-list">
-            <div><q-icon name="security" /> 预览和运行继承主表数据权限</div>
-            <div><q-icon name="table_view" /> 明细行逐行展开，固定汇总行只使用汇总行</div>
-            <div><q-icon name="data_object" /> SQL 数据集先保存设计，执行会在安全校验后开放</div>
-            <div><q-icon name="ios_share" /> Excel 导出结构已预留</div>
+            <div>
+              <q-icon name="security" />
+              {{ t('ui.previewAndRunSuccessionMasterTableDataPrivileges') }}
+            </div>
+            <div><q-icon name="table_view" /> {{ t('ui.lineByLineFixedSumbarsOnly') }}</div>
+            <div>
+              <q-icon name="data_object" />
+              {{ t('ui.saveTheSqlDatasetDesignFirstExecutionIsEnabledAfter') }}
+            </div>
+            <div><q-icon name="ios_share" /> {{ t('ui.excelExportStructureReserved') }}</div>
           </div>
         </div>
       </q-tab-panel>
@@ -230,6 +253,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import type {
   ReportCellBindingType,
   ReportCellStyle,
@@ -238,6 +263,8 @@ import type {
   ReportKind,
   ReportRuntimeDisplayMode,
 } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type InspectorTab = 'cell' | 'data' | 'report'
 type Option<T = string> = { label: string; value: T }
@@ -328,7 +355,10 @@ function emitRuntimeDisplay(value: unknown) {
 
 function emitRuntimePageSize(value: unknown) {
   const numeric = Number(value)
-  emit('update:runtimePageSize', Number.isFinite(numeric) ? Math.min(Math.max(numeric, 1), 500) : 20)
+  emit(
+    'update:runtimePageSize',
+    Number.isFinite(numeric) ? Math.min(Math.max(numeric, 1), 500) : 20,
+  )
 }
 
 function datasetName(id: string) {

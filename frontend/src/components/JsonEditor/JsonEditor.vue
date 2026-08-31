@@ -4,7 +4,7 @@
       v-model="jsonText"
       type="textarea"
       outlined
-      :label="label"
+      :label="displayLabel"
       rows="8"
       class="full-width"
       :error="!!error"
@@ -12,12 +12,18 @@
       :disable="disabled"
       @blur="validateJson"
     />
-    <div v-if="!error && jsonText" class="q-mt-xs text-caption text-green">有效的JSON格式</div>
+    <div v-if="!error && jsonText" class="q-mt-xs text-caption text-green">
+      {{ t('ui.validJsonFormat') }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import { computed, ref, watch, onMounted } from 'vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 interface JsonEditorProps {
   modelValue?: string | object | null
@@ -28,10 +34,12 @@ interface JsonEditorProps {
 
 const props = withDefaults(defineProps<JsonEditorProps>(), {
   modelValue: null,
-  label: 'JSON数据',
+  label: '',
   rules: () => [],
   disabled: false,
 })
+
+const displayLabel = computed(() => props.label || t('ui.jsonData'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: any]
@@ -74,7 +82,7 @@ const initJsonText = () => {
     error.value = ''
   } catch (e) {
     console.error('Error initializing JSON editor:', e)
-    error.value = '无法解析JSON数据'
+    error.value = t('ui.invalidJsonData')
     jsonText.value =
       typeof props.modelValue === 'string'
         ? props.modelValue
@@ -103,14 +111,14 @@ const validateJson = () => {
     const parsed = JSON.parse(jsonText.value)
     // 只接受对象或数组，裸数字/字符串/布尔值不算有效的JSON配置
     if (typeof parsed !== 'object' || parsed === null) {
-      error.value = '请输入JSON对象 {} 或数组 []'
+      error.value = t('ui.enterJsonObjectOrArray')
       return
     }
     emit('update:modelValue', parsed)
     error.value = ''
   } catch (e) {
     console.error('Error parsing JSON:', e)
-    error.value = '无效的JSON格式'
+    error.value = t('ui.invalidJsonFormat')
   }
 
   setTimeout(() => {
@@ -124,7 +132,7 @@ const validate = () => {
   for (const rule of props.rules) {
     const result = rule(props.modelValue)
     if (result !== true) {
-      error.value = typeof result === 'string' ? result : '字段值不合法'
+      error.value = typeof result === 'string' ? result : t('ui.invalidFieldValue')
       return false
     }
   }

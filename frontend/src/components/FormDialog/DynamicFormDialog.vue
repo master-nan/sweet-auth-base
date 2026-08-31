@@ -1,9 +1,9 @@
 <template>
   <form-dialog-shell
     v-model="show"
-    :title="title"
+    :title="displayTitle"
     :subtitle="dialogSubtitle"
-    :submit-text="submitBtnText"
+    :submit-text="displaySubmitText"
     :loading="loading"
     :readonly="isReadonly"
     :show-preview="showFormPreview"
@@ -16,7 +16,7 @@
       <!-- 加载状态 -->
       <div v-if="loadingData" class="full-width row flex-center q-my-xl">
         <q-spinner color="primary" size="3em" />
-        <div class="q-ml-md text-primary text-subtitle1">加载中...</div>
+        <div class="q-ml-md text-primary text-subtitle1">{{ t('ui.loading') }}</div>
       </div>
 
       <!-- 表单内容 -->
@@ -35,7 +35,7 @@
 
         <!-- 没有字段时显示提示 -->
         <div v-if="displayFields.length === 0" class="text-center q-pa-md text-grey">
-          未找到可编辑字段，请检查表结构配置
+          {{ t('ui.noEditableFieldsFoundCheckTableStructureConfiguration') }}
         </div>
 
         <!-- 表单字段 -->
@@ -107,20 +107,20 @@
 
     <template #preview>
       <div class="form-preview">
-        <div class="form-preview__title">填写预览</div>
+        <div class="form-preview__title">{{ t('ui.fillPreview') }}</div>
         <div class="form-preview__metrics">
           <div>
             <strong>{{ filledFieldCount }}/{{ displayFields.length }}</strong>
-            <span>已填写</span>
+            <span>{{ t('ui.otherOrganiser') }}</span>
           </div>
           <div>
             <strong>{{ missingRequiredFields.length }}</strong>
-            <span>待完善</span>
+            <span>{{ t('ui.toBePerfected') }}</span>
           </div>
         </div>
 
         <div class="form-preview__panel">
-          <div class="form-preview__panel-title">关键字段</div>
+          <div class="form-preview__panel-title">{{ t('ui.keyFields') }}</div>
           <div v-for="item in previewItems" :key="item.code" class="form-preview__row">
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
@@ -128,8 +128,10 @@
         </div>
 
         <div class="form-preview__panel">
-          <div class="form-preview__panel-title">校验提示</div>
-          <div v-if="previewHints.length === 0" class="form-preview__empty">暂无明显问题</div>
+          <div class="form-preview__panel-title">{{ t('ui.verifyHints') }}</div>
+          <div v-if="previewHints.length === 0" class="form-preview__empty">
+            {{ t('ui.thereSNoObviousProblem') }}
+          </div>
           <div v-for="hint in previewHints" :key="hint" class="form-preview__hint">
             <q-icon name="info" size="16px" color="primary" />
             <span>{{ hint }}</span>
@@ -141,6 +143,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
 import { QForm } from 'quasar'
 import { type TableField } from 'src/api/services/sys-table'
@@ -176,6 +180,8 @@ import {
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { getFieldFormGridClass } from 'src/utils/field-layout'
 
+const { t } = useI18n({ useScope: 'global' })
+
 // 使用泛型T扩展默认实体接口
 interface BaseEntity {
   id?: number
@@ -201,7 +207,7 @@ const props = defineProps({
   // 表单相关配置
   title: {
     type: String,
-    default: '表单',
+    default: '',
   },
   fields: {
     type: Array as PropType<TableField[]>,
@@ -209,7 +215,7 @@ const props = defineProps({
   },
   submitBtnText: {
     type: String,
-    default: '保存',
+    default: '',
   },
   formButtons: {
     type: Array as PropType<MenuButton[]>,
@@ -232,6 +238,9 @@ const props = defineProps({
     default: false,
   },
 })
+
+const displayTitle = computed(() => props.title || t('ui.form'))
+const displaySubmitText = computed(() => props.submitBtnText || t('ui.save'))
 
 const emit = defineEmits(['update:modelValue', 'submit', 'button-click'])
 
@@ -283,8 +292,18 @@ const dictCodeOptions = ref<Array<{ label: string; value: string }>>([])
 const filteredDictCodeOptions = ref<Array<{ label: string; value: string }>>([])
 
 const booleanToggleOptions = [
-  { label: '否', value: false },
-  { label: '是', value: true },
+  {
+    get label() {
+      return t('ui.no')
+    },
+    value: false,
+  },
+  {
+    get label() {
+      return t('ui.yes')
+    },
+    value: true,
+  },
 ]
 
 type OrganizationSelectorConfig = NonNullable<ReturnType<typeof resolveOrganizationSelectorConfig>>
@@ -563,8 +582,12 @@ const displayFieldGroups = computed<FieldGroup[]>(() => {
     return [
       {
         key: 'base',
-        title: '基础信息',
-        description: isEdit.value ? '调整当前记录字段' : '填写新记录字段',
+        get title() {
+          return t('ui.basicInfo')
+        },
+        get description() {
+          return isEdit.value ? t('ui.adjustTheCurrentRecordField') : t('ui.fillInNewRecordFields')
+        },
         fields,
       },
     ]
@@ -579,23 +602,30 @@ const displayFieldGroups = computed<FieldGroup[]>(() => {
   )
 
   return [
-    makeFieldGroup('base', '基础信息', '字段名称、编码、类型和默认值', baseFields),
+    makeFieldGroup('base', t('ui.basicInfo'), t('ui.fieldNameCodeTypeAndDefault'), baseFields),
     makeFieldGroup(
       'behavior',
-      '页面与查询',
-      '控制列表、新增、编辑、查询和排序能力',
+      t('ui.pagesAndQuery'),
+      t('ui.controlListAddEditQueryAndSortingAbility'),
       behaviorFields,
     ),
-    makeFieldGroup('advanced', '约束与高级配置', '字典、联动、表达式和扩展规则', advancedFields),
+    makeFieldGroup(
+      'advanced',
+      t('ui.constraintsAndAdvancedConfiguration'),
+      t('ui.dictionaryConnectionExpressionAndExtensionRules'),
+      advancedFields,
+    ),
   ].filter((group): group is FieldGroup => Boolean(group))
 })
 
 const dialogSubtitle = computed(() => {
-  if (isReadonly.value) return '查看记录详情'
+  if (isReadonly.value) return t('ui.viewRecordDetails')
   if (isFieldMetadataForm.value) {
-    return isEdit.value ? '调整字段结构、页面能力和高级配置' : '配置字段结构、页面能力和高级配置'
+    return isEdit.value
+      ? t('ui.adjustFieldStructurePageCapacityAndAdvancedConfiguration')
+      : t('ui.configureFieldStructurePageCapacityAndAdvancedConfiguration')
   }
-  return isEdit.value ? '编辑当前记录' : '创建记录'
+  return isEdit.value ? t('ui.editCurrentRecord') : t('ui.createRecordDialogTitle')
 })
 
 const showFormPreview = computed(() => false)
@@ -629,12 +659,12 @@ const missingRequiredFields = computed(() =>
 const resolveFieldDisplayValue = (field: TableField) => {
   const value = formData.value[field.field_code]
   if (!isFilledValue(value)) return '-'
-  if (getFieldInputType(field) === 'boolean') return value ? '是' : '否'
+  if (getFieldInputType(field) === 'boolean') return value ? t('ui.yes') : t('ui.no')
   const options = getSelectOptions(field)
   const option = Array.isArray(options) ? options.find((item) => item.value === value) : null
   if (option) return option.label
   if (Array.isArray(value)) return value.join('、')
-  if (typeof value === 'object') return '已配置'
+  if (typeof value === 'object') return t('ui.configured')
   return String(value)
 }
 
@@ -649,17 +679,17 @@ const previewItems = computed(() =>
 const previewHints = computed(() => {
   const hints: string[] = []
   if (missingRequiredFields.value.length > 0) {
-    hints.push(`还有 ${missingRequiredFields.value.length} 个必填字段未填写`)
+    hints.push(t('ui.alsoUnfilled', { value1: missingRequiredFields.value.length }))
   }
   if (isFieldMetadataForm.value && formData.value.input_type === SysTableFieldInputType.SELECT) {
     if (!formData.value.dict_code && !formData.value.linkage_config) {
-      hints.push('下拉字段建议配置字典或关联字段')
+      hints.push(t('ui.drawdownFieldSuggestsConfigurationOfDictionariesOrAssociatedFields'))
     }
   }
   if (isFieldMetadataForm.value && formData.value.field_code) {
     const code = String(formData.value.field_code)
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(code)) {
-      hints.push('字段编码建议使用字母、数字和下划线，且不要以数字开头')
+      hints.push(t('ui.fieldEncodingSuggestsLettersNumbersAndUnderlinedNumbersAndDoes'))
     }
   }
   return hints
@@ -668,9 +698,16 @@ const previewHints = computed(() => {
 const formCompletionText = computed(() => {
   if (displayFields.value.length === 0) return ''
   if (missingRequiredFields.value.length > 0) {
-    return `已填写 ${filledFieldCount.value}/${displayFields.value.length}，待完善 ${missingRequiredFields.value.length} 项`
+    return t('ui.completedPendingCompletionOfItem', {
+      value1: filledFieldCount.value,
+      value2: displayFields.value.length,
+      value3: missingRequiredFields.value.length,
+    })
   }
-  return `已填写 ${filledFieldCount.value}/${displayFields.value.length}`
+  return t('ui.completedFieldCount', {
+    value1: filledFieldCount.value,
+    value2: displayFields.value.length,
+  })
 })
 
 const buildRuntimeRelationOptions = (
@@ -1250,7 +1287,7 @@ const buildFieldRules = (field: TableField) => {
   if (!field.is_null) {
     rules.push((val) => {
       if (shouldSkip()) return true
-      return !isValueEmpty(val) || `${field.field_name}不能为空`
+      return !isValueEmpty(val) || t('ui.cannotBeEmpty', { value1: field.field_name })
     })
   }
 
@@ -1268,7 +1305,11 @@ const buildFieldRules = (field: TableField) => {
   if (!isSelectLike && isIntegerField) {
     rules.push((val) => {
       if (shouldSkip()) return true
-      return isValueEmpty(val) || /^-?\d+$/.test(String(val)) || `${field.field_name}必须是整数`
+      return (
+        isValueEmpty(val) ||
+        /^-?\d+$/.test(String(val)) ||
+        t('ui.mustBeInteger', { value1: field.field_name })
+      )
     })
   } else if (!isSelectLike && isExactDecimalFieldType(field.field_type)) {
     rules.push((val) => {
@@ -1277,14 +1318,15 @@ const buildFieldRules = (field: TableField) => {
       const match = String(val)
         .trim()
         .match(/^-?(\d+)(?:\.(\d+))?$/)
-      if (!match) return `${field.field_name}必须是十进制数字`
+      if (!match) return t('ui.mustBeADecimalNumber', { value1: field.field_name })
       const integerDigits = match[1]!.replace(/^0+(?=\d)/, '').length
       const fractionalDigits = (match[2] || '').length
       const precision = Number(field.numeric_precision || 0)
       const scale = Number(field.numeric_scale || 0)
-      if (fractionalDigits > scale) return `${field.field_name}小数位不能超过${scale}位`
+      if (fractionalDigits > scale)
+        return t('ui.cannotHaveMoreThanDecimalPlaces', { value1: field.field_name, scale: scale })
       if (precision > 0 && integerDigits + fractionalDigits > precision) {
-        return `${field.field_name}总位数不能超过${precision}位`
+        return t('ui.totalDigitsCannotExceed', { value1: field.field_name, precision: precision })
       }
       return true
     })
@@ -1294,7 +1336,7 @@ const buildFieldRules = (field: TableField) => {
       return (
         isValueEmpty(val) ||
         String(val).length <= field.field_length ||
-        `${field.field_name}长度不能超过${field.field_length}`
+        t('ui.valueLengthCannotExceed', { value1: field.field_name, value2: field.field_length })
       )
     })
   }
@@ -1303,7 +1345,10 @@ const buildFieldRules = (field: TableField) => {
     rules.push((val) => {
       if (shouldSkip() || isValueEmpty(val)) return true
       const value = Number(val)
-      return (value >= -32768 && value <= 32767) || `${field.field_name}必须在-32768到32767之间`
+      return (
+        (value >= -32768 && value <= 32767) ||
+        t('ui.valueMustBeSmallIntegerRange', { value1: field.field_name })
+      )
     })
   }
 
@@ -1314,15 +1359,21 @@ const buildFieldRules = (field: TableField) => {
       rules.push((val) => {
         if (shouldSkip() || isValueEmpty(val)) return true
         const comparison = compareExactDecimal(val, minText)
-        return comparison === null || comparison >= 0 || `${field.field_name}不能小于${minText}`
+        return (
+          comparison === null ||
+          comparison >= 0 ||
+          t('ui.valueCannotBeBelowMinimum', { value1: field.field_name, minText: minText })
+        )
       })
     } else if (!Number.isNaN(minVal)) {
       rules.push((val) => {
         if (shouldSkip()) return true
         if (isValueEmpty(val)) return true
         return isNumberField
-          ? Number(val) >= minVal || `${field.field_name}不能小于${minVal}`
-          : String(val).length >= minVal || `${field.field_name}长度不能小于${minVal}`
+          ? Number(val) >= minVal ||
+              t('ui.cannotBeLessThan', { value1: field.field_name, minVal: minVal })
+          : String(val).length >= minVal ||
+              t('ui.valueLengthCannotBeBelowMinimum', { value1: field.field_name, minVal: minVal })
       })
     }
   }
@@ -1334,15 +1385,21 @@ const buildFieldRules = (field: TableField) => {
       rules.push((val) => {
         if (shouldSkip() || isValueEmpty(val)) return true
         const comparison = compareExactDecimal(val, maxText)
-        return comparison === null || comparison <= 0 || `${field.field_name}不能大于${maxText}`
+        return (
+          comparison === null ||
+          comparison <= 0 ||
+          t('ui.valueCannotExceedMaximum', { value1: field.field_name, maxText: maxText })
+        )
       })
     } else if (!Number.isNaN(maxVal)) {
       rules.push((val) => {
         if (shouldSkip()) return true
         if (isValueEmpty(val)) return true
         return isNumberField
-          ? Number(val) <= maxVal || `${field.field_name}不能大于${maxVal}`
-          : String(val).length <= maxVal || `${field.field_name}长度不能超过${maxVal}`
+          ? Number(val) <= maxVal ||
+              t('ui.cannotBeGreaterThan', { value1: field.field_name, maxVal: maxVal })
+          : String(val).length <= maxVal ||
+              t('ui.cannotExceed', { value1: field.field_name, maxVal: maxVal })
       })
     }
   }
@@ -1351,7 +1408,11 @@ const buildFieldRules = (field: TableField) => {
     const emailReg = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     rules.push((val) => {
       if (shouldSkip()) return true
-      return isValueEmpty(val) || emailReg.test(String(val)) || `${field.field_name}格式不正确`
+      return (
+        isValueEmpty(val) ||
+        emailReg.test(String(val)) ||
+        t('ui.formatIsIncorrect', { value1: field.field_name })
+      )
     })
   }
 
@@ -1359,7 +1420,11 @@ const buildFieldRules = (field: TableField) => {
     const urlReg = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-./?%&=]*)?$/
     rules.push((val) => {
       if (shouldSkip()) return true
-      return isValueEmpty(val) || urlReg.test(String(val)) || `${field.field_name}格式不正确`
+      return (
+        isValueEmpty(val) ||
+        urlReg.test(String(val)) ||
+        t('ui.formatIsIncorrect', { value1: field.field_name })
+      )
     })
   }
 
@@ -1367,7 +1432,11 @@ const buildFieldRules = (field: TableField) => {
     const phoneReg = /^1\d{10}$/
     rules.push((val) => {
       if (shouldSkip()) return true
-      return isValueEmpty(val) || phoneReg.test(String(val)) || `${field.field_name}格式不正确`
+      return (
+        isValueEmpty(val) ||
+        phoneReg.test(String(val)) ||
+        t('ui.formatIsIncorrect', { value1: field.field_name })
+      )
     })
   }
 
@@ -1378,7 +1447,11 @@ const buildFieldRules = (field: TableField) => {
         const reg = new RegExp(rule)
         rules.push((val) => {
           if (shouldSkip()) return true
-          return isValueEmpty(val) || reg.test(String(val)) || `${field.field_name}格式不正确`
+          return (
+            isValueEmpty(val) ||
+            reg.test(String(val)) ||
+            t('ui.formatIsIncorrect', { value1: field.field_name })
+          )
         })
       } catch (error) {
         console.warn('无效的正则校验规则', error)
@@ -1407,22 +1480,25 @@ const getFieldRules = (field: TableField) => {
 
 const getFieldHint = (field: TableField) => {
   if (field.field_code === 'form_span') {
-    return '0为自动；表单最多2列，1为半行，2为整行'
+    return t('ui.formColumnSpanHint')
   }
   if (field.field_code === 'detail_span') {
-    return '0为自动；详情最多4列，1/2/3/4控制宽度，4为整行'
+    return t('ui.detailColumnSpanHint')
   }
   if (isDictCodeField(field)) {
-    return '下拉、级联、布尔字段可配置字典'
+    return t('ui.drawdownCascadeBooleanFieldsConfigureDictionary')
   }
   if (field.field_code === 'binding') {
-    return '校验：min=1|max=50|email|url|phone；文件：multiple=true|accept=.pdf,.docx|maxSize=500|chunkThreshold=5'
+    return t('ui.validationMin1mamax50EmailUrlPhoneDocumentMultipleTru')
   }
   if (field.field_code === 'linkage_config') {
-    return 'JSON示例：{"linkage":{"enabled":true,"mode":"relation","tableCode":"sys_user","labelKey":"user_name","valueKey":"id","filterMapping":{"foreign_key":"main_field"}}}'
+    return t('ui.jsonExampleLinkageMineTrueTableCodeSysUserLabelkey', {
+      example:
+        '{"linkage":{"enabled":true,"mode":"relation","tableCode":"sys_user","labelKey":"user_name","valueKey":"id","filterMapping":{"foreign_key":"main_field"}}}',
+    })
   }
   if (field.field_code === 'tag') {
-    return '示例：gorm:"size:128;comment:发件人密码" json:"sender_password"'
+    return t('ui.exampleGomSize128DecisionSenderPasswordJsonSenderPassword')
   }
   return ''
 }

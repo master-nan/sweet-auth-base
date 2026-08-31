@@ -13,9 +13,11 @@
         class="file-display__chip"
       >
         <q-icon name="attach_file" size="16px" class="q-mr-xs" />
-        <span class="ellipsis file-display__name">{{ file.file_name || `文件 #${file.id}` }}</span>
+        <span class="ellipsis file-display__name">{{
+          file.file_name || t('ui.fileNumber', { id: file.id })
+        }}</span>
         <q-tooltip
-          >{{ file.file_name || `文件 #${file.id}`
+          >{{ file.file_name || t('ui.fileNumber', { id: file.id })
           }}{{ file.file_size ? ` · ${formatFileSize(file.file_size)}` : '' }}</q-tooltip
         >
 
@@ -28,10 +30,10 @@
           class="q-ml-xs"
           @click.stop="openFile(file, 'preview')"
         >
-          <q-tooltip>预览</q-tooltip>
+          <q-tooltip>{{ t('ui.preview') }}</q-tooltip>
         </q-btn>
         <q-btn flat dense round size="xs" icon="download" @click.stop="openFile(file, 'download')">
-          <q-tooltip>下载</q-tooltip>
+          <q-tooltip>{{ t('ui.download') }}</q-tooltip>
         </q-btn>
       </q-chip>
 
@@ -47,6 +49,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import {
@@ -56,6 +60,8 @@ import {
   type FileInfo,
 } from 'src/api/services/file'
 import { parseFileIds } from 'src/utils/file-value'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type FilePreviewDialogExpose = {
   open: (file: FileInfo, context?: FileBusinessContext) => void | Promise<void>
@@ -124,7 +130,13 @@ async function loadFiles() {
 
 async function openFile(file: FileInfo, mode: FileAccessMode) {
   if (!file.file_uuid) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '文件缺少访问标识' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.fileAccessIdentifierMissing')
+      },
+    })
     return
   }
 
@@ -141,7 +153,7 @@ async function openFile(file: FileInfo, mode: FileAccessMode) {
     $q.notify({
       type: 'negative',
       position: 'top-right',
-      message: response.message || '获取文件访问地址失败',
+      message: response.message || t('ui.failedToGetFileAccessUrl'),
     })
     return
   }

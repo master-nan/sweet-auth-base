@@ -48,12 +48,12 @@
             <q-separator v-if="showDate && showTime" vertical />
             <div v-if="showTime" class="sweet-date-time-clock">
               <div class="sweet-date-time-clock__selection">
-                <span>已选择</span>
+                <span>{{ t('ui.selected') }}</span>
                 <strong>{{ selectedValueSummary }}</strong>
               </div>
               <div class="sweet-date-time-clock__head">
-                <span>时间</span>
-                <q-btn flat dense color="primary" label="现在" @click="setNow" />
+                <span>{{ t('ui.time') }}</span>
+                <q-btn flat dense color="primary" :label="t('ui.now')" @click="setNow" />
               </div>
               <div class="sweet-date-time-clock__editor">
                 <template v-for="(part, index) in timeParts" :key="part.key">
@@ -82,8 +82,10 @@
                   >
                 </template>
               </div>
-              <div class="sweet-date-time-clock__hint">可直接输入，或使用方向键和滚轮调整</div>
-              <div class="sweet-date-time-clock__quick-title">常用时间</div>
+              <div class="sweet-date-time-clock__hint">
+                {{ t('ui.youCanEnterDirectlyOrUseAArrowKeyAnd') }}
+              </div>
+              <div class="sweet-date-time-clock__quick-title">{{ t('ui.commonTime') }}</div>
               <div class="sweet-date-time-clock__quick-list">
                 <q-btn
                   v-for="preset in quickTimes"
@@ -91,7 +93,7 @@
                   flat
                   dense
                   no-caps
-                  :aria-label="`设为 ${preset}`"
+                  :aria-label="t('ui.setPreset', { preset })"
                   :class="{ 'is-active': normalizedTimeValue === preset }"
                   :label="preset"
                   @click="applyQuickTime(preset)"
@@ -99,9 +101,16 @@
               </div>
             </div>
             <div class="sweet-date-time-actions">
-              <q-btn v-if="showDate" flat dense color="primary" label="今天" @click="setToday" />
-              <q-btn flat dense color="grey-7" label="清空" @click="clearValue" />
-              <q-btn unelevated dense color="primary" label="确定" @click="confirmValue" />
+              <q-btn
+                v-if="showDate"
+                flat
+                dense
+                color="primary"
+                :label="t('ui.today')"
+                @click="setToday"
+              />
+              <q-btn flat dense color="grey-7" :label="t('ui.clear')" @click="clearValue" />
+              <q-btn unelevated dense color="primary" :label="t('ui.sure')" @click="confirmValue" />
             </div>
           </div>
         </q-popup-proxy>
@@ -111,7 +120,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, reactive, ref, watch } from 'vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type PickerType = 'date' | 'time' | 'datetime' | 'year' | 'year-month'
 
@@ -170,9 +183,33 @@ const dateDefaultView = computed(() => {
 const displayValue = computed(() => props.modelValue || '')
 const popupTarget = computed(() => inputRef.value?.$el || false)
 const timeParts = [
-  { key: 'hour' as const, label: '时', inputLabel: '小时' },
-  { key: 'minute' as const, label: '分', inputLabel: '分钟' },
-  { key: 'second' as const, label: '秒', inputLabel: '秒钟' },
+  {
+    key: 'hour' as const,
+    get label() {
+      return t('ui.hourUnitShort')
+    },
+    get inputLabel() {
+      return t('ui.hours')
+    },
+  },
+  {
+    key: 'minute' as const,
+    get label() {
+      return t('ui.minuteUnitShort')
+    },
+    get inputLabel() {
+      return t('ui.min')
+    },
+  },
+  {
+    key: 'second' as const,
+    get label() {
+      return t('ui.sec')
+    },
+    get inputLabel() {
+      return t('ui.seconds')
+    },
+  },
 ]
 const quickTimes = ['00:00:00', '08:30:00', '12:00:00', '18:00:00']
 
@@ -199,7 +236,7 @@ const normalizedTimeValue = computed(() => {
 
 const selectedValueSummary = computed(() => {
   if (props.type === 'time') return normalizedTimeValue.value
-  if (!dateValue.value) return '请选择日期'
+  if (!dateValue.value) return t('ui.pleaseSelectADate')
   return `${dateValue.value} ${normalizedTimeValue.value}`
 })
 

@@ -12,9 +12,9 @@
           option-label="label"
           option-value="value"
           :options="expressionLogicOptions"
-          label="逻辑关系"
+          :label="t('ui.logicalRelations')"
           class="logic-select"
-          :rules="[(val: any) => hasValue(val) || '请选择逻辑关系']"
+          :rules="[(val: any) => hasValue(val) || t('ui.selectLogicalRelationships')]"
           hide-bottom-space
           @update:model-value="(value) => emit('update:logic', value)"
         />
@@ -32,11 +32,11 @@
           :options="filteredFields"
           :option-label="fieldLabelKey"
           :option-value="fieldValueKey"
-          label="字段"
+          :label="t('ui.field')"
           class="field-select"
           use-input
           input-debounce="120"
-          :rules="[(val: any) => hasValue(val) || '请选择字段']"
+          :rules="[(val: any) => hasValue(val) || t('ui.selectField')]"
           hide-bottom-space
           clearable
           @filter="filterFields"
@@ -53,7 +53,9 @@
           </template>
           <template #no-option>
             <q-item>
-              <q-item-section class="text-grey-6">暂无匹配字段</q-item-section>
+              <q-item-section class="text-grey-6">{{
+                t('ui.noMatchingFieldsAvailable')
+              }}</q-item-section>
             </q-item>
           </template>
         </q-select>
@@ -70,11 +72,11 @@
           option-label="label"
           option-value="value"
           :options="expressionTypeOptionsForRule(rule)"
-          label="操作符"
+          :label="t('ui.operator')"
           class="field-select"
           :disable="!rule.field"
           clearable
-          :rules="[(val: any) => hasValue(val) || '请选择操作符']"
+          :rules="[(val: any) => hasValue(val) || t('ui.selectOperator')]"
           hide-bottom-space
           @update:model-value="() => emit('update-expression-type')"
         />
@@ -86,8 +88,8 @@
           dense
           outlined
           readonly
-          :model-value="bindingLabels.join(' 至 ')"
-          label="动态值"
+          :model-value="bindingLabels.join(t('ui.to'))"
+          :label="t('ui.dynamicValue')"
           class="field-input"
           hide-bottom-space
         >
@@ -97,10 +99,10 @@
               round
               dense
               icon="close"
-              aria-label="改为固定值"
+              :aria-label="t('ui.changeToFixedValue')"
               @click="emit('clear-bindings')"
             >
-              <q-tooltip>改为固定值</q-tooltip>
+              <q-tooltip>{{ t('ui.changeToFixedValue') }}</q-tooltip>
             </q-btn>
           </template>
         </q-input>
@@ -109,8 +111,8 @@
           dense
           outlined
           disable
-          model-value="无需填写"
-          label="值"
+          :model-value="t('ui.noNeedToFill')"
+          :label="t('ui.value')"
           class="field-input"
           hide-bottom-space
         />
@@ -124,7 +126,7 @@
             rule.expression_type === undefined || requireOrganizationSelectorConfig(rule).disabled
           "
           clearable
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :rules="valueRules(rule)"
           @update:model-value="(value) => updateOrganizationSelectorValue(rule, value)"
@@ -146,7 +148,7 @@
           map-options
           clearable
           :disable="rule.expression_type === undefined"
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :rules="valueRules(rule)"
           hide-bottom-space
@@ -177,7 +179,7 @@
           map-options
           clearable
           :disable="rule.expression_type === undefined"
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :rules="valueRules(rule)"
           hide-bottom-space
@@ -195,13 +197,19 @@
           <template #no-option>
             <q-item>
               <q-item-section class="text-grey-6">
-                {{ isRelationLoading(rule) ? '正在加载选项...' : '暂无选项，可输入关键字搜索' }}
+                {{
+                  isRelationLoading(rule)
+                    ? t('ui.loadingOptions')
+                    : t('ui.noOptionsEnterKeywordSearch')
+                }}
               </q-item-section>
             </q-item>
           </template>
           <template #after-options>
             <q-item v-if="hasMoreRelationOptions(rule)" dense>
-              <q-item-section class="text-grey-6 text-caption"> 向下滚动加载更多 </q-item-section>
+              <q-item-section class="text-grey-6 text-caption">
+                {{ t('ui.scrollDownToLoadMore') }}
+              </q-item-section>
             </q-item>
           </template>
         </q-select>
@@ -246,7 +254,7 @@
           map-options
           clearable
           :disable="rule.expression_type === undefined"
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :rules="valueRules(rule)"
           hide-bottom-space
@@ -259,7 +267,7 @@
           v-else-if="dateTimePickerTypeForRule(rule) && !isFreeInputMultiValueRule(rule)"
           v-model="rule.value"
           :type="dateTimePickerTypeForRule(rule) || 'date'"
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :disable="rule.expression_type === undefined"
           :rules="valueRules(rule)"
@@ -270,11 +278,13 @@
           outlined
           v-model="rule.value"
           :type="isFreeInputMultiValueRule(rule) ? 'text' : inputTypeForRule(rule)"
-          label="值"
+          :label="t('ui.value')"
           class="field-input"
           :disable="rule.expression_type === undefined"
           :placeholder="
-            rule.expression_type === undefined ? '请先选择操作符' : valuePlaceholderForRule(rule)
+            rule.expression_type === undefined
+              ? t('ui.pleaseSelectTheOperatorFirst')
+              : valuePlaceholderForRule(rule)
           "
           :rules="valueRules(rule)"
           hide-bottom-space
@@ -298,6 +308,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ref, toRefs, watch } from 'vue'
 import type { QueryRule } from 'src/types/global'
 import { SysTableFieldInputTypeMap, SysTableFieldTypeMap } from 'src/types/enum'
@@ -305,6 +317,8 @@ import type { OrganizationSelectorRuntimeConfig } from 'src/types/organization-s
 import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
 import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'AdvancedQueryRuleRow' })
 
@@ -426,12 +440,12 @@ const fieldOptionCaption = (field: unknown) => {
   const parts: string[] = []
   const fieldTypeLabel =
     item?.logical_type === 'relation'
-      ? '关联'
+      ? t('ui.association')
       : SysTableFieldTypeMap[item?.field_type as keyof typeof SysTableFieldTypeMap] ||
-        (item?.field_type ? `类型 ${item.field_type}` : '')
+        (item?.field_type ? t('ui.typeWithValue', { value1: item.field_type }) : '')
   const inputTypeLabel =
     SysTableFieldInputTypeMap[item?.input_type as keyof typeof SysTableFieldInputTypeMap] ||
-    (item?.input_type ? `控件 ${item.input_type}` : '')
+    (item?.input_type ? t('ui.control', { value1: item.input_type }) : '')
   if (fieldTypeLabel) parts.push(fieldTypeLabel)
   if (inputTypeLabel) parts.push(inputTypeLabel)
   return parts.join(' · ')
@@ -469,7 +483,7 @@ const updateRangeValue = (rule: QueryRule, index: 0 | 1, value: unknown) => {
 }
 
 const rangeBoundaryRule = (value: unknown) => {
-  return hasValue(value) || '请填写'
+  return hasValue(value) || t('ui.pleaseFillIn')
 }
 
 const {

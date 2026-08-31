@@ -3,9 +3,9 @@
     <master-detail-page
       v-if="isMasterDetailEnabled"
       :mode="masterDetailMode"
-      :master-title="currentTable?.table_name || '主表数据'"
+      :master-title="currentTable?.table_name || t('ui.mainTableData')"
       :master-subtitle="currentTable?.table_code || ''"
-      :detail-title="detailTable?.table_name || '子表数据'"
+      :detail-title="detailTable?.table_name || t('ui.subsheetData')"
       :detail-subtitle="detailRelationLabel"
       :master-width="masterDetailMasterWidth"
       min-height="calc(100vh - 132px)"
@@ -30,7 +30,7 @@
           :columns="columns"
         />
         <q-btn round flat icon="refresh" color="primary" :disable="loading" @click="fetchData">
-          <q-tooltip>刷新主表</q-tooltip>
+          <q-tooltip>{{ t('ui.refreshMasterTable') }}</q-tooltip>
         </q-btn>
       </template>
 
@@ -41,22 +41,27 @@
             outlined
             debounce="300"
             v-model="query.quick_query!.keyword"
-            placeholder="搜索主表关键词"
+            :placeholder="t('ui.searchForMasterKeywords')"
             class="generalization-md-search"
           >
             <template v-slot:append>
               <q-icon name="search" />
             </template>
           </q-input>
-          <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+          <q-btn
+            color="primary"
+            :label="t('ui.search')"
+            :disable="loading"
+            @click="handleBasicSearch"
+          />
           <q-btn
             outline
             icon="tune"
             color="primary"
             :aria-label="
               hasAppliedAdvancedFilters
-                ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                : '高级查询'
+                ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                : t('ui.advancedQuery')
             "
             @click="showAdvancedQuery = true"
           >
@@ -65,8 +70,8 @@
             }}</q-badge>
             <q-tooltip>{{
               hasAppliedAdvancedFilters
-                ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                : '高级查询'
+                ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                : t('ui.advancedQuery')
             }}</q-tooltip>
           </q-btn>
         </div>
@@ -228,10 +233,14 @@
         <div class="generalization-detail-context">
           <div class="generalization-detail-title-wrap">
             <div class="generalization-detail-title">
-              {{ detailTable?.table_name || '子表数据' }}
+              {{ detailTable?.table_name || t('ui.subsheetData') }}
             </div>
             <div class="generalization-detail-subtitle">
-              {{ selectedMasterRow ? getMasterRowTitle(selectedMasterRow) : '请选择左侧主表数据' }}
+              {{
+                selectedMasterRow
+                  ? getMasterRowTitle(selectedMasterRow)
+                  : t('ui.selectTheMainLeftTableData')
+              }}
             </div>
           </div>
           <q-space />
@@ -245,7 +254,7 @@
             v-if="detailCanWrite"
             color="primary"
             icon="add"
-            label="新增子数据"
+            :label="t('ui.addSubdata')"
             :disable="loading || detailLoading || !selectedMasterRow"
             @click="openDetailAddDialog"
           />
@@ -254,7 +263,7 @@
             outlined
             debounce="300"
             v-model="detailQuery.quick_query!.keyword"
-            placeholder="搜索子表关键词"
+            :placeholder="t('ui.searchSubScheduleKeywords')"
             class="generalization-md-search"
             @keyup.enter="handleDetailSearch"
           >
@@ -266,7 +275,7 @@
             outline
             color="primary"
             icon="search"
-            label="搜索"
+            :label="t('ui.search')"
             :disable="detailLoading || !selectedMasterRow"
             @click="handleDetailSearch"
           />
@@ -278,7 +287,7 @@
             :disable="detailLoading || !selectedMasterRow"
             @click="fetchDetailData"
           >
-            <q-tooltip>刷新子表</q-tooltip>
+            <q-tooltip>{{ t('ui.refreshDetailTable') }}</q-tooltip>
           </q-btn>
         </div>
       </template>
@@ -325,7 +334,7 @@
                 :disable="detailLoading"
                 @click="openDetailEditDialog(props.row)"
               >
-                <q-tooltip>编辑子数据</q-tooltip>
+                <q-tooltip>{{ t('ui.editSubdata') }}</q-tooltip>
               </q-btn>
               <q-btn
                 flat
@@ -337,7 +346,7 @@
                 :disable="detailLoading"
                 @click="confirmDetailDelete(props.row)"
               >
-                <q-tooltip>删除子数据</q-tooltip>
+                <q-tooltip>{{ t('ui.deleteChildData') }}</q-tooltip>
               </q-btn>
             </q-td>
           </template>
@@ -354,7 +363,9 @@
                   {{ detailLoadErrorMessage || t('generalization.loadFailed') }}
                 </div>
                 <div v-else class="text-grey-7 q-mb-sm">
-                  {{ selectedMasterRow ? t('generalization.noData') : '请选择主表数据' }}
+                  {{
+                    selectedMasterRow ? t('generalization.noData') : t('ui.selectMasterTableData')
+                  }}
                 </div>
                 <q-btn
                   outline
@@ -424,13 +435,18 @@
               outlined
               debounce="300"
               v-model="query.quick_query!.keyword"
-              placeholder="搜索关键词"
+              :placeholder="t('ui.searchKeywords')"
             >
               <template v-slot:append>
                 <q-icon name="search" />
               </template>
             </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+            <q-btn
+              color="primary"
+              :label="t('ui.search')"
+              :disable="loading"
+              @click="handleBasicSearch"
+            />
             <q-btn
               outline
               icon="tune"
@@ -438,8 +454,8 @@
               class="q-ml-xs"
               :aria-label="
                 hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
+                  ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                  : t('ui.advancedQuery')
               "
               @click="showAdvancedQuery = true"
             >
@@ -448,8 +464,8 @@
               }}</q-badge>
               <q-tooltip>{{
                 hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
+                  ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                  : t('ui.advancedQuery')
               }}</q-tooltip>
             </q-btn>
           </template>
@@ -536,7 +552,7 @@
       :menu-id="resolveMenuId()"
       :table-code="currentTable?.table_code || query.table_code || ''"
       :readonly="formReadonly"
-      :submit-btn-text="currentEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
       @button-click="handleFormButtonClick"
     />
@@ -549,7 +565,7 @@
       :menu-id="resolveDetailMenuId()"
       :table-code="detailTable?.table_code || ''"
       :readonly="detailFormReadonly"
-      :submit-btn-text="detailEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="detailEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleDetailFormSubmit"
     />
 
@@ -560,7 +576,7 @@
       :fields="paramsFields"
       :menu-id="resolveMenuId()"
       :table-code="currentTable?.table_code || query.table_code || ''"
-      submit-btn-text="执行"
+      :submit-btn-text="t('ui.implementation')"
       @submit="handleParamsSubmit"
     />
   </base-content>
@@ -787,8 +803,8 @@ const paramsDialogTitle = computed(
   () => pendingActionButton.value?.name || t('generalization.paramsDialogTitle'),
 )
 const formDialogTitle = computed(() => {
-  if (formReadonly.value) return '查看数据'
-  return currentEditData.value?.id ? '编辑数据' : '新增数据'
+  if (formReadonly.value) return t('ui.viewData')
+  return currentEditData.value?.id ? t('ui.editData') : t('ui.addData')
 })
 
 const activeMasterRelation = computed<TableRelation | null>(() => {
@@ -867,8 +883,8 @@ const detailRelationLabel = computed(() => {
 })
 
 const detailFormDialogTitle = computed(() => {
-  if (detailFormReadonly.value) return '查看子数据'
-  return detailEditData.value?.id ? '编辑子数据' : '新增子数据'
+  if (detailFormReadonly.value) return t('ui.viewSubdata')
+  return detailEditData.value?.id ? t('ui.editSubdata') : t('ui.addSubdata')
 })
 
 const detailCanWrite = computed(() => !!detailTable.value?.table_code)
@@ -935,7 +951,9 @@ const buildTableColumns = (
     nextColumns?.push({
       name: 'actions',
       align: 'center',
-      label: '操作',
+      get label() {
+        return t('ui.actions')
+      },
       field: 'actions',
       sortable: false,
     })
@@ -1167,7 +1185,9 @@ const openDetailEditDialog = (row: Record<string, any>) => {
 const confirmDetailDelete = (row: Record<string, any>) => {
   if (!detailCanWrite.value) return
   confirmDanger({
-    message: `确定要删除该子数据吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheSubdata')
+    },
     loading: detailLoading.value,
     disable: detailLoading.value,
   }).onOk(() => {
@@ -1273,11 +1293,23 @@ const openRecordFormPage = async (
 ) => {
   const tableCode = currentTable.value?.table_code || query.value.table_code
   if (!tableCode) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '缺少表编码，无法打开表单' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.couldNotOpenFormWithoutTableEncoding')
+      },
+    })
     return
   }
   if ((mode === 'edit' || mode === 'copy') && !row?.id) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '缺少记录ID，无法打开表单' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.missingLogIdUnableToOpenForm')
+      },
+    })
     return
   }
 
@@ -1296,7 +1328,9 @@ const openRecordFormPage = async (
 
 const confirmDelete = (row: Record<string, any>) => {
   confirmDanger({
-    message: `确定要删除该数据吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheData')
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -1458,7 +1492,9 @@ const validateParamsWithSchema = (schemaText: string, data: Record<string, any>)
       $q.notify({
         type: 'negative',
         position: 'top-right',
-        message: `${missingField.field_name}不能为空`,
+        get message() {
+          return t('ui.cannotBeEmpty', { value1: missingField.field_name })
+        },
       })
       return false
     }
@@ -1504,7 +1540,9 @@ const executeMenuButtonAction = async (
   if (!actionName) {
     $q.notify({
       type: 'warning',
-      message: `按钮 ${button.name || button.code || ''} 未配置事件动作`,
+      get message() {
+        return t('ui.buttonUnconfiguredEventAction', { value1: button.name || button.code || '' })
+      },
     })
     return
   }
@@ -1752,7 +1790,9 @@ const openRecordDetailTab = async (dataRow: Record<string, any>) => {
     $q.notify({
       type: 'warning',
       position: 'top-right',
-      message: '缺少记录ID或表编码，无法打开详情',
+      get message() {
+        return t('ui.missingLogIdOrTableEncodingUnableToOpenDetails')
+      },
     })
     return
   }

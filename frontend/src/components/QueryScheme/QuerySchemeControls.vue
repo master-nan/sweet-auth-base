@@ -44,7 +44,7 @@
     :source-name="schemeSource?.name || ''"
     :dirty="dirty"
     :enable-nested="enableNested !== false"
-    :title="advancedTitle || '高级查询'"
+    :title="displayAdvancedTitle"
     @search="applyAdvancedQuery"
   />
 
@@ -57,6 +57,8 @@
 </template>
 
 <script setup lang="ts" generic="TQuery extends Query">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref } from 'vue'
 import type { TableField } from 'src/api/services/sys-table'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
@@ -67,6 +69,8 @@ import type { QuerySchemePageController } from 'src/composables/query-scheme-pag
 import type { TableQueryState } from 'src/composables/table-query-state'
 import type { Query } from 'src/types/global'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type ControlsController<TQuery extends Query> = Pick<
   QuerySchemePageController<TQuery>,
@@ -105,13 +109,15 @@ const props = withDefaults(
     layout?: 'standard' | 'compact'
   }>(),
   {
-    advancedTitle: '高级查询',
+    advancedTitle: '',
     advancedEnabled: true,
     enableNested: true,
     showFilterCount: true,
     layout: 'standard',
   },
 )
+
+const displayAdvancedTitle = computed(() => props.advancedTitle || t('ui.advancedQuery'))
 
 const showAdvancedQuery = ref(false)
 const {
@@ -138,8 +144,8 @@ const {
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvanced.value))
 const filterCountLabel = computed(() =>
   props.showFilterCount && activeFilterCount.value
-    ? `高级查询，已启用 ${activeFilterCount.value} 个条件`
-    : '高级查询',
+    ? t('ui.advancedQueryEnabled', { count: activeFilterCount.value })
+    : t('ui.advancedQuery'),
 )
 
 const openAdvancedQuery = () => {

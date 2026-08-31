@@ -4,7 +4,9 @@
       <q-card-section class="row items-center q-px-lg q-py-md">
         <q-icon name="visibility" color="primary" size="28px" class="q-mr-sm" />
         <div class="col">
-          <div class="text-h6 text-weight-bold ellipsis">{{ currentFile?.file_name || '文件预览' }}</div>
+          <div class="text-h6 text-weight-bold ellipsis">
+            {{ currentFile?.file_name || t('ui.filePreview') }}
+          </div>
           <div class="text-caption text-grey-7">
             {{ currentFile ? formatFileSize(currentFile.file_size) : '' }}
           </div>
@@ -14,7 +16,7 @@
           flat
           color="primary"
           icon="download"
-          label="下载"
+          :label="t('ui.download')"
           @click="openDownload"
         />
         <q-btn flat round dense icon="close" v-close-popup />
@@ -34,7 +36,9 @@
         >
           <q-icon name="insert_drive_file" size="56px" color="grey-5" />
           <div class="text-subtitle2">{{ unsupportedPreviewMessage }}</div>
-          <div class="text-caption text-grey-7">可以点击右上角下载后在本地应用中查看。</div>
+          <div class="text-caption text-grey-7">
+            {{ t('ui.youCanViewItInLocalApplicationsByClickingOn') }}
+          </div>
         </div>
 
         <component
@@ -58,17 +62,17 @@
         <div v-else-if="previewUrl && currentFile && !loading" class="file-preview-dialog__empty">
           <template v-if="viewerLoading">
             <q-spinner color="primary" size="42px" />
-            <div>正在加载文件预览组件</div>
+            <div>{{ t('ui.loadingFilePreviewComponent') }}</div>
           </template>
           <template v-else>
             <q-icon name="insert_drive_file" size="56px" color="grey-5" />
-            <div>暂无可预览文件</div>
+            <div>{{ t('ui.noPreviewableFiles') }}</div>
           </template>
         </div>
 
         <div v-else-if="!loading" class="file-preview-dialog__empty">
           <q-icon name="insert_drive_file" size="56px" color="grey-5" />
-          <div>暂无可预览文件</div>
+          <div>{{ t('ui.noPreviewableFiles') }}</div>
         </div>
       </q-card-section>
     </q-card>
@@ -76,11 +80,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, markRaw, ref, shallowRef, type Component } from 'vue'
 import { useQuasar } from 'quasar'
 import type { PreviewPlugin, PreviewToolbarOptions } from '@open-file-viewer/core'
 import '@open-file-viewer/core/style.css'
 import { useFileApi, type FileBusinessContext, type FileInfo } from 'src/api/services/file'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const fileApi = useFileApi()
@@ -104,23 +112,53 @@ const toolbarOptions: PreviewToolbarOptions = {
   print: true,
   search: true,
   labels: {
-    previous: '上一个',
-    next: '下一个',
-    queue: '文件',
-    'zoom-out': '缩小',
-    'zoom-in': '放大',
-    'zoom-reset': '重置',
-    'rotate-right': '旋转',
-    download: '下载',
-    fullscreen: '全屏',
-    print: '打印',
-    search: '搜索',
+    get previous() {
+      return t('ui.previous')
+    },
+    get next() {
+      return t('ui.next')
+    },
+    get queue() {
+      return t('ui.documentation')
+    },
+    get 'zoom-out'() {
+      return t('ui.zoomOut')
+    },
+    get 'zoom-in'() {
+      return t('ui.zoomIn')
+    },
+    get 'zoom-reset'() {
+      return t('ui.reset')
+    },
+    get 'rotate-right'() {
+      return t('ui.rotate')
+    },
+    get download() {
+      return t('ui.download')
+    },
+    get fullscreen() {
+      return t('ui.fullscreen')
+    },
+    get print() {
+      return t('ui.print')
+    },
+    get search() {
+      return t('ui.search')
+    },
   },
   titles: {
-    download: '下载文件',
-    fullscreen: '全屏预览',
-    print: '打印',
-    search: '搜索内容',
+    get download() {
+      return t('ui.downloadFile')
+    },
+    get fullscreen() {
+      return t('ui.fullScreenPreview')
+    },
+    get print() {
+      return t('ui.print')
+    },
+    get search() {
+      return t('ui.searchForContents')
+    },
   },
 }
 
@@ -132,20 +170,31 @@ const extension = computed(() => {
 
 const mimeType = computed(() => String(currentFile.value?.file_type || '').toLowerCase())
 
-const designPreviewDisabled = computed(() => isDesignPreviewDisabled(extension.value, mimeType.value))
+const designPreviewDisabled = computed(() =>
+  isDesignPreviewDisabled(extension.value, mimeType.value),
+)
 
 const unsupportedPreviewMessage = computed(() => {
   const ext = extension.value
-  if (viewerLoadError.value) return '文件预览组件加载失败'
-  if (designExtensions.has(ext)) return `${ext.toUpperCase() || '设计'} 文件暂不支持在线预览`
-  return '当前文件类型暂不支持在线预览'
+  if (viewerLoadError.value) return t('ui.filePreviewComponentLoadedFailed')
+  if (designExtensions.has(ext))
+    return t('ui.filesAreNotSupportedForOnlinePreview', {
+      value1: ext.toUpperCase() || t('ui.design'),
+    })
+  return t('ui.theOnlinePreviewIsNotSupportedForTheCurrentFile')
 })
 
 const designExtensions = new Set(['psd', 'psb', 'abr', 'ai', 'eps'])
 
 const open = async (file: FileInfo, context?: FileBusinessContext) => {
   if (!file.file_uuid) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '文件缺少访问标识' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.fileAccessIdentifierMissing')
+      },
+    })
     return
   }
 
@@ -162,7 +211,7 @@ const open = async (file: FileInfo, context?: FileBusinessContext) => {
       fileApi.getFileDownloadAccessUrl(file.file_uuid, 900, context),
     ])
     if (!previewRes.success || !previewRes.data?.url) {
-      throw new Error(previewRes.message || '获取文件预览地址失败')
+      throw new Error(previewRes.message || t('ui.failedToGetFilePreviewUrl'))
     }
     previewUrl.value = previewRes.data.url
     downloadUrl.value = downloadRes.success && downloadRes.data?.url ? downloadRes.data.url : ''
@@ -174,7 +223,7 @@ const open = async (file: FileInfo, context?: FileBusinessContext) => {
     $q.notify({
       type: 'negative',
       position: 'top-right',
-      message: error?.message || '获取文件预览地址失败',
+      message: error?.message || t('ui.failedToGetFilePreviewUrl'),
     })
   } finally {
     loading.value = false
@@ -190,7 +239,9 @@ const handlePreviewUnsupported = () => {
   $q.notify({
     type: 'warning',
     position: 'top-right',
-    message: '当前文件暂不支持在线预览，可点击下载查看',
+    get message() {
+      return t('ui.theCurrentFileDoesNotSupportOnlinePreviewsAndCan')
+    },
   })
 }
 
@@ -198,7 +249,7 @@ const handlePreviewError = (error: Error) => {
   $q.notify({
     type: 'negative',
     position: 'top-right',
-    message: error?.message || '文件预览失败',
+    message: error?.message || t('ui.filePreviewFailed'),
   })
 }
 

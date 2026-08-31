@@ -37,7 +37,12 @@
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -82,15 +87,15 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData ? '编辑应用' : '新增应用'"
+      :title="currentEditData ? t('ui.editApplication') : t('ui.addApplication')"
       :fields="tableFields"
-      :submit-btn-text="currentEditData ? '保存' : '创建'"
+      :submit-btn-text="currentEditData ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
     <q-dialog v-model="showApplicationSecretDialog" @hide="clearApplicationSecret">
       <q-card class="application-secret-dialog">
-        <q-card-section class="text-h6">应用密钥</q-card-section>
+        <q-card-section class="text-h6">{{ t('ui.applyKeys') }}</q-card-section>
         <q-separator />
         <q-card-section class="q-gutter-md">
           <q-input
@@ -110,7 +115,7 @@
                 :disable="!applicationSecretValue?.app_key"
                 @click="copyApplicationSecret(applicationSecretValue?.app_key)"
               >
-                <q-tooltip>复制</q-tooltip>
+                <q-tooltip>{{ t('ui.copy') }}</q-tooltip>
               </q-btn>
             </template>
           </q-input>
@@ -131,14 +136,16 @@
                 :disable="!applicationSecretValue?.app_secret"
                 @click="copyApplicationSecret(applicationSecretValue?.app_secret)"
               >
-                <q-tooltip>复制</q-tooltip>
+                <q-tooltip>{{ t('ui.copy') }}</q-tooltip>
               </q-btn>
             </template>
           </q-input>
-          <div class="text-caption text-grey-7">关闭后可通过轮换密钥重新生成</div>
+          <div class="text-caption text-grey-7">
+            {{ t('ui.afterClosingGenerateANewOneByRotatingTheSecret') }}
+          </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn color="primary" label="关闭" v-close-popup />
+          <q-btn color="primary" :label="t('ui.close')" v-close-popup />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -146,6 +153,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_application' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
@@ -174,6 +183,8 @@ import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import type { TableColumn } from 'src/types/global'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const loading = ref(false)
 const loadError = ref('')
@@ -289,7 +300,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '应用列表加载失败'
+    loadError.value = t('ui.failedToApplyListLoading')
   } finally {
     loading.value = false
   }
@@ -309,7 +320,9 @@ const fetchTableFields = async () => {
       virtualColumns: [
         {
           name: 'actions',
-          label: '操作',
+          get label() {
+            return t('ui.actions')
+          },
           field: 'actions',
           align: 'center',
           order: 100,
@@ -382,7 +395,9 @@ const openEditDialog = async (row: Application) => {
 // 确认删除
 const confirmDelete = (row: Application) => {
   confirmDanger({
-    message: `确定要删除应用 "${row.name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheApplication', { value1: row.name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -397,8 +412,12 @@ const confirmDelete = (row: Application) => {
 
 const confirmRotateSecret = (row: Application) => {
   confirmAction({
-    title: '确认轮换密钥',
-    message: `确定要轮换应用 "${row.name}" 的 App Secret 吗？`,
+    get title() {
+      return t('ui.confirmRotationKeys')
+    },
+    get message() {
+      return t('ui.areYouSureYouWantToRotateAppSecretFor', { value1: row.name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -441,10 +460,22 @@ const copyApplicationSecret = async (value?: string) => {
   if (!value) return
   try {
     await copyToClipboard(value)
-    $q.notify({ type: 'positive', position: 'top-right', message: '已复制到剪贴板' })
+    $q.notify({
+      type: 'positive',
+      position: 'top-right',
+      get message() {
+        return t('ui.copiedToClipboard')
+      },
+    })
   } catch (error) {
     console.error('复制失败', error)
-    $q.notify({ type: 'negative', position: 'top-right', message: '复制失败' })
+    $q.notify({
+      type: 'negative',
+      position: 'top-right',
+      get message() {
+        return t('ui.copyFailed')
+      },
+    })
   }
 }
 

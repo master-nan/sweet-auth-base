@@ -37,7 +37,12 @@
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -87,9 +92,9 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData?.id ? '编辑角色' : '新增角色'"
+      :title="currentEditData?.id ? t('ui.editRole') : t('ui.addRole')"
       :fields="tableFields"
-      :submit-btn-text="currentEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
@@ -103,6 +108,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_role' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
@@ -128,6 +135,8 @@ import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 // 加载状态
 const loading = ref(false)
@@ -257,7 +266,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '角色列表加载失败'
+    loadError.value = t('ui.loadingOfTheRoleListFailed')
   } finally {
     loading.value = false
   }
@@ -335,7 +344,9 @@ const openPermissionDialog = async (role: Role) => {
 // 确认删除
 const confirmDelete = (row: Role) => {
   confirmDanger({
-    message: `确定要删除角色 "${row.name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheCharacter', { value1: row.name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

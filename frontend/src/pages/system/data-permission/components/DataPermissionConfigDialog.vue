@@ -5,7 +5,7 @@
     :subtitle="subtitle"
     :icon="dialogIcon"
     :loading="saving"
-    :submit-text="editData ? '保存' : '创建'"
+    :submit-text="editData ? t('ui.save') : t('ui.createRecord')"
     :show-preview="false"
     @submit="submit"
   >
@@ -17,7 +17,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="资源编码"
+            :label="t('ui.resourceCode')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -26,7 +26,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="资源名称"
+            :label="t('ui.resourceName')"
             :rules="requiredRules"
           />
           <q-select
@@ -36,7 +36,7 @@
             dense
             emit-value
             map-options
-            label="资源类型"
+            :label="t('ui.resourceType')"
             :disable="Boolean(editData)"
             :options="resourceTypeOptions"
             :rules="requiredRules"
@@ -47,7 +47,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="适配器编码"
+            :label="t('ui.adaptorEncoding')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -60,7 +60,7 @@
             emit-value
             map-options
             use-input
-            label="元数据表"
+            :label="t('ui.metadataTable')"
             :disable="Boolean(editData)"
             :options="tableOptions"
             :rules="selectedIdRules"
@@ -72,7 +72,7 @@
             class="col-12"
             outlined
             dense
-            label="业务服务编码"
+            :label="t('ui.businessServiceCode')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -83,7 +83,7 @@
             outlined
             dense
             type="number"
-            label="报表定义ID"
+            :label="t('ui.reportDefinitionId')"
             :disable="Boolean(editData)"
             :rules="positiveIdRules"
           />
@@ -96,7 +96,7 @@
             emit-value
             map-options
             use-chips
-            label="支持操作"
+            :label="t('ui.supportingOperations')"
             :options="operationOptions"
             :rules="atLeastOneRules"
           />
@@ -108,9 +108,9 @@
             dense
             type="textarea"
             autogrow
-            label="说明"
+            :label="t('ui.descriptionLabel')"
           />
-          <q-toggle v-model="resourceForm.state" label="配置状态启用" />
+          <q-toggle v-model="resourceForm.state" :label="t('ui.configurationEnabled')" />
         </div>
       </template>
 
@@ -124,7 +124,7 @@
             emit-value
             map-options
             use-input
-            label="数据资源"
+            :label="t('ui.dataResource')"
             :disable="Boolean(editData)"
             :options="resourceOptions"
             :rules="selectedIdRules"
@@ -136,7 +136,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="归属编码"
+            :label="t('ui.ownershipCode')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -147,7 +147,7 @@
             dense
             emit-value
             map-options
-            label="数据维度"
+            :label="t('ui.dataDimension')"
             :disable="Boolean(editData)"
             :options="dimensionOptions"
             :rules="selectedIdRules"
@@ -160,7 +160,7 @@
             dense
             emit-value
             map-options
-            label="绑定类型"
+            :label="t('ui.bindingType')"
             :disable="Boolean(editData)"
             :options="bindingTypeOptions"
             :rules="requiredRules"
@@ -173,7 +173,7 @@
             dense
             emit-value
             map-options
-            label="元数据字段"
+            :label="t('ui.metadataField')"
             :disable="Boolean(editData)"
             :loading="metadataFieldLoading"
             :options="metadataFieldOptions"
@@ -185,8 +185,8 @@
             class="col-12"
             outlined
             dense
-            label="注册字段编码"
-            hint="仅接受服务端已经注册的稳定字段编码"
+            :label="t('ui.registerFieldEncoding')"
+            :hint="t('ui.onlyStableFieldCodesRegisteredByTheServerAreAccepted')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -197,13 +197,13 @@
             dense
             emit-value
             map-options
-            label="值类型"
+            :label="t('ui.valueType')"
             :disable="Boolean(editData)"
             :options="valueTypeOptions"
             :rules="requiredRules"
           />
           <div class="col-12 col-md-6 row items-center">
-            <q-toggle v-model="ownershipForm.state" label="配置状态启用" />
+            <q-toggle v-model="ownershipForm.state" :label="t('ui.configurationEnabled')" />
           </div>
         </div>
       </template>
@@ -215,7 +215,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="策略编码"
+            :label="t('ui.policyCode')"
             :disable="Boolean(editData)"
             :rules="requiredRules"
           />
@@ -224,7 +224,7 @@
             class="col-12 col-md-6"
             outlined
             dense
-            label="策略名称"
+            :label="t('ui.policyNameLabel')"
             :rules="requiredRules"
           />
           <q-input
@@ -235,16 +235,16 @@
             dense
             type="textarea"
             autogrow
-            label="说明"
+            :label="t('ui.descriptionLabel')"
           />
           <div class="col-12">
             <div class="row items-center q-mb-sm">
-              <div class="text-subtitle1 text-weight-medium">策略规则</div>
+              <div class="text-subtitle1 text-weight-medium">{{ t('ui.policyRules') }}</div>
               <q-space />
               <q-btn
                 color="primary"
                 icon="add"
-                label="新增规则"
+                :label="t('ui.addRule')"
                 :disable="policyForm.rules.length >= 8"
                 @click="addPolicyRule"
               />
@@ -260,7 +260,7 @@
                       dense
                       emit-value
                       map-options
-                      label="归属定义"
+                      :label="t('ui.ownershipDefinition')"
                       :options="ownershipIdentityOptions"
                       :rules="requiredRules"
                       @update:model-value="syncPolicyRuleOwnership(rule)"
@@ -272,7 +272,7 @@
                       dense
                       emit-value
                       map-options
-                      label="范围来源"
+                      :label="t('ui.scopeSource')"
                       :options="scopeSourceOptionsFor(rule.dimension_id)"
                       :rules="requiredRules"
                       @update:model-value="syncPolicyRuleOperator(rule)"
@@ -284,7 +284,7 @@
                       dense
                       emit-value
                       map-options
-                      label="关系"
+                      :label="t('ui.relationLabel')"
                       :options="relationOptions"
                       :rules="requiredRules"
                     />
@@ -295,7 +295,7 @@
                       dense
                       emit-value
                       map-options
-                      label="操作符"
+                      :label="t('ui.operator')"
                       :options="operatorOptions"
                       :rules="requiredRules"
                     />
@@ -308,7 +308,7 @@
                         icon="delete"
                         @click="removePolicyRule(index)"
                       >
-                        <q-tooltip>删除规则</q-tooltip>
+                        <q-tooltip>{{ t('ui.deleteRule') }}</q-tooltip>
                       </q-btn>
                     </div>
                     <q-input
@@ -317,8 +317,8 @@
                       class="col-12 col-md-8"
                       outlined
                       dense
-                      label="指定值"
-                      hint="多个值使用逗号分隔"
+                      :label="t('ui.specifiedValue')"
+                      :hint="t('ui.commaSeparatedMultipleValues')"
                       :rules="requiredRules"
                     />
                     <q-input
@@ -327,18 +327,20 @@
                       class="col-12 col-md-4"
                       outlined
                       dense
-                      label="组织视图编码"
+                      :label="t('ui.organisation')"
                       :rules="requiredRules"
                     />
                   </div>
                 </q-item-section>
               </q-item>
               <q-item v-if="policyForm.rules.length === 0">
-                <q-item-section class="text-grey-7">至少配置一条策略规则</q-item-section>
+                <q-item-section class="text-grey-7">{{
+                  t('ui.configureAtLeastOnePolicyRule')
+                }}</q-item-section>
               </q-item>
             </q-list>
           </div>
-          <q-toggle v-model="policyForm.state" label="配置状态启用" />
+          <q-toggle v-model="policyForm.state" :label="t('ui.configurationEnabled')" />
         </div>
       </template>
 
@@ -351,7 +353,7 @@
             dense
             emit-value
             map-options
-            label="授权主体类型"
+            :label="t('ui.typeOfSubjectAuthorized')"
             :options="subjectTypeOptions"
             :rules="requiredRules"
             @update:model-value="loadSubjectOptions"
@@ -365,7 +367,7 @@
             map-options
             use-input
             input-debounce="300"
-            label="授权主体"
+            :label="t('ui.authorisationSubject')"
             :options="subjectOptions"
             :rules="selectedIdRules"
             @filter="filterSubjectOptions"
@@ -378,7 +380,7 @@
             emit-value
             map-options
             use-input
-            label="数据资源"
+            :label="t('ui.dataResource')"
             :options="resourceOptions"
             :rules="selectedIdRules"
             @filter="filterResourceOptions"
@@ -391,7 +393,7 @@
             dense
             emit-value
             map-options
-            label="资源操作"
+            :label="t('ui.resourceAction')"
             :options="grantOperationOptions"
             :rules="requiredRules"
           />
@@ -403,7 +405,7 @@
             emit-value
             map-options
             use-input
-            label="权限策略"
+            :label="t('ui.permissionPolicy')"
             :options="policyOptions"
             :rules="selectedIdRules"
             @filter="filterPolicyOptions"
@@ -412,14 +414,14 @@
             :model-value="grantForm.valid_from ?? null"
             class="col-12 col-md-6"
             type="date"
-            label="有效期开始"
+            :label="t('ui.validFrom')"
             @update:model-value="grantForm.valid_from = $event || null"
           />
           <sweet-date-time-picker
             :model-value="grantForm.valid_to ?? null"
             class="col-12 col-md-6"
             type="date"
-            label="有效期结束"
+            :label="t('ui.validUntil')"
             @update:model-value="grantForm.valid_to = $event || null"
           />
           <q-input
@@ -429,7 +431,7 @@
             dense
             type="textarea"
             autogrow
-            label="说明"
+            :label="t('ui.descriptionLabel')"
           />
         </div>
       </template>
@@ -438,6 +440,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, nextTick, ref, watch } from 'vue'
 import { type QForm, useQuasar } from 'quasar'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
@@ -463,6 +467,8 @@ import { useTableApi, type Table, type TableField } from 'src/api/services/sys-t
 import { useRoleApi, type Role } from 'src/api/services/sys-role'
 import { useSysUserApi, type User } from 'src/api/services/sys-user'
 import type { Query } from 'src/types/global'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type DialogKind = 'resource' | 'ownership' | 'policy' | 'grant'
 type EditValue = DataResource | DataOwnership | DataPolicy | DataGrant | null
@@ -526,49 +532,149 @@ const saving = ref(false)
 const metadataFieldLoading = ref(false)
 
 const requiredRules = [
-  (value: unknown) => (value !== null && value !== undefined && value !== '') || '必填',
+  (value: unknown) => (value !== null && value !== undefined && value !== '') || t('ui.required'),
 ]
 const positiveIdRules = [
-  (value: number | null | undefined) => Number(value) > 0 || '请输入有效ID',
+  (value: number | null | undefined) => Number(value) > 0 || t('ui.pleaseEnterAValidId'),
 ]
 const selectedIdRules = [
-  (value: number | null | undefined) => Number(value) > 0 || '请选择有效项目',
+  (value: number | null | undefined) => Number(value) > 0 || t('ui.selectAValidItem'),
 ]
-const atLeastOneRules = [(value: unknown[]) => value?.length > 0 || '至少选择一项']
+const atLeastOneRules = [(value: unknown[]) => value?.length > 0 || t('ui.atLeastOneOfThem')]
 
 const resourceTypeOptions: SelectOption<DataPermissionResourceType>[] = [
-  { label: '低代码数据表', value: 'low_code_table' },
-  { label: '业务服务', value: 'business_service' },
-  { label: '报表', value: 'report' },
+  {
+    get label() {
+      return t('ui.lowCodeDataTable')
+    },
+    value: 'low_code_table',
+  },
+  {
+    get label() {
+      return t('ui.businessService')
+    },
+    value: 'business_service',
+  },
+  {
+    get label() {
+      return t('ui.report')
+    },
+    value: 'report',
+  },
 ]
 const bindingTypeOptions: SelectOption<DataPermissionBindingType>[] = [
-  { label: '元数据字段', value: 'metadata_field' },
-  { label: '注册字段', value: 'registered_field' },
+  {
+    get label() {
+      return t('ui.metadataField')
+    },
+    value: 'metadata_field',
+  },
+  {
+    get label() {
+      return t('ui.registeredField')
+    },
+    value: 'registered_field',
+  },
 ]
 const valueTypeOptions: SelectOption<DataPermissionValueType>[] = [
-  { label: '数字ID', value: 'bigint' },
-  { label: '字符串编码', value: 'string' },
+  {
+    get label() {
+      return t('ui.numericId')
+    },
+    value: 'bigint',
+  },
+  {
+    get label() {
+      return t('ui.stringCode')
+    },
+    value: 'string',
+  },
 ]
 const operationOptions: SelectOption<DataPermissionOperation>[] = [
-  { label: '查询', value: 'query' },
-  { label: '详情', value: 'detail' },
-  { label: '新增', value: 'create' },
-  { label: '修改', value: 'update' },
-  { label: '删除', value: 'delete' },
-  { label: '导出', value: 'export' },
-  { label: '运行', value: 'run' },
+  {
+    get label() {
+      return t('ui.query')
+    },
+    value: 'query',
+  },
+  {
+    get label() {
+      return t('ui.details')
+    },
+    value: 'detail',
+  },
+  {
+    get label() {
+      return t('ui.create')
+    },
+    value: 'create',
+  },
+  {
+    get label() {
+      return t('ui.modify')
+    },
+    value: 'update',
+  },
+  {
+    get label() {
+      return t('ui.delete')
+    },
+    value: 'delete',
+  },
+  {
+    get label() {
+      return t('ui.export')
+    },
+    value: 'export',
+  },
+  {
+    get label() {
+      return t('ui.run')
+    },
+    value: 'run',
+  },
 ]
 const relationOptions = [
-  { label: '精确匹配', value: 'exact' },
-  { label: '本级及下级', value: 'self_and_descendants' },
+  {
+    get label() {
+      return t('ui.exactMatch')
+    },
+    value: 'exact',
+  },
+  {
+    get label() {
+      return t('ui.currentLevelAndBelow')
+    },
+    value: 'self_and_descendants',
+  },
 ]
 const operatorOptions = [
-  { label: '等于', value: 'eq' },
-  { label: '包含于', value: 'in' },
+  {
+    get label() {
+      return t('ui.equals')
+    },
+    value: 'eq',
+  },
+  {
+    get label() {
+      return t('ui.containedIn')
+    },
+    value: 'in',
+  },
 ]
 const subjectTypeOptions = [
-  { label: '角色', value: 'role' },
-  { label: '用户', value: 'user' },
+  {
+    get label() {
+      return t('ui.role')
+    },
+    value: 'role',
+  },
+  {
+    get label() {
+      return t('ui.user')
+    },
+    value: 'user',
+  },
 ]
 
 const resourceForm = ref<EditableResourceForm>({
@@ -625,17 +731,28 @@ const grantOperationOptions = ref<SelectOption<DataPermissionOperation>[]>([])
 
 const title = computed(() => {
   const names = {
-    resource: '数据资源',
-    ownership: '归属定义',
-    policy: '权限策略',
-    grant: '权限授权',
+    get resource() {
+      return t('ui.dataResource')
+    },
+    get ownership() {
+      return t('ui.ownershipDefinition')
+    },
+    get policy() {
+      return t('ui.permissionPolicy')
+    },
+    get grant() {
+      return t('ui.permissionGrant')
+    },
   }
-  return `${props.editData ? '编辑' : '新增'}${names[props.kind]}`
+  return t('ui.dataPermissionDialogTitle', {
+    value1: props.editData ? t('ui.edit') : t('ui.create'),
+    value2: names[props.kind],
+  })
 })
 const subtitle = computed(() =>
   props.kind === 'ownership'
-    ? '归属定义只描述资源记录的业务归属，不保存SQL或字段表达式'
-    : '按照数据权限配置边界维护当前记录',
+    ? t('ui.theAttributionDefinitionOnlyDescribesTheBusinessAttributionOfThe')
+    : t('ui.maintainCurrentRecordsAccordingToDataPermissionsConfigurationBoundaries'),
 )
 const dialogIcon = computed(
   () =>
@@ -832,15 +949,44 @@ const syncPolicyRuleOwnership = (rule: EditablePolicyRule) => {
 
 const scopeSourceOptionsFor = (dimensionId: number) => {
   const dimension = dimensions.value.find((item) => item.id === dimensionId)
-  const specified = { label: '指定值', value: 'specified_values' }
+  const specified = {
+    get label() {
+      return t('ui.specifiedValue')
+    },
+    value: 'specified_values',
+  }
   if (dimension?.dimension_code === 'legal_entity') {
-    return [{ label: '当前有效法人', value: 'effective_legal_entities' }, specified]
+    return [
+      {
+        get label() {
+          return t('ui.currentValidLegalEntity')
+        },
+        value: 'effective_legal_entities',
+      },
+      specified,
+    ]
   }
   if (['management_org', 'management_organization'].includes(dimension?.dimension_code || '')) {
-    return [{ label: '当前有效组织', value: 'effective_org_units' }, specified]
+    return [
+      {
+        get label() {
+          return t('ui.currentValidOrganization')
+        },
+        value: 'effective_org_units',
+      },
+      specified,
+    ]
   }
   if (['employee', 'enterprise_employee'].includes(dimension?.dimension_code || '')) {
-    return [{ label: '当前员工', value: 'current_employee' }, specified]
+    return [
+      {
+        get label() {
+          return t('ui.currentEmployee')
+        },
+        value: 'current_employee',
+      },
+      specified,
+    ]
   }
   return [specified]
 }
@@ -1018,7 +1164,12 @@ const submit = async () => {
   const valid = await formRef.value?.validate()
   if (!valid) return
   if (props.kind === 'policy' && policyForm.value.rules.length === 0) {
-    $q.notify({ type: 'warning', message: '至少配置一条策略规则' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.configureAtLeastOnePolicyRule')
+      },
+    })
     return
   }
   saving.value = true
@@ -1053,7 +1204,12 @@ const submit = async () => {
       if (!request) return
       await api.createGrant(request)
     }
-    $q.notify({ type: 'positive', message: '保存成功' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.saveSuccessfully')
+      },
+    })
     visible.value = false
     emit('saved')
   } finally {

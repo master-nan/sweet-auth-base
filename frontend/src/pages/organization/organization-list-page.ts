@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { date } from 'quasar'
 import type { TableField } from 'src/api/services/sys-table'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
@@ -86,16 +87,36 @@ export const organizationStatusColor = (status?: string): string => {
 }
 
 const organizationSyncObjectLabels: Record<string, string> = {
-  all: '全部对象',
-  legal_entity: '法人主体',
-  management_company: '管理公司',
-  management_unit: '管理组织',
-  legal_unit: '法人组织',
-  structure_node: '架构节点',
-  position: '岗位',
-  employee: '人员档案',
-  assignment: '任职',
-  resigned_employee: '离职人员',
+  get all() {
+    return t('ui.allObjects')
+  },
+  get legal_entity() {
+    return t('ui.legalEntity')
+  },
+  get management_company() {
+    return t('ui.managementCompany')
+  },
+  get management_unit() {
+    return t('ui.managementOrganization')
+  },
+  get legal_unit() {
+    return t('ui.organizationOfLegalPersons')
+  },
+  get structure_node() {
+    return t('ui.structureNodes')
+  },
+  get position() {
+    return t('ui.positionLabel')
+  },
+  get employee() {
+    return t('ui.employeeProfiles')
+  },
+  get assignment() {
+    return t('ui.appointments')
+  },
+  get resigned_employee() {
+    return t('ui.separations')
+  },
 }
 
 export const organizationSyncObjectLabel = (value?: string | null): string => {

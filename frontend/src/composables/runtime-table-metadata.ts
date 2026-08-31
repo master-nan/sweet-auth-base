@@ -1,9 +1,6 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
-import {
-  useTableApi,
-  type RuntimeTableMetadata,
-  type TableField,
-} from 'src/api/services/sys-table'
+import { useTableApi, type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
 
 type MetadataLoader = (tableCode: string) => Promise<{
   success: boolean
@@ -34,8 +31,11 @@ export function useRuntimeTableMetadata(
     const labels = Array.from(
       new Set(quickSearchFields.value.map((field) => field.field_name.trim()).filter(Boolean)),
     )
-    if (!labels.length) return '搜索关键词'
-    return `搜索${labels.slice(0, 3).join('、')}${labels.length > 3 ? '等' : ''}`
+    if (!labels.length) return t('ui.searchKeywords')
+    return t('ui.searchFieldSummary', {
+      value1: labels.slice(0, 3).join(t('ui.listSeparator')),
+      value2: labels.length > 3 ? t('ui.andMore') : '',
+    })
   })
   const advancedSearchFields = computed(() =>
     fields.value.filter((field) => field.is_advanced_search),
@@ -49,7 +49,7 @@ export function useRuntimeTableMetadata(
     const code = toValue(tableCode).trim()
     if (!code) {
       metadata.value = null
-      metadataError.value = '缺少表编码'
+      metadataError.value = t('ui.synchronisingFolder')
       return null
     }
     metadataLoading.value = true
@@ -59,13 +59,13 @@ export function useRuntimeTableMetadata(
         ? await options.loader(code)
         : await tableApi.queryRuntimeTableByCode(code)
       if (!response.success || !response.data) {
-        throw new Error(response.message || '元数据加载失败')
+        throw new Error(response.message || t('ui.loadingMetadataFailed'))
       }
       metadata.value = response.data
       return response.data
     } catch (error) {
       metadata.value = null
-      metadataError.value = error instanceof Error ? error.message : '元数据加载失败'
+      metadataError.value = error instanceof Error ? error.message : t('ui.loadingMetadataFailed')
       return null
     } finally {
       metadataLoading.value = false

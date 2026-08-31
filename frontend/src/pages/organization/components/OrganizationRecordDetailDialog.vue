@@ -49,7 +49,7 @@
     </q-banner>
     <section v-else>
       <div class="text-subtitle1 text-weight-bold q-mb-lg">
-        {{ activeSection?.label || '基本信息' }}
+        {{ activeSection?.label || t('ui.basicInformation') }}
       </div>
       <detail-field-grid :items="activeSection?.items || []" variant="plain" />
       <slot name="section" :section-key="activeSectionKey" mode="dialog" />
@@ -97,6 +97,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
@@ -110,6 +112,8 @@ import type {
   OrganizationDetailItem,
   OrganizationDetailSection,
 } from './organization-record-detail'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(
   defineProps<{
@@ -154,7 +158,15 @@ const emit = defineEmits<{
 const normalizedSections = computed<OrganizationDetailSection[]>(() =>
   props.sections.length
     ? props.sections
-    : [{ key: 'basic', label: '基础信息', items: props.items }],
+    : [
+        {
+          key: 'basic',
+          get label() {
+            return t('ui.basicInfo')
+          },
+          items: props.items,
+        },
+      ],
 )
 const activeSectionKey = ref('')
 const activeSection = computed(

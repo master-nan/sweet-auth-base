@@ -2,12 +2,13 @@
   <header class="designer-topbar">
     <div class="brand-block">
       <q-btn flat round dense icon="arrow_back" @click="$emit('back')">
-        <q-tooltip>返回报表管理</q-tooltip>
+        <q-tooltip>{{ t('ui.returnToReportManagement') }}</q-tooltip>
       </q-btn>
       <div>
-        <div class="designer-title">报表设计器</div>
+        <div class="designer-title">{{ t('ui.reportDesigner') }}</div>
         <div class="designer-subtitle">
-          {{ reportName || '未命名报表' }} · {{ primarySourceCode || '未绑定主表' }}
+          {{ reportName || t('ui.unnamedReport') }} ·
+          {{ primarySourceCode || t('ui.noMasterChartBound') }}
         </div>
       </div>
     </div>
@@ -17,49 +18,55 @@
         :model-value="reportName"
         dense
         outlined
-        label="报表名称"
+        :label="t('ui.reportName')"
         @update:model-value="$emit('update:reportName', String($event || ''))"
       />
       <q-input
         :model-value="reportCode"
         dense
         outlined
-        label="报表编码"
+        :label="t('ui.reportEncoding')"
         @update:model-value="$emit('update:reportCode', String($event || ''))"
       />
       <div class="status-strip">
         <q-chip dense square :color="statusColor" text-color="white">
           {{ statusLabel }}
         </q-chip>
-        <q-chip
-          v-if="publishedVersionNo"
-          dense
-          square
-          outline
-          color="primary"
-        >
-          线上版本 V{{ publishedVersionNo }}
+        <q-chip v-if="publishedVersionNo" dense square outline color="primary">
+          {{ t('ui.onlineVersionV') }}{{ publishedVersionNo }}
         </q-chip>
       </div>
     </div>
 
     <div class="topbar-actions">
-      <q-btn outline color="primary" icon="tune" label="参数" @click="$emit('addParameter')" />
+      <q-btn
+        outline
+        color="primary"
+        icon="tune"
+        :label="t('ui.parameters')"
+        @click="$emit('addParameter')"
+      />
       <q-btn
         outline
         color="primary"
         icon="preview"
-        label="保存并预览"
+        :label="t('ui.saveAndPreview')"
         :disable="previewDisabled"
         :loading="previewing"
         @click="$emit('preview')"
       />
-      <q-btn outline color="primary" icon="rule" label="校验" @click="$emit('validate')" />
+      <q-btn
+        outline
+        color="primary"
+        icon="rule"
+        :label="t('ui.verify')"
+        @click="$emit('validate')"
+      />
       <q-btn
         unelevated
         color="primary"
         icon="save"
-        label="保存草稿"
+        :label="t('ui.saveDraft')"
         :loading="saving"
         @click="$emit('saveDraft')"
       />
@@ -67,7 +74,7 @@
         unelevated
         color="primary"
         icon="publish"
-        label="保存并发布"
+        :label="t('ui.saveAndPublish')"
         :disable="publishDisabled"
         :loading="publishing"
         @click="$emit('publish')"
@@ -76,7 +83,7 @@
         outline
         color="primary"
         icon="history"
-        label="版本"
+        :label="t('ui.version')"
         :disable="versionDisabled"
         @click="$emit('versions')"
       />
@@ -85,8 +92,12 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type { ReportStatus } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   reportName: string
@@ -116,11 +127,17 @@ defineEmits<{
 
 const statusLabel = computed(() => {
   const labels: Record<ReportStatus, string> = {
-    draft: '草稿',
-    published: '已发布',
-    disabled: '已停用',
+    get draft() {
+      return t('ui.draft')
+    },
+    get published() {
+      return t('ui.published')
+    },
+    get disabled() {
+      return t('ui.deactivatedStatus')
+    },
   }
-  return labels[props.reportStatus] || '草稿'
+  return labels[props.reportStatus] || t('ui.draft')
 })
 
 const statusColor = computed(() => {

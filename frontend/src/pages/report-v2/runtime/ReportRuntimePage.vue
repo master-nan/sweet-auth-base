@@ -7,14 +7,14 @@
 
     <q-card v-else-if="loadError" flat bordered class="runtime-state-card">
       <q-icon name="error_outline" color="negative" size="40px" />
-      <div class="text-subtitle1 text-weight-medium">报表加载失败</div>
+      <div class="text-subtitle1 text-weight-medium">{{ t('ui.failedToLoadReport') }}</div>
       <div class="text-body2 text-grey-7">{{ loadError }}</div>
-      <q-btn outline color="primary" icon="arrow_back" label="返回" @click="goBack" />
+      <q-btn outline color="primary" icon="arrow_back" :label="t('ui.back')" @click="goBack" />
     </q-card>
 
     <report-runtime-shell
       v-else
-      :title="report?.report_name || '报表运行页'"
+      :title="report?.report_name || t('ui.reportRunPage')"
       :report-code="runtimeReportCode"
       :status="report?.status || ''"
       :source-type="sourceType"
@@ -22,7 +22,7 @@
       :runtime-entry-type="runtimeEntryType"
       :menu-id="runtimeMenuId"
       :permission-table-code="runtimePermissionTableCode"
-      :description="report?.description || '通用报表运行页面骨架'"
+      :description="report?.description || t('ui.genericReportRunningPageSkeleton')"
       :version-no="displayVersionNo"
       :keyword="keyword"
       :parameters="runtimeParameters"
@@ -49,6 +49,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
@@ -58,6 +60,8 @@ import ReportRuntimeShell from '../components/ReportRuntimeShell.vue'
 import { useReportExport } from '../composables/useReportExport'
 import { useReportParameterControls } from '../composables/useReportParameterControls'
 import { useReportRuntime, type ReportRuntimeContext } from '../composables/useReportRuntime'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type RuntimeEntryType = 'menu' | 'development'
 
@@ -97,15 +101,24 @@ const {
 } = useReportParameterControls()
 
 const runtimeParameters = computed(() => resolveParameters(report.value))
-const sourceType = computed(() => report.value?.source_type || report.value?.data_source_name || '-')
+const sourceType = computed(
+  () => report.value?.source_type || report.value?.data_source_name || '-',
+)
 const displayVersionNo = computed(() => versionNo.value || report.value?.published_version_no || 0)
-const reportId = computed(() => firstNumber(route.meta.reportId, route.params.id, route.query.report_id))
+const reportId = computed(() =>
+  firstNumber(route.meta.reportId, route.params.id, route.query.report_id),
+)
 const routeMenuId = computed(() => firstNumber(route.meta.menuId, route.query.menu_id))
 const runtimeMenuId = computed(() =>
   firstNumber(route.meta.menuId, route.query.menu_id, report.value?.permission_menu_id),
 )
 const runtimeReportCode = computed(() =>
-  firstString(route.meta.reportCode, route.params.code, route.query.report_code, report.value?.report_code),
+  firstString(
+    route.meta.reportCode,
+    route.params.code,
+    route.query.report_code,
+    report.value?.report_code,
+  ),
 )
 const runtimePermissionTableCode = computed(() =>
   firstString(route.meta.permissionTableCode, report.value?.permission_table_code),
@@ -115,8 +128,9 @@ const runtimeEntryType = computed<RuntimeEntryType>(() =>
   isMenuRuntime.value ? 'menu' : 'development',
 )
 const runtimeMenuName = computed(() => {
-  if (isMenuRuntime.value) return firstString(route.meta.title, report.value?.report_name) || '报表菜单'
-  return '开发运行页'
+  if (isMenuRuntime.value)
+    return firstString(route.meta.title, report.value?.report_name) || t('ui.reportMenu')
+  return t('ui.developRunpage')
 })
 const runtimeContext = computed<ReportRuntimeContext>(() => ({
   ...(runtimeMenuId.value ? { menuId: runtimeMenuId.value } : {}),
@@ -147,14 +161,16 @@ async function loadReport() {
   if (!id) {
     report.value = null
     resetRuntime()
-    loadError.value = '缺少报表 ID'
+    loadError.value = t('ui.missingReportId')
     return
   }
   reportLoading.value = true
   loadError.value = ''
   resetRuntime()
   try {
-    const loadedReport = await reportApi.queryReportById(id, routeMenuId.value).then((res) => res.data)
+    const loadedReport = await reportApi
+      .queryReportById(id, routeMenuId.value)
+      .then((res) => res.data)
     report.value = loadedReport
     initRuntime(loadedReport)
     await loadControls(loadedReport, resolveParameters(loadedReport))
@@ -164,7 +180,8 @@ async function loadReport() {
     }
   } catch (error) {
     report.value = null
-    loadError.value = error instanceof Error && error.message ? error.message : '报表详情加载失败'
+    loadError.value =
+      error instanceof Error && error.message ? error.message : t('ui.failedToLoadReportDetails')
     $q.notify({ type: 'negative', message: loadError.value })
   } finally {
     reportLoading.value = false
@@ -174,12 +191,14 @@ async function loadReport() {
 async function handleRun() {
   if (!report.value) return
   try {
-    warnMissingMenuId('运行')
+    warnMissingMenuId(t('ui.run'))
     await runReport(report.value, runtimeParameters.value, runtimeContext.value)
   } catch (error) {
     $q.notify({
       type: 'negative',
-      message: error instanceof Error ? error.message : '报表运行失败',
+      get message() {
+        return error instanceof Error ? error.message : t('ui.reportRunningFailed')
+      },
     })
   }
 }
@@ -197,14 +216,21 @@ function handleReset() {
 async function handleExport() {
   if (!report.value) return
   try {
-    warnMissingMenuId('导出')
+    warnMissingMenuId(t('ui.export'))
     const runReq = buildRunReq(report.value, runtimeParameters.value, runtimeContext.value)
     await exportReport(report.value, buildExportReq(report.value, runReq, total.value))
-    $q.notify({ type: 'positive', message: '报表导出成功' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.reportExportSuccess')
+      },
+    })
   } catch (error) {
     $q.notify({
       type: 'negative',
-      message: error instanceof Error ? error.message : '导出失败',
+      get message() {
+        return error instanceof Error ? error.message : t('ui.exportFailed')
+      },
     })
   }
 }

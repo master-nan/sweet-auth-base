@@ -34,7 +34,12 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -131,6 +136,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_interface_definition' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -169,6 +176,8 @@ import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-ha
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const route = useRoute()
 const api = useIntegrationApi()
@@ -196,10 +205,30 @@ const {
 } = useRuntimeTableMetadata('integration_interface_definition')
 const advancedFields = computed(() => metadataAdvancedFields.value)
 const statusMeta: Record<string, { label: string; color: string }> = {
-  draft: { label: '草稿', color: 'grey-7' },
-  enabled: { label: '已启用', color: 'positive' },
-  disabled: { label: '已停用', color: 'warning' },
-  unavailable: { label: '当前不可用', color: 'negative' },
+  draft: {
+    get label() {
+      return t('ui.draft')
+    },
+    color: 'grey-7',
+  },
+  enabled: {
+    get label() {
+      return t('ui.activatedStatus')
+    },
+    color: 'positive',
+  },
+  disabled: {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    color: 'warning',
+  },
+  unavailable: {
+    get label() {
+      return t('ui.notAvailable')
+    },
+    color: 'negative',
+  },
 }
 const columns = ref<TableColumn<InterfaceDefinitionListItem>[]>([])
 const visibleColumns = ref<string[]>([])
@@ -250,7 +279,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '接口定义加载失败'
+    loadError.value = t('ui.interfaceDefinitionLoadFailed')
   } finally {
     loading.value = false
   }
@@ -294,7 +323,13 @@ const fetchMetadata = async () => {
       { fieldCode: 'external_system_id', visible: false },
       { fieldCode: 'name', visible: false },
       { fieldCode: 'relative_path', visible: false },
-      { fieldCode: 'interface_code', label: '接口定义', order: 2 },
+      {
+        fieldCode: 'interface_code',
+        get label() {
+          return t('ui.interfaceDefinition')
+        },
+        order: 2,
+      },
       { fieldCode: 'http_method', label: 'Method', align: 'center', order: 3 },
       { fieldCode: 'protocol', align: 'center', order: 5 },
       { fieldCode: 'status', align: 'center', order: 6 },
@@ -302,14 +337,25 @@ const fetchMetadata = async () => {
     virtualColumns: [
       {
         name: 'external_system',
-        label: '所属系统',
+        get label() {
+          return t('ui.owningSystem')
+        },
         field: (row) => row.external_system.name,
         order: 1,
       },
-      { name: 'path_summary', label: '相对路径', field: 'path_summary', order: 4 },
+      {
+        name: 'path_summary',
+        get label() {
+          return t('ui.relativePathLabel')
+        },
+        field: 'path_summary',
+        order: 4,
+      },
       {
         name: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         align: 'center',
         order: 100,
@@ -345,8 +391,16 @@ const openEdit = async (row: InterfaceDefinitionListItem) => {
 }
 const changeState = (row: InterfaceDefinitionListItem, enable: boolean) => {
   confirmAction({
-    title: enable ? '确认启用' : '确认停用',
-    message: `${enable ? '启用' : '停用'}接口“${row.name}”v${row.version}？`,
+    get title() {
+      return enable ? t('ui.confirmEnable') : t('ui.confirmDisable')
+    },
+    get message() {
+      return t('ui.interfaceV', {
+        value1: enable ? t('ui.enabled') : t('ui.disabled'),
+        value2: row.name,
+        value3: row.version,
+      })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -360,8 +414,12 @@ const changeState = (row: InterfaceDefinitionListItem, enable: boolean) => {
 }
 const createVersion = (row: InterfaceDefinitionListItem) => {
   confirmAction({
-    title: '创建新版本',
-    message: `基于“${row.name}”v${row.version}创建下一草稿版本？`,
+    get title() {
+      return t('ui.createANewVersion')
+    },
+    get message() {
+      return t('ui.createTheNextDraftBasedOnV', { value1: row.name, value2: row.version })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

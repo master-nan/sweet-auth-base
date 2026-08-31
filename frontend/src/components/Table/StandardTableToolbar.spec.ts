@@ -1,11 +1,7 @@
 import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { createI18n } from 'vue-i18n'
 import StandardTableToolbar from './StandardTableToolbar.vue'
-import messages from 'src/i18n'
-
-const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages })
 
 const QBtnStub = defineComponent({
   emits: ['click'],
@@ -20,7 +16,6 @@ describe('StandardTableToolbar', () => {
     const wrapper = mount(StandardTableToolbar, {
       slots: { 'quick-search': '<input data-testid="quick" />' },
       global: {
-        plugins: [i18n],
         stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true, QSeparator: true },
       },
     })
@@ -36,7 +31,6 @@ describe('StandardTableToolbar', () => {
         'query-controls': '<span data-testid="controls">方案 · 本月 · 高级查询</span>',
       },
       global: {
-        plugins: [i18n],
         stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true, QSeparator: true },
       },
     })
@@ -51,7 +45,6 @@ describe('StandardTableToolbar', () => {
         'column-selector': '<span>列设置</span>',
       },
       global: {
-        plugins: [i18n],
         stubs: { QBtn: QBtnStub, QTooltip: true, QSpace: true, QSeparator: true },
       },
     })

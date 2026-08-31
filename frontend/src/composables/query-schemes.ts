@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { computed, onScopeDispose, ref } from 'vue'
 import { useQuerySchemeApi } from 'src/api/services/query-scheme'
 import { useQueryScope } from 'src/composables/query-scope'
@@ -51,8 +52,8 @@ export function useQuerySchemes<TQuery extends Query>(
 
   const currentLabel = computed(() => {
     const name = queryState.schemeSource.value?.name
-    if (!name) return '查询方案'
-    return queryState.dirty.value ? `${name}（已修改）` : name
+    if (!name) return t('ui.queryScheme')
+    return queryState.dirty.value ? t('ui.modifiedSchemeName', { name: name }) : name
   })
 
   const personalDefault = computed(() =>
@@ -73,7 +74,7 @@ export function useQuerySchemes<TQuery extends Query>(
       schemes.value = response.data || []
       return schemes.value
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '查询方案加载失败'
+      error.value = cause instanceof Error ? cause.message : t('ui.failedToLoadQueryScheme')
       schemes.value = []
       return null
     } finally {
@@ -90,7 +91,7 @@ export function useQuerySchemes<TQuery extends Query>(
     try {
       const response = await api.resolve(scheme.id, scope.scopeCode.value)
       const result = response.data
-      if (!result) throw new Error('查询方案解析结果为空')
+      if (!result) throw new Error(t('ui.queryProjectResolutionResultsAreEmpty'))
       if (
         result.validation_status !== QuerySchemeValidationStatus.VALID ||
         !result.resolved_query
@@ -102,7 +103,7 @@ export function useQuerySchemes<TQuery extends Query>(
       queryState.applyResolvedScheme(result.scheme, result.resolved_query, result.bindings || [])
       return true
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : '查询方案应用失败'
+      error.value = cause instanceof Error ? cause.message : t('ui.failedToQueryProgramApplication')
       return false
     } finally {
       loading.value = false
@@ -146,7 +147,7 @@ export function useQuerySchemes<TQuery extends Query>(
   }
 
   const savePersonal = async (name: string, isDefault: boolean, saveAs: boolean) => {
-    if (!scope.scopeCode.value) throw new Error('当前页面未配置查询方案范围')
+    if (!scope.scopeCode.value) throw new Error(t('ui.theCurrentPageDoesNotConfigureTheQueryRange'))
     const source = queryState.schemeSource.value
     let detail: QuerySchemeDetail | undefined
     if (!saveAs && source?.type === QuerySchemeType.PERSONAL) {
@@ -166,7 +167,7 @@ export function useQuerySchemes<TQuery extends Query>(
       })
       detail = response.data
     }
-    if (!detail) throw new Error('查询方案保存结果为空')
+    if (!detail) throw new Error(t('ui.querySchemeSaveResultIsEmpty'))
     queryState.markSchemeSaved({
       id: detail.id,
       name: detail.name,

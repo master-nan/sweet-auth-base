@@ -1,4 +1,7 @@
+import ui from './ui'
+
 export default {
+  ui,
   router: {
     home: 'Home',
     table: 'Table',

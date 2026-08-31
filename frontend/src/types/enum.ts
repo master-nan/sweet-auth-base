@@ -1,11 +1,16 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 export enum SysTableType {
   SYSTEM = 1,
   VIEW,
 }
 
 export const SysTableTypeMap = {
-  [SysTableType.SYSTEM]: '系统表',
-  [SysTableType.VIEW]: '视图',
+  get [SysTableType.SYSTEM]() {
+    return t('ui.systemChart')
+  },
+  get [SysTableType.VIEW]() {
+    return t('ui.view')
+  },
 }
 
 export enum SysMasterDetailMode {
@@ -16,10 +21,18 @@ export enum SysMasterDetailMode {
 }
 
 export const SysMasterDetailModeMap = {
-  [SysMasterDetailMode.AUTO]: '自动',
-  [SysMasterDetailMode.SUMMARY]: '摘要主表',
-  [SysMasterDetailMode.TABLE]: '主表表格',
-  [SysMasterDetailMode.STACKED]: '上下主子表',
+  get [SysMasterDetailMode.AUTO]() {
+    return t('ui.auto')
+  },
+  get [SysMasterDetailMode.SUMMARY]() {
+    return t('ui.summaryMasterTable')
+  },
+  get [SysMasterDetailMode.TABLE]() {
+    return t('ui.mainTableTable')
+  },
+  get [SysMasterDetailMode.STACKED]() {
+    return t('ui.masterSWatch')
+  },
 }
 
 export enum SysFormOpenMode {
@@ -29,9 +42,15 @@ export enum SysFormOpenMode {
 }
 
 export const SysFormOpenModeMap = {
-  [SysFormOpenMode.AUTO]: '自动',
-  [SysFormOpenMode.DIALOG]: '弹框',
-  [SysFormOpenMode.PAGE]: '页签',
+  get [SysFormOpenMode.AUTO]() {
+    return t('ui.auto')
+  },
+  get [SysFormOpenMode.DIALOG]() {
+    return t('ui.box')
+  },
+  get [SysFormOpenMode.PAGE]() {
+    return t('ui.pages')
+  },
 }
 
 export enum SysDetailOpenMode {
@@ -41,9 +60,15 @@ export enum SysDetailOpenMode {
 }
 
 export const SysDetailOpenModeMap = {
-  [SysDetailOpenMode.AUTO]: '自动',
-  [SysDetailOpenMode.DIALOG]: '弹框',
-  [SysDetailOpenMode.PAGE]: '页签',
+  get [SysDetailOpenMode.AUTO]() {
+    return t('ui.auto')
+  },
+  get [SysDetailOpenMode.DIALOG]() {
+    return t('ui.box')
+  },
+  get [SysDetailOpenMode.PAGE]() {
+    return t('ui.pages')
+  },
 }
 
 export enum SysTableFieldInputType {
@@ -66,22 +91,54 @@ export enum SysTableFieldInputType {
 }
 
 export const SysTableFieldInputTypeMap = {
-  [SysTableFieldInputType.INPUT]: '输入框',
-  [SysTableFieldInputType.INPUT_NUMBER]: '数字输入',
-  [SysTableFieldInputType.TEXTAREA]: '多行文本',
-  [SysTableFieldInputType.SELECT]: '下拉选择',
-  [SysTableFieldInputType.DATE_PICKER]: '日期选择',
-  [SysTableFieldInputType.DATETIME_PICKER]: '日期时间',
-  [SysTableFieldInputType.TIME_PICKER]: '时间选择',
-  [SysTableFieldInputType.YEAR_PICKER]: '年份选择',
-  [SysTableFieldInputType.YEAR_MONTH_PICKER]: '年月选择',
-  [SysTableFieldInputType.FILE_PICKER]: '文件选择',
-  [SysTableFieldInputType.BOOLEAN]: '布尔开关',
-  [SysTableFieldInputType.JSON_EDITOR]: 'JSON编辑器',
-  [SysTableFieldInputType.ARRAY_INPUT]: '数组输入',
-  [SysTableFieldInputType.KEY_VALUE_EDITOR]: '键值对编辑',
-  [SysTableFieldInputType.CASCADER]: '级联选择',
-  [SysTableFieldInputType.RICH_TEXT]: '富文本编辑器',
+  get [SysTableFieldInputType.INPUT]() {
+    return t('ui.inputBox')
+  },
+  get [SysTableFieldInputType.INPUT_NUMBER]() {
+    return t('ui.numberInput')
+  },
+  get [SysTableFieldInputType.TEXTAREA]() {
+    return t('ui.multilineText')
+  },
+  get [SysTableFieldInputType.SELECT]() {
+    return t('ui.dropdownSelection')
+  },
+  get [SysTableFieldInputType.DATE_PICKER]() {
+    return t('ui.dateSelection')
+  },
+  get [SysTableFieldInputType.DATETIME_PICKER]() {
+    return t('ui.dateAndTime')
+  },
+  get [SysTableFieldInputType.TIME_PICKER]() {
+    return t('ui.timeSelection')
+  },
+  get [SysTableFieldInputType.YEAR_PICKER]() {
+    return t('ui.yearPickerType')
+  },
+  get [SysTableFieldInputType.YEAR_MONTH_PICKER]() {
+    return t('ui.yearSelection')
+  },
+  get [SysTableFieldInputType.FILE_PICKER]() {
+    return t('ui.fileSelection')
+  },
+  get [SysTableFieldInputType.BOOLEAN]() {
+    return t('ui.booleanSwitch')
+  },
+  get [SysTableFieldInputType.JSON_EDITOR]() {
+    return t('ui.jsonEditor')
+  },
+  get [SysTableFieldInputType.ARRAY_INPUT]() {
+    return t('ui.clusterInput')
+  },
+  get [SysTableFieldInputType.KEY_VALUE_EDITOR]() {
+    return t('ui.keyToEdit')
+  },
+  get [SysTableFieldInputType.CASCADER]() {
+    return t('ui.cascadeSelection')
+  },
+  get [SysTableFieldInputType.RICH_TEXT]() {
+    return t('ui.richTextEditor')
+  },
 }
 
 export enum ExpressionLogic {
@@ -90,8 +147,12 @@ export enum ExpressionLogic {
 }
 
 export const ExpressionLogicMap = {
-  [ExpressionLogic.AND]: '与',
-  [ExpressionLogic.OR]: '或',
+  get [ExpressionLogic.AND]() {
+    return t('ui.and')
+  },
+  get [ExpressionLogic.OR]() {
+    return t('ui.or')
+  },
 }
 
 export enum ExpressionType {
@@ -112,20 +173,48 @@ export enum ExpressionType {
 }
 
 export const ExpressionTypeMap = {
-  [ExpressionType.GT]: '大于',
-  [ExpressionType.LT]: '小于',
-  [ExpressionType.GTE]: '大于等于',
-  [ExpressionType.LTE]: '小于等于',
-  [ExpressionType.EQ]: '等于',
-  [ExpressionType.NE]: '不等于',
-  [ExpressionType.LIKE]: '包含',
-  [ExpressionType.NOT_LIKE]: '不包含',
-  [ExpressionType.IN]: '在里面',
-  [ExpressionType.NOT_IN]: '不在里面',
-  [ExpressionType.IS_NULL]: '空',
-  [ExpressionType.IS_NOT_NULL]: '非空',
-  [ExpressionType.BETWEEN]: '区间',
-  [ExpressionType.NOT_BETWEEN]: '不在区间',
+  get [ExpressionType.GT]() {
+    return t('ui.greaterThan')
+  },
+  get [ExpressionType.LT]() {
+    return t('ui.lessThan')
+  },
+  get [ExpressionType.GTE]() {
+    return t('ui.greaterThanOrEqualTo')
+  },
+  get [ExpressionType.LTE]() {
+    return t('ui.lessThanOrEqualTo')
+  },
+  get [ExpressionType.EQ]() {
+    return t('ui.equals')
+  },
+  get [ExpressionType.NE]() {
+    return t('ui.notEqualTo')
+  },
+  get [ExpressionType.LIKE]() {
+    return t('ui.containsOperator')
+  },
+  get [ExpressionType.NOT_LIKE]() {
+    return t('ui.notContainsOperator')
+  },
+  get [ExpressionType.IN]() {
+    return t('ui.inside')
+  },
+  get [ExpressionType.NOT_IN]() {
+    return t('ui.itSNotInside')
+  },
+  get [ExpressionType.IS_NULL]() {
+    return t('ui.empty')
+  },
+  get [ExpressionType.IS_NOT_NULL]() {
+    return t('ui.nonEmpty')
+  },
+  get [ExpressionType.BETWEEN]() {
+    return t('ui.area')
+  },
+  get [ExpressionType.NOT_BETWEEN]() {
+    return t('ui.notInTheCompartment')
+  },
 }
 
 export enum SysTableFieldType {
@@ -143,17 +232,37 @@ export enum SysTableFieldType {
 }
 
 export const SysTableFieldTypeMap = {
-  [SysTableFieldType.BIGINT]: '大数字',
-  [SysTableFieldType.DECIMAL]: '精确小数',
-  [SysTableFieldType.VARCHAR]: '字符串',
-  [SysTableFieldType.TEXT]: '文本',
-  [SysTableFieldType.BOOLEAN]: '布尔',
-  [SysTableFieldType.DATE]: '日期',
-  [SysTableFieldType.DATETIME]: '日期时间',
-  [SysTableFieldType.TIME]: '时间',
-  [SysTableFieldType.SMALLINT]: '小整数',
+  get [SysTableFieldType.BIGINT]() {
+    return t('ui.largeNumber')
+  },
+  get [SysTableFieldType.DECIMAL]() {
+    return t('ui.exactDecimal')
+  },
+  get [SysTableFieldType.VARCHAR]() {
+    return t('ui.string')
+  },
+  get [SysTableFieldType.TEXT]() {
+    return t('ui.text')
+  },
+  get [SysTableFieldType.BOOLEAN]() {
+    return t('ui.boolean')
+  },
+  get [SysTableFieldType.DATE]() {
+    return t('ui.date')
+  },
+  get [SysTableFieldType.DATETIME]() {
+    return t('ui.dateAndTime')
+  },
+  get [SysTableFieldType.TIME]() {
+    return t('ui.time')
+  },
+  get [SysTableFieldType.SMALLINT]() {
+    return t('ui.smallIntegerType')
+  },
   [SysTableFieldType.JSON]: 'JSON',
-  [SysTableFieldType.INT]: '数字',
+  get [SysTableFieldType.INT]() {
+    return t('ui.number')
+  },
 }
 
 export enum SysMenuButtonPosition {
@@ -167,13 +276,27 @@ export enum SysMenuButtonPosition {
 }
 
 export const SysMenuButtonPositionMap = {
-  [SysMenuButtonPosition.LINE]: '行按钮',
-  [SysMenuButtonPosition.TOP]: '表格顶部',
-  [SysMenuButtonPosition.BOTTOM]: '表格底部',
-  [SysMenuButtonPosition.FORM_TOP]: '表单顶部',
-  [SysMenuButtonPosition.FORM_BOTTOM]: '表单底部',
-  [SysMenuButtonPosition.DETAIL_TOP]: '详情顶部',
-  [SysMenuButtonPosition.DETAIL_BOTTOM]: '详情底部',
+  get [SysMenuButtonPosition.LINE]() {
+    return t('ui.rowButton')
+  },
+  get [SysMenuButtonPosition.TOP]() {
+    return t('ui.topOfTable')
+  },
+  get [SysMenuButtonPosition.BOTTOM]() {
+    return t('ui.bottomOfTable')
+  },
+  get [SysMenuButtonPosition.FORM_TOP]() {
+    return t('ui.topOfForm')
+  },
+  get [SysMenuButtonPosition.FORM_BOTTOM]() {
+    return t('ui.bottomOfForm')
+  },
+  get [SysMenuButtonPosition.DETAIL_TOP]() {
+    return t('ui.topOfDetails')
+  },
+  get [SysMenuButtonPosition.DETAIL_BOTTOM]() {
+    return t('ui.bottomOfDetails')
+  },
 }
 
 export enum SysMenuButtonDisplayMode {
@@ -184,10 +307,18 @@ export enum SysMenuButtonDisplayMode {
 }
 
 export const SysMenuButtonDisplayModeMap = {
-  [SysMenuButtonDisplayMode.AUTO]: '自动',
-  [SysMenuButtonDisplayMode.ICON]: '仅图标',
-  [SysMenuButtonDisplayMode.TEXT]: '仅文字',
-  [SysMenuButtonDisplayMode.ICON_TEXT]: '图标文字',
+  get [SysMenuButtonDisplayMode.AUTO]() {
+    return t('ui.auto')
+  },
+  get [SysMenuButtonDisplayMode.ICON]() {
+    return t('ui.iconsOnly')
+  },
+  get [SysMenuButtonDisplayMode.TEXT]() {
+    return t('ui.textOnly')
+  },
+  get [SysMenuButtonDisplayMode.ICON_TEXT]() {
+    return t('ui.iconText')
+  },
 }
 
 export enum SysMenuButtonEventAction {
@@ -255,67 +386,189 @@ export enum SysMenuButtonEventAction {
 }
 
 export const SysMenuButtonEventActionMap = {
-  [SysMenuButtonEventAction.QUERY]: '查询',
-  [SysMenuButtonEventAction.METADATA]: '页面元数据',
-  [SysMenuButtonEventAction.DETAIL]: '详情',
-  [SysMenuButtonEventAction.CREATE]: '新增',
-  [SysMenuButtonEventAction.CREATE_CHILD]: '新增子级',
-  [SysMenuButtonEventAction.UPDATE]: '编辑',
-  [SysMenuButtonEventAction.DELETE]: '删除',
-  [SysMenuButtonEventAction.REFRESH]: '刷新',
-  [SysMenuButtonEventAction.BATCH_DELETE]: '批量删除',
-  [SysMenuButtonEventAction.COPY]: '复制',
-  [SysMenuButtonEventAction.DUPLICATE]: '复制记录',
-  [SysMenuButtonEventAction.EXPORT]: '导出',
-  [SysMenuButtonEventAction.NAVIGATE]: '页面跳转',
-  [SysMenuButtonEventAction.CUSTOM]: '自定义',
-  [SysMenuButtonEventAction.SAVE]: '保存',
-  [SysMenuButtonEventAction.ORDER]: '排序',
-  [SysMenuButtonEventAction.REFRESH_CACHE]: '刷新缓存',
-  [SysMenuButtonEventAction.TEST_EMAIL]: '测试邮件',
-  [SysMenuButtonEventAction.CREATE_BUTTON]: '新增按钮',
-  [SysMenuButtonEventAction.UPDATE_BUTTON]: '编辑按钮',
-  [SysMenuButtonEventAction.DELETE_BUTTON]: '删除按钮',
-  [SysMenuButtonEventAction.QUERY_BUTTON]: '按钮查询',
-  [SysMenuButtonEventAction.BUTTON_METADATA]: '按钮元数据',
-  [SysMenuButtonEventAction.CREATE_ITEM]: '新增字典项',
-  [SysMenuButtonEventAction.UPDATE_ITEM]: '编辑字典项',
-  [SysMenuButtonEventAction.DELETE_ITEM]: '删除字典项',
-  [SysMenuButtonEventAction.QUERY_ITEM]: '字典项查询',
-  [SysMenuButtonEventAction.DETAIL_ITEM]: '字典项详情',
-  [SysMenuButtonEventAction.ITEM_METADATA]: '字典项元数据',
-  [SysMenuButtonEventAction.ASSIGN_PERMISSION]: '分配权限',
-  [SysMenuButtonEventAction.QUERY_USER_MENU]: '用户菜单查询',
-  [SysMenuButtonEventAction.QUERY_PERMISSION_MENU]: '授权菜单查询',
-  [SysMenuButtonEventAction.RESET_PASSWORD]: '重置密码',
-  [SysMenuButtonEventAction.UNLOCK_LOGIN]: '解除锁定',
-  [SysMenuButtonEventAction.ROTATE_SECRET]: '轮换密钥',
-  [SysMenuButtonEventAction.PUBLISH]: '发布',
-  [SysMenuButtonEventAction.UNPUBLISH]: '取消发布',
-  [SysMenuButtonEventAction.RUN]: '运行',
-  [SysMenuButtonEventAction.VERSION]: '版本',
-  [SysMenuButtonEventAction.DISABLE]: '停用',
-  [SysMenuButtonEventAction.PUBLISH_MENU]: '发布到菜单',
-  [SysMenuButtonEventAction.UNPUBLISH_MENU]: '取消发布菜单',
-  [SysMenuButtonEventAction.INIT_META]: '初始化元数据',
-  [SysMenuButtonEventAction.SYNC_FIELDS]: '同步字段',
-  [SysMenuButtonEventAction.SYNC_INDEX]: '同步索引',
-  [SysMenuButtonEventAction.FIELD_MANAGER]: '字段管理',
-  [SysMenuButtonEventAction.CREATE_FIELD]: '新增字段',
-  [SysMenuButtonEventAction.UPDATE_FIELD]: '编辑字段',
-  [SysMenuButtonEventAction.DELETE_FIELD]: '删除字段',
-  [SysMenuButtonEventAction.QUERY_FIELD]: '字段列表',
-  [SysMenuButtonEventAction.DETAIL_FIELD]: '字段详情',
-  [SysMenuButtonEventAction.CREATE_INDEX]: '新增索引',
-  [SysMenuButtonEventAction.UPDATE_INDEX]: '编辑索引',
-  [SysMenuButtonEventAction.DELETE_INDEX]: '删除索引',
-  [SysMenuButtonEventAction.QUERY_INDEX]: '索引列表',
-  [SysMenuButtonEventAction.DETAIL_INDEX]: '索引详情',
-  [SysMenuButtonEventAction.CREATE_RELATION]: '新增关系',
-  [SysMenuButtonEventAction.UPDATE_RELATION]: '编辑关系',
-  [SysMenuButtonEventAction.DELETE_RELATION]: '删除关系',
-  [SysMenuButtonEventAction.QUERY_RELATION]: '关系列表',
-  [SysMenuButtonEventAction.DETAIL_RELATION]: '关系详情',
+  get [SysMenuButtonEventAction.QUERY]() {
+    return t('ui.query')
+  },
+  get [SysMenuButtonEventAction.METADATA]() {
+    return t('ui.pageMetadata')
+  },
+  get [SysMenuButtonEventAction.DETAIL]() {
+    return t('ui.details')
+  },
+  get [SysMenuButtonEventAction.CREATE]() {
+    return t('ui.create')
+  },
+  get [SysMenuButtonEventAction.CREATE_CHILD]() {
+    return t('ui.addSubclass')
+  },
+  get [SysMenuButtonEventAction.UPDATE]() {
+    return t('ui.edit')
+  },
+  get [SysMenuButtonEventAction.DELETE]() {
+    return t('ui.delete')
+  },
+  get [SysMenuButtonEventAction.REFRESH]() {
+    return t('ui.refresh')
+  },
+  get [SysMenuButtonEventAction.BATCH_DELETE]() {
+    return t('ui.batchDelete')
+  },
+  get [SysMenuButtonEventAction.COPY]() {
+    return t('ui.copy')
+  },
+  get [SysMenuButtonEventAction.DUPLICATE]() {
+    return t('ui.copyRecord')
+  },
+  get [SysMenuButtonEventAction.EXPORT]() {
+    return t('ui.export')
+  },
+  get [SysMenuButtonEventAction.NAVIGATE]() {
+    return t('ui.pageJump')
+  },
+  get [SysMenuButtonEventAction.CUSTOM]() {
+    return t('ui.custom')
+  },
+  get [SysMenuButtonEventAction.SAVE]() {
+    return t('ui.save')
+  },
+  get [SysMenuButtonEventAction.ORDER]() {
+    return t('ui.sort')
+  },
+  get [SysMenuButtonEventAction.REFRESH_CACHE]() {
+    return t('ui.refreshCache')
+  },
+  get [SysMenuButtonEventAction.TEST_EMAIL]() {
+    return t('ui.testMail')
+  },
+  get [SysMenuButtonEventAction.CREATE_BUTTON]() {
+    return t('ui.addButton')
+  },
+  get [SysMenuButtonEventAction.UPDATE_BUTTON]() {
+    return t('ui.editButton')
+  },
+  get [SysMenuButtonEventAction.DELETE_BUTTON]() {
+    return t('ui.removeButton')
+  },
+  get [SysMenuButtonEventAction.QUERY_BUTTON]() {
+    return t('ui.buttonQuery')
+  },
+  get [SysMenuButtonEventAction.BUTTON_METADATA]() {
+    return t('ui.buttonMetadata')
+  },
+  get [SysMenuButtonEventAction.CREATE_ITEM]() {
+    return t('ui.addDictionaryEntry')
+  },
+  get [SysMenuButtonEventAction.UPDATE_ITEM]() {
+    return t('ui.editDictionaryItems')
+  },
+  get [SysMenuButtonEventAction.DELETE_ITEM]() {
+    return t('ui.removeDictionaryEntry')
+  },
+  get [SysMenuButtonEventAction.QUERY_ITEM]() {
+    return t('ui.dictionaryEntryQueries')
+  },
+  get [SysMenuButtonEventAction.DETAIL_ITEM]() {
+    return t('ui.dictionaryItemDetails')
+  },
+  get [SysMenuButtonEventAction.ITEM_METADATA]() {
+    return t('ui.dictionaryItemMetadata')
+  },
+  get [SysMenuButtonEventAction.ASSIGN_PERMISSION]() {
+    return t('ui.allocationOfCompetence')
+  },
+  get [SysMenuButtonEventAction.QUERY_USER_MENU]() {
+    return t('ui.userMenuQuery')
+  },
+  get [SysMenuButtonEventAction.QUERY_PERMISSION_MENU]() {
+    return t('ui.authorizedMenuQuery')
+  },
+  get [SysMenuButtonEventAction.RESET_PASSWORD]() {
+    return t('ui.resetPassword')
+  },
+  get [SysMenuButtonEventAction.UNLOCK_LOGIN]() {
+    return t('ui.unlock')
+  },
+  get [SysMenuButtonEventAction.ROTATE_SECRET]() {
+    return t('ui.rotationKey')
+  },
+  get [SysMenuButtonEventAction.PUBLISH]() {
+    return t('ui.publishAction')
+  },
+  get [SysMenuButtonEventAction.UNPUBLISH]() {
+    return t('ui.cancelRelease')
+  },
+  get [SysMenuButtonEventAction.RUN]() {
+    return t('ui.run')
+  },
+  get [SysMenuButtonEventAction.VERSION]() {
+    return t('ui.version')
+  },
+  get [SysMenuButtonEventAction.DISABLE]() {
+    return t('ui.disabled')
+  },
+  get [SysMenuButtonEventAction.PUBLISH_MENU]() {
+    return t('ui.releaseToMenu')
+  },
+  get [SysMenuButtonEventAction.UNPUBLISH_MENU]() {
+    return t('ui.cancelReleaseMenu')
+  },
+  get [SysMenuButtonEventAction.INIT_META]() {
+    return t('ui.initializeMetadata')
+  },
+  get [SysMenuButtonEventAction.SYNC_FIELDS]() {
+    return t('ui.syncFields')
+  },
+  get [SysMenuButtonEventAction.SYNC_INDEX]() {
+    return t('ui.syncIndex')
+  },
+  get [SysMenuButtonEventAction.FIELD_MANAGER]() {
+    return t('ui.fieldManagement')
+  },
+  get [SysMenuButtonEventAction.CREATE_FIELD]() {
+    return t('ui.addField')
+  },
+  get [SysMenuButtonEventAction.UPDATE_FIELD]() {
+    return t('ui.editFields')
+  },
+  get [SysMenuButtonEventAction.DELETE_FIELD]() {
+    return t('ui.deleteField')
+  },
+  get [SysMenuButtonEventAction.QUERY_FIELD]() {
+    return t('ui.fieldList')
+  },
+  get [SysMenuButtonEventAction.DETAIL_FIELD]() {
+    return t('ui.fieldDetails')
+  },
+  get [SysMenuButtonEventAction.CREATE_INDEX]() {
+    return t('ui.addIndex')
+  },
+  get [SysMenuButtonEventAction.UPDATE_INDEX]() {
+    return t('ui.editIndex')
+  },
+  get [SysMenuButtonEventAction.DELETE_INDEX]() {
+    return t('ui.deleteIndex')
+  },
+  get [SysMenuButtonEventAction.QUERY_INDEX]() {
+    return t('ui.indexList')
+  },
+  get [SysMenuButtonEventAction.DETAIL_INDEX]() {
+    return t('ui.indexDetails')
+  },
+  get [SysMenuButtonEventAction.CREATE_RELATION]() {
+    return t('ui.addRelationship')
+  },
+  get [SysMenuButtonEventAction.UPDATE_RELATION]() {
+    return t('ui.editRelations')
+  },
+  get [SysMenuButtonEventAction.DELETE_RELATION]() {
+    return t('ui.removeRelationship')
+  },
+  get [SysMenuButtonEventAction.QUERY_RELATION]() {
+    return t('ui.relationshipList')
+  },
+  get [SysMenuButtonEventAction.DETAIL_RELATION]() {
+    return t('ui.relationshipDetails')
+  },
 }
 
 export enum SysTableRelationType {
@@ -326,10 +579,18 @@ export enum SysTableRelationType {
 }
 
 export const SysTableRelationTypeMap = {
-  [SysTableRelationType.ONE_TO_ONE]: '一对一',
-  [SysTableRelationType.ONE_TO_MANY]: '一对多',
-  [SysTableRelationType.MANY_TO_ONE]: '多对一',
-  [SysTableRelationType.MANY_TO_MANY]: '多对多',
+  get [SysTableRelationType.ONE_TO_ONE]() {
+    return t('ui.oneOnOne')
+  },
+  get [SysTableRelationType.ONE_TO_MANY]() {
+    return t('ui.morePairs')
+  },
+  get [SysTableRelationType.MANY_TO_ONE]() {
+    return t('ui.oneMore')
+  },
+  get [SysTableRelationType.MANY_TO_MANY]() {
+    return t('ui.multiplePairs')
+  },
 }
 
 export enum SysTableFieldCategory {
@@ -339,7 +600,13 @@ export enum SysTableFieldCategory {
 }
 
 export const SysTableFieldCategoryMap = {
-  [SysTableFieldCategory.NORMAL]: '普通字段',
-  [SysTableFieldCategory.VIRTUAL]: '虚拟列',
-  [SysTableFieldCategory.CALCULATED]: '计算字段',
+  get [SysTableFieldCategory.NORMAL]() {
+    return t('ui.normalFields')
+  },
+  get [SysTableFieldCategory.VIRTUAL]() {
+    return t('ui.virtualColumn')
+  },
+  get [SysTableFieldCategory.CALCULATED]() {
+    return t('ui.calculateFields')
+  },
 }

@@ -5,8 +5,8 @@
     dense
     color="primary"
     icon="bookmark_border"
-    :label="currentLabel"
-    :title="currentLabel"
+    :label="displayCurrentLabel"
+    :title="displayCurrentLabel"
     :loading="loading"
     :disable="disabled"
     content-class="query-scheme-selector-menu"
@@ -32,7 +32,7 @@
           </q-item-section>
           <q-item-section side class="row items-center no-wrap q-gutter-xs">
             <q-icon v-if="scheme.is_default" name="star" color="amber-7" size="16px">
-              <q-tooltip>默认方案</q-tooltip>
+              <q-tooltip>{{ t('ui.defaultScheme') }}</q-tooltip>
             </q-icon>
             <q-icon
               v-if="scheme.status !== QuerySchemeValidationStatus.VALID"
@@ -44,8 +44,8 @@
             >
               <q-tooltip>{{
                 scheme.status === QuerySchemeValidationStatus.INVALID
-                  ? '方案不可用'
-                  : '方案需要修复'
+                  ? t('ui.programNotAvailable')
+                  : t('ui.programmeNeedsRehabilitation')
               }}</q-tooltip>
             </q-icon>
           </q-item-section>
@@ -61,13 +61,13 @@
           ><q-icon name="error_outline" color="negative" size="20px"
         /></q-item-section>
         <q-item-section>
-          <q-item-label class="text-negative">查询方案加载失败</q-item-label>
-          <q-item-label caption>点击重试</q-item-label>
+          <q-item-label class="text-negative">{{ t('ui.failedToLoadQueryScheme') }}</q-item-label>
+          <q-item-label caption>{{ t('ui.clickToRetry') }}</q-item-label>
         </q-item-section>
       </q-item>
       <q-item v-else-if="!schemes.length && !loading" class="query-scheme-selector-empty">
         <q-item-section class="text-grey-7">
-          暂无已保存方案，可保存当前查询条件以便下次使用
+          {{ t('ui.noSchemeSavedSaveTheCurrentQueryConditionsForNext') }}
         </q-item-section>
       </q-item>
       <q-separator />
@@ -90,7 +90,7 @@
         @click="$emit('restore-current')"
       >
         <q-item-section avatar><q-icon name="undo" color="primary" size="20px" /></q-item-section>
-        <q-item-section>撤销当前方案修改</q-item-section>
+        <q-item-section>{{ t('ui.undoTheCurrentProgramChanges') }}</q-item-section>
       </q-item>
       <q-item
         class="query-scheme-selector-action"
@@ -101,29 +101,33 @@
         <q-item-section avatar
           ><q-icon name="restart_alt" color="primary" size="20px"
         /></q-item-section>
-        <q-item-section>恢复默认查询</q-item-section>
+        <q-item-section>{{ t('ui.restoreDefaultQuery') }}</q-item-section>
       </q-item>
       <q-item class="query-scheme-selector-action" clickable v-close-popup @click="$emit('manage')">
         <q-item-section avatar
           ><q-icon name="settings" color="primary" size="20px"
         /></q-item-section>
-        <q-item-section>管理查询方案</q-item-section>
+        <q-item-section>{{ t('ui.manageQueryPrograms') }}</q-item-section>
       </q-item>
     </q-list>
   </q-btn-dropdown>
   <q-dialog v-model="confirmVisible">
     <q-card style="width: 420px; max-width: 100%">
-      <q-card-section class="text-h6">切换查询方案</q-card-section>
-      <q-card-section>当前方案有未保存修改，切换后这些修改将丢失。</q-card-section>
+      <q-card-section class="text-h6">{{ t('ui.switchQueryScheme') }}</q-card-section>
+      <q-card-section>{{
+        t('ui.thereAreUnsavedChangesToTheCurrentSchemeWhichWill')
+      }}</q-card-section>
       <q-card-actions align="right">
-        <q-btn v-close-popup flat label="取消" />
-        <q-btn color="primary" label="继续切换" @click="confirmSelect" />
+        <q-btn v-close-popup flat :label="t('ui.cancel')" />
+        <q-btn color="primary" :label="t('ui.continueSwitching')" @click="confirmSelect" />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref } from 'vue'
 import {
   QUERY_SCHEME_TYPE_LABELS,
@@ -132,6 +136,8 @@ import {
   type QuerySchemeSource,
   type QuerySchemeSummary,
 } from 'src/modules/query-scheme/types'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(
   defineProps<{
@@ -144,13 +150,15 @@ const props = withDefaults(
     source?: QuerySchemeSource | null
   }>(),
   {
-    currentLabel: '查询方案',
+    currentLabel: '',
     loading: false,
     disabled: false,
     dirty: false,
     loadError: '',
   },
 )
+
+const displayCurrentLabel = computed(() => props.currentLabel || t('ui.queryScheme'))
 
 const emit = defineEmits<{
   select: [scheme: QuerySchemeSummary]
@@ -194,10 +202,10 @@ const groupedSchemes = computed(() =>
 )
 const saveActionLabel = computed(() => {
   if (props.source?.type === QuerySchemeType.PERSONAL && props.dirty) {
-    return '保存当前方案修改'
+    return t('ui.saveTheCurrentProgramChanges')
   }
-  if (props.source) return '另存为我的方案'
-  return '保存当前查询为方案'
+  if (props.source) return t('ui.saveAsMyScheme')
+  return t('ui.saveTheCurrentQueryAsAScheme')
 })
 </script>
 

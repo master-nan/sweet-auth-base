@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { SysMasterDetailMode } from 'src/types/enum'
 
 export const MasterDetailDisplayMode = {
@@ -21,17 +22,23 @@ export interface MasterDetailLayoutConfig {
 
 export const masterDetailDisplayModeOptions = [
   {
-    label: '摘要主表',
+    get label() {
+      return t('ui.summaryMasterTable')
+    },
     value: MasterDetailDisplayMode.SUMMARY,
     maxFields: 5,
   },
   {
-    label: '主表表格',
+    get label() {
+      return t('ui.mainTableTable')
+    },
     value: MasterDetailDisplayMode.TABLE,
     maxFields: 12,
   },
   {
-    label: '上下主子表',
+    get label() {
+      return t('ui.masterSWatch')
+    },
     value: MasterDetailDisplayMode.STACKED,
     maxFields: Infinity,
   },

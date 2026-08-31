@@ -145,7 +145,7 @@
           dense
           unelevated
           icon="remove"
-          aria-label="减少"
+          :aria-label="t('ui.reduction')"
           class="number-input-field__step"
           :tabindex="-1"
           :disable="context.readonly"
@@ -157,7 +157,7 @@
           dense
           unelevated
           icon="add"
-          aria-label="增加"
+          :aria-label="t('ui.increase')"
           class="number-input-field__step"
           :tabindex="-1"
           :disable="context.readonly"
@@ -219,16 +219,18 @@
           {{
             context.relationSelect
               ? context.relationLoading
-                ? '正在加载选项...'
-                : '暂无选项，可输入关键字搜索'
-              : '暂无选项'
+                ? t('ui.loadingOptions')
+                : t('ui.noOptionsEnterKeywordSearch')
+              : t('ui.noOptionsAvailable')
           }}
         </q-item-section>
       </q-item>
     </template>
     <template #after-options>
       <q-item v-if="context.relationHasMore" dense>
-        <q-item-section class="text-grey-6 text-caption">向下滚动加载更多</q-item-section>
+        <q-item-section class="text-grey-6 text-caption">{{
+          t('ui.scrollDownToLoadMore')
+        }}</q-item-section>
       </q-item>
     </template>
   </q-select>
@@ -311,6 +313,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import type { TableField } from 'src/api/services/sys-table'
 import CascaderSelect from 'src/components/Cascader/CascaderSelect.vue'
@@ -322,6 +326,8 @@ import JsonEditor from 'src/components/JsonEditor/JsonEditor.vue'
 import KeyValueEditor from 'src/components/JsonEditor/KeyValueEditor.vue'
 import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
 import type { resolveOrganizationSelectorConfig } from 'src/utils/field-metadata'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type OrganizationSelectorConfig = NonNullable<ReturnType<typeof resolveOrganizationSelectorConfig>>
 

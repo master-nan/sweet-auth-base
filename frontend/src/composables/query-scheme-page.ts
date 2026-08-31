@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
@@ -67,7 +68,10 @@ export function useQuerySchemePage<TQuery extends Query>(
     }
     $q.notify({
       type: 'warning',
-      message: runtime.issues.value[0]?.message || runtime.error.value || '该方案当前不可用',
+      message:
+        runtime.issues.value[0]?.message ||
+        runtime.error.value ||
+        t('ui.theProgramIsCurrentlyUnavailable'),
     })
   }
 

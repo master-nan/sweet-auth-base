@@ -6,7 +6,7 @@
     <div class="dictionary-workspace">
       <master-detail-page
         :mode="SysMasterDetailMode.SUMMARY"
-        master-title="字典类型"
+        :master-title="t('ui.dictionaryType')"
         master-width="372px"
         min-width="980px"
         min-height="calc(100vh - 142px)"
@@ -38,13 +38,18 @@
                 outlined
                 debounce="300"
                 v-model="keyword"
-                placeholder="搜索字典名称 / 编码"
+                :placeholder="t('ui.searchForDictionaryNameEncoding')"
               >
                 <template v-slot:append>
                   <q-icon name="search" />
                 </template>
               </q-input>
-              <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+              <q-btn
+                color="primary"
+                :label="t('ui.search')"
+                :disable="loading"
+                @click="handleBasicSearch"
+              />
             </div>
           </div>
         </template>
@@ -94,7 +99,7 @@
             <q-item v-if="loading">
               <q-item-section class="text-center">
                 <q-spinner color="primary" size="24px" />
-                <div class="q-mt-sm text-grey">加载中...</div>
+                <div class="q-mt-sm text-grey">{{ t('ui.loading') }}</div>
               </q-item-section>
             </q-item>
           </q-list>
@@ -114,14 +119,18 @@
           <div class="dictionary-detail-context">
             <div class="dictionary-context-card">
               <div class="dictionary-context-icon">
-                {{ currentDict ? currentDict.dict_name.slice(0, 1) : '字' }}
+                {{ currentDict ? currentDict.dict_name.slice(0, 1) : t('ui.word') }}
               </div>
               <div class="dictionary-context-copy">
                 <div class="dictionary-context-title">
-                  {{ currentDict ? currentDict.dict_name : '请选择字典类型' }}
+                  {{ currentDict ? currentDict.dict_name : t('ui.selectTheDictionaryType') }}
                 </div>
                 <div class="dictionary-context-code">
-                  {{ currentDict ? currentDict.dict_code : '左侧选择后管理对应字典项' }}
+                  {{
+                    currentDict
+                      ? currentDict.dict_code
+                      : t('ui.manageDictionariesAfterLeftSelection')
+                  }}
                 </div>
               </div>
             </div>
@@ -142,7 +151,7 @@
                 outlined
                 debounce="300"
                 v-model="itemSearchText"
-                placeholder="搜索字典项名称 / 编码 / 值"
+                :placeholder="t('ui.searchDictionaryEntriesForEncodingValues')"
                 :disable="!currentDict"
               >
                 <template v-slot:append>
@@ -176,7 +185,11 @@
             :dark="$q.dark.isActive"
             :loading="itemsLoading"
             :no-data-label="
-              !currentDict ? '请先选择左侧字典' : itemsLoading ? '加载中...' : '暂无字典项'
+              !currentDict
+                ? t('ui.pleaseSelectTheLeftDictionaryFirst')
+                : itemsLoading
+                  ? t('ui.loading')
+                  : t('ui.noDictionaryEntryForNow')
             "
             :pagination="{ rowsPerPage: 0 }"
             hide-pagination
@@ -200,7 +213,6 @@
                 </q-btn>
               </q-td>
             </template>
-
           </q-table>
         </template>
       </master-detail-page>
@@ -210,9 +222,9 @@
     <dynamic-form-dialog
       v-model="showDictFormDialog"
       :edit-data="currentEditDict"
-      :title="currentEditDict ? '编辑字典' : '新增字典'"
+      :title="currentEditDict ? t('ui.editDictionary') : t('ui.addDictionary')"
       :fields="dictFields"
-      :submit-btn-text="currentEditDict ? '保存' : '创建'"
+      :submit-btn-text="currentEditDict ? t('ui.save') : t('ui.createRecord')"
       @submit="handleDictFormSubmit"
     />
 
@@ -220,15 +232,23 @@
     <dynamic-form-dialog
       v-model="showDictItemFormDialog"
       :edit-data="currentEditDictItem"
-      :title="currentEditDictItem && currentEditDictItem.id ? '编辑字典项' : '新增字典项'"
+      :title="
+        currentEditDictItem && currentEditDictItem.id
+          ? t('ui.editDictionaryItems')
+          : t('ui.addDictionaryEntry')
+      "
       :fields="dictItemFields"
-      :submit-btn-text="currentEditDictItem && currentEditDictItem.id ? '保存' : '创建'"
+      :submit-btn-text="
+        currentEditDictItem && currentEditDictItem.id ? t('ui.save') : t('ui.createRecord')
+      "
       @submit="handleDictItemFormSubmit"
     />
   </base-content>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'develop_dictionary' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
@@ -255,6 +275,8 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { SysMasterDetailMode } from 'src/types/enum'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const loading = ref(false)
 const loadError = ref('')
@@ -298,16 +320,16 @@ const detailTopButtons = computed(() => executableButtons(rawDetailTopButtons.va
 const detailLineButtons = computed(() => executableButtons(rawDetailLineButtons.value))
 
 const masterButtonLabel = (btn: MenuButton) => {
-  if (btn.event_action === 'create') return '新增字典'
-  if (btn.event_action === 'update') return '编辑字典'
-  if (btn.event_action === 'delete') return '删除字典'
+  if (btn.event_action === 'create') return t('ui.addDictionary')
+  if (btn.event_action === 'update') return t('ui.editDictionary')
+  if (btn.event_action === 'delete') return t('ui.removeDictionary')
   return btn.name
 }
 
 const detailButtonLabel = (btn: MenuButton) => {
-  if (btn.event_action === 'create_item') return '新增字典项'
-  if (btn.event_action === 'update_item') return '编辑字典项'
-  if (btn.event_action === 'delete_item') return '删除字典项'
+  if (btn.event_action === 'create_item') return t('ui.addDictionaryEntry')
+  if (btn.event_action === 'update_item') return t('ui.editDictionaryItems')
+  if (btn.event_action === 'delete_item') return t('ui.removeDictionaryEntry')
   return btn.name
 }
 
@@ -429,7 +451,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '字典列表加载失败'
+    loadError.value = t('ui.loadingOfDictionaryListFailed')
   } finally {
     loading.value = false
   }
@@ -543,7 +565,11 @@ const openEditDictItemDialog = (dictItem: DictItem) => {
 // 确认删除字典
 const confirmDeleteDict = (dict: Dict) => {
   confirmDanger({
-    message: `确定要删除字典 "${dict.dict_name}" 吗？删除后将无法恢复，且会同时删除所有字典项！`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheDictionaryTheDeletionWill', {
+        value1: dict.dict_name,
+      })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await dictApi.deleteDict(dict.id)
@@ -562,7 +588,9 @@ const confirmDeleteDict = (dict: Dict) => {
 // 确认删除字典项
 const confirmDeleteDictItem = (dictItem: DictItem) => {
   confirmDanger({
-    message: `确定要删除字典项 "${dictItem.item_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheDictionaryEntry', { value1: dictItem.item_name })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await dictApi.deleteDictItem(dictItem.id)

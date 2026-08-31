@@ -20,7 +20,7 @@
     <template #no-option>
       <q-item>
         <q-item-section class="text-grey-7">
-          {{ loadFailed ? '角色加载失败' : '暂无可选角色' }}
+          {{ loadFailed ? t('ui.roleLoadFailed') : t('ui.thereSNoChoice') }}
         </q-item-section>
       </q-item>
     </template>
@@ -28,9 +28,13 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoleApi, type Role } from 'src/api/services/sys-role'
 import SweetSelect from 'src/components/Select/SweetSelect.vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type RoleOption = { label: string; value: number; disabled?: boolean }
 type FilterUpdate = (callback: () => void) => void

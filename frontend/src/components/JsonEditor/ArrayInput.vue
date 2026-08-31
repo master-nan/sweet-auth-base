@@ -2,7 +2,7 @@
   <div class="array-input">
     <q-card flat bordered class="q-pa-sm">
       <q-card-section class="q-py-xs">
-        <div class="text-subtitle1">{{ label }}</div>
+        <div class="text-subtitle1">{{ displayLabel }}</div>
       </q-card-section>
 
       <q-separator />
@@ -24,7 +24,7 @@
           </q-chip>
 
           <div v-if="filteredItems.length === 0" class="text-grey q-px-sm q-py-xs">
-            暂无参数，请在下方添加
+            {{ t('ui.noParametersAddBelow') }}
           </div>
         </div>
 
@@ -35,7 +35,7 @@
               v-model="newItem"
               outlined
               dense
-              :placeholder="`请输入${label}项`"
+              :placeholder="t('ui.enterNamedItem', { label: displayLabel })"
               :disable="disabled"
               @keyup.enter="addItemFromInput"
               @blur="handleInputBlur"
@@ -61,7 +61,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ref, watch, onMounted, computed } from 'vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 interface ArrayInputProps {
   modelValue?: string[] | string | null
@@ -72,10 +76,12 @@ interface ArrayInputProps {
 
 const props = withDefaults(defineProps<ArrayInputProps>(), {
   modelValue: () => [],
-  label: '数组数据',
+  label: '',
   rules: () => [],
   disabled: false,
 })
+
+const displayLabel = computed(() => props.label || t('ui.numericData'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
@@ -233,7 +239,7 @@ const validate = () => {
   for (const rule of props.rules) {
     const result = rule(filteredItems.value)
     if (result !== true) {
-      errorMessage.value = typeof result === 'string' ? result : '字段值不合法'
+      errorMessage.value = typeof result === 'string' ? result : t('ui.invalidFieldValue')
       return false
     }
   }

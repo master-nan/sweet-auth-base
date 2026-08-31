@@ -6,25 +6,31 @@
           <q-icon name="space_dashboard" size="24px" />
         </div>
         <div class="dashboard-header__copy">
-          <h1>平台概览</h1>
-          <p>查看组织基础数据、登录会话、集成异常和最近操作。</p>
+          <h1>{{ t('ui.overviewOfThePlatform') }}</h1>
+          <p>
+            {{
+              t(
+                'ui.viewOrganizationalFundamentalsLoginSessionsIntegrationAnomaliesAndRecentOperations',
+              )
+            }}
+          </p>
         </div>
         <q-space />
         <div class="dashboard-header__meta">
-          <span>{{ userStore.user_name || '当前用户' }}</span>
-          <span>更新于 {{ refreshedAt || '-' }}</span>
+          <span>{{ userStore.user_name || t('ui.currentUser') }}</span>
+          <span>{{ t('ui.updateOn') }} {{ refreshedAt || '-' }}</span>
         </div>
         <q-btn round flat icon="refresh" :loading="refreshing" @click="loadDashboard">
-          <q-tooltip>刷新概览</q-tooltip>
+          <q-tooltip>{{ t('ui.updateOverview') }}</q-tooltip>
         </q-btn>
       </header>
 
       <q-banner v-if="partialFailure" dense class="dashboard-warning">
         <template #avatar><q-icon name="info_outline" color="warning" /></template>
-        部分概览数据暂时无法读取，其他模块仍可正常使用。
+        {{ t('ui.someOverviewDataAreNotAvailableForTheTimeBeing') }}
       </q-banner>
 
-      <section class="metric-strip" aria-label="平台关键指标">
+      <section class="metric-strip" :aria-label="t('ui.platformKeyIndicators')">
         <article v-for="item in metrics" :key="item.label" class="metric-item">
           <div class="metric-item__icon" :class="`metric-item__icon--${item.tone}`">
             <q-icon :name="item.icon" size="21px" />
@@ -41,15 +47,15 @@
         <section class="dashboard-section dashboard-section--organization">
           <div class="section-heading">
             <div>
-              <h2>组织基础数据</h2>
-              <p>法人架构、管理架构、人员和岗位的当前档案数量。</p>
+              <h2>{{ t('ui.organizationalFundamentals') }}</h2>
+              <p>{{ t('ui.numberOfCurrentFilesOfLegalEntitiesRegulatoryStructuresPersonnel') }}</p>
             </div>
             <q-btn
               v-if="canOpenOrganization"
               flat
               color="primary"
               icon-right="arrow_forward"
-              label="查看组织架构"
+              :label="t('ui.viewOrganisation')"
               :to="{ name: 'organization_structure' }"
             />
           </div>
@@ -68,7 +74,7 @@
                 icon="chevron_right"
                 :to="{ name: item.route }"
               >
-                <q-tooltip>打开{{ item.label }}</q-tooltip>
+                <q-tooltip>{{ t('ui.open') }}{{ item.label }}</q-tooltip>
               </q-btn>
             </article>
           </div>
@@ -77,8 +83,8 @@
         <section class="dashboard-section dashboard-section--attention">
           <div class="section-heading">
             <div>
-              <h2>需要关注</h2>
-              <p>只统计当前账号有权查看的运行异常。</p>
+              <h2>{{ t('ui.needingAttention') }}</h2>
+              <p>{{ t('ui.onlyTheCurrentAccountNumberIsCountedAsHavingThe') }}</p>
             </div>
           </div>
           <div class="attention-list">
@@ -99,7 +105,7 @@
               >
                 {{ item.value }}
               </q-chip>
-              <span v-else class="text-caption text-grey-6">无查看权限</span>
+              <span v-else class="text-caption text-grey-6">{{ t('ui.noView') }}</span>
               <q-btn
                 v-if="item.route && item.value !== null"
                 round
@@ -108,7 +114,7 @@
                 icon="chevron_right"
                 :to="{ name: item.route }"
               >
-                <q-tooltip>查看详情</q-tooltip>
+                <q-tooltip>{{ t('ui.viewDetails') }}</q-tooltip>
               </q-btn>
             </article>
           </div>
@@ -118,12 +124,12 @@
       <section class="dashboard-section dashboard-section--audit">
         <div class="section-heading">
           <div>
-            <h2>最近操作</h2>
+            <h2>{{ t('ui.recentOperation') }}</h2>
             <p>
               {{
                 auditAvailable
-                  ? '最近发生的后台操作，便于快速发现失败请求。'
-                  : '当前账号没有审计日志查看权限。'
+                  ? t('ui.recentBackOfficeOperationsFacilitateTheRapidDetectionOfFailedRequests')
+                  : t('ui.theCurrentAccountDoesNotHaveAuditLogAccess')
               }}
             </p>
           </div>
@@ -132,19 +138,19 @@
             flat
             color="primary"
             icon-right="arrow_forward"
-            label="查看全部"
+            :label="t('ui.viewAll')"
             :to="{ name: 'system_audit' }"
           />
         </div>
         <q-markup-table flat separator="horizontal" class="dashboard-table">
           <thead>
             <tr>
-              <th class="text-left">时间</th>
-              <th class="text-left">用户</th>
-              <th class="text-left">动作</th>
-              <th class="text-left">资源</th>
-              <th class="text-left">结果</th>
-              <th class="text-right">耗时</th>
+              <th class="text-left">{{ t('ui.time') }}</th>
+              <th class="text-left">{{ t('ui.user') }}</th>
+              <th class="text-left">{{ t('ui.action') }}</th>
+              <th class="text-left">{{ t('ui.resources') }}</th>
+              <th class="text-left">{{ t('ui.result') }}</th>
+              <th class="text-right">{{ t('ui.duration') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -160,22 +166,22 @@
                   :color="log.success ? 'positive' : 'negative'"
                   text-color="white"
                 >
-                  {{ log.success ? '成功' : '失败' }}
+                  {{ log.success ? t('ui.success') : t('ui.failed') }}
                 </q-chip>
               </td>
               <td class="text-right">{{ log.duration_ms }}ms</td>
             </tr>
             <tr v-if="recentLogs.length === 0">
               <td colspan="6" class="text-center text-grey-7 q-pa-lg">
-                {{ auditAvailable ? '暂无审计记录' : '无查看权限' }}
+                {{ auditAvailable ? t('ui.auditRecordsNotAvailable') : t('ui.noView') }}
               </td>
             </tr>
           </tbody>
         </q-markup-table>
       </section>
 
-      <nav class="quick-entry" aria-label="常用入口">
-        <span>常用入口</span>
+      <nav class="quick-entry" :aria-label="t('ui.commonEntry')">
+        <span>{{ t('ui.commonEntry') }}</span>
         <q-btn
           v-for="item in quickEntries"
           :key="item.route"
@@ -191,6 +197,8 @@
 </template>
 
 <script lang="ts" setup>
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, reactive, ref } from 'vue'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import { useUserStore } from 'src/stores/user'
@@ -199,6 +207,8 @@ import { queryOrganizationOptions, type OrganizationSelectorType } from 'src/api
 import { useUserSessionApi } from 'src/api/services/user-session'
 import { useIntegrationApi } from 'src/api/services/integration'
 import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'DashboardIndex' })
 
@@ -239,38 +249,57 @@ const combinedValue = (...values: SummaryValue[]): SummaryValue => {
 
 const attentionSummary = computed(() => {
   const parts: string[] = []
-  if (summary.failedExecutions !== null) parts.push(`执行失败 ${summary.failedExecutions}`)
-  if (summary.expiredCredentials !== null) parts.push(`凭证过期 ${summary.expiredCredentials}`)
-  return parts.length ? parts.join(' · ') : '无集成运行查看权限'
+  if (summary.failedExecutions !== null)
+    parts.push(t('ui.executionFailed', { value1: summary.failedExecutions }))
+  if (summary.expiredCredentials !== null)
+    parts.push(t('ui.expiry', { value1: summary.expiredCredentials }))
+  return parts.length ? parts.join(' · ') : t('ui.noIntegratedRunViewingAccess')
 })
 
 const metrics = computed(() => [
   {
-    label: '当前在线用户',
+    get label() {
+      return t('ui.currentOnlineUsers')
+    },
     value: summary.onlineUsers,
-    hint:
-      summary.onlineSessions === null
-        ? '无登录会话查看权限'
-        : `${summary.onlineSessions} 个活跃会话`,
+    get hint() {
+      return summary.onlineSessions === null
+        ? t('ui.noLoginSessionViewingPermissions')
+        : t('ui.liveSession', { value1: summary.onlineSessions })
+    },
     icon: 'group',
     tone: 'primary',
   },
   {
-    label: '法人主体',
+    get label() {
+      return t('ui.legalEntity')
+    },
     value: summary.legalEntities,
-    hint: summary.orgUnits === null ? '无组织档案查看权限' : `${summary.orgUnits} 个管理组织`,
+    get hint() {
+      return summary.orgUnits === null
+        ? t('ui.noAccessToOrganizationalFiles')
+        : t('ui.managementOrganizations', { value1: summary.orgUnits })
+    },
     icon: 'corporate_fare',
     tone: 'neutral',
   },
   {
-    label: '人员档案',
+    get label() {
+      return t('ui.employeeProfiles')
+    },
     value: summary.employees,
-    hint: summary.positions === null ? '无人员档案查看权限' : `${summary.positions} 个岗位`,
+    get hint() {
+      return summary.positions === null
+        ? t('ui.noAccessToPersonnelFiles')
+        : t('ui.posts', { value1: summary.positions })
+    },
     icon: 'badge',
     tone: 'positive',
   },
   {
-    label: '待处理异常',
+    get label() {
+      return t('ui.unusualToProcess')
+    },
     value: combinedValue(summary.failedExecutions, summary.expiredCredentials),
     hint: attentionSummary.value,
     icon: 'error_outline',
@@ -280,7 +309,9 @@ const metrics = computed(() => [
 
 const organizationItems = computed(() => [
   {
-    label: '法人主体',
+    get label() {
+      return t('ui.legalEntity')
+    },
     value: summary.legalEntities,
     icon: 'account_balance',
     color: 'primary',
@@ -288,7 +319,9 @@ const organizationItems = computed(() => [
     available: hasGrantedCapability('organization_legal_entity_options'),
   },
   {
-    label: '管理组织',
+    get label() {
+      return t('ui.managementOrganization')
+    },
     value: summary.orgUnits,
     icon: 'account_tree',
     color: 'teal',
@@ -296,7 +329,9 @@ const organizationItems = computed(() => [
     available: hasGrantedCapability('organization_unit_options'),
   },
   {
-    label: '人员档案',
+    get label() {
+      return t('ui.employeeProfiles')
+    },
     value: summary.employees,
     icon: 'badge',
     color: 'positive',
@@ -304,7 +339,9 @@ const organizationItems = computed(() => [
     available: hasGrantedCapability('organization_employee_options'),
   },
   {
-    label: '岗位档案',
+    get label() {
+      return t('ui.jobProfile')
+    },
     value: summary.positions,
     icon: 'work_outline',
     color: 'orange-8',
@@ -315,18 +352,28 @@ const organizationItems = computed(() => [
 
 const attentionItems = computed(() => [
   {
-    label: '失败的集成执行',
+    get label() {
+      return t('ui.failedIsolationExecution')
+    },
     value: summary.failedExecutions,
-    description:
-      summary.failedExecutions === 0 ? '当前没有失败执行' : '检查接口调用和同步处理结果',
+    get description() {
+      return summary.failedExecutions === 0
+        ? t('ui.noFailedExecutionAtThisTime')
+        : t('ui.checkInterfaceCallsAndSynchronizedProcessingResults')
+    },
     icon: 'sync_problem',
     route: 'integration_execution',
   },
   {
-    label: '已过期集成凭证',
+    get label() {
+      return t('ui.expiredIc')
+    },
     value: summary.expiredCredentials,
-    description:
-      summary.expiredCredentials === 0 ? '当前没有过期凭证' : '更新凭证后再恢复接口调用',
+    get description() {
+      return summary.expiredCredentials === 0
+        ? t('ui.noExpiredCertificateCurrentlyAvailable')
+        : t('ui.revertInterfaceCallAfterUpdatingTheVoucher')
+    },
     icon: 'key_off',
     route: 'integration_credential',
   },
@@ -335,25 +382,33 @@ const attentionItems = computed(() => [
 const quickEntries = computed(() => {
   const entries = [
     {
-      label: '组织架构',
+      get label() {
+        return t('ui.organizationalStructure')
+      },
       icon: 'account_tree',
       route: 'organization_structure',
       visible: canOpenOrganization.value,
     },
     {
-      label: '在线用户',
+      get label() {
+        return t('ui.onlineUsers')
+      },
       icon: 'devices',
       route: 'system_online_session',
       visible: hasGrantedCapability('system_online_session_query'),
     },
     {
-      label: '执行记录',
+      get label() {
+        return t('ui.implementationRecord')
+      },
       icon: 'play_circle',
       route: 'integration_execution',
       visible: hasGrantedCapability('integration_execution_query'),
     },
     {
-      label: '审计日志',
+      get label() {
+        return t('ui.auditLogs')
+      },
       icon: 'manage_search',
       route: 'system_audit',
       visible: auditAvailable.value,
@@ -422,11 +477,9 @@ const loadDashboard = async () => {
   }
   if (auditAvailable.value) {
     tasks.push(
-      accessLogApi
-        .queryAccessLogs({ page: 1, num: 6, expressions: [] })
-        .then((response) => {
-          recentLogs.value = response.data || []
-        }),
+      accessLogApi.queryAccessLogs({ page: 1, num: 6, expressions: [] }).then((response) => {
+        recentLogs.value = response.data || []
+      }),
     )
   }
 

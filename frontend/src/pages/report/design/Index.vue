@@ -115,10 +115,10 @@
     </main>
 
     <footer class="designer-statusbar">
-      <span>当前单元格：{{ activeCellLabel }}</span>
-      <span>数据集：{{ datasets.length }}</span>
-      <span>已绑定字段：{{ usedFields.length }}</span>
-      <span>{{ reportId ? `报表ID ${reportId}` : '新建报表' }}</span>
+      <span>{{ t('ui.currentCell') }}{{ activeCellLabel }}</span>
+      <span>{{ t('ui.dataSet') }}{{ datasets.length }}</span>
+      <span>{{ t('ui.boundFieldsPrefix') }}{{ usedFields.length }}</span>
+      <span>{{ reportId ? t('ui.reportId', { id: reportId }) : t('ui.newReport') }}</span>
     </footer>
 
     <report-dataset-dialog
@@ -175,9 +175,13 @@
       <q-card class="preview-dialog">
         <q-card-section class="dialog-head">
           <div>
-            <div class="dialog-title">运行预览</div>
+            <div class="dialog-title">{{ t('ui.runPreview') }}</div>
             <div class="dialog-caption">
-              {{ form.id ? '真实数据预览，已经过后端数据权限' : '未保存报表的本地结构预览' }}
+              {{
+                form.id
+                  ? t('ui.realDataPreviewBackendDataPermissions')
+                  : t('ui.previewOfLocalStructuresWithoutSavingReports')
+              }}
             </div>
           </div>
           <q-btn flat round dense icon="close" v-close-popup />
@@ -185,25 +189,13 @@
         <q-card-section>
           <div class="preview-meta">
             <q-chip dense square color="primary" text-color="white">
-              {{ previewData.total }} 行
+              {{ previewData.total }} {{ t('ui.okay') }}
             </q-chip>
-            <q-chip
-              v-if="previewData.meta?.version_no"
-              dense
-              square
-              outline
-              color="primary"
-            >
-              预览版本 V{{ previewData.meta.version_no }}
+            <q-chip v-if="previewData.meta?.version_no" dense square outline color="primary">
+              {{ t('ui.previewV') }}{{ previewData.meta.version_no }}
             </q-chip>
-            <q-chip
-              v-if="previewData.meta?.dataset_id"
-              dense
-              square
-              outline
-              color="primary"
-            >
-              主数据集 {{ previewData.meta.dataset_id }}
+            <q-chip v-if="previewData.meta?.dataset_id" dense square outline color="primary">
+              {{ t('ui.mainDataSet') }} {{ previewData.meta.dataset_id }}
             </q-chip>
             <q-chip
               v-for="join in previewData.joins || []"
@@ -238,6 +230,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'report_design' })
 
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -294,7 +288,13 @@ import {
   reportSheetCellSpan,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
-import { hasReportCellConfig, normalizeReportSheet, reportParameterDefaultsForField } from 'src/modules/report/schema'
+import {
+  hasReportCellConfig,
+  normalizeReportSheet,
+  reportParameterDefaultsForField,
+} from 'src/modules/report/schema'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const route = useRoute()
@@ -402,9 +402,15 @@ const datasetOptions = computed(() =>
     value: item.id,
   })),
 )
-const primaryDataset = computed(() => datasets.value.find((item) => item.primary) || datasets.value[0])
-const selectedDataset = computed(() => datasets.value.find((item) => item.id === selectedDatasetId.value))
-const editingDataset = computed(() => datasets.value.find((item) => item.id === editingDatasetId.value))
+const primaryDataset = computed(
+  () => datasets.value.find((item) => item.primary) || datasets.value[0],
+)
+const selectedDataset = computed(() =>
+  datasets.value.find((item) => item.id === selectedDatasetId.value),
+)
+const editingDataset = computed(() =>
+  datasets.value.find((item) => item.id === editingDatasetId.value),
+)
 const activeCell = computed(() => {
   const parts = selectedCellId.value.split(':')
   const row = Number(parts[0])
@@ -448,7 +454,9 @@ const datasetDraftPreviewFields = computed(() => {
   if (datasetDraft.type === 'table') {
     return dataSources.value.find((item) => item.code === datasetDraft.source_code)?.fields || []
   }
-  return sqlDraftFields.value.length ? sqlDraftFields.value : parseSqlDatasetFields(datasetDraft.fieldsText)
+  return sqlDraftFields.value.length
+    ? sqlDraftFields.value
+    : parseSqlDatasetFields(datasetDraft.fieldsText)
 })
 const parameterFieldOptions = computed(() => {
   const dataset = datasets.value.find((item) => item.id === parameterDraft.dataset_id)
@@ -490,7 +498,8 @@ const activeBindingField = computed({
     const dataset = datasets.value.find((item) => item.id === activeBindingDatasetId.value)
     const field = dataset?.fields.find((item) => item.code === value)
     patchBinding({ field: value })
-    if (field) patchActiveCell({ value: reportBindingText(activeBindingType.value, dataset!, field) })
+    if (field)
+      patchActiveCell({ value: reportBindingText(activeBindingType.value, dataset!, field) })
     buildLocalPreview()
   },
 })
@@ -522,7 +531,12 @@ async function loadDataSources() {
     dataSources.value = res.data || []
   } catch {
     dataSources.value = []
-    $q.notify({ type: 'negative', message: '数据源加载失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.dataSourceLoadFailed')
+      },
+    })
   }
 }
 
@@ -535,7 +549,12 @@ async function loadReport() {
     const res = await reportApi.queryReportById(reportId.value)
     applyReport(res.data)
   } catch {
-    $q.notify({ type: 'negative', message: '报表加载失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToLoadReport')
+      },
+    })
     goBack()
   }
 }
@@ -559,7 +578,8 @@ function applyReport(report: Report) {
       ? report.layout_config.datasets
       : createInitialDatasets(report.source_code),
   )
-  datasetJoins.value = report.layout_config?.dataset_joins || report.query_config?.dataset_joins || []
+  datasetJoins.value =
+    report.layout_config?.dataset_joins || report.query_config?.dataset_joins || []
   sheet.value = normalizeReportSheet(report.layout_config?.sheet || defaultReportSheet())
   parameters.value = report.layout_config?.parameters || report.query_config?.parameters || []
   selectedDatasetId.value = datasets.value[0]?.id || ''
@@ -596,7 +616,7 @@ function createInitialDatasets(sourceCode?: string): ReportDataset[] {
   return [
     {
       id: 'main',
-      name: source.name || '主数据',
+      name: source.name || t('ui.primaryData'),
       type: 'table',
       source_code: source.code,
       fields: source.fields,
@@ -667,7 +687,7 @@ function handleDraftTypeChange(value: ReportDatasetType) {
     sqlDraftFields.value = []
     handleDraftSourceChange(datasetDraft.source_code || '')
   } else {
-    datasetDraft.name = 'SQL 数据集'
+    datasetDraft.name = t('ui.sqlDataset')
     datasetDraft.source_code = ''
     sqlDraftFields.value = parseSqlDatasetFields(datasetDraft.fieldsText)
   }
@@ -688,7 +708,12 @@ function handleDatasetDraftSqlChange(value: string) {
 async function inferSqlDatasetFields() {
   const sql = datasetDraft.sql.trim()
   if (!sql) {
-    $q.notify({ type: 'warning', message: '请先填写 SQL' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseFillInSql')
+      },
+    })
     return false
   }
   sqlFieldsLoading.value = true
@@ -697,10 +722,20 @@ async function inferSqlDatasetFields() {
     sqlDraftFields.value = res.data || []
     datasetDraft.fieldsText = sqlDraftFields.value.map((field) => field.code).join(',')
     if (!sqlDraftFields.value.length) {
-      $q.notify({ type: 'warning', message: 'SQL 未解析出字段' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.noFieldsParsedFromSql')
+        },
+      })
       return false
     }
-    $q.notify({ type: 'positive', message: `已解析 ${sqlDraftFields.value.length} 个字段` })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.parsedFields', { value1: sqlDraftFields.value.length })
+      },
+    })
     return true
   } catch (error) {
     sqlDraftFields.value = []
@@ -716,7 +751,12 @@ async function confirmDataset() {
   if (datasetDraft.type === 'table') {
     const source = dataSources.value.find((item) => item.code === datasetDraft.source_code)
     if (!source) {
-      $q.notify({ type: 'warning', message: '请选择来源表' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.selectSourceTable')
+        },
+      })
       return
     }
     upsertDataset({
@@ -729,7 +769,12 @@ async function confirmDataset() {
     })
   } else {
     if (!datasetDraft.sql.trim()) {
-      $q.notify({ type: 'warning', message: '请填写 SQL' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.sqlRequired')
+        },
+      })
       return
     }
     let fields = datasetDraftPreviewFields.value
@@ -737,13 +782,18 @@ async function confirmDataset() {
       const ok = await inferSqlDatasetFields()
       fields = datasetDraftPreviewFields.value
       if (!ok || fields.length === 0) {
-        $q.notify({ type: 'warning', message: '请先解析 SQL 字段' })
+        $q.notify({
+          type: 'warning',
+          get message() {
+            return t('ui.pleaseParseSqlFieldsFirst')
+          },
+        })
         return
       }
     }
     upsertDataset({
       id,
-      name: datasetDraft.name || 'SQL 数据集',
+      name: datasetDraft.name || t('ui.sqlDataset'),
       type: 'sql',
       sql: datasetDraft.sql,
       fields,
@@ -778,12 +828,14 @@ function removeDataset(id: string) {
     (join) => join.left_dataset_id !== id && join.right_dataset_id !== id,
   )
   parameters.value = parameters.value.filter((param) => param.dataset_id !== id)
-  sheet.value.cells = sheet.value.cells.map((cell) => {
-    if (cell.binding?.dataset_id !== id) return cell
-    const style = { ...(cell.style || {}) }
-    delete style.color
-    return { ...cell, value: '', binding: undefined, style }
-  }).filter(hasReportCellConfig)
+  sheet.value.cells = sheet.value.cells
+    .map((cell) => {
+      if (cell.binding?.dataset_id !== id) return cell
+      const style = { ...(cell.style || {}) }
+      delete style.color
+      return { ...cell, value: '', binding: undefined, style }
+    })
+    .filter(hasReportCellConfig)
   if (removed?.primary && datasets.value[0]) datasets.value[0].primary = true
   selectedDatasetId.value = datasets.value[0]?.id || ''
   buildLocalPreview()
@@ -792,7 +844,12 @@ function removeDataset(id: string) {
 function setPrimaryDataset(id: string) {
   const dataset = datasets.value.find((item) => item.id === id)
   if (!dataset || dataset.type !== 'table') {
-    $q.notify({ type: 'warning', message: '只有现有表数据集可以作为第一版运行主表' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.onlyExistingTableDataSetsCanBeUsedAsThe')
+      },
+    })
     return
   }
   datasets.value.forEach((item) => {
@@ -854,7 +911,8 @@ function cellAt(row: number, col: number) {
 
 function patchCell(row: number, col: number, patch: Partial<ReportSheetCell>) {
   const index = sheet.value.cells.findIndex((item) => item.row === row && item.col === col)
-  const current = index === -1 ? { id: reportCellId(row, col), row, col, value: '' } : sheet.value.cells[index]!
+  const current =
+    index === -1 ? { id: reportCellId(row, col), row, col, value: '' } : sheet.value.cells[index]!
   const next = { ...current, ...patch }
   if (!hasReportCellConfig(next)) {
     if (index !== -1) sheet.value.cells.splice(index, 1)
@@ -912,8 +970,8 @@ function refreshActiveCellBindingText() {
 function isGeneratedBindingValue(value: string) {
   return datasets.value.some((dataset) =>
     dataset.fields.some((field) =>
-      ['field', 'group', 'sum', 'count', 'formula'].some((type) =>
-        reportBindingText(type as ReportCellBindingType, dataset, field) === value,
+      ['field', 'group', 'sum', 'count', 'formula'].some(
+        (type) => reportBindingText(type as ReportCellBindingType, dataset, field) === value,
       ),
     ),
   )
@@ -959,7 +1017,12 @@ function mergeRight() {
   if (!cell || cell.col >= sheet.value.cols) return
   const nextCol = cell.col + (cell.colspan || 1)
   if (nextCol <= sheet.value.cols && cellHasContent(cellAt(cell.row, nextCol))) {
-    $q.notify({ type: 'warning', message: '右侧单元格已有内容，请先选择区域合并或清空后再合并' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.rightCellAlreadyHasContentSelectTheAreaToMerge')
+      },
+    })
     return
   }
   patchActiveCell({ colspan: Math.min((cell.colspan || 1) + 1, sheet.value.cols - cell.col + 1) })
@@ -971,7 +1034,12 @@ function mergeSelection() {
   if (!range) return
   const bounds = reportNormalizeSheetRange(range)
   if (bounds.maxRow === bounds.minRow && bounds.maxCol === bounds.minCol) {
-    $q.notify({ type: 'warning', message: '请先按住 Shift 选择要合并的单元格区域' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseHoldShiftToSelectTheCellRangeToMerge')
+      },
+    })
     return
   }
   const anchor = cellAt(bounds.minRow, bounds.minCol)
@@ -980,7 +1048,12 @@ function mergeSelection() {
     return cellHasContent(cell)
   })
   if (blocked) {
-    $q.notify({ type: 'warning', message: '合并区域内已有内容，请先清理后再合并' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.theContentsOfTheConsolidationAreaAreAvailablePleaseClear')
+      },
+    })
     return
   }
   cellsInBounds(bounds).forEach((cell) => {
@@ -1076,8 +1149,12 @@ function insertRowAfter(row: number) {
       : cell,
   )
   sheet.value.rows += 1
-  sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) => (item > row ? item + 1 : item))
-  sheet.value.detail_rows = (sheet.value.detail_rows || []).map((item) => (item > row ? item + 1 : item))
+  sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) =>
+    item > row ? item + 1 : item,
+  )
+  sheet.value.detail_rows = (sheet.value.detail_rows || []).map((item) =>
+    item > row ? item + 1 : item,
+  )
   buildLocalPreview()
 }
 
@@ -1141,7 +1218,12 @@ function openParameterDialog(id = '') {
   const dataset = primaryDataset.value
   const field = dataset?.fields[0]
   if (!dataset || !field) {
-    $q.notify({ type: 'warning', message: '请先添加表数据集' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.addTableDataSetFirst')
+      },
+    })
     return
   }
   const current = parameters.value.find((item) => item.id === id)
@@ -1153,7 +1235,7 @@ function openParameterDialog(id = '') {
   const defaults = reportParameterDefaultsForField(field)
   parameterDraft.type = current?.type || defaults.type
   parameterDraft.operator = current?.operator || defaults.operator
-  parameterDraft.placeholder = current?.placeholder || `请输入${field.name}`
+  parameterDraft.placeholder = current?.placeholder || t('ui.pleaseEnter', { value1: field.name })
   parameterDraft.default_value = stringifyParameterDefault(current?.default_value)
   parameterDialogVisible.value = true
 }
@@ -1166,7 +1248,7 @@ function handleParameterDatasetChange(id: string) {
   if (field) {
     const defaults = reportParameterDefaultsForField(field)
     parameterDraft.label = field.name
-    parameterDraft.placeholder = `请输入${field.name}`
+    parameterDraft.placeholder = t('ui.pleaseEnter', { value1: field.name })
     parameterDraft.type = defaults.type
     parameterDraft.operator = defaults.operator
   }
@@ -1178,7 +1260,7 @@ function handleParameterFieldChange(fieldCode: string) {
   const field = dataset?.fields.find((item) => item.code === fieldCode)
   if (!field) return
   parameterDraft.label = field.name
-  parameterDraft.placeholder = `请输入${field.name}`
+  parameterDraft.placeholder = t('ui.pleaseEnter', { value1: field.name })
   parameterDraft.default_value = ''
   const defaults = reportParameterDefaultsForField(field)
   parameterDraft.type = defaults.type
@@ -1187,7 +1269,12 @@ function handleParameterFieldChange(fieldCode: string) {
 
 function confirmParameter() {
   if (!parameterDraft.label.trim() || !parameterDraft.dataset_id || !parameterDraft.field) {
-    $q.notify({ type: 'warning', message: '请完整配置参数名称、数据集和字段' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseCompleteTheParameterNameDataSetAndFieldConfiguration')
+      },
+    })
     return
   }
   const dataset = datasets.value.find((item) => item.id === parameterDraft.dataset_id)
@@ -1226,16 +1313,26 @@ function removeParameter(id: string) {
 }
 
 function stringifyParameterDefault(value: ReportParameter['default_value']) {
-  if (Array.isArray(value)) return value.map((item) => String(item ?? '')).filter(Boolean).join(',')
+  if (Array.isArray(value))
+    return value
+      .map((item) => String(item ?? ''))
+      .filter(Boolean)
+      .join(',')
   if (value === null || value === undefined) return ''
   return String(value)
 }
 
-function parseParameterDefault(value: string, type: ReportParameterType): ReportParameter['default_value'] {
+function parseParameterDefault(
+  value: string,
+  type: ReportParameterType,
+): ReportParameter['default_value'] {
   const text = value.trim()
   if (!text) return undefined
   if (type === 'date_range') {
-    const parts = text.split(',').map((item) => item.trim()).filter(Boolean)
+    const parts = text
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
     return parts.length ? parts.slice(0, 2) : undefined
   }
   if (type === 'number') {
@@ -1248,9 +1345,9 @@ function parseParameterDefault(value: string, type: ReportParameterType): Report
 function sqlFieldInferErrorMessage(error: unknown) {
   const status = (error as { response?: { status?: number } })?.response?.status
   if (status === 401 || status === 403) {
-    return 'SQL 字段解析接口无权限，请给当前角色分配“SQL字段解析”接口权限'
+    return t('ui.sqlFieldParsingInterfaceIsNotValidPleaseAssignSql')
   }
-  return 'SQL 字段解析失败，请检查 SQL 语句或后端接口'
+  return t('ui.failedToParseSqlFieldsCheckTheSqlOrBackend')
 }
 
 function datasetFieldOptions(datasetId: string) {
@@ -1328,7 +1425,12 @@ function confirmJoin() {
     !joinDraft.right_field ||
     joinDraft.left_dataset_id === joinDraft.right_dataset_id
   ) {
-    $q.notify({ type: 'warning', message: '请完整配置两个不同数据集的关联字段' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseConfigureTheRelevantFieldsOfTheTwoDifferentData')
+      },
+    })
     return
   }
   datasetJoins.value.push({
@@ -1362,7 +1464,12 @@ function buildLocalPreview() {
 
 async function preview() {
   if (form.status === 'disabled') {
-    $q.notify({ type: 'warning', message: '已停用报表不能设计时预览' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.previewWhenADisabledReportCannotBeDesigned')
+      },
+    })
     return
   }
   const id = await saveReport('draft', { strict: true, notify: false })
@@ -1380,9 +1487,10 @@ async function preview() {
     previewData.value = res
   } catch (error) {
     buildLocalPreview()
-    const message = error instanceof Error && error.message
-      ? error.message
-      : '设计时预览失败，已显示本地结构预览'
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : t('ui.previewFailedAtDesignLocalStructurePreviewShown')
     $q.notify({ type: 'negative', message })
   } finally {
     previewLoading.value = false
@@ -1408,11 +1516,17 @@ async function saveReport(
       await router.replace({ name: 'report_design', query: { ...route.query, id: form.id } })
     }
     if (shouldNotify) {
-      $q.notify({ type: 'positive', message: '报表设计已保存' })
+      $q.notify({
+        type: 'positive',
+        get message() {
+          return t('ui.reportDesignSaved')
+        },
+      })
     }
     return form.id || null
   } catch (error) {
-    const message = error instanceof Error && error.message ? error.message : '报表保存失败'
+    const message =
+      error instanceof Error && error.message ? error.message : t('ui.reportSaveFailed')
     $q.notify({ type: 'negative', message })
     return null
   } finally {
@@ -1422,7 +1536,12 @@ async function saveReport(
 
 async function publishReport() {
   if (form.status === 'disabled') {
-    $q.notify({ type: 'warning', message: '已停用报表不能发布' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.disableFromReleaseOfDisabledReport')
+      },
+    })
     return
   }
   const changeLog = await confirmPublishReport()
@@ -1436,9 +1555,14 @@ async function publishReport() {
     publishedVersionId.value = res.version_id
     publishedVersionNo.value = res.version_no
     await refreshCurrentReport(id)
-    $q.notify({ type: 'positive', message: '报表已发布，可在报表中心运行' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.theReportIsPublishedAndCanBeRunAtThe')
+      },
+    })
   } catch (error) {
-    const message = error instanceof Error && error.message ? error.message : '发布失败'
+    const message = error instanceof Error && error.message ? error.message : t('ui.publishFailed')
     $q.notify({ type: 'negative', message })
   } finally {
     publishing.value = false
@@ -1448,12 +1572,18 @@ async function publishReport() {
 function confirmPublishReport() {
   return new Promise<string | null>((resolve) => {
     $q.dialog({
-      title: '发布报表',
-      message: '确认发布当前报表吗？发布后报表中心将运行新的发布版本。',
+      get title() {
+        return t('ui.publishReport')
+      },
+      get message() {
+        return t('ui.confirmsThatTheCurrentStatementIsBeingIssuedTheNew')
+      },
       prompt: {
         model: '',
         type: 'textarea',
-        label: '发布说明（可选）',
+        get label() {
+          return t('ui.releaseNotesOptional')
+        },
       },
       cancel: true,
       persistent: true,
@@ -1469,13 +1599,23 @@ async function refreshCurrentReport(id: number) {
     const res = await reportApi.queryReportById(id)
     applyReport(res.data)
   } catch {
-    $q.notify({ type: 'warning', message: '发布成功，但报表详情刷新失败，请稍后手动刷新' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.releaseSuccessfullyButFailureToRefreshTheDetailsOfThe')
+      },
+    })
   }
 }
 
 function openVersionDialog() {
   if (!form.id) {
-    $q.notify({ type: 'warning', message: '请先保存报表后查看版本' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseSaveTheReportAndSeeTheVersion')
+      },
+    })
     return
   }
   versionDialogVisible.value = true
@@ -1498,20 +1638,40 @@ function syncForm() {
 
 function validateReport(strict = true) {
   if (!form.report_name.trim()) {
-    $q.notify({ type: 'warning', message: '请填写报表名称' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseFillInTheNameOfTheReport')
+      },
+    })
     return false
   }
   if (!form.report_code.trim()) {
-    $q.notify({ type: 'warning', message: '请填写报表编码' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseCompleteTheReportCode')
+      },
+    })
     return false
   }
   if (!strict) return true
   if (!primaryDataset.value || primaryDataset.value.type !== 'table') {
-    $q.notify({ type: 'warning', message: '第一版运行必须设置一个现有表作为主数据集' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.theFirstEditionMustBeRunWithAnExistingTable')
+      },
+    })
     return false
   }
   if (usedFields.value.length === 0) {
-    $q.notify({ type: 'warning', message: '请至少绑定一个主数据集字段' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pleaseBindAtLeastOnePrimaryDataSetField')
+      },
+    })
     return false
   }
   if (!validateSqlDatasets()) {
@@ -1535,7 +1695,12 @@ function validateReport(strict = true) {
 function validateAndNotify() {
   syncForm()
   if (validateReport(true)) {
-    $q.notify({ type: 'positive', message: '配置检查通过' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.configureCheckPassed')
+      },
+    })
   }
 }
 
@@ -1544,20 +1709,35 @@ function validateDatasetJoins() {
     const leftDataset = datasets.value.find((item) => item.id === join.left_dataset_id)
     const rightDataset = datasets.value.find((item) => item.id === join.right_dataset_id)
     if (!leftDataset || !rightDataset || leftDataset.id === rightDataset.id) {
-      $q.notify({ type: 'warning', message: '请检查数据集关联，两端必须是不同且存在的数据集' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.checkTheDataSetAssociationBothEndsMustBeDifferent')
+        },
+      })
       return false
     }
     const leftFieldExists = leftDataset.fields.some((field) => field.code === join.left_field)
     const rightFieldExists = rightDataset.fields.some((field) => field.code === join.right_field)
     if (!leftFieldExists || !rightFieldExists) {
-      $q.notify({ type: 'warning', message: '请检查数据集关联字段，字段必须来自对应数据集' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.checkTheDatasetCorrelationFieldWhichMustBeFromThe')
+        },
+      })
       return false
     }
   }
 
   if (boundDatasetIds.value.length <= 1) return true
   if (!datasetJoins.value.length) {
-    $q.notify({ type: 'warning', message: '当前报表使用了多个数据集字段，请先配置数据集关联' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.theCurrentReportUsesMultipleDatasetFieldsPleaseConfigureThe')
+      },
+    })
     return false
   }
   const joinedDatasetIds = new Set<string>()
@@ -1567,19 +1747,30 @@ function validateDatasetJoins() {
   })
   const unjoinedDataset = boundDatasetIds.value.find((id) => !joinedDatasetIds.has(id))
   if (unjoinedDataset) {
-    const datasetName = datasets.value.find((item) => item.id === unjoinedDataset)?.name || unjoinedDataset
-    $q.notify({ type: 'warning', message: `数据集“${datasetName}”已绑定到单元格，但没有配置关联` })
+    const datasetName =
+      datasets.value.find((item) => item.id === unjoinedDataset)?.name || unjoinedDataset
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.theDataSetHasBeenBoundToCellsButIsNotConfigured', { datasetName: datasetName })
+      },
+    })
     return false
   }
   return true
 }
 
 function validateSqlDatasets() {
-  const invalid = datasets.value.find((dataset) =>
-    dataset.type === 'sql' && (!dataset.sql?.trim() || !dataset.fields?.length),
+  const invalid = datasets.value.find(
+    (dataset) => dataset.type === 'sql' && (!dataset.sql?.trim() || !dataset.fields?.length),
   )
   if (!invalid) return true
-  $q.notify({ type: 'warning', message: `SQL 数据集“${invalid.name}”需要先填写 SQL 并解析字段` })
+  $q.notify({
+    type: 'warning',
+    get message() {
+      return t('ui.sqlDataSetNeedsToFillInSqlAndParseFieldsFirst', { value1: invalid.name })
+    },
+  })
   return false
 }
 
@@ -1590,23 +1781,43 @@ function validateBoundCells() {
     const label = `${reportColumnName(cell.col)}${cell.row}`
     if (binding.type === 'formula') {
       if (!binding.formula?.trim() && !cell.value?.trim()) {
-        $q.notify({ type: 'warning', message: `单元格 ${label} 的公式为空` })
+        $q.notify({
+          type: 'warning',
+          get message() {
+            return t('ui.theFormulaForCellIsEmpty', { label: label })
+          },
+        })
         return false
       }
       continue
     }
     if (!binding.dataset_id || !binding.field) {
-      $q.notify({ type: 'warning', message: `单元格 ${label} 未完整绑定数据集字段` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.cellIncompletelyBoundDataSetFields', { label: label })
+        },
+      })
       return false
     }
     const dataset = datasets.value.find((item) => item.id === binding.dataset_id)
     const field = dataset?.fields.find((item) => item.code === binding.field)
     if (!dataset || !field) {
-      $q.notify({ type: 'warning', message: `单元格 ${label} 绑定的数据集或字段已不存在` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.cellBoundDataSetOrFieldNoLongerExists', { label: label })
+        },
+      })
       return false
     }
     if (binding.type === 'sum' && !isNumericReportField(field)) {
-      $q.notify({ type: 'warning', message: `单元格 ${label} 的求和字段应选择数值字段` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.theSumOfCellsShouldSelectANumericalField', { label: label })
+        },
+      })
       return false
     }
   }
@@ -1617,24 +1828,44 @@ function validateParameters() {
   const seen = new Set<string>()
   for (const param of parameters.value) {
     if (!param.label?.trim() || !param.dataset_id || !param.field) {
-      $q.notify({ type: 'warning', message: '请检查报表参数，参数名称、数据集和字段不能为空' })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.checkTheReportParametersTheParameterNameTheDataSet')
+        },
+      })
       return false
     }
     const key = `${param.dataset_id}:${param.field}:${param.operator}`
     if (seen.has(key)) {
-      $q.notify({ type: 'warning', message: `参数“${param.label}”重复绑定了同一字段和匹配方式` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.parameterRepeatedlyBindsTheSameFieldAndMatches', { value1: param.label })
+        },
+      })
       return false
     }
     seen.add(key)
     const dataset = datasets.value.find((item) => item.id === param.dataset_id)
     const field = dataset?.fields.find((item) => item.code === param.field)
     if (!dataset || !field) {
-      $q.notify({ type: 'warning', message: `参数“${param.label}”绑定的数据集或字段已不存在` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.theDataSetOrFieldBoundByTheParameterNoLongerExists', { value1: param.label })
+        },
+      })
       return false
     }
     const compatibilityError = parameterCompatibilityError(param.type, param.operator, field)
     if (compatibilityError) {
-      $q.notify({ type: 'warning', message: `参数“${param.label}”：${compatibilityError}` })
+      $q.notify({
+        type: 'warning',
+        get message() {
+          return t('ui.parameter', { value1: param.label, compatibilityError: compatibilityError })
+        },
+      })
       return false
     }
   }
@@ -1645,7 +1876,12 @@ function validateRuntimeSettings() {
   if (form.runtime_display !== 'paged') return true
   const pageSize = Number(form.runtime_page_size || 0)
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) {
-    $q.notify({ type: 'warning', message: '分页展示时，每页条数必须在 1 到 500 之间' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.pageBreakShowsTheNumberOfPagesPerPageMust')
+      },
+    })
     return false
   }
   return true
@@ -1656,28 +1892,39 @@ function parameterCompatibilityError(
   operator: ReportParameterOperator,
   field?: ReportField,
 ) {
-  if (!field) return '请选择有效字段'
+  if (!field) return t('ui.pleaseSelectAValidField')
   if (type === 'date_range' && operator !== 'between') {
-    return '日期范围参数必须使用区间匹配'
+    return t('ui.dateRangeParametersMustBeMatchedByAnInterArea')
   }
   if (operator === 'between' && type !== 'date_range') {
-    return '区间匹配请使用日期范围参数'
+    return t('ui.matchBetweenFieldsWithDateRangeParameters')
   }
   if (operator === 'like' && isNumericReportField(field)) {
-    return '数字字段不能使用包含匹配，请改为等于、大于等于或小于等于'
+    return t('ui.numericalFieldsCannotBeMatchedByIncludingThemReplaceThem')
   }
   if (type === 'number' && operator === 'like') {
-    return '数字参数不能使用包含匹配'
+    return t('ui.numericalParametersCannotBeMatchedWithInclusion')
   }
   return ''
 }
 
 function isNumericReportField(field: ReportField) {
   const type = String(field.type || '').toLowerCase()
-  return field.role === 'metric' ||
-    ['number', 'numeric', 'decimal', 'float', 'double', 'real', 'int', 'bigint', 'smallint', 'serial'].some((item) =>
-      type.includes(item),
-    )
+  return (
+    field.role === 'metric' ||
+    [
+      'number',
+      'numeric',
+      'decimal',
+      'float',
+      'double',
+      'real',
+      'int',
+      'bigint',
+      'smallint',
+      'serial',
+    ].some((item) => type.includes(item))
+  )
 }
 
 function goBack() {

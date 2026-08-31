@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -13,7 +14,9 @@ const routes: RouteRecordRaw[] = [
     path: '/change-password',
     name: 'ChangePassword',
     meta: {
-      title: '修改密码',
+      get title() {
+        return t('ui.changePassword')
+      },
     },
     component: () => import('pages/ChangePassword.vue'),
   },

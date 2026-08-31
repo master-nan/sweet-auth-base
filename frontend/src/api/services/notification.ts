@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { instance } from 'boot/axios'
 import { localLoadingRequestConfig } from 'src/api/request-config'
 import type { ResponseData } from 'src/types/global'
@@ -48,19 +49,39 @@ export interface NotificationQuery {
 }
 
 export const NOTIFICATION_CATEGORY_LABELS: Record<NotificationCategory, string> = {
-  SYSTEM: '系统',
-  BUSINESS: '业务',
-  TASK: '任务',
-  REMINDER: '提醒',
-  SECURITY: '安全',
-  INTEGRATION: '集成',
+  get SYSTEM() {
+    return t('ui.system')
+  },
+  get BUSINESS() {
+    return t('ui.operations')
+  },
+  get TASK() {
+    return t('ui.tasks')
+  },
+  get REMINDER() {
+    return t('ui.reminderNotificationCategory')
+  },
+  get SECURITY() {
+    return t('ui.securityNotificationCategory')
+  },
+  get INTEGRATION() {
+    return t('ui.integration')
+  },
 }
 
 export const NOTIFICATION_LEVEL_LABELS: Record<NotificationLevel, string> = {
-  INFO: '信息',
-  SUCCESS: '成功',
-  WARNING: '警告',
-  ERROR: '错误',
+  get INFO() {
+    return t('ui.information')
+  },
+  get SUCCESS() {
+    return t('ui.success')
+  },
+  get WARNING() {
+    return t('ui.warning')
+  },
+  get ERROR() {
+    return t('ui.error')
+  },
 }
 
 export const NOTIFICATION_LEVEL_COLORS: Record<NotificationLevel, string> = {

@@ -1,14 +1,18 @@
 <template>
   <div class="query-preview">
-    <div v-if="!treeLines.length" class="query-preview__empty">未设置高级查询条件</div>
-    <div v-else class="query-preview-tree" role="tree" aria-label="查询条件层级">
+    <div v-if="!treeLines.length" class="query-preview__empty">
+      {{ t('ui.noAdvancedQueryConditionSet') }}
+    </div>
+    <div
+      v-else
+      class="query-preview-tree"
+      role="tree"
+      :aria-label="t('ui.levelOfQueryConditionals')"
+    >
       <div
         v-for="line in treeLines"
         :key="line.key"
-        :class="[
-          'query-preview-tree__line',
-          `query-preview-tree__line--${line.kind}`,
-        ]"
+        :class="['query-preview-tree__line', `query-preview-tree__line--${line.kind}`]"
         role="treeitem"
         :aria-level="line.depth + 1"
       >
@@ -25,18 +29,23 @@
     </div>
     <div v-if="payload.quick_query.keyword || payload.order.field" class="query-preview-meta">
       <div v-if="payload.quick_query.keyword" class="query-preview-meta__item">
-        <q-badge outline color="secondary" label="关键词" />
-        <span>包含“{{ payload.quick_query.keyword }}”</span>
+        <q-badge outline color="secondary" :label="t('ui.keyword')" />
+        <span>{{ t('ui.containsOpeningQuote') }}{{ payload.quick_query.keyword }}”</span>
       </div>
       <div v-if="payload.order.field" class="query-preview-meta__item">
-        <q-badge outline color="secondary" label="排序" />
-        <span>{{ fieldLabel(payload.order.field) }} {{ payload.order.is_asc ? '升序' : '降序' }}</span>
+        <q-badge outline color="secondary" :label="t('ui.sort')" />
+        <span
+          >{{ fieldLabel(payload.order.field) }}
+          {{ payload.order.is_asc ? t('ui.raise') : t('ui.descending') }}</span
+        >
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import { ExpressionLogic, ExpressionTypeMap } from 'src/types/enum'
 import { useDictStore } from 'src/stores/dict'
@@ -49,6 +58,8 @@ import {
   type QuerySchemePayloadV1,
 } from 'src/modules/query-scheme/types'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const props = defineProps<{
   payload: QuerySchemePayloadV1
   fields?: TableField[]
@@ -56,24 +67,31 @@ const props = defineProps<{
 }>()
 
 const dictStore = useDictStore()
-const fieldMap = computed(() => new Map((props.fields || []).map((field) => [field.field_code, field])))
-const bindingMap = computed(() => new Map((props.payload.bindings || []).map((binding) => [binding.pointer, binding])))
+const fieldMap = computed(
+  () => new Map((props.fields || []).map((field) => [field.field_code, field])),
+)
+const bindingMap = computed(
+  () => new Map((props.payload.bindings || []).map((binding) => [binding.pointer, binding])),
+)
 const relationLabels = ref<Record<string, Record<string, string>>>({})
-const fieldLabel = (code: string) => fieldMap.value.get(code)?.field_name || '已失效字段'
+const fieldLabel = (code: string) => fieldMap.value.get(code)?.field_name || t('ui.expiredField')
 
 const bindingLabel = (binding: QuerySchemeBinding) => {
   const base = QUERY_SCHEME_BINDING_LABELS[binding.kind]
-  const offset = binding.params?.day_offset ?? binding.params?.week_offset ?? binding.params?.month_offset
-  return offset ? `${base}（偏移 ${offset}）` : base
+  const offset =
+    binding.params?.day_offset ?? binding.params?.week_offset ?? binding.params?.month_offset
+  return offset ? t('ui.diversion', { base: base, offset: offset }) : base
 }
 
 const singleValueLabel = (rule: QueryRule, value: unknown, pointer: string) => {
   const binding = bindingMap.value.get(pointer)
   if (binding) return bindingLabel(binding)
   const field = fieldMap.value.get(rule.field)
-  if (field?.dict_code) return dictStore.getDictLabel(field.dict_code, value) || String(value ?? '-')
-  if (field?.relation) return relationLabels.value[rule.field]?.[String(value)] || '关联值未解析'
-  if (value === null || value === undefined || value === '') return '无需填写'
+  if (field?.dict_code)
+    return dictStore.getDictLabel(field.dict_code, value) || String(value ?? '-')
+  if (field?.relation)
+    return relationLabels.value[rule.field]?.[String(value)] || t('ui.associationValueUnsolved')
+  if (value === null || value === undefined || value === '') return t('ui.noNeedToFill')
   return String(value)
 }
 
@@ -81,7 +99,7 @@ const valueLabel = (rule: QueryRule, pointer: string) => {
   if (Array.isArray(rule.value)) {
     return rule.value
       .map((value, index) => singleValueLabel(rule, value, `${pointer}/${index}`))
-      .join(' 至 ')
+      .join(t('ui.to'))
   }
   return singleValueLabel(rule, rule.value, pointer)
 }
@@ -157,7 +175,13 @@ const buildGroupNode = (group: ExpressionGroup, path: string): PreviewTreeNode |
   const children: PreviewTreeNode[] = group.rules.map((rule, index) => ({
     key: `${path}/rules/${index}`,
     kind: 'rule',
-    text: `${fieldLabel(rule.field)} ${ExpressionTypeMap[rule.expression_type!] || '匹配'} ${valueLabel(rule, `${path}/rules/${index}/value`)}`,
+    get text() {
+      return t('ui.queryRuleSummary', {
+        value1: fieldLabel(rule.field),
+        value2: ExpressionTypeMap[rule.expression_type!] || t('ui.match'),
+        value3: valueLabel(rule, `${path}/rules/${index}/value`),
+      })
+    },
     children: [],
   }))
   ;(group.nested || []).forEach((nested, index) => {
@@ -170,7 +194,9 @@ const buildGroupNode = (group: ExpressionGroup, path: string): PreviewTreeNode |
     key: path,
     kind: 'group',
     logic,
-    text: logic === 'AND' ? '满足全部条件' : '满足任一条件',
+    get text() {
+      return logic === 'AND' ? t('ui.allConditionsMet') : t('ui.eitherConditionIsMet')
+    },
     children,
   }
 }
@@ -185,7 +211,9 @@ const treeRoots = computed<PreviewTreeNode[]>(() => {
       key: '/expressions',
       kind: 'group',
       logic: 'AND',
-      text: '满足全部表达式组',
+      get text() {
+        return t('ui.meetAllExpressionGroups')
+      },
       children: groups,
     },
   ]

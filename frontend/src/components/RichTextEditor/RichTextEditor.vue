@@ -26,14 +26,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ref, shallowRef, onBeforeUnmount, watch, type PropType } from 'vue'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import type { IEditorConfig, IToolbarConfig, IDomEditor } from '@wangeditor/editor'
 import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
-import {
-  hydrateRichTextFileUrls,
-  serializeRichTextFileUrls,
-} from 'src/utils/rich-text-files'
+import { hydrateRichTextFileUrls, serializeRichTextFileUrls } from 'src/utils/rich-text-files'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps({
   modelValue: {
@@ -46,7 +47,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: '请输入内容...',
+    default: '',
   },
   minHeight: {
     type: Number,
@@ -142,7 +143,7 @@ const customUploadAttachment = async (file: File, insertFn: InsertAttachmentFn) 
 
 // ─── 编辑器配置 ──────────────────────────────────
 const editorConfig: Partial<IEditorConfig> = {
-  placeholder: props.placeholder,
+  placeholder: props.placeholder || t('ui.enterContent'),
   readOnly: props.disabled,
   MENU_CONF: {
     uploadImage: {
@@ -284,7 +285,7 @@ const validate = (val?: string) => {
     }
     if (result === false) {
       hasError.value = true
-      errorMessage.value = '该字段不符合要求'
+      errorMessage.value = t('ui.theFieldDoesNotMeetTheRequirements')
       return false
     }
   }

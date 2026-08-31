@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { SysMenuButtonEventAction } from 'src/types/enum'
 import type { MenuButton } from 'src/api/services/sys-menu'
 
@@ -124,15 +125,40 @@ export const registerAfterHook = (name: string, handler: ButtonHookHandler) => {
 
 /** 获取所有可用的 before hook 选项 */
 export const getBeforeHookOptions = () => [
-  { label: '要求选中行', value: 'requireSelection' },
-  { label: '要求行上下文', value: 'requireRow' },
+  {
+    get label() {
+      return t('ui.couldNotInitialiseBonobo')
+    },
+    value: 'requireSelection',
+  },
+  {
+    get label() {
+      return t('ui.requestingContext')
+    },
+    value: 'requireRow',
+  },
 ]
 
 /** 获取所有可用的 after hook 选项 */
 export const getAfterHookOptions = () => [
-  { label: '刷新数据', value: 'refresh' },
-  { label: '清空选中', value: 'clearSelection' },
-  { label: '关闭对话框', value: 'closeDialog' },
+  {
+    get label() {
+      return t('ui.refreshData')
+    },
+    value: 'refresh',
+  },
+  {
+    get label() {
+      return t('ui.emptySelection')
+    },
+    value: 'clearSelection',
+  },
+  {
+    get label() {
+      return t('ui.closeDialogue')
+    },
+    value: 'closeDialog',
+  },
 ]
 
 /**
@@ -329,7 +355,7 @@ export const executeButtonAction = async (name: string, ctx: ButtonActionContext
       await ctx.onCustom(action, ctx)
       return
     }
-    throw new Error(`未注册的按钮动作: ${action}`)
+    throw new Error(t('ui.unregisteredButtonAction', { action: action }))
   }
   await handler(ctx)
 }

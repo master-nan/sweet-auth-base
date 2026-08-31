@@ -1,4 +1,7 @@
+import ui from './ui'
+
 export default {
+  ui,
   router: {
     home: '首页',
     table: '表格',

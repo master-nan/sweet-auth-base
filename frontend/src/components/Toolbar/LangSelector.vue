@@ -23,18 +23,20 @@
 
 <script lang="ts" setup>
 import { useI18n } from 'vue-i18n'
-import {
-  writeUIPreferences,
-  type SupportedLocale,
-} from 'src/utils/ui-preferences'
-import { applyQuasarLanguage } from 'src/i18n/quasar-language'
+import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
+import { applyQuasarLanguage } from 'src/i18n/runtime/quasar'
 
 defineOptions({ name: 'LangSelector' })
 
 const { locale, t } = useI18n({ useScope: 'global' })
 const localeOptions = [
   { value: 'en-US', label: 'English' },
-  { value: 'zh-CN', label: '简体中文' },
+  {
+    value: 'zh-CN',
+    get label() {
+      return t('ui.simplifiedChinese')
+    },
+  },
 ]
 
 const handleSelectLanguage = () => {

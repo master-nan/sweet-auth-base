@@ -8,8 +8,10 @@
     <q-card class="version-dialog">
       <q-card-section class="dialog-head">
         <div>
-          <div class="dialog-title">发布版本</div>
-          <div class="dialog-caption">查看当前报表的发布快照，报表中心运行时只读取已发布版本。</div>
+          <div class="dialog-title">{{ t('ui.release') }}</div>
+          <div class="dialog-caption">
+            {{ t('ui.viewTheReleaseSnapshotOfTheCurrentReportAndOnly') }}
+          </div>
         </div>
       </q-card-section>
 
@@ -35,12 +37,7 @@
 
           <template #body-cell-status="slotProps">
             <q-td :props="slotProps">
-              <q-chip
-                dense
-                square
-                :color="statusColor(slotProps.row.status)"
-                text-color="white"
-              >
+              <q-chip dense square :color="statusColor(slotProps.row.status)" text-color="white">
                 {{ statusLabel(slotProps.row.status) }}
               </q-chip>
             </q-td>
@@ -68,7 +65,7 @@
                 text-color="white"
                 icon="verified"
               >
-                当前版本
+                {{ t('ui.currentVersion') }}
               </q-chip>
               <span v-else class="text-grey-6">-</span>
             </q-td>
@@ -88,19 +85,20 @@
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="关闭" @click="handleDialogValue(false)" />
+        <q-btn flat :label="t('ui.close')" @click="handleDialogValue(false)" />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
-import {
-  useReportApi,
-  type ReportVersion,
-} from 'src/api/services/report'
+import { useReportApi, type ReportVersion } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   modelValue: boolean
@@ -122,23 +120,60 @@ const errorMessage = ref('')
 let requestSeq = 0
 
 const columns = computed<QTableProps['columns']>(() => [
-  { name: 'version_no', field: 'version_no', label: '版本号', align: 'left' },
-  { name: 'status', field: 'status', label: '状态', align: 'left' },
+  {
+    name: 'version_no',
+    field: 'version_no',
+    get label() {
+      return t('ui.versionNumber')
+    },
+    align: 'left',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    align: 'left',
+  },
   {
     name: 'published_at',
     field: (row: ReportVersion) => row.published_at || '-',
-    label: '发布时间',
+    get label() {
+      return t('ui.releaseTime')
+    },
     align: 'left',
   },
-  { name: 'publisher', field: publisherName, label: '发布人', align: 'left' },
-  { name: 'change_log', field: 'change_log', label: '发布说明', align: 'left' },
-  { name: 'current', field: (row: ReportVersion) => isCurrentVersion(row), label: '当前版本', align: 'left' },
+  {
+    name: 'publisher',
+    field: publisherName,
+    get label() {
+      return t('ui.publisher')
+    },
+    align: 'left',
+  },
+  {
+    name: 'change_log',
+    field: 'change_log',
+    get label() {
+      return t('ui.issuanceOfNotes')
+    },
+    align: 'left',
+  },
+  {
+    name: 'current',
+    field: (row: ReportVersion) => isCurrentVersion(row),
+    get label() {
+      return t('ui.currentVersion')
+    },
+    align: 'left',
+  },
 ])
 
 const emptyText = computed(() => {
   if (errorMessage.value) return errorMessage.value
-  if (!props.reportId) return '请选择报表后查看版本'
-  return '暂无发布版本'
+  if (!props.reportId) return t('ui.pleaseSelectTheReportAndSeeTheVersion')
+  return t('ui.noReleaseVersionAvailable')
 })
 
 watch(
@@ -183,7 +218,8 @@ async function loadVersions() {
     versions.value = items
   } catch (error) {
     if (currentRequest !== requestSeq || !props.modelValue) return
-    const message = error instanceof Error && error.message ? error.message : '版本列表加载失败'
+    const message =
+      error instanceof Error && error.message ? error.message : t('ui.failedToLoadVersionList')
     errorMessage.value = message
     $q.notify({
       type: 'negative',
@@ -211,18 +247,23 @@ function publisherName(version: ReportVersion) {
 function isCurrentVersion(version: ReportVersion) {
   if (version.is_current) return true
   if (props.currentVersionId !== undefined && version.id === props.currentVersionId) return true
-  return (
-    props.currentVersionNo !== undefined &&
-    version.version_no === props.currentVersionNo
-  )
+  return props.currentVersionNo !== undefined && version.version_no === props.currentVersionNo
 }
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    draft: '草稿',
-    published: '已发布',
-    archived: '已归档',
-    disabled: '已停用',
+    get draft() {
+      return t('ui.draft')
+    },
+    get published() {
+      return t('ui.published')
+    },
+    get archived() {
+      return t('ui.archived')
+    },
+    get disabled() {
+      return t('ui.deactivatedStatus')
+    },
   }
   return labels[status] || status || '-'
 }

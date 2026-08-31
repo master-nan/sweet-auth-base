@@ -8,9 +8,9 @@
     <q-card class="publish-menu-dialog">
       <q-card-section class="dialog-head">
         <div>
-          <div class="dialog-title">发布到菜单</div>
+          <div class="dialog-title">{{ t('ui.releaseToMenu') }}</div>
           <div class="dialog-caption">
-            将已发布报表挂载到左侧菜单，业务用户点击菜单后进入通用报表运行页。
+            {{ t('ui.loadsPublishedReportsToTheLeftMenuAndBusinessUsers') }}
           </div>
         </div>
       </q-card-section>
@@ -21,7 +21,7 @@
             <template #avatar>
               <q-icon name="info" color="primary" />
             </template>
-            第一阶段默认授权 super_admin。角色授权可在后续版本接入。
+            {{ t('ui.theFirstStageIsTheDefaultAuthorizationOfSuperAdmin') }}
           </q-banner>
 
           <div class="row q-col-gutter-md">
@@ -34,16 +34,18 @@
                 map-options
                 use-input
                 input-debounce="0"
-                label="父级菜单"
+                :label="t('ui.parentMenu')"
                 :options="filteredParentOptions"
                 :loading="menuLoading"
-                :rules="[(val) => !!val || '请选择父级菜单']"
+                :rules="[(val) => !!val || t('ui.pleaseSelectAParentMenu')]"
                 @filter="filterParentOptions"
               >
                 <template #no-option>
                   <q-item>
                     <q-item-section class="text-grey-6">
-                      {{ menuLoading ? '正在加载菜单目录' : '暂无可选目录菜单' }}
+                      {{
+                        menuLoading ? t('ui.loadingMenuDirectory') : t('ui.temporaryDirectoryMenu')
+                      }}
                     </q-item-section>
                   </q-item>
                 </template>
@@ -55,8 +57,8 @@
                 v-model.trim="title"
                 outlined
                 dense
-                label="菜单名称"
-                :rules="[(val) => !!val || '请输入菜单名称']"
+                :label="t('ui.menuName')"
+                :rules="[(val) => !!val || t('ui.pleaseEnterAMenuName')]"
               />
             </div>
 
@@ -65,7 +67,7 @@
                 v-model.trim="icon"
                 outlined
                 dense
-                label="图标"
+                :label="t('ui.icon')"
                 placeholder="assessment"
               />
             </div>
@@ -75,38 +77,35 @@
                 v-model.trim="path"
                 outlined
                 dense
-                label="运行路径"
-                :rules="[(val) => !!val || '请输入运行路径']"
+                :label="t('ui.runPath')"
+                :rules="[(val) => !!val || t('ui.pleaseEnterTheRunningPath')]"
               >
-                <template #hint>
-                  默认格式：report/runtime/{report_code}
-                </template>
+                <template #hint> {{ t('ui.defaultFormatReportRuntime') }} </template>
               </q-input>
             </div>
 
             <div class="col-12 col-md-6">
-              <q-input
-                v-model.number="sort"
-                outlined
-                dense
-                type="number"
-                label="排序"
-              />
+              <q-input v-model.number="sort" outlined dense type="number" :label="t('ui.sort')" />
             </div>
 
             <div class="col-12 col-md-6 flex items-center">
-              <q-toggle v-model="visible" label="显示到菜单" />
+              <q-toggle v-model="visible" :label="t('ui.showToMenu')" />
             </div>
           </div>
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="取消" :disable="submitting" @click="handleDialogValue(false)" />
+          <q-btn
+            flat
+            :label="t('ui.cancel')"
+            :disable="submitting"
+            @click="handleDialogValue(false)"
+          />
           <q-btn
             unelevated
             color="primary"
             type="submit"
-            label="确认发布"
+            :label="t('ui.confirmRelease')"
             :loading="submitting"
           />
         </q-card-actions>
@@ -116,11 +115,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ref, watch } from 'vue'
 import { useQuasar, type QForm } from 'quasar'
 import type { Query } from 'src/types/global'
 import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
 import { useReportApi, type Report } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type ParentMenuOption = {
   label: string
@@ -247,17 +250,18 @@ async function loadParentMenus() {
     $q.notify({
       type: 'negative',
       position: 'top-right',
-      message: error instanceof Error && error.message ? error.message : '父级菜单加载失败',
+      get message() {
+        return error instanceof Error && error.message
+          ? error.message
+          : t('ui.fatherMenuLoadedFailed')
+      },
     })
   } finally {
     menuLoading.value = false
   }
 }
 
-function filterParentOptions(
-  value: string,
-  update: (callback: () => void) => void,
-) {
+function filterParentOptions(value: string, update: (callback: () => void) => void) {
   update(() => {
     const keyword = value.trim().toLowerCase()
     filteredParentOptions.value = keyword
@@ -286,7 +290,9 @@ async function submit() {
     $q.notify({
       type: 'positive',
       position: 'top-right',
-      message: '报表已发布到菜单',
+      get message() {
+        return t('ui.reportPublishedToMenu')
+      },
     })
     emit('success')
     handleDialogValue(false)
@@ -294,7 +300,11 @@ async function submit() {
     $q.notify({
       type: 'negative',
       position: 'top-right',
-      message: error instanceof Error && error.message ? error.message : '发布到菜单失败',
+      get message() {
+        return error instanceof Error && error.message
+          ? error.message
+          : t('ui.failedToPublishToMenu')
+      },
     })
   } finally {
     submitting.value = false

@@ -1,10 +1,6 @@
 import { defineComponent, h, reactive } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createI18n } from 'vue-i18n'
-import messages from 'src/i18n'
-
-const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages })
 
 const notify = vi.hoisted(() => vi.fn())
 const router = vi.hoisted(() => ({
@@ -111,8 +107,7 @@ const stubs = {
   QCardSection: SlotStub('QCardSection'),
 }
 
-const mountPopover = () =>
-  mount(NotificationPopover, { global: { plugins: [i18n], stubs } })
+const mountPopover = () => mount(NotificationPopover, { global: { stubs } })
 
 const summary = (overrides: Record<string, unknown> = {}) => ({
   id: 1,

@@ -17,34 +17,36 @@
           <template v-if="kind === 'resource'">
             <q-item>
               <q-item-section>
-                <q-item-label caption>资源编码</q-item-label>
+                <q-item-label caption>{{ t('ui.resourceCode') }}</q-item-label>
                 <q-item-label>{{ resourceDetail.resource_code }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>资源名称</q-item-label>
+                <q-item-label caption>{{ t('ui.resourceName') }}</q-item-label>
                 <q-item-label>{{ resourceDetail.name }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>资源类型</q-item-label>
+                <q-item-label caption>{{ t('ui.resourceType') }}</q-item-label>
                 <q-item-label>{{ resourceTypeLabel(resourceDetail.resource_type) }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>数据权限</q-item-label>
+                <q-item-label caption>{{ t('ui.dataPermissions') }}</q-item-label>
                 <q-item-label>
                   <q-badge
                     :color="resourceDetail.permission_enabled ? 'positive' : 'grey-6'"
                     outline
                   >
-                    {{ resourceDetail.permission_enabled ? '已启用' : '未启用' }}
+                    {{
+                      resourceDetail.permission_enabled ? t('ui.activatedStatus') : t('ui.notEnabled')
+                    }}
                   </q-badge>
                 </q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>支持操作</q-item-label>
+                <q-item-label caption>{{ t('ui.supportingOperations') }}</q-item-label>
                 <q-item-label>
                   <q-chip
                     v-for="operation in resourceOperations"
@@ -62,15 +64,15 @@
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>归属定义</q-item-label>
+                <q-item-label caption>{{ t('ui.ownershipDefinition') }}</q-item-label>
                 <q-item-label>{{ resourceOwnerships.length }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>关联策略</q-item-label>
+                <q-item-label caption>{{ t('ui.associationPolicy') }}</q-item-label>
                 <q-item-label>{{ resourcePolicyCount }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>授权数量</q-item-label>
+                <q-item-label caption>{{ t('ui.numberOfAuthorizations') }}</q-item-label>
                 <q-item-label>{{ resourceGrants.length }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -79,25 +81,25 @@
           <template v-else-if="kind === 'ownership'">
             <q-item>
               <q-item-section>
-                <q-item-label caption>归属编码</q-item-label>
+                <q-item-label caption>{{ t('ui.ownershipCode') }}</q-item-label>
                 <q-item-label>{{ ownershipDetail.ownership_code }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>数据资源</q-item-label>
+                <q-item-label caption>{{ t('ui.dataResource') }}</q-item-label>
                 <q-item-label>{{ ownershipDetail.resource?.name || '-' }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>数据维度</q-item-label>
+                <q-item-label caption>{{ t('ui.dataDimension') }}</q-item-label>
                 <q-item-label>{{ ownershipDetail.dimension?.name || '-' }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>绑定类型</q-item-label>
+                <q-item-label caption>{{ t('ui.bindingType') }}</q-item-label>
                 <q-item-label>{{ bindingTypeLabel(ownershipDetail.binding_type) }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>值类型</q-item-label>
+                <q-item-label caption>{{ t('ui.valueType') }}</q-item-label>
                 <q-item-label>{{ valueTypeLabel(ownershipDetail.value_type) }}</q-item-label>
               </q-item-section>
             </q-item>
@@ -106,24 +108,24 @@
           <template v-else-if="kind === 'policy'">
             <q-item>
               <q-item-section>
-                <q-item-label caption>策略编码</q-item-label>
+                <q-item-label caption>{{ t('ui.policyCode') }}</q-item-label>
                 <q-item-label>{{ policyDetail.policy_code }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>策略名称</q-item-label>
+                <q-item-label caption>{{ t('ui.policyNameLabel') }}</q-item-label>
                 <q-item-label>{{ policyDetail.name }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>规则数量</q-item-label>
+                <q-item-label caption>{{ t('ui.numberOfRules') }}</q-item-label>
                 <q-item-label>{{ policyDetail.rules?.length || 0 }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>状态</q-item-label>
+                <q-item-label caption>{{ t('ui.status') }}</q-item-label>
                 <q-item-label>
                   <q-badge :color="policyDetail.state ? 'positive' : 'grey-6'" outline>
-                    {{ policyDetail.state ? '启用' : '停用' }}
+                    {{ policyDetail.state ? t('ui.enabled') : t('ui.disabled') }}
                   </q-badge>
                 </q-item-label>
               </q-item-section>
@@ -133,28 +135,32 @@
           <template v-else>
             <q-item>
               <q-item-section>
-                <q-item-label caption>授权主体</q-item-label>
+                <q-item-label caption>{{ t('ui.authorisationSubject') }}</q-item-label>
                 <q-item-label>{{ grantSubjectLabel }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>数据资源</q-item-label>
-                <q-item-label>{{ grantDetail.resource?.name || '数据资源不可用' }}</q-item-label>
+                <q-item-label caption>{{ t('ui.dataResource') }}</q-item-label>
+                <q-item-label>{{
+                  grantDetail.resource?.name || t('ui.dataResourcesNotAvailable')
+                }}</q-item-label>
               </q-item-section>
             </q-item>
             <q-item>
               <q-item-section>
-                <q-item-label caption>资源操作</q-item-label>
+                <q-item-label caption>{{ t('ui.resourceAction') }}</q-item-label>
                 <q-item-label>{{ operationLabel(grantDetail.operation) }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>权限策略</q-item-label>
-                <q-item-label>{{ grantDetail.policy?.name || '权限策略不可用' }}</q-item-label>
+                <q-item-label caption>{{ t('ui.permissionPolicy') }}</q-item-label>
+                <q-item-label>{{
+                  grantDetail.policy?.name || t('ui.permissionPolicyNotAvailable')
+                }}</q-item-label>
               </q-item-section>
               <q-item-section>
-                <q-item-label caption>状态</q-item-label>
+                <q-item-label caption>{{ t('ui.status') }}</q-item-label>
                 <q-item-label>
                   <q-badge :color="grantDetail.state ? 'positive' : 'grey-6'" outline>
-                    {{ grantDetail.state ? '启用' : '停用' }}
+                    {{ grantDetail.state ? t('ui.enabled') : t('ui.disabled') }}
                   </q-badge>
                 </q-item-label>
               </q-item-section>
@@ -163,7 +169,7 @@
         </q-list>
 
         <div v-if="kind === 'policy'" class="text-subtitle1 text-weight-medium q-mt-lg q-mb-sm">
-          策略规则
+          {{ t('ui.policyRules') }}
         </div>
         <q-table
           v-if="kind === 'policy'"
@@ -175,7 +181,7 @@
           separator="cell"
           hide-pagination
           :pagination="{ rowsPerPage: 0 }"
-          no-data-label="暂无策略规则"
+          :no-data-label="t('ui.thereAreNoStrategicRules')"
         />
       </template>
     </div>
@@ -183,6 +189,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
@@ -195,6 +203,8 @@ import {
   useDataPermissionConfigApi,
 } from 'src/api/services/data-permission-config'
 import type { Query } from 'src/types/global'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type DetailKind = 'resource' | 'ownership' | 'policy' | 'grant'
 
@@ -225,7 +235,10 @@ const policyDetail = computed(() => detail.value as DataPolicy)
 const grantDetail = computed(() => detail.value as DataGrant)
 const grantSubjectLabel = computed(() => {
   const subject = grantDetail.value.subject
-  if (!subject) return grantDetail.value.subject_type === 'role' ? '角色不可用' : '用户不可用'
+  if (!subject)
+    return grantDetail.value.subject_type === 'role'
+      ? t('ui.roleUnavailable')
+      : t('ui.userUnavailable')
   return subject.code ? `${subject.name} · ${subject.code}` : subject.name
 })
 const resourcePolicyCount = computed(
@@ -235,14 +248,22 @@ const resourcePolicyCount = computed(
 const title = computed(
   () =>
     ({
-      resource: '数据资源详情',
-      ownership: '归属定义详情',
-      policy: '权限策略详情',
-      grant: '权限授权详情',
+      get resource() {
+        return t('ui.dataResourcesDetails')
+      },
+      get ownership() {
+        return t('ui.detailsOfAttributionDefinition')
+      },
+      get policy() {
+        return t('ui.permissionPolicyDetails')
+      },
+      get grant() {
+        return t('ui.detailsOfAuthority')
+      },
     })[props.kind],
 )
 const subtitle = computed(() => {
-  if (!detail.value) return '正在读取配置'
+  if (!detail.value) return t('ui.readingConfiguration')
   if (props.kind === 'resource') return resourceDetail.value.resource_code
   if (props.kind === 'ownership') return ownershipDetail.value.ownership_code
   if (props.kind === 'policy') return policyDetail.value.policy_code
@@ -259,29 +280,51 @@ const icon = computed(
 )
 
 const ruleColumns: QTableProps['columns'] = [
-  { name: 'sequence', label: '顺序', field: 'sequence', align: 'left' },
-  { name: 'ownership_code', label: '归属编码', field: 'ownership_code', align: 'left' },
+  {
+    name: 'sequence',
+    get label() {
+      return t('ui.order')
+    },
+    field: 'sequence',
+    align: 'left',
+  },
+  {
+    name: 'ownership_code',
+    get label() {
+      return t('ui.ownershipCode')
+    },
+    field: 'ownership_code',
+    align: 'left',
+  },
   {
     name: 'dimension',
-    label: '数据维度',
-    field: (row) => row.dimension?.name || '数据维度不可用',
+    get label() {
+      return t('ui.dataDimension')
+    },
+    field: (row) => row.dimension?.name || t('ui.dataDimensionUnavailable'),
     align: 'left',
   },
   {
     name: 'scope_source',
-    label: '范围来源',
+    get label() {
+      return t('ui.scopeSource')
+    },
     field: (row) => scopeSourceLabel(row.scope_source),
     align: 'left',
   },
   {
     name: 'relation',
-    label: '关系',
+    get label() {
+      return t('ui.relationLabel')
+    },
     field: (row) => relationLabel(row.relation),
     align: 'left',
   },
   {
     name: 'operator',
-    label: '操作符',
+    get label() {
+      return t('ui.operator')
+    },
     field: (row) => operatorLabel(row.operator),
     align: 'left',
   },
@@ -327,31 +370,92 @@ const loadDetail = async () => {
 }
 
 const resourceTypeLabel = (value: string) =>
-  ({ low_code_table: '低代码数据表', business_service: '业务服务', report: '报表' })[value] || value
+  ({
+    get low_code_table() {
+      return t('ui.lowCodeDataTable')
+    },
+    get business_service() {
+      return t('ui.businessService')
+    },
+    get report() {
+      return t('ui.report')
+    },
+  })[value] || value
 const operationLabel = (value: string) =>
   ({
-    query: '查询',
-    detail: '详情',
-    create: '新增',
-    update: '修改',
-    delete: '删除',
-    export: '导出',
-    run: '运行',
+    get query() {
+      return t('ui.query')
+    },
+    get detail() {
+      return t('ui.details')
+    },
+    get create() {
+      return t('ui.create')
+    },
+    get update() {
+      return t('ui.modify')
+    },
+    get delete() {
+      return t('ui.delete')
+    },
+    get export() {
+      return t('ui.export')
+    },
+    get run() {
+      return t('ui.run')
+    },
   })[value] || value
 const bindingTypeLabel = (value: string) =>
-  ({ metadata_field: '元数据字段', registered_field: '注册字段' })[value] || value
+  ({
+    get metadata_field() {
+      return t('ui.metadataField')
+    },
+    get registered_field() {
+      return t('ui.registeredField')
+    },
+  })[value] || value
 const valueTypeLabel = (value: string) =>
-  ({ bigint: '数字ID', string: '字符串编码' })[value] || value
+  ({
+    get bigint() {
+      return t('ui.numericId')
+    },
+    get string() {
+      return t('ui.stringCode')
+    },
+  })[value] || value
 const scopeSourceLabel = (value: string) =>
   ({
-    effective_legal_entities: '当前有效法人',
-    effective_org_units: '当前有效组织',
-    current_employee: '当前员工',
-    specified_values: '指定值',
+    get effective_legal_entities() {
+      return t('ui.currentValidLegalEntity')
+    },
+    get effective_org_units() {
+      return t('ui.currentValidOrganization')
+    },
+    get current_employee() {
+      return t('ui.currentEmployee')
+    },
+    get specified_values() {
+      return t('ui.specifiedValue')
+    },
   })[value] || value
 const relationLabel = (value: string) =>
-  ({ exact: '精确匹配', self_and_descendants: '本级及下级' })[value] || value
-const operatorLabel = (value: string) => ({ eq: '等于', in: '包含于' })[value] || value
+  ({
+    get exact() {
+      return t('ui.exactMatch')
+    },
+    get self_and_descendants() {
+      return t('ui.currentLevelAndBelow')
+    },
+  })[value] || value
+const operatorLabel = (value: string) =>
+  ({
+    get eq() {
+      return t('ui.equals')
+    },
+    get in() {
+      return t('ui.containedIn')
+    },
+  })[value] || value
 
 watch(
   () => [props.modelValue, props.kind, props.id],

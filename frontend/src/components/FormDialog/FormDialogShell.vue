@@ -40,7 +40,7 @@
       <q-space />
       <slot name="footer-actions" />
       <q-btn
-        :label="readonly ? '关闭' : cancelText"
+        :label="readonly ? t('ui.close') : displayCancelText"
         color="grey-7"
         :disable="loading"
         flat
@@ -48,7 +48,7 @@
       />
       <q-btn
         v-if="!readonly && showSubmit"
-        :label="submitText"
+        :label="displaySubmitText"
         color="primary"
         unelevated
         :loading="loading"
@@ -62,7 +62,13 @@
     </div>
   </div>
 
-  <q-dialog v-else v-model="show" persistent transition-show="slide-up" transition-hide="slide-down">
+  <q-dialog
+    v-else
+    v-model="show"
+    persistent
+    transition-show="slide-up"
+    transition-hide="slide-down"
+  >
     <q-card class="form-dialog-shell" :style="{ width, maxWidth: width, maxHeight }">
       <q-card-section class="form-dialog-shell__header">
         <div class="form-dialog-shell__mark">
@@ -105,7 +111,7 @@
         <q-space />
         <slot name="footer-actions" />
         <q-btn
-          :label="readonly ? '关闭' : cancelText"
+          :label="readonly ? t('ui.close') : displayCancelText"
           color="grey-7"
           :disable="loading"
           flat
@@ -113,7 +119,7 @@
         />
         <q-btn
           v-if="!readonly && showSubmit"
-          :label="submitText"
+          :label="displaySubmitText"
           color="primary"
           unelevated
           :loading="loading"
@@ -130,7 +136,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, useSlots } from 'vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'FormDialogShell' })
 
@@ -153,8 +163,8 @@ const props = withDefaults(
   {
     subtitle: '',
     icon: 'edit_note',
-    submitText: '保存',
-    cancelText: '取消',
+    submitText: '',
+    cancelText: '',
     loading: false,
     readonly: false,
     showSubmit: true,
@@ -164,6 +174,9 @@ const props = withDefaults(
     maxHeight: 'min(88vh, 860px)',
   },
 )
+
+const displaySubmitText = computed(() => props.submitText || t('ui.save'))
+const displayCancelText = computed(() => props.cancelText || t('ui.cancel'))
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void

@@ -4,11 +4,17 @@
       <q-card-section class="menu-page-header">
         <q-avatar class="menu-icon-tile" color="primary" text-color="white" :icon="pageIcon" />
         <div>
-          <div class="menu-page-title">菜单管理</div>
-          <div class="menu-page-subtitle">统一维护页面导航、操作按钮与接口权限</div>
+          <div class="menu-page-title">{{ t('ui.menuManagement') }}</div>
+          <div class="menu-page-subtitle">
+            {{
+              t('ui.harmonizedMaintenanceOfPageNavigationOperationButtonsAndInterfacePrivileges')
+            }}
+          </div>
         </div>
         <q-space />
-        <div class="menu-page-description">菜单定义页面入口，按钮定义功能操作</div>
+        <div class="menu-page-description">
+          {{ t('ui.menuDefinesPageEntryButtonDefinesFunctionality') }}
+        </div>
       </q-card-section>
     </q-card>
 
@@ -16,7 +22,7 @@
       <div class="menu-workbench-body">
         <section class="menu-tree-pane">
           <div class="menu-pane-header">
-            <div class="menu-pane-title">菜单结构</div>
+            <div class="menu-pane-title">{{ t('ui.menuStructure') }}</div>
             <q-badge rounded color="deep-purple-1" text-color="primary">
               {{ countMenus(filteredMenuData) }}
             </q-badge>
@@ -30,7 +36,7 @@
               :loading="loading"
               @click="fetchMenus"
             >
-              <q-tooltip>刷新菜单</q-tooltip>
+              <q-tooltip>{{ t('ui.refreshMenu') }}</q-tooltip>
             </q-btn>
             <q-btn
               v-for="btn in master_top_buttons"
@@ -51,7 +57,7 @@
               outlined
               dense
               clearable
-              placeholder="搜索菜单名称、编码或路径"
+              :placeholder="t('ui.searchForMenuNameCodeOrPath')"
             >
               <template #prepend>
                 <q-icon name="search" />
@@ -126,7 +132,7 @@
                   class="menu-detail-status"
                   :class="{ 'menu-detail-status--disabled': !isMenuEnabled(selectedMenu) }"
                 >
-                  {{ isMenuEnabled(selectedMenu) ? '正常显示' : '已隐藏' }}
+                  {{ isMenuEnabled(selectedMenu) ? t('ui.normalDisplay') : t('ui.hidden') }}
                 </div>
               </div>
               <div class="menu-detail-meta">
@@ -141,7 +147,7 @@
               v-if="selectedMenuUpdateButton"
               v-bind="menuButtonDisplayProps(selectedMenuUpdateButton)"
               icon="edit"
-              label="编辑菜单"
+              :label="t('ui.editMenu')"
               :round="false"
               :color="selectedMenuUpdateButton.color || 'primary'"
               size="sm"
@@ -153,19 +159,19 @@
 
           <div class="menu-detail-summary">
             <div class="menu-summary-item menu-summary-item--wide">
-              <div class="menu-summary-label">页面组件</div>
+              <div class="menu-summary-label">{{ t('ui.pageComponent') }}</div>
               <div class="menu-summary-value">{{ selectedMenu.component || '-' }}</div>
             </div>
             <div class="menu-summary-item">
-              <div class="menu-summary-label">页面类型</div>
+              <div class="menu-summary-label">{{ t('ui.pageType') }}</div>
               <div class="menu-summary-value">{{ menuPageTypeLabel(selectedMenu.page_type) }}</div>
             </div>
             <div class="menu-summary-item">
-              <div class="menu-summary-label">父级菜单</div>
+              <div class="menu-summary-label">{{ t('ui.parentMenu') }}</div>
               <div class="menu-summary-value">{{ selectedParentMenuTitle }}</div>
             </div>
             <div class="menu-summary-item">
-              <div class="menu-summary-label">排序</div>
+              <div class="menu-summary-label">{{ t('ui.sort') }}</div>
               <div class="menu-summary-value">{{ selectedMenu.sequence ?? '-' }}</div>
             </div>
           </div>
@@ -182,7 +188,7 @@
             <q-tab name="page_buttons">
               <div class="menu-tab-label">
                 <q-icon name="touch_app" />
-                <span>页面按钮</span>
+                <span>{{ t('ui.pageButton') }}</span>
                 <q-badge rounded color="deep-purple-1" text-color="primary">
                   {{ pageMenuButtons.length }}
                 </q-badge>
@@ -191,7 +197,7 @@
             <q-tab name="api_permissions">
               <div class="menu-tab-label">
                 <q-icon name="verified_user" />
-                <span>接口权限</span>
+                <span>{{ t('ui.apiPermissions') }}</span>
                 <q-badge rounded color="deep-purple-1" text-color="primary">
                   {{ apiPermissionButtons.length }}
                 </q-badge>
@@ -200,7 +206,7 @@
             <q-tab name="preview">
               <div class="menu-tab-label">
                 <q-icon name="visibility" />
-                <span>菜单预览</span>
+                <span>{{ t('ui.menuPreview') }}</span>
               </div>
             </q-tab>
           </q-tabs>
@@ -236,92 +242,92 @@
               :pagination="{ rowsPerPage: 0 }"
               hide-pagination
             >
-                <template #body-cell-feature="props">
-                  <q-td :props="props">
-                    <div class="menu-button-feature">
-                      <q-avatar
-                        class="menu-icon-tile"
-                        size="30px"
-                        color="deep-purple-1"
-                        text-color="primary"
-                        :icon="props.row.icon || 'touch_app'"
-                      />
-                      <div>
-                        <div class="menu-button-name">{{ props.row.name }}</div>
-                        <div class="menu-button-code">{{ props.row.code }}</div>
-                      </div>
-                    </div>
-                  </q-td>
-                </template>
-                <template #body-cell-position="props">
-                  <q-td :props="props">
-                    <q-badge color="grey-3" text-color="grey-8">
-                      {{ menuButtonPositionLabel(props.row.position) }}
-                    </q-badge>
-                  </q-td>
-                </template>
-                <template #body-cell-event_action="props">
-                  <q-td :props="props">
-                    <span class="menu-button-action">{{ props.row.event_action || '-' }}</span>
-                  </q-td>
-                </template>
-                <template #body-cell-permission="props">
-                  <q-td :props="props">
-                    <div class="menu-button-permission">
-                      <q-badge
-                        v-if="props.row.http_method"
-                        :color="httpMethodColor(props.row.http_method)"
-                      >
-                        {{ props.row.http_method.toUpperCase() }}
-                      </q-badge>
-                      <span class="menu-button-api-path">{{ props.row.api_path || '-' }}</span>
-                    </div>
-                  </q-td>
-                </template>
-                <template #body-cell-state="props">
-                  <q-td :props="props">
-                    <q-badge outline :color="isMenuButtonEnabled(props.row) ? 'positive' : 'grey'">
-                      {{ isMenuButtonEnabled(props.row) ? '启用' : '停用' }}
-                    </q-badge>
-                  </q-td>
-                </template>
-                <template #body-cell-actions="props">
-                  <q-td :props="props">
-                    <div class="row items-center no-wrap q-gutter-xs">
-                      <q-btn
-                        v-for="btn in detailRowButtons"
-                        :key="btn.id"
-                        v-bind="menuButtonDisplayProps(btn)"
-                        flat
-                        dense
-                        round
-                        size="sm"
-                        :color="btn.color || 'primary'"
-                        @click="handleButtonClick(btn, props.row)"
-                      >
-                        <q-tooltip>{{ btn.name }}</q-tooltip>
-                      </q-btn>
-                    </div>
-                  </q-td>
-                </template>
-                <template #no-data>
-                  <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
-                    <q-icon
-                      :name="activeTab === 'page_buttons' ? 'touch_app' : 'verified_user'"
-                      size="28px"
+              <template #body-cell-feature="props">
+                <q-td :props="props">
+                  <div class="menu-button-feature">
+                    <q-avatar
+                      class="menu-icon-tile"
+                      size="30px"
+                      color="deep-purple-1"
+                      text-color="primary"
+                      :icon="props.row.icon || 'touch_app'"
                     />
-                    <span>{{ activeButtonEmptyText }}</span>
+                    <div>
+                      <div class="menu-button-name">{{ props.row.name }}</div>
+                      <div class="menu-button-code">{{ props.row.code }}</div>
+                    </div>
                   </div>
-                </template>
+                </q-td>
+              </template>
+              <template #body-cell-position="props">
+                <q-td :props="props">
+                  <q-badge color="grey-3" text-color="grey-8">
+                    {{ menuButtonPositionLabel(props.row.position) }}
+                  </q-badge>
+                </q-td>
+              </template>
+              <template #body-cell-event_action="props">
+                <q-td :props="props">
+                  <span class="menu-button-action">{{ props.row.event_action || '-' }}</span>
+                </q-td>
+              </template>
+              <template #body-cell-permission="props">
+                <q-td :props="props">
+                  <div class="menu-button-permission">
+                    <q-badge
+                      v-if="props.row.http_method"
+                      :color="httpMethodColor(props.row.http_method)"
+                    >
+                      {{ props.row.http_method.toUpperCase() }}
+                    </q-badge>
+                    <span class="menu-button-api-path">{{ props.row.api_path || '-' }}</span>
+                  </div>
+                </q-td>
+              </template>
+              <template #body-cell-state="props">
+                <q-td :props="props">
+                  <q-badge outline :color="isMenuButtonEnabled(props.row) ? 'positive' : 'grey'">
+                    {{ isMenuButtonEnabled(props.row) ? t('ui.enabled') : t('ui.disabled') }}
+                  </q-badge>
+                </q-td>
+              </template>
+              <template #body-cell-actions="props">
+                <q-td :props="props">
+                  <div class="row items-center no-wrap q-gutter-xs">
+                    <q-btn
+                      v-for="btn in detailRowButtons"
+                      :key="btn.id"
+                      v-bind="menuButtonDisplayProps(btn)"
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      :color="btn.color || 'primary'"
+                      @click="handleButtonClick(btn, props.row)"
+                    >
+                      <q-tooltip>{{ btn.name }}</q-tooltip>
+                    </q-btn>
+                  </div>
+                </q-td>
+              </template>
+              <template #no-data>
+                <div class="full-width row flex-center text-grey-7 q-gutter-sm q-pa-xl">
+                  <q-icon
+                    :name="activeTab === 'page_buttons' ? 'touch_app' : 'verified_user'"
+                    size="28px"
+                  />
+                  <span>{{ activeButtonEmptyText }}</span>
+                </div>
+              </template>
             </q-table>
           </div>
 
           <div v-else class="preview-container">
             <div class="preview-sidebar">
-              <div class="preview-header">应用导航</div>
+              <div class="preview-header">{{ t('ui.applyNavigation') }}</div>
               <q-scroll-area class="preview-scroll">
                 <q-list bordered separator :dark="$q.dark.isActive">
-                  <q-item-label header>菜单视图</q-item-label>
+                  <q-item-label header>{{ t('ui.menuView') }}</q-item-label>
                   <template v-for="menu in previewMenus" :key="menu.id">
                     <q-expansion-item
                       v-if="menu.children && menu.children.length > 0"
@@ -373,8 +379,10 @@
 
         <section v-else class="menu-detail-empty">
           <q-icon name="account_tree" size="72px" />
-          <div class="menu-empty-title">选择左侧菜单</div>
-          <div class="menu-empty-desc">选择菜单后维护页面按钮与接口权限</div>
+          <div class="menu-empty-title">{{ t('ui.selectLeftMenu') }}</div>
+          <div class="menu-empty-desc">
+            {{ t('ui.maintainPageButtonsAndInterfacePrivilegesAfterSelectingMenu') }}
+          </div>
         </section>
       </div>
     </div>
@@ -384,10 +392,14 @@
       v-model="showFormDialog"
       :edit-data="currentEditData"
       :title="
-        currentEditData?.id ? '编辑菜单' : currentEditData?.pid ? '新增子菜单' : '新增顶级菜单'
+        currentEditData?.id
+          ? t('ui.editMenu')
+          : currentEditData?.pid
+            ? t('ui.addSubmenu')
+            : t('ui.addTopMenu')
       "
       :fields="menuFields"
-      :submit-btn-text="currentEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
@@ -396,7 +408,7 @@
       :edit-data="buttonEditData"
       :title="buttonDialogTitle"
       :fields="buttonFields"
-      :submit-btn-text="isButtonEdit ? '保存' : '创建'"
+      :submit-btn-text="isButtonEdit ? t('ui.save') : t('ui.createRecord')"
       table-code="sys_menu_button"
       @submit="handleButtonFormSubmit"
     />
@@ -593,7 +605,8 @@ const collectExpandableMenuIds = (menus: Menu[]): number[] =>
   ])
 
 const menuNodeMeta = (menu: Menu) => {
-  if (menu.children?.length) return `${menu.name} · ${menu.children.length} 个子菜单`
+  if (menu.children?.length)
+    return t('ui.submenu', { value1: menu.name, value2: menu.children.length })
   return [menu.name, menu.path].filter(Boolean).join(' · ') || '-'
 }
 
@@ -604,9 +617,15 @@ const isMenuButtonEnabled = (button: MenuButton) =>
 
 const menuPageTypeLabel = (pageType?: string) => {
   const labels: Record<string, string> = {
-    directory: '目录',
-    fixed: '固定页面',
-    low_code: '低代码页面',
+    get directory() {
+      return t('ui.contents')
+    },
+    get fixed() {
+      return t('ui.fixedPage')
+    },
+    get low_code() {
+      return t('ui.lowCodePage')
+    },
   }
   return pageType ? labels[pageType] || pageType : '-'
 }
@@ -628,7 +647,7 @@ const httpMethodColor = (method: string) => {
 const selectedParentMenuTitle = computed(() => {
   if (!selectedMenu.value) return '-'
   const parent = findParentMenu(menuData.value, selectedMenu.value.id)
-  return parent ? t(parent.title) : '顶级菜单'
+  return parent ? t(parent.title) : t('ui.topMenu')
 })
 
 const firstMenu = (menus: Menu[]): Menu | null => {
@@ -713,8 +732,11 @@ const currentButtonIsPageButton = computed(() =>
   normalizeBooleanValue(buttonEditData.value.is_button, true),
 )
 const buttonDialogTitle = computed(() => {
-  const kind = currentButtonIsPageButton.value ? '页面按钮' : '接口权限'
-  return `${isButtonEdit.value ? '编辑' : '新增'}${kind}`
+  const kind = currentButtonIsPageButton.value ? t('ui.pageButton') : t('ui.apiPermissions')
+  return t('ui.menuButtonDialogTitle', {
+    value1: isButtonEdit.value ? t('ui.edit') : t('ui.create'),
+    kind: kind,
+  })
 })
 
 const pageMenuButtons = computed(() =>
@@ -730,24 +752,24 @@ const activeButtonRows = computed(() =>
 )
 
 const activeButtonPanelTitle = computed(() =>
-  activeTab.value === 'api_permissions' ? '接口权限' : '页面按钮',
+  activeTab.value === 'api_permissions' ? t('ui.apiPermissions') : t('ui.pageButton'),
 )
 
 const activeButtonPanelSubtitle = computed(() =>
   activeTab.value === 'api_permissions'
-    ? '维护当前页面使用但不直接显示为按钮的接口权限'
-    : '控制当前页面中可见的操作及其接口权限',
+    ? t('ui.maintainingInterfacePrivilegesForCurrentPageUsesButNotShown')
+    : t('ui.controlsVisibleOperationsOnTheCurrentPageAndTheirInterface'),
 )
 
 const activeButtonEmptyText = computed(() =>
   activeTab.value === 'api_permissions'
-    ? '当前菜单还没有配置接口权限'
-    : '当前菜单还没有配置页面按钮',
+    ? t('ui.theCurrentMenuDoesNotYetHaveInterfacePrivileges')
+    : t('ui.theCurrentMenuDoesNotYetConfigureThePageButton'),
 )
 
 const activeToolbarButtonLabel = (button: MenuButton) =>
   activeTab.value === 'api_permissions' && button.event_action === 'create_button'
-    ? '新增接口权限'
+    ? t('ui.addInterfacePermissions')
     : button.name
 
 const normalizeBooleanValue = (value: unknown, fallback = false): boolean => {
@@ -792,7 +814,9 @@ const query = ref<Query>({
 const buttonDisplayColumns: QTableProps['columns'] = [
   {
     name: 'feature',
-    label: '功能按钮',
+    get label() {
+      return t('ui.functionButton')
+    },
     field: 'name',
     align: 'left',
     style: 'width: 22%',
@@ -800,7 +824,9 @@ const buttonDisplayColumns: QTableProps['columns'] = [
   },
   {
     name: 'position',
-    label: '展示位置',
+    get label() {
+      return t('ui.displayPosition')
+    },
     field: 'position',
     align: 'left',
     style: 'width: 13%',
@@ -808,7 +834,9 @@ const buttonDisplayColumns: QTableProps['columns'] = [
   },
   {
     name: 'event_action',
-    label: '触发动作',
+    get label() {
+      return t('ui.triggerAction')
+    },
     field: 'event_action',
     align: 'left',
     style: 'width: 16%',
@@ -816,13 +844,17 @@ const buttonDisplayColumns: QTableProps['columns'] = [
   },
   {
     name: 'permission',
-    label: '接口权限',
+    get label() {
+      return t('ui.apiPermissions')
+    },
     field: 'api_path',
     align: 'left',
   },
   {
     name: 'state',
-    label: '状态',
+    get label() {
+      return t('ui.status')
+    },
     field: 'state',
     align: 'left',
     style: 'width: 9%',
@@ -830,7 +862,9 @@ const buttonDisplayColumns: QTableProps['columns'] = [
   },
   {
     name: 'actions',
-    label: '操作',
+    get label() {
+      return t('ui.actions')
+    },
     field: 'id',
     align: 'left',
     style: 'width: 90px',
@@ -840,9 +874,13 @@ const buttonDisplayColumns: QTableProps['columns'] = [
 
 const normalizeMenuFields = (fields: TableField[] = []) => {
   const labelMap: Record<string, string> = {
-    page_type: '页面类型',
-    table_code: '绑定表编码',
-    option: '扩展配置',
+    get page_type() {
+      return t('ui.pageType')
+    },
+    table_code: t('ui.bindTableEncoding'),
+    get option() {
+      return t('ui.extensionConfiguration')
+    },
   }
   return fields.map((field) => ({
     ...field,
@@ -868,7 +906,11 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'sys_menu_button_position',
-          field_name: currentButtonIsPageButton.value ? '展示位置' : '接口归类',
+          get field_name() {
+            return currentButtonIsPageButton.value
+              ? t('ui.displayPosition')
+              : t('ui.interfaceCategory')
+          },
         }
       }
       if (field.field_code === 'display_mode') {
@@ -876,7 +918,9 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'sys_menu_button_display_mode',
-          field_name: '展示方式',
+          get field_name() {
+            return t('ui.presentation')
+          },
         }
       }
       if (field.field_code === 'event_action') {
@@ -884,7 +928,9 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'sys_menu_button_event_action',
-          field_name: currentButtonIsPageButton.value ? '事件动作' : '权限动作',
+          get field_name() {
+            return currentButtonIsPageButton.value ? t('ui.eventAction') : t('ui.permissionActions')
+          },
           options: menuButtonEventActionOptions,
         }
       }
@@ -893,7 +939,9 @@ const buttonFields = computed(() =>
           ...field,
           input_type: SysTableFieldInputType.SELECT,
           dict_code: field.dict_code || 'http_method',
-          field_name: '请求方法',
+          get field_name() {
+            return t('ui.methodOfRequest')
+          },
         }
       }
       if (
@@ -911,21 +959,45 @@ const buttonFields = computed(() =>
       if (field.field_code === 'is_button') {
         return {
           ...field,
-          field_name: '是否页面按钮',
+          get field_name() {
+            return t('ui.whetherOrNotToButtonPage')
+          },
           default_value: 'true',
         }
       }
       if (field.field_code === 'name') {
-        return { ...field, field_name: currentButtonIsPageButton.value ? '按钮名称' : '接口名称' }
+        return {
+          ...field,
+          get field_name() {
+            return currentButtonIsPageButton.value ? t('ui.buttonName') : t('ui.apiName')
+          },
+        }
       }
       if (field.field_code === 'code') {
-        return { ...field, field_name: currentButtonIsPageButton.value ? '按钮编码' : '接口编码' }
+        return {
+          ...field,
+          get field_name() {
+            return currentButtonIsPageButton.value ? t('ui.buttonEncoding') : t('ui.apiCode')
+          },
+        }
       }
       if (field.field_code === 'is_hidden') {
-        return { ...field, field_name: '是否隐藏', default_value: 'false' }
+        return {
+          ...field,
+          get field_name() {
+            return t('ui.whetherToHide')
+          },
+          default_value: 'false',
+        }
       }
       if (field.field_code === 'is_disabled') {
-        return { ...field, field_name: '是否禁用', default_value: 'false' }
+        return {
+          ...field,
+          get field_name() {
+            return t('ui.disableFieldLabel')
+          },
+          default_value: 'false',
+        }
       }
       return field
     })
@@ -1087,7 +1159,9 @@ const duplicateMenu = (menu: Menu) => {
   currentEditData.value = {
     ...menu,
     id: 0,
-    title: `${menu.title} (复制)`,
+    get title() {
+      return t('ui.copiedName', { value1: menu.title })
+    },
   }
   showFormDialog.value = true
 }
@@ -1095,7 +1169,9 @@ const duplicateMenu = (menu: Menu) => {
 // 确认删除菜单
 const confirmDeleteMenu = (menuId: number) => {
   confirmDanger({
-    message: '确定要删除该菜单吗？删除后将无法恢复，且所有子菜单和按钮也将被删除。',
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteThisMenuThe')
+    },
   }).onOk(() => {
     void (async () => {
       const res = await menuApi.deleteMenu(menuId)
@@ -1193,7 +1269,9 @@ const openEditButtonDialog = (button: MenuButton) => {
 // 确认删除按钮
 const confirmDeleteButton = (button: MenuButton) => {
   confirmDanger({
-    message: `确定要删除按钮 "${button.name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToRemoveTheButton', { value1: button.name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {
@@ -1245,7 +1323,13 @@ const buildMenuButtonPayload = (
 
 const validateMenuButtonPayload = (button: MenuButtonCreateReq | MenuButtonUpdateReq) => {
   if (!button.event_action) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请选择事件动作' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.selectEventAction')
+      },
+    })
     return false
   }
   if (
@@ -1253,7 +1337,13 @@ const validateMenuButtonPayload = (button: MenuButtonCreateReq | MenuButtonUpdat
       button.event_action as SysMenuButtonEventAction,
     )
   ) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '事件动作不在系统枚举范围内' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.eventActionIsNotSupported')
+      },
+    })
     return false
   }
   return true

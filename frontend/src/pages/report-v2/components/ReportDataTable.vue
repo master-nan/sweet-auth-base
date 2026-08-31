@@ -38,7 +38,7 @@
       <template #no-data>
         <div class="empty-state">
           <q-icon name="inbox" size="28px" />
-          <span>{{ emptyText }}</span>
+          <span>{{ displayEmptyText }}</span>
         </div>
       </template>
     </q-table>
@@ -56,28 +56,38 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 import type { QTableProps } from 'quasar'
 import TablePagination from 'components/Table/TablePagination.vue'
 
-const props = withDefaults(defineProps<{
-  rows: unknown[]
-  columns: QTableProps['columns']
-  rowKey?: string
-  loading?: boolean
-  page?: number
-  pageSize?: number
-  total?: number
-  showPagination?: boolean
-  emptyText?: string
-}>(), {
-  rowKey: 'id',
-  loading: false,
-  page: 1,
-  pageSize: 20,
-  total: 0,
-  showPagination: true,
-  emptyText: '暂无数据',
-})
+const { t } = useI18n({ useScope: 'global' })
+
+const props = withDefaults(
+  defineProps<{
+    rows: unknown[]
+    columns: QTableProps['columns']
+    rowKey?: string
+    loading?: boolean
+    page?: number
+    pageSize?: number
+    total?: number
+    showPagination?: boolean
+    emptyText?: string
+  }>(),
+  {
+    rowKey: 'id',
+    loading: false,
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    showPagination: true,
+    emptyText: '',
+  },
+)
+
+const displayEmptyText = computed(() => props.emptyText || t('ui.noData'))
 
 defineEmits<{
   'update:page': [value: number]

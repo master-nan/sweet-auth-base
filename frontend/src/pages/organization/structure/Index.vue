@@ -4,8 +4,12 @@
       <q-card flat bordered :dark="Dark.isActive" class="organization-page-toolbar">
         <q-card-section class="row items-center justify-between q-gutter-md q-py-sm">
           <div class="organization-page-heading">
-            <h1 class="text-h6 text-weight-bold q-my-none">组织架构</h1>
-            <p class="text-caption text-grey-7 q-my-none">浏览法人架构与管理架构两棵组织树</p>
+            <h1 class="text-h6 text-weight-bold q-my-none">
+              {{ t('ui.organizationalStructure') }}
+            </h1>
+            <p class="text-caption text-grey-7 q-my-none">
+              {{ t('ui.browseTwoOrganizationalTreesOfCorporateAndRegulatoryStructures') }}
+            </p>
           </div>
 
           <div class="row items-center justify-end q-gutter-sm">
@@ -19,7 +23,7 @@
               map-options
               outlined
               dense
-              label="架构类型"
+              :label="t('ui.structureType')"
               class="architecture-mode-toggle"
               @update:model-value="handleArchitectureModeChange"
             />
@@ -36,20 +40,20 @@
               outlined
               dense
               :loading="structureLoading"
-              label="管理视图"
+              :label="t('ui.manageView')"
               class="structure-select"
               @update:model-value="handleStructureChange"
             >
               <template #no-option>
                 <q-item>
-                  <q-item-section class="text-grey-7">暂无管理视图</q-item-section>
+                  <q-item-section class="text-grey-7">{{ t('ui.noManagedView') }}</q-item-section>
                 </q-item>
               </template>
             </q-select>
 
             <q-btn
               icon="refresh"
-              aria-label="刷新当前视图"
+              :aria-label="t('ui.refreshCurrentView')"
               round
               flat
               dense
@@ -57,7 +61,7 @@
               :loading="treeLoading || structureLoading"
               @click="refreshPage"
             >
-              <q-tooltip>刷新当前视图</q-tooltip>
+              <q-tooltip>{{ t('ui.refreshCurrentView') }}</q-tooltip>
             </q-btn>
           </div>
         </q-card-section>
@@ -110,7 +114,7 @@
                     :disable="architectureMode === 'management' && !selectedStructure"
                     @click="handleSearch"
                   >
-                    <q-tooltip>搜索</q-tooltip>
+                    <q-tooltip>{{ t('ui.search') }}</q-tooltip>
                   </q-btn>
                 </template>
               </q-input>
@@ -184,6 +188,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'organization_structure' })
 
 import { computed, onMounted, ref } from 'vue'
@@ -206,6 +212,8 @@ import {
   type StructureOrgTreeNode,
 } from 'src/api/services/org'
 import { useDictStore } from 'src/stores/dict'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type ArchitectureMode = 'management' | 'legal'
 type LegalArchitectureNodeKind = 'legal_entity' | 'legal_unit'
@@ -258,8 +266,18 @@ const legalTreeLoaded = ref(false)
 let detailRequestSequence = 0
 
 const architectureModeOptions = [
-  { label: '管理架构', value: 'management' },
-  { label: '法人架构', value: 'legal' },
+  {
+    get label() {
+      return t('ui.managementStructure')
+    },
+    value: 'management',
+  },
+  {
+    get label() {
+      return t('ui.legalEntityStructure')
+    },
+    value: 'legal',
+  },
 ]
 
 const selectedStructure = computed(
@@ -281,28 +299,44 @@ const selectedTreeNodeId = computed(() =>
     : (selectedLegalNode.value?.id ?? null),
 )
 const treeTitle = computed(() =>
-  architectureMode.value === 'management' ? '管理架构' : '法人架构',
+  architectureMode.value === 'management'
+    ? t('ui.managementStructure')
+    : t('ui.legalEntityStructure'),
 )
 const treeSummary = computed(() => {
   if (architectureMode.value === 'legal') {
     const counts = countLegalArchitectureNodes(legalTree.value)
-    return `${counts.legalEntities} 个法人 · ${counts.legalUnits} 个部门`
+    return t('ui.legalEntityDepartment', {
+      value1: counts.legalEntities,
+      value2: counts.legalUnits,
+    })
   }
-  if (!selectedStructure.value) return '暂无管理架构数据'
-  return `${selectedStructure.value.name} · ${countStructureNodes(managementTree.value)} 个组织`
+  if (!selectedStructure.value) return t('ui.noManagementStructureDataAvailable')
+  return t('ui.organizationCountSummary', {
+    value1: selectedStructure.value.name,
+    value2: countStructureNodes(managementTree.value),
+  })
 })
 const searchPlaceholder = computed(() =>
-  architectureMode.value === 'management' ? '搜索组织编码或名称' : '搜索法人或部门编码、名称',
+  architectureMode.value === 'management'
+    ? t('ui.searchForOrganizationalCodeOrName')
+    : t('ui.searchForLegalPersonOrSectorCodeName'),
 )
 const treeEmptyText = computed(() => {
   if (architectureMode.value === 'legal') {
-    return treeKeyword.value ? '没有匹配的法人或部门' : '暂无法人架构数据'
+    return treeKeyword.value
+      ? t('ui.noMatchingCorporateEntityOrDepartment')
+      : t('ui.organizationArchitectureUnavailable')
   }
-  if (!selectedStructure.value) return '暂无可用管理视图'
-  return treeKeyword.value ? '当前视图没有匹配的组织' : '当前视图暂无组织数据'
+  if (!selectedStructure.value) return t('ui.noManagementViewAvailableForNow')
+  return treeKeyword.value
+    ? t('ui.noMatchingOrganizationForTheCurrentView')
+    : t('ui.noOrganizationDataInCurrentView')
 })
 const detailEmptyText = computed(() =>
-  architectureMode.value === 'management' ? '请选择左侧管理组织' : '请选择左侧法人或部门',
+  architectureMode.value === 'management'
+    ? t('ui.selectTheLeftManipulationOrganization')
+    : t('ui.selectTheLegalEntityOrDepartmentOnTheLeftSide'),
 )
 const selectionSummary = computed<SelectionSummary | null>(() => {
   if (architectureMode.value === 'legal') {
@@ -373,7 +407,7 @@ const loadStructures = async () => {
     structures.value = []
     legalStructure.value = null
     selectedStructureCode.value = null
-    structureError.value = errorMessage(error, '管理视图加载失败')
+    structureError.value = errorMessage(error, t('ui.managingViewLoadingFailed'))
   } finally {
     structureLoading.value = false
   }
@@ -412,7 +446,7 @@ const loadManagementTree = async () => {
     managementTree.value = []
     selectedManagementNode.value = null
     managementDetail.value = null
-    treeError.value = errorMessage(error, '管理组织树加载失败')
+    treeError.value = errorMessage(error, t('ui.managingOrganisationalTreeLoadingFailed'))
   } finally {
     treeLoading.value = false
   }
@@ -452,7 +486,7 @@ const loadLegalTree = async () => {
     legalDetail.value = null
     legalUnitDetail.value = null
     legalTreeLoaded.value = false
-    treeError.value = errorMessage(error, '法人架构加载失败')
+    treeError.value = errorMessage(error, t('ui.failedToLoadCorporateArchitecture'))
   } finally {
     treeLoading.value = false
   }
@@ -527,7 +561,7 @@ const selectManagementNode = async (node: StructureOrgTreeNode) => {
     if (sequence === detailRequestSequence) managementDetail.value = result
   } catch (error) {
     if (sequence === detailRequestSequence) {
-      detailError.value = errorMessage(error, '管理组织详情加载失败')
+      detailError.value = errorMessage(error, t('ui.failedToManageOrganizationDetailsLoaded'))
     }
   } finally {
     if (sequence === detailRequestSequence) detailLoading.value = false
@@ -556,7 +590,7 @@ const selectLegalNode = async (node: LegalArchitectureNode) => {
     }
   } catch (error) {
     if (sequence === detailRequestSequence) {
-      detailError.value = errorMessage(error, '法人架构详情加载失败')
+      detailError.value = errorMessage(error, t('ui.loadingDetailsOfCorporateArchitectureFailed'))
     }
   } finally {
     if (sequence === detailRequestSequence) detailLoading.value = false
@@ -593,55 +627,81 @@ function managementDetailGroups(detail: OrgUnitDetail | null): OrganizationDetai
   return [
     {
       key: 'management-detail',
-      title: '管理组织详情',
+      get title() {
+        return t('ui.manageOrganizationalDetails')
+      },
       fields: [
-        { key: 'name', label: '组织名称', value: displayValue(detail.name) },
+        {
+          key: 'name',
+          get label() {
+            return t('ui.nameOfOrganization')
+          },
+          value: displayValue(detail.name),
+        },
         {
           key: 'code',
-          label: '组织编码',
+          get label() {
+            return t('ui.organizationCodeLabel')
+          },
           value: displayValue(detail.code),
           kind: 'code',
         },
         {
           key: 'unit_type',
-          label: '组织类型',
+          get label() {
+            return t('ui.organizationType')
+          },
           value: unitTypeLabel(detail.unit_type),
         },
         {
           key: 'structure',
-          label: '管理视图',
+          get label() {
+            return t('ui.manageView')
+          },
           value: selectedStructure.value?.name || '-',
         },
         {
           key: 'primary_legal_entity',
-          label: '主要法人',
+          get label() {
+            return t('ui.primaryLegalEntityLabel')
+          },
           value: primaryLegalEntity,
         },
         {
           key: 'status',
-          label: '状态',
+          get label() {
+            return t('ui.status')
+          },
           value: statusLabel(detail.status),
           kind: 'status',
           color: statusColor(detail.status, false),
         },
         {
           key: 'valid_from',
-          label: '有效期开始',
+          get label() {
+            return t('ui.validFrom')
+          },
           value: formatDate(detail.valid_from),
         },
         {
           key: 'valid_to',
-          label: '有效期结束',
-          value: formatDate(detail.valid_to, '长期有效'),
+          get label() {
+            return t('ui.validUntil')
+          },
+          value: formatDate(detail.valid_to, t('ui.noExpiration')),
         },
         {
           key: 'gmt_modify',
-          label: '更新时间',
+          get label() {
+            return t('ui.updatedAt')
+          },
           value: formatDateTime(detail.gmt_modify),
         },
         {
           key: 'local_note',
-          label: '平台备注',
+          get label() {
+            return t('ui.platformNotes')
+          },
           value: displayValue(detail.local_note),
           wide: true,
         },
@@ -659,67 +719,97 @@ function legalEntityDetailGroups(detail: LegalEntityDetail | null): Organization
   return [
     {
       key: 'legal-detail',
-      title: '法人详情',
+      get title() {
+        return t('ui.detailsOfLegalPersons')
+      },
       fields: [
-        { key: 'name', label: '法人名称', value: displayValue(detail.name) },
+        {
+          key: 'name',
+          get label() {
+            return t('ui.nameOfLegalPerson')
+          },
+          value: displayValue(detail.name),
+        },
         {
           key: 'short_name',
-          label: '法人简称',
+          get label() {
+            return t('ui.abbreviationsForLegalPersons')
+          },
           value: displayValue(detail.short_name),
         },
         {
           key: 'code',
-          label: '法人编码',
+          get label() {
+            return t('ui.legalPersonCode')
+          },
           value: displayValue(detail.code),
           kind: 'code',
         },
         {
           key: 'entity_type',
-          label: '主体类型',
+          get label() {
+            return t('ui.subjectType')
+          },
           value: legalEntityTypeLabel(detail.entity_type),
         },
         {
           key: 'parent',
-          label: '上级法人',
+          get label() {
+            return t('ui.parentLegalEntity')
+          },
           value: parent ? `${parent.code} - ${parent.name}` : '-',
         },
         {
           key: 'unified_social_credit_code',
-          label: '统一社会信用代码',
+          get label() {
+            return t('ui.unifiedSocialCreditCode')
+          },
           value: displayValue(detail.unified_social_credit_code),
           kind: 'code',
         },
         {
           key: 'accounting_code',
-          label: '核算编码',
+          get label() {
+            return t('ui.accountingCode')
+          },
           value: displayValue(detail.accounting_code),
           kind: 'code',
         },
         {
           key: 'status',
-          label: '状态',
+          get label() {
+            return t('ui.status')
+          },
           value: statusLabel(detail.status),
           kind: 'status',
           color: statusColor(detail.status, false),
         },
         {
           key: 'valid_from',
-          label: '有效期开始',
+          get label() {
+            return t('ui.validFrom')
+          },
           value: formatDate(detail.valid_from),
         },
         {
           key: 'valid_to',
-          label: '有效期结束',
-          value: formatDate(detail.valid_to, '长期有效'),
+          get label() {
+            return t('ui.validUntil')
+          },
+          value: formatDate(detail.valid_to, t('ui.noExpiration')),
         },
         {
           key: 'gmt_modify',
-          label: '更新时间',
+          get label() {
+            return t('ui.updatedAt')
+          },
           value: formatDateTime(detail.gmt_modify),
         },
         {
           key: 'local_note',
-          label: '平台备注',
+          get label() {
+            return t('ui.platformNotes')
+          },
           value: displayValue(detail.local_note),
           wide: true,
         },
@@ -737,46 +827,74 @@ function legalUnitDetailGroups(detail: OrgUnitDetail | null): OrganizationDetail
   return [
     {
       key: 'legal-unit-detail',
-      title: '法人部门详情',
+      get title() {
+        return t('ui.detailsOfTheLegalEntity')
+      },
       fields: [
-        { key: 'name', label: '部门名称', value: displayValue(detail.name) },
+        {
+          key: 'name',
+          get label() {
+            return t('ui.departmentName')
+          },
+          value: displayValue(detail.name),
+        },
         {
           key: 'code',
-          label: '部门编码',
+          get label() {
+            return t('ui.sectorCode')
+          },
           value: displayValue(detail.code),
           kind: 'code',
         },
         {
           key: 'unit_type',
-          label: '组织类型',
+          get label() {
+            return t('ui.organizationType')
+          },
           value: unitTypeLabel(detail.unit_type),
         },
-        { key: 'legal_entity', label: '所属法人', value: legalEntity },
+        {
+          key: 'legal_entity',
+          get label() {
+            return t('ui.owningLegalEntity')
+          },
+          value: legalEntity,
+        },
         {
           key: 'status',
-          label: '状态',
+          get label() {
+            return t('ui.status')
+          },
           value: statusLabel(detail.status),
           kind: 'status',
           color: statusColor(detail.status, false),
         },
         {
           key: 'valid_from',
-          label: '有效期开始',
+          get label() {
+            return t('ui.validFrom')
+          },
           value: formatDate(detail.valid_from),
         },
         {
           key: 'valid_to',
-          label: '有效期结束',
-          value: formatDate(detail.valid_to, '长期有效'),
+          get label() {
+            return t('ui.validUntil')
+          },
+          value: formatDate(detail.valid_to, t('ui.noExpiration')),
         },
         {
           key: 'gmt_modify',
-          label: '更新时间',
+          get label() {
+            return t('ui.updatedAt')
+          },
           value: formatDateTime(detail.gmt_modify),
         },
         {
           key: 'local_note',
-          label: '平台备注',
+          get label() {
+            return t('ui.platformNotes')
+          },
           value: displayValue(detail.local_note),
           wide: true,
         },

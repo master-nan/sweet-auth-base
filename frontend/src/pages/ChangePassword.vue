@@ -2,7 +2,7 @@
   <div class="change-password-page">
     <section class="change-password-panel">
       <div>
-        <div class="text-h5 text-weight-medium">修改密码</div>
+        <div class="text-h5 text-weight-medium">{{ t('ui.changePassword') }}</div>
         <div class="text-body2 text-grey-7 q-mt-sm">{{ reasonText }}</div>
       </div>
 
@@ -11,7 +11,7 @@
           v-model="password"
           outlined
           dense
-          label="新密码"
+          :label="t('ui.newPassword')"
           :type="showPassword ? 'text' : 'password'"
           :rules="passwordRules"
           autocomplete="new-password"
@@ -31,7 +31,7 @@
           v-model="confirmPassword"
           outlined
           dense
-          label="确认密码"
+          :label="t('ui.confirmPassword')"
           :type="showPassword ? 'text' : 'password'"
           :rules="confirmRules"
           autocomplete="new-password"
@@ -40,8 +40,8 @@
         <div class="text-caption text-grey-7">{{ policyText }}</div>
 
         <div class="row items-center justify-end q-gutter-sm">
-          <q-btn flat color="grey-8" label="退出登录" @click="logout" />
-          <q-btn color="primary" label="保存" type="submit" :loading="loading" />
+          <q-btn flat color="grey-8" :label="t('ui.exitLogin')" @click="logout" />
+          <q-btn color="primary" :label="t('ui.save')" type="submit" :loading="loading" />
         </div>
       </q-form>
     </section>
@@ -49,6 +49,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Notify } from 'quasar'
@@ -57,6 +59,8 @@ import { useConfigureStore } from 'src/stores/configure'
 import { useUserStore } from 'src/stores/user'
 import { useLoadingStore } from 'src/stores/loading'
 import { buildPasswordRules, passwordPolicyDescription } from 'src/utils/passwordPolicy'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'ChangePassword' })
 
@@ -72,14 +76,15 @@ const showPassword = ref(false)
 
 const passwordRules = computed(() => buildPasswordRules(configureStore.$state))
 const confirmRules = computed(() => [
-  (val: string | null | undefined) => (val ?? '') === password.value || '两次输入的密码不一致',
+  (val: string | null | undefined) =>
+    (val ?? '') === password.value || t('ui.thePasswordsDoNotMatch'),
 ])
 const policyText = computed(() => passwordPolicyDescription(configureStore.$state))
 const reasonText = computed(() => {
   if (userStore.password_change_reason === 'expired') {
-    return '当前密码已过期，请设置新密码后继续使用。'
+    return t('ui.theCurrentPasswordIsExpiredAndPleaseSetANew')
   }
-  return '当前账号需要先修改密码。'
+  return t('ui.theCurrentAccountNumberRequiresAPasswordChangeFirst')
 })
 
 onMounted(async () => {
@@ -90,7 +95,13 @@ const submit = async () => {
   const result = await sysUserApi.updatePassword(password.value)
   if (result.success) {
     userStore.setPasswordChangeRequirement(false)
-    Notify.create({ type: 'positive', position: 'top-right', message: '密码已修改，请重新登录' })
+    Notify.create({
+      type: 'positive',
+      position: 'top-right',
+      get message() {
+        return t('ui.passwordModifiedPleaseReEnter')
+      },
+    })
     userStore.setLogout()
   }
 }

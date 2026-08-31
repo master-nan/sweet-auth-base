@@ -50,15 +50,19 @@
 
     <div v-else-if="!loading" class="absolute-full column flex-center q-gutter-sm text-grey-6">
       <q-icon name="account_tree" size="42px" />
-      <span>{{ emptyText }}</span>
+      <span>{{ displayEmptyText }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import { Dark } from 'quasar'
 import type { OrganizationReadOnlyTreeNode } from './organization-read-only-tree'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(
   defineProps<{
@@ -71,10 +75,12 @@ const props = withDefaults(
   {
     selectedId: null,
     loading: false,
-    emptyText: '暂无组织数据',
+    emptyText: '',
     expandAll: false,
   },
 )
+
+const displayEmptyText = computed(() => props.emptyText || t('ui.noOrganizationData'))
 
 const emit = defineEmits<{
   select: [id: number]

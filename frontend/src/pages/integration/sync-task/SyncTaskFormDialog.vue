@@ -1,10 +1,12 @@
 <template>
   <form-dialog-shell
     v-model="visible"
-    :title="editData ? '编辑同步任务' : '新增同步任务'"
-    :subtitle="editData ? `${editData.task_code} · v${editData.version}` : '创建版本 1 草稿'"
+    :title="editData ? t('ui.editSyncTasks') : t('ui.createSyncTaskTitle')"
+    :subtitle="
+      editData ? `${editData.task_code} · v${editData.version}` : t('ui.createDraftVersion1')
+    "
     icon="sync_alt"
-    :submit-text="editData ? '保存' : '创建'"
+    :submit-text="editData ? t('ui.save') : t('ui.createRecord')"
     :loading="loading || false"
     width="min(1080px, calc(100vw - 40px))"
     @submit="submit"
@@ -15,10 +17,16 @@
         outlined
         dense
         :disable="Boolean(editData)"
-        label="任务编码 *"
+        :label="t('ui.taskCode')"
         :rules="[taskCodeRule]"
       />
-      <q-input v-model="form.task_name" outlined dense label="任务名称 *" :rules="[requiredRule]" />
+      <q-input
+        v-model="form.task_name"
+        outlined
+        dense
+        :label="t('ui.taskName')"
+        :rules="[requiredRule]"
+      />
       <q-select
         v-model="form.external_system_id"
         outlined
@@ -26,7 +34,7 @@
         emit-value
         map-options
         :options="systemOptions"
-        label="外部系统 *"
+        :label="t('ui.externalSystemRequiredLabel')"
         :rules="[positiveRule]"
         @update:model-value="onSystemChanged"
       />
@@ -37,7 +45,7 @@
         emit-value
         map-options
         :options="interfaceOptions"
-        label="接口定义版本 *"
+        :label="t('ui.interfaceDefinitionVersion')"
         :rules="[positiveRule]"
         @update:model-value="onInterfaceChanged"
       />
@@ -54,7 +62,7 @@
         <template #no-option>
           <q-item>
             <q-item-section class="text-grey-7">
-              当前服务未开放可用 Consumer，请先检查后端同步配置
+              {{ t('ui.consumerPleaseCheckBackendSyncConfigurationFirst') }}
             </q-item-section>
           </q-item>
         </template>
@@ -66,23 +74,23 @@
         emit-value
         map-options
         :options="scheduleOptions"
-        label="调度方式 *"
+        :label="t('ui.scheduleMode')"
       />
       <q-input
         v-if="form.schedule_type === 'cron'"
         v-model="form.cron_expression"
         outlined
         dense
-        label="Cron（五段式） *"
-        hint="格式：分钟 小时 日 月 星期，例如 0 */2 * * * 表示每 2 小时执行"
+        :label="t('ui.cronFiveFields')"
+        :hint="t('ui.formatMinutesHoursDaysAndMonthsEG02')"
         :rules="[cronRule]"
       >
         <template #append>
-          <q-btn flat round dense icon="help_outline" aria-label="查看 Cron 示例">
-            <q-tooltip>查看 Cron 示例</q-tooltip>
+          <q-btn flat round dense icon="help_outline" :aria-label="t('ui.viewCronExample')">
+            <q-tooltip>{{ t('ui.viewCronExample') }}</q-tooltip>
             <q-menu anchor="bottom right" self="top right">
               <q-list dense style="min-width: 320px">
-                <q-item-label header>Cron 示例</q-item-label>
+                <q-item-label header>{{ t('ui.cronExamples') }}</q-item-label>
                 <q-item
                   v-for="example in cronExamples"
                   :key="example.value"
@@ -104,8 +112,8 @@
         v-model="form.timezone"
         outlined
         dense
-        label="IANA 时区 *"
-        hint="例如 Asia/Shanghai 或 UTC"
+        :label="t('ui.ianaTimeZone')"
+        :hint="t('ui.asiaShanghaiOrUtc')"
         :rules="[requiredRule]"
       />
       <q-select
@@ -115,13 +123,13 @@
         emit-value
         map-options
         :options="checkpointOptions"
-        label="Checkpoint 模式 *"
+        :label="t('ui.checkpointMode')"
       />
       <sweet-date-time-picker
         v-if="form.checkpoint_mode === 'timestamp'"
         v-model="initialCheckpointLocal"
         type="datetime"
-        label="初始 Checkpoint *"
+        :label="t('ui.initialCheckpoint')"
         :rules="[requiredRule]"
       />
       <q-input
@@ -132,7 +140,7 @@
         type="number"
         min="0"
         max="604800"
-        label="Lookback（秒）"
+        :label="t('ui.lookbackSeconds')"
         :rules="[lookbackRule]"
       />
       <q-input
@@ -143,7 +151,7 @@
         type="number"
         min="60"
         max="604800"
-        label="窗口切片（秒） *"
+        :label="t('ui.slicesOfWindowsSeconds')"
         :rules="[sliceRule]"
       />
 
@@ -155,10 +163,10 @@
         emit-value
         map-options
         :options="windowModeOptions"
-        label="源时间窗口契约 *"
+        :label="t('ui.sourceWindowContract')"
       />
 
-      <div class="sync-task-form__wide text-subtitle2">受控输入计划</div>
+      <div class="sync-task-form__wide text-subtitle2">{{ t('ui.controlledInputSchedule') }}</div>
       <q-select
         v-model="selectedStaticKeys"
         class="sync-task-form__wide"
@@ -169,8 +177,8 @@
         map-options
         use-chips
         :options="staticParameterOptions"
-        label="静态参数"
-        hint="仅可选择接口契约中声明的非敏感参数"
+        :label="t('ui.staticParameters')"
+        :hint="t('ui.onlyNonSensitiveParametersDeclaredInTheApiContractCan')"
       />
       <template v-for="parameter in selectedStaticParameters" :key="parameterKey(parameter)">
         <q-toggle
@@ -184,7 +192,7 @@
           outlined
           dense
           :label="parameterLabel(parameter)"
-          :hint="parameter.allow_multiple ? '多个值使用英文逗号分隔' : undefined"
+          :hint="parameter.allow_multiple ? t('ui.multipleValuesSeparatedByCommas') : undefined"
           @update:model-value="setStaticTextValue(parameter, $event)"
         />
       </template>
@@ -197,13 +205,15 @@
         emit-value
         map-options
         :options="windowParameterOptions"
-        label="窗口开始参数 *"
-        hint="选项来自当前接口定义的请求参数，不是字典项"
+        :label="t('ui.windowStartParameters')"
+        :hint="t('ui.optionsFromTheRequestedParameterAsDefinedByTheCurrent')"
         :rules="[requiredRule]"
       >
         <template #no-option>
           <q-item>
-            <q-item-section class="text-grey-7">当前接口未声明可绑定的时间参数</q-item-section>
+            <q-item-section class="text-grey-7">{{
+              t('ui.currentInterfaceDoesNotDeclareBindingTimeParameters')
+            }}</q-item-section>
           </q-item>
         </template>
       </q-select>
@@ -215,13 +225,15 @@
         emit-value
         map-options
         :options="formatOptions(windowStartKey)"
-        label="窗口开始格式 *"
-        hint="格式是平台固定规则；请按外部接口实际接收格式选择"
+        :label="t('ui.windowStartFormat')"
+        :hint="t('ui.formatIsThePlatformSFixedRulePleaseSelectThe')"
         :rules="[requiredRule]"
       >
         <template #no-option>
           <q-item>
-            <q-item-section class="text-grey-7">请先选择窗口开始参数</q-item-section>
+            <q-item-section class="text-grey-7">{{
+              t('ui.pleaseSelectTheStartingParametersForTheWindow')
+            }}</q-item-section>
           </q-item>
         </template>
       </q-select>
@@ -233,7 +245,7 @@
         emit-value
         map-options
         :options="windowParameterOptions"
-        label="窗口结束参数 *"
+        :label="t('ui.windowEndParameters')"
         :rules="[requiredRule]"
       />
       <q-select
@@ -244,7 +256,7 @@
         emit-value
         map-options
         :options="formatOptions(windowEndKey)"
-        label="窗口结束格式 *"
+        :label="t('ui.windowEndFormat')"
         :rules="[requiredRule]"
       />
       <q-input
@@ -255,18 +267,20 @@
         type="textarea"
         autogrow
         maxlength="512"
-        label="描述"
+        :label="t('ui.description')"
       />
     </q-form>
     <template #footer-status
-      ><span class="text-caption text-grey-7"
-        >任务启用后技术配置不可直接修改；Checkpoint 由服务端维护</span
-      ></template
+      ><span class="text-caption text-grey-7">{{
+        t('ui.theConfigurationOfTheTechnologyCannotBeModifiedDirectlyAfter')
+      }}</span></template
     >
   </form-dialog-shell>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
@@ -286,6 +300,8 @@ import {
   type SyncWindowMode,
   useIntegrationApi,
 } from 'src/api/services/integration'
+
+const { t } = useI18n({ useScope: 'global' })
 
 export type SyncTaskFormValue = SyncTaskCreateRequest
 type SyncTaskEditableForm = Omit<
@@ -329,22 +345,72 @@ const initialCheckpointLocal = ref('')
 const form = reactive<SyncTaskEditableForm>(emptyForm())
 
 const scheduleOptions: { label: string; value: SyncScheduleType }[] = [
-  { label: '仅手工触发', value: 'none' },
-  { label: 'Cron 定时', value: 'cron' },
+  {
+    get label() {
+      return t('ui.manualTriggerOnly')
+    },
+    value: 'none',
+  },
+  {
+    get label() {
+      return t('ui.cronSchedule')
+    },
+    value: 'cron',
+  },
 ]
 const cronExamples = [
-  { value: '0 * * * *', label: '每小时整点' },
-  { value: '0 */2 * * *', label: '每 2 小时' },
-  { value: '0 2 * * *', label: '每天 02:00' },
-  { value: '0 2 * * 1-5', label: '工作日每天 02:00' },
+  {
+    value: '0 * * * *',
+    get label() {
+      return t('ui.hourlyFullPoint')
+    },
+  },
+  {
+    value: '0 */2 * * *',
+    get label() {
+      return t('ui.every2Hours')
+    },
+  },
+  {
+    value: '0 2 * * *',
+    get label() {
+      return t('ui.daily0200')
+    },
+  },
+  {
+    value: '0 2 * * 1-5',
+    get label() {
+      return t('ui.workday0200')
+    },
+  },
 ]
 const checkpointOptions: { label: string; value: SyncCheckpointMode }[] = [
-  { label: '无 Checkpoint', value: 'none' },
-  { label: '时间戳', value: 'timestamp' },
+  {
+    get label() {
+      return t('ui.noCheckpoint')
+    },
+    value: 'none',
+  },
+  {
+    get label() {
+      return t('ui.timetamp')
+    },
+    value: 'timestamp',
+  },
 ]
 const windowModeOptions: { label: string; value: SyncWindowMode }[] = [
-  { label: '完整起止窗口', value: 'bounded_window' },
-  { label: '仅时间下界（响应不受上界限制）', value: 'lower_bound_only' },
+  {
+    get label() {
+      return t('ui.fullStartWindow')
+    },
+    value: 'bounded_window',
+  },
+  {
+    get label() {
+      return t('ui.onlyBelowTheBoundsOfTimeResponsesAreNotSubject')
+    },
+    value: 'lower_bound_only',
+  },
 ]
 const systemOptions = computed(() =>
   props.systems.map((item) => ({ label: `${item.name} (${item.system_code})`, value: item.id })),
@@ -400,14 +466,15 @@ const formatOptions = (key: string) => {
       ? ['rfc3339', 'local_datetime_seconds', 'unix_seconds', 'unix_milliseconds']
       : ['unix_seconds', 'unix_milliseconds']
   return values.map((value) => ({
-    label:
-      value === 'rfc3339'
+    get label() {
+      return value === 'rfc3339'
         ? 'RFC 3339'
         : value === 'local_datetime_seconds'
-          ? '本地日期时间（秒）'
+          ? t('ui.localDateTimeSec')
           : value === 'unix_seconds'
-            ? 'Unix 秒'
-            : 'Unix 毫秒',
+            ? t('ui.unixSeconds')
+            : t('ui.unixMilliseconds')
+    },
     value,
   }))
 }
@@ -448,14 +515,15 @@ function emptyPlan(): SyncExecutionInputPlan {
   return { version: 1, static_input: { path_params: {}, query_params: {}, headers: {} } }
 }
 const taskCodeRule = (value: string) =>
-  /^[a-z][a-z0-9_]{0,63}$/.test(value || '') || '请输入合法任务编码'
-const requiredRule = (value: unknown) => Boolean(value) || '此项必填'
-const positiveRule = (value: number | null) => Number(value) > 0 || '请选择有效项目'
-const cronRule = (value: string) => value.trim().split(/\s+/).length === 5 || 'Cron 必须为五段式'
+  /^[a-z][a-z0-9_]{0,63}$/.test(value || '') || t('ui.pleaseEnterAValidTaskCode')
+const requiredRule = (value: unknown) => Boolean(value) || t('ui.thisFieldIsRequired')
+const positiveRule = (value: number | null) => Number(value) > 0 || t('ui.selectAValidItem')
+const cronRule = (value: string) =>
+  value.trim().split(/\s+/).length === 5 || t('ui.cronMustUseFiveFields')
 const lookbackRule = (value: number) =>
-  (value >= 0 && value <= 604800) || 'Lookback 必须在 0 至 604800 秒之间'
+  (value >= 0 && value <= 604800) || t('ui.lookbackMustBeBetween0And604800Seconds')
 const sliceRule = (value: number) =>
-  (value >= 60 && value <= 604800) || '切片必须在 60 至 604800 秒之间'
+  (value >= 60 && value <= 604800) || t('ui.theSliceMustBeBetween60And604800Seconds')
 
 async function loadDefinition(id: number | null) {
   definition.value = id ? (await api.getInterfaceDefinition(id)).data || null : null

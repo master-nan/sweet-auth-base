@@ -21,10 +21,10 @@
             indicator-color="primary"
             @update:model-value="reloadFirstPage"
           >
-            <q-tab :name="QuerySchemeType.PERSONAL" label="我的方案" />
-            <q-tab :name="QuerySchemeType.PUBLIC" label="公共方案" />
-            <q-tab :name="QuerySchemeType.ROLE" label="角色方案" />
-            <q-tab :name="QuerySchemeType.PAGE_DEFAULT" label="页面默认" />
+            <q-tab :name="QuerySchemeType.PERSONAL" :label="t('ui.myPlan')" />
+            <q-tab :name="QuerySchemeType.PUBLIC" :label="t('ui.publicSchemes')" />
+            <q-tab :name="QuerySchemeType.ROLE" :label="t('ui.roleProgram')" />
+            <q-tab :name="QuerySchemeType.PAGE_DEFAULT" :label="t('ui.pageDefault')" />
           </q-tabs>
           <q-separator class="q-mb-sm" />
           <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
@@ -35,7 +35,7 @@
                 outlined
                 clearable
                 debounce="300"
-                label="方案名称"
+                :label="t('ui.schemeName')"
                 @update:model-value="updateNameFilter"
                 @keyup.enter="reloadFirstPage"
               />
@@ -47,18 +47,18 @@
                 emit-value
                 map-options
                 :options="scopeOptions"
-                label="所属页面"
+                :label="t('ui.page')"
                 style="min-width: 190px"
                 @update:model-value="reloadFirstPage"
               />
-              <q-btn color="primary" label="查询" @click="reloadFirstPage" />
+              <q-btn color="primary" :label="t('ui.query')" @click="reloadFirstPage" />
             </template>
             <template #right-actions>
               <q-btn
                 v-if="canManageShared && activeType !== QuerySchemeType.PERSONAL"
                 color="primary"
                 icon="add"
-                label="新建方案"
+                :label="t('ui.newScheme')"
                 @click="openCreate"
               />
             </template>
@@ -83,7 +83,7 @@
       <template #body-cell-is_default="props"
         ><q-td :props="props"
           ><q-icon v-if="props.row.is_default" name="star" color="amber-7" size="sm"
-            ><q-tooltip>默认方案</q-tooltip></q-icon
+            ><q-tooltip>{{ t('ui.defaultScheme') }}</q-tooltip></q-icon
           ><span v-else>-</span></q-td
         ></template
       >
@@ -96,7 +96,7 @@
       <template #body-cell-enabled="props"
         ><q-td :props="props"
           ><status-chip
-            :label="props.row.enabled ? '已启用' : '已停用'"
+            :label="props.row.enabled ? t('ui.activatedStatus') : t('ui.deactivatedStatus')"
             :color="props.row.enabled ? 'positive' : 'grey'" /></q-td
       ></template>
       <template #body-cell-actions="props">
@@ -129,9 +129,9 @@
               size="sm"
               icon="more_horiz"
               color="primary"
-              aria-label="更多方案操作"
+              :aria-label="t('ui.moreProgramOperations')"
             >
-              <q-tooltip>更多操作</q-tooltip>
+              <q-tooltip>{{ t('ui.moreOperations') }}</q-tooltip>
               <q-menu auto-close>
                 <q-list dense style="min-width: 180px">
                   <template
@@ -165,7 +165,7 @@
             outline
             color="primary"
             icon="refresh"
-            label="重试"
+            :label="t('ui.retry')"
             @click="fetchData"
           />
         </div>
@@ -263,22 +263,78 @@ const scopeOptions = computed(() =>
 )
 const scopeMenus = computed(() => collectQueryScopes(userStore.menus))
 const columns: TableColumn<QuerySchemeListItem>[] = [
-  { name: 'name', field: 'name', label: '方案名称', align: 'left' },
-  { name: 'type', field: 'type', label: '类型', align: 'center' },
-  { name: 'is_default', field: 'is_default', label: '默认', align: 'center' },
-  { name: 'status', field: 'status', label: '校验状态', align: 'center' },
-  { name: 'enabled', field: 'enabled', label: '启用状态', align: 'center' },
-  { name: 'creator', field: 'creator_display_name', label: '创建人', align: 'left' },
-  { name: 'updated_at', field: 'updated_at', label: '更新时间', align: 'left' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'name',
+    field: 'name',
+    get label() {
+      return t('ui.schemeName')
+    },
+    align: 'left',
+  },
+  {
+    name: 'type',
+    field: 'type',
+    get label() {
+      return t('ui.type')
+    },
+    align: 'center',
+  },
+  {
+    name: 'is_default',
+    field: 'is_default',
+    get label() {
+      return t('ui.default')
+    },
+    align: 'center',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.verifyStatus')
+    },
+    align: 'center',
+  },
+  {
+    name: 'enabled',
+    field: 'enabled',
+    get label() {
+      return t('ui.enableStatus')
+    },
+    align: 'center',
+  },
+  {
+    name: 'creator',
+    field: 'creator_display_name',
+    get label() {
+      return t('ui.createdBy')
+    },
+    align: 'left',
+  },
+  {
+    name: 'updated_at',
+    field: 'updated_at',
+    get label() {
+      return t('ui.updatedAt')
+    },
+    align: 'left',
+  },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ]
 
 const statusLabel = (status: ValidationStatus) =>
   status === QuerySchemeValidationStatus.VALID
-    ? '可用'
+    ? t('ui.available')
     : status === QuerySchemeValidationStatus.DEGRADED
-      ? '需要修复'
-      : '不可用'
+      ? t('ui.needsAttention')
+      : t('ui.unavailable')
 const statusColor = (status: ValidationStatus) =>
   status === QuerySchemeValidationStatus.VALID
     ? 'positive'
@@ -291,10 +347,12 @@ const typeLabel = (row: QuerySchemeListItem) => QUERY_SCHEME_TYPE_LABELS[row.typ
 const canUseScheme = (row: QuerySchemeListItem) =>
   row.enabled && row.status === QuerySchemeValidationStatus.VALID
 const useSchemeTooltip = (row: QuerySchemeListItem) => {
-  if (!row.enabled) return '方案已停用，无法使用'
-  if (row.status === QuerySchemeValidationStatus.DEGRADED) return '方案需要修复后才能使用'
-  if (row.status === QuerySchemeValidationStatus.INVALID) return '方案校验未通过，无法使用'
-  return '进入所属页面并使用此方案'
+  if (!row.enabled) return t('ui.programDisabledNotAvailable')
+  if (row.status === QuerySchemeValidationStatus.DEGRADED)
+    return t('ui.theProgrammeNeedsToBeRepairedBeforeItCanBe')
+  if (row.status === QuerySchemeValidationStatus.INVALID)
+    return t('ui.programValidationFailedNotAvailable')
+  return t('ui.enterThePageAndUseTheScheme')
 }
 type SchemeRowAction = {
   key: string
@@ -310,7 +368,9 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   const actions: SchemeRowAction[] = [
     {
       key: 'use',
-      label: '使用方案',
+      get label() {
+        return t('ui.useProgram')
+      },
       tooltip: useSchemeTooltip(row),
       icon: 'open_in_new',
       color: 'primary',
@@ -321,8 +381,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   if (canEdit(row)) {
     actions.push({
       key: 'edit',
-      label: '编辑方案',
-      tooltip: '编辑方案',
+      get label() {
+        return t('ui.editScheme')
+      },
+      get tooltip() {
+        return t('ui.editScheme')
+      },
       icon: 'edit',
       color: 'primary',
       handler: () => void openEdit(row),
@@ -330,8 +394,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   }
   actions.push({
     key: 'detail',
-    label: '查看方案详情',
-    tooltip: '查看方案详情',
+    get label() {
+      return t('ui.viewSchemeDetails')
+    },
+    get tooltip() {
+      return t('ui.viewSchemeDetails')
+    },
     icon: 'visibility',
     color: 'primary',
     handler: () => openDetail(row),
@@ -339,8 +407,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   if (row.type === QuerySchemeType.PERSONAL) {
     actions.push({
       key: 'default',
-      label: row.is_default ? '取消默认' : '设为默认',
-      tooltip: row.is_default ? '取消默认方案' : '设为默认方案',
+      get label() {
+        return row.is_default ? t('ui.cancelDefault') : t('ui.setAsDefault')
+      },
+      get tooltip() {
+        return row.is_default ? t('ui.removeDefaultScheme') : t('ui.setAsDefaultScheme')
+      },
       icon: row.is_default ? 'star_border' : 'star',
       color: 'amber-8',
       handler: () => setPersonalDefault(row),
@@ -348,8 +420,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   } else {
     actions.push({
       key: 'copy',
-      label: '复制为我的方案',
-      tooltip: '复制为我的方案',
+      get label() {
+        return t('ui.copyToMySchemes')
+      },
+      get tooltip() {
+        return t('ui.copyToMySchemes')
+      },
       icon: 'content_copy',
       color: 'primary',
       handler: () => copyScheme(row),
@@ -357,8 +433,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
     if (canManageShared.value) {
       actions.push({
         key: 'toggle',
-        label: row.enabled ? '停用方案' : '启用方案',
-        tooltip: row.enabled ? '停用方案' : '启用方案',
+        get label() {
+          return row.enabled ? t('ui.disableScheme') : t('ui.enableScheme')
+        },
+        get tooltip() {
+          return row.enabled ? t('ui.disableScheme') : t('ui.enableScheme')
+        },
         icon: row.enabled ? 'toggle_off' : 'toggle_on',
         color: row.enabled ? 'warning' : 'positive',
         handler: () => toggleEnabled(row),
@@ -368,8 +448,12 @@ const schemeRowActions = (row: QuerySchemeListItem): SchemeRowAction[] => {
   if (canEdit(row)) {
     actions.push({
       key: 'delete',
-      label: '删除方案',
-      tooltip: '删除方案',
+      get label() {
+        return t('ui.deleteScheme')
+      },
+      get tooltip() {
+        return t('ui.deleteScheme')
+      },
       icon: 'delete',
       color: 'negative',
       destructive: true,
@@ -385,9 +469,9 @@ const updateNameFilter = (value: string | number | null) => {
 }
 const hasFilters = computed(() => !!nameFilter.value.trim() || !!scopeFilter.value)
 const emptyMessage = computed(() => {
-  if (error.value) return '查询方案加载失败，可重试'
-  if (hasFilters.value) return '没有符合当前查询条件的方案'
-  return '当前分类暂无查询方案'
+  if (error.value) return t('ui.failedToLoadQuerySchemeTryAgain')
+  if (hasFilters.value) return t('ui.noSchemeMeetingCurrentQueryConditions')
+  return t('ui.currentClassificationHasNoQueryOption')
 })
 
 const fetchData = async () => {
@@ -406,7 +490,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    error.value = '查询方案加载失败'
+    error.value = t('ui.failedToLoadQueryScheme')
   } finally {
     loading.value = false
   }
@@ -423,7 +507,12 @@ const useScheme = (row: QuerySchemeListItem) => {
   if (!canUseScheme(row)) return
   const target = scopeMenus.value.find((scope) => scope.scope_code === row.scope_code)
   if (!target) {
-    $q.notify({ type: 'warning', message: '当前账号无法进入该方案所属页面' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.currentAccountCannotAccessThePageOfTheProgram')
+      },
+    })
     return
   }
   void router.push({
@@ -446,12 +535,18 @@ const editDetail = (detail: QuerySchemeDetail) => {
 }
 const copyScheme = (row: QuerySchemeListItem | QuerySchemeDetail) => {
   $q.dialog({
-    title: '复制为我的方案',
-    message: '请输入新方案名称',
+    get title() {
+      return t('ui.copyToMySchemes')
+    },
+    get message() {
+      return t('ui.pleaseEnterANewProjectName')
+    },
     prompt: {
       model: buildQuerySchemeCopyName(row.name),
       type: 'text',
-      hint: '最多 64 个字符',
+      get hint() {
+        return t('ui.maximum64Characters')
+      },
       isValid: isValidQuerySchemeName,
     },
     cancel: true,
@@ -463,31 +558,50 @@ const copyScheme = (row: QuerySchemeListItem | QuerySchemeDetail) => {
 }
 const setPersonalDefault = (row: QuerySchemeListItem) =>
   confirmAction({
-    title: row.is_default ? '取消默认方案' : '设置默认方案',
-    message: `确认${row.is_default ? '取消' : '设置'}“${row.name}”为个人默认方案？`,
+    get title() {
+      return row.is_default ? t('ui.removeDefaultScheme') : t('ui.setDefaultScheme')
+    },
+    get message() {
+      return t('ui.confirmingAsAPersonalDefaultScheme', {
+        value1: row.is_default ? t('ui.cancel') : t('ui.set'),
+        value2: row.name,
+      })
+    },
   }).onOk(() => {
     void api.setPersonalDefault(row.id, !row.is_default, row.revision).then(fetchData)
   })
 const toggleEnabled = (row: QuerySchemeListItem) =>
   confirmAction({
-    title: row.enabled ? '停用方案' : '启用方案',
-    message: `确认${row.enabled ? '停用' : '启用'}“${row.name}”？`,
+    get title() {
+      return row.enabled ? t('ui.disableScheme') : t('ui.enableScheme')
+    },
+    get message() {
+      return t('ui.confirmNamedAction', {
+        value1: row.enabled ? t('ui.disabled') : t('ui.enabled'),
+        value2: row.name,
+      })
+    },
   }).onOk(() => {
     void api.setSharedEnabled(row.id, !row.enabled, row.revision).then(fetchData)
   })
 const deleteScheme = (row: QuerySchemeListItem) =>
-  confirmDanger({ title: '删除查询方案', message: `删除“${row.name}”后无法恢复，确认继续？` }).onOk(
-    () => {
-      const request =
-        row.type === QuerySchemeType.PERSONAL
-          ? api.deletePersonal(row.id, row.revision)
-          : api.deleteShared(row.id, row.revision)
-      void request.then(() => {
-        notifyQuerySchemeDeleted(row.id)
-        return fetchData()
-      })
+  confirmDanger({
+    get title() {
+      return t('ui.deleteQueryScheme')
     },
-  )
+    get message() {
+      return t('ui.couldNotResumeAfterDeletingToConfirmContinuation', { value1: row.name })
+    },
+  }).onOk(() => {
+    const request =
+      row.type === QuerySchemeType.PERSONAL
+        ? api.deletePersonal(row.id, row.revision)
+        : api.deleteShared(row.id, row.revision)
+    void request.then(() => {
+      notifyQuerySchemeDeleted(row.id)
+      return fetchData()
+    })
+  })
 
 watch(
   () => [page.value, pageSize.value],

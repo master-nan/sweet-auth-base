@@ -26,6 +26,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'record_form_page' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -35,11 +37,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
 import { useGeneralizationApi } from 'src/api/services/generalization'
-import {
-  useTableApi,
-  type RuntimeTableMetadata,
-  type TableField,
-} from 'src/api/services/sys-table'
+import { useTableApi, type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
 import type { RouteData } from 'src/types'
 import { useUserStore } from 'src/stores/user'
 import { useTagViewStore } from 'src/stores/tagView'
@@ -50,6 +48,8 @@ import {
   findMenuPathByTableCode,
   findMenuTrailById,
 } from 'src/utils/menu-context'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type FormMode = 'create' | 'edit' | 'copy'
 
@@ -81,13 +81,13 @@ const resolvedMenuId = computed(() => {
 const currentMenu = computed(() => findMenuByTableCode(userStore.menus, tableCode.value))
 
 const pageTitle = computed(() => {
-  const tableName = table.value?.table_name || tableCode.value || '记录'
-  if (mode.value === 'edit') return `编辑${tableName}`
-  if (mode.value === 'copy') return `复制${tableName}`
-  return `新增${tableName}`
+  const tableName = table.value?.table_name || tableCode.value || t('ui.record')
+  if (mode.value === 'edit') return t('ui.editNamedRecordTitle', { tableName: tableName })
+  if (mode.value === 'copy') return t('ui.copyNamedRecordTitle', { tableName: tableName })
+  return t('ui.addNamedRecordTitle', { tableName: tableName })
 })
 
-const submitText = computed(() => (mode.value === 'edit' ? '保存' : '创建'))
+const submitText = computed(() => (mode.value === 'edit' ? t('ui.save') : t('ui.createRecord')))
 const sourceListPath = computed(() => {
   return (
     findMenuPathByTableCode(userStore.menus, tableCode.value) ||
@@ -148,7 +148,7 @@ function buildFormBreadcrumbs(title: string): RouteData[] {
   if (menuCrumbs.length) return [...menuCrumbs, formCrumb]
   return [
     {
-      title: table.value?.table_name || tableCode.value || '记录',
+      title: table.value?.table_name || tableCode.value || t('ui.record'),
       fullPath: sourceListPath.value,
       name: currentMenu.value?.name || sourceListPath.value,
       icon: currentMenu.value?.icon || 'dynamic_form',
@@ -159,7 +159,7 @@ function buildFormBreadcrumbs(title: string): RouteData[] {
 
 async function loadForm() {
   if (!tableCode.value) {
-    loadError.value = '缺少表编码，无法打开表单'
+    loadError.value = t('ui.couldNotOpenFormWithoutTableEncoding')
     return
   }
 
@@ -170,7 +170,7 @@ async function loadForm() {
   try {
     const tableRes = await tableApi.queryRuntimeTableByCode(tableCode.value)
     if (!tableRes.success || !tableRes.data) {
-      throw new Error(tableRes.message || '表元数据不存在')
+      throw new Error(tableRes.message || t('ui.tableMetadataDoesNotExist'))
     }
     table.value = tableRes.data
     tableFields.value = tableRes.data.table_fields || []
@@ -178,13 +178,13 @@ async function loadForm() {
 
     if (mode.value === 'edit' || mode.value === 'copy') {
       if (!recordId.value) {
-        throw new Error('缺少记录ID，无法加载表单数据')
+        throw new Error(t('ui.missingLogIdUnableToLoadFormData'))
       }
       const row = await loadRecord(recordId.value)
       editData.value = mode.value === 'copy' ? stripRecordIdentity(row) : row
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : '表单加载失败'
+    const message = error instanceof Error ? error.message : t('ui.formLoadingFailed')
     loadError.value = message
   }
 }
@@ -196,7 +196,7 @@ async function loadRecord(id: number) {
     resolvedMenuId.value,
   )
   if (!res.success || !res.data) {
-    throw new Error(res.message || '记录不存在')
+    throw new Error(res.message || t('ui.recordDoesNotExist'))
   }
   return res.data
 }
@@ -221,7 +221,11 @@ function stripRecordIdentity(row: Record<string, any>) {
   return copied
 }
 
-async function handleSubmit(formPayload: { data: Record<string, any>; isEdit: boolean; id?: number }) {
+async function handleSubmit(formPayload: {
+  data: Record<string, any>
+  isEdit: boolean
+  id?: number
+}) {
   if (!tableCode.value) return
   const result =
     mode.value === 'edit' && recordId.value

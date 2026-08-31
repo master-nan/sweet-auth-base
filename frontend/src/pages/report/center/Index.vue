@@ -3,9 +3,9 @@
     <div class="report-workspace">
       <section class="report-head">
         <div>
-          <div class="report-title">报表中心</div>
+          <div class="report-title">{{ t('ui.reportCentre') }}</div>
           <div class="report-caption">
-            面向业务用户查看和运行已发布报表，设计、发布和停用请到报表管理处理。
+            {{ t('ui.viewAndRunPublishedStatementsForBusinessUsersDesignIssue') }}
           </div>
         </div>
         <div class="report-head-actions">
@@ -16,14 +16,20 @@
             clearable
             debounce="300"
             class="report-search"
-            placeholder="搜索报表名称 / 编码 / 分类"
+            :placeholder="t('ui.searchReportNameCodeCategory')"
             @keyup.enter="handleSearch"
           >
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
-          <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
+          <q-btn
+            outline
+            color="primary"
+            icon="refresh"
+            :label="t('ui.refresh')"
+            @click="fetchData"
+          />
         </div>
       </section>
 
@@ -32,41 +38,41 @@
           <q-icon name="assessment" />
           <div>
             <strong>{{ publishedCount }}</strong>
-            <span>已发布报表</span>
+            <span>{{ t('ui.publishedReports') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="folder_special" />
           <div>
             <strong>{{ categories.length }}</strong>
-            <span>报表分类</span>
+            <span>{{ t('ui.reportCategory') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="dataset" />
           <div>
             <strong>{{ dataSourceCount }}</strong>
-            <span>可用数据集</span>
+            <span>{{ t('ui.availableDatasets') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="security" />
           <div>
             <strong>{{ permissionCount }}</strong>
-            <span>继承数据权限</span>
+            <span>{{ t('ui.inheritDataPermissions') }}</span>
           </div>
         </div>
       </section>
 
       <section class="report-main-grid">
         <aside class="category-panel">
-          <div class="section-title">报表分类</div>
+          <div class="section-title">{{ t('ui.reportCategory') }}</div>
           <button
             class="category-item"
             :class="{ active: activeCategory === '' }"
             @click="selectCategory('')"
           >
-            <span>全部报表</span>
+            <span>{{ t('ui.allReports') }}</span>
             <q-badge color="primary" outline>{{ rows.length }}</q-badge>
           </button>
           <button
@@ -82,19 +88,25 @@
 
           <q-separator class="q-my-md" />
 
-          <div class="section-title">使用说明</div>
+          <div class="section-title">{{ t('ui.descriptionOfUse') }}</div>
           <div class="flow-list">
-            <div class="flow-step"><b>1</b><span>选择分类或搜索报表</span></div>
-            <div class="flow-step"><b>2</b><span>运行报表并输入查询参数</span></div>
-            <div class="flow-step"><b>3</b><span>导出当前结果为 CSV</span></div>
+            <div class="flow-step">
+              <b>1</b><span>{{ t('ui.selectCategoryOrSearchReport') }}</span>
+            </div>
+            <div class="flow-step">
+              <b>2</b><span>{{ t('ui.runTheReportAndEnterTheQueryParameters') }}</span>
+            </div>
+            <div class="flow-step">
+              <b>3</b><span>{{ t('ui.exportCurrentResultToCsv') }}</span>
+            </div>
           </div>
         </aside>
 
         <section class="report-list-panel">
           <div class="list-head">
             <div>
-              <div class="section-title">可运行报表</div>
-              <div class="report-caption">只展示已发布并可运行的报表。</div>
+              <div class="section-title">{{ t('ui.runableReport') }}</div>
+              <div class="report-caption">{{ t('ui.showsOnlyPublishedAndRunningReports') }}</div>
             </div>
           </div>
 
@@ -137,7 +149,11 @@
                   :color="props.row.permission_table_code ? 'positive' : 'warning'"
                   outline
                 >
-                  {{ props.row.permission_table_code ? '继承数据权限' : '未绑定权限表' }}
+                  {{
+                    props.row.permission_table_code
+                      ? t('ui.inheritDataPermissions')
+                      : t('ui.noPermissionTableBound')
+                  }}
                 </q-chip>
               </q-td>
             </template>
@@ -152,7 +168,7 @@
                     icon="play_arrow"
                     @click="openRuntime(props.row)"
                   >
-                    <q-tooltip>运行</q-tooltip>
+                    <q-tooltip>{{ t('ui.run') }}</q-tooltip>
                   </q-btn>
                 </div>
               </q-td>
@@ -165,7 +181,11 @@
             </template>
             <template #bottom>
               <q-space />
-              <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
+              <table-pagination
+                v-model:page="query.page"
+                v-model:pageSize="query.num"
+                :total="total"
+              />
             </template>
           </q-table>
         </section>
@@ -182,6 +202,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'report_center' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
@@ -189,14 +211,12 @@ import TablePagination from 'components/Table/TablePagination.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import type { Query } from 'src/types/global'
-import {
-  useReportApi,
-  type Report,
-  type ReportKind,
-} from 'src/api/services/report'
+import { useReportApi, type Report, type ReportKind } from 'src/api/services/report'
 import { useLoadingStore } from 'src/stores/loading'
 import { storeToRefs } from 'pinia'
 import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const reportApi = useReportApi()
@@ -228,24 +248,68 @@ const runtimeVisible = ref(false)
 const runtimeReport = ref<Report | null>(null)
 
 const columns = computed<QTableProps['columns']>(() => [
-  { name: 'report_name', field: 'report_name', label: '报表名称', align: 'left' },
-  { name: 'report_kind', field: 'report_kind', label: '展开方式', align: 'center' },
-  { name: 'category', field: 'category', label: '分类', align: 'left' },
-  { name: 'data_source_name', field: 'data_source_name', label: '数据集', align: 'left' },
-  { name: 'permission', field: 'permission_table_code', label: '权限', align: 'center' },
+  {
+    name: 'report_name',
+    field: 'report_name',
+    get label() {
+      return t('ui.reportName')
+    },
+    align: 'left',
+  },
+  {
+    name: 'report_kind',
+    field: 'report_kind',
+    get label() {
+      return t('ui.expansionMode')
+    },
+    align: 'center',
+  },
+  {
+    name: 'category',
+    field: 'category',
+    get label() {
+      return t('ui.category')
+    },
+    align: 'left',
+  },
+  {
+    name: 'data_source_name',
+    field: 'data_source_name',
+    get label() {
+      return t('ui.dataset')
+    },
+    align: 'left',
+  },
+  {
+    name: 'permission',
+    field: 'permission_table_code',
+    get label() {
+      return t('ui.permissions')
+    },
+    align: 'center',
+  },
   {
     name: 'updated_at',
     field: (row) => row.updated_at || row.gmt_modify || '-',
-    label: '最近更新',
+    get label() {
+      return t('ui.recentlyUpdated')
+    },
     align: 'left',
   },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ])
 
 const categories = computed(() => {
   const map = new Map<string, number>()
   rows.value.forEach((item) => {
-    const name = item.category || '未分类'
+    const name = item.category || t('ui.uncategorized')
     map.set(name, (map.get(name) || 0) + 1)
   })
   return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
@@ -253,7 +317,7 @@ const categories = computed(() => {
 
 const filteredRows = computed(() => rows.value)
 
-const emptyText = computed(() => '暂无可运行报表，请先在报表管理中发布。')
+const emptyText = computed(() => t('ui.forTheTimeBeingThereAreNoOperationalStatementsAnd'))
 
 const publishedCount = computed(
   () => rows.value.filter((item) => item.status === 'published').length,
@@ -282,7 +346,12 @@ async function fetchData() {
     rows.value = []
     total.value = 0
     pagination.value.rowsNumber = 0
-    $q.notify({ type: 'negative', message: '报表列表加载失败，请检查后端服务或接口权限' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToLoadReportsCheckTheBackendServiceOrApi')
+      },
+    })
   }
 }
 
@@ -312,7 +381,12 @@ async function loadDataSources() {
     dataSourceCount.value = res.total ?? res.data.length
   } catch {
     dataSourceCount.value = 0
-    $q.notify({ type: 'warning', message: '数据集列表加载失败，设计器可能无法选择数据源' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.failedToLoadDatasetsDataSourcesMayBeUnavailableIn')
+      },
+    })
   }
 }
 
@@ -322,16 +396,25 @@ async function openRuntime(row: Report) {
     runtimeReport.value = res.data
     runtimeVisible.value = true
   } catch {
-    $q.notify({ type: 'negative', message: '报表详情加载失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToLoadReportDetails')
+      },
+    })
   }
 }
 
 function kindLabel(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
-    detail: '明细行',
-    summary: '汇总行',
+    get detail() {
+      return t('ui.detailRow')
+    },
+    get summary() {
+      return t('ui.summaryRow')
+    },
   }
-  return map[kind] || '明细行'
+  return map[kind] || t('ui.detailRow')
 }
 
 function kindIcon(kind: ReportKind) {
@@ -349,7 +432,6 @@ watch(
     void fetchData()
   },
 )
-
 </script>
 
 <style scoped lang="scss">

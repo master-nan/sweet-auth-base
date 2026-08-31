@@ -1,8 +1,10 @@
 <template>
   <form-dialog-shell
     v-model="visible"
-    title="接口定义详情"
-    :subtitle="detail ? `${detail.interface_code} · v${detail.version}` : '正在读取技术契约'"
+    :title="t('ui.interfaceDefinitionDetails')"
+    :subtitle="
+      detail ? `${detail.interface_code} · v${detail.version}` : t('ui.readingTechnologyCompacts')
+    "
     icon="api"
     readonly
     :loading="loading"
@@ -10,19 +12,19 @@
   >
     <div v-if="detail" class="interface-detail">
       <section>
-        <div class="interface-detail__title">基础信息</div>
+        <div class="interface-detail__title">{{ t('ui.basicInfo') }}</div>
         <detail-field-grid :items="basicItems" />
       </section>
       <q-separator />
       <section>
-        <div class="interface-detail__title">技术契约</div>
+        <div class="interface-detail__title">{{ t('ui.technicalCompact') }}</div>
         <detail-field-grid :items="contractItems" />
       </section>
       <q-separator />
       <section>
-        <div class="interface-detail__title">请求参数契约</div>
+        <div class="interface-detail__title">{{ t('ui.contractForRequestedParameters') }}</div>
         <div class="interface-detail__hint">
-          这里展示接口允许接收的参数名称、位置和类型，不展示任何一次执行的真实参数值。
+          {{ t('ui.thisDisplayShowsTheNameLocationAndTypeOfParameter') }}
         </div>
         <q-markup-table
           v-if="detail.input_contract.parameters.length"
@@ -33,12 +35,12 @@
         >
           <thead>
             <tr>
-              <th class="text-left">参数</th>
-              <th class="text-left">位置</th>
-              <th class="text-left">类型</th>
-              <th class="text-center">必填</th>
-              <th class="text-center">允许多值</th>
-              <th class="text-right">最大长度</th>
+              <th class="text-left">{{ t('ui.parameters') }}</th>
+              <th class="text-left">{{ t('ui.position') }}</th>
+              <th class="text-left">{{ t('ui.type') }}</th>
+              <th class="text-center">{{ t('ui.required') }}</th>
+              <th class="text-center">{{ t('ui.allowMultipleValues') }}</th>
+              <th class="text-right">{{ t('ui.maximumLength') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -54,20 +56,21 @@
               </td>
               <td>{{ locationLabels[parameter.location] }}</td>
               <td>{{ dataTypeLabels[parameter.data_type] }}</td>
-              <td class="text-center">{{ parameter.required ? '是' : '否' }}</td>
-              <td class="text-center">{{ parameter.allow_multiple ? '是' : '否' }}</td>
+              <td class="text-center">{{ parameter.required ? t('ui.yes') : t('ui.no') }}</td>
+              <td class="text-center">{{ parameter.allow_multiple ? t('ui.yes') : t('ui.no') }}</td>
               <td class="text-right">{{ parameter.max_length || '-' }}</td>
             </tr>
           </tbody>
         </q-markup-table>
-        <div v-else class="interface-detail__empty">该接口没有声明可变请求参数。</div>
+        <div v-else class="interface-detail__empty">
+          {{ t('ui.theInterfaceDoesNotDeclareVariableRequestParameters') }}
+        </div>
       </section>
       <q-separator />
       <section>
-        <div class="interface-detail__title">响应处理</div>
+        <div class="interface-detail__title">{{ t('ui.responseProcessing') }}</div>
         <div class="interface-detail__hint">
-          平台按“响应大小限制”读取结果。执行详情只展示 HTTP 状态、响应大小、Hash
-          和安全摘要，原始响应体不作为管理页面内容保存。
+          {{ t('ui.thePlatformReadsTheResultsAccordingToTheResponseSize') }}
         </div>
       </section>
     </div>
@@ -78,6 +81,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
 import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
@@ -89,6 +94,8 @@ import {
   useIntegrationApi,
 } from 'src/api/services/integration'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const props = defineProps<{ modelValue: boolean; id: number }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: boolean): void }>()
 const api = useIntegrationApi()
@@ -98,7 +105,17 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value),
 })
-const statusLabels = { draft: '草稿', enabled: '已启用', disabled: '已停用' }
+const statusLabels = {
+  get draft() {
+    return t('ui.draft')
+  },
+  get enabled() {
+    return t('ui.activatedStatus')
+  },
+  get disabled() {
+    return t('ui.deactivatedStatus')
+  },
+}
 const locationLabels: Record<InterfaceInputLocation, string> = {
   path: 'Path',
   query: 'Query',
@@ -106,57 +123,130 @@ const locationLabels: Record<InterfaceInputLocation, string> = {
   body: 'JSON Body',
 }
 const dataTypeLabels: Record<InterfaceInputDataType, string> = {
-  string: '字符串',
-  integer: '整数',
-  number: '数值',
-  boolean: '布尔',
-  object: '对象',
-  array: '数组',
+  get string() {
+    return t('ui.string')
+  },
+  get integer() {
+    return t('ui.integer')
+  },
+  get number() {
+    return t('ui.valueLabel')
+  },
+  get boolean() {
+    return t('ui.boolean')
+  },
+  get object() {
+    return t('ui.object')
+  },
+  get array() {
+    return t('ui.array')
+  },
 }
 const basicItems = computed<DetailFieldItem[]>(() =>
   detail.value
     ? [
         {
-          label: '所属系统',
+          get label() {
+            return t('ui.owningSystem')
+          },
           value: `${detail.value.external_system.name}（${detail.value.external_system.system_code}）`,
         },
-        { label: '接口编码', value: detail.value.interface_code },
-        { label: '接口名称', value: detail.value.name },
-        { label: '版本', value: `v${detail.value.version}` },
-        { label: '状态', value: statusLabels[detail.value.status] },
-        { label: '更新时间', value: detail.value.gmt_modify },
+        {
+          get label() {
+            return t('ui.apiCode')
+          },
+          value: detail.value.interface_code,
+        },
+        {
+          get label() {
+            return t('ui.apiName')
+          },
+          value: detail.value.name,
+        },
+        {
+          get label() {
+            return t('ui.version')
+          },
+          value: `v${detail.value.version}`,
+        },
+        {
+          get label() {
+            return t('ui.status')
+          },
+          value: statusLabels[detail.value.status],
+        },
+        {
+          get label() {
+            return t('ui.updatedAt')
+          },
+          value: detail.value.gmt_modify,
+        },
       ]
     : [],
 )
 const contractItems = computed<DetailFieldItem[]>(() =>
   detail.value
     ? [
-        { label: '协议', value: detail.value.protocol.toUpperCase() },
-        { label: 'HTTP Method', value: detail.value.http_method },
-        { label: '相对路径', value: detail.value.relative_path },
-        { label: '超时', value: `${detail.value.timeout_seconds} 秒` },
         {
-          label: '响应大小限制',
+          get label() {
+            return t('ui.protocolLabel')
+          },
+          value: detail.value.protocol.toUpperCase(),
+        },
+        { label: 'HTTP Method', value: detail.value.http_method },
+        {
+          get label() {
+            return t('ui.relativePathLabel')
+          },
+          value: detail.value.relative_path,
+        },
+        {
+          get label() {
+            return t('ui.timeout')
+          },
+          value: t('ui.secondsValue', { value1: detail.value.timeout_seconds }),
+        },
+        {
+          get label() {
+            return t('ui.responseSizeLimit')
+          },
           value: `${(detail.value.response_limit / 1024).toLocaleString()} KiB`,
         },
         {
-          label: '认证引用',
+          get label() {
+            return t('ui.authenticationReference')
+          },
           value: detail.value.credential
             ? `${detail.value.credential.name}（${detail.value.credential.credential_code}）`
-            : '未配置',
+            : t('ui.notConfigured'),
         },
-        { label: '凭证状态', value: detail.value.credential?.effective_status || '-' },
         {
-          label: '重试策略',
+          get label() {
+            return t('ui.documentStatus')
+          },
+          value: detail.value.credential?.effective_status || '-',
+        },
+        {
+          get label() {
+            return t('ui.retryPolicy')
+          },
           value: detail.value.retry_policy
             ? `${detail.value.retry_policy.policy_name}（${detail.value.retry_policy.policy_code} · v${detail.value.retry_policy.version}）`
-            : '未配置',
+            : t('ui.notConfigured'),
         },
         {
-          label: '策略状态',
+          get label() {
+            return t('ui.policyStatus')
+          },
           value: detail.value.retry_policy ? statusLabels[detail.value.retry_policy.status] : '-',
         },
-        { label: '描述', value: detail.value.description || '-', fullWidth: true },
+        {
+          get label() {
+            return t('ui.description')
+          },
+          value: detail.value.description || '-',
+          fullWidth: true,
+        },
       ]
     : [],
 )

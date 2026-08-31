@@ -33,7 +33,12 @@
                   @keyup.enter="handleBasicSearch"
                   ><template #append><q-icon name="search" /></template
                 ></q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -78,21 +83,22 @@
       >
       <template #body-cell-consumer="props"
         ><q-td :props="props">
-          <span class="text-mono">{{ props.row.consumer.code }}@{{ props.row.consumer.version }}</span>
+          <span class="text-mono"
+            >{{ props.row.consumer.code }}@{{ props.row.consumer.version }}</span
+          >
           <status-chip
             v-if="consumerMetadataLoaded && !isConsumerAvailable(props.row)"
             class="q-ml-sm"
             color="negative"
-            label="当前服务未开放"
+            :label="t('ui.currentServiceIsNotOpen')"
           >
-            <q-tooltip>后端没有注册这个 Consumer，任务暂时不能启用或运行</q-tooltip>
+            <q-tooltip>{{ t('ui.theBackendIsNotRegisteredToConsumerTheTaskIs') }}</q-tooltip>
           </status-chip>
-        </q-td
-        ></template
+        </q-td></template
       >
       <template #body-cell-schedule="props"
         ><q-td :props="props"
-          >{{ props.row.schedule_type === 'cron' ? props.row.cron_summary : '仅手工' }}
+          >{{ props.row.schedule_type === 'cron' ? props.row.cron_summary : t('ui.manualOnly') }}
           <div class="text-caption text-grey-7">{{ props.row.timezone }}</div></q-td
         ></template
       >
@@ -101,8 +107,8 @@
           props.row.checkpoint_mode === 'timestamp'
             ? props.row.checkpoint_at
               ? formatRuntimeDateTime(props.row.checkpoint_at)
-              : '待首次启用'
-            : '无'
+              : t('ui.toBeFirstEnabled')
+            : t('ui.none')
         }}</q-td></template
       >
       <template #body-cell-actions="props"
@@ -141,6 +147,8 @@
   </base-content>
 </template>
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_sync_task' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
@@ -176,6 +184,8 @@ import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const api = useIntegrationApi()
 const loading = ref(false)
@@ -202,9 +212,24 @@ const {
 } = useRuntimeTableMetadata('integration_sync_task')
 const canQueryTasks = computed(() => hasGrantedCapability('integration_sync_task_query'))
 const statusMeta = {
-  draft: { label: '草稿', color: 'grey-7' },
-  enabled: { label: '已启用', color: 'positive' },
-  disabled: { label: '已停用', color: 'warning' },
+  draft: {
+    get label() {
+      return t('ui.draft')
+    },
+    color: 'grey-7',
+  },
+  enabled: {
+    get label() {
+      return t('ui.activatedStatus')
+    },
+    color: 'positive',
+  },
+  disabled: {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    color: 'warning',
+  },
 }
 const statusFor = (row: SyncTaskListItem) => statusMeta[row.status]
 const columns = ref<TableColumn<SyncTaskListItem>[]>([])
@@ -241,7 +266,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '同步任务加载失败'
+    loadError.value = t('ui.synchronisingTaskLoadFailed')
   } finally {
     loading.value = false
   }
@@ -257,16 +282,38 @@ const fetchMetadata = async () => {
       { fieldCode: 'consumer_version', visible: false },
       { fieldCode: 'schedule_type', visible: false },
       { fieldCode: 'checkpoint_at', visible: false },
-      { fieldCode: 'task_code', label: '同步任务', order: 1 },
+      {
+        fieldCode: 'task_code',
+        get label() {
+          return t('ui.synchroniseTasks')
+        },
+        order: 1,
+      },
       { fieldCode: 'status', align: 'center', order: 2 },
-      { fieldCode: 'window_slice_seconds', label: '切片（秒）', align: 'right', order: 7 },
+      {
+        fieldCode: 'window_slice_seconds',
+        get label() {
+          return t('ui.sliceSeconds')
+        },
+        align: 'right',
+        order: 7,
+      },
     ],
     virtualColumns: [
-      { name: 'interface', label: '接口版本', field: 'interface_definition', order: 3 },
+      {
+        name: 'interface',
+        get label() {
+          return t('ui.apiVersion')
+        },
+        field: 'interface_definition',
+        order: 3,
+      },
       { name: 'consumer', label: 'Consumer', field: 'consumer', order: 4 },
       {
         name: 'schedule',
-        label: '调度',
+        get label() {
+          return t('ui.scheduling')
+        },
         field: 'schedule_type',
         order: 5,
         serverSortField: 'schedule_type',
@@ -280,7 +327,9 @@ const fetchMetadata = async () => {
       },
       {
         name: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         align: 'center',
         order: 100,
@@ -359,7 +408,7 @@ const isLineButtonDisabled = (button: MenuButton, row: SyncTaskListItem) =>
   (button.event_action === 'enable' || button.event_action === 'run')
 const lineButtonTooltip = (button: MenuButton, row: SyncTaskListItem) =>
   isLineButtonDisabled(button, row)
-    ? `${button.name}不可用：当前服务未注册该 Consumer`
+    ? t('ui.notAvailableCurrentServiceIsNotRegisteredInConsumer', { value1: button.name })
     : button.name
 const openCreate = async () => {
   await fetchReferences()
@@ -373,8 +422,15 @@ const openEdit = async (row: SyncTaskListItem) => {
 }
 const createVersion = (row: SyncTaskListItem) =>
   confirmAction({
-    title: '创建任务版本',
-    message: `基于“${row.task_name}”v${row.version} 创建下一草稿版本？`,
+    get title() {
+      return t('ui.createTaskVersion')
+    },
+    get message() {
+      return t('ui.confirmCreateNextDraft', {
+        value1: row.task_name,
+        value2: row.version,
+      })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await api.createSyncTaskVersion(row.id, row.revision)
@@ -390,12 +446,25 @@ const createVersion = (row: SyncTaskListItem) =>
   })
 const changeState = (row: SyncTaskListItem, enable: boolean) => {
   if (enable && consumerMetadataLoaded.value && !isConsumerAvailable(row)) {
-    $q.notify({ type: 'warning', message: '当前服务未开放该同步 Consumer，不能启用任务' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.currentServiceIsNotOpenConsumerNotEnabled')
+      },
+    })
     return
   }
   confirmAction({
-    title: enable ? '确认启用' : '确认停用',
-    message: `${enable ? '启用' : '停用'}任务“${row.task_name}”v${row.version}？`,
+    get title() {
+      return enable ? t('ui.confirmEnable') : t('ui.confirmDisable')
+    },
+    get message() {
+      return t('ui.taskV', {
+        value1: enable ? t('ui.enabled') : t('ui.disabled'),
+        value2: row.task_name,
+        value3: row.version,
+      })
+    },
   }).onOk(() => {
     void (async () => {
       const result = enable
@@ -407,17 +476,34 @@ const changeState = (row: SyncTaskListItem, enable: boolean) => {
 }
 const runTask = (row: SyncTaskListItem) => {
   if (consumerMetadataLoaded.value && !isConsumerAvailable(row)) {
-    $q.notify({ type: 'warning', message: '当前服务未开放该同步 Consumer，不能运行任务' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.currentServiceIsNotOpenConsumerCannotRunTasks')
+      },
+    })
     return
   }
   confirmAction({
-    title: '运行一次',
-    message: `按当前 Checkpoint 运行任务“${row.task_name}”v${row.version}？`,
+    get title() {
+      return t('ui.runOnce')
+    },
+    get message() {
+      return t('ui.runTaskVFromTheCurrentCheckpoint', {
+        value1: row.task_name,
+        value2: row.version,
+      })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await api.runSyncTask(row.id, row.revision)
       if (result.success && result.data) {
-        $q.notify({ type: 'positive', message: `已创建同步批次 ${result.data.batch_no}` })
+        $q.notify({
+          type: 'positive',
+          get message() {
+            return t('ui.createdSyncedBatch', { value1: result.data.batch_no })
+          },
+        })
         await fetchData()
       }
     })()

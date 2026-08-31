@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type { QVueGlobals } from 'quasar'
 
 type ConfirmDialogOptions = {
@@ -20,19 +21,19 @@ type ReasonDialogOptions = ConfirmDialogOptions & {
 export const useConfirmDialog = ($q: QVueGlobals) => {
   const confirmAction = (options: ConfirmDialogOptions) => {
     return $q.dialog({
-      title: options.title || '确认操作',
+      title: options.title || t('ui.confirmOperation'),
       message: options.message,
       persistent: true,
       class: `app-confirm-dialog app-confirm-dialog--action ${options.className || ''}`,
       ok: {
-        label: options.okLabel || '确认',
+        label: options.okLabel || t('ui.confirm'),
         color: options.color || 'primary',
         unelevated: true,
         loading: options.loading,
         disable: options.disable,
       },
       cancel: {
-        label: options.cancelLabel || '取消',
+        label: options.cancelLabel || t('ui.cancel'),
         color: 'grey-7',
         flat: true,
         disable: options.disable,
@@ -42,19 +43,19 @@ export const useConfirmDialog = ($q: QVueGlobals) => {
 
   const confirmDanger = (options: ConfirmDialogOptions) => {
     return $q.dialog({
-      title: options.title || '确认删除',
+      title: options.title || t('ui.confirmDelete'),
       message: options.message,
       persistent: true,
       class: `app-confirm-dialog app-confirm-dialog--danger ${options.className || ''}`,
       ok: {
-        label: options.okLabel || '删除',
+        label: options.okLabel || t('ui.delete'),
         color: options.color || 'negative',
         unelevated: true,
         loading: options.loading,
         disable: options.disable,
       },
       cancel: {
-        label: options.cancelLabel || '取消',
+        label: options.cancelLabel || t('ui.cancel'),
         color: 'grey-7',
         flat: true,
         disable: options.disable,
@@ -65,7 +66,7 @@ export const useConfirmDialog = ($q: QVueGlobals) => {
   const confirmWithReason = (options: ReasonDialogOptions) => {
     const maxLength = options.maxLength || 160
     return $q.dialog({
-      title: options.title || '确认操作',
+      title: options.title || t('ui.confirmOperation'),
       message: options.message,
       persistent: true,
       class: `app-confirm-dialog app-confirm-dialog--action ${options.className || ''}`,
@@ -73,19 +74,19 @@ export const useConfirmDialog = ($q: QVueGlobals) => {
         model: options.defaultReason || '',
         type: 'textarea',
         outlined: true,
-        label: options.reasonLabel || '操作原因',
+        label: options.reasonLabel || t('ui.reasonForOperation'),
         maxlength: maxLength,
         counter: true,
         autogrow: true,
-        rules: [(value: string) => Boolean(value.trim()) || '请填写操作原因'],
+        rules: [(value: string) => Boolean(value.trim()) || t('ui.pleaseFillOutTheReason')],
       },
       ok: {
-        label: options.okLabel || '确认',
+        label: options.okLabel || t('ui.confirm'),
         color: options.color || 'primary',
         unelevated: true,
       },
       cancel: {
-        label: options.cancelLabel || '取消',
+        label: options.cancelLabel || t('ui.cancel'),
         color: 'grey-7',
         flat: true,
       },

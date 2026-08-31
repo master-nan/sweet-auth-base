@@ -21,7 +21,7 @@
               :controller="schemePage"
               :query-state="queryState"
               :fields="advancedFields"
-              advanced-title="同步异常高级查询"
+              :advanced-title="t('ui.synchronizationOfAtypicalAdvancedQuery')"
               :show-filter-count="false"
             >
               <template #quick-search>
@@ -30,12 +30,12 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索来源编码、错误编码"
+                  :placeholder="t('ui.searchSourceCodeErrorCode')"
                   @keyup.enter="search"
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+                <q-btn color="primary" :label="t('ui.search')" :disable="loading" @click="search" />
               </template>
             </query-scheme-controls>
           </template>
@@ -82,7 +82,7 @@
 
     <organization-record-detail-dialog
       v-model="showDetailDialog"
-      title="同步记录详情"
+      :title="t('ui.synchroniseRecordDetails')"
       :subtitle="recordDetail?.source_summary || ''"
       :sections="detailSections"
       icon="sync_problem"
@@ -99,11 +99,11 @@
 
     <organization-record-detail-dialog
       v-model="showErrorDialog"
-      title="同步错误详情"
+      :title="t('ui.syncErrorDetails')"
       :subtitle="currentRecord?.source_summary || ''"
       :items="errorItems"
       icon="error_outline"
-      status-label="失败"
+      :status-label="t('ui.failed')"
       status-color="negative"
       :loading="errorLoading"
       :error="errorLoadError"
@@ -112,6 +112,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'organization_sync_error' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -154,6 +156,8 @@ import { ExpressionType, SysTableFieldInputType, SysTableFieldType } from 'src/t
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const route = useRoute()
 const dictStore = useDictStore()
@@ -220,35 +224,99 @@ const errorLoading = ref(false)
 const errorLoadError = ref('')
 
 const columns: QTableProps['columns'] = [
-  { name: 'batch_id', field: 'batch_id', label: '批次ID', align: 'right', sortable: true },
-  { name: 'object_type', field: 'object_type', label: '对象类型', align: 'left' },
-  { name: 'source_summary', field: 'source_summary', label: '来源摘要', align: 'left' },
-  { name: 'action', field: 'action', label: '动作', align: 'center' },
-  { name: 'status', field: 'status', label: '处理状态', align: 'center' },
-  { name: 'error_code', field: 'error_code', label: '错误码', align: 'left' },
-  { name: 'retry_count', field: 'retry_count', label: '重试次数', align: 'right' },
-  { name: 'last_retry_at', field: 'last_retry_at', label: '最近重试', align: 'left' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'batch_id',
+    field: 'batch_id',
+    get label() {
+      return t('ui.batchId')
+    },
+    align: 'right',
+    sortable: true,
+  },
+  {
+    name: 'object_type',
+    field: 'object_type',
+    get label() {
+      return t('ui.objectType')
+    },
+    align: 'left',
+  },
+  {
+    name: 'source_summary',
+    field: 'source_summary',
+    get label() {
+      return t('ui.sourceSummary')
+    },
+    align: 'left',
+  },
+  {
+    name: 'action',
+    field: 'action',
+    get label() {
+      return t('ui.action')
+    },
+    align: 'center',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.processingStatus')
+    },
+    align: 'center',
+  },
+  {
+    name: 'error_code',
+    field: 'error_code',
+    get label() {
+      return t('ui.errorCode')
+    },
+    align: 'left',
+  },
+  {
+    name: 'retry_count',
+    field: 'retry_count',
+    get label() {
+      return t('ui.retryCount')
+    },
+    align: 'right',
+  },
+  {
+    name: 'last_retry_at',
+    field: 'last_retry_at',
+    get label() {
+      return t('ui.recentTry')
+    },
+    align: 'left',
+  },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ]
 
 const advancedFields = [
-  createOrganizationField('批次ID', 'batch_id', SysTableFieldType.BIGINT, {
+  createOrganizationField(t('ui.batchId'), 'batch_id', SysTableFieldType.BIGINT, {
     inputType: SysTableFieldInputType.INPUT_NUMBER,
   }),
-  createOrganizationField('对象类型', 'object_type'),
-  createOrganizationField('本地对象ID', 'local_id', SysTableFieldType.BIGINT, {
+  createOrganizationField(t('ui.objectType'), 'object_type'),
+  createOrganizationField(t('ui.localObjectId'), 'local_id', SysTableFieldType.BIGINT, {
     inputType: SysTableFieldInputType.INPUT_NUMBER,
   }),
-  createOrganizationField('同步动作', 'action', SysTableFieldType.VARCHAR, {
+  createOrganizationField(t('ui.syncAction'), 'action', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_action',
   }),
-  createOrganizationField('处理状态', 'status', SysTableFieldType.VARCHAR, {
+  createOrganizationField(t('ui.processingStatus'), 'status', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_record_status',
   }),
-  createOrganizationField('错误码', 'error_code'),
-  createOrganizationField('重试次数', 'retry_count', SysTableFieldType.INT, {
+  createOrganizationField(t('ui.errorCode'), 'error_code'),
+  createOrganizationField(t('ui.retryCount'), 'retry_count', SysTableFieldType.INT, {
     inputType: SysTableFieldInputType.INPUT_NUMBER,
   }),
 ]
@@ -267,18 +335,54 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
   return [
     {
       key: 'basic',
-      label: '基本信息',
-      caption: '对象与处理状态',
+      get label() {
+        return t('ui.basicInformation')
+      },
+      get caption() {
+        return t('ui.objectAndProcessStatus')
+      },
       icon: 'info',
       items: [
-        { label: '批次ID', value: detail.batch_id },
-        { label: '集成执行ID', value: detail.execution_id ?? null },
-        { label: '对象类型', value: objectTypeLabel(detail.object_type) },
-        { label: '来源摘要', value: detail.source_summary },
-        { label: '本地对象ID', value: detail.local_id ?? null },
-        { label: '同步动作', value: dictLabel('org_sync_action', detail.action) },
         {
-          label: '处理状态',
+          get label() {
+            return t('ui.batchId')
+          },
+          value: detail.batch_id,
+        },
+        {
+          get label() {
+            return t('ui.integrationExecutionId')
+          },
+          value: detail.execution_id ?? null,
+        },
+        {
+          get label() {
+            return t('ui.objectType')
+          },
+          value: objectTypeLabel(detail.object_type),
+        },
+        {
+          get label() {
+            return t('ui.sourceSummary')
+          },
+          value: detail.source_summary,
+        },
+        {
+          get label() {
+            return t('ui.localObjectId')
+          },
+          value: detail.local_id ?? null,
+        },
+        {
+          get label() {
+            return t('ui.syncAction')
+          },
+          value: dictLabel('org_sync_action', detail.action),
+        },
+        {
+          get label() {
+            return t('ui.processingStatus')
+          },
           value: dictLabel('org_sync_record_status', detail.status),
           chip: true,
           color: organizationStatusColor(detail.status),
@@ -287,13 +391,32 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
     },
     {
       key: 'retry',
-      label: '重试与依赖',
-      caption: '依赖和重试信息',
+      get label() {
+        return t('ui.retryAndDependence')
+      },
+      get caption() {
+        return t('ui.relianceAndRetryInformation')
+      },
       icon: 'replay',
       items: [
-        { label: '依赖类型', value: dictLabel('org_dependency_type', detail.dependency_type) },
-        { label: '重试次数', value: detail.retry_count },
-        { label: '最近重试时间', value: formatOrganizationDateTime(detail.last_retry_at) },
+        {
+          get label() {
+            return t('ui.dependencyType')
+          },
+          value: dictLabel('org_dependency_type', detail.dependency_type),
+        },
+        {
+          get label() {
+            return t('ui.retryCount')
+          },
+          value: detail.retry_count,
+        },
+        {
+          get label() {
+            return t('ui.lastRetryTime')
+          },
+          value: formatOrganizationDateTime(detail.last_retry_at),
+        },
       ],
     },
   ]
@@ -303,9 +426,24 @@ const errorItems = computed<OrganizationDetailItem[]>(() => {
   const error = recordError.value
   if (!error) return []
   return [
-    { label: '错误码', value: error.error_code },
-    { label: '依赖类型', value: dictLabel('org_dependency_type', error.dependency_type) },
-    { label: '依赖摘要', value: error.dependency_summary },
+    {
+      get label() {
+        return t('ui.errorCode')
+      },
+      value: error.error_code,
+    },
+    {
+      get label() {
+        return t('ui.dependencyType')
+      },
+      value: dictLabel('org_dependency_type', error.dependency_type),
+    },
+    {
+      get label() {
+        return t('ui.relianceOnSummary')
+      },
+      value: error.dependency_summary,
+    },
   ]
 })
 
@@ -326,7 +464,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '同步异常加载失败'
+    loadError.value = t('ui.synchronisingAbnormalLoadFailed')
   } finally {
     loading.value = false
   }
@@ -341,7 +479,7 @@ const openDetail = async (row: SyncRecordListItem) => {
   try {
     recordDetail.value = await getSyncRecordDetail(row.id)
   } catch {
-    detailError.value = '同步记录详情加载失败'
+    detailError.value = t('ui.synchronisingRecordingDetailsLoadedFailed')
   } finally {
     detailLoading.value = false
   }
@@ -356,7 +494,7 @@ const openError = async (row: SyncRecordListItem) => {
   try {
     recordError.value = await getSyncRecordError(row.id)
   } catch {
-    errorLoadError.value = '同步错误详情加载失败'
+    errorLoadError.value = t('ui.synchronisingErrorDetailsLoadedFailed')
   } finally {
     errorLoading.value = false
   }

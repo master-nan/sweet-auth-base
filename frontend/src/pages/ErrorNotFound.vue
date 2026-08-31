@@ -3,9 +3,7 @@
     <div>
       <div style="font-size: 30vh">404</div>
 
-      <div class="text-h2" style="opacity: 0.4">
-        哎呀，这里什么都没有...
-      </div>
+      <div class="text-h2" style="opacity: 0.4">{{ t('ui.thereSNothingHere') }}</div>
 
       <q-btn
         class="q-mt-xl"
@@ -13,11 +11,15 @@
         text-color="primary"
         unelevated
         to="/admin/home"
-        label="返回"
+        :label="t('ui.back')"
         no-caps
       />
     </div>
   </div>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n({ useScope: 'global' })
+</script>

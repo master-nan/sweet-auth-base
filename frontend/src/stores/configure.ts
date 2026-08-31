@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { defineStore } from 'pinia'
 import { useBasicApi } from 'src/api/services/basic'
 
@@ -41,7 +42,9 @@ export const useConfigureStore = defineStore('configure', {
     system_name: 'Sweet Admin',
     system_version: '0.1',
     system_logo: '',
-    system_description: '通用低代码底座',
+    get system_description() {
+      return t('ui.generalPurposeLowCodeFoundation')
+    },
     // 邮件配置默认值
     enable_email: false,
     smtp_server: '',

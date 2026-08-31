@@ -23,7 +23,7 @@
               :controller="schemePage"
               :query-state="queryState"
               :fields="auditAdvancedFields"
-              advanced-title="审计日志查询"
+              :advanced-title="t('ui.auditLogQueries')"
               :enable-nested="false"
             >
               <template #quick-search>
@@ -32,14 +32,19 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索用户、动作、资源、路径、IP"
+                  :placeholder="t('ui.searchForUsersActionsResourcesPathsIps')"
                   @keyup.enter="handleBasicSearch"
                 >
                   <template #append>
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -55,7 +60,7 @@
           <status-chip
             :color="props.row.success ? 'positive' : 'negative'"
             :outline="false"
-            :label="props.row.success ? '成功' : '失败'"
+            :label="props.row.success ? t('ui.success') : t('ui.failed')"
           />
         </q-td>
       </template>
@@ -91,6 +96,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_audit' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
@@ -116,6 +123,8 @@ import { useQuerySchemePage } from 'src/composables/query-scheme-page'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { executeButtonAction, type ButtonActionContext } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const router = useRouter()
@@ -154,23 +163,95 @@ const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
 const hasAppliedAdvancedFilters = computed(() => hasEffectiveQueryRules(appliedAdvancedQuery.value))
 
 const columns = computed<QTableProps['columns']>(() => [
-  { name: 'gmt_create', field: 'gmt_create', label: '时间', align: 'left', sortable: true },
-  { name: 'user_name', field: 'user_name', label: '用户', align: 'left', sortable: true },
-  { name: 'action', field: 'action', label: '动作', align: 'left', sortable: true },
   {
-    name: 'resource_code',
-    field: 'resource_code',
-    label: '资源编码',
+    name: 'gmt_create',
+    field: 'gmt_create',
+    get label() {
+      return t('ui.time')
+    },
     align: 'left',
     sortable: true,
   },
-  { name: 'method', field: 'method', label: '方法', align: 'center', sortable: true },
-  { name: 'url', field: 'url', label: '路径', align: 'left' },
-  { name: 'status_code', field: 'status_code', label: '状态码', align: 'right', sortable: true },
-  { name: 'success', field: 'success', label: '结果', align: 'center', sortable: true },
-  { name: 'duration_ms', field: 'duration_ms', label: '耗时', align: 'right', sortable: true },
+  {
+    name: 'user_name',
+    field: 'user_name',
+    get label() {
+      return t('ui.user')
+    },
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'action',
+    field: 'action',
+    get label() {
+      return t('ui.action')
+    },
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'resource_code',
+    field: 'resource_code',
+    get label() {
+      return t('ui.resourceCode')
+    },
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'method',
+    field: 'method',
+    get label() {
+      return t('ui.method')
+    },
+    align: 'center',
+    sortable: true,
+  },
+  {
+    name: 'url',
+    field: 'url',
+    get label() {
+      return t('ui.path')
+    },
+    align: 'left',
+  },
+  {
+    name: 'status_code',
+    field: 'status_code',
+    get label() {
+      return t('ui.statusCode')
+    },
+    align: 'right',
+    sortable: true,
+  },
+  {
+    name: 'success',
+    field: 'success',
+    get label() {
+      return t('ui.result')
+    },
+    align: 'center',
+    sortable: true,
+  },
+  {
+    name: 'duration_ms',
+    field: 'duration_ms',
+    get label() {
+      return t('ui.duration')
+    },
+    align: 'right',
+    sortable: true,
+  },
   { name: 'ip', field: 'ip', label: 'IP', align: 'left' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ])
 
 const visibleColumns = ref([
@@ -196,28 +277,33 @@ const pagination = ref({
 
 const auditAdvancedFields: TableField[] = [
   buildAuditField(
-    '时间',
+    t('ui.time'),
     'gmt_create',
     SysTableFieldType.DATETIME,
     SysTableFieldInputType.DATETIME_PICKER,
   ),
-  buildAuditField('用户', 'user_name', SysTableFieldType.VARCHAR),
-  buildAuditField('动作', 'action', SysTableFieldType.VARCHAR),
-  buildAuditField('资源类型', 'resource_type', SysTableFieldType.VARCHAR),
-  buildAuditField('资源编码', 'resource_code', SysTableFieldType.VARCHAR),
-  buildAuditField('资源ID', 'resource_id', SysTableFieldType.VARCHAR),
-  buildAuditField('方法', 'method', SysTableFieldType.VARCHAR),
-  buildAuditField('路径', 'url', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.user'), 'user_name', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.action'), 'action', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.resourceType'), 'resource_type', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.resourceCode'), 'resource_code', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.resourceId'), 'resource_id', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.method'), 'method', SysTableFieldType.VARCHAR),
+  buildAuditField(t('ui.path'), 'url', SysTableFieldType.VARCHAR),
   buildAuditField('IP', 'ip', SysTableFieldType.VARCHAR),
   buildAuditField(
-    '状态码',
+    t('ui.statusCode'),
     'status_code',
     SysTableFieldType.INT,
     SysTableFieldInputType.INPUT_NUMBER,
   ),
-  buildAuditField('结果', 'success', SysTableFieldType.BOOLEAN, SysTableFieldInputType.BOOLEAN),
   buildAuditField(
-    '耗时',
+    t('ui.result'),
+    'success',
+    SysTableFieldType.BOOLEAN,
+    SysTableFieldInputType.BOOLEAN,
+  ),
+  buildAuditField(
+    t('ui.duration'),
     'duration_ms',
     SysTableFieldType.BIGINT,
     SysTableFieldInputType.INPUT_NUMBER,
@@ -281,7 +367,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '审计日志加载失败'
+    loadError.value = t('ui.failedToLoadAuditLog')
   } finally {
     loading.value = false
   }

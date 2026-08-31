@@ -1,10 +1,16 @@
 <template>
-  <q-dialog :model-value="modelValue" persistent @update:model-value="$emit('update:modelValue', $event)">
+  <q-dialog
+    :model-value="modelValue"
+    persistent
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <q-card class="join-dialog">
       <q-card-section class="dialog-head">
         <div>
-          <div class="dialog-title">新增数据集关联</div>
-          <div class="dialog-caption">用于描述多个数据集之间的取数关系，例如运单.company_id 关联 公司.id。</div>
+          <div class="dialog-title">{{ t('ui.newDataSetAssociation') }}</div>
+          <div class="dialog-caption">
+            {{ t('ui.toDescribeTheNumberingRelationshipsBetweenMultipleDataSetsSuch') }}
+          </div>
         </div>
         <q-btn flat round dense icon="close" @click="$emit('update:modelValue', false)" />
       </q-card-section>
@@ -16,7 +22,7 @@
           outlined
           emit-value
           map-options
-          label="左数据集"
+          :label="t('ui.leftDataSet')"
           :options="datasetOptions"
           @update:model-value="$emit('update:leftDatasetId', String($event || ''))"
         />
@@ -26,7 +32,7 @@
           outlined
           emit-value
           map-options
-          label="左字段"
+          :label="t('ui.leftField')"
           :options="leftFieldOptions"
           @update:model-value="$emit('update:leftField', String($event || ''))"
         />
@@ -36,7 +42,7 @@
           outlined
           emit-value
           map-options
-          label="右数据集"
+          :label="t('ui.rightDataSet')"
           :options="datasetOptions"
           @update:model-value="$emit('update:rightDatasetId', String($event || ''))"
         />
@@ -46,7 +52,7 @@
           outlined
           emit-value
           map-options
-          label="右字段"
+          :label="t('ui.rightField')"
           :options="rightFieldOptions"
           @update:model-value="$emit('update:rightField', String($event || ''))"
         />
@@ -56,22 +62,32 @@
           outlined
           emit-value
           map-options
-          label="关联方式"
+          :label="t('ui.relationMode')"
           :options="joinTypeOptions"
           @update:model-value="$emit('update:joinType', $event as ReportDatasetJoinType)"
         />
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="取消" @click="$emit('update:modelValue', false)" />
-        <q-btn color="primary" unelevated icon="add_link" label="添加关联" @click="$emit('confirm')" />
+        <q-btn flat :label="t('ui.cancel')" @click="$emit('update:modelValue', false)" />
+        <q-btn
+          color="primary"
+          unelevated
+          icon="add_link"
+          :label="t('ui.addAssociation')"
+          @click="$emit('confirm')"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import type { ReportDatasetJoinType } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type Option<T = string> = { label: string; value: T }
 

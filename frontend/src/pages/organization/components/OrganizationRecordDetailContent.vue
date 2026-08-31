@@ -7,13 +7,7 @@
           <div class="organization-detail-page-title">{{ title }}</div>
           <div class="row items-center q-gutter-sm text-grey-7 q-mt-xs">
             <span v-if="subtitle">{{ subtitle }}</span>
-            <q-chip
-              v-if="statusLabel"
-              dense
-              square
-              :color="statusColor"
-              text-color="white"
-            >
+            <q-chip v-if="statusLabel" dense square :color="statusColor" text-color="white">
               {{ statusLabel }}
             </q-chip>
           </div>
@@ -30,12 +24,18 @@
           :disable="isButtonDisabled(button)"
           @click="emit('button-click', button)"
         />
-        <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="emit('close')" />
+        <q-btn
+          flat
+          color="primary"
+          icon="arrow_back"
+          :label="t('ui.backToList')"
+          @click="emit('close')"
+        />
         <q-btn
           outline
           color="primary"
           icon="refresh"
-          label="刷新"
+          :label="t('ui.refresh')"
           :loading="loading"
           @click="emit('refresh')"
         />
@@ -56,18 +56,14 @@
         class="organization-detail-page-panel"
       >
         <div class="text-subtitle1 text-weight-bold q-mb-md">{{ section.label }}</div>
-        <detail-field-grid
-          v-if="section.items?.length"
-          :items="section.items"
-          variant="card"
-        />
+        <detail-field-grid v-if="section.items?.length" :items="section.items" variant="card" />
         <slot name="section" :section-key="section.key" :mode="mode" />
       </section>
 
       <slot :mode="mode" />
 
       <section v-if="(bottomButtons || []).length" class="organization-detail-page-panel">
-        <div class="text-subtitle1 text-weight-bold q-mb-md">详情操作</div>
+        <div class="text-subtitle1 text-weight-bold q-mb-md">{{ t('ui.detailActions') }}</div>
         <div class="row q-gutter-sm">
           <q-btn
             v-for="button in bottomButtons || []"
@@ -85,6 +81,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
@@ -95,6 +93,8 @@ import type {
 } from './organization-record-detail'
 import { evaluateButtonDisabled } from 'src/utils/button-handlers'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(
   defineProps<{
@@ -136,7 +136,15 @@ const emit = defineEmits<{
 const normalizedSections = computed<OrganizationDetailSection[]>(() =>
   props.sections.length
     ? props.sections
-    : [{ key: 'basic', label: '基础信息', items: props.items }],
+    : [
+        {
+          key: 'basic',
+          get label() {
+            return t('ui.basicInfo')
+          },
+          items: props.items,
+        },
+      ],
 )
 
 const isButtonDisabled = (button: MenuButton) =>

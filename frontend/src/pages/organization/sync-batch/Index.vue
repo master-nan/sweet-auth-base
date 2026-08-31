@@ -20,7 +20,7 @@
               :controller="schemePage"
               :query-state="queryState"
               :fields="advancedFields"
-              advanced-title="同步批次高级查询"
+              :advanced-title="t('ui.syncBatchAdvancedQueries')"
               :show-filter-count="false"
             >
               <template #quick-search>
@@ -29,12 +29,12 @@
                   dense
                   outlined
                   debounce="300"
-                  placeholder="搜索批次号"
+                  :placeholder="t('ui.searchBatchNumbers')"
                   @keyup.enter="search"
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+                <q-btn color="primary" :label="t('ui.search')" :disable="loading" @click="search" />
               </template>
             </query-scheme-controls>
           </template>
@@ -96,11 +96,11 @@
 
     <organization-record-detail-dialog
       v-model="showErrorDialog"
-      title="同步批次错误"
+      :title="t('ui.syncBatchErrors')"
       :subtitle="currentBatch?.batch_no || ''"
       :items="errorItems"
       icon="error_outline"
-      status-label="失败"
+      :status-label="t('ui.failed')"
       status-color="negative"
       :loading="errorLoading"
       :error="errorLoadError"
@@ -109,6 +109,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'organization_sync_batch' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -144,6 +146,8 @@ import { useDictStore } from 'src/stores/dict'
 import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
 import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const dictStore = useDictStore()
 const router = useRouter()
@@ -181,31 +185,95 @@ const errorLoadError = ref('')
 const errorSummary = ref('')
 
 const errorItems = computed<OrganizationDetailItem[]>(() => [
-  { label: '错误摘要', value: errorSummary.value, fullWidth: true },
+  {
+    get label() {
+      return t('ui.errorSummary')
+    },
+    value: errorSummary.value,
+    fullWidth: true,
+  },
 ])
 const columns: QTableProps['columns'] = [
-  { name: 'batch_no', field: 'batch_no', label: '批次号', align: 'left', sortable: true },
-  { name: 'sync_type', field: 'sync_type', label: '同步类型', align: 'center' },
-  { name: 'object_scope', field: 'object_scope', label: '对象范围', align: 'left' },
-  { name: 'started_at', field: 'started_at', label: '开始时间', align: 'left', sortable: true },
-  { name: 'duration', field: 'duration', label: '耗时', align: 'right' },
-  { name: 'progress', field: 'progress', label: '成功 / 失败 / 总数', align: 'right' },
-  { name: 'status', field: 'status', label: '状态', align: 'center' },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'batch_no',
+    field: 'batch_no',
+    get label() {
+      return t('ui.batchNumber')
+    },
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'sync_type',
+    field: 'sync_type',
+    get label() {
+      return t('ui.syncType')
+    },
+    align: 'center',
+  },
+  {
+    name: 'object_scope',
+    field: 'object_scope',
+    get label() {
+      return t('ui.objectScope')
+    },
+    align: 'left',
+  },
+  {
+    name: 'started_at',
+    field: 'started_at',
+    get label() {
+      return t('ui.startTime')
+    },
+    align: 'left',
+    sortable: true,
+  },
+  {
+    name: 'duration',
+    field: 'duration',
+    get label() {
+      return t('ui.duration')
+    },
+    align: 'right',
+  },
+  {
+    name: 'progress',
+    field: 'progress',
+    get label() {
+      return t('ui.successFailureTotal')
+    },
+    align: 'right',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ]
 
 const advancedFields = [
-  createOrganizationField('批次号', 'batch_no'),
-  createOrganizationField('同步类型', 'sync_type', SysTableFieldType.VARCHAR, {
+  createOrganizationField(t('ui.batchNumber'), 'batch_no'),
+  createOrganizationField(t('ui.syncType'), 'sync_type', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_type',
   }),
-  createOrganizationField('对象范围', 'object_scope'),
-  createOrganizationField('批次状态', 'status', SysTableFieldType.VARCHAR, {
+  createOrganizationField(t('ui.objectScope'), 'object_scope'),
+  createOrganizationField(t('ui.batchStatus'), 'status', SysTableFieldType.VARCHAR, {
     inputType: SysTableFieldInputType.SELECT,
     dictCode: 'org_sync_record_status',
   }),
-  createOrganizationField('开始时间', 'started_at', SysTableFieldType.DATETIME, {
+  createOrganizationField(t('ui.startTime'), 'started_at', SysTableFieldType.DATETIME, {
     inputType: SysTableFieldInputType.DATETIME_PICKER,
   }),
 ]
@@ -241,7 +309,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '同步批次加载失败'
+    loadError.value = t('ui.failedToLoadSyncBatches')
   } finally {
     loading.value = false
   }
@@ -261,7 +329,7 @@ const openError = async (row: SyncBatchListItem) => {
     const result = await getSyncBatchError(row.id)
     errorSummary.value = result.error_summary
   } catch {
-    errorLoadError.value = '同步批次错误加载失败'
+    errorLoadError.value = t('ui.failedToLoadSyncBatchErrors')
   } finally {
     errorLoading.value = false
   }

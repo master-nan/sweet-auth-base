@@ -1,10 +1,16 @@
 <template>
-  <q-dialog :model-value="modelValue" persistent @update:model-value="$emit('update:modelValue', $event)">
+  <q-dialog
+    :model-value="modelValue"
+    persistent
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
     <q-card class="parameter-dialog">
       <q-card-section class="dialog-head">
         <div>
-          <div class="dialog-title">{{ editing ? '编辑参数' : '新增参数' }}</div>
-          <div class="dialog-caption">参数会显示在报表运行页顶部，并转换为绑定数据集字段的查询条件。</div>
+          <div class="dialog-title">
+            {{ editing ? t('ui.editParameters') : t('ui.addParameter') }}
+          </div>
+          <div class="dialog-caption">{{ t('ui.parametersAreDisplayedAtTheTopOfTheRunPage') }}</div>
         </div>
         <q-btn flat round dense icon="close" @click="$emit('update:modelValue', false)" />
       </q-card-section>
@@ -14,7 +20,7 @@
           :model-value="draft.label"
           dense
           outlined
-          label="参数名称"
+          :label="t('ui.parameterName')"
           @update:model-value="$emit('update:label', String($event || ''))"
         />
         <q-select
@@ -23,7 +29,7 @@
           outlined
           emit-value
           map-options
-          label="控件类型"
+          :label="t('ui.controlType')"
           :options="typeOptions"
           @update:model-value="$emit('update:type', $event as ReportParameterType)"
         />
@@ -33,7 +39,7 @@
           outlined
           emit-value
           map-options
-          label="数据集"
+          :label="t('ui.dataset')"
           :options="datasetOptions"
           @update:model-value="$emit('update:datasetId', String($event || ''))"
         />
@@ -43,7 +49,7 @@
           outlined
           emit-value
           map-options
-          label="字段"
+          :label="t('ui.field')"
           :options="fieldOptions"
           @update:model-value="$emit('update:field', String($event || ''))"
         />
@@ -53,7 +59,7 @@
           outlined
           emit-value
           map-options
-          label="匹配方式"
+          :label="t('ui.matchingMethod')"
           :options="operatorOptions"
           @update:model-value="$emit('update:operator', $event as ReportParameterOperator)"
         />
@@ -61,7 +67,7 @@
           :model-value="draft.placeholder"
           dense
           outlined
-          label="占位提示"
+          :label="t('ui.placeholderTip')"
           @update:model-value="$emit('update:placeholder', String($event || ''))"
         />
         <q-input
@@ -69,25 +75,32 @@
           dense
           outlined
           clearable
-          label="默认值"
-          hint="运行页打开时自动带入；日期范围用英文逗号分隔开始和结束"
+          :label="t('ui.defaultValue')"
+          :hint="t('ui.autoIntakeWhenRunningPagesOpenDateRangesSeparatedFrom')"
           @update:model-value="$emit('update:defaultValue', String($event || ''))"
         />
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="取消" @click="$emit('update:modelValue', false)" />
-        <q-btn color="primary" unelevated icon="save" label="保存" @click="$emit('confirm')" />
+        <q-btn flat :label="t('ui.cancel')" @click="$emit('update:modelValue', false)" />
+        <q-btn
+          color="primary"
+          unelevated
+          icon="save"
+          :label="t('ui.save')"
+          @click="$emit('confirm')"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
 </template>
 
 <script setup lang="ts">
-import type {
-  ReportParameterOperator,
-  ReportParameterType,
-} from 'src/api/services/report'
+import { useI18n } from 'vue-i18n'
+
+import type { ReportParameterOperator, ReportParameterType } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type Option<T = string> = { label: string; value: T }
 

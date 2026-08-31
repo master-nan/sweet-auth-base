@@ -1,10 +1,7 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import {
-  useReportApi,
-  type Report,
-  type ReportExportReq,
-} from 'src/api/services/report'
+import { useReportApi, type Report, type ReportExportReq } from 'src/api/services/report'
 import { downloadBlob } from 'src/utils/download'
 
 type ReportExportOptions = {
@@ -62,7 +59,12 @@ export function useReportExport() {
   async function exportReportWithReq(report: Report, req: ReportExportReq) {
     const file = await reportApi.exportReport(report.id, req)
     downloadBlob(file.blob, file.filename)
-    $q.notify({ type: 'positive', message: '报表导出成功' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.reportExportSuccess')
+      },
+    })
   }
 
   async function exportRuntimeCsv(report: Report | null, options: ReportExportOptions = {}) {
@@ -72,7 +74,8 @@ export function useReportExport() {
       await exportReportWithReq(report, buildReportExportReq(report, options))
       return true
     } catch (error) {
-      const message = error instanceof Error && error.message ? error.message : '报表导出失败'
+      const message =
+        error instanceof Error && error.message ? error.message : t('ui.reportExportFailed')
       $q.notify({ type: 'negative', message })
       return false
     } finally {
@@ -87,7 +90,8 @@ export function useReportExport() {
       await exportReportWithReq(row, buildReportExportReq(row))
       return true
     } catch (error) {
-      const message = error instanceof Error && error.message ? error.message : '报表导出失败'
+      const message =
+        error instanceof Error && error.message ? error.message : t('ui.reportExportFailed')
       $q.notify({ type: 'negative', message })
       return false
     } finally {

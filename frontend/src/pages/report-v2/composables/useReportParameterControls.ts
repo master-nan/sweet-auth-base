@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'
@@ -11,7 +12,13 @@ import {
 } from 'src/utils/field-metadata'
 import type { ReportRuntimeParameterValue } from './useReportRuntime'
 
-export type ReportParameterControlType = 'text' | 'number' | 'date' | 'datetime' | 'select' | 'boolean'
+export type ReportParameterControlType =
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'datetime'
+  | 'select'
+  | 'boolean'
 
 export interface ReportParameterControlOption {
   label: string
@@ -33,13 +40,17 @@ export interface ReportParameterControlMeta {
   tableField?: TableField
 }
 
-type RuntimeParameterOption = string | number | boolean | {
-  label?: string
-  name?: string
-  text?: string
-  value?: string | number | boolean
-  code?: string | number | boolean
-}
+type RuntimeParameterOption =
+  | string
+  | number
+  | boolean
+  | {
+      label?: string
+      name?: string
+      text?: string
+      value?: string | number | boolean
+      code?: string | number | boolean
+    }
 
 const tableFieldCache = new Map<string, TableField[]>()
 
@@ -65,7 +76,11 @@ export function useReportParameterControls() {
       const nextDefaults: Record<string, ReportRuntimeParameterValue> = {}
       metas.forEach((meta) => {
         nextMetas[meta.id] = meta
-        if (meta.defaultValue !== undefined && meta.defaultValue !== null && meta.defaultValue !== '') {
+        if (
+          meta.defaultValue !== undefined &&
+          meta.defaultValue !== null &&
+          meta.defaultValue !== ''
+        ) {
           nextDefaults[meta.id] = meta.defaultValue
         }
       })
@@ -78,35 +93,44 @@ export function useReportParameterControls() {
 
   async function loadTableFields(report: Report | null) {
     const result: Record<string, TableField[]> = {}
-    const sourceCodes = Array.from(new Set(
-      resolveDatasets(report)
-        .filter((dataset) => dataset.type === 'table' && dataset.source_code)
-        .map((dataset) => String(dataset.source_code)),
-    ))
+    const sourceCodes = Array.from(
+      new Set(
+        resolveDatasets(report)
+          .filter((dataset) => dataset.type === 'table' && dataset.source_code)
+          .map((dataset) => String(dataset.source_code)),
+      ),
+    )
 
-    await Promise.all(sourceCodes.map(async (sourceCode) => {
-      if (tableFieldCache.has(sourceCode)) {
-        result[sourceCode] = tableFieldCache.get(sourceCode) || []
-        return
-      }
-      try {
-        const res = await tableApi.queryTableByCode(sourceCode)
-        const fields = res.data?.table_fields || []
-        tableFieldCache.set(sourceCode, fields)
-        result[sourceCode] = fields
-      } catch {
-        const message = `字段元数据加载失败：${sourceCode}，参数控件已降级为报表参数类型`
-        errors.value.push(message)
-        result[sourceCode] = []
-        $q.notify({ type: 'warning', message })
-      }
-    }))
+    await Promise.all(
+      sourceCodes.map(async (sourceCode) => {
+        if (tableFieldCache.has(sourceCode)) {
+          result[sourceCode] = tableFieldCache.get(sourceCode) || []
+          return
+        }
+        try {
+          const res = await tableApi.queryTableByCode(sourceCode)
+          const fields = res.data?.table_fields || []
+          tableFieldCache.set(sourceCode, fields)
+          result[sourceCode] = fields
+        } catch {
+          const message = t(
+            'ui.fieldMetadataLoadedFailedArgumentControlDowngradedToReportParameterType',
+            { sourceCode: sourceCode },
+          )
+          errors.value.push(message)
+          result[sourceCode] = []
+          $q.notify({ type: 'warning', message })
+        }
+      }),
+    )
 
     return result
   }
 
   async function loadDictOptions(metas: ReportParameterControlMeta[]) {
-    const dictCodes = Array.from(new Set(metas.map((meta) => meta.dictCode).filter((code): code is string => !!code)))
+    const dictCodes = Array.from(
+      new Set(metas.map((meta) => meta.dictCode).filter((code): code is string => !!code)),
+    )
     if (!dictCodes.length) return
     await dictStore.loadDicts(dictCodes)
     metas.forEach((meta) => {
@@ -128,7 +152,9 @@ export function useReportParameterControls() {
     const tableField = sourceCode
       ? tableFieldsBySource[sourceCode]?.find((field) => matchField(field, param.field))
       : undefined
-    const parameterOptions = normalizeOptions((param as { options?: RuntimeParameterOption[] }).options || [])
+    const parameterOptions = normalizeOptions(
+      (param as { options?: RuntimeParameterOption[] }).options || [],
+    )
     const dictCode = tableField?.dict_code || readString(param, ['dict_code', 'dictCode'])
     const controlType = inferControlType(param, tableField, dictCode, parameterOptions)
     const defaultValue = readDefaultValue(param, tableField)
@@ -137,11 +163,23 @@ export function useReportParameterControls() {
       label: param.label || tableField?.field_name || param.field,
       field: param.field,
       controlType,
-      htmlInputType: tableField ? fieldHtmlInputType(tableField.input_type) : fallbackHtmlInputType(String(param.type || 'text')),
+      htmlInputType: tableField
+        ? fieldHtmlInputType(tableField.input_type)
+        : fallbackHtmlInputType(String(param.type || 'text')),
       options: controlType === 'boolean' ? booleanOptions() : parameterOptions,
-      required: Boolean(readBoolean(param, ['required']) ?? readBoolean(tableField, ['is_required']) ?? (tableField ? !tableField.is_null : false)),
-      placeholder: param.placeholder || `请输入${param.label || tableField?.field_name || param.field}`,
-      source: tableField ? 'field_metadata' : parameterOptions.length ? 'parameter_options' : 'parameter',
+      required: Boolean(
+        readBoolean(param, ['required']) ??
+          readBoolean(tableField, ['is_required']) ??
+          (tableField ? !tableField.is_null : false),
+      ),
+      placeholder:
+        param.placeholder ||
+        t('ui.pleaseEnter', { value1: param.label || tableField?.field_name || param.field }),
+      source: tableField
+        ? 'field_metadata'
+        : parameterOptions.length
+          ? 'parameter_options'
+          : 'parameter',
     }
     if (dictCode) {
       meta.dictCode = dictCode
@@ -177,7 +215,11 @@ export function useReportParameterControls() {
       const matched = datasets.find((dataset) => dataset.id === param.dataset_id)
       if (matched) return matched
     }
-    return datasets.find((dataset) => dataset.fields?.some((field) => field.code === param.field || field.name === param.field)) || datasets[0]
+    return (
+      datasets.find((dataset) =>
+        dataset.fields?.some((field) => field.code === param.field || field.name === param.field),
+      ) || datasets[0]
+    )
   }
 
   function matchField(field: TableField, fieldCode: string) {
@@ -210,31 +252,54 @@ export function useReportParameterControls() {
   }
 
   function normalizeOptions(options: RuntimeParameterOption[]) {
-    return options.map((option) => {
-      if (typeof option === 'string' || typeof option === 'number' || typeof option === 'boolean') {
-        return { label: String(option), value: option }
-      }
-      const value = option.value ?? option.code ?? option.label ?? option.name ?? option.text ?? ''
-      return {
-        label: String(option.label || option.name || option.text || value),
-        value,
-      }
-    }).filter((option) => option.value !== '')
+    return options
+      .map((option) => {
+        if (
+          typeof option === 'string' ||
+          typeof option === 'number' ||
+          typeof option === 'boolean'
+        ) {
+          return { label: String(option), value: option }
+        }
+        const value =
+          option.value ?? option.code ?? option.label ?? option.name ?? option.text ?? ''
+        return {
+          label: String(option.label || option.name || option.text || value),
+          value,
+        }
+      })
+      .filter((option) => option.value !== '')
   }
 
   function booleanOptions(): ReportParameterControlOption[] {
     return [
-      { label: '是', value: true },
-      { label: '否', value: false },
+      {
+        get label() {
+          return t('ui.yes')
+        },
+        value: true,
+      },
+      {
+        get label() {
+          return t('ui.no')
+        },
+        value: false,
+      },
     ]
   }
 
   function readDefaultValue(param: ReportParameter, tableField?: TableField) {
-    if (param.default_value !== undefined && param.default_value !== null && param.default_value !== '') {
+    if (
+      param.default_value !== undefined &&
+      param.default_value !== null &&
+      param.default_value !== ''
+    ) {
       return param.default_value
     }
     const fieldDefault = tableField?.default_value
-    return fieldDefault === '' || fieldDefault === null || fieldDefault === undefined ? undefined : fieldDefault
+    return fieldDefault === '' || fieldDefault === null || fieldDefault === undefined
+      ? undefined
+      : fieldDefault
   }
 
   function readString(source: unknown, keys: string[]) {

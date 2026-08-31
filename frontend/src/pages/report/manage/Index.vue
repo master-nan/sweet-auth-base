@@ -3,9 +3,9 @@
     <div class="report-workspace">
       <section class="report-head">
         <div>
-          <div class="report-title">报表管理</div>
+          <div class="report-title">{{ t('ui.reportManagement') }}</div>
           <div class="report-caption">
-            管理报表草稿、发布、停用和设计入口，业务运行请到报表中心。
+            {{ t('ui.manageDraftStatementsIssueDisableAndDesignAccessAndBusiness') }}
           </div>
         </div>
         <div class="report-head-actions">
@@ -16,7 +16,7 @@
             clearable
             debounce="300"
             class="report-search"
-            placeholder="搜索报表名称 / 编码 / 分类"
+            :placeholder="t('ui.searchReportNameCodeCategory')"
             @keyup.enter="handleSearch"
           >
             <template #prepend>
@@ -27,10 +27,16 @@
             v-if="canCreateReport"
             color="primary"
             icon="add"
-            label="新建报表"
+            :label="t('ui.newReport')"
             @click="openDesigner()"
           />
-          <q-btn outline color="primary" icon="refresh" label="刷新" @click="fetchData" />
+          <q-btn
+            outline
+            color="primary"
+            icon="refresh"
+            :label="t('ui.refresh')"
+            @click="fetchData"
+          />
         </div>
       </section>
 
@@ -39,41 +45,41 @@
           <q-icon name="assessment" />
           <div>
             <strong>{{ publishedCount }}</strong>
-            <span>已发布报表</span>
+            <span>{{ t('ui.publishedReports') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="folder_special" />
           <div>
             <strong>{{ categories.length }}</strong>
-            <span>报表分类</span>
+            <span>{{ t('ui.reportCategory') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="dataset" />
           <div>
             <strong>{{ dataSourceCount }}</strong>
-            <span>可用数据集</span>
+            <span>{{ t('ui.availableDatasets') }}</span>
           </div>
         </div>
         <div class="metric-item">
           <q-icon name="security" />
           <div>
             <strong>{{ permissionCount }}</strong>
-            <span>继承数据权限</span>
+            <span>{{ t('ui.inheritDataPermissions') }}</span>
           </div>
         </div>
       </section>
 
       <section class="report-main-grid">
         <aside class="category-panel">
-          <div class="section-title">分类筛选</div>
+          <div class="section-title">{{ t('ui.categoryFilter') }}</div>
           <button
             class="category-item"
             :class="{ active: activeCategory === '' }"
             @click="selectCategory('')"
           >
-            <span>全部报表</span>
+            <span>{{ t('ui.allReports') }}</span>
             <q-badge color="primary" outline>{{ rows.length }}</q-badge>
           </button>
           <button
@@ -89,20 +95,31 @@
 
           <q-separator class="q-my-md" />
 
-          <div class="section-title">快速流程</div>
+          <div class="section-title">{{ t('ui.quickProcess') }}</div>
           <div class="flow-list">
-            <div class="flow-step"><b>1</b><span>新建报表并选择数据集</span></div>
-            <div class="flow-step"><b>2</b><span>进入设计器配置参数、组件和字段</span></div>
-            <div class="flow-step"><b>3</b><span>运行预览，继承菜单数据权限</span></div>
-            <div class="flow-step"><b>4</b><span>发布给业务角色使用</span></div>
+            <div class="flow-step">
+              <b>1</b><span>{{ t('ui.newReportAndSelectDataSet') }}</span>
+            </div>
+            <div class="flow-step">
+              <b>2</b
+              ><span>{{ t('ui.enterTheDesignerConfigurationParametersComponentsAndFields') }}</span>
+            </div>
+            <div class="flow-step">
+              <b>3</b><span>{{ t('ui.runPreviewsInheritMenuDataPrivileges') }}</span>
+            </div>
+            <div class="flow-step">
+              <b>4</b><span>{{ t('ui.publishedForBusinessRoleUse') }}</span>
+            </div>
           </div>
         </aside>
 
         <section class="report-list-panel">
           <div class="list-head">
             <div>
-              <div class="section-title">报表管理</div>
-              <div class="report-caption">维护草稿、发布和停用状态，设计配置在设计器中处理。</div>
+              <div class="section-title">{{ t('ui.reportManagement') }}</div>
+              <div class="report-caption">
+                {{ t('ui.maintainsTheDraftReleaseAndDecommissioningStateAndDesignConfigurations') }}
+              </div>
             </div>
             <q-select
               v-model="statusFilter"
@@ -154,7 +171,11 @@
                   :color="props.row.permission_table_code ? 'positive' : 'warning'"
                   outline
                 >
-                  {{ props.row.permission_table_code ? '继承数据权限' : '未绑定权限表' }}
+                  {{
+                    props.row.permission_table_code
+                      ? t('ui.inheritDataPermissions')
+                      : t('ui.noPermissionTableBound')
+                  }}
                 </q-chip>
               </q-td>
             </template>
@@ -178,7 +199,7 @@
                     icon="play_arrow"
                     @click="openRuntime(props.row)"
                   >
-                    <q-tooltip>运行</q-tooltip>
+                    <q-tooltip>{{ t('ui.run') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canExportReport"
@@ -191,7 +212,7 @@
                     icon="download"
                     @click="exportReportRow(props.row)"
                   >
-                    <q-tooltip>导出</q-tooltip>
+                    <q-tooltip>{{ t('ui.export') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canDesignReport"
@@ -202,7 +223,7 @@
                     icon="design_services"
                     @click="openDesigner(props.row)"
                   >
-                    <q-tooltip>设计</q-tooltip>
+                    <q-tooltip>{{ t('ui.design') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canCopyReport && props.row.status === 'published'"
@@ -213,7 +234,7 @@
                     icon="content_copy"
                     @click="copyReport(props.row)"
                   >
-                    <q-tooltip>复制</q-tooltip>
+                    <q-tooltip>{{ t('ui.copy') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canPublishReport"
@@ -225,7 +246,7 @@
                     icon="publish"
                     @click="publishReport(props.row)"
                   >
-                    <q-tooltip>发布</q-tooltip>
+                    <q-tooltip>{{ t('ui.publishAction') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canViewReportVersions"
@@ -237,7 +258,7 @@
                     icon="history"
                     @click="openVersionDialog(props.row)"
                   >
-                    <q-tooltip>版本</q-tooltip>
+                    <q-tooltip>{{ t('ui.version') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canChangeReportStatus && props.row.status === 'published'"
@@ -248,7 +269,7 @@
                     icon="pause_circle"
                     @click="changeReportStatus(props.row, 'disabled')"
                   >
-                    <q-tooltip>停用</q-tooltip>
+                    <q-tooltip>{{ t('ui.disabled') }}</q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="canDeleteReport"
@@ -259,7 +280,7 @@
                     icon="delete"
                     @click="deleteReport(props.row)"
                   >
-                    <q-tooltip>删除</q-tooltip>
+                    <q-tooltip>{{ t('ui.delete') }}</q-tooltip>
                   </q-btn>
                 </div>
               </q-td>
@@ -272,7 +293,11 @@
             </template>
             <template #bottom>
               <q-space />
-              <table-pagination v-model:page="query.page" v-model:pageSize="query.num" :total="total" />
+              <table-pagination
+                v-model:page="query.page"
+                v-model:pageSize="query.num"
+                :total="total"
+              />
             </template>
           </q-table>
         </section>
@@ -296,6 +321,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'report_manage' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
@@ -318,6 +345,8 @@ import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
 import ReportVersionDialog from '../components/ReportVersionDialog.vue'
 import { useReportExport } from '../composables/useReportExport'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const $q = useQuasar()
 const router = useRouter()
 const reportApi = useReportApi()
@@ -332,8 +361,7 @@ const canChangeReportStatus = computed(() => hasGrantedCapability('report_manage
 const canDeleteReport = computed(() => hasGrantedCapability('report_manage_delete'))
 const canPublishReport = computed(() => hasGrantedCapability('report_manage_publish'))
 const canRunReport = computed(
-  () =>
-    hasGrantedCapability('report_manage_run') || hasGrantedCapability('report_manage_preview'),
+  () => hasGrantedCapability('report_manage_run') || hasGrantedCapability('report_manage_preview'),
 )
 const canExportReport = computed(() => hasGrantedCapability('report_manage_export'))
 const canViewReportVersions = computed(() => hasGrantedCapability('report_manage_versions'))
@@ -367,32 +395,103 @@ const versionDialogReport = ref<Report | null>(null)
 const { exportingReportId, exportReportRow } = useReportExport()
 
 const statusOptions = [
-  { label: '全部状态', value: 'all' },
-  { label: '已发布', value: 'published' },
-  { label: '草稿', value: 'draft' },
-  { label: '已停用', value: 'disabled' },
+  {
+    get label() {
+      return t('ui.allStatus')
+    },
+    value: 'all',
+  },
+  {
+    get label() {
+      return t('ui.published')
+    },
+    value: 'published',
+  },
+  {
+    get label() {
+      return t('ui.draft')
+    },
+    value: 'draft',
+  },
+  {
+    get label() {
+      return t('ui.deactivatedStatus')
+    },
+    value: 'disabled',
+  },
 ]
 
 const columns = computed<QTableProps['columns']>(() => [
-  { name: 'report_name', field: 'report_name', label: '报表名称', align: 'left' },
-  { name: 'report_kind', field: 'report_kind', label: '展开方式', align: 'center' },
-  { name: 'category', field: 'category', label: '分类', align: 'left' },
-  { name: 'data_source_name', field: 'data_source_name', label: '数据集', align: 'left' },
-  { name: 'permission', field: 'permission_table_code', label: '权限', align: 'center' },
-  { name: 'status', field: 'status', label: '状态', align: 'center' },
+  {
+    name: 'report_name',
+    field: 'report_name',
+    get label() {
+      return t('ui.reportName')
+    },
+    align: 'left',
+  },
+  {
+    name: 'report_kind',
+    field: 'report_kind',
+    get label() {
+      return t('ui.expansionMode')
+    },
+    align: 'center',
+  },
+  {
+    name: 'category',
+    field: 'category',
+    get label() {
+      return t('ui.category')
+    },
+    align: 'left',
+  },
+  {
+    name: 'data_source_name',
+    field: 'data_source_name',
+    get label() {
+      return t('ui.dataset')
+    },
+    align: 'left',
+  },
+  {
+    name: 'permission',
+    field: 'permission_table_code',
+    get label() {
+      return t('ui.permissions')
+    },
+    align: 'center',
+  },
+  {
+    name: 'status',
+    field: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    align: 'center',
+  },
   {
     name: 'updated_at',
     field: (row) => row.updated_at || row.gmt_modify || '-',
-    label: '最近更新',
+    get label() {
+      return t('ui.recentlyUpdated')
+    },
     align: 'left',
   },
-  { name: 'actions', field: 'actions', label: '操作', align: 'center' },
+  {
+    name: 'actions',
+    field: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    align: 'center',
+  },
 ])
 
 const categories = computed(() => {
   const map = new Map<string, number>()
   rows.value.forEach((item) => {
-    const name = item.category || '未分类'
+    const name = item.category || t('ui.uncategorized')
     map.set(name, (map.get(name) || 0) + 1)
   })
   return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
@@ -401,7 +500,9 @@ const categories = computed(() => {
 const filteredRows = computed(() => rows.value)
 
 const emptyText = computed(() =>
-  canCreateReport.value ? '暂无报表，点击右上角新建报表开始配置。' : '暂无报表。',
+  canCreateReport.value
+    ? t('ui.thereAreNoReportsClickOnTheTopRightCorner')
+    : t('ui.noStatementsAreAvailable'),
 )
 
 const publishedCount = computed(
@@ -431,7 +532,12 @@ async function fetchData() {
     rows.value = []
     total.value = 0
     pagination.value.rowsNumber = 0
-    $q.notify({ type: 'negative', message: '报表列表加载失败，请检查后端服务或接口权限' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToLoadReportsCheckTheBackendServiceOrApi')
+      },
+    })
   }
 }
 
@@ -462,7 +568,12 @@ async function loadDataSources() {
     dataSourceCount.value = res.total ?? res.data.length
   } catch {
     dataSourceCount.value = 0
-    $q.notify({ type: 'warning', message: '数据集列表加载失败，设计器可能无法选择数据源' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.failedToLoadDatasetsDataSourcesMayBeUnavailableIn')
+      },
+    })
   }
 }
 
@@ -476,7 +587,12 @@ async function openRuntime(row: Report) {
     runtimeReport.value = res.data
     runtimeVisible.value = true
   } catch {
-    $q.notify({ type: 'negative', message: '报表详情加载失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToLoadReportDetails')
+      },
+    })
   }
 }
 
@@ -486,7 +602,9 @@ async function copyReport(row: Report) {
     const fields = detail.query_config?.fields || []
     const layout = detail.layout_config
     const payload = {
-      report_name: `${detail.report_name} 副本`,
+      get report_name() {
+        return t('ui.reportCopyName', { value1: detail.report_name })
+      },
       report_code: `${detail.report_code}_copy_${Date.now().toString().slice(-4)}`,
       report_kind: detail.report_kind,
       fields,
@@ -501,12 +619,24 @@ async function copyReport(row: Report) {
       ...(detail.description ? { description: detail.description } : {}),
       ...(detail.data_source_id ? { data_source_id: detail.data_source_id } : {}),
       ...(detail.permission_menu_id ? { permission_menu_id: detail.permission_menu_id } : {}),
-      ...(detail.permission_table_code ? { permission_table_code: detail.permission_table_code } : {}),
+      ...(detail.permission_table_code
+        ? { permission_table_code: detail.permission_table_code }
+        : {}),
     })
-    $q.notify({ type: 'positive', message: `已复制报表 #${res.data}` })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.copyedReport', { value1: res.data })
+      },
+    })
     await fetchData()
   } catch {
-    $q.notify({ type: 'negative', message: '复制失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.copyFailed')
+      },
+    })
   }
 }
 
@@ -522,12 +652,20 @@ function openVersionDialog(row: Report) {
 function confirmPublishReport(row: Report) {
   return new Promise<string | null>((resolve) => {
     $q.dialog({
-      title: '发布报表',
-      message: `确认发布「${row.report_name}」吗？发布后报表中心将运行新的发布版本。`,
+      get title() {
+        return t('ui.publishReport')
+      },
+      get message() {
+        return t('ui.confirmTheReleaseOfTheNewReleaseVersionWillBeRunBy', {
+          value1: row.report_name,
+        })
+      },
       prompt: {
         model: '',
         type: 'textarea',
-        label: '发布说明（可选）',
+        get label() {
+          return t('ui.releaseNotesOptional')
+        },
       },
       cancel: true,
       persistent: true,
@@ -544,10 +682,15 @@ async function publishReport(row: Report) {
   if (changeLog === null) return
   try {
     await reportApi.publishReport(row.id, changeLog ? { change_log: changeLog } : {})
-    $q.notify({ type: 'positive', message: '报表已发布' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.theReportWasPublished')
+      },
+    })
     await fetchData()
   } catch (error) {
-    const message = error instanceof Error && error.message ? error.message : '发布失败'
+    const message = error instanceof Error && error.message ? error.message : t('ui.publishFailed')
     $q.notify({ type: 'negative', message })
   }
 }
@@ -557,11 +700,15 @@ async function changeReportStatus(row: Report, status: ReportStatus) {
     await publishReport(row)
     return
   }
-  const actionText = status === 'draft' ? '改为草稿' : '停用'
+  const actionText = status === 'draft' ? t('ui.forAsDraft') : t('ui.disabled')
   const confirmed = await new Promise<boolean>((resolve) => {
     $q.dialog({
-      title: `${actionText}报表`,
-      message: `确认${actionText}「${row.report_name}」吗？`,
+      get title() {
+        return t('ui.reportActionLabel', { actionText: actionText })
+      },
+      get message() {
+        return t('ui.areYouSure', { actionText: actionText, value2: row.report_name })
+      },
       cancel: true,
       persistent: true,
     })
@@ -572,18 +719,32 @@ async function changeReportStatus(row: Report, status: ReportStatus) {
   if (!confirmed) return
   try {
     await reportApi.updateReportStatus(row.id, status)
-    $q.notify({ type: 'positive', message: `报表已${actionText}` })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.reportActionResult', { actionText: actionText })
+      },
+    })
     await fetchData()
   } catch {
-    $q.notify({ type: 'negative', message: `${actionText}失败` })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.namedActionFailed', { actionText: actionText })
+      },
+    })
   }
 }
 
 async function deleteReport(row: Report) {
   const confirmed = await new Promise<boolean>((resolve) => {
     $q.dialog({
-      title: '删除报表',
-      message: `确认删除「${row.report_name}」吗？删除后不可恢复。`,
+      get title() {
+        return t('ui.deleteReport')
+      },
+      get message() {
+        return t('ui.areYouSureYouWantToDelete', { value1: row.report_name })
+      },
       cancel: true,
       persistent: true,
     })
@@ -594,19 +755,33 @@ async function deleteReport(row: Report) {
   if (!confirmed) return
   try {
     await reportApi.deleteReport(row.id)
-    $q.notify({ type: 'positive', message: '报表已删除' })
+    $q.notify({
+      type: 'positive',
+      get message() {
+        return t('ui.reportDeleted')
+      },
+    })
     await fetchData()
   } catch {
-    $q.notify({ type: 'negative', message: '删除失败' })
+    $q.notify({
+      type: 'negative',
+      get message() {
+        return t('ui.failedToDelete')
+      },
+    })
   }
 }
 
 function kindLabel(kind: ReportKind) {
   const map: Record<ReportKind, string> = {
-    detail: '明细行',
-    summary: '汇总行',
+    get detail() {
+      return t('ui.detailRow')
+    },
+    get summary() {
+      return t('ui.summaryRow')
+    },
   }
-  return map[kind] || '明细行'
+  return map[kind] || t('ui.detailRow')
 }
 
 function kindIcon(kind: ReportKind) {
@@ -619,11 +794,17 @@ function kindIcon(kind: ReportKind) {
 
 function statusLabel(status: ReportStatus) {
   const map: Record<ReportStatus, string> = {
-    draft: '草稿',
-    published: '已发布',
-    disabled: '已停用',
+    get draft() {
+      return t('ui.draft')
+    },
+    get published() {
+      return t('ui.published')
+    },
+    get disabled() {
+      return t('ui.deactivatedStatus')
+    },
   }
-  return map[status] || '草稿'
+  return map[status] || t('ui.draft')
 }
 
 function statusColor(status: ReportStatus) {

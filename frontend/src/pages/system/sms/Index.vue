@@ -37,7 +37,12 @@
                     <q-icon name="search" />
                   </template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+                <q-btn
+                  color="primary"
+                  :label="t('ui.search')"
+                  :disable="loading"
+                  @click="handleBasicSearch"
+                />
               </template>
             </query-scheme-controls>
           </template>
@@ -71,7 +76,9 @@
             >
               {{ param }}
             </q-chip>
-            <span v-if="!formatTemplateParams(props.value).length" class="text-grey">无参数</span>
+            <span v-if="!formatTemplateParams(props.value).length" class="text-grey">{{
+              t('ui.noArguments')
+            }}</span>
           </div>
         </q-td>
       </template>
@@ -100,15 +107,17 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData ? '编辑短信模板' : '新增短信模板'"
+      :title="currentEditData ? t('ui.editSmsTemplate') : t('ui.addSmsTemplate')"
       :fields="tableFields"
-      :submit-btn-text="currentEditData ? '保存' : '创建'"
+      :submit-btn-text="currentEditData ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
   </base-content>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'system_sms' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
@@ -132,6 +141,8 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const loading = ref(false)
 const loadError = ref('')
@@ -236,7 +247,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '短信模板加载失败'
+    loadError.value = t('ui.smsTemplateListLoadFailed')
   } finally {
     loading.value = false
   }
@@ -357,7 +368,9 @@ const openEditDialog = async (row: SmsTemplate) => {
 // 确认删除
 const confirmDelete = (row: SmsTemplate) => {
   confirmDanger({
-    message: `确定要删除短信模板 "${row.template_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheSmsTemplate', { value1: row.template_name })
+    },
     loading: loading.value,
     disable: loading.value,
   }).onOk(() => {

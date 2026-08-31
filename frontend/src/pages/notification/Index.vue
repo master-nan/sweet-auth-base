@@ -29,9 +29,9 @@
               indicator-color="primary"
               @update:model-value="search"
             >
-              <q-tab name="ALL" label="全部" />
-              <q-tab name="UNREAD" label="未读" />
-              <q-tab name="READ" label="已读" />
+              <q-tab name="ALL" :label="t('ui.all')" />
+              <q-tab name="UNREAD" :label="t('ui.unread')" />
+              <q-tab name="READ" :label="t('ui.read')" />
             </q-tabs>
             <q-input
               v-model="keyword"
@@ -39,7 +39,7 @@
               outlined
               clearable
               debounce="250"
-              placeholder="搜索通知标题或内容"
+              :placeholder="t('ui.searchForNotificationTitleOrContent')"
               class="notification-center__keyword"
               @keyup.enter="search"
             >
@@ -53,18 +53,18 @@
               emit-value
               map-options
               :options="categoryOptions"
-              label="通知类型"
+              :label="t('ui.typeOfNotification')"
               class="notification-center__category"
               @update:model-value="search"
             />
-            <q-btn color="primary" icon="search" label="查询" @click="search" />
+            <q-btn color="primary" icon="search" :label="t('ui.query')" @click="search" />
           </template>
           <template #right-actions>
             <q-btn
               outline
               color="primary"
               icon="done_all"
-              label="全部已读"
+              :label="t('ui.markAllAsRead')"
               :disable="notificationStore.unreadCount === 0"
               @click="markAllRead"
             />
@@ -96,7 +96,7 @@
                   <span
                     v-if="!props.row.read"
                     class="notification-center__unread-dot"
-                    aria-label="未读"
+                    :aria-label="t('ui.unread')"
                   />
                   <span
                     class="ellipsis"
@@ -106,7 +106,11 @@
                   </span>
                   <q-icon v-if="props.row.action" name="open_in_new" color="primary" size="16px">
                     <q-tooltip>
-                      {{ props.row.action.available ? '可打开相关页面' : '当前无目标页面权限' }}
+                      {{
+                        props.row.action.available
+                          ? t('ui.openRelatedPageCapability')
+                          : t('ui.currentlyNoTargetPagePermissions')
+                      }}
                     </q-tooltip>
                   </q-icon>
                 </div>
@@ -121,7 +125,7 @@
           </q-td>
           <q-td key="read" :props="props">
             <status-chip
-              :label="props.row.read ? '已读' : '未读'"
+              :label="props.row.read ? t('ui.read') : t('ui.unread')"
               :color="props.row.read ? 'grey-7' : 'primary'"
             />
           </q-td>
@@ -135,10 +139,10 @@
               dense
               color="primary"
               icon="visibility"
-              aria-label="查看通知"
+              :aria-label="t('ui.viewNotifications')"
               @click.stop="openNotification(props.row)"
             >
-              <q-tooltip>查看通知</q-tooltip>
+              <q-tooltip>{{ t('ui.viewNotifications') }}</q-tooltip>
             </q-btn>
           </q-td>
         </q-tr>
@@ -149,18 +153,26 @@
           <template v-if="error">
             <q-icon name="cloud_off" color="grey-6" size="42px" />
             <div class="text-grey-7">{{ error }}</div>
-            <q-btn outline color="primary" icon="refresh" label="重试" @click="loadPage" />
+            <q-btn
+              outline
+              color="primary"
+              icon="refresh"
+              :label="t('ui.retry')"
+              @click="loadPage"
+            />
           </template>
           <template v-else>
             <q-icon name="inbox" color="grey-5" size="48px" />
-            <div class="text-body1 text-grey-7">暂无符合条件的通知</div>
+            <div class="text-body1 text-grey-7">{{ t('ui.notEligibleForNotice') }}</div>
           </template>
         </div>
       </template>
 
       <template #bottom>
         <div class="full-width row items-center no-wrap">
-          <div class="text-caption text-grey-7">共 {{ total }} 条通知</div>
+          <div class="text-caption text-grey-7">
+            {{ t('ui.total') }} {{ total }} {{ t('ui.articleNotifications') }}
+          </div>
           <q-space />
           <table-pagination v-model:page="page" v-model:page-size="pageSize" :total="total" />
         </div>
@@ -177,18 +189,25 @@
               {{ detail ? formatTime(detail.created_at) : '' }}
             </div>
           </div>
-          <q-btn v-close-popup flat round dense icon="close" aria-label="关闭通知详情" />
+          <q-btn
+            v-close-popup
+            flat
+            round
+            dense
+            icon="close"
+            :aria-label="t('ui.closeNotificationDetails')"
+          />
         </q-card-section>
         <q-separator />
         <q-card-section class="notification-center__content">{{ detail?.content }}</q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn v-close-popup flat label="关闭" />
+          <q-btn v-close-popup flat :label="t('ui.close')" />
           <q-btn
             v-if="detail?.action"
             color="primary"
             icon="open_in_new"
-            label="前往相关页面"
+            :label="t('ui.goToTheRelevantPage')"
             :disable="!detail.action.available || !detail.action.path"
             @click="navigateToAction"
           />
@@ -199,6 +218,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'notification_center' })
 
 import { onMounted, ref, watch } from 'vue'
@@ -220,6 +241,8 @@ import {
 } from 'src/api/services/notification'
 import { useNotificationStore } from 'src/stores/notification'
 import type { TableColumn } from 'src/types/global'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const api = useNotificationApi()
 const notificationStore = useNotificationStore()
@@ -243,23 +266,50 @@ const categoryOptions = Object.entries(NOTIFICATION_CATEGORY_LABELS).map(([value
   label,
 }))
 const columns: TableColumn<NotificationSummary>[] = [
-  { name: 'message', label: '通知内容', field: 'title', align: 'left' },
+  {
+    name: 'message',
+    get label() {
+      return t('ui.contentsOfTheNotice')
+    },
+    field: 'title',
+    align: 'left',
+  },
   {
     name: 'category',
-    label: '类型',
+    get label() {
+      return t('ui.type')
+    },
     field: 'category',
     align: 'center',
     headerStyle: 'width: 110px',
   },
-  { name: 'read', label: '状态', field: 'read', align: 'center', headerStyle: 'width: 90px' },
+  {
+    name: 'read',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'read',
+    align: 'center',
+    headerStyle: 'width: 90px',
+  },
   {
     name: 'created_at',
-    label: '时间',
+    get label() {
+      return t('ui.time')
+    },
     field: 'created_at',
     align: 'left',
     headerStyle: 'width: 180px',
   },
-  { name: 'actions', label: '操作', field: 'id', align: 'center', headerStyle: 'width: 72px' },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'id',
+    align: 'center',
+    headerStyle: 'width: 72px',
+  },
 ]
 const categoryLabel = (value: NotificationCategory) => NOTIFICATION_CATEGORY_LABELS[value]
 const levelColor = (value: NotificationLevel) => NOTIFICATION_LEVEL_COLORS[value]
@@ -281,7 +331,8 @@ const loadPage = async () => {
     items.value = response.data || []
     total.value = response.total || 0
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : '通知列表加载失败'
+    error.value =
+      caught instanceof Error ? caught.message : t('ui.notificationListLoadFailed')
   } finally {
     loading.value = false
   }
@@ -303,13 +354,23 @@ const openNotification = async (item: NotificationSummary) => {
 const navigateToAction = async () => {
   const action = detail.value?.action
   if (!action?.available || !action.path) {
-    $q.notify({ type: 'warning', message: '当前无权访问目标页面' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.youDoNotHaveAccessToTheTargetPage')
+      },
+    })
     return
   }
   const resolved = router.resolve(action.path)
   const missing = resolved.matched.some((route) => route.path.includes(':catchAll'))
   if (!resolved.matched.length || missing) {
-    $q.notify({ type: 'warning', message: '目标页面不存在或暂不可用' })
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.theTargetPageDoesNotExistOrIsTemporarilyUnavailable')
+      },
+    })
     return
   }
   showDetail.value = false

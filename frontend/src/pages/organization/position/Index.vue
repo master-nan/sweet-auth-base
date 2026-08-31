@@ -22,7 +22,7 @@
               :controller="schemePage"
               :query-state="queryState"
               :fields="advancedFields"
-              advanced-title="岗位高级查询"
+              :advanced-title="t('ui.postAdvancedQuery')"
               :show-filter-count="false"
             >
               <template #quick-search>
@@ -36,7 +36,7 @@
                 >
                   <template #append><q-icon name="search" /></template>
                 </q-input>
-                <q-btn color="primary" label="搜索" :disable="loading" @click="search" />
+                <q-btn color="primary" :label="t('ui.search')" :disable="loading" @click="search" />
               </template>
             </query-scheme-controls>
           </template>
@@ -62,12 +62,12 @@
       <template #body-cell-validity="props">
         <q-td :props="props">
           {{ formatOrganizationDate(props.row.valid_from) }}
-          <span class="text-grey-6 q-mx-xs">至</span>
-          {{ formatOrganizationDate(props.row.valid_to, '长期') }}
+          <span class="text-grey-6 q-mx-xs">{{ t('ui.to') }}</span>
+          {{ formatOrganizationDate(props.row.valid_to, t('ui.longTerm')) }}
         </q-td>
       </template>
       <template #body-cell-is_manager_position="props">
-        <q-td :props="props">{{ props.row.is_manager_position ? '是' : '否' }}</q-td>
+        <q-td :props="props">{{ props.row.is_manager_position ? t('ui.yes') : t('ui.no') }}</q-td>
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" class="q-gutter-xs">
@@ -92,7 +92,7 @@
 
     <organization-record-detail-dialog
       v-model="showDetailDialog"
-      :title="positionDetail?.name || '岗位详情'"
+      :title="positionDetail?.name || t('ui.jobDetails')"
       :subtitle="positionDetail?.code || ''"
       :sections="detailSections"
       icon="work"
@@ -110,6 +110,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'organization_position' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -147,6 +149,8 @@ import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
 import { resolveRuntimeColumns } from 'src/utils/column-format'
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import type { TableColumn } from 'src/types/global'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const router = useRouter()
 const dictStore = useDictStore()
@@ -212,41 +216,108 @@ const detailSections = computed<OrganizationDetailSection[]>(() => {
   return [
     {
       key: 'basic',
-      label: '基本信息',
-      caption: '岗位定义与有效状态',
+      get label() {
+        return t('ui.basicInformation')
+      },
+      get caption() {
+        return t('ui.positionDefinitionAndValidity')
+      },
       icon: 'work',
       items: [
-        { label: '岗位编码', value: detail.code },
-        { label: '岗位名称', value: detail.name },
-        { label: '岗位类型', value: dictLabel('org_position_type', detail.position_type) },
-        { label: '职级', value: detail.job_level },
-        { label: '管理岗位', value: detail.is_manager_position },
         {
-          label: '状态',
+          get label() {
+            return t('ui.jobEncoding')
+          },
+          value: detail.code,
+        },
+        {
+          get label() {
+            return t('ui.nameOfPost')
+          },
+          value: detail.name,
+        },
+        {
+          get label() {
+            return t('ui.typeOfPost')
+          },
+          value: dictLabel('org_position_type', detail.position_type),
+        },
+        {
+          get label() {
+            return t('ui.level')
+          },
+          value: detail.job_level,
+        },
+        {
+          get label() {
+            return t('ui.managementPositions')
+          },
+          value: detail.is_manager_position,
+        },
+        {
+          get label() {
+            return t('ui.status')
+          },
           value: dictLabel('org_object_status', detail.status),
           chip: true,
           color: organizationStatusColor(detail.status),
         },
-        { label: '有效期开始', value: formatOrganizationDate(detail.valid_from) },
-        { label: '有效期结束', value: formatOrganizationDate(detail.valid_to, '长期') },
+        {
+          get label() {
+            return t('ui.validFrom')
+          },
+          value: formatOrganizationDate(detail.valid_from),
+        },
+        {
+          get label() {
+            return t('ui.validUntil')
+          },
+          value: formatOrganizationDate(detail.valid_to, t('ui.longTerm')),
+        },
       ],
     },
     {
       key: 'ownership',
-      label: '归属信息',
-      caption: '法人和组织归属',
+      get label() {
+        return t('ui.attributionInformation')
+      },
+      get caption() {
+        return t('ui.legalPersonsAndOrganizationalAttribution')
+      },
       icon: 'account_tree',
       items: [
-        { label: '所属组织', value: referenceLabel(detail.org_unit) },
-        { label: '所属法人', value: referenceLabel(detail.legal_entity) },
+        {
+          get label() {
+            return t('ui.organization')
+          },
+          value: referenceLabel(detail.org_unit),
+        },
+        {
+          get label() {
+            return t('ui.owningLegalEntity')
+          },
+          value: referenceLabel(detail.legal_entity),
+        },
       ],
     },
     {
       key: 'mirror',
-      label: '镜像信息',
-      caption: '平台扩展信息',
+      get label() {
+        return t('ui.imageInformation')
+      },
+      get caption() {
+        return t('ui.platformExtensionInformation')
+      },
       icon: 'sync',
-      items: [{ label: '平台备注', value: detail.local_note, fullWidth: true }],
+      items: [
+        {
+          get label() {
+            return t('ui.platformNotes')
+          },
+          value: detail.local_note,
+          fullWidth: true,
+        },
+      ],
     },
   ]
 })
@@ -266,7 +337,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '岗位数据加载失败'
+    loadError.value = t('ui.jobDataLoadedFailed')
   } finally {
     loading.value = false
   }
@@ -280,7 +351,7 @@ const openDetail = async (row: PositionListItem) => {
   try {
     positionDetail.value = await getPositionDetail(row.id)
   } catch {
-    detailError.value = '岗位详情加载失败'
+    detailError.value = t('ui.loadingOfJobDetailsFailed')
   } finally {
     detailLoading.value = false
   }
@@ -335,11 +406,20 @@ onMounted(async () => {
       { fieldCode: 'status', align: 'center' },
     ],
     virtualColumns: [
-      { name: 'validity', field: 'validity', label: '有效期', order: 90 },
+      {
+        name: 'validity',
+        field: 'validity',
+        get label() {
+          return t('ui.validityPeriod')
+        },
+        order: 90,
+      },
       {
         name: 'actions',
         field: 'actions',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         align: 'center',
         order: 100,
         defaultVisible: has_line_buttons.value,

@@ -5,11 +5,19 @@
       <q-card-section class="advanced-search-header row items-center">
         <div class="advanced-search-title">
           <q-icon name="manage_search" size="22px" />
-          <span>{{ title }}</span>
+          <span>{{ displayTitle }}</span>
         </div>
         <q-space />
-        <q-btn icon="close" flat round dense size="sm" aria-label="关闭查询条件窗口" v-close-popup>
-          <q-tooltip>关闭</q-tooltip>
+        <q-btn
+          icon="close"
+          flat
+          round
+          dense
+          size="sm"
+          :aria-label="t('ui.closeTheQueryConditionWindow')"
+          v-close-popup
+        >
+          <q-tooltip>{{ t('ui.close') }}</q-tooltip>
         </q-btn>
       </q-card-section>
 
@@ -18,14 +26,15 @@
         dense
         class="bg-primary-1 text-primary q-mx-md q-mt-sm rounded-borders"
       >
-        当前方案：{{ sourceName }}<span v-if="dirty">（已修改）</span>
+        {{ t('ui.currentProgramme') }}{{ sourceName
+        }}<span v-if="dirty">{{ t('ui.modified') }}</span>
       </q-banner>
       <q-banner
         v-if="readOnlyDepth"
         dense
         class="bg-warning text-dark q-mx-md q-mt-sm rounded-borders"
       >
-        当前方案包含第三层条件。本版本会完整保留并展示，但不能编辑或覆盖该结构。
+        {{ t('ui.theCurrentSchemeContainsAThirdLayerOfConditionsThis') }}
       </q-banner>
 
       <!-- 内容区域（可滚动） -->
@@ -43,7 +52,7 @@
                   <q-card-section class="expression-card-head">
                     <div class="row items-center">
                       <div class="text-subtitle2 text-weight-medium text-primary">
-                        表达式组 {{ eIndex + 1 }}
+                        {{ t('ui.expressionGroup') }} {{ eIndex + 1 }}
                       </div>
                       <q-space />
                       <q-btn
@@ -61,7 +70,7 @@
                         dense
                         size="sm"
                         icon="add_to_photos"
-                        label="添加表达式"
+                        :label="t('ui.addExpression')"
                         color="primary"
                         @click="addExpression(eIndex)"
                       />
@@ -134,12 +143,14 @@
                       <q-card flat class="nested-card">
                         <q-card-section class="nested-section-head">
                           <div class="row items-center">
-                            <div class="text-subtitle2 text-primary">嵌套条件</div>
+                            <div class="text-subtitle2 text-primary">
+                              {{ t('ui.embeddedCondition') }}
+                            </div>
                             <q-space />
                             <q-btn
                               color="primary"
                               icon="fa-regular fa-square-plus"
-                              label="添加嵌套组"
+                              :label="t('ui.addEmbeddedGroup')"
                               dense
                               flat
                               size="sm"
@@ -169,7 +180,7 @@
                               <q-card-section class="nested-header q-py-xs">
                                 <div class="row items-center">
                                   <div class="text-subtitle2 text-primary">
-                                    嵌套组 {{ nIndex + 1 }}
+                                    {{ t('ui.embeddedGroup') }} {{ nIndex + 1 }}
                                   </div>
                                   <q-space />
                                   <q-btn
@@ -266,8 +277,8 @@
           </div>
         </q-form>
         <q-separator v-if="!readOnlyDepth" class="q-my-sm" />
-        <section class="advanced-query-preview" aria-label="条件预览">
-          <div class="advanced-query-preview__title">条件预览</div>
+        <section class="advanced-query-preview" :aria-label="t('ui.conditionalPreview')">
+          <div class="advanced-query-preview__title">{{ t('ui.conditionalPreview') }}</div>
           <query-scheme-preview
             :payload="previewPayload"
             :fields="previewFields"
@@ -278,14 +289,18 @@
 
       <!-- 固定底部按钮区域 -->
       <q-card-actions align="right" class="advanced-search-footer">
-        <q-btn v-if="isSchemeConditionEditor" flat label="取消" @click="cancelConditionEdit" />
+        <q-btn
+          v-if="isSchemeConditionEditor"
+          flat
+          :label="t('ui.cancel')"
+          @click="cancelConditionEdit"
+        />
         <q-btn v-else-if="!readOnlyDepth" outline color="secondary" @click="resetFilter">
-          <q-icon left size="sm" name="restart_alt" />
-          重置
+          <q-icon left size="sm" name="restart_alt" /> {{ t('ui.reset') }}
         </q-btn>
         <q-btn v-if="!readOnlyDepth" color="primary" @click="completeQueryAction">
           <q-icon left size="sm" :name="isSchemeConditionEditor ? 'check' : 'search'" />
-          {{ isSchemeConditionEditor ? '确定' : '搜索' }}
+          {{ isSchemeConditionEditor ? t('ui.sure') : t('ui.search') }}
         </q-btn>
       </q-card-actions>
     </q-card>
@@ -293,6 +308,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'AdvancedQuery' })
 import { ref, computed, watch, type PropType } from 'vue'
 import { useQuasar, type QForm } from 'quasar'
@@ -332,6 +349,8 @@ import { findMenuByName, toPositiveMenuId } from 'src/utils/menu-context'
 import AdvancedQueryRuleRow from './AdvancedQueryRuleRow.vue'
 import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
 import { Router } from 'src/router'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const $q = useQuasar()
 const form = ref<QForm>()
@@ -376,7 +395,7 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: '高级查询',
+    default: '',
   },
   maxWidth: {
     type: Number,
@@ -420,6 +439,8 @@ const props = defineProps({
   },
 })
 
+const displayTitle = computed(() => props.title || t('ui.advancedQuery'))
+
 const currentMenuId = computed(() => {
   const explicit = toPositiveMenuId(props.menuId)
   if (explicit > 0) return explicit
@@ -436,8 +457,18 @@ const emit = defineEmits([
 ])
 
 const booleanOptions = [
-  { label: '是', value: true },
-  { label: '否', value: false },
+  {
+    get label() {
+      return t('ui.yes')
+    },
+    value: true,
+  },
+  {
+    get label() {
+      return t('ui.no')
+    },
+    value: false,
+  },
 ]
 
 const readOnlyDepth = computed(() => queryExpressionDepth(props.queryModel.expressions) > 2)
@@ -974,32 +1005,32 @@ const hasRangeValue = (value: unknown) => {
 const valueRules = (rule: QueryRule) => {
   if (isNullOperator(rule)) return []
   if (isRangeRule(rule)) {
-    return [(val: unknown) => hasRangeValue(val) || '请填写完整区间']
+    return [(val: unknown) => hasRangeValue(val) || t('ui.pleaseFillInTheFullSpace')]
   }
   if (isMultiValueRule(rule) || isFreeInputMultiValueRule(rule)) {
-    return [(val: unknown) => hasMultiValue(val) || '请填写至少一个值']
+    return [(val: unknown) => hasMultiValue(val) || t('ui.pleaseFillInAtLeastOneValue')]
   }
-  return [(val: unknown) => hasValue(val) || '请填写值']
+  return [(val: unknown) => hasValue(val) || t('ui.pleaseFillInTheValues')]
 }
 
 const valuePlaceholderForRule = (rule: QueryRule) => {
   if (!isFreeInputMultiValueRule(rule)) return ''
   if (isTextMultiKeywordExpressionType(rule.expression_type)) {
-    return '多个关键词用逗号、分号或换行分隔'
+    return t('ui.multipleKeywordsSeparatedByCommasSemicolonsOrLineBreaks')
   }
-  return '多个值用逗号、分号或换行分隔'
+  return t('ui.multipleValuesSeparatedByCommasSemiColonsOrLines')
 }
 
 const rangePlaceholderForRule = (rule: QueryRule, index: 0 | 1) => {
   const field = findField(rule.field)
-  const label = index === 0 ? '开始值' : '结束值'
+  const label = index === 0 ? t('ui.startValue') : t('ui.endValue')
   switch (field?.field_type) {
     case SysTableFieldType.DATE:
-      return index === 0 ? '开始日期' : '结束日期'
+      return index === 0 ? t('ui.startDate') : t('ui.endDate')
     case SysTableFieldType.DATETIME:
-      return index === 0 ? '开始时间' : '结束时间'
+      return index === 0 ? t('ui.startTime') : t('ui.endTime')
     case SysTableFieldType.TIME:
-      return index === 0 ? '起始时刻' : '结束时刻'
+      return index === 0 ? t('ui.startMoment') : t('ui.endMoment')
     default:
       return label
   }
@@ -1188,7 +1219,11 @@ const completeQueryAction = () => {
     void form.value?.validate()
     $q.notify({
       color: 'negative',
-      message: isSchemeConditionEditor.value ? '请完善查询条件' : '请完善搜索条件',
+      get message() {
+        return isSchemeConditionEditor.value
+          ? t('ui.pleaseCompleteTheSearchConditions')
+          : t('ui.completeSearchConditions')
+      },
       position: 'top-right',
       timeout: 6000,
     })

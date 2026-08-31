@@ -36,7 +36,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import type { DetailFieldItem } from './types'
+
+const { t } = useI18n({ useScope: 'global' })
 
 withDefaults(
   defineProps<{
@@ -51,7 +55,7 @@ withDefaults(
 
 const displayValue = (value: DetailFieldItem['value']) => {
   if (value === null || value === undefined || value === '') return '-'
-  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'boolean') return value ? t('ui.yes') : t('ui.no')
   return String(value)
 }
 </script>

@@ -20,12 +20,24 @@
           flat
           dense
           icon="call_merge"
-          label="合并选区"
+          :label="t('ui.mergeSelections')"
           :disable="!hasRangeSelection"
           @click="$emit('mergeSelection')"
         />
-        <q-btn flat dense icon="splitscreen" label="取消合并" @click="$emit('unmergeActiveCell')" />
-        <q-btn flat dense icon="backspace" label="清除选区" @click="$emit('clearSelection')" />
+        <q-btn
+          flat
+          dense
+          icon="splitscreen"
+          :label="t('ui.unmerger')"
+          @click="$emit('unmergeActiveCell')"
+        />
+        <q-btn
+          flat
+          dense
+          icon="backspace"
+          :label="t('ui.clearSelection')"
+          @click="$emit('clearSelection')"
+        />
       </div>
       <div class="toolbar-group">
         <q-chip
@@ -46,7 +58,7 @@
           size="sm"
           color="primary"
           icon="add"
-          label="行"
+          :label="t('ui.okay')"
           @click="$emit('addRow')"
         />
         <q-btn
@@ -55,7 +67,7 @@
           size="sm"
           color="primary"
           icon="add"
-          label="列"
+          :label="t('ui.column')"
           @click="$emit('addCol')"
         />
         <q-btn flat round dense icon="zoom_out" @click="$emit('zoomOut')" />
@@ -88,8 +100,10 @@
             :style="renderRow.headerStyle"
           >
             {{ renderRow.row }}
-            <q-tooltip v-if="renderRow.detail">明细行：运行时按数据逐行展开</q-tooltip>
-            <q-tooltip v-else-if="renderRow.summary">汇总行：运行时聚合当前数据</q-tooltip>
+            <q-tooltip v-if="renderRow.detail">{{ t('ui.linesRunOnALineByLineBasis') }}</q-tooltip>
+            <q-tooltip v-else-if="renderRow.summary">{{
+              t('ui.summarizeRowsAggregatingCurrentDataOnRunningTime')
+            }}</q-tooltip>
           </div>
           <template v-for="renderCell in renderRow.cells" :key="renderCell.key">
             <div
@@ -139,39 +153,39 @@
         @click.stop
       >
         <button type="button" @click="runContextAction('edit')">
-          <q-icon name="edit" /> 编辑文本
+          <q-icon name="edit" /> {{ t('ui.editText') }}
         </button>
         <button type="button" @click="runContextAction('clear')">
-          <q-icon name="backspace" /> 清除单元格
+          <q-icon name="backspace" /> {{ t('ui.clearCells') }}
         </button>
         <button
           type="button"
           :disabled="!hasRangeSelection"
           @click="runContextAction('mergeSelection')"
         >
-          <q-icon name="call_merge" /> 合并选区
+          <q-icon name="call_merge" /> {{ t('ui.mergeSelections') }}
         </button>
         <button type="button" @click="runContextAction('mergeRight')">
-          <q-icon name="call_merge" /> 合并右侧
+          <q-icon name="call_merge" /> {{ t('ui.mergeRight') }}
         </button>
         <button type="button" @click="runContextAction('unmerge')">
-          <q-icon name="splitscreen" /> 取消合并
+          <q-icon name="splitscreen" /> {{ t('ui.unmerger') }}
         </button>
         <div class="sheet-context-menu__separator" />
         <button type="button" @click="runContextAction('insertRow')">
-          <q-icon name="table_rows" /> 下方插入行
+          <q-icon name="table_rows" /> {{ t('ui.insertRowBelow') }}
         </button>
         <button type="button" @click="runContextAction('insertCol')">
-          <q-icon name="view_column" /> 右侧插入列
+          <q-icon name="view_column" /> {{ t('ui.insertColumnsRight') }}
         </button>
         <div class="sheet-context-menu__separator" />
         <button type="button" @click="runContextAction('summary')">
           <q-icon name="functions" />
-          {{ isSummaryRow(contextMenu.row) ? '取消汇总行' : '设为汇总行' }}
+          {{ isSummaryRow(contextMenu.row) ? t('ui.ungroupRows') : t('ui.setAsSummaryRows') }}
         </button>
         <button type="button" @click="runContextAction('detail')">
           <q-icon name="view_stream" />
-          {{ isDetailRow(contextMenu.row) ? '取消明细行' : '设为明细行' }}
+          {{ isDetailRow(contextMenu.row) ? t('ui.cancelLines') : t('ui.setLines') }}
         </button>
       </div>
     </div>
@@ -179,6 +193,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, reactive, ref } from 'vue'
 import type {
   ReportDataset,
@@ -194,6 +210,8 @@ import {
   reportSheetCellSpan,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   sheet: ReportSheetConfig

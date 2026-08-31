@@ -6,7 +6,7 @@
         dense
         outlined
         clearable
-        label="关键词"
+        :label="t('ui.keyword')"
         :disable="disabled"
         @update:model-value="$emit('update:keyword', String($event || ''))"
         @keyup.enter="$emit('search')"
@@ -70,18 +70,36 @@
     <div class="parameter-actions">
       <div class="parameter-hint">
         <q-spinner v-if="loading" size="14px" color="primary" />
-        <span v-if="parameters.length">参数控件优先复用低代码字段元数据和字典。</span>
-        <span v-else>当前报表未配置参数，可直接查询运行。</span>
+        <span v-if="parameters.length">{{
+          t('ui.parameterControlsGivePreferenceToReusingLowCodeFieldMetadata')
+        }}</span>
+        <span v-else>{{ t('ui.theCurrentReportDoesNotConfigureParametersAndCanBe') }}</span>
       </div>
       <div class="row q-gutter-sm">
-        <q-btn outline color="primary" icon="restart_alt" label="重置" :disable="disabled" @click="$emit('reset')" />
-        <q-btn color="primary" unelevated icon="search" label="查询" :loading="disabled" @click="$emit('search')" />
+        <q-btn
+          outline
+          color="primary"
+          icon="restart_alt"
+          :label="t('ui.reset')"
+          :disable="disabled"
+          @click="$emit('reset')"
+        />
+        <q-btn
+          color="primary"
+          unelevated
+          icon="search"
+          :label="t('ui.query')"
+          :loading="disabled"
+          @click="$emit('search')"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
 import type { ReportParameter } from 'src/api/services/report'
 import type {
@@ -89,21 +107,26 @@ import type {
   ReportParameterControlType,
 } from '../composables/useReportParameterControls'
 
+const { t } = useI18n({ useScope: 'global' })
+
 type ParameterValue = string | number | boolean | Array<string | number> | null | undefined
 
-const props = withDefaults(defineProps<{
-  parameters: ReportParameter[]
-  modelValue: Record<string, ParameterValue>
-  keyword?: string
-  loading?: boolean
-  controlMetas?: Record<string, ReportParameterControlMeta>
-  disabled?: boolean
-}>(), {
-  keyword: '',
-  loading: false,
-  controlMetas: () => ({}),
-  disabled: false,
-})
+const props = withDefaults(
+  defineProps<{
+    parameters: ReportParameter[]
+    modelValue: Record<string, ParameterValue>
+    keyword?: string
+    loading?: boolean
+    controlMetas?: Record<string, ReportParameterControlMeta>
+    disabled?: boolean
+  }>(),
+  {
+    keyword: '',
+    loading: false,
+    controlMetas: () => ({}),
+    disabled: false,
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: Record<string, ParameterValue>]
@@ -113,17 +136,19 @@ const emit = defineEmits<{
 }>()
 
 function controlMeta(param: ReportParameter): ReportParameterControlMeta {
-  return props.controlMetas[param.id] || {
-    id: param.id,
-    label: param.label,
-    field: param.field,
-    controlType: fallbackControlType(String(param.type || 'text')),
-    htmlInputType: fallbackHtmlInputType(String(param.type || 'text')),
-    options: [],
-    required: false,
-    placeholder: param.placeholder || `请输入${param.label}`,
-    source: 'fallback',
-  }
+  return (
+    props.controlMetas[param.id] || {
+      id: param.id,
+      label: param.label,
+      field: param.field,
+      controlType: fallbackControlType(String(param.type || 'text')),
+      htmlInputType: fallbackHtmlInputType(String(param.type || 'text')),
+      options: [],
+      required: false,
+      placeholder: param.placeholder || t('ui.pleaseEnter', { value1: param.label }),
+      source: 'fallback',
+    }
+  )
 }
 
 function valueOf(id: string) {

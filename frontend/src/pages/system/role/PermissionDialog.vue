@@ -3,16 +3,16 @@
     <q-card class="permission-dialog-card">
       <q-card-section class="permission-dialog-header">
         <div>
-          <div class="text-h6 text-weight-bold">权限分配</div>
+          <div class="text-h6 text-weight-bold">{{ t('ui.allocationOfCompetences') }}</div>
           <div class="text-caption text-grey-7">{{ role?.name }}</div>
         </div>
         <q-space />
         <div class="permission-summary">
           <q-chip dense square color="primary" text-color="white" icon="account_tree">
-            {{ selectedMenuCount }}/{{ totalMenuCount }} 菜单
+            {{ selectedMenuCount }}/{{ totalMenuCount }} {{ t('ui.menu') }}
           </q-chip>
           <q-chip dense square color="indigo-1" text-color="primary" icon="touch_app">
-            {{ selectedButtonCount }} 按钮
+            {{ selectedButtonCount }} {{ t('ui.button') }}
           </q-chip>
           <q-chip
             v-if="apiPermissionCount > 0"
@@ -22,7 +22,7 @@
             text-color="grey-8"
             icon="link"
           >
-            {{ apiPermissionCount }} 接口权限
+            {{ apiPermissionCount }} {{ t('ui.apiPermissions') }}
           </q-chip>
         </div>
         <q-btn flat round dense icon="close" :disable="loading" @click="isOpen = false" />
@@ -32,10 +32,14 @@
         <section class="permission-panel permission-menu-panel">
           <div class="permission-panel-head">
             <div>
-              <div class="permission-panel-title">菜单权限</div>
-              <div class="permission-panel-caption">勾选角色可访问的菜单，点菜单查看右侧按钮</div>
+              <div class="permission-panel-title">{{ t('ui.menuPermissions') }}</div>
+              <div class="permission-panel-caption">
+                {{ t('ui.checkingTheRolesToAccessMenuDotMenuToSee') }}
+              </div>
             </div>
-            <q-badge color="primary" outline>{{ selectedMenuCount }} 已选</q-badge>
+            <q-badge color="primary" outline
+              >{{ selectedMenuCount }} {{ t('ui.selectedStatus') }}</q-badge
+            >
           </div>
 
           <div class="permission-menu-tools">
@@ -44,7 +48,7 @@
               dense
               outlined
               clearable
-              placeholder="搜索菜单名称 / 编码 / 路径"
+              :placeholder="t('ui.searchMenuNameEncodingPath')"
               class="permission-menu-search"
             >
               <template #prepend>
@@ -52,10 +56,10 @@
               </template>
             </q-input>
             <q-btn flat round dense icon="unfold_more" color="primary" @click="expandAllMenus">
-              <q-tooltip>展开全部</q-tooltip>
+              <q-tooltip>{{ t('ui.expandAll') }}</q-tooltip>
             </q-btn>
             <q-btn flat round dense icon="unfold_less" color="primary" @click="collapseAllMenus">
-              <q-tooltip>收起全部</q-tooltip>
+              <q-tooltip>{{ t('ui.putItAllAway') }}</q-tooltip>
             </q-btn>
           </div>
 
@@ -103,7 +107,7 @@
             </q-tree>
             <div v-else class="permission-empty">
               <q-icon name="search_off" />
-              <span>没有匹配的菜单</span>
+              <span>{{ t('ui.noMatchingMenus') }}</span>
             </div>
           </q-scroll-area>
         </section>
@@ -122,14 +126,14 @@
                     {{ selectedMenu.path }}
                   </q-badge>
                   <q-badge v-if="selectedMenu.table_code" color="indigo-5" outline>
-                    绑定表 {{ selectedMenu.table_code }}
+                    {{ t('ui.tieTable') }} {{ selectedMenu.table_code }}
                   </q-badge>
                 </div>
               </div>
               <q-toggle
                 :model-value="isSelectedMenuTicked"
                 color="primary"
-                label="菜单权限"
+                :label="t('ui.menuPermissions')"
                 @update:model-value="toggleSelectedMenu"
               />
             </div>
@@ -137,11 +141,13 @@
             <div class="permission-tab-panel">
               <div class="permission-button-toolbar">
                 <div>
-                  <div class="permission-panel-title">按钮权限</div>
+                  <div class="permission-panel-title">{{ t('ui.buttonPermissions') }}</div>
                   <div class="permission-panel-caption">
-                    页面按钮 {{ selectedVisibleButtonCount }}/{{
+                    {{ t('ui.pageButton') }} {{ selectedVisibleButtonCount }}/{{
                       visibleMenuButtons.length
-                    }}，接口权限 {{ selectedApiPermissionCount }}/{{ apiPermissionButtons.length }}
+                    }}{{ t('ui.interfacePrivileges') }} {{ selectedApiPermissionCount }}/{{
+                      apiPermissionButtons.length
+                    }}
                   </div>
                 </div>
                 <div class="permission-button-actions">
@@ -150,7 +156,7 @@
                     dense
                     color="primary"
                     icon="done_all"
-                    label="全选按钮"
+                    :label="t('ui.selectAllButtons')"
                     :disable="menuButtons.length === 0"
                     @click="selectButtonGroup(menuButtons)"
                   />
@@ -159,7 +165,7 @@
                     dense
                     color="grey-7"
                     icon="remove_done"
-                    label="清空"
+                    :label="t('ui.clear')"
                     :disable="menuButtons.length === 0"
                     @click="clearButtonGroup(menuButtons)"
                   />
@@ -172,7 +178,7 @@
                   class="permission-empty permission-empty--large"
                 >
                   <q-icon name="touch_app" />
-                  <span>该菜单没有可分配的按钮权限</span>
+                  <span>{{ t('ui.thereAreNoAllocatedButtonPrivilegesForThisMenu') }}</span>
                 </div>
 
                 <div
@@ -194,14 +200,14 @@
                         flat
                         dense
                         color="primary"
-                        label="全选"
+                        :label="t('ui.selectAll')"
                         @click="selectButtonGroup(group.buttons)"
                       />
                       <q-btn
                         flat
                         dense
                         color="grey-7"
-                        label="清空"
+                        :label="t('ui.clear')"
                         @click="clearButtonGroup(group.buttons)"
                       />
                     </div>
@@ -222,12 +228,14 @@
                           <q-icon :name="button.icon || fallbackButtonIcon(button)" />
                           <span>{{ button.name }}</span>
                           <q-badge v-if="isApiPermission(button)" color="grey-7" outline>
-                            接口
-                            <q-tooltip
-                              >不在页面展示，用来控制查询、详情、元数据等后台接口权限</q-tooltip
-                            >
+                            {{ t('ui.api') }}
+                            <q-tooltip>{{
+                              t('ui.notDisplayedOnThePageUsedToControlQueryDetail')
+                            }}</q-tooltip>
                           </q-badge>
-                          <q-badge v-if="button.is_disabled" color="orange-7" outline>禁用</q-badge>
+                          <q-badge v-if="button.is_disabled" color="orange-7" outline>{{
+                            t('ui.disable')
+                          }}</q-badge>
                         </div>
                         <div class="permission-button-code">{{ button.code }}</div>
                         <div v-if="button.api_path" class="permission-button-api">
@@ -249,16 +257,22 @@
 
           <div v-else class="permission-empty permission-empty--large">
             <q-icon name="ads_click" />
-            <span>选择左侧菜单后配置按钮权限</span>
+            <span>{{ t('ui.configureButtonPrivilegesAfterSelectingTheLeftMenu') }}</span>
           </div>
         </section>
       </q-card-section>
 
       <q-card-actions class="permission-dialog-actions" align="right">
-        <q-btn flat label="关闭" color="grey-7" :loading="loading" @click="isOpen = false" />
+        <q-btn
+          flat
+          :label="t('ui.close')"
+          color="grey-7"
+          :loading="loading"
+          @click="isOpen = false"
+        />
         <q-btn
           unelevated
-          label="保存权限"
+          :label="t('ui.savePermissions')"
           color="primary"
           :loading="loading"
           @click="savePermission"
@@ -410,7 +424,9 @@ const buttonGroups = computed<ButtonGroup[]>(() => {
   if (apiPermissionButtons.value.length > 0) {
     groups.push({
       key: 'api_permission',
-      label: '接口权限',
+      get label() {
+        return t('ui.apiPermissions')
+      },
       icon: 'link',
       buttons: apiPermissionButtons.value,
     })
@@ -656,7 +672,7 @@ const findMenuById = (menus: Menu[], id: number): Menu | null => {
 }
 
 const positionLabel = (position: SysMenuButtonPosition) => {
-  return SysMenuButtonPositionMap[position] || '未分组'
+  return SysMenuButtonPositionMap[position] || t('ui.notGrouped')
 }
 
 const fallbackButtonIcon = (button: MenuButton) => {
@@ -684,7 +700,7 @@ const fallbackButtonIcon = (button: MenuButton) => {
 const derivedButtonApi = (button: MenuButton) => {
   const action = (button.event_action || '').trim()
   if (action === SysMenuButtonEventAction.DETAIL && !button.api_path) {
-    return '打开当前记录详情页'
+    return t('ui.openTheCurrentRecordDetailsPage')
   }
   return ''
 }

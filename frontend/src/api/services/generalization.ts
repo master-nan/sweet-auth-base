@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type { Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
 import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
@@ -46,7 +47,7 @@ const allowedRuntimeActionMethods = new Set<RuntimeActionMethod>([
 export const assertControlledRuntimePath = (path: string): string => {
   const value = path.trim()
   if (!value.startsWith('/admin/') || value.startsWith('//') || value.includes('\\')) {
-    throw new Error('运行时动作路径不合法')
+    throw new Error(t('ui.invalidActionPathWhenRunning'))
   }
   const parsed = new URL(value, 'https://runtime.invalid')
   if (
@@ -54,7 +55,7 @@ export const assertControlledRuntimePath = (path: string): string => {
     !parsed.pathname.startsWith('/admin/') ||
     parsed.pathname.includes('..')
   ) {
-    throw new Error('运行时动作路径不合法')
+    throw new Error(t('ui.invalidActionPathWhenRunning'))
   }
   return `${parsed.pathname}${parsed.search}`
 }
@@ -62,10 +63,12 @@ export const assertControlledRuntimePath = (path: string): string => {
 export const executeControlledRuntimeAction = async <
   TResponse = unknown,
   TPayload = Record<string, unknown>,
->(request: RuntimeActionRequest<TPayload>): Promise<AxiosResponse<TResponse>> => {
+>(
+  request: RuntimeActionRequest<TPayload>,
+): Promise<AxiosResponse<TResponse>> => {
   const method = String(request.method || 'POST').toUpperCase() as RuntimeActionMethod
   if (!allowedRuntimeActionMethods.has(method)) {
-    throw new Error('运行时动作方法不受支持')
+    throw new Error(t('ui.runtimeActionMethodNotSupported'))
   }
   const path = assertControlledRuntimePath(request.path)
   const config: AxiosRequestConfig = {
@@ -85,18 +88,20 @@ export const useGeneralizationApi = () => {
       ...params,
     }
     return instance
-      .post<ResponseData<Array<Record<string, any>>>>(
-        `/admin/generalization/query/code/${tableCode}`,
-        data,
-      )
+      .post<
+        ResponseData<Array<Record<string, any>>>
+      >(`/admin/generalization/query/code/${tableCode}`, data)
       .then((res) => res.data)
   }
 
   const getGeneralizationDetailByCode = async (tableCode: string, id: number, menuId?: number) => {
     return instance
-      .get<ResponseData<Record<string, any>>>(`/admin/generalization/detail/code/${tableCode}/${id}`, {
-        params: menuId ? { menu_id: menuId } : undefined,
-      })
+      .get<ResponseData<Record<string, any>>>(
+        `/admin/generalization/detail/code/${tableCode}/${id}`,
+        {
+          params: menuId ? { menu_id: menuId } : undefined,
+        },
+      )
       .then((res) => res.data)
   }
 
@@ -113,9 +118,11 @@ export const useGeneralizationApi = () => {
   }
 
   const deleteGeneralization = async (req: GeneralizationDeleteReq) => {
-    return instance.delete<ResponseData<boolean>>('/admin/generalization/delete', { data: req }).then((res) => {
-      return res.data
-    })
+    return instance
+      .delete<ResponseData<boolean>>('/admin/generalization/delete', { data: req })
+      .then((res) => {
+        return res.data
+      })
   }
 
   return {

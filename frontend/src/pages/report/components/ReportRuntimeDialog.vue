@@ -11,7 +11,9 @@
           <div class="report-title">{{ runtimeReport?.report_name || runtimeTitle }}</div>
           <div class="report-caption">
             {{ runtimeReport?.data_source_name || '-' }} ·
-            {{ runtimeReport?.description || '运行预览会应用后端数据权限' }}
+            {{
+              runtimeReport?.description || t('ui.runPreviewSessionsToApplyBackendDataPrivileges')
+            }}
           </div>
           <q-chip
             v-if="runtimeVersionNo"
@@ -21,7 +23,7 @@
             text-color="white"
             class="runtime-version-chip"
           >
-            当前版本：V{{ runtimeVersionNo }}
+            {{ t('ui.currentVersionV') }}{{ runtimeVersionNo }}
           </q-chip>
         </div>
         <q-space />
@@ -30,7 +32,7 @@
           outline
           color="primary"
           icon="download"
-          label="导出 CSV"
+          :label="t('ui.exportCsv')"
           :disable="!runtimeRows.length || exporting"
           :loading="exporting"
           @click="exportCurrentRuntime"
@@ -44,7 +46,7 @@
           dense
           outlined
           clearable
-          label="关键词"
+          :label="t('ui.keyword')"
           class="runtime-filter"
           @keyup.enter="loadRuntimePreview"
         />
@@ -63,7 +65,7 @@
               :model-value="runtimeRangeValue(param.id, 0)"
               type="date"
               dense
-              :label="`${param.label}开始`"
+              :label="t('ui.rangeStart', { label: param.label })"
               class="runtime-filter"
               @update:model-value="setRuntimeRangeValue(param.id, 0, $event)"
             />
@@ -71,7 +73,7 @@
               :model-value="runtimeRangeValue(param.id, 1)"
               type="date"
               dense
-              :label="`${param.label}结束`"
+              :label="t('ui.rangeEnd', { label: param.label })"
               class="runtime-filter"
               @update:model-value="setRuntimeRangeValue(param.id, 1, $event)"
             />
@@ -93,17 +95,17 @@
         <q-select
           dense
           outlined
-          label="权限范围"
-          model-value="继承当前菜单数据权限"
+          :label="t('ui.scopeOfCompetence')"
+          :model-value="t('ui.inheritCurrentMenuDataPrivileges')"
           class="runtime-filter"
-          :options="['继承当前菜单数据权限']"
+          :options="[t('ui.inheritCurrentMenuDataPrivileges')]"
         />
-        <q-btn color="primary" icon="search" label="查询" @click="loadRuntimePreview" />
+        <q-btn color="primary" icon="search" :label="t('ui.query')" @click="loadRuntimePreview" />
         <q-btn
           outline
           color="primary"
           icon="restart_alt"
-          label="重置"
+          :label="t('ui.reset')"
           @click="resetRuntimeFilters"
         />
       </q-card-section>
@@ -124,8 +126,8 @@
           />
         </div>
         <div v-else class="runtime-pagination">
-          <span>共 {{ runtimePagination.rowsNumber }} 行</span>
-          <q-badge color="primary" label="全部展示" />
+          <span>{{ t('ui.total') }} {{ runtimePagination.rowsNumber }} {{ t('ui.okay') }}</span>
+          <q-badge color="primary" :label="t('ui.showAll')" />
         </div>
       </q-card-section>
     </q-card>
@@ -133,6 +135,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, watch } from 'vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
@@ -141,16 +145,21 @@ import ReportSheetPreview from './ReportSheetPreview.vue'
 import { useReportRuntime } from '../composables/useReportRuntime'
 import { useReportExport } from '../composables/useReportExport'
 
-const props = withDefaults(defineProps<{
-  modelValue: boolean
-  report: Report | null
-  defaultPageSize?: number | undefined
-  allowExport?: boolean
-  mode?: 'center' | 'manage'
-}>(), {
-  allowExport: true,
-  mode: 'center',
-})
+const { t } = useI18n({ useScope: 'global' })
+
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    report: Report | null
+    defaultPageSize?: number | undefined
+    allowExport?: boolean
+    mode?: 'center' | 'manage'
+  }>(),
+  {
+    allowExport: true,
+    mode: 'center',
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -181,9 +190,9 @@ const {
 
 const { exporting, exportRuntimeCsv } = useReportExport()
 
-const runtimeTitle = computed(() => (
-  props.mode === 'manage' ? '报表运行预览' : '报表运行'
-))
+const runtimeTitle = computed(() =>
+  props.mode === 'manage' ? t('ui.reportRunPreview') : t('ui.reportRun'),
+)
 
 watch(
   () => props.modelValue,

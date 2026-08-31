@@ -7,8 +7,8 @@
         outlined
         clearable
         debounce="150"
-        placeholder="搜索菜单"
-        aria-label="搜索菜单"
+        :placeholder="t('ui.searchMenus')"
+        :aria-label="t('ui.searchMenus')"
       >
         <template #prepend>
           <q-icon name="search" />
@@ -24,7 +24,9 @@
         />
       </template>
       <q-item v-else-if="hasMenuKeyword" dense>
-        <q-item-section class="text-grey-6 text-caption">没有匹配的菜单</q-item-section>
+        <q-item-section class="text-grey-6 text-caption">{{
+          t('ui.noMatchingMenus')
+        }}</q-item-section>
       </q-item>
     </q-list>
   </q-scroll-area>

@@ -2,12 +2,12 @@
   <div class="report-sheet-preview">
     <div v-if="loading" class="report-sheet-preview__state">
       <q-spinner color="primary" size="32px" />
-      <span>正在加载报表数据</span>
+      <span>{{ t('ui.loadingReportData') }}</span>
     </div>
 
     <div v-else-if="!renderCells.length" class="report-sheet-preview__state">
       <q-icon name="dataset_off" size="32px" />
-      <span>暂无可预览的数据或单元格配置</span>
+      <span>{{ t('ui.noDataOrCellConfigurationForWhichPreviewIsAvailable') }}</span>
     </div>
 
     <div v-else class="report-sheet-preview__scroll">
@@ -32,6 +32,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type {
   ReportDataset,
@@ -48,16 +50,21 @@ import {
   reportSheetUsedBounds,
 } from 'src/modules/report/sheet'
 
-const props = withDefaults(defineProps<{
-  sheet: ReportSheetConfig
-  datasets: ReportDataset[]
-  previewData: ReportPreviewRes
-  loading?: boolean
-  reportKind?: ReportKind
-}>(), {
-  loading: false,
-  reportKind: 'detail',
-})
+const { t } = useI18n({ useScope: 'global' })
+
+const props = withDefaults(
+  defineProps<{
+    sheet: ReportSheetConfig
+    datasets: ReportDataset[]
+    previewData: ReportPreviewRes
+    loading?: boolean
+    reportKind?: ReportKind
+  }>(),
+  {
+    loading: false,
+    reportKind: 'detail',
+  },
+)
 
 type RenderCell = {
   key: string
@@ -212,9 +219,7 @@ const renderCells = computed<RenderCell[]>(() => {
   return cells
 })
 
-function trimTrailingBlankRenderRows(
-  plan: RenderPlanItem[],
-) {
+function trimTrailingBlankRenderRows(plan: RenderPlanItem[]) {
   let end = plan.length
   while (end > 1) {
     const item = plan[end - 1]
@@ -254,7 +259,10 @@ function cellAt(row: number, col: number): ReportSheetCell {
 
 function displayCellValue(cell: ReportSheetCell, dataRow: Record<string, unknown> | undefined) {
   if (cell.binding?.field && cell.binding.type !== 'static') {
-    if (!dataRow && (props.reportKind !== 'detail' || props.sheet.summary_rows?.includes(cell.row))) {
+    if (
+      !dataRow &&
+      (props.reportKind !== 'detail' || props.sheet.summary_rows?.includes(cell.row))
+    ) {
       return aggregateCellValue(cell)
     }
     return reportRuntimeCellValue(dataRow, cell, props.datasets)
@@ -279,7 +287,7 @@ function aggregateCellValue(cell: ReportSheetCell) {
   const uniqueValues = [...new Set(values)]
   if (!uniqueValues.length) return ''
   if (uniqueValues.length === 1) return uniqueValues[0] || ''
-  return `${uniqueValues[0]} 等 ${uniqueValues.length} 个`
+  return t('ui.andTotalValues', { value1: uniqueValues[0], value2: uniqueValues.length })
 }
 
 function cellStyle(cell: ReportSheetCell) {

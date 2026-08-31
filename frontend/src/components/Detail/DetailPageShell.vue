@@ -27,7 +27,7 @@
         </template>
         {{ error }}
         <template v-if="retryable" #action>
-          <q-btn flat color="negative" :label="retryLabel" @click="emit('retry')" />
+          <q-btn flat color="negative" :label="displayRetryLabel" @click="emit('retry')" />
         </template>
       </q-banner>
 
@@ -37,11 +37,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'DetailPageShell' })
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     title: string
     subtitle?: string
@@ -56,9 +61,11 @@ withDefaults(
     loading: false,
     error: '',
     retryable: false,
-    retryLabel: '重新加载',
+    retryLabel: '',
   },
 )
+
+const displayRetryLabel = computed(() => props.retryLabel || t('ui.reload'))
 
 const emit = defineEmits<{
   retry: []

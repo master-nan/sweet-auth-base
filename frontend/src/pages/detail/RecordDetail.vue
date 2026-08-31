@@ -7,7 +7,7 @@
   />
 
   <base-content v-else-if="!canLoadRecordDetail" scrollable class="q-pa-sm">
-    <q-banner rounded class="bg-red-1 text-negative">无详情查看权限</q-banner>
+    <q-banner rounded class="bg-red-1 text-negative">{{ t('ui.noDetailsToView') }}</q-banner>
   </base-content>
 
   <detail-page-shell
@@ -37,12 +37,18 @@
         :disable="isDetailButtonDisabled(button)"
         @click="handleDetailButtonClick(button)"
       />
-      <q-btn flat color="primary" icon="arrow_back" label="返回列表" @click="goBackToList" />
+      <q-btn
+        flat
+        color="primary"
+        icon="arrow_back"
+        :label="t('ui.backToList')"
+        @click="goBackToList"
+      />
       <q-btn
         outline
         color="primary"
         icon="refresh"
-        label="刷新"
+        :label="t('ui.refresh')"
         :loading="loading"
         @click="loadDetail"
       />
@@ -55,7 +61,7 @@
       :fields="paramsFields"
       :menu-id="resolveDetailMenuId()"
       :table-code="tableCode"
-      submit-btn-text="执行"
+      :submit-btn-text="t('ui.implementation')"
       @submit="handleParamsSubmit"
     />
 
@@ -63,7 +69,7 @@
       <section class="detail-page-section">
         <div class="detail-page-section__head">
           <div>
-            <h3>基础信息</h3>
+            <h3>{{ t('ui.basicInfo') }}</h3>
           </div>
         </div>
 
@@ -89,7 +95,7 @@
                 :color="field.rawValue ? 'positive' : 'grey-5'"
                 text-color="white"
               >
-                {{ field.rawValue ? '是' : '否' }}
+                {{ field.rawValue ? t('ui.yes') : t('ui.no') }}
               </q-chip>
               <file-display
                 v-else-if="field.kind === 'file'"
@@ -136,7 +142,7 @@
       >
         <div class="detail-page-section__head">
           <div>
-            <h3>详情操作</h3>
+            <h3>{{ t('ui.detailActions') }}</h3>
           </div>
         </div>
         <div class="record-detail-action-row">
@@ -157,6 +163,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'record_detail_page' })
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -215,6 +223,8 @@ import {
   normalizeFieldLabel,
 } from 'src/utils/field-layout'
 import { parseParamsSchema } from 'src/utils/params-schema'
+
+const { t } = useI18n({ useScope: 'global' })
 
 interface DetailField {
   key: string
@@ -314,11 +324,13 @@ const detailBottomButtons = computed(() =>
   ),
 )
 
-const paramsDialogTitle = computed(() => pendingDetailButton.value?.name || '详情操作')
+const paramsDialogTitle = computed(() => pendingDetailButton.value?.name || t('ui.detailActions'))
 
 const pageTitle = computed(() => {
   const label = recordLabel.value
-  return label && label !== '-' ? `${tableName.value}详情：${label}` : `${tableName.value}详情`
+  return label && label !== '-'
+    ? t('ui.detailsOf', { value1: tableName.value, label: label })
+    : t('ui.namedDetailsTitle', { value1: tableName.value })
 })
 
 const displayFields = computed(() =>
@@ -327,7 +339,9 @@ const displayFields = computed(() =>
 
 const compactFields = computed(() => displayFields.value.filter((field) => !isLongField(field)))
 
-const longPanelTitle = computed(() => (isAudit.value ? '请求与响应' : '扩展内容'))
+const longPanelTitle = computed(() =>
+  isAudit.value ? t('ui.requestAndResponse') : t('ui.extension'),
+)
 
 const longSections = computed<LongSection[]>(() =>
   displayFields.value
@@ -419,7 +433,7 @@ function formatByField(value: unknown, row: Record<string, any>, field?: TableFi
 
 function defaultFormat(value: unknown) {
   if (value === null || value === undefined || value === '') return '-'
-  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (typeof value === 'boolean') return value ? t('ui.yes') : t('ui.no')
   if (typeof value === 'object') return stringifyValue(value)
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
     return String(value)
@@ -564,12 +578,12 @@ async function hydrateDetailRichText() {
 async function loadAuditDetail() {
   const response = await accessLogApi.getAccessLogById(recordId.value)
   if (!response.success) {
-    throw new Error(response.message || '加载审计详情失败')
+    throw new Error(response.message || t('ui.failedToLoadAuditDetails'))
   }
   record.value = response.data as AccessLog
   table.value = {
     id: 0,
-    table_name: '审计日志',
+    table_name: t('ui.auditLogs'),
     table_code: 'access_log',
     table_type: 1 as any,
     master_detail_mode: 'auto' as any,
@@ -584,7 +598,7 @@ async function loadAuditDetail() {
 async function loadGeneralizationDetail() {
   const loadedMetadata = await loadMetadata()
   if (!loadedMetadata || !runtimeMetadata.value) {
-    throw new Error(metadataError.value || '加载表元数据失败')
+    throw new Error(metadataError.value || t('ui.failedToLoadTableMetadata'))
   }
 
   table.value = runtimeMetadata.value
@@ -604,11 +618,11 @@ async function loadGeneralizationDetail() {
     resolveDetailMenuId(),
   )
   if (!response.success) {
-    throw new Error(response.message || '加载记录详情失败')
+    throw new Error(response.message || t('ui.failedToLoadRecordDetails'))
   }
   const row = response.data || null
   if (!row) {
-    throw new Error('记录不存在或无权访问')
+    throw new Error(t('ui.recordsDoNotExistOrAreNotAccessible'))
   }
   record.value = row
   relationLookups.value = await hydrateRelationLookups(
@@ -694,7 +708,9 @@ async function executeDetailButton(button: MenuButton, params?: Record<string, a
         $q.notify({
           type: 'warning',
           position: 'top-right',
-          message: '该详情按钮未配置执行接口或动作',
+          get message() {
+            return t('ui.theDetailsButtonDoesNotConfigureTheExecutionInterfaceOr')
+          },
         })
         return
       }
@@ -709,7 +725,13 @@ async function executeDetailButton(button: MenuButton, params?: Record<string, a
   try {
     const shouldProceed = await runBeforeHooks(button.before_hooks, ctx)
     if (!shouldProceed) {
-      $q.notify({ type: 'warning', position: 'top-right', message: '按钮前置条件未通过' })
+      $q.notify({
+        type: 'warning',
+        position: 'top-right',
+        get message() {
+          return t('ui.buttonPrefixNotPassed')
+        },
+      })
       return
     }
     if (button.api_path && actionName !== 'navigate') {
@@ -728,9 +750,13 @@ function runDetailButtonWithConfirm(button: MenuButton, params?: Record<string, 
   const run = () => void executeDetailButton(button, params)
   if (button.confirm_text) {
     confirmAction({
-      title: '确认操作',
+      get title() {
+        return t('ui.confirmOperation')
+      },
       message: button.confirm_text,
-      okLabel: '确认',
+      get okLabel() {
+        return t('ui.confirm')
+      },
     }).onOk(run)
     return
   }
@@ -764,7 +790,7 @@ async function loadDetail() {
   if (!canLoadRecordDetail.value) return
   if (isOrganizationSyncBatch.value) return
   if (!recordId.value || !tableCode.value) {
-    loadError.value = '详情路由缺少记录ID或表编码'
+    loadError.value = t('ui.detailsRouteMissingLogIdOrTableCode')
     return
   }
   loadError.value = ''
@@ -777,7 +803,7 @@ async function loadDetail() {
     }
     await hydrateDetailRichText()
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : '加载详情失败'
+    loadError.value = error instanceof Error ? error.message : t('ui.loadingDetailsFailed')
     record.value = null
   }
 }
@@ -792,24 +818,50 @@ async function goBackToList() {
 
 const auditFieldLabels: Record<string, string> = {
   id: 'ID',
-  gmt_create: '时间',
-  user_name: '用户',
-  action: '动作',
-  resource_type: '资源类型',
-  resource_code: '资源编码',
-  resource_id: '资源ID',
-  method: '方法',
-  url: '路径',
-  status_code: '状态码',
-  success: '结果',
-  duration_ms: '耗时',
+  get gmt_create() {
+    return t('ui.time')
+  },
+  get user_name() {
+    return t('ui.user')
+  },
+  action: t('ui.action'),
+  get resource_type() {
+    return t('ui.resourceType')
+  },
+  resource_code: t('ui.resourceCode'),
+  get resource_id() {
+    return t('ui.resourceId')
+  },
+  method: t('ui.method'),
+  url: t('ui.path'),
+  get status_code() {
+    return t('ui.statusCode')
+  },
+  get success() {
+    return t('ui.result')
+  },
+  get duration_ms() {
+    return t('ui.duration')
+  },
   ip: 'IP',
-  locality: '归属地',
-  request_id: '请求ID',
-  trace_id: '追踪ID',
-  result: '审计结果',
-  error_code: '错误码',
-  error_message: '安全错误信息',
+  get locality() {
+    return t('ui.ownership')
+  },
+  get request_id() {
+    return t('ui.requestId')
+  },
+  get trace_id() {
+    return t('ui.traceId')
+  },
+  get result() {
+    return t('ui.auditResult')
+  },
+  get error_code() {
+    return t('ui.errorCode')
+  },
+  get error_message() {
+    return t('ui.safeErrorMessage')
+  },
 }
 
 const preferredSystemKeys = [
@@ -862,29 +914,34 @@ function buildAuditFields() {
   return [
     auditField('ID', 'id', SysTableFieldType.BIGINT),
     auditField(
-      '时间',
+      t('ui.time'),
       'gmt_create',
       SysTableFieldType.DATETIME,
       SysTableFieldInputType.DATETIME_PICKER,
     ),
-    auditField('用户', 'user_name', SysTableFieldType.VARCHAR),
-    auditField('动作', 'action', SysTableFieldType.VARCHAR),
-    auditField('资源类型', 'resource_type', SysTableFieldType.VARCHAR),
-    auditField('资源编码', 'resource_code', SysTableFieldType.VARCHAR),
-    auditField('资源ID', 'resource_id', SysTableFieldType.VARCHAR),
-    auditField('方法', 'method', SysTableFieldType.VARCHAR),
-    auditField('路径', 'url', SysTableFieldType.VARCHAR),
-    auditField('状态码', 'status_code', SysTableFieldType.INT),
-    auditField('结果', 'success', SysTableFieldType.BOOLEAN, SysTableFieldInputType.BOOLEAN),
-    auditField('耗时', 'duration_ms', SysTableFieldType.BIGINT),
-    auditField('IP', 'ip', SysTableFieldType.VARCHAR),
-    auditField('归属地', 'locality', SysTableFieldType.VARCHAR),
-    auditField('请求ID', 'request_id', SysTableFieldType.VARCHAR),
-    auditField('追踪ID', 'trace_id', SysTableFieldType.VARCHAR),
-    auditField('审计结果', 'result', SysTableFieldType.VARCHAR),
-    auditField('错误码', 'error_code', SysTableFieldType.VARCHAR),
+    auditField(t('ui.user'), 'user_name', SysTableFieldType.VARCHAR),
+    auditField(t('ui.action'), 'action', SysTableFieldType.VARCHAR),
+    auditField(t('ui.resourceType'), 'resource_type', SysTableFieldType.VARCHAR),
+    auditField(t('ui.resourceCode'), 'resource_code', SysTableFieldType.VARCHAR),
+    auditField(t('ui.resourceId'), 'resource_id', SysTableFieldType.VARCHAR),
+    auditField(t('ui.method'), 'method', SysTableFieldType.VARCHAR),
+    auditField(t('ui.path'), 'url', SysTableFieldType.VARCHAR),
+    auditField(t('ui.statusCode'), 'status_code', SysTableFieldType.INT),
     auditField(
-      '安全错误信息',
+      t('ui.result'),
+      'success',
+      SysTableFieldType.BOOLEAN,
+      SysTableFieldInputType.BOOLEAN,
+    ),
+    auditField(t('ui.duration'), 'duration_ms', SysTableFieldType.BIGINT),
+    auditField('IP', 'ip', SysTableFieldType.VARCHAR),
+    auditField(t('ui.ownership'), 'locality', SysTableFieldType.VARCHAR),
+    auditField(t('ui.requestId'), 'request_id', SysTableFieldType.VARCHAR),
+    auditField(t('ui.traceId'), 'trace_id', SysTableFieldType.VARCHAR),
+    auditField(t('ui.auditResult'), 'result', SysTableFieldType.VARCHAR),
+    auditField(t('ui.errorCode'), 'error_code', SysTableFieldType.VARCHAR),
+    auditField(
+      t('ui.safeErrorMessage'),
       'error_message',
       SysTableFieldType.TEXT,
       SysTableFieldInputType.TEXTAREA,

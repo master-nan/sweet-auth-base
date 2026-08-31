@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 type SelectLikeOption = {
   label?: unknown
   value?: unknown
@@ -54,7 +55,9 @@ export const compactSelectionDisplay = (
   })
 
   const visibleLabels = labels.slice(0, maxVisible).join('、')
-  return labels.length > maxVisible ? `${visibleLabels} 等 ${labels.length} 个` : visibleLabels
+  return labels.length > maxVisible
+    ? t('ui.visibleLabelsAndTotal', { visibleLabels: visibleLabels, value2: labels.length })
+    : visibleLabels
 }
 
 export const compactSelectionTooltip = (value: unknown, options: unknown[] = []) => {

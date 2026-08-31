@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type {
   Report,
   ReportDataset,
@@ -19,7 +20,10 @@ export const normalizeReportKind = (value: unknown): ReportKind => {
   return 'detail'
 }
 
-export const guessReportFieldRole = (code: string, type: string): NonNullable<ReportField['role']> => {
+export const guessReportFieldRole = (
+  code: string,
+  type: string,
+): NonNullable<ReportField['role']> => {
   const lower = code.toLowerCase()
   const normalizedType = String(type || '').toLowerCase()
   if (
@@ -27,13 +31,16 @@ export const guessReportFieldRole = (code: string, type: string): NonNullable<Re
     lower.includes('time') ||
     ['6', '7', '8'].includes(normalizedType) ||
     ['date', 'datetime', 'timestamp', 'time'].some((item) => normalizedType.includes(item))
-  ) return 'time'
+  )
+    return 'time'
   if (lower === 'id' || lower.endsWith('_id')) {
     return 'dimension'
   }
   if (
     ['1', '2', '9', '11'].includes(normalizedType) ||
-    ['number', 'numeric', 'decimal', 'float', 'double', 'int', 'bigint'].some((item) => normalizedType.includes(item))
+    ['number', 'numeric', 'decimal', 'float', 'double', 'int', 'bigint'].some((item) =>
+      normalizedType.includes(item),
+    )
   ) {
     return 'metric'
   }
@@ -94,19 +101,20 @@ const normalizeSheetRows = (rows: number[] | undefined, maxRows: number) => {
   return [...unique].sort((a, b) => a - b)
 }
 
-export const hasReportCellConfig = (cell: Partial<ReportSheetCell>) => Boolean(
-  cell.value ||
-    cell.binding?.field ||
-    cell.binding?.formula ||
-    (cell.style && Object.keys(cell.style).length > 0) ||
-    (cell.colspan && cell.colspan > 1) ||
-    (cell.rowspan && cell.rowspan > 1),
-)
+export const hasReportCellConfig = (cell: Partial<ReportSheetCell>) =>
+  Boolean(
+    cell.value ||
+      cell.binding?.field ||
+      cell.binding?.formula ||
+      (cell.style && Object.keys(cell.style).length > 0) ||
+      (cell.colspan && cell.colspan > 1) ||
+      (cell.rowspan && cell.rowspan > 1),
+  )
 
 export const createReportLayout = (report?: Partial<Report>): ReportLayoutConfig => ({
   version: REPORT_SCHEMA_VERSION,
   view: 'sheet',
-  title: report?.report_name || report?.name || '未命名报表',
+  title: report?.report_name || report?.name || t('ui.unnamedReport'),
   subtitle: report?.description || '',
   kind: normalizeReportKind(report?.report_kind),
   datasets: [],

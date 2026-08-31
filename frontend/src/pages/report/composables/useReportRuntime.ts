@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import {
@@ -11,12 +12,7 @@ import {
   type ReportSheetConfig,
 } from 'src/api/services/report'
 
-export type ReportRuntimeFilterValue =
-  | string
-  | number
-  | Array<string | number>
-  | null
-  | undefined
+export type ReportRuntimeFilterValue = string | number | Array<string | number> | null | undefined
 
 export function useReportRuntime() {
   const $q = useQuasar()
@@ -92,19 +88,17 @@ export function useReportRuntime() {
     if (!runtimeReport.value?.id) return false
     runtimeLoading.value = true
     try {
-      const res = await reportApi.runReport(
-        runtimeReport.value.id,
-        buildRuntimePreviewReq(),
-      )
+      const res = await reportApi.runReport(runtimeReport.value.id, buildRuntimePreviewReq())
       runtimeData.value = res
       runtimePagination.value.rowsNumber = res.total ?? res.rows.length
       return true
     } catch (error) {
       runtimeData.value = { columns: [], rows: [], total: 0 }
       runtimePagination.value.rowsNumber = 0
-      const message = error instanceof Error && error.message
-        ? error.message
-        : '报表运行失败，请检查报表配置、数据权限或后端接口'
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : t('ui.reportRunningFailedCheckReportConfigurationDataPrivilegesOrBackendInterface')
       $q.notify({ type: 'negative', message })
       return false
     } finally {
@@ -170,7 +164,11 @@ export function useReportRuntime() {
 
   function runtimeScalarValue(id: string) {
     const value = runtimeFilterValues.value[id]
-    return Array.isArray(value) ? String(value[0] || '') : value === undefined ? null : String(value)
+    return Array.isArray(value)
+      ? String(value[0] || '')
+      : value === undefined
+        ? null
+        : String(value)
   }
 
   function runtimeRangeValue(id: string, index: number) {

@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { makeReportCellId } from './schema'
 import type {
   ReportCellBindingType,
@@ -59,7 +60,10 @@ export const reportBindingText = (
   return `${prefix}.S(${field.name})`
 }
 
-export const reportRuntimeColumnAlias = (datasetId: string | undefined, fieldCode: string | undefined) => {
+export const reportRuntimeColumnAlias = (
+  datasetId: string | undefined,
+  fieldCode: string | undefined,
+) => {
   const raw = `${datasetId || ''}__${fieldCode || ''}`.replace(/^_+|_+$/g, '') || fieldCode || ''
   const normalized = raw.replace(/[^A-Za-z0-9_]/g, '_')
   if (!normalized) return ''
@@ -93,10 +97,7 @@ export const reportRuntimeCellValue = (
   return ''
 }
 
-const reportBoundFields = (
-  datasets: ReportDataset[],
-  sheet: ReportSheetConfig,
-) => {
+const reportBoundFields = (datasets: ReportDataset[], sheet: ReportSheetConfig) => {
   const fields: Array<{ dataset: ReportDataset; field: ReportField }> = []
   const seen = new Set<string>()
   sheet.cells.forEach((cell) => {
@@ -118,32 +119,38 @@ export const reportSheetCellAt = (
   row: number,
   col: number,
 ): ReportSheetCell => {
-  return sheet.cells.find((cell) => cell.row === row && cell.col === col) || {
-    id: makeReportCellId(row, col),
-    row,
-    col,
-    value: '',
-  }
+  return (
+    sheet.cells.find((cell) => cell.row === row && cell.col === col) || {
+      id: makeReportCellId(row, col),
+      row,
+      col,
+      value: '',
+    }
+  )
 }
 
 export const reportSheetCellSpan = (cell: ReportSheetCell, bounds?: Partial<ReportSheetBounds>) => {
   const rawRowspan = Math.max(cell.rowspan || 1, 1)
   const rawColspan = Math.max(cell.colspan || 1, 1)
   return {
-    rowspan: Math.max(Math.min(rawRowspan, (bounds?.maxRow || cell.row + rawRowspan - 1) - cell.row + 1), 1),
-    colspan: Math.max(Math.min(rawColspan, (bounds?.maxCol || cell.col + rawColspan - 1) - cell.col + 1), 1),
+    rowspan: Math.max(
+      Math.min(rawRowspan, (bounds?.maxRow || cell.row + rawRowspan - 1) - cell.row + 1),
+      1,
+    ),
+    colspan: Math.max(
+      Math.min(rawColspan, (bounds?.maxCol || cell.col + rawColspan - 1) - cell.col + 1),
+      1,
+    ),
   }
 }
 
-export const reportSheetIsCoveredCell = (
-  sheet: ReportSheetConfig,
-  row: number,
-  col: number,
-) => {
+export const reportSheetIsCoveredCell = (sheet: ReportSheetConfig, row: number, col: number) => {
   return sheet.cells.some((cell) => {
     if (cell.row === row && cell.col === col) return false
     const { rowspan, colspan } = reportSheetCellSpan(cell)
-    return row >= cell.row && row < cell.row + rowspan && col >= cell.col && col < cell.col + colspan
+    return (
+      row >= cell.row && row < cell.row + rowspan && col >= cell.col && col < cell.col + colspan
+    )
   })
 }
 
@@ -151,9 +158,9 @@ export const reportSheetUsedBounds = (sheet: ReportSheetConfig): ReportSheetBoun
   const used = sheet.cells.filter((cell) => {
     return Boolean(
       cell.value ||
-      cell.binding?.field ||
-      (cell.colspan && cell.colspan > 1) ||
-      (cell.rowspan && cell.rowspan > 1),
+        cell.binding?.field ||
+        (cell.colspan && cell.colspan > 1) ||
+        (cell.rowspan && cell.rowspan > 1),
     )
   })
   if (!used.length) {
@@ -171,9 +178,7 @@ export const reportSheetUsedBounds = (sheet: ReportSheetConfig): ReportSheetBoun
   }
 }
 
-export const reportNormalizeSheetRange = (
-  range: ReportSheetRange,
-): ReportSheetBounds => ({
+export const reportNormalizeSheetRange = (range: ReportSheetRange): ReportSheetBounds => ({
   minRow: Math.min(range.startRow, range.endRow),
   maxRow: Math.max(range.startRow, range.endRow),
   minCol: Math.min(range.startCol, range.endCol),
@@ -187,7 +192,9 @@ export const reportSheetRangeContains = (
 ) => {
   if (!range) return false
   const bounds = reportNormalizeSheetRange(range)
-  return row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol
+  return (
+    row >= bounds.minRow && row <= bounds.maxRow && col >= bounds.minCol && col <= bounds.maxCol
+  )
 }
 
 export const reportSheetMarkedRows = (sheet: ReportSheetConfig) => {
@@ -210,10 +217,7 @@ export const reportCellStyle = (cell: ReportSheetCell) => {
   }
 }
 
-export const collectReportUsedFields = (
-  datasets: ReportDataset[],
-  sheet: ReportSheetConfig,
-) => {
+export const collectReportUsedFields = (datasets: ReportDataset[], sheet: ReportSheetConfig) => {
   const used = new Map<string, ReportField>()
   const primary = datasets.find((item) => item.primary) || datasets[0]
   sheet.cells.forEach((cell) => {
@@ -230,14 +234,14 @@ export const collectReportUsedFields = (
   return [...used.values()]
 }
 
-export const reportSampleCellValue = (
-  field: ReportField,
-  rowIndex: number,
-  fieldIndex: number,
-) => {
+export const reportSampleCellValue = (field: ReportField, rowIndex: number, fieldIndex: number) => {
   if (field.role === 'metric') return rowIndex * 1000 + fieldIndex * 120
   if (field.role === 'time') return `2026-07-${String(rowIndex + fieldIndex).padStart(2, '0')}`
-  if (field.code.includes('status')) return ['待发车', '已创建', '已发车'][rowIndex - 1] || '已创建'
+  if (field.code.includes('status'))
+    return (
+      [t('ui.pendingDispatch'), t('ui.createdStatus'), t('ui.sended')][rowIndex - 1] ||
+      t('ui.createdStatus')
+    )
   return `${field.name}${rowIndex}`
 }
 

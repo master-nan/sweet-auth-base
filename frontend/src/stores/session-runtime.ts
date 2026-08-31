@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { defineStore } from 'pinia'
 import { Notify } from 'quasar'
 import { instance, refreshAccessToken } from 'src/boot/axios'
@@ -70,19 +71,19 @@ export const useSessionRuntimeStore = defineStore('session-runtime', {
             signal: controller.signal,
           })
           if (response.status === 401) {
-            await refreshAccessToken()
+            try {
+              await refreshAccessToken()
+            } catch {
+              useUserStore().setLogout()
+            }
             return
           }
-          if (!response.ok || !response.body) throw new Error('会话事件连接失败')
+          if (!response.ok || !response.body) throw new Error(t('ui.sessionEventConnectionFailed'))
           const keepRunning = await this.readEvents(response.body, generation)
           if (!keepRunning) return
-        } catch (error) {
+        } catch {
           if (controller.signal.aborted || !this.running) return
           if (generation !== useUserStore().session_generation) return
-          if (error instanceof Error && error.message.includes('重新登录')) {
-            useUserStore().setLogout()
-            return
-          }
         } finally {
           if (this.streamController === controller) this.streamController = null
         }
@@ -111,7 +112,9 @@ export const useSessionRuntimeStore = defineStore('session-runtime', {
     async handleEvent(message: SessionEvent) {
       if (message.event === 'session_revoked') {
         const text =
-          typeof message.data.message === 'string' ? message.data.message : '当前登录已被管理员下线'
+          typeof message.data.message === 'string'
+            ? message.data.message
+            : t('ui.currentLoginIsOfflineForAdministrator')
         Notify.create({ type: 'warning', position: 'top-right', message: text, timeout: 5000 })
         useUserStore().setLogout()
         return false

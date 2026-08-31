@@ -24,13 +24,18 @@
               outlined
               debounce="300"
               v-model="query.quick_query!.keyword"
-              placeholder="搜索关键词"
+              :placeholder="t('ui.searchKeywords')"
             >
               <template v-slot:append>
                 <q-icon name="search" />
               </template>
             </q-input>
-            <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
+            <q-btn
+              color="primary"
+              :label="t('ui.search')"
+              :disable="loading"
+              @click="handleBasicSearch"
+            />
             <q-btn
               outline
               icon="tune"
@@ -38,8 +43,8 @@
               class="q-ml-xs"
               :aria-label="
                 hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
+                  ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                  : t('ui.advancedQuery')
               "
               @click="showAdvancedQuery = true"
             >
@@ -48,8 +53,8 @@
               }}</q-badge>
               <q-tooltip>{{
                 hasAppliedAdvancedFilters
-                  ? `高级查询，已启用 ${activeFilterCount} 个条件`
-                  : '高级查询'
+                  ? t('ui.advancedQueryEnabled', { count: activeFilterCount })
+                  : t('ui.advancedQuery')
               }}</q-tooltip>
             </q-btn>
           </template>
@@ -113,9 +118,9 @@
     <dynamic-form-dialog
       v-model="showFormDialog"
       :edit-data="currentEditData"
-      :title="currentEditData?.id ? '编辑数据表' : '新增数据表'"
+      :title="currentEditData?.id ? t('ui.editDataSheet') : t('ui.addDataSheet')"
       :fields="tableFields"
-      :submit-btn-text="currentEditData?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditData?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFormSubmit"
     />
 
@@ -123,11 +128,11 @@
       <q-card class="table-structure-workbench">
         <q-card-section class="structure-header">
           <div class="structure-title-area">
-            <div class="structure-avatar">表</div>
+            <div class="structure-avatar">{{ t('ui.table') }}</div>
             <div class="structure-title-copy">
-              <div class="structure-title">表结构管理</div>
+              <div class="structure-title">{{ t('ui.tableStructureManagement') }}</div>
               <div class="structure-subtitle">
-                <span>当前表：{{ currentTable?.table_name || '-' }}</span>
+                <span>{{ t('ui.currentTablePrefix') }}{{ currentTable?.table_name || '-' }}</span>
                 <span class="structure-code">{{ currentTable?.table_code || '-' }}</span>
                 <span>{{ tableKindLabel }}</span>
               </div>
@@ -140,28 +145,43 @@
                 outline
                 color="primary"
                 icon="sync"
-                label="同步字段"
+                :label="t('ui.syncFields')"
                 :loading="loading"
                 @click="confirmSyncCurrentTableFields"
               />
-              <q-btn color="primary" icon="add" label="新增字段" @click="openAddFieldDialog" />
+              <q-btn
+                color="primary"
+                icon="add"
+                :label="t('ui.addField')"
+                @click="openAddFieldDialog"
+              />
             </template>
             <template v-else-if="activeMetaTab === 'indexes'">
               <q-btn
                 outline
                 color="primary"
                 icon="sync"
-                label="同步索引"
+                :label="t('ui.syncIndex')"
                 :loading="loading"
                 @click="confirmSyncTableIndexes"
               />
-              <q-btn color="primary" icon="add" label="新增索引" @click="openAddIndexDialog" />
+              <q-btn
+                color="primary"
+                icon="add"
+                :label="t('ui.addIndex')"
+                @click="openAddIndexDialog"
+              />
             </template>
             <template v-else>
-              <q-btn color="primary" icon="add" label="新增关联" @click="openAddRelationDialog" />
+              <q-btn
+                color="primary"
+                icon="add"
+                :label="t('ui.addRelation')"
+                @click="openAddRelationDialog"
+              />
             </template>
             <q-btn flat round icon="close" v-close-popup>
-              <q-tooltip>关闭</q-tooltip>
+              <q-tooltip>{{ t('ui.close') }}</q-tooltip>
             </q-btn>
           </div>
         </q-card-section>
@@ -206,7 +226,7 @@
                 :loading="loading"
                 @click="refreshCurrentStructure"
               >
-                <q-tooltip>刷新</q-tooltip>
+                <q-tooltip>{{ t('ui.refresh') }}</q-tooltip>
               </q-btn>
             </div>
 
@@ -280,7 +300,7 @@
                       size="sm"
                       @click.stop="moveField(props.row, -1)"
                     >
-                      <q-tooltip>上移</q-tooltip>
+                      <q-tooltip>{{ t('ui.moveUp') }}</q-tooltip>
                     </q-btn>
                     <q-btn
                       flat
@@ -290,7 +310,7 @@
                       size="sm"
                       @click.stop="moveField(props.row, 1)"
                     >
-                      <q-tooltip>下移</q-tooltip>
+                      <q-tooltip>{{ t('ui.moveDown') }}</q-tooltip>
                     </q-btn>
                   </q-td>
                 </q-tr>
@@ -324,7 +344,7 @@
                       class="structure-tag"
                       :class="props.row.is_unique ? 'is-warn' : 'is-blue'"
                     >
-                      {{ props.row.is_unique ? '唯一索引' : '普通索引' }}
+                      {{ props.row.is_unique ? t('ui.uniqueIndex') : t('ui.standardIndex') }}
                     </span>
                   </q-td>
                   <q-td key="fields" :props="props">
@@ -394,43 +414,43 @@
                     class="structure-status"
                     :class="{ 'is-off': selectedField.state === false }"
                   >
-                    {{ selectedField.state === false ? '停用' : '启用' }}
+                    {{ selectedField.state === false ? t('ui.disabled') : t('ui.enabled') }}
                   </span>
                 </div>
 
                 <div class="structure-detail-scroll">
                   <div class="structure-section">
-                    <div class="structure-section-title">基础信息</div>
+                    <div class="structure-section-title">{{ t('ui.basicInfo') }}</div>
                     <div class="structure-info-grid">
                       <div>
-                        <span>字段名称</span>
+                        <span>{{ t('ui.fieldName') }}</span>
                         <strong>{{ selectedField.field_name || '-' }}</strong>
                       </div>
                       <div>
-                        <span>字段编码</span>
+                        <span>{{ t('ui.fieldCode') }}</span>
                         <strong>{{ selectedField.field_code || '-' }}</strong>
                       </div>
                       <div>
-                        <span>字段类型</span>
+                        <span>{{ t('ui.fieldType') }}</span>
                         <strong>{{ fieldTypeLabel(selectedField) }}</strong>
                       </div>
                       <div>
-                        <span>输入控件</span>
+                        <span>{{ t('ui.inputControl') }}</span>
                         <strong>{{ inputTypeLabel(selectedField) }}</strong>
                       </div>
                       <div>
-                        <span>默认值</span>
+                        <span>{{ t('ui.defaultValue') }}</span>
                         <strong>{{ selectedField.default_value || '-' }}</strong>
                       </div>
                       <div>
-                        <span>排序</span>
+                        <span>{{ t('ui.sort') }}</span>
                         <strong>{{ selectedField.sequence ?? '-' }}</strong>
                       </div>
                     </div>
                   </div>
 
                   <div class="structure-section">
-                    <div class="structure-section-title">页面与查询</div>
+                    <div class="structure-section-title">{{ t('ui.pagesAndQuery') }}</div>
                     <div class="structure-switch-grid">
                       <span
                         v-for="tag in fieldDisplayTags(selectedField)"
@@ -450,7 +470,9 @@
                   </div>
 
                   <div class="structure-section">
-                    <div class="structure-section-title">约束与高级配置</div>
+                    <div class="structure-section-title">
+                      {{ t('ui.constraintsAndAdvancedConfiguration') }}
+                    </div>
                     <div class="structure-tag-row q-mb-sm">
                       <span
                         v-for="tag in fieldConstraintTags(selectedField)"
@@ -463,19 +485,19 @@
                     </div>
                     <div class="structure-info-list">
                       <div>
-                        <span>所用字典</span>
+                        <span>{{ t('ui.dictionaryUsed') }}</span>
                         <strong>{{ selectedField.dict_code || '-' }}</strong>
                       </div>
                       <div>
-                        <span>字段类别</span>
+                        <span>{{ t('ui.fieldCategory') }}</span>
                         <strong>{{ fieldCategoryLabel(selectedField) }}</strong>
                       </div>
                       <div>
-                        <span>计算表达式</span>
+                        <span>{{ t('ui.calculateExpression') }}</span>
                         <strong>{{ selectedField.expression || '-' }}</strong>
                       </div>
                       <div>
-                        <span>联动配置</span>
+                        <span>{{ t('ui.connectConfiguration') }}</span>
                         <strong>{{ selectedField.linkage_config || '-' }}</strong>
                       </div>
                     </div>
@@ -486,17 +508,17 @@
                   <q-btn
                     flat
                     color="negative"
-                    label="删除字段"
+                    :label="t('ui.deleteField')"
                     @click="confirmDeleteField(selectedField)"
                   />
                   <q-btn
                     color="primary"
-                    label="编辑字段"
+                    :label="t('ui.editFields')"
                     @click="openEditFieldDialog(selectedField)"
                   />
                 </div>
               </div>
-              <div v-else class="structure-empty">暂无字段</div>
+              <div v-else class="structure-empty">{{ t('ui.noFieldsForNow') }}</div>
             </template>
 
             <template v-else-if="activeMetaTab === 'indexes'">
@@ -505,19 +527,21 @@
                   <div>
                     <div class="structure-detail-title">{{ selectedIndex.index_name }}</div>
                     <div class="structure-subtitle">
-                      <span>{{ selectedIndex.is_unique ? '唯一索引' : '普通索引' }}</span>
+                      <span>{{
+                        selectedIndex.is_unique ? t('ui.uniqueIndex') : t('ui.standardIndex')
+                      }}</span>
                     </div>
                   </div>
                   <span
                     class="structure-status"
                     :class="{ 'is-off': selectedIndex.state === false }"
                   >
-                    {{ selectedIndex.state === false ? '停用' : '启用' }}
+                    {{ selectedIndex.state === false ? t('ui.disabled') : t('ui.enabled') }}
                   </span>
                 </div>
                 <div class="structure-detail-scroll">
                   <div class="structure-section">
-                    <div class="structure-section-title">索引字段</div>
+                    <div class="structure-section-title">{{ t('ui.indexFields') }}</div>
                     <div class="structure-index-fields">
                       <span
                         v-for="(field, index) in selectedIndex.index_fields || []"
@@ -532,17 +556,17 @@
                   <q-btn
                     flat
                     color="negative"
-                    label="删除索引"
+                    :label="t('ui.deleteIndex')"
                     @click="confirmDeleteIndex(selectedIndex)"
                   />
                   <q-btn
                     color="primary"
-                    label="编辑索引"
+                    :label="t('ui.editIndex')"
                     @click="openEditIndexDialog(selectedIndex)"
                   />
                 </div>
               </div>
-              <div v-else class="structure-empty">暂无索引</div>
+              <div v-else class="structure-empty">{{ t('ui.noIndex') }}</div>
             </template>
 
             <template v-else>
@@ -560,23 +584,23 @@
                     class="structure-status"
                     :class="{ 'is-off': selectedRelation.state === false }"
                   >
-                    {{ selectedRelation.state === false ? '停用' : '启用' }}
+                    {{ selectedRelation.state === false ? t('ui.disabled') : t('ui.enabled') }}
                   </span>
                 </div>
                 <div class="structure-detail-scroll">
                   <div class="structure-section">
-                    <div class="structure-section-title">字段映射</div>
+                    <div class="structure-section-title">{{ t('ui.fieldMapping') }}</div>
                     <div class="structure-info-list">
                       <div>
-                        <span>主表字段</span>
+                        <span>{{ t('ui.masterField') }}</span>
                         <strong>{{ selectedRelation.reference_key }}</strong>
                       </div>
                       <div>
-                        <span>关联表字段</span>
+                        <span>{{ t('ui.relatedTableField') }}</span>
                         <strong>{{ selectedRelation.foreign_key }}</strong>
                       </div>
                       <div>
-                        <span>中间表</span>
+                        <span>{{ t('ui.junctionTable') }}</span>
                         <strong>{{ selectedRelation.many_table_code || '-' }}</strong>
                       </div>
                     </div>
@@ -586,17 +610,17 @@
                   <q-btn
                     flat
                     color="negative"
-                    label="删除关联"
+                    :label="t('ui.deleteRelation')"
                     @click="confirmDeleteRelation(selectedRelation)"
                   />
                   <q-btn
                     color="primary"
-                    label="编辑关联"
+                    :label="t('ui.editAssociation')"
                     @click="openEditRelationDialog(selectedRelation)"
                   />
                 </div>
               </div>
-              <div v-else class="structure-empty">暂无关联关系</div>
+              <div v-else class="structure-empty">{{ t('ui.itSNotRelated') }}</div>
             </template>
           </aside>
         </q-card-section>
@@ -606,19 +630,19 @@
     <dynamic-form-dialog
       v-model="showFieldFormDialog"
       :edit-data="currentEditField"
-      :title="currentEditField?.id ? '编辑字段' : '新增字段'"
+      :title="currentEditField?.id ? t('ui.editFields') : t('ui.addField')"
       :fields="fieldFormFields"
       :table-code="currentTable?.table_code || ''"
-      :submit-btn-text="currentEditField?.id ? '保存' : '创建'"
+      :submit-btn-text="currentEditField?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFieldFormSubmit"
     />
 
     <form-dialog-shell
       v-model="showIndexFormDialog"
-      :title="currentEditIndex?.id ? '编辑索引' : '新增索引'"
-      subtitle="配置索引名称、唯一性和参与字段"
+      :title="currentEditIndex?.id ? t('ui.editIndex') : t('ui.addIndex')"
+      :subtitle="t('ui.configureIndexNamesUniquenessAndParticipationFields')"
       icon="toc"
-      submit-text="保存"
+      :submit-text="t('ui.save')"
       width="min(780px, calc(100vw - 48px))"
       @submit="handleIndexFormSubmit"
     >
@@ -626,14 +650,16 @@
         <section class="metadata-simple-section">
           <div class="metadata-simple-section__head">
             <div>
-              <div class="metadata-simple-section__title">索引信息</div>
-              <div class="metadata-simple-section__desc">索引名称建议使用数据库可读的英文编码</div>
+              <div class="metadata-simple-section__title">{{ t('ui.indexInformation') }}</div>
+              <div class="metadata-simple-section__desc">
+                {{ t('ui.indexNameSuggestsUsingADatabaseReadableEnglishCode') }}
+              </div>
             </div>
           </div>
           <div class="metadata-form-grid">
             <q-input
               v-model="indexForm.index_name"
-              label="索引名称"
+              :label="t('ui.indexName')"
               outlined
               dense
               maxlength="64"
@@ -641,7 +667,7 @@
             <q-select
               v-model="indexForm.is_unique"
               :options="indexUniqueOptions"
-              label="索引类型"
+              :label="t('ui.indexType')"
               emit-value
               map-options
               outlined
@@ -651,12 +677,17 @@
               v-model="indexForm.field_ids"
               class="metadata-form-wide"
               :options="indexFieldOptions"
-              label="索引字段"
+              :label="t('ui.indexFields')"
               multiple
               emit-value
               map-options
               :display-value="
-                compactSelectionDisplay(indexForm.field_ids, indexFieldOptions, 2, '索引字段')
+                compactSelectionDisplay(
+                  indexForm.field_ids,
+                  indexFieldOptions,
+                  2,
+                  t('ui.indexFields'),
+                )
               "
               outlined
               dense
@@ -675,7 +706,7 @@
 
       <template #preview>
         <div class="metadata-form-preview">
-          <div class="metadata-form-preview__title">索引预览</div>
+          <div class="metadata-form-preview__title">{{ t('ui.indexPreview') }}</div>
           <div
             v-for="item in indexPreviewItems"
             :key="item.label"
@@ -690,10 +721,10 @@
 
     <form-dialog-shell
       v-model="showRelationFormDialog"
-      :title="currentEditRelation?.id ? '编辑关联' : '新增关联'"
-      subtitle="配置主表与关联表的字段映射"
+      :title="currentEditRelation?.id ? t('ui.editAssociation') : t('ui.addRelation')"
+      :subtitle="t('ui.configureFieldMappingOfTheMasterAndAssociationTables')"
       icon="device_hub"
-      submit-text="保存"
+      :submit-text="t('ui.save')"
       width="min(840px, calc(100vw - 48px))"
       @submit="handleRelationFormSubmit"
     >
@@ -701,9 +732,9 @@
         <section class="metadata-simple-section">
           <div class="metadata-simple-section__head">
             <div>
-              <div class="metadata-simple-section__title">关联关系</div>
+              <div class="metadata-simple-section__title">{{ t('ui.relation') }}</div>
               <div class="metadata-simple-section__desc">
-                先选择关联表，再选择两端用于匹配的字段
+                {{ t('ui.selectARelatedTableThenSelectTheFieldsToMatch') }}
               </div>
             </div>
           </div>
@@ -712,7 +743,7 @@
               v-model="relationForm.related_table_id"
               class="metadata-form-wide"
               :options="tableOptions"
-              label="关联表"
+              :label="t('ui.relatedTable')"
               emit-value
               map-options
               outlined
@@ -721,7 +752,7 @@
             <q-select
               v-model="relationForm.reference_key"
               :options="currentTableFieldOptions"
-              label="主表字段"
+              :label="t('ui.masterField')"
               emit-value
               map-options
               outlined
@@ -730,7 +761,7 @@
             <q-select
               v-model="relationForm.foreign_key"
               :options="relatedTableFieldOptions"
-              label="关联表字段"
+              :label="t('ui.relatedTableField')"
               emit-value
               map-options
               outlined
@@ -739,7 +770,7 @@
             <q-select
               v-model="relationForm.relation_type"
               :options="relationTypeOptions"
-              label="关系类型"
+              :label="t('ui.relationType')"
               emit-value
               map-options
               outlined
@@ -747,7 +778,7 @@
             />
             <q-input
               v-model="relationForm.many_table_code"
-              label="中间表（多对多）"
+              :label="t('ui.junctionTableManyToMany')"
               outlined
               dense
               maxlength="64"
@@ -763,7 +794,7 @@
 
       <template #preview>
         <div class="metadata-form-preview">
-          <div class="metadata-form-preview__title">关联预览</div>
+          <div class="metadata-form-preview__title">{{ t('ui.associationPreview') }}</div>
           <div
             v-for="item in relationPreviewItems"
             :key="item.label"
@@ -779,23 +810,23 @@
     <q-dialog v-model="showInitDialog" persistent>
       <q-card style="min-width: 420px">
         <q-card-section class="row items-center">
-          <div class="text-h6">初始化元数据</div>
+          <div class="text-h6">{{ t('ui.initializeMetadata') }}</div>
         </q-card-section>
         <q-card-section>
           <q-input
             v-model="initTableCode"
-            label="表名（table_code）"
+            :label="t('ui.tableNameTableCode')"
             outlined
             dense
             :error="initTableCodeError"
-            :error-message="initTableCodeError ? '表名不能为空' : ''"
+            :error-message="initTableCodeError ? t('ui.tableNameCannotBeEmpty') : ''"
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" v-close-popup :disable="initLoading" />
+          <q-btn flat :label="t('ui.cancel')" v-close-popup :disable="initLoading" />
           <q-btn
             color="primary"
-            label="确认"
+            :label="t('ui.confirm')"
             :loading="initLoading"
             :disable="initLoading"
             @click="confirmInitTableMeta"
@@ -936,20 +967,32 @@ const relationRows = ref<TableRelation[]>([])
 const structureNavigationItems = computed<DetailSectionNavigationItem[]>(() => [
   {
     key: 'fields',
-    label: '字段',
-    caption: '列表、表单、查询能力',
+    get label() {
+      return t('ui.field')
+    },
+    get caption() {
+      return t('ui.listsFormsQueryCapabilities')
+    },
     count: fieldRows.value.length,
   },
   {
     key: 'indexes',
-    label: '索引',
-    caption: '唯一索引、组合索引',
+    get label() {
+      return t('ui.index')
+    },
+    get caption() {
+      return t('ui.uniqueIndexGroupIndex')
+    },
     count: indexRows.value.length,
   },
   {
     key: 'relations',
-    label: '关联关系',
-    caption: '主子表、联动数据源',
+    get label() {
+      return t('ui.relation')
+    },
+    get caption() {
+      return t('ui.masterDetailAndLinkedDataSources')
+    },
     count: relationRows.value.length,
   },
 ])
@@ -979,12 +1022,17 @@ const dbIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 const validateDBIdentifier = (label: string, value: unknown, required = true) => {
   const text = String(value ?? '').trim()
-  if (!text) return required ? `${label}不能为空` : ''
+  if (!text) return required ? t('ui.namedFieldRequired', { label: label }) : ''
   if (text.length > DB_IDENTIFIER_MAX_LENGTH) {
-    return `${label}长度不能超过${DB_IDENTIFIER_MAX_LENGTH}`
+    return t('ui.databaseIdentifierLengthExceeded', {
+      label: label,
+      DB_IDENTIFIER_MAX_LENGTH: DB_IDENTIFIER_MAX_LENGTH,
+    })
   }
   if (!dbIdentifierPattern.test(text)) {
-    return `${label}只能包含字母、数字、下划线，且不能以数字开头`
+    return t('ui.canOnlyContainLettersNumbersUnderlinedsAndCannotStartWithNumbers', {
+      label: label,
+    })
   }
   return ''
 }
@@ -1083,10 +1131,20 @@ const withPublishStatus = (items: Table[]): TableRow[] =>
       ...item,
       is_published: isPublished,
       is_low_code_publishable: !isFixedPage,
-      publish_status: isFixedPage ? '固定页面' : isPublished ? '已发布' : '未发布',
-      publish_block_reason: isFixedPage
-        ? `已绑定固定菜单 ${binding.fixedMenuTitle}，不能发布成低代码页面`
-        : '',
+      get publish_status() {
+        return isFixedPage
+          ? t('ui.fixedPage')
+          : isPublished
+            ? t('ui.published')
+            : t('ui.notPublished')
+      },
+      get publish_block_reason() {
+        return isFixedPage
+          ? t('ui.fixedMenuBoundCannotBePublishedAsLowCodePageNoodles', {
+              value1: binding.fixedMenuTitle,
+            })
+          : ''
+      },
     }
   })
 
@@ -1129,22 +1187,70 @@ const relationTypeOptions = computed(() => {
 })
 
 const structureFieldColumns: QTableProps['columns'] = [
-  { name: 'sequence', label: '序号', field: 'sequence', align: 'left', headerStyle: 'width: 72px' },
-  { name: 'field', label: '字段', field: 'field_name', align: 'left' },
-  { name: 'type', label: '类型', field: 'field_type', align: 'left', headerStyle: 'width: 130px' },
+  {
+    name: 'sequence',
+    get label() {
+      return t('ui.serialNumber')
+    },
+    field: 'sequence',
+    align: 'left',
+    headerStyle: 'width: 72px',
+  },
+  {
+    name: 'field',
+    get label() {
+      return t('ui.field')
+    },
+    field: 'field_name',
+    align: 'left',
+  },
+  {
+    name: 'type',
+    get label() {
+      return t('ui.type')
+    },
+    field: 'field_type',
+    align: 'left',
+    headerStyle: 'width: 130px',
+  },
   {
     name: 'input',
-    label: '输入控件',
+    get label() {
+      return t('ui.inputControl')
+    },
     field: 'input_type',
     align: 'left',
     headerStyle: 'width: 130px',
   },
-  { name: 'display', label: '页面显示', field: 'is_list_show', align: 'left' },
-  { name: 'search', label: '查询能力', field: 'is_quick_search', align: 'left' },
-  { name: 'constraints', label: '约束', field: 'is_primary_key', align: 'left' },
+  {
+    name: 'display',
+    get label() {
+      return t('ui.pageDisplay')
+    },
+    field: 'is_list_show',
+    align: 'left',
+  },
+  {
+    name: 'search',
+    get label() {
+      return t('ui.queryCapacity')
+    },
+    field: 'is_quick_search',
+    align: 'left',
+  },
+  {
+    name: 'constraints',
+    get label() {
+      return t('ui.constraints')
+    },
+    field: 'is_primary_key',
+    align: 'left',
+  },
   {
     name: 'actions',
-    label: '调整',
+    get label() {
+      return t('ui.adjustment')
+    },
     field: 'actions',
     align: 'center',
     headerStyle: 'width: 96px',
@@ -1152,17 +1258,55 @@ const structureFieldColumns: QTableProps['columns'] = [
 ]
 
 const structureIndexColumns: QTableProps['columns'] = [
-  { name: 'name', label: '索引名称', field: 'index_name', align: 'left' },
-  { name: 'type', label: '类型', field: 'is_unique', align: 'left', headerStyle: 'width: 130px' },
-  { name: 'fields', label: '索引字段', field: 'index_fields', align: 'left' },
+  {
+    name: 'name',
+    get label() {
+      return t('ui.indexName')
+    },
+    field: 'index_name',
+    align: 'left',
+  },
+  {
+    name: 'type',
+    get label() {
+      return t('ui.type')
+    },
+    field: 'is_unique',
+    align: 'left',
+    headerStyle: 'width: 130px',
+  },
+  {
+    name: 'fields',
+    get label() {
+      return t('ui.indexFields')
+    },
+    field: 'index_fields',
+    align: 'left',
+  },
 ]
 
 const structureRelationColumns: QTableProps['columns'] = [
-  { name: 'relation', label: '关联关系', field: 'relation_type', align: 'left' },
-  { name: 'mapping', label: '字段映射', field: 'reference_key', align: 'left' },
+  {
+    name: 'relation',
+    get label() {
+      return t('ui.relation')
+    },
+    field: 'relation_type',
+    align: 'left',
+  },
+  {
+    name: 'mapping',
+    get label() {
+      return t('ui.fieldMapping')
+    },
+    field: 'reference_key',
+    align: 'left',
+  },
   {
     name: 'many',
-    label: '中间表',
+    get label() {
+      return t('ui.junctionTable')
+    },
     field: 'many_table_code',
     align: 'left',
     headerStyle: 'width: 180px',
@@ -1218,31 +1362,124 @@ const hasLinkageConfig = (field: TableField) => {
 
 const fieldDisplayTags = (field: TableField): StructureTag[] => {
   const tags: StructureTag[] = []
-  if (field.is_list_show) tags.push({ label: '列表', tone: 'ok' })
-  if (field.is_insert_show) tags.push({ label: '新增', tone: 'ok' })
-  if (field.is_update_show) tags.push({ label: '编辑', tone: 'ok' })
-  return tags.length > 0 ? tags : [{ label: '隐藏', tone: 'muted' }]
+  if (field.is_list_show)
+    tags.push({
+      get label() {
+        return t('ui.list')
+      },
+      tone: 'ok',
+    })
+  if (field.is_insert_show)
+    tags.push({
+      get label() {
+        return t('ui.create')
+      },
+      tone: 'ok',
+    })
+  if (field.is_update_show)
+    tags.push({
+      get label() {
+        return t('ui.edit')
+      },
+      tone: 'ok',
+    })
+  return tags.length > 0
+    ? tags
+    : [
+        {
+          get label() {
+            return t('ui.hide')
+          },
+          tone: 'muted',
+        },
+      ]
 }
 
 const fieldSearchTags = (field: TableField): StructureTag[] => {
   const tags: StructureTag[] = []
-  if (field.is_quick_search) tags.push({ label: '快捷', tone: 'blue' })
-  if (field.is_advanced_search) tags.push({ label: '高级', tone: 'warn' })
-  if (field.is_sort) tags.push({ label: '排序', tone: 'blue' })
-  return tags.length > 0 ? tags : [{ label: '无', tone: 'muted' }]
+  if (field.is_quick_search)
+    tags.push({
+      get label() {
+        return t('ui.shortcut')
+      },
+      tone: 'blue',
+    })
+  if (field.is_advanced_search)
+    tags.push({
+      get label() {
+        return t('ui.advanced')
+      },
+      tone: 'warn',
+    })
+  if (field.is_sort)
+    tags.push({
+      get label() {
+        return t('ui.sort')
+      },
+      tone: 'blue',
+    })
+  return tags.length > 0
+    ? tags
+    : [
+        {
+          get label() {
+            return t('ui.none')
+          },
+          tone: 'muted',
+        },
+      ]
 }
 
 const fieldConstraintTags = (field: TableField): StructureTag[] => {
   const tags: StructureTag[] = []
-  if (field.is_primary_key) tags.push({ label: '主键', tone: 'ok' })
-  if (field.is_index) tags.push({ label: '索引', tone: 'blue' })
-  if (!field.is_null) tags.push({ label: '非空', tone: 'soft' })
-  if (field.dict_code) tags.push({ label: '字典', tone: 'ok' })
-  if (hasLinkageConfig(field)) tags.push({ label: '联动', tone: 'warn' })
+  if (field.is_primary_key)
+    tags.push({
+      get label() {
+        return t('ui.primaryKey')
+      },
+      tone: 'ok',
+    })
+  if (field.is_index)
+    tags.push({
+      get label() {
+        return t('ui.index')
+      },
+      tone: 'blue',
+    })
+  if (!field.is_null)
+    tags.push({
+      get label() {
+        return t('ui.nonEmpty')
+      },
+      tone: 'soft',
+    })
+  if (field.dict_code)
+    tags.push({
+      get label() {
+        return t('ui.dictionary')
+      },
+      tone: 'ok',
+    })
+  if (hasLinkageConfig(field))
+    tags.push({
+      get label() {
+        return t('ui.connect')
+      },
+      tone: 'warn',
+    })
   if (field.field_category && field.field_category !== SysTableFieldCategory.NORMAL) {
     tags.push({ label: fieldCategoryLabel(field), tone: 'warn' })
   }
-  return tags.length > 0 ? tags : [{ label: '普通', tone: 'muted' }]
+  return tags.length > 0
+    ? tags
+    : [
+        {
+          get label() {
+            return t('ui.normal')
+          },
+          tone: 'muted',
+        },
+      ]
 }
 
 const normalizeSearch = (value: unknown) =>
@@ -1283,7 +1520,7 @@ const filteredIndexRows = computed(() => {
   return sortedIndexRows.value.filter((index) =>
     [
       index.index_name,
-      index.is_unique ? '唯一索引' : '普通索引',
+      index.is_unique ? t('ui.uniqueIndex') : t('ui.standardIndex'),
       ...(index.index_fields || []).flatMap((field) => [field.field_name, field.field_code]),
     ]
       .map(normalizeSearch)
@@ -1295,8 +1532,18 @@ const relatedTableLabel = (tableId: number) =>
   tableLabelMap.value[tableId] || String(tableId || '-')
 
 const indexUniqueOptions = [
-  { label: '普通索引', value: false },
-  { label: '唯一索引', value: true },
+  {
+    get label() {
+      return t('ui.standardIndex')
+    },
+    value: false,
+  },
+  {
+    get label() {
+      return t('ui.uniqueIndex')
+    },
+    value: true,
+  },
 ]
 
 const findOptionLabel = <T extends string | number | boolean | null>(
@@ -1313,18 +1560,38 @@ const selectedIndexFieldLabels = computed(() =>
 
 const indexFormStatusText = computed(() => {
   const missing: string[] = []
-  if (!indexForm.value.index_name.trim()) missing.push('索引名称')
-  if (indexForm.value.field_ids.length === 0) missing.push('索引字段')
-  if (missing.length > 0) return `待完善：${missing.join('、')}`
-  return `${indexForm.value.is_unique ? '唯一索引' : '普通索引'}，${indexForm.value.field_ids.length} 个字段`
+  if (!indexForm.value.index_name.trim()) missing.push(t('ui.indexName'))
+  if (indexForm.value.field_ids.length === 0) missing.push(t('ui.indexFields'))
+  if (missing.length > 0) return t('ui.toBeCompleted', { value1: missing.join('、') })
+  return t('ui.fields', {
+    value1: indexForm.value.is_unique ? t('ui.uniqueIndex') : t('ui.standardIndex'),
+    value2: indexForm.value.field_ids.length,
+  })
 })
 
 const indexPreviewItems = computed(() => [
-  { label: '所属表', value: currentTable.value?.table_code || '-' },
-  { label: '索引名称', value: indexForm.value.index_name.trim() || '-' },
-  { label: '索引类型', value: indexForm.value.is_unique ? '唯一索引' : '普通索引' },
   {
-    label: '索引字段',
+    get label() {
+      return t('ui.schedules')
+    },
+    value: currentTable.value?.table_code || '-',
+  },
+  {
+    get label() {
+      return t('ui.indexName')
+    },
+    value: indexForm.value.index_name.trim() || '-',
+  },
+  {
+    get label() {
+      return t('ui.indexType')
+    },
+    value: indexForm.value.is_unique ? t('ui.uniqueIndex') : t('ui.standardIndex'),
+  },
+  {
+    get label() {
+      return t('ui.indexFields')
+    },
     value: selectedIndexFieldLabels.value.length ? selectedIndexFieldLabels.value.join('、') : '-',
   },
 ])
@@ -1351,35 +1618,56 @@ const selectedForeignFieldLabel = computed(() =>
 
 const relationFormStatusText = computed(() => {
   const missing: string[] = []
-  if (!relationForm.value.related_table_id) missing.push('关联表')
-  if (!relationForm.value.reference_key) missing.push('主表字段')
-  if (!relationForm.value.foreign_key) missing.push('关联表字段')
+  if (!relationForm.value.related_table_id) missing.push(t('ui.relatedTable'))
+  if (!relationForm.value.reference_key) missing.push(t('ui.masterField'))
+  if (!relationForm.value.foreign_key) missing.push(t('ui.relatedTableField'))
   if (
     relationForm.value.relation_type === SysTableRelationType.MANY_TO_MANY &&
     !relationForm.value.many_table_code.trim()
   ) {
-    missing.push('中间表')
+    missing.push(t('ui.junctionTable'))
   }
-  return missing.length > 0 ? `待完善：${missing.join('、')}` : '关联关系已配置'
+  return missing.length > 0
+    ? t('ui.toBeCompleted', { value1: missing.join('、') })
+    : t('ui.associationConfigured')
 })
 
 const relationPreviewItems = computed(() => [
-  { label: '主表', value: currentTable.value?.table_code || '-' },
-  { label: '关联表', value: selectedRelationTableLabel.value },
-  { label: '关系类型', value: relationTypeFormLabel.value || '-' },
   {
-    label: '字段映射',
+    get label() {
+      return t('ui.masterTable')
+    },
+    value: currentTable.value?.table_code || '-',
+  },
+  {
+    get label() {
+      return t('ui.relatedTable')
+    },
+    value: selectedRelationTableLabel.value,
+  },
+  {
+    get label() {
+      return t('ui.relationType')
+    },
+    value: relationTypeFormLabel.value || '-',
+  },
+  {
+    get label() {
+      return t('ui.fieldMapping')
+    },
     value:
       relationForm.value.reference_key && relationForm.value.foreign_key
         ? `${selectedReferenceFieldLabel.value} -> ${selectedForeignFieldLabel.value}`
         : '-',
   },
   {
-    label: '中间表',
+    get label() {
+      return t('ui.junctionTable')
+    },
     value:
       relationForm.value.relation_type === SysTableRelationType.MANY_TO_MANY
         ? relationForm.value.many_table_code.trim() || '-'
-        : '不需要',
+        : t('ui.notRequired'),
   },
 ])
 
@@ -1415,9 +1703,10 @@ const selectedRelation = computed(() => {
 })
 
 const structureSearchPlaceholder = computed(() => {
-  if (activeMetaTab.value === 'indexes') return '搜索索引名称 / 字段'
-  if (activeMetaTab.value === 'relations') return '搜索关联表 / 字段 / 关系类型'
-  return '搜索字段名称 / 编码 / 类型'
+  if (activeMetaTab.value === 'indexes') return t('ui.searchIndexNameField')
+  if (activeMetaTab.value === 'relations')
+    return t('ui.searchForAssociationTableFieldRelationshipType')
+  return t('ui.searchFieldNameEncodingType')
 })
 
 const selectField = (row: TableField) => {
@@ -1522,7 +1811,9 @@ const fetchTableFields = async () => {
     {
       name: 'publish_status',
       align: 'center',
-      label: '发布状态',
+      get label() {
+        return t('ui.publicationStatus')
+      },
       field: 'publish_status',
       sortable: false,
     },
@@ -1556,7 +1847,9 @@ const openEditDialog = async (row: Table) => {
 
 const confirmDelete = (row: Table) => {
   confirmDanger({
-    message: `确定要删除数据表 "${row.table_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheDataSheet', { value1: row.table_name })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await tableApi.deleteTable(row.id)
@@ -1569,7 +1862,7 @@ const confirmDelete = (row: Table) => {
 
 const handleFormSubmit = async (formPayload: { data: Table; isEdit: boolean; id?: number }) => {
   const tableCode = String(formPayload.data.table_code ?? '').trim()
-  if (warnValidation(validateDBIdentifier('表编码', tableCode))) return
+  if (warnValidation(validateDBIdentifier(t('ui.tableEncoding'), tableCode))) return
   if (formPayload.isEdit && formPayload.id) {
     const result = await tableApi.updateTable({
       id: formPayload.id,
@@ -1693,10 +1986,10 @@ const ensureFieldLayoutFormFields = (fields: TableField[]) => {
   const base = fields[0]
 
   if (!codes.has('form_span')) {
-    result.push(buildFieldLayoutMetaField(base, 'form_span', '表单占位', 251))
+    result.push(buildFieldLayoutMetaField(base, 'form_span', t('ui.formInPlace'), 251))
   }
   if (!codes.has('detail_span')) {
-    result.push(buildFieldLayoutMetaField(base, 'detail_span', '详情占位', 252))
+    result.push(buildFieldLayoutMetaField(base, 'detail_span', t('ui.detailsInPlace'), 252))
   }
 
   return result.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
@@ -1801,8 +2094,12 @@ const confirmInitTableMeta = async () => {
 
 const confirmSyncTableFields = (tableCode: string) => {
   $q.dialog({
-    title: '确认同步',
-    message: `确定要同步表 "${tableCode}" 的字段元数据吗？`,
+    get title() {
+      return t('ui.confirmSync')
+    },
+    get message() {
+      return t('ui.areYouSureYouWantToSyncFieldMetadataForTable', { tableCode: tableCode })
+    },
     cancel: true,
     persistent: true,
   }).onOk(() => {
@@ -1864,7 +2161,13 @@ const collectPublishParentOptions = (menus: Menu[], level = 0): PublishParentOpt
       const prefix = level > 0 ? `${'　'.repeat(level)}└ ` : ''
       const isDefault = isDefaultPublishParent(menu)
       options.push({
-        label: `${prefix}${getPublishMenuTitle(menu)}${isDefault ? '（默认）' : ''}`,
+        get label() {
+          return t('ui.indentedMenuOptionLabel', {
+            prefix: prefix,
+            value2: getPublishMenuTitle(menu),
+            value3: isDefault ? t('ui.defaultInParentheses') : '',
+          })
+        },
         value: String(menu.id),
         isDefault,
       })
@@ -1877,7 +2180,12 @@ const collectPublishParentOptions = (menus: Menu[], level = 0): PublishParentOpt
 }
 
 const loadPublishParentOptions = async () => {
-  const fallbackOption = { label: '开发管理（默认）', value: '0' }
+  const fallbackOption = {
+    get label() {
+      return t('ui.developmentManagementDefault')
+    },
+    value: '0',
+  }
   try {
     const res = await menuApi.queryMenu(publishParentQuery())
     if (!res.success || !Array.isArray(res.data)) {
@@ -1904,9 +2212,13 @@ const loadPublishParentOptions = async () => {
 const confirmPublishTable = (row: TableRow) => {
   if (row.is_low_code_publishable === false) {
     $q.dialog({
-      title: '不能发布',
-      message: row.publish_block_reason || '当前表已绑定固定页面，不能发布成低代码页面。',
-      ok: '知道了',
+      get title() {
+        return t('ui.cannotPublish')
+      },
+      message: row.publish_block_reason || t('ui.theCurrentTableIsBoundToAFixedPageAnd'),
+      get ok() {
+        return t('ui.acknowledgedAction')
+      },
     })
     return
   }
@@ -1914,8 +2226,12 @@ const confirmPublishTable = (row: TableRow) => {
   void (async () => {
     const parentOptions = await loadPublishParentOptions()
     $q.dialog({
-      title: '确认发布',
-      message: `确定要将表 "${tableCode}" 发布为低代码菜单吗？`,
+      get title() {
+        return t('ui.confirmRelease')
+      },
+      get message() {
+        return t('ui.areYouSureYouWantToPublishTheTableAsALow', { tableCode: tableCode })
+      },
       options: {
         type: 'radio',
         model: parentOptions.model,
@@ -1942,8 +2258,12 @@ const confirmPublishTable = (row: TableRow) => {
 
 const confirmUnpublishTable = (tableCode: string) => {
   $q.dialog({
-    title: '确认下线',
-    message: `确定要下线表 "${tableCode}" 的低代码菜单吗？`,
+    get title() {
+      return t('ui.confirmTheOffline')
+    },
+    get message() {
+      return t('ui.areYouSureYouWantALowCodeMenuFor', { tableCode: tableCode })
+    },
     cancel: true,
     persistent: true,
   }).onOk(() => {
@@ -1964,8 +2284,12 @@ const confirmSyncTableIndexes = () => {
   if (!currentTable.value?.table_code) return
   const tableCode = currentTable.value.table_code
   $q.dialog({
-    title: '确认同步',
-    message: `确定要同步表 "${tableCode}" 的索引元数据吗？`,
+    get title() {
+      return t('ui.confirmSync')
+    },
+    get message() {
+      return t('ui.determinesTheIndexMetadataToSynchronizeTheTable', { tableCode: tableCode })
+    },
     cancel: true,
     persistent: true,
   }).onOk(() => {
@@ -2009,7 +2333,9 @@ const openEditFieldDialog = (row: TableField) => {
 
 const confirmDeleteField = (row: TableField) => {
   confirmDanger({
-    message: `确定要删除字段 "${row.field_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheField', { value1: row.field_name })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await tableApi.deleteTableField(row.id)
@@ -2034,7 +2360,7 @@ const handleFieldFormSubmit = async (formPayload: {
   const fieldType = (formPayload.data as any).type ?? formPayload.data.field_type
   const inputType = formPayload.data.input_type
   const fieldCode = String(formPayload.data.field_code ?? '').trim()
-  if (warnValidation(validateDBIdentifier('字段编码', fieldCode))) return
+  if (warnValidation(validateDBIdentifier(t('ui.fieldCode'), fieldCode))) return
   // 将 linkage_config 序列化为字符串（JsonEditor 会将 JSON 字符串解析为对象）
   const rawLinkage = (formPayload.data as any).linkage_config
   const linkageConfigStr =
@@ -2049,7 +2375,9 @@ const handleFieldFormSubmit = async (formPayload: {
     $q.notify({
       type: 'warning',
       position: 'top-right',
-      message: '选择“下拉选择”时必须指定字典编码或关联配置',
+      get message() {
+        return t('ui.youMustSpecifyDictionariesEncodingOrAssociationConfigurationWhenYou')
+      },
     })
     return
   }
@@ -2175,14 +2503,26 @@ const buildIndexFieldReqs = (tableId: number, fieldIds: number[]) => {
 const handleIndexFormSubmit = async () => {
   if (!currentTable.value) return
   const indexName = indexForm.value.index_name.trim()
-  if (warnValidation(validateDBIdentifier('索引名称', indexName))) return
+  if (warnValidation(validateDBIdentifier(t('ui.indexName'), indexName))) return
   if (indexForm.value.field_ids.length === 0) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请至少选择一个索引字段' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.pleaseSelectAtLeastOneIndexField')
+      },
+    })
     return
   }
   const indexFields = buildIndexFieldReqs(currentTable.value.id, indexForm.value.field_ids)
   if (indexFields.length !== indexForm.value.field_ids.length) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '索引字段无效，请重新选择' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.indexFieldIsInvalidRecheck')
+      },
+    })
     return
   }
 
@@ -2216,7 +2556,9 @@ const handleIndexFormSubmit = async () => {
 
 const confirmDeleteIndex = (row: TableIndex) => {
   confirmDanger({
-    message: `确定要删除索引 "${row.index_name}" 吗？`,
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheIndex', { value1: row.index_name })
+    },
   }).onOk(() => {
     void (async () => {
       const result = await tableApi.deleteTableIndex(row.id)
@@ -2265,22 +2607,42 @@ const handleRelationFormSubmit = async () => {
   const foreignKey = relationForm.value.foreign_key.trim()
   const manyTableCode = relationForm.value.many_table_code.trim()
   if (!relationForm.value.related_table_id) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请选择关联表' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.selectTheAssociationTable')
+      },
+    })
     return
   }
   if (!referenceKey) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请选择主表字段' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.selectTheMainTableField')
+      },
+    })
     return
   }
   if (!foreignKey) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请选择关联表字段' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.selectTheAssociatedTableField')
+      },
+    })
     return
   }
-  if (warnValidation(validateDBIdentifier('主表字段', referenceKey))) return
-  if (warnValidation(validateDBIdentifier('关联表字段', foreignKey))) return
+  if (warnValidation(validateDBIdentifier(t('ui.masterField'), referenceKey))) return
+  if (warnValidation(validateDBIdentifier(t('ui.relatedTableField'), foreignKey))) return
   if (relationForm.value.relation_type === SysTableRelationType.MANY_TO_MANY) {
-    if (warnValidation(validateDBIdentifier('中间表编码', manyTableCode))) return
-  } else if (warnValidation(validateDBIdentifier('中间表编码', manyTableCode, false))) {
+    if (warnValidation(validateDBIdentifier(t('ui.junctionTableCode'), manyTableCode))) return
+  } else if (
+    warnValidation(validateDBIdentifier(t('ui.junctionTableCode'), manyTableCode, false))
+  ) {
     return
   }
 
@@ -2318,7 +2680,9 @@ const handleRelationFormSubmit = async () => {
 
 const confirmDeleteRelation = (row: TableRelation) => {
   confirmDanger({
-    message: '确定要删除该关联关系吗？',
+    get message() {
+      return t('ui.areYouSureYouWantToDeleteTheConnection')
+    },
   }).onOk(() => {
     void (async () => {
       const result = await tableApi.deleteTableRelation(row.id)

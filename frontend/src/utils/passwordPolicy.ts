@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import type { Configure } from 'src/api/services/basic'
 
 export type PasswordRule = (val: unknown) => true | string
@@ -41,39 +42,66 @@ export interface PasswordPolicyPreset {
 export const passwordPolicyPresets: PasswordPolicyPreset[] = [
   {
     value: 'low',
-    label: '低：至少6位',
-    shortLabel: '低',
+    get label() {
+      return t('ui.lowAtLeast6Places')
+    },
+    get shortLabel() {
+      return t('ui.low')
+    },
     minLen: 6,
     complexity: 1,
-    description: '仅校验长度，不限制字符组合，适合内网临时或测试环境。',
+    get description() {
+      return t('ui.onlyVerifyTheLengthWithoutLimitingTheCombinationOfCharactersSuitableFor')
+    },
     regexText: '^\\S{6,}$',
   },
   {
     value: 'medium',
-    label: '中：至少8位，字母+数字',
-    shortLabel: '中',
+    get label() {
+      return t('ui.mediumAtLeast8BitsLettersNumbers')
+    },
+    get shortLabel() {
+      return t('ui.medium')
+    },
     minLen: 8,
     complexity: 2,
-    description: '至少包含字母和数字，不允许空白字符，适合普通管理后台。',
+    get description() {
+      return t('ui.atLeastIncludeLettersAndNumbersBlankCharactersAreNotAllowedAnd')
+    },
     regexText: '^(?=.*[A-Za-z])(?=.*\\d)\\S{8,}$',
   },
   {
     value: 'high',
-    label: '高：至少12位，三类字符',
-    shortLabel: '高',
+    get label() {
+      return t('ui.highAtLeast12BitsThreeCharacters')
+    },
+    get shortLabel() {
+      return t('ui.high')
+    },
     minLen: 12,
     complexity: 3,
-    description: '至少包含三类字符，且必须包含字母和数字，适合生产和高权限账号。',
-    regexText: '^(?=.*[A-Za-z])(?=.*\\d)(?:(?=.*[a-z])(?=.*[A-Z])|(?=.*[a-z])(?=.*[^A-Za-z0-9\\s])|(?=.*[A-Z])(?=.*[^A-Za-z0-9\\s])|(?=.*\\d)(?=.*[^A-Za-z0-9\\s]))\\S{12,}$',
+    get description() {
+      return t('ui.containsAtLeastThreeTypesOfCharactersAndMustContainLettersAnd')
+    },
+    regexText:
+      '^(?=.*[A-Za-z])(?=.*\\d)(?:(?=.*[a-z])(?=.*[A-Z])|(?=.*[a-z])(?=.*[^A-Za-z0-9\\s])|(?=.*[A-Z])(?=.*[^A-Za-z0-9\\s])|(?=.*\\d)(?=.*[^A-Za-z0-9\\s]))\\S{12,}$',
   },
   {
     value: 'custom',
-    label: '自定义：手动设置长度和组合',
-    shortLabel: '自定义',
+    get label() {
+      return t('ui.customManualSettingsLengthAndGrouping')
+    },
+    get shortLabel() {
+      return t('ui.custom')
+    },
     minLen: 6,
     complexity: 1,
-    description: '使用下方最小长度和复杂度配置，适合特殊业务规则。',
-    regexText: '按自定义长度和复杂度动态校验',
+    get description() {
+      return t('ui.useTheMinimumLengthAndComplexityConfigurationBelowToFitTheSpecial')
+    },
+    get regexText() {
+      return t('ui.validationByCustomLengthAndComplexityDynamic')
+    },
   },
 ]
 
@@ -84,7 +112,9 @@ export const passwordPolicyOptions = passwordPolicyPresets.map((preset) => ({
 }))
 
 export function normalizePasswordPolicy(policy?: string): PasswordPolicyLevel {
-  const normalized = String(policy ?? '').trim().toLowerCase()
+  const normalized = String(policy ?? '')
+    .trim()
+    .toLowerCase()
   if (normalized === 'strong') return 'high'
   if (['low', 'medium', 'high', 'custom'].includes(normalized)) {
     return normalized as PasswordPolicyLevel
@@ -94,7 +124,9 @@ export function normalizePasswordPolicy(policy?: string): PasswordPolicyLevel {
 
 export function getPasswordPolicyPreset(policy?: string): PasswordPolicyPreset {
   const normalized = normalizePasswordPolicy(policy)
-  return passwordPolicyPresets.find((preset) => preset.value === normalized) ?? passwordPolicyPresets[1]!
+  return (
+    passwordPolicyPresets.find((preset) => preset.value === normalized) ?? passwordPolicyPresets[1]!
+  )
 }
 
 export function effectivePasswordPolicy(cfg: PasswordPolicyConfig): {
@@ -134,27 +166,27 @@ export function passwordPolicyDescription(cfg: PasswordPolicyConfig): string {
   const { minLen, complexity } = effectivePasswordPolicy(cfg)
 
   if (complexity <= 1) {
-    return `至少 ${minLen} 位`
+    return t('ui.atLeastBits', { minLen: minLen })
   }
 
   if (complexity === 2) {
-    return `至少 ${minLen} 位，且包含字母与数字`
+    return t('ui.atLeastBitsWithLettersAndNumbers', { minLen: minLen })
   }
 
   // complexity >= 3
-  return `至少 ${minLen} 位，且至少包含三类字符（大写/小写/数字/特殊字符），并必须包含字母与数字`
+  return t('ui.atLeastBitsWhichContainAtLeastThreeTypesOfCharactersFast', { minLen: minLen })
 }
 
 export function validatePasswordByConfigure(
   password: string,
-  cfg: PasswordPolicyConfig
+  cfg: PasswordPolicyConfig,
 ): true | string {
   const pwd = String(password ?? '').trim()
-  if (!pwd) return '密码不能为空'
-  if (hasWhitespace(pwd)) return '密码不能包含空白字符'
+  if (!pwd) return t('ui.passwordCannotBeEmpty')
+  if (hasWhitespace(pwd)) return t('ui.passwordCannotContainWhitespaceCharacters')
 
   const { minLen, complexity } = effectivePasswordPolicy(cfg)
-  if (pwd.length < minLen) return `密码长度不足：至少 ${minLen} 位`
+  if (pwd.length < minLen) return t('ui.passwordLengthInsufficientAtLeastBit', { minLen: minLen })
 
   if (complexity <= 1) return true
 
@@ -165,23 +197,21 @@ export function validatePasswordByConfigure(
 
   if (complexity >= 2) {
     if (!(digit && (lower || upper))) {
-      return '密码复杂度不足：至少包含字母和数字'
+      return t('ui.passwordComplexityInsufficientContainsAtLeastLettersAndNumbers')
     }
   }
 
   if (complexity >= 3) {
     const classCount = [lower, upper, digit, special].filter(Boolean).length
     if (classCount < 3) {
-      return '密码复杂度不足：至少包含三类字符（大写/小写/数字/特殊字符）'
+      return t('ui.insufficientPasswordComplexityContainsAtLeastThreeTypesOfCharactersFacileCut')
     }
   }
 
   return true
 }
 
-export function buildPasswordRules(
-  cfg: PasswordPolicyConfig
-): PasswordRule[] {
+export function buildPasswordRules(cfg: PasswordPolicyConfig): PasswordRule[] {
   return [
     (val) => {
       const password = typeof val === 'string' ? val : ''

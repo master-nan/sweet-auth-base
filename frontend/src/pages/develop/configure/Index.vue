@@ -6,15 +6,17 @@
           <q-icon :name="pageIcon" />
         </div>
         <div class="configure-hero__content">
-          <div class="configure-hero__title">配置管理</div>
-          <div class="configure-hero__subtitle">系统参数、登录策略和邮件服务集中维护</div>
+          <div class="configure-hero__title">{{ t('ui.configureManagement') }}</div>
+          <div class="configure-hero__subtitle">
+            {{ t('ui.systemParametersLoginPolicyAndMailServicesCentralized') }}
+          </div>
         </div>
         <div class="configure-hero__actions">
           <q-btn
             outline
             color="primary"
             icon="refresh"
-            label="刷新"
+            :label="t('ui.refresh')"
             :loading="loading"
             @click="refreshConfig"
           />
@@ -46,9 +48,9 @@
           <div class="configure-sidebar-note">
             <q-icon name="verified_user" />
             <div>
-              <div class="configure-sidebar-note__title">运行时配置</div>
+              <div class="configure-sidebar-note__title">{{ t('ui.runTimeConfiguration') }}</div>
               <div class="configure-sidebar-note__text">
-                保存后会刷新前端配置缓存，登录策略即时生效。
+                {{ t('ui.savesItAndRefreshsTheFrontEndConfigurationCacheAnd') }}
               </div>
             </div>
           </div>
@@ -80,15 +82,17 @@
                   <q-icon name="shield" />
                 </span>
                 <div>
-                  <div class="setting-row__title">登录验证码</div>
-                  <div class="setting-row__caption">开启后登录页会出现验证码输入与校验</div>
+                  <div class="setting-row__title">{{ t('ui.loginAuthenticationCode') }}</div>
+                  <div class="setting-row__caption">
+                    {{ t('ui.theLoginPageWillBeUsedToObtainTheAuthentication') }}
+                  </div>
                 </div>
               </div>
               <q-toggle
                 v-model="formData.enable_captcha"
                 color="primary"
                 keep-color
-                :label="formData.enable_captcha ? '已开启' : '已关闭'"
+                :label="formData.enable_captcha ? t('ui.switchedOnStatus') : t('ui.closed')"
               />
             </div>
 
@@ -97,13 +101,15 @@
                 v-model="formData.password_policy"
                 class="field-grid__wide"
                 :options="policyOptions"
-                label="密码策略"
+                :label="t('ui.passwordPolicy')"
                 outlined
                 dense
                 hide-bottom-space
                 emit-value
                 map-options
-                :rules="[(val) => String(val ?? '').trim().length > 0 || '请选择密码策略']"
+                :rules="[
+                  (val) => String(val ?? '').trim().length > 0 || t('ui.selectPasswordPolicy'),
+                ]"
                 @update:model-value="syncPasswordPolicyPreset"
               >
                 <template #option="scope">
@@ -132,7 +138,7 @@
                   </div>
                 </div>
                 <div class="password-policy-card__rule">
-                  <span>校验表达式</span>
+                  <span>{{ t('ui.verifyExpression') }}</span>
                   <code>{{ passwordPolicyRegex }}</code>
                 </div>
               </div>
@@ -141,11 +147,13 @@
                 <q-input
                   v-model.number="formData.password_length"
                   type="number"
-                  label="自定义最小长度"
+                  :label="t('ui.customizeMinimumLength')"
                   outlined
                   dense
                   hide-bottom-space
-                  :rules="[(val) => Number(val) >= 6 || '密码长度不能小于6位']"
+                  :rules="[
+                    (val) => Number(val) >= 6 || t('ui.passwordLengthCannotBeLessThan6Bits'),
+                  ]"
                 >
                   <template #append>
                     <q-icon name="password" />
@@ -155,7 +163,7 @@
                 <q-select
                   v-model="formData.password_complexity"
                   :options="complexityOptions"
-                  label="自定义复杂度"
+                  :label="t('ui.customComplexity')"
                   outlined
                   dense
                   hide-bottom-space
@@ -171,11 +179,11 @@
               <q-input
                 v-model.number="formData.password_expire_time"
                 type="number"
-                label="密码过期时间（天）"
+                :label="t('ui.expiryPasswordDays')"
                 outlined
                 dense
                 hide-bottom-space
-                :rules="[(val) => Number(val) >= 0 || '过期时间不能为负数']"
+                :rules="[(val) => Number(val) >= 0 || t('ui.expiryCannotBeNegative')]"
               >
                 <template #append>
                   <q-icon name="timer" />
@@ -185,11 +193,11 @@
               <q-input
                 v-model.number="formData.password_error_count"
                 type="number"
-                label="密码错误锁定次数"
+                :label="t('ui.passwordErrorLockingTimes')"
                 outlined
                 dense
                 hide-bottom-space
-                :rules="[(val) => Number(val) > 0 || '错误次数必须大于0']"
+                :rules="[(val) => Number(val) > 0 || t('ui.theNumberOfErrorsMustBeGreaterThan0')]"
               >
                 <template #append>
                   <q-icon name="lock" />
@@ -199,11 +207,11 @@
               <q-input
                 v-model.number="formData.password_lock_minutes"
                 type="number"
-                label="锁定时长（分钟）"
+                :label="t('ui.lockDurationMinutes')"
                 outlined
                 dense
                 hide-bottom-space
-                :rules="[(val) => Number(val) > 0 || '锁定时长必须大于0']"
+                :rules="[(val) => Number(val) > 0 || t('ui.lockTimeMustBeGreaterThan0')]"
               >
                 <template #append>
                   <q-icon name="lock_clock" />
@@ -216,11 +224,12 @@
                 </span>
                 <div class="login-lock-card__body">
                   <div class="login-lock-card__title">
-                    连续失败 {{ formData.password_error_count }} 次后锁定
-                    {{ formData.password_lock_minutes }} 分钟
+                    {{ t('ui.continuousFailure') }} {{ formData.password_error_count }}
+                    {{ t('ui.lockItInASecond') }} {{ formData.password_lock_minutes }}
+                    {{ t('ui.min') }}
                   </div>
                   <div class="login-lock-card__text">
-                    到期会自动解锁；管理员也可以在用户管理行操作中解除锁定。
+                    {{ t('ui.theTimeExpiresAutomaticallyUnlocksTheLockTheAdministratorCan') }}
                   </div>
                 </div>
               </div>
@@ -233,7 +242,7 @@
                 <img
                   v-if="systemConfig.system_logo"
                   :src="systemConfig.system_logo"
-                  alt="系统Logo"
+                  :alt="t('ui.systemLogo')"
                 />
                 <q-icon v-else name="hub" />
               </div>
@@ -242,7 +251,7 @@
                   {{ systemConfig.system_name || 'Sweet Admin' }}
                 </div>
                 <div class="system-brand-row__caption">
-                  {{ systemConfig.system_description || '通用低代码底座' }}
+                  {{ systemConfig.system_description || t('ui.generalPurposeLowCodeFoundation') }}
                 </div>
               </div>
             </div>
@@ -250,18 +259,26 @@
             <div class="field-grid">
               <q-input
                 v-model="systemConfig.system_name"
-                label="系统名称"
+                :label="t('ui.systemName')"
                 outlined
                 dense
                 hide-bottom-space
-                :rules="[(val) => String(val ?? '').trim().length > 0 || '请输入系统名称']"
+                :rules="[
+                  (val) =>
+                    String(val ?? '').trim().length > 0 || t('ui.pleaseEnterTheNameOfTheSystem'),
+                ]"
               >
                 <template #append>
                   <q-icon name="business" />
                 </template>
               </q-input>
 
-              <q-input v-model="systemConfig.system_version" label="系统版本" outlined dense>
+              <q-input
+                v-model="systemConfig.system_version"
+                :label="t('ui.systemVersion')"
+                outlined
+                dense
+              >
                 <template #append>
                   <q-icon name="new_releases" />
                 </template>
@@ -270,7 +287,7 @@
               <q-input
                 v-model="systemConfig.system_logo"
                 class="field-grid__wide"
-                label="系统Logo URL"
+                :label="t('ui.systemLogoUrl')"
                 outlined
                 dense
               >
@@ -283,7 +300,7 @@
                 v-model="systemConfig.system_description"
                 class="field-grid__wide"
                 type="textarea"
-                label="系统描述"
+                :label="t('ui.systemDescription')"
                 outlined
                 dense
                 autogrow
@@ -302,9 +319,13 @@
                   <q-icon name="mark_email_read" />
                 </span>
                 <div>
-                  <div class="setting-row__title">邮件服务</div>
+                  <div class="setting-row__title">{{ t('ui.mailService') }}</div>
                   <div class="setting-row__caption">
-                    维护 SMTP 参数，用户密码重置后可自动发送临时密码通知
+                    {{
+                      t(
+                        'ui.maintainSmtpParametersWithAutomaticSendingOfTemporaryPasswordNotifications',
+                      )
+                    }}
                   </div>
                 </div>
               </div>
@@ -312,14 +333,14 @@
                 v-model="emailConfig.enable_email"
                 color="primary"
                 keep-color
-                :label="emailConfig.enable_email ? '已开启' : '已关闭'"
+                :label="emailConfig.enable_email ? t('ui.switchedOnStatus') : t('ui.closed')"
               />
             </div>
 
             <div class="field-grid">
               <q-input
                 v-model="emailConfig.smtp_server"
-                label="SMTP服务器"
+                :label="t('ui.smtpServer')"
                 outlined
                 dense
                 hide-bottom-space
@@ -328,7 +349,7 @@
                   (val) =>
                     !emailConfig.enable_email ||
                     String(val ?? '').trim().length > 0 ||
-                    'SMTP服务器不能为空',
+                    t('ui.smtpServerCannotBeEmpty'),
                 ]"
               >
                 <template #append>
@@ -339,13 +360,14 @@
               <q-input
                 v-model.number="emailConfig.smtp_port"
                 type="number"
-                label="SMTP端口"
+                :label="t('ui.smtpPort')"
                 outlined
                 dense
                 hide-bottom-space
                 :disable="!emailConfig.enable_email"
                 :rules="[
-                  (val) => !emailConfig.enable_email || Number(val) > 0 || 'SMTP端口不能为空',
+                  (val) =>
+                    !emailConfig.enable_email || Number(val) > 0 || t('ui.smtpPortCannotBeEmpty'),
                 ]"
               >
                 <template #append>
@@ -355,7 +377,7 @@
 
               <q-input
                 v-model="emailConfig.sender_email"
-                label="发件人邮箱"
+                :label="t('ui.senderMailbox')"
                 outlined
                 dense
                 hide-bottom-space
@@ -364,7 +386,7 @@
                   (val) =>
                     !emailConfig.enable_email ||
                     String(val ?? '').trim().length > 0 ||
-                    '发件人邮箱不能为空',
+                    t('ui.senderMailboxCannotBeEmpty'),
                 ]"
               >
                 <template #append>
@@ -374,12 +396,12 @@
 
               <q-input
                 v-model="emailConfig.sender_password"
-                label="发件人密码/授权码"
+                :label="t('ui.senderPasswordAuthorizationCode')"
                 outlined
                 dense
                 :type="showPassword ? 'text' : 'password'"
                 :disable="!emailConfig.enable_email"
-                hint="留空保存时会沿用原授权码"
+                :hint="t('ui.theOriginalAuthorizationCodeWillBeUsedWhenLeavingEmpty')"
               >
                 <template #append>
                   <q-icon
@@ -394,11 +416,11 @@
             <div class="email-test-row">
               <q-input
                 v-model="testEmailTo"
-                label="测试收件邮箱"
+                :label="t('ui.testInbox')"
                 outlined
                 dense
                 :disable="!emailConfig.enable_email"
-                hint="使用已保存的邮件配置发送；修改 SMTP 参数后请先保存"
+                :hint="t('ui.useSavedMailConfigurationToSendSaveSmtpArgumentsAfter')"
               >
                 <template #append>
                   <q-icon name="mail" />
@@ -408,7 +430,7 @@
                 color="primary"
                 outline
                 icon="outgoing_mail"
-                label="发送测试邮件"
+                :label="t('ui.sendTestEmails')"
                 type="button"
                 :loading="loading"
                 :disable="!emailConfig.enable_email"
@@ -426,7 +448,7 @@
               <q-btn
                 color="primary"
                 icon="save"
-                label="保存配置"
+                :label="t('ui.saveConfiguration')"
                 :loading="loading"
                 unelevated
                 type="submit"
@@ -440,6 +462,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'develop_configure' })
 import { computed, nextTick, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -457,6 +481,8 @@ import {
   passwordPolicyOptions,
   passwordPolicyRegexText,
 } from 'src/utils/passwordPolicy'
+
+const { t } = useI18n({ useScope: 'global' })
 
 type ConfigTab = 'security' | 'system' | 'email'
 
@@ -486,19 +512,40 @@ const showPassword = ref(false)
 const testEmailTo = ref('')
 
 const complexityOptions = [
-  { label: '低：长度校验', value: 1 },
-  { label: '中：字母 + 数字', value: 2 },
-  { label: '高：三类字符', value: 3 },
+  {
+    get label() {
+      return t('ui.lowLengthCheck')
+    },
+    value: 1,
+  },
+  {
+    get label() {
+      return t('ui.mediumLettersNumbers')
+    },
+    value: 2,
+  },
+  {
+    get label() {
+      return t('ui.highThreeCharacters')
+    },
+    value: 3,
+  },
 ]
 
 const policyOptions = passwordPolicyOptions
 
 const defaultSection: ConfigSection = {
   name: 'security',
-  label: '安全配置',
-  caption: '登录策略与密码规则',
+  get label() {
+    return t('ui.securityConfiguration')
+  },
+  get caption() {
+    return t('ui.loginPolicyAndPasswordRules')
+  },
   icon: 'security',
-  status: '配置',
+  get status() {
+    return t('ui.configure')
+  },
   color: 'primary',
 }
 
@@ -517,7 +564,9 @@ const systemConfig = ref({
   system_name: 'Sweet Admin',
   system_version: '0.1',
   system_logo: '',
-  system_description: '通用低代码底座',
+  get system_description() {
+    return t('ui.generalPurposeLowCodeFoundation')
+  },
 })
 
 const emailConfig = ref({
@@ -546,35 +595,52 @@ const policyLabel = computed(() => currentPolicyPreset.value.label)
 
 const lastUpdatedText = computed(() => {
   return formData.value.gmt_modify
-    ? `最近修改：${formData.value.gmt_modify}`
-    : '配置尚未保存修改记录'
+    ? t('ui.recentlyModified', { value1: formData.value.gmt_modify })
+    : t('ui.configureNotKeptTheModifiedRecord')
 })
 
 const configSections = computed<ConfigSection[]>(() => [
   {
     name: 'security',
-    label: '安全配置',
-    caption: `验证码${formData.value.enable_captcha ? '开启' : '关闭'}，${passwordPolicySummary.value}`,
+    get label() {
+      return t('ui.securityConfiguration')
+    },
+    get caption() {
+      return t('ui.verificationCode', {
+        value1: formData.value.enable_captcha ? t('ui.on') : t('ui.off'),
+        value2: passwordPolicySummary.value,
+      })
+    },
     icon: 'security',
-    status: `${formData.value.password_error_count}次`,
+    get status() {
+      return t('ui.timesCount', { value1: formData.value.password_error_count })
+    },
     color: 'primary',
   },
   {
     name: 'email',
-    label: '邮件配置',
-    caption: emailConfig.value.enable_email
-      ? emailConfig.value.smtp_server || '待配置服务器'
-      : '邮件服务未启用',
+    get label() {
+      return t('ui.mailConfiguration')
+    },
+    get caption() {
+      return emailConfig.value.enable_email
+        ? emailConfig.value.smtp_server || t('ui.serverToBeConfigured')
+        : t('ui.mailServiceNotEnabled')
+    },
     icon: 'email',
-    status: emailConfig.value.enable_email ? '开启' : '关闭',
+    get status() {
+      return emailConfig.value.enable_email ? t('ui.enable') : t('ui.close')
+    },
     color: emailConfig.value.enable_email ? 'positive' : 'grey-6',
   },
   {
     name: 'system',
-    label: '系统配置',
+    get label() {
+      return t('ui.systemConfiguration')
+    },
     caption: systemConfig.value.system_name || 'Sweet Admin',
     icon: 'settings',
-    status: systemConfig.value.system_version || '版本',
+    status: systemConfig.value.system_version || t('ui.version'),
     color: 'primary',
   },
 ])
@@ -585,20 +651,29 @@ const currentSection = computed<ConfigSection>(() => {
 
 const overviewItems = computed(() => [
   {
-    label: '验证码',
-    value: formData.value.enable_captcha ? '开启' : '关闭',
+    get label() {
+      return t('ui.authenticationCode')
+    },
+    value: formData.value.enable_captcha ? t('ui.enable') : t('ui.close'),
     icon: 'verified_user',
     color: formData.value.enable_captcha ? 'positive' : 'grey-7',
   },
   {
-    label: '密码策略',
+    get label() {
+      return t('ui.passwordPolicy')
+    },
     value: policyLabel.value,
     icon: 'lock',
     color: 'primary',
   },
   {
-    label: '登录锁定',
-    value: `${formData.value.password_error_count}次/${formData.value.password_lock_minutes}分钟`,
+    get label() {
+      return t('ui.loginLock')
+    },
+    value: t('ui.timesMinutes', {
+      value1: formData.value.password_error_count,
+      value2: formData.value.password_lock_minutes,
+    }),
     icon: 'lock_clock',
     color: 'warning',
   },
@@ -617,7 +692,8 @@ const fetchConfig = async () => {
       system_name: response.data.system_name || 'Sweet Admin',
       system_version: response.data.system_version || '0.1',
       system_logo: response.data.system_logo || '',
-      system_description: response.data.system_description || '通用低代码底座',
+      system_description:
+        response.data.system_description || t('ui.generalPurposeLowCodeFoundation'),
     }
 
     emailConfig.value = {
@@ -633,7 +709,13 @@ fetchConfig()
 
 const refreshConfig = async () => {
   await fetchConfig()
-  $q.notify({ type: 'positive', position: 'top-right', message: '配置已刷新' })
+  $q.notify({
+    type: 'positive',
+    position: 'top-right',
+    get message() {
+      return t('ui.configurationRefreshed')
+    },
+  })
 }
 
 const syncPasswordPolicyPreset = () => {
@@ -645,7 +727,13 @@ const syncPasswordPolicyPreset = () => {
 const sendTestEmail = async () => {
   const to = testEmailTo.value.trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-    $q.notify({ type: 'warning', position: 'top-right', message: '请输入正确的测试收件邮箱' })
+    $q.notify({
+      type: 'warning',
+      position: 'top-right',
+      get message() {
+        return t('ui.pleaseEnterTheCorrectTestInbox')
+      },
+    })
     return
   }
   await basicApi.testConfigureEmail(to)
@@ -690,7 +778,9 @@ const saveConfig = async () => {
     $q.notify({
       color: 'negative',
       position: 'top-right',
-      message: '请先完善必填项后再保存',
+      get message() {
+        return t('ui.pleaseCompleteTheRequiredEntriesBeforeSavingThem')
+      },
     })
     return
   }

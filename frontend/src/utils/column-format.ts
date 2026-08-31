@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 /**
  * 列表列格式化工具
  * 统一处理日期时间、字典、布尔、关联表字段的列显示
@@ -234,7 +235,7 @@ export const buildColumnFormat = (
       }
       if (label) return label
       // fallback: 布尔字段显示"是/否"，其他显示原始值
-      if (isBool) return val === true || val === 1 ? '是' : '否'
+      if (isBool) return val === true || val === 1 ? t('ui.yes') : t('ui.no')
       return val == null ? '' : String(val)
     }
   }
@@ -244,13 +245,13 @@ export const buildColumnFormat = (
     return (val: any) => {
       if (val == null || val === '') return ''
       const lookup = ctx.relationLookups?.[field.field_code]
-      return lookup?.[String(val)] || '关联值未解析'
+      return lookup?.[String(val)] || t('ui.associationValueUnsolved')
     }
   }
 
   // 布尔字段
   if (field.field_type === SysTableFieldType.BOOLEAN) {
-    return (val: any) => (val === true || val === 1 ? '是' : '否')
+    return (val: any) => (val === true || val === 1 ? t('ui.yes') : t('ui.no'))
   }
 
   // 日期时间字段
@@ -268,7 +269,7 @@ export const buildColumnFormat = (
   if (field.input_type === SysTableFieldInputType.FILE_PICKER) {
     return (val: any) => {
       if (val == null || val === '' || val === '0') return ''
-      return '已上传'
+      return t('ui.uploaded')
     }
   }
 
@@ -413,7 +414,9 @@ export const buildTableColumns = (
       {
         name: 'actions',
         align: 'center',
-        label: '操作',
+        get label() {
+          return t('ui.actions')
+        },
         field: 'actions',
         defaultVisible: true,
       },

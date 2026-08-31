@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { defineBoot } from '#q-app/wrappers'
 import axios, { type AxiosInstance } from 'axios'
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from 'axios'
@@ -26,7 +27,9 @@ declare module '@vue/runtime-core' {
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/sweet_admin',
   timeout: 300000,
-  timeoutErrorMessage: '请求超时，请检查网络连接',
+  get timeoutErrorMessage() {
+    return t('ui.requestTimeoutCheckNetworkConnection')
+  },
   withCredentials: true,
 })
 
@@ -38,7 +41,7 @@ type SessionBoundRequestConfig = InternalAxiosRequestConfig & {
 
 export class StaleSessionResponseError extends Error {
   constructor() {
-    super('请求所属登录会话已切换')
+    super(t('ui.theRequestedLoginSessionHasBeenSwitched'))
     this.name = 'StaleSessionResponseError'
   }
 }
@@ -61,7 +64,7 @@ export function refreshAccessToken() {
     .post<ResponseData<{ access_token: string }>>('/admin/refresh')
     .then((response) => {
       const accessToken = String(response.data.data?.access_token || '')
-      if (!response.data.success || !accessToken) throw new Error('登录已失效，请重新登录')
+      if (!response.data.success || !accessToken) throw new Error(t('ui.loginExpiredPleaseReEntry'))
       useUserStore().replaceAccessToken(accessToken)
       return accessToken
     })
@@ -179,10 +182,10 @@ instance.interceptors.response.use(
     const res = response.data
     if (!res.success) {
       notifyRequestError(
-        res.error_message || '未知错误',
+        res.error_message || t('ui.unknownError'),
         `business:${response.config.method || 'get'}:${response.config.url || ''}:${res.error_code || res.code || ''}:${res.error_message || ''}`,
       )
-      const error = new Error(res.error_message || '未知错误') as Error & {
+      const error = new Error(res.error_message || t('ui.unknownError')) as Error & {
         response: typeof response
       }
       error.response = response
@@ -232,9 +235,11 @@ instance.interceptors.response.use(
         .then(() => instance.request(requestConfig!))
         .catch((refreshError) => {
           userStore.setLogout()
-          notifyRequestError('登录已失效，请重新登录', 'auth:expired')
+          notifyRequestError(t('ui.loginExpiredPleaseReEntry'), 'auth:expired')
           return Promise.reject(
-            refreshError instanceof Error ? refreshError : new Error('登录已失效，请重新登录'),
+            refreshError instanceof Error
+              ? refreshError
+              : new Error(t('ui.loginExpiredPleaseReEntry')),
           )
         })
     }
@@ -249,38 +254,42 @@ instance.interceptors.response.use(
       return Promise.reject(new StaleSessionResponseError())
     }
     if (typeof error.response === 'undefined') {
-      error.message = '网络异常'
+      error.message = t('ui.networkAnomaly')
       notifyRequestError(error.message || 'Request Error', 'network:error')
-      return Promise.reject(error instanceof Error ? error : new Error(error.message || '网络异常'))
+      return Promise.reject(
+        error instanceof Error ? error : new Error(error.message || t('ui.networkAnomaly')),
+      )
     }
     if (error.config?.responseType === 'blob') {
-      return Promise.reject(error instanceof Error ? error : new Error(error.message || '导出失败'))
+      return Promise.reject(
+        error instanceof Error ? error : new Error(error.message || t('ui.exportFailed')),
+      )
     }
 
     switch (res.status) {
       case 404:
-        error.message = '资源不存在(404)'
+        error.message = t('ui.resourceNotFound404')
         break
       case 408:
-        error.message = '请求超时(408)'
+        error.message = t('ui.requestTimeout408')
         break
       case 500:
-        error.message = '服务器错误(500)'
+        error.message = t('ui.serverError500')
         break
       case 501:
-        error.message = '服务未实现(501)'
+        error.message = t('ui.notImplemented501')
         break
       case 502:
-        error.message = '网络错误(502)'
+        error.message = t('ui.networkError502')
         break
       case 503:
-        error.message = '服务不可用(503)'
+        error.message = t('ui.serviceUnavailable503')
         break
       case 504:
-        error.message = '网络超时(504)'
+        error.message = t('ui.gatewayTimeout504')
         break
       case 505:
-        error.message = 'HTTP版本不受支持(505)'
+        error.message = t('ui.httpVersionNotSupported505')
         break
       default:
         error.message = res.data.error_message
@@ -290,7 +299,7 @@ instance.interceptors.response.use(
       res.data.error_message || error.message || 'Request Error',
       `http:${res.status}:${res.config?.method || 'get'}:${res.config?.url || ''}:${res.data.error_code || ''}:${res.data.error_message || ''}`,
     )
-    return Promise.reject(new Error(res.data.error_message || '未知错误'))
+    return Promise.reject(new Error(res.data.error_message || t('ui.unknownError')))
   },
 )
 export default defineBoot(({ app }) => {

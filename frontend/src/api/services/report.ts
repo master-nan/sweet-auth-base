@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 import { instance } from 'boot/axios'
 import type { Basic, Query, ResponseData } from 'src/types/global'
 import { parseBlobJsonError, parseContentDispositionFilename } from 'src/utils/download'
@@ -166,17 +167,19 @@ const normalizeWidgetFields = (
 const resolveDatasets = (item: BackendReport, fields: ReportField[]): ReportDataset[] => {
   const layoutDatasets = item.layout_config?.datasets || item.query_config?.datasets || []
   if (layoutDatasets.length) {
-    return ensureOnePrimaryDataset(layoutDatasets.map((dataset, index) => ({
-      ...dataset,
-      id: dataset.id || `dataset_${index + 1}`,
-      fields: (dataset.fields || []).map(toField),
-      primary: dataset.primary || index === 0,
-    })))
+    return ensureOnePrimaryDataset(
+      layoutDatasets.map((dataset, index) => ({
+        ...dataset,
+        id: dataset.id || `dataset_${index + 1}`,
+        fields: (dataset.fields || []).map(toField),
+        primary: dataset.primary || index === 0,
+      })),
+    )
   }
   return [
     {
       id: 'main',
-      name: item.source_code || '主数据',
+      name: item.source_code || t('ui.primaryData'),
       type: 'table',
       source_code: item.source_code,
       fields,
@@ -255,8 +258,10 @@ const toBackendReport = (req: ReportSaveReq) => {
   const primary = primaryTableDataset(datasets)
   const sourceCode = primary?.source_code || String(req.data_source_id || '')
   const sourceLayout = req.layout_config
-  const datasetJoins = req.dataset_joins || req.query_config?.dataset_joins || sourceLayout?.dataset_joins || []
-  const parameters = req.parameters || req.query_config?.parameters || sourceLayout?.parameters || []
+  const datasetJoins =
+    req.dataset_joins || req.query_config?.dataset_joins || sourceLayout?.dataset_joins || []
+  const parameters =
+    req.parameters || req.query_config?.parameters || sourceLayout?.parameters || []
   const layoutConfig: ReportLayoutConfig = {
     ...(sourceLayout || {}),
     version: sourceLayout?.version || REPORT_SCHEMA_VERSION,
@@ -362,29 +367,35 @@ const toPreview = (data: BackendReportPreview): ReportPreviewRes => ({
 
 export const useReportApi = () => {
   const queryReports = async (params: Query) => {
-    return instance.post<ResponseData<BackendReport[]>>('/admin/report/query', params).then((res) => {
-      return {
-        ...res.data,
-        data: (res.data.data || []).map(toReport),
-      } as ResponseData<Report[]>
-    })
+    return instance
+      .post<ResponseData<BackendReport[]>>('/admin/report/query', params)
+      .then((res) => {
+        return {
+          ...res.data,
+          data: (res.data.data || []).map(toReport),
+        } as ResponseData<Report[]>
+      })
   }
 
   const queryReportById = async (id: number, menuId = 0) => {
-    return instance.get<ResponseData<BackendReport>>(`/admin/report/${id}`, {
-      params: menuId > 0 ? { menu_id: menuId } : undefined,
-    }).then((res) => {
-      return {
-        ...res.data,
-        data: toReport(res.data.data),
-      } as ResponseData<Report>
-    })
+    return instance
+      .get<ResponseData<BackendReport>>(`/admin/report/${id}`, {
+        params: menuId > 0 ? { menu_id: menuId } : undefined,
+      })
+      .then((res) => {
+        return {
+          ...res.data,
+          data: toReport(res.data.data),
+        } as ResponseData<Report>
+      })
   }
 
   const createReport = async (req: ReportSaveReq) => {
-    return instance.post<ResponseData<number>>('/admin/report', toBackendReport(req)).then((res) => {
-      return res.data
-    })
+    return instance
+      .post<ResponseData<number>>('/admin/report', toBackendReport(req))
+      .then((res) => {
+        return res.data
+      })
   }
 
   const updateReport = async (req: ReportSaveReq) => {
@@ -403,10 +414,7 @@ export const useReportApi = () => {
       .then((res) => res.data)
   }
 
-  const publishReport = async (
-    id: number,
-    req?: ReportPublishReq,
-  ): Promise<ReportPublishRes> => {
+  const publishReport = async (id: number, req?: ReportPublishReq): Promise<ReportPublishRes> => {
     return instance
       .post<ResponseData<ReportPublishRes>>(`/admin/report/${id}/publish`, req || {})
       .then((res) => res.data.data)
@@ -435,10 +443,9 @@ export const useReportApi = () => {
       throw new Error('report_id is required for backend preview')
     }
     return instance
-      .post<ResponseData<BackendReportPreview>>(
-        `/admin/report/${req.report_id}/preview`,
-        toPreviewPayload(req),
-      )
+      .post<
+        ResponseData<BackendReportPreview>
+      >(`/admin/report/${req.report_id}/preview`, toPreviewPayload(req))
       .then((res) => {
         return {
           ...res.data,
@@ -452,10 +459,9 @@ export const useReportApi = () => {
     req: ReportPreviewReq,
   ): Promise<ReportPreviewRes> => {
     return instance
-      .post<ResponseData<BackendReportPreview>>(
-        `/admin/report/${id}/design-preview`,
-        toPreviewPayload(req),
-      )
+      .post<
+        ResponseData<BackendReportPreview>
+      >(`/admin/report/${id}/design-preview`, toPreviewPayload(req))
       .then((res) => toPreview(res.data.data))
   }
 
@@ -465,10 +471,7 @@ export const useReportApi = () => {
       .then((res) => toPreview(res.data.data))
   }
 
-  const exportReport = async (
-    id: number,
-    req: ReportExportReq,
-  ): Promise<ReportExportFile> => {
+  const exportReport = async (id: number, req: ReportExportReq): Promise<ReportExportFile> => {
     const format = req.format || 'csv'
     const fallbackFilename = `report_${id}.csv`
 
@@ -489,7 +492,7 @@ export const useReportApi = () => {
 
       if (contentType.toLowerCase().includes('json')) {
         const errorMessage = await parseBlobJsonError(blob)
-        throw new Error(errorMessage || '导出失败')
+        throw new Error(errorMessage || t('ui.exportFailed'))
       }
 
       const filename =

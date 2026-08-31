@@ -34,7 +34,7 @@
                 ><q-btn
                   color="primary"
                   icon="search"
-                  label="查询"
+                  :label="t('ui.query')"
                   :disable="loading"
                   @click="search"
                 />
@@ -54,7 +54,11 @@
           ><status-chip
             :color="props.row.result_certainty === 'confirmed' ? 'positive' : 'warning'"
             :outline="false"
-            :label="props.row.result_certainty === 'confirmed' ? '结果已确认' : '结果未知'" /></q-td
+            :label="
+              props.row.result_certainty === 'confirmed'
+                ? t('ui.resultsConfirmed')
+                : t('ui.resultsUnknown')
+            " /></q-td
       ></template>
       <template #body-cell-actions="props"
         ><q-td :props="props" class="q-gutter-xs no-wrap"
@@ -81,12 +85,12 @@
     <q-dialog v-model="showDetail"
       ><q-card style="min-width: min(720px, 92vw)"
         ><q-card-section class="row items-center"
-          ><div class="text-h6">调用日志详情</div>
+          ><div class="text-h6">{{ t('ui.callLogDetails') }}</div>
           <q-space /><q-btn v-close-popup flat round icon="close" /></q-card-section
         ><q-separator /><q-card-section v-if="detail"
           ><div class="row q-col-gutter-lg">
             <div class="col-6">
-              <div class="text-caption text-grey-7">执行编号</div>
+              <div class="text-caption text-grey-7">{{ t('ui.executionId') }}</div>
               <div>{{ detail.execution_no }}</div>
             </div>
             <div class="col-6">
@@ -94,47 +98,47 @@
               <div>#{{ detail.attempt_no }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">凭证编码</div>
+              <div class="text-caption text-grey-7">{{ t('ui.credentialCodeLabel') }}</div>
               <div>{{ detail.credential_code || '-' }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">凭证版本摘要</div>
+              <div class="text-caption text-grey-7">{{ t('ui.documentVersionSummary') }}</div>
               <div>{{ detail.credential_version || '-' }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">响应类型</div>
+              <div class="text-caption text-grey-7">{{ t('ui.responseType') }}</div>
               <div>{{ detail.response_content_type || '-' }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">响应大小</div>
+              <div class="text-caption text-grey-7">{{ t('ui.responseSize') }}</div>
               <div>{{ detail.result_size_bytes }} bytes</div>
             </div>
             <div class="col-12">
-              <div class="text-caption text-grey-7">安全错误消息</div>
+              <div class="text-caption text-grey-7">{{ t('ui.securityErrorMessage') }}</div>
               <div>{{ detail.result_summary || detail.error_code || '-' }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">调用类型</div>
-              <div>{{ detail.attempt_no > 1 ? '自动重试' : '首次调用' }}</div>
+              <div class="text-caption text-grey-7">{{ t('ui.callType') }}</div>
+              <div>{{ detail.attempt_no > 1 ? t('ui.autoRetry') : t('ui.firstCall') }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">可重试</div>
-              <div>{{ detail.retryable ? '是' : '否' }}</div>
+              <div class="text-caption text-grey-7">{{ t('ui.tryAgain') }}</div>
+              <div>{{ detail.retryable ? t('ui.yes') : t('ui.no') }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">重试原因</div>
+              <div class="text-caption text-grey-7">{{ t('ui.retryReason') }}</div>
               <div>{{ formatRetryReason(detail.retry_reason_code) }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">重试延迟</div>
-              <div>{{ detail.retry_delay_ms }} 毫秒</div>
+              <div class="text-caption text-grey-7">{{ t('ui.delayInRetrying') }}</div>
+              <div>{{ detail.retry_delay_ms }} {{ t('ui.milliseconds') }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">计划重试时间</div>
+              <div class="text-caption text-grey-7">{{ t('ui.timeToRetry') }}</div>
               <div>{{ formatDate(detail.retry_scheduled_at) }}</div>
             </div>
             <div class="col-6">
-              <div class="text-caption text-grey-7">调度来源</div>
+              <div class="text-caption text-grey-7">{{ t('ui.movementControlSource') }}</div>
               <div>{{ retryAfterSourceLabel(detail.retry_after_source) }}</div>
             </div>
           </div></q-card-section
@@ -145,6 +149,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 defineOptions({ name: 'integration_log' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps } from 'quasar'
@@ -169,6 +175,8 @@ import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/
 import { resolveTableEmptyMessage } from 'src/utils/table-state'
 import { countEffectiveQueryRules } from 'src/utils/query-state'
 import { ExpressionType } from 'src/types/enum'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const route = useRoute()
 const api = useIntegrationApi()
@@ -214,8 +222,11 @@ const queryState = useTableQueryState<IntegrationLogQuery>({
   }),
 })
 const { query, keyword, appliedAdvanced: appliedAdvancedQuery } = queryState
-const { quickSearchPlaceholder, advancedSearchFields: advancedFields, loadMetadata } =
-  useRuntimeTableMetadata('integration_log')
+const {
+  quickSearchPlaceholder,
+  advancedSearchFields: advancedFields,
+  loadMetadata,
+} = useRuntimeTableMetadata('integration_log')
 const activeFilterCount = computed(() => countEffectiveQueryRules(appliedAdvancedQuery.value))
 const emptyMessage = computed(() =>
   resolveTableEmptyMessage({
@@ -225,34 +236,122 @@ const emptyMessage = computed(() =>
   }),
 )
 const statusMeta: Record<string, { label: string; color: string }> = {
-  running: { label: '执行中', color: 'primary' },
-  succeeded: { label: '成功', color: 'positive' },
-  failed: { label: '失败', color: 'negative' },
-  cancelled: { label: '已取消', color: 'grey-6' },
+  running: {
+    get label() {
+      return t('ui.executionRunningStatus')
+    },
+    color: 'primary',
+  },
+  succeeded: {
+    get label() {
+      return t('ui.success')
+    },
+    color: 'positive',
+  },
+  failed: {
+    get label() {
+      return t('ui.failed')
+    },
+    color: 'negative',
+  },
+  cancelled: {
+    get label() {
+      return t('ui.cancelled')
+    },
+    color: 'grey-6',
+  },
 }
 const retryAfterSourceLabel = (value: string) =>
   ({
-    none: '无',
-    local: '本地退避',
-    http_delta: 'Retry-After 秒数',
-    http_date: 'Retry-After 日期',
-    ignored: '已忽略',
-    invalid_fallback: '无效值，回退本地退避',
+    get none() {
+      return t('ui.none')
+    },
+    get local() {
+      return t('ui.localRetreat')
+    },
+    get http_delta() {
+      return t('ui.retryAfterSeconds')
+    },
+    get http_date() {
+      return t('ui.retryAfterDate')
+    },
+    get ignored() {
+      return t('ui.ignored')
+    },
+    get invalid_fallback() {
+      return t('ui.invalidValueRetreatLocally')
+    },
   })[value] ||
   value ||
   '-'
 const formatDate = formatRuntimeDateTime
 const columns: QTableProps['columns'] = [
-  { name: 'execution_no', label: '执行编号', field: 'execution_no', align: 'left' },
+  {
+    name: 'execution_no',
+    get label() {
+      return t('ui.executionId')
+    },
+    field: 'execution_no',
+    align: 'left',
+  },
   { name: 'attempt_no', label: 'Attempt', field: 'attempt_no', align: 'center' },
-  { name: 'system_code', label: '系统', field: 'system_code', align: 'left' },
-  { name: 'interface_code', label: '接口', field: 'interface_code', align: 'left' },
+  {
+    name: 'system_code',
+    get label() {
+      return t('ui.system')
+    },
+    field: 'system_code',
+    align: 'left',
+  },
+  {
+    name: 'interface_code',
+    get label() {
+      return t('ui.api')
+    },
+    field: 'interface_code',
+    align: 'left',
+  },
   { name: 'worker_id_summary', label: 'Worker', field: 'worker_id_summary', align: 'left' },
-  { name: 'status', label: '状态', field: 'status', align: 'center' },
-  { name: 'http_status', label: 'HTTP状态', field: 'http_status', align: 'center' },
-  { name: 'duration_ms', label: '耗时（毫秒）', field: 'duration_ms', align: 'right' },
-  { name: 'result_certainty', label: '结果确定性', field: 'result_certainty', align: 'center' },
-  { name: 'actions', label: '操作', field: 'actions', align: 'center' },
+  {
+    name: 'status',
+    get label() {
+      return t('ui.status')
+    },
+    field: 'status',
+    align: 'center',
+  },
+  {
+    name: 'http_status',
+    get label() {
+      return t('ui.httpStatusLabel')
+    },
+    field: 'http_status',
+    align: 'center',
+  },
+  {
+    name: 'duration_ms',
+    get label() {
+      return t('ui.durationMs')
+    },
+    field: 'duration_ms',
+    align: 'right',
+  },
+  {
+    name: 'result_certainty',
+    get label() {
+      return t('ui.resultCertainty')
+    },
+    field: 'result_certainty',
+    align: 'center',
+  },
+  {
+    name: 'actions',
+    get label() {
+      return t('ui.actions')
+    },
+    field: 'actions',
+    align: 'center',
+  },
 ]
 const fetchData = async () => {
   if (!canQueryLogs.value) return
@@ -265,7 +364,7 @@ const fetchData = async () => {
   } catch {
     rows.value = []
     total.value = 0
-    loadError.value = '调用日志加载失败'
+    loadError.value = t('ui.callLogLoadingFailed')
   } finally {
     loading.value = false
   }

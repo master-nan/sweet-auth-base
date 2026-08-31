@@ -1,3 +1,4 @@
+import { translate as t } from 'src/i18n/runtime/instance'
 export const QUERY_SCHEME_NAME_MAX_CODE_POINTS = 64
 
 export const querySchemeNameLength = (value: string) => Array.from(value).length
@@ -16,7 +17,7 @@ export const isValidQuerySchemeName = (value: string) => {
 }
 
 export const buildQuerySchemeCopyName = (value: string) => {
-  const suffix = ' 副本'
+  const suffix = t('ui.querySchemeCopySuffix')
   const baseLength = QUERY_SCHEME_NAME_MAX_CODE_POINTS - querySchemeNameLength(suffix)
   return `${truncateQuerySchemeName(normalizeQuerySchemeName(value), baseLength)}${suffix}`
 }

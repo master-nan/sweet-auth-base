@@ -2,7 +2,7 @@
   <div
     class="assignment-scope-switch"
     role="tablist"
-    aria-label="任职记录时间范围"
+    :aria-label="t('ui.assignmentDateRange')"
     :style="indicatorStyle"
   >
     <span class="assignment-scope-switch__indicator" aria-hidden="true" />
@@ -23,14 +23,38 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type { AssignmentTimeScope } from 'src/api/services/org'
 
+const { t } = useI18n({ useScope: 'global' })
+
 const options: Array<{ label: string; value: AssignmentTimeScope }> = [
-  { label: '当前', value: 'current' },
-  { label: '历史', value: 'history' },
-  { label: '未来', value: 'future' },
-  { label: '时间轴', value: 'timeline' },
+  {
+    get label() {
+      return t('ui.current')
+    },
+    value: 'current',
+  },
+  {
+    get label() {
+      return t('ui.history')
+    },
+    value: 'history',
+  },
+  {
+    get label() {
+      return t('ui.theFuture')
+    },
+    value: 'future',
+  },
+  {
+    get label() {
+      return t('ui.axisOfTime')
+    },
+    value: 'timeline',
+  },
 ]
 
 const props = withDefaults(

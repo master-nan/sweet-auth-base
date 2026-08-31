@@ -7,9 +7,11 @@
     <q-card class="dataset-dialog">
       <q-card-section class="dialog-head">
         <div>
-          <div class="dialog-title">{{ editingDataset ? '编辑数据集' : '新增数据集' }}</div>
+          <div class="dialog-title">
+            {{ editingDataset ? t('ui.editDataSet') : t('ui.addDataSet') }}
+          </div>
           <div class="dialog-caption">
-            表数据集可直接选择系统表，SQL 数据集先维护 SQL 与字段结构。
+            {{ t('ui.tableDataSetsCanBeDirectlySelectedForTheSystem') }}
           </div>
         </div>
         <q-btn flat round dense icon="close" @click="$emit('update:modelValue', false)" />
@@ -23,7 +25,7 @@
             outlined
             emit-value
             map-options
-            label="数据集类型"
+            :label="t('ui.dataSetType')"
             :disable="!!editingDataset"
             :options="datasetTypeOptions"
             @update:model-value="$emit('update:type', $event as ReportDatasetType)"
@@ -32,7 +34,7 @@
             :model-value="draft.name"
             dense
             outlined
-            label="数据集名称"
+            :label="t('ui.datasetName')"
             @update:model-value="$emit('update:name', String($event || ''))"
           />
           <q-select
@@ -44,7 +46,7 @@
             map-options
             option-label="name"
             option-value="code"
-            label="来源表"
+            :label="t('ui.sourceTable')"
             use-input
             input-debounce="80"
             :options="tableSourceOptions"
@@ -56,7 +58,7 @@
             :model-value="draft.sql"
             outlined
             type="textarea"
-            label="SQL 语句"
+            :label="t('ui.sqlStatement')"
             placeholder="select company_name, amount from tms_waybill where ..."
             @update:model-value="$emit('update:sql', String($event || ''))"
           />
@@ -65,32 +67,34 @@
               outline
               color="primary"
               icon="schema"
-              label="解析字段"
+              :label="t('ui.parsingFields')"
               :loading="sqlFieldsLoading"
               @click="$emit('inferSqlFields')"
             />
-            <span>根据 SQL 结果列自动生成字段，避免手工维护字段编码。</span>
+            <span>{{
+              t('ui.theSqlResultsColumnAutomaticallyGeneratesFieldsAvoidingManualMaintenance')
+            }}</span>
           </div>
           <q-banner v-if="draft.type === 'sql'" dense rounded class="sql-note">
             <template #avatar>
               <q-icon name="verified" color="primary" />
             </template>
-            SQL 数据集保存前必须生成字段；接口无权限时，请在角色授权中勾选报表的“SQL字段解析”接口。
+            {{ t('ui.sqlDataSetsMustBeGeneratedBeforeSavingTickThe') }}
           </q-banner>
           <q-expansion-item
             v-if="draft.type === 'sql'"
             dense
             class="manual-fields"
             icon="edit_note"
-            label="手动填写字段"
-            caption="只有 SQL 无法解析时才需要填写"
+            :label="t('ui.manuallyFillFields')"
+            :caption="t('ui.onlySqlsThatCannotBeParsedNeedToBeFilled')"
           >
             <q-input
               :model-value="draft.fieldsText"
               dense
               outlined
-              label="字段"
-              hint="逗号分隔，例如 company_name,amount"
+              :label="t('ui.field')"
+              :hint="t('ui.commaSeparatedEGCompanyNameAmount')"
               @update:model-value="$emit('update:fieldsText', String($event || ''))"
             />
           </q-expansion-item>
@@ -98,8 +102,8 @@
 
         <div class="field-preview">
           <div class="preview-head">
-            <strong>字段预览</strong>
-            <span>{{ previewFields.length }} 个字段</span>
+            <strong>{{ t('ui.fieldPreview') }}</strong>
+            <span>{{ previewFields.length }} {{ t('ui.fieldCountSuffix') }}</span>
           </div>
           <q-table
             flat
@@ -117,12 +121,12 @@
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="取消" @click="$emit('update:modelValue', false)" />
+        <q-btn flat :label="t('ui.cancel')" @click="$emit('update:modelValue', false)" />
         <q-btn
           color="primary"
           unelevated
           icon="save"
-          :label="editingDataset ? '保存' : '添加'"
+          :label="editingDataset ? t('ui.save') : t('ui.add')"
           @click="$emit('confirm')"
         />
       </q-card-actions>
@@ -131,6 +135,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import type {
@@ -139,6 +145,8 @@ import type {
   ReportDatasetType,
   ReportField,
 } from 'src/api/services/report'
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   modelValue: boolean
@@ -168,10 +176,38 @@ defineEmits<{
 }>()
 
 const fieldColumns = computed<QTableProps['columns']>(() => [
-  { name: 'name', field: 'name', label: '字段名称', align: 'left' },
-  { name: 'code', field: 'code', label: '字段编码', align: 'left' },
-  { name: 'type', field: (row: ReportField) => fieldTypeLabel(row.type), label: '类型', align: 'left' },
-  { name: 'role', field: (row: ReportField) => row.role || '-', label: '角色', align: 'left' },
+  {
+    name: 'name',
+    field: 'name',
+    get label() {
+      return t('ui.fieldName')
+    },
+    align: 'left',
+  },
+  {
+    name: 'code',
+    field: 'code',
+    get label() {
+      return t('ui.fieldCode')
+    },
+    align: 'left',
+  },
+  {
+    name: 'type',
+    field: (row: ReportField) => fieldTypeLabel(row.type),
+    get label() {
+      return t('ui.type')
+    },
+    align: 'left',
+  },
+  {
+    name: 'role',
+    field: (row: ReportField) => row.role || '-',
+    get label() {
+      return t('ui.role')
+    },
+    align: 'left',
+  },
 ])
 
 const tableSourceOptions = ref<ReportDataSource[]>([])
@@ -192,10 +228,7 @@ function filterDataSources(value: string, update: (callback: () => void) => void
       return
     }
     tableSourceOptions.value = props.dataSources.filter((item) => {
-      return (
-        item.name.toLowerCase().includes(keyword) ||
-        item.code.toLowerCase().includes(keyword)
-      )
+      return item.name.toLowerCase().includes(keyword) || item.code.toLowerCase().includes(keyword)
     })
   })
 }
@@ -203,24 +236,60 @@ function filterDataSources(value: string, update: (callback: () => void) => void
 function fieldTypeLabel(type: string | number | undefined) {
   const value = String(type || '').toLowerCase()
   const labels: Record<string, string> = {
-    '1': '数字',
-    '2': '大数字',
-    '3': '字符串',
-    '4': '文本',
-    '5': '布尔',
-    '6': '日期',
-    '7': '时间',
-    number: '数字',
-    bigint: '大数字',
-    integer: '数字',
-    string: '字符串',
-    text: '文本',
-    boolean: '布尔',
-    bool: '布尔',
-    date: '日期',
-    time: '时间',
-    datetime: '日期时间',
-    timestamp: '日期时间',
+    get '1'() {
+      return t('ui.number')
+    },
+    get '2'() {
+      return t('ui.largeNumber')
+    },
+    get '3'() {
+      return t('ui.string')
+    },
+    get '4'() {
+      return t('ui.text')
+    },
+    get '5'() {
+      return t('ui.boolean')
+    },
+    get '6'() {
+      return t('ui.date')
+    },
+    get '7'() {
+      return t('ui.time')
+    },
+    get number() {
+      return t('ui.number')
+    },
+    get bigint() {
+      return t('ui.largeNumber')
+    },
+    get integer() {
+      return t('ui.number')
+    },
+    get string() {
+      return t('ui.string')
+    },
+    get text() {
+      return t('ui.text')
+    },
+    get boolean() {
+      return t('ui.boolean')
+    },
+    get bool() {
+      return t('ui.boolean')
+    },
+    get date() {
+      return t('ui.date')
+    },
+    get time() {
+      return t('ui.time')
+    },
+    get datetime() {
+      return t('ui.dateAndTime')
+    },
+    get timestamp() {
+      return t('ui.dateAndTime')
+    },
   }
   return labels[value] || type || '-'
 }

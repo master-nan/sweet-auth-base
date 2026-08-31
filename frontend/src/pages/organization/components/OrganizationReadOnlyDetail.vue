@@ -40,15 +40,19 @@
 
     <div v-else-if="!loading" class="absolute-full column flex-center q-gutter-sm text-grey-6">
       <q-icon name="description" size="42px" />
-      <div>{{ emptyText }}</div>
+      <div>{{ displayEmptyText }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import { Dark } from 'quasar'
 import type { OrganizationDetailGroup } from './organization-read-only-detail'
+
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'OrganizationReadOnlyDetail' })
 
@@ -62,9 +66,11 @@ const props = withDefaults(
   {
     loading: false,
     error: '',
-    emptyText: '请选择一条记录',
+    emptyText: '',
   },
 )
+
+const displayEmptyText = computed(() => props.emptyText || t('ui.pleaseSelectARecord'))
 
 const fields = computed(() => props.groups.flatMap((group) => group.fields))
 </script>
