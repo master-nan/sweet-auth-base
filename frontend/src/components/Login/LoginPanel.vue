@@ -1,14 +1,5 @@
 <template>
   <q-card flat class="login-card">
-    <div class="login-card-top">
-      <span>简体中文</span>
-      <div class="login-mode-toggle">
-        <dark-mode />
-      </div>
-    </div>
-
-    <login-flow-visual class="login-flow-visual" />
-
     <div class="login-mobile-brand">
       <div class="login-brand">
         <div class="login-brand-logo">
@@ -21,6 +12,8 @@
         </div>
       </div>
     </div>
+
+    <login-flow-visual class="login-flow-visual" />
 
     <q-card-section class="login-body">
       <div class="login-kicker">账号登录</div>
@@ -133,7 +126,6 @@ import { computed, ref, onMounted } from 'vue'
 import { useVModels } from '@vueuse/core'
 import { useBasicApi } from 'src/api/services/basic'
 import { QForm } from 'quasar'
-import DarkMode from 'src/components/Toolbar/DarkMode.vue'
 import LoginFlowVisual from 'src/components/Login/LoginFlowVisual.vue'
 import { useConfigureStore } from 'stores/configure'
 
@@ -233,16 +225,6 @@ const onLoginClick = async () => {
   box-shadow: none;
 }
 
-.login-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-bottom: 10px;
-  color: #7f899b;
-  font-size: 12px;
-}
-
 .login-flow-visual {
   width: calc(100% + 48px);
   height: 116px;
@@ -316,29 +298,9 @@ const onLoginClick = async () => {
   font-size: 12px;
 }
 
-.login-mode-toggle {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid #d8deea;
-  border-radius: 50%;
-  background: #fbfcfd;
-}
-
-.login-mode-toggle :deep(.dark-mode-btn) {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0;
-  color: #151a27;
-}
-
 .login-mobile-brand {
   display: none;
-  margin-bottom: 42px;
+  margin-bottom: 22px;
 }
 
 .login-body {
@@ -480,20 +442,10 @@ const onLoginClick = async () => {
   color: #f8fafc;
 }
 
-.login-card.q-dark .login-card-top,
 .login-card.q-dark .login-brand-subtitle,
 .login-card.q-dark .login-welcome p,
 .login-card.q-dark .login-field > label {
   color: #a3adbf;
-}
-
-.login-card.q-dark .login-mode-toggle {
-  border-color: #3a4050;
-  background: #242835;
-}
-
-.login-card.q-dark .login-mode-toggle :deep(.dark-mode-btn) {
-  color: #f2f4f8;
 }
 
 .login-card.q-dark .login-form :deep(.q-field__control) {
@@ -524,19 +476,16 @@ const onLoginClick = async () => {
 }
 
 @media (max-width: 599px) {
-  .login-card-top {
-    margin-bottom: 8px;
-  }
-
   .login-mobile-brand {
     display: block;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
+    padding-right: 88px;
   }
 
   .login-flow-visual {
     width: calc(100% + 24px);
-    height: 96px;
-    margin: 0 -12px 20px;
+    height: 78px;
+    margin: 0 -12px 18px;
   }
 
   .login-welcome h2 {
@@ -551,9 +500,8 @@ const onLoginClick = async () => {
 
   .login-flow-visual {
     width: calc(100% + 32px);
-    height: 108px;
-    margin-right: -16px;
-    margin-left: -16px;
+    height: 92px;
+    margin: 0 -16px 20px;
   }
 }
 </style>

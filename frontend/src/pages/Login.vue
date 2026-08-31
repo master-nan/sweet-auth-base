@@ -4,6 +4,35 @@
       <login-illustration />
     </div>
     <section class="login-side">
+      <div class="login-actions">
+        <q-btn
+          class="login-action-btn"
+          dense
+          flat
+          icon="language"
+          aria-label="切换语言"
+        >
+          <q-tooltip>切换语言</q-tooltip>
+          <q-menu anchor="bottom right" self="top right">
+            <q-list dense class="login-language-menu">
+              <q-item
+                v-for="option in localeOptions"
+                :key="option.value"
+                v-close-popup
+                clickable
+                @click="setLocale(option.value)"
+              >
+                <q-item-section>{{ option.label }}</q-item-section>
+                <q-item-section side>
+                  <q-icon v-if="locale === option.value" name="check" color="primary" size="xs" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+        <dark-mode />
+      </div>
+
       <div class="login-panel-wrap">
         <login-panel
           v-model:username="loginData.user_name"
@@ -32,6 +61,8 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from 'src/stores/user'
 import { useQuasar } from 'quasar'
+import { useI18n } from 'vue-i18n'
+import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
 
 const $q = useQuasar()
 
@@ -47,6 +78,7 @@ const connectionLabel =
 
 import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
 import LoginPanel from 'src/components/Login/LoginPanel.vue'
+import DarkMode from 'src/components/Toolbar/DarkMode.vue'
 import { useLoadingStore } from 'stores/loading'
 import { storeToRefs } from 'pinia'
 
@@ -54,11 +86,21 @@ defineOptions({ name: 'Login' })
 
 const userStore = useUserStore()
 const router = useRouter()
+const { locale } = useI18n({ useScope: 'global' })
 const message = ref<string>('')
 const { login } = useBasicApi()
 
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)
+const localeOptions: Array<{ value: SupportedLocale; label: string }> = [
+  { value: 'zh-CN', label: '简体中文' },
+  { value: 'en-US', label: 'English' },
+]
+
+const setLocale = (value: SupportedLocale) => {
+  locale.value = value
+  writeUIPreferences({ locale: value })
+}
 
 // 登录表单只保存用户输入；Token和当前用户状态由User Store接管。
 const loginData: SignInReq = reactive({
@@ -105,6 +147,7 @@ const onLoginClick = async () => {
 }
 
 .login-side {
+  position: relative;
   min-width: 0;
   min-height: 100vh;
   display: grid;
@@ -118,8 +161,38 @@ const onLoginClick = async () => {
 .login-panel-wrap {
   width: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: clamp(28px, 7vh, 76px);
+}
+
+.login-actions {
+  position: absolute;
+  z-index: 3;
+  top: clamp(22px, 3vw, 32px);
+  right: clamp(24px, 4vw, 44px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-action-btn,
+.login-actions :deep(.dark-mode-btn) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid #d8deea;
+  border-radius: 50%;
+  background: #fbfcfd;
+  color: #151a27;
+}
+
+.login-action-btn:hover,
+.login-actions :deep(.dark-mode-btn:hover) {
+  color: var(--q-primary);
+  background: #f3f5fa;
 }
 
 .login-footer {
@@ -168,6 +241,19 @@ const onLoginClick = async () => {
   color: #f7f8fb;
 }
 
+.login-page--dark .login-action-btn,
+.login-page--dark .login-actions :deep(.dark-mode-btn) {
+  border-color: #3a4050;
+  background: #242835;
+  color: #f2f4f8;
+}
+
+.login-page--dark .login-action-btn:hover,
+.login-page--dark .login-actions :deep(.dark-mode-btn:hover) {
+  color: #a99ff8;
+  background: #2b3040;
+}
+
 .login-page--dark .login-footer {
   border-top-color: rgba(255, 255, 255, 0.08);
   color: rgba(247, 248, 251, 0.44);
@@ -184,6 +270,15 @@ const onLoginClick = async () => {
     border-left: 0;
   }
 
+  .login-panel-wrap {
+    padding-top: 0;
+  }
+
+  .login-actions {
+    top: 28px;
+    right: clamp(20px, 7vw, 64px);
+  }
+
   .login-footer {
     width: min(100%, 440px);
     margin: 0 auto;
@@ -193,6 +288,11 @@ const onLoginClick = async () => {
 @media (max-width: 599px) {
   .login-side {
     padding: 22px 22px 18px;
+  }
+
+  .login-actions {
+    top: 22px;
+    right: 22px;
   }
 
   .login-footer {

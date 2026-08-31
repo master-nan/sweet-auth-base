@@ -3,46 +3,12 @@
 </template>
 
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useQuasar } from 'quasar'
-import lottie, { type AnimationItem } from 'lottie-web/build/player/lottie_light'
 import { createLoginFlowAnimation } from 'src/components/Login/login-flow-animation'
+import { useLoginLottie } from 'src/components/Login/use-login-lottie'
 
 defineOptions({ name: 'LoginFlowVisual' })
 
-const $q = useQuasar()
-const containerRef = ref<HTMLElement | null>(null)
-let animation: AnimationItem | null = null
-
-const renderAnimation = () => {
-  if (containerRef.value == null) return
-
-  animation?.destroy()
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  animation = lottie.loadAnimation({
-    container: containerRef.value,
-    renderer: 'svg',
-    loop: !reduceMotion,
-    autoplay: !reduceMotion,
-    animationData: createLoginFlowAnimation($q.dark.isActive),
-    rendererSettings: {
-      preserveAspectRatio: 'xMidYMid meet',
-      progressiveLoad: true,
-    },
-  })
-
-  if (reduceMotion) {
-    animation.goToAndStop(45, true)
-  }
-}
-
-onMounted(renderAnimation)
-watch(() => $q.dark.isActive, renderAnimation)
-
-onBeforeUnmount(() => {
-  animation?.destroy()
-  animation = null
-})
+const { containerRef } = useLoginLottie(createLoginFlowAnimation)
 </script>
 
 <style scoped lang="scss">
