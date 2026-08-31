@@ -4,6 +4,22 @@
       <login-illustration />
     </div>
     <section class="login-side">
+      <svg
+        class="login-divider"
+        viewBox="0 0 96 1000"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <path
+          class="login-divider-left"
+          d="M48 0 C20 180 18 320 48 500 C78 680 76 820 48 1000 L0 1000 L0 0 Z"
+        />
+        <path
+          class="login-divider-right"
+          d="M48 0 C20 180 18 320 48 500 C78 680 76 820 48 1000 L96 1000 L96 0 Z"
+        />
+      </svg>
+
       <div class="login-actions">
         <q-btn
           class="login-action-btn"
@@ -158,6 +174,25 @@ const onLoginClick = async () => {
   color: #172033;
 }
 
+.login-divider {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: -36px;
+  width: 72px;
+  height: 100%;
+  pointer-events: none;
+}
+
+.login-divider-left {
+  fill: #edf1f7;
+}
+
+.login-divider-right {
+  fill: #ffffff;
+}
+
 .login-panel-wrap {
   width: 100%;
   display: flex;
@@ -241,6 +276,14 @@ const onLoginClick = async () => {
   color: #f7f8fb;
 }
 
+.login-page--dark .login-divider-left {
+  fill: #171a26;
+}
+
+.login-page--dark .login-divider-right {
+  fill: #1d202c;
+}
+
 .login-page--dark .login-action-btn,
 .login-page--dark .login-actions :deep(.dark-mode-btn) {
   border-color: #3a4050;
@@ -268,6 +311,10 @@ const onLoginClick = async () => {
     width: 100%;
     padding: 28px clamp(20px, 7vw, 64px) 22px;
     border-left: 0;
+  }
+
+  .login-divider {
+    display: none;
   }
 
   .login-panel-wrap {
