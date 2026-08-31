@@ -7,9 +7,7 @@
       </div>
     </div>
 
-    <div class="login-flow-visual" aria-hidden="true">
-      <img :src="loginFlowVisual" alt="" />
-    </div>
+    <login-flow-visual class="login-flow-visual" />
 
     <div class="login-mobile-brand">
       <div class="login-brand">
@@ -136,8 +134,8 @@ import { useVModels } from '@vueuse/core'
 import { useBasicApi } from 'src/api/services/basic'
 import { QForm } from 'quasar'
 import DarkMode from 'src/components/Toolbar/DarkMode.vue'
+import LoginFlowVisual from 'src/components/Login/LoginFlowVisual.vue'
 import { useConfigureStore } from 'stores/configure'
-import loginFlowVisual from 'src/assets/login-flow-visual.png'
 
 defineOptions({ name: 'MyLogin' })
 
@@ -246,20 +244,15 @@ const onLoginClick = async () => {
 }
 
 .login-flow-visual {
+  --login-flow-track: rgba(88, 101, 126, 0.16);
+  --login-flow-violet: #7164ed;
+  --login-flow-cyan: #2d9fb5;
+  --login-flow-green: #3aaa7c;
+  --login-flow-coral: #d9796d;
   width: calc(100% + 48px);
   height: 116px;
   margin: 0 -24px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
-}
-
-.login-flow-visual img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
 }
 
 .login-brand {
@@ -500,7 +493,11 @@ const onLoginClick = async () => {
 }
 
 .login-card.q-dark .login-flow-visual {
-  opacity: 0.9;
+  --login-flow-track: rgba(203, 213, 225, 0.15);
+  --login-flow-violet: #988df6;
+  --login-flow-cyan: #5bb9ca;
+  --login-flow-green: #5bc598;
+  --login-flow-coral: #e18c82;
 }
 
 .login-card.q-dark .login-mode-toggle {
