@@ -42,9 +42,7 @@ export const useConfigureStore = defineStore('configure', {
     system_name: 'Sweet Admin',
     system_version: '0.1',
     system_logo: '',
-    get system_description() {
-      return t('ui.generalPurposeLowCodeFoundation')
-    },
+    system_description: '',
     // 邮件配置默认值
     enable_email: false,
     smtp_server: '',
@@ -88,7 +86,7 @@ export const useConfigureStore = defineStore('configure', {
       return state.system_logo
     },
     getSystemDescription(state) {
-      return state.system_description
+      return state.system_description || t('ui.generalPurposeLowCodeFoundation')
     },
     // 邮件配置的getter
     getEnableEmail(state) {
