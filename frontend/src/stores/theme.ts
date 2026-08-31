@@ -4,7 +4,6 @@ import {
   DEFAULT_PRIMARY_COLOR,
   readUIPreferences,
   writeUIPreferences,
-  type DisplayDensity,
   type LayoutMode,
 } from 'src/utils/ui-preferences'
 
@@ -17,7 +16,6 @@ const darkPageColor = '#161b28'
 interface ThemeColor {
   primary: string
   layoutMode: LayoutMode
-  density: DisplayDensity
   dark: boolean
 }
 
@@ -25,7 +23,6 @@ export const useThemeStore = defineStore('theme', {
   state: (): ThemeColor => ({
     primary: primaryColor,
     layoutMode: preferences.layoutMode,
-    density: preferences.density,
     dark: preferences.dark,
   }),
 
@@ -71,7 +68,6 @@ export const useThemeStore = defineStore('theme', {
   actions: {
     applyPreferences() {
       this.applyThemeColor(this.primary)
-      this.applyDensity(this.density)
       Dark.set(this.dark)
     },
     applyThemeColor(color: string) {
@@ -95,14 +91,6 @@ export const useThemeStore = defineStore('theme', {
     setLayoutMode(mode: LayoutMode) {
       this.layoutMode = mode
       writeUIPreferences({ layoutMode: mode })
-    },
-    applyDensity(density: DisplayDensity) {
-      this.density = density
-      document.body.classList.toggle('app-density--compact', density === 'compact')
-    },
-    setDensity(density: DisplayDensity) {
-      this.applyDensity(density)
-      writeUIPreferences({ density })
     },
     setDarkMode(dark: boolean) {
       this.dark = dark

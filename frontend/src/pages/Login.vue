@@ -1,23 +1,25 @@
 <template>
-  <div
-    class="login-page flex justify-center items-center full-height"
-    :class="{ 'login-page--dark': $q.dark.isActive }"
-  >
-    <corner-bottom :start-color="'#1976D2'" :end-color="'#00ACC1'" class="wave fit" />
-    <div class="login-visual col-6 flex justify-center items-center" v-show="$q.screen.gt.sm">
+  <div class="login-page" :class="{ 'login-page--dark': $q.dark.isActive }">
+    <div v-if="$q.screen.gt.sm" class="login-visual">
       <login-illustration />
     </div>
-    <div class="login-panel-wrap">
-      <login-panel
-        v-model:username="loginData.user_name"
-        v-model:password="loginData.password"
-        v-model:captcha="loginData.captcha"
-        v-model:captcha_id="loginData.captcha_id"
-        v-model:loading="loading"
-        @onLoginClick="onLoginClick"
-        :message="message"
-      />
-    </div>
+    <section class="login-side">
+      <div class="login-panel-wrap">
+        <login-panel
+          v-model:username="loginData.user_name"
+          v-model:password="loginData.password"
+          v-model:captcha="loginData.captcha"
+          v-model:captcha_id="loginData.captcha_id"
+          v-model:loading="loading"
+          @onLoginClick="onLoginClick"
+          :message="message"
+        />
+      </div>
+      <footer class="login-footer">
+        <span>Copyright © 2026 Sweet Admin</span>
+        <span class="login-secure"><i />连接安全</span>
+      </footer>
+    </section>
   </div>
 </template>
 
@@ -31,7 +33,6 @@ import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
 
-import CornerBottom from 'src/components/Login/CornerBottom.vue'
 import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
 import LoginPanel from 'src/components/Login/LoginPanel.vue'
 import { useLoadingStore } from 'stores/loading'
@@ -77,47 +78,104 @@ const onLoginClick = async () => {
 
 <style scoped>
 .login-page {
-  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(600px, 1.4fr) minmax(430px, 0.76fr);
   overflow: hidden;
-  display: grid !important;
-  grid-template-columns: minmax(420px, 1fr) minmax(360px, 520px);
-  gap: clamp(32px, 6vw, 88px);
-  padding: 48px clamp(32px, 7vw, 96px);
-  background:
-    linear-gradient(120deg, rgba(25, 118, 210, 0.08) 0 32%, transparent 32% 100%),
-    linear-gradient(135deg, #eef6f2 0%, #f8fafc 48%, #fff8ed 100%);
-}
-
-.wave {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  z-index: -1;
-  opacity: 0.55;
+  background: #ffffff;
 }
 
 .login-visual {
-  min-width: 420px;
-  justify-self: end;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.login-side {
+  min-width: 0;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: clamp(30px, 4vw, 54px) clamp(34px, 5vw, 72px) 24px;
+  border-left: 1px solid rgba(23, 32, 51, 0.08);
+  background: #ffffff;
+  color: #172033;
 }
 
 .login-panel-wrap {
-  width: min(500px, calc(100vw - 32px));
+  width: 100%;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+}
+
+.login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(23, 32, 51, 0.08);
+  color: rgba(23, 32, 51, 0.48);
+  font-size: 11px;
+}
+
+.login-secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.login-secure i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #55c991;
+  box-shadow: 0 0 10px rgba(85, 201, 145, 0.66);
 }
 
 .login-page--dark {
-  background:
-    linear-gradient(120deg, rgba(38, 166, 154, 0.12) 0 32%, transparent 32% 100%),
-    linear-gradient(135deg, #0f172a 0%, #111827 58%, #1f2937 100%);
+  background: #171a26;
+}
+
+.login-page--dark .login-side {
+  border-left-color: rgba(255, 255, 255, 0.08);
+  background: #1d202c;
+  color: #f7f8fb;
+}
+
+.login-page--dark .login-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  color: rgba(247, 248, 251, 0.44);
 }
 
 @media (max-width: 1023px) {
   .login-page {
-    display: flex !important;
-    padding: 32px 16px;
+    display: block;
+  }
+
+  .login-side {
+    width: 100%;
+    padding: 28px clamp(20px, 7vw, 64px) 22px;
+    border-left: 0;
+  }
+
+  .login-footer {
+    width: min(100%, 440px);
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 599px) {
+  .login-side {
+    padding: 22px 22px 18px;
+  }
+
+  .login-footer {
+    align-items: flex-start;
+    font-size: 10px;
   }
 }
 </style>

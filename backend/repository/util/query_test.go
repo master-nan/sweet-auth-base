@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gorm.io/datatypes"
+
 	"backend/dto/request"
 	"backend/enum"
 	"backend/internal/datapermission"
@@ -788,6 +790,21 @@ func TestGetFieldTypeUsesStringForTimeFields(t *testing.T) {
 	}
 	if got := GetFieldType(enum.DatetimeFieldType); got != reflect.TypeOf(time.Time{}) {
 		t.Fatalf("DATETIME fields should scan into time.Time, got %v", got)
+	}
+}
+
+func TestGetFieldTypeUsesScannableJSONType(t *testing.T) {
+	jsonType := GetFieldType(enum.JsonFieldType)
+	if jsonType != reflect.TypeOf(datatypes.JSON{}) {
+		t.Fatalf("JSON fields should scan into datatypes.JSON, got %v", jsonType)
+	}
+
+	value := reflect.New(jsonType).Interface().(*datatypes.JSON)
+	if err := value.Scan([]byte(`{"id":42,"name":"sample.pdf"}`)); err != nil {
+		t.Fatalf("JSON fields should accept PostgreSQL byte values: %v", err)
+	}
+	if got := string(*value); got != `{"id":42,"name":"sample.pdf"}` {
+		t.Fatalf("unexpected JSON value: %s", got)
 	}
 }
 

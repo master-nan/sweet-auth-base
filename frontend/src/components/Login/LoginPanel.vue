@@ -1,6 +1,13 @@
 <template>
   <q-card flat class="login-card">
     <div class="login-card-top">
+      <span>简体中文</span>
+      <div class="login-mode-toggle">
+        <dark-mode />
+      </div>
+    </div>
+
+    <div class="login-mobile-brand">
       <div class="login-brand">
         <div class="login-brand-logo">
           <img v-if="systemLogo" :src="systemLogo" alt="系统Logo" />
@@ -11,18 +18,20 @@
           <div class="login-brand-subtitle">{{ systemDescription || '通用低代码底座' }}</div>
         </div>
       </div>
-      <div class="login-mode-toggle">
-        <dark-mode />
-      </div>
     </div>
-    <div class="column items-stretch">
-      <q-card-section class="login-body">
-        <q-form
-          ref="loginForm"
-          class="login-form"
-          @submit.prevent="onLoginClick"
-        >
+
+    <q-card-section class="login-body">
+      <div class="login-kicker">安全入口</div>
+      <div class="login-welcome">
+        <h2>欢迎回来</h2>
+        <p>使用你的平台账号继续</p>
+      </div>
+
+      <q-form ref="loginForm" class="login-form" @submit.prevent="onLoginClick">
+        <div class="login-field">
+          <label for="login-username">账号</label>
           <q-input
+            id="login-username"
             v-model="username"
             placeholder="请输入账号"
             dense
@@ -37,7 +46,12 @@
               <q-icon size="xs" name="person" />
             </template>
           </q-input>
+        </div>
+
+        <div class="login-field">
+          <label for="login-password">密码</label>
           <q-input
+            id="login-password"
             v-model="password"
             placeholder="请输入密码"
             dense
@@ -60,8 +74,12 @@
               />
             </template>
           </q-input>
+        </div>
+
+        <div v-if="enableCaptcha" class="login-field">
+          <label for="login-captcha">验证码</label>
           <q-input
-            v-if="enableCaptcha"
+            id="login-captcha"
             v-model="captcha"
             class="login-captcha-field"
             placeholder="请输入验证码"
@@ -81,31 +99,29 @@
               </q-img>
             </template>
           </q-input>
-          <q-btn
-            class="login-submit full-width"
-            size="md"
-            unelevated
-            color="primary"
-            type="submit"
-            :loading="loading"
-          >
-            登录
-          </q-btn>
-          <q-banner
-            v-if="message !== ''"
-            inline-actions
-            dense
-            rounded
-            class="login-message text-red"
-          >
-            {{ message }}
-          </q-banner>
-        </q-form>
-        <div v-if="systemDescription" class="login-desc text-caption text-grey-7">
-          {{ systemDescription }}
         </div>
-      </q-card-section>
-    </div>
+
+        <q-btn
+          class="login-submit full-width"
+          size="md"
+          unelevated
+          color="primary"
+          type="submit"
+          :loading="loading"
+        >
+          登录
+        </q-btn>
+        <q-banner
+          v-if="message !== ''"
+          inline-actions
+          dense
+          rounded
+          class="login-message text-red"
+        >
+          {{ message }}
+        </q-banner>
+      </q-form>
+    </q-card-section>
   </q-card>
 </template>
 
@@ -206,52 +222,42 @@ const onLoginClick = async () => {
 <style scoped lang="scss">
 .login-card {
   width: 100%;
-  max-width: 460px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.98);
-  color: #111827;
-  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(14px);
-}
-
-.login-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  background: linear-gradient(90deg, #1976d2, #26a69a, #f6a623);
+  max-width: 380px;
+  border-radius: 0;
+  background: transparent;
+  color: #151a27;
+  box-shadow: none;
 }
 
 .login-card-top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 38px 38px 22px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: clamp(66px, 12vh, 116px);
+  color: #7f899b;
+  font-size: 12px;
 }
 
 .login-brand {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .login-brand-logo {
-  width: 50px;
-  height: 50px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 8px;
   color: #ffffff;
-  background: linear-gradient(135deg, #111827, #243044);
-  box-shadow: 0 14px 28px rgba(17, 24, 39, 0.2);
+  background: #252b38;
 }
 
 .login-brand-logo .q-icon {
-  font-size: 28px;
+  font-size: 22px;
 }
 
 .login-brand-logo img {
@@ -262,48 +268,102 @@ const onLoginClick = async () => {
 }
 
 .login-brand-title {
-  color: #111827;
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .login-brand-subtitle {
   margin-top: 4px;
-  color: #64748b;
-  font-size: 14px;
+  color: #7f899b;
+  font-size: 12px;
 }
 
 .login-mode-toggle {
   width: 34px;
   height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: #f1f5f9;
-  border: 1px solid rgba(100, 116, 139, 0.18);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #d8deea;
+  border-radius: 50%;
+  background: #fbfcfd;
+}
+
+.login-mode-toggle :deep(.dark-mode-btn) {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: #151a27;
+}
+
+.login-mobile-brand {
+  display: none;
+  margin-bottom: 42px;
 }
 
 .login-body {
-  padding: 0 38px 30px;
+  padding: 0;
+}
+
+.login-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: #6559ee;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.login-kicker::before {
+  content: '';
+  width: 22px;
+  height: 2px;
+  background: #6559ee;
+}
+
+.login-welcome h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.login-welcome p {
+  margin: 5px 0 28px;
+  color: #7f899b;
+  font-size: 13px;
 }
 
 .login-form {
   display: grid;
-  gap: 12px;
+  gap: 16px;
+}
+
+.login-field {
+  display: grid;
+  gap: 7px;
+}
+
+.login-field > label {
+  color: #526077;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .login-form :deep(.q-field__control) {
-  height: 46px;
-  min-height: 46px;
-  border-radius: 8px;
-  background: #ffffff;
+  height: 48px;
+  min-height: 48px;
+  border-radius: 6px;
+  background: #fbfcfd;
 }
 
 .login-form :deep(.q-field__marginal) {
-  height: 46px;
-  min-height: 46px;
+  height: 48px;
+  min-height: 48px;
   align-items: center;
 }
 
@@ -321,7 +381,7 @@ const onLoginClick = async () => {
 }
 
 .login-form :deep(.q-field--outlined .q-field__control::before) {
-  border-color: rgba(100, 116, 139, 0.28);
+  border-color: #d8deea;
 }
 
 .login-form :deep(.q-field--focused .q-field__control::after) {
@@ -350,12 +410,12 @@ const onLoginClick = async () => {
 .login-form :deep(.q-field__prefix),
 .login-form :deep(.q-field__suffix),
 .login-form :deep(.q-field__input) {
-  min-height: 46px;
+  min-height: 48px;
   line-height: 22px;
 }
 
 .login-form :deep(.q-icon) {
-  color: #111827;
+  color: #526077;
 }
 
 .login-form :deep(.q-field__label),
@@ -364,12 +424,13 @@ const onLoginClick = async () => {
 }
 
 .login-submit {
-  height: 50px;
-  border-radius: 8px;
-  font-size: 16px;
+  height: 48px;
+  margin-top: 4px;
+  border-radius: 6px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0;
-  box-shadow: 0 14px 24px rgba(25, 118, 210, 0.18);
+  box-shadow: 0 12px 24px rgba(103, 92, 241, 0.18);
 }
 
 .login-message {
@@ -377,16 +438,33 @@ const onLoginClick = async () => {
   background: rgba(244, 67, 54, 0.08);
 }
 
-.login-desc {
-  margin-top: 18px;
-  text-align: center;
-  line-height: 1.4;
+.login-card.q-dark {
+  background: transparent;
+  color: #f8fafc;
 }
 
-.login-card.q-dark {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(17, 24, 39, 0.94);
-  color: #f8fafc;
+.login-card.q-dark .login-card-top,
+.login-card.q-dark .login-brand-subtitle,
+.login-card.q-dark .login-welcome p,
+.login-card.q-dark .login-field > label {
+  color: #a3adbf;
+}
+
+.login-card.q-dark .login-mode-toggle {
+  border-color: #3a4050;
+  background: #242835;
+}
+
+.login-card.q-dark .login-mode-toggle :deep(.dark-mode-btn) {
+  color: #f2f4f8;
+}
+
+.login-card.q-dark .login-form :deep(.q-field__control) {
+  background: #242835;
+}
+
+.login-card.q-dark .login-form :deep(.q-field--outlined .q-field__control::before) {
+  border-color: #3a4050;
 }
 
 .login-card.q-dark .login-captcha-image {
@@ -409,16 +487,23 @@ const onLoginClick = async () => {
 }
 
 @media (max-width: 599px) {
-  .login-card {
-    box-shadow: 0 16px 42px rgba(30, 41, 59, 0.14);
-  }
-
   .login-card-top {
-    padding: 30px 24px 18px;
+    margin-bottom: 36px;
   }
 
-  .login-body {
-    padding: 0 24px 26px;
+  .login-mobile-brand {
+    display: block;
+    margin-bottom: 38px;
+  }
+
+  .login-welcome h2 {
+    font-size: 28px;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1023px) {
+  .login-mobile-brand {
+    display: block;
   }
 }
 </style>

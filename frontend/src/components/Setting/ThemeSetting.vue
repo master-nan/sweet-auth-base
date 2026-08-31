@@ -37,20 +37,6 @@
         />
       </q-card-section>
       <q-separator />
-      <q-card-section class="q-gutter-sm">
-        <div class="text-weight-bold text-subtitle2">{{ t('themeSetting.displayDensity') }}</div>
-        <q-btn-toggle
-          v-model="density"
-          class="theme-setting-layout-toggle"
-          spread
-          no-caps
-          unelevated
-          toggle-color="primary"
-          :options="densityOptions"
-        />
-        <div class="text-caption text-grey-7">{{ t('themeSetting.displayDensityHint') }}</div>
-      </q-card-section>
-      <q-separator />
       <q-card-section>
         <div class="text-weight-bold text-subtitle2 q-mb-sm">
           {{ t('themeSetting.setting') }}
@@ -95,11 +81,7 @@ import { useThemeStore } from 'src/stores/theme'
 import { useAppStore } from 'src/stores/app'
 import DarkMode from '../Toolbar/DarkMode.vue'
 import { useI18n } from 'vue-i18n'
-import {
-  DEFAULT_PRIMARY_COLOR,
-  type DisplayDensity,
-  type LayoutMode,
-} from 'src/utils/ui-preferences'
+import { DEFAULT_PRIMARY_COLOR, type LayoutMode } from 'src/utils/ui-preferences'
 
 const { t } = useI18n()
 const openSettingPanel = ref<boolean>(false)
@@ -115,10 +97,6 @@ const isDefaultThemeColor = computed(
 const layoutMode = computed<LayoutMode>({
   get: () => themeStore.layoutMode,
   set: (value) => themeStore.setLayoutMode(value),
-})
-const density = computed<DisplayDensity>({
-  get: () => themeStore.density,
-  set: (value) => themeStore.setDensity(value),
 })
 const drawerMini = computed({
   get: () => appStore.is_drawer_mini,
@@ -136,19 +114,6 @@ const layoutOptions = computed(() => [
     icon: 'web_asset',
   },
 ])
-const densityOptions = computed(() => [
-  {
-    label: t('themeSetting.densityComfortable'),
-    value: 'comfortable',
-    icon: 'view_agenda',
-  },
-  {
-    label: t('themeSetting.densityCompact'),
-    value: 'compact',
-    icon: 'density_small',
-  },
-])
-
 defineExpose({ toggleSettingPanel })
 
 const handleColorChange = (colorHex: string) => {

@@ -200,65 +200,6 @@ input[type='number']::-webkit-inner-spin-button {
   position: relative;
 }
 
-body.app-density--compact {
-  .q-table__top {
-    min-height: 48px;
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-
-  .q-table__bottom {
-    min-height: 42px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  .q-table thead tr,
-  .q-table tbody tr {
-    height: 42px;
-  }
-
-  .q-table th,
-  .q-table td {
-    height: 42px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    font-size: 13px;
-  }
-
-  .q-toolbar {
-    min-height: 44px;
-  }
-
-  .app-header__tabs {
-    min-height: 38px;
-  }
-
-  .app-drawer .q-item,
-  .q-menu .q-item {
-    min-height: 40px;
-  }
-
-  .q-field--dense:not(.q-field--auto-height) .q-field__control,
-  .q-field--dense .q-field__marginal {
-    min-height: 36px;
-    height: 36px;
-  }
-
-  .q-field--dense.q-field--auto-height .q-field__control {
-    min-height: 36px;
-  }
-
-  .q-field--dense:not(.q-field--auto-height) .q-field__native,
-  .q-field--dense:not(.q-field--auto-height) .q-field__input {
-    min-height: 36px;
-  }
-
-  .q-btn:not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini) {
-    min-height: 34px;
-  }
-}
-
 .body--dark {
   --app-scrollbar-thumb: rgba(148, 163, 184, 0.48);
   --app-scrollbar-thumb-hover: rgba(203, 213, 225, 0.74);
@@ -418,53 +359,6 @@ body.app-density--compact {
   .q-field--readonly .q-field__control {
     background: rgba(255, 255, 255, 0.025);
     opacity: 1;
-  }
-
-  .login-card {
-    border-color: var(--app-dark-border) !important;
-    background: rgba(17, 24, 39, 0.94) !important;
-    color: var(--app-dark-text) !important;
-  }
-
-  .login-card .q-field__control {
-    background: rgba(255, 255, 255, 0.045) !important;
-  }
-
-  .login-card .q-field__native,
-  .login-card .q-field__input,
-  .login-card .q-field__label,
-  .login-card .q-field__marginal,
-  .login-card .q-icon {
-    color: var(--app-dark-text) !important;
-  }
-
-  .login-card input::placeholder {
-    color: var(--app-dark-muted) !important;
-  }
-
-  .login-brand-title {
-    color: var(--app-dark-heading) !important;
-  }
-
-  .login-brand-subtitle,
-  .login-desc {
-    color: var(--app-dark-muted) !important;
-  }
-
-  .login-mode-toggle {
-    border-color: var(--app-dark-border) !important;
-    background: rgba(255, 255, 255, 0.06) !important;
-  }
-
-  .login-captcha-image {
-    border-color: rgba(203, 213, 225, 0.34) !important;
-    background: rgba(248, 250, 252, 0.96) !important;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
-  }
-
-  .login-brand-logo {
-    color: #f8fafc;
-    background: linear-gradient(135deg, #2563eb, #14b8a6) !important;
   }
 
   .app-drawer {

@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -1087,7 +1088,7 @@ func GetFieldType(fieldType enum.SysTableFieldType) reflect.Type {
 	case enum.SmallIntFieldType:
 		return reflect.TypeOf(int16(0))
 	case enum.JsonFieldType:
-		return reflect.TypeOf(map[string]interface{}{}) // JSON 类型
+		return reflect.TypeOf(datatypes.JSON{})
 	default:
 		return reflect.TypeOf(nil) // 未知类型返回 nil 类型，可能需要处理错误
 	}
