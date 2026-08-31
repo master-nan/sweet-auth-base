@@ -16,8 +16,10 @@
         />
       </div>
       <footer class="login-footer">
-        <span>Copyright © 2026 Sweet Admin</span>
-        <span class="login-secure"><i />连接安全</span>
+        <span>© 2026 Sweet Admin</span>
+        <span class="login-secure" :class="`login-secure--${connectionState}`">
+          <i />{{ connectionLabel }}
+        </span>
       </footer>
     </section>
   </div>
@@ -32,6 +34,16 @@ import { useUserStore } from 'src/stores/user'
 import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
+
+const isLocalConnection = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+const connectionState =
+  window.location.protocol === 'https:' ? 'secure' : isLocalConnection ? 'local' : 'warning'
+const connectionLabel =
+  connectionState === 'secure'
+    ? '加密连接'
+    : connectionState === 'local'
+      ? '本地连接'
+      : '未加密连接'
 
 import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
 import LoginPanel from 'src/components/Login/LoginPanel.vue'
@@ -134,6 +146,16 @@ const onLoginClick = async () => {
   border-radius: 50%;
   background: #55c991;
   box-shadow: 0 0 10px rgba(85, 201, 145, 0.66);
+}
+
+.login-secure--local i {
+  background: #31a8be;
+  box-shadow: 0 0 10px rgba(49, 168, 190, 0.58);
+}
+
+.login-secure--warning i {
+  background: #efb34b;
+  box-shadow: 0 0 10px rgba(239, 179, 75, 0.56);
 }
 
 .login-page--dark {

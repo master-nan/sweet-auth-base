@@ -13,10 +13,8 @@
       </div>
     </header>
 
-    <div class="visual-status"><span />Platform online</div>
-
     <div class="visual-copy">
-      <div class="visual-eyebrow">Foundation for every system</div>
+      <div class="visual-eyebrow">连接每一条业务路径</div>
       <h1>让每一条业务路径<br />都有清晰的方向</h1>
       <p>统一身份、组织权限、数据管理与系统集成，在稳定底座上连接每一个业务现场。</p>
       <div class="visual-capabilities">
@@ -306,7 +304,6 @@ onBeforeUnmount(() => {
 }
 
 .visual-brand,
-.visual-status,
 .visual-copy {
   position: absolute;
   z-index: 1;
@@ -321,24 +318,50 @@ onBeforeUnmount(() => {
 }
 
 .visual-brand-logo {
+  position: relative;
+  isolation: isolate;
   width: 42px;
   height: 42px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(37, 43, 56, 0.18);
   border-radius: 8px;
   background: #252b38;
   color: #fff;
+  box-shadow: 0 8px 22px rgba(40, 52, 78, 0.16);
+}
+
+.visual-brand-logo::before,
+.visual-brand-logo::after {
+  position: absolute;
+  content: '';
+}
+
+.visual-brand-logo::before {
+  z-index: 0;
+  inset: 0;
+  background: conic-gradient(#7568dc, #31a8be, #55c991, #efb34b, #d86f62, #7568dc);
+}
+
+.visual-brand-logo::after {
+  z-index: 1;
+  inset: 3px;
+  border-radius: 6px;
+  background: #252b38;
 }
 
 .visual-brand-logo .q-icon {
+  position: relative;
+  z-index: 2;
   font-size: 22px;
 }
 
 .visual-brand-logo img {
-  width: 100%;
-  height: 100%;
+  position: relative;
+  z-index: 2;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -352,25 +375,6 @@ onBeforeUnmount(() => {
   margin-top: 4px;
   color: rgba(23, 32, 51, 0.56);
   font-size: 12px;
-}
-
-.visual-status {
-  top: clamp(38px, 4.7vw, 54px);
-  right: clamp(30px, 4vw, 50px);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: rgba(23, 32, 51, 0.62);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.visual-status span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #55c991;
-  box-shadow: 0 0 14px rgba(85, 201, 145, 0.78);
 }
 
 .visual-copy {
@@ -446,12 +450,10 @@ onBeforeUnmount(() => {
 }
 
 .login-illustration--dark .visual-brand-logo {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .login-illustration--dark .visual-brand-subtitle,
-.login-illustration--dark .visual-status,
 .login-illustration--dark .visual-eyebrow,
 .login-illustration--dark .visual-copy p,
 .login-illustration--dark .visual-capabilities {

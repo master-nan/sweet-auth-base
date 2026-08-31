@@ -7,6 +7,10 @@
       </div>
     </div>
 
+    <div class="login-flow-visual" aria-hidden="true">
+      <img :src="loginFlowVisual" alt="" />
+    </div>
+
     <div class="login-mobile-brand">
       <div class="login-brand">
         <div class="login-brand-logo">
@@ -21,7 +25,7 @@
     </div>
 
     <q-card-section class="login-body">
-      <div class="login-kicker">安全入口</div>
+      <div class="login-kicker">账号登录</div>
       <div class="login-welcome">
         <h2>欢迎回来</h2>
         <p>使用你的平台账号继续</p>
@@ -71,6 +75,7 @@
                 :name="isPwd ? 'visibility_off' : 'visibility'"
                 class="cursor-pointer"
                 @click="isPwd = !isPwd"
+                size="xs"
               />
             </template>
           </q-input>
@@ -132,6 +137,7 @@ import { useBasicApi } from 'src/api/services/basic'
 import { QForm } from 'quasar'
 import DarkMode from 'src/components/Toolbar/DarkMode.vue'
 import { useConfigureStore } from 'stores/configure'
+import loginFlowVisual from 'src/assets/login-flow-visual.png'
 
 defineOptions({ name: 'MyLogin' })
 
@@ -234,9 +240,26 @@ const onLoginClick = async () => {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  margin-bottom: clamp(66px, 12vh, 116px);
+  margin-bottom: 10px;
   color: #7f899b;
   font-size: 12px;
+}
+
+.login-flow-visual {
+  width: calc(100% + 48px);
+  height: 116px;
+  margin: 0 -24px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.login-flow-visual img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
 }
 
 .login-brand {
@@ -246,24 +269,50 @@ const onLoginClick = async () => {
 }
 
 .login-brand-logo {
+  position: relative;
+  isolation: isolate;
   width: 42px;
   height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border-radius: 8px;
   color: #ffffff;
   background: #252b38;
 }
 
+.login-brand-logo::before,
+.login-brand-logo::after {
+  position: absolute;
+  content: '';
+}
+
+.login-brand-logo::before {
+  z-index: 0;
+  inset: 0;
+  background: conic-gradient(#7568dc, #31a8be, #55c991, #efb34b, #d86f62, #7568dc);
+}
+
+.login-brand-logo::after {
+  z-index: 1;
+  inset: 3px;
+  border-radius: 6px;
+  background: #252b38;
+}
+
 .login-brand-logo .q-icon {
+  position: relative;
+  z-index: 2;
   font-size: 22px;
 }
 
 .login-brand-logo img {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
+  position: relative;
+  z-index: 2;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -450,6 +499,10 @@ const onLoginClick = async () => {
   color: #a3adbf;
 }
 
+.login-card.q-dark .login-flow-visual {
+  opacity: 0.9;
+}
+
 .login-card.q-dark .login-mode-toggle {
   border-color: #3a4050;
   background: #242835;
@@ -488,12 +541,18 @@ const onLoginClick = async () => {
 
 @media (max-width: 599px) {
   .login-card-top {
-    margin-bottom: 36px;
+    margin-bottom: 8px;
   }
 
   .login-mobile-brand {
     display: block;
-    margin-bottom: 38px;
+    margin-bottom: 24px;
+  }
+
+  .login-flow-visual {
+    width: calc(100% + 24px);
+    height: 96px;
+    margin: 0 -12px 20px;
   }
 
   .login-welcome h2 {
@@ -504,6 +563,13 @@ const onLoginClick = async () => {
 @media (min-width: 600px) and (max-width: 1023px) {
   .login-mobile-brand {
     display: block;
+  }
+
+  .login-flow-visual {
+    width: calc(100% + 32px);
+    height: 108px;
+    margin-right: -16px;
+    margin-left: -16px;
   }
 }
 </style>
