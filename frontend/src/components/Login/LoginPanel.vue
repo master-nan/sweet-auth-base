@@ -244,11 +244,6 @@ const onLoginClick = async () => {
 }
 
 .login-flow-visual {
-  --login-flow-track: rgba(88, 101, 126, 0.16);
-  --login-flow-violet: #7164ed;
-  --login-flow-cyan: #2d9fb5;
-  --login-flow-green: #3aaa7c;
-  --login-flow-coral: #d9796d;
   width: calc(100% + 48px);
   height: 116px;
   margin: 0 -24px 24px;
@@ -490,14 +485,6 @@ const onLoginClick = async () => {
 .login-card.q-dark .login-welcome p,
 .login-card.q-dark .login-field > label {
   color: #a3adbf;
-}
-
-.login-card.q-dark .login-flow-visual {
-  --login-flow-track: rgba(203, 213, 225, 0.15);
-  --login-flow-violet: #988df6;
-  --login-flow-cyan: #5bb9ca;
-  --login-flow-green: #5bc598;
-  --login-flow-coral: #e18c82;
 }
 
 .login-card.q-dark .login-mode-toggle {
