@@ -41,9 +41,7 @@ const { containerRef } = useLoginLottie(createLoginPlatformAnimation)
   overflow: hidden;
   background: #edf1f7;
   color: #172033;
-  transition:
-    background 180ms ease,
-    color 180ms ease;
+  transition: color 180ms ease;
 }
 
 .visual-brand {

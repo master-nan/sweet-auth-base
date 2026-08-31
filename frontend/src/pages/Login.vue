@@ -169,7 +169,6 @@ const onLoginClick = async () => {
   display: grid;
   grid-template-rows: 1fr auto;
   padding: clamp(30px, 4vw, 54px) clamp(34px, 5vw, 72px) 24px;
-  border-left: 1px solid rgba(23, 32, 51, 0.08);
   background: #ffffff;
   color: #172033;
 }
@@ -271,7 +270,6 @@ const onLoginClick = async () => {
 }
 
 .login-page--dark .login-side {
-  border-left-color: rgba(255, 255, 255, 0.08);
   background: #1d202c;
   color: #f7f8fb;
 }
@@ -310,7 +308,6 @@ const onLoginClick = async () => {
   .login-side {
     width: 100%;
     padding: 28px clamp(20px, 7vw, 64px) 22px;
-    border-left: 0;
   }
 
   .login-divider {
