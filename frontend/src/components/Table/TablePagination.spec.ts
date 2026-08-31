@@ -42,7 +42,7 @@ const InputStub = defineComponent({
 })
 
 const SelectStub = defineComponent({
-  props: { modelValue: Number },
+  props: { modelValue: Number, options: Array },
   emits: ['update:modelValue'],
   setup(props, { emit, slots }) {
     return () =>
@@ -82,6 +82,7 @@ describe('TablePagination', () => {
     expect(wrapper.text()).toContain('共 25,000 条')
     expect(wrapper.text()).toContain('/ 1,250 页')
     expect(wrapper.get('input[aria-label="当前页"]').element).toHaveProperty('value', '1001')
+    expect(wrapper.findComponent(SelectStub).props('options')).toEqual([20, 50, 100, 200])
   })
 
   it('moves to the first, previous, next and last pages', async () => {

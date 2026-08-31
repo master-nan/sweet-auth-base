@@ -107,7 +107,7 @@ const emit = defineEmits<{
   'update:pageSize': [value: number]
 }>()
 
-const resolvedPageSizeOptions = computed(() => props.pageSizeOptions || [20, 30, 50, 100, 200, 500])
+const resolvedPageSizeOptions = computed(() => props.pageSizeOptions || [20, 50, 100, 200])
 const currentPage = ref(Math.max(1, props.page))
 const currentPageSize = ref(props.pageSize)
 const pageDraft = ref(String(currentPage.value))
