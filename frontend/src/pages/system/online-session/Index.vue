@@ -11,6 +11,8 @@
       :columns="columns"
       :visible-columns="visibleColumns"
       :loading="loading"
+      :pagination="{ rowsPerPage: 0 }"
+      hide-pagination
       :no-data-label="loadError || '暂无符合条件的登录会话'"
     >
       <template #top>
@@ -238,7 +240,7 @@ const selectedSession = ref<UserSession | null>(null)
 
 const statusOptions = [
   { label: '当前在线', value: 'online' },
-  { label: '令牌仍有效', value: 'active' },
+  { label: '有效会话', value: 'active' },
   { label: '已结束', value: 'closed' },
   { label: '全部会话', value: 'all' },
 ]
@@ -269,7 +271,7 @@ const sessionStatus = (row: UserSession) => {
   if (row.online)
     return { label: '在线', color: 'positive', textColor: 'white', outline: false }
   if (row.status === 'active')
-    return { label: '离线，令牌仍有效', color: 'orange-9', textColor: '', outline: true }
+    return { label: '有效，当前未在线', color: 'orange-9', textColor: '', outline: true }
   const closedStates: Record<string, { label: string; color: string }> = {
     logged_out: { label: '已退出', color: 'grey-7' },
     forced_offline: { label: '已强制下线', color: 'negative' },

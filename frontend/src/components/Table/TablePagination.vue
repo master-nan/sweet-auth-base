@@ -189,9 +189,20 @@ watch(
   min-height: 36px;
 }
 
+.table-pagination__page-input :deep(.q-field__control-container),
+.table-pagination__page-input :deep(.q-field__append) {
+  height: 100%;
+  align-items: center;
+}
+
 .table-pagination__page-input :deep(.q-field__native) {
+  height: 100%;
+  min-height: 0;
   min-width: 34px;
+  padding-top: 0;
   padding-right: 4px;
+  padding-bottom: 0;
+  line-height: 1;
 }
 
 .table-pagination__page-input :deep(.q-field__append) {
@@ -204,6 +215,13 @@ watch(
   font-size: 13px;
   font-weight: 400;
   white-space: nowrap;
+}
+
+.table-pagination__page-total {
+  display: inline-flex;
+  height: 100%;
+  align-items: center;
+  line-height: 1;
 }
 
 .table-pagination__page-size {

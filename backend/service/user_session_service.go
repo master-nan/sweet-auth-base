@@ -135,6 +135,9 @@ func (s *UserSessionService) RevokeSession(ctx context.Context, id int, closure 
 	if err := s.db.DB.WithContext(ctx).Where("id = ?", id).First(&record).Error; err != nil {
 		return appErrors.WrapDatabaseError(err)
 	}
+	if record.Status != model.UserSessionStatusActive || !time.Time(record.ExpiresAt).After(s.now().UTC()) {
+		return nil
+	}
 	if err := s.tokens.RevokeSessionDigest(record.UserID, record.SessionKeyHash); err != nil {
 		return err
 	}
@@ -330,7 +333,7 @@ func mapUserSessionRows(rows []userSessionRow, currentSessionID string, now, onl
 func (s *UserSessionService) closeDigest(ctx context.Context, userID int, digest, status string, closure UserSessionClosure) error {
 	now := model.CustomTime(s.now().UTC())
 	result := s.db.DB.WithContext(ctx).Model(&model.SysUserSession{}).
-		Where("user_id = ? AND session_key_hash = ?", userID, digest).
+		Where("user_id = ? AND session_key_hash = ? AND status = ?", userID, digest, model.UserSessionStatusActive).
 		Updates(map[string]any{
 			"status": status, "logout_reason": strings.TrimSpace(closure.Reason), "logout_at": &now,
 			"closed_by_user_id": closure.OperatorID, "closed_by_user_name": strings.TrimSpace(closure.OperatorName),

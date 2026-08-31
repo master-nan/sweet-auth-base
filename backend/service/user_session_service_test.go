@@ -68,6 +68,18 @@ func TestUserSessionLifecycleUsesSnowflakeIDAndRevokesRedisSession(t *testing.T)
 	if len(closed.Items) != 1 || closed.Items[0].Status != model.UserSessionStatusForcedOffline || closed.Items[0].LogoutReason != "管理员测试下线" || closed.Items[0].ClosedByUserName != "admin" {
 		t.Fatalf("unexpected closed session: %+v", closed.Items)
 	}
+	if err := service.RevokeSession(context.Background(), result.Items[0].ID, UserSessionClosure{
+		Reason: "重复下线不应覆盖审计记录", OperatorID: 2, OperatorName: "other-admin",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	closedAgain, err := service.Query(context.Background(), request.UserSessionQueryReq{Status: "closed", Page: 1, Num: 20}, pair.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(closedAgain.Items) != 1 || closedAgain.Items[0].Status != model.UserSessionStatusForcedOffline || closedAgain.Items[0].LogoutReason != "管理员测试下线" || closedAgain.Items[0].ClosedByUserName != "admin" {
+		t.Fatalf("repeated revoke overwrote the original closure: %+v", closedAgain.Items)
+	}
 
 	if err := db.Delete(&model.SysUser{}, 1).Error; err != nil {
 		t.Fatal(err)
