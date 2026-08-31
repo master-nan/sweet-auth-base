@@ -31,19 +31,7 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-            <q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              emit-value
-              map-options
-              :options="columns"
-              option-value="name"
-              options-cover
-            ></q-select>
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
             <q-btn
               outline
               icon="tune"
@@ -819,6 +807,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'develop_database' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
+import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'

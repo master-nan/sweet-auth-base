@@ -39,18 +39,10 @@
             </template>
           </q-input>
           <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-          <q-select
+          <table-column-selector
             v-if="masterDetailMode !== MasterDetailDisplayMode.SUMMARY"
             v-model="visibleColumns"
-            multiple
-            outlined
-            dense
-            options-dense
-            :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-            emit-value
-            map-options
-            :options="columns"
-            option-value="name"
+            :columns="columns"
           />
           <q-btn
             outline
@@ -434,19 +426,7 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-            <q-select
-              v-model="visibleColumns"
-              multiple
-              outlined
-              dense
-              options-dense
-              :display-value="compactSelectionDisplay(visibleColumns, columns, 2, '列')"
-              emit-value
-              map-options
-              :options="columns"
-              option-value="name"
-              options-cover
-            />
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
             <q-btn
               outline
               icon="tune"
@@ -585,6 +565,7 @@ defineOptions({ name: 'generalization_page' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
+import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
 import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
@@ -645,7 +626,6 @@ import {
 } from 'src/utils/query-state'
 import { findMenuById, findMenuByTableCode, toPositiveMenuId } from 'src/utils/menu-context'
 import { isPageButton } from 'src/utils/menu-button'
-import { compactSelectionDisplay } from 'src/utils/select-display'
 import { useConfirmDialog } from 'src/composables/confirm-dialog'
 import { parseParamsSchema } from 'src/utils/params-schema'
 
