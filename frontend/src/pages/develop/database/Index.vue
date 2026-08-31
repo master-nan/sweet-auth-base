@@ -17,8 +17,8 @@
       :loading="loading"
     >
       <template v-slot:top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
               dense
               outlined
@@ -31,7 +31,6 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-            <table-column-selector v-model="visibleColumns" :columns="columns" />
             <q-btn
               outline
               icon="tune"
@@ -53,11 +52,13 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
+          </template>
 
-          <q-space />
+          <template #column-selector>
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
+          </template>
 
-          <div class="row q-gutter-xs">
+          <template #right-actions>
             <q-btn
               v-for="btn in top_buttons"
               :key="btn.id"
@@ -67,8 +68,8 @@
               :disable="loading"
               @click="handleButtonClick(btn)"
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template v-slot:body-cell-actions="props">
@@ -807,6 +808,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'develop_database' })
 import BaseContent from 'components/BaseContent/BaseContent.vue'
+import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
 import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import { ref, computed, watch, onMounted } from 'vue'

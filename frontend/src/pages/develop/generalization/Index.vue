@@ -19,6 +19,16 @@
           :disable="loading || isButtonDisabled(btn)"
           @click="handleMenuButtonClick(btn)"
         />
+        <q-separator
+          v-if="topButtons.length && masterDetailMode !== MasterDetailDisplayMode.SUMMARY"
+          vertical
+          inset
+        />
+        <table-column-selector
+          v-if="masterDetailMode !== MasterDetailDisplayMode.SUMMARY"
+          v-model="visibleColumns"
+          :columns="columns"
+        />
         <q-btn round flat icon="refresh" color="primary" :disable="loading" @click="fetchData">
           <q-tooltip>刷新主表</q-tooltip>
         </q-btn>
@@ -39,11 +49,6 @@
             </template>
           </q-input>
           <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-          <table-column-selector
-            v-if="masterDetailMode !== MasterDetailDisplayMode.SUMMARY"
-            v-model="visibleColumns"
-            :columns="columns"
-          />
           <q-btn
             outline
             icon="tune"
@@ -412,8 +417,8 @@
       </template>
 
       <template v-slot:top>
-        <div class="row q-gutter-xs full-width">
-          <div class="col-grow row q-gutter-xs">
+        <standard-table-toolbar :refreshing="loading" @refresh="fetchData">
+          <template #quick-search>
             <q-input
               dense
               outlined
@@ -426,7 +431,6 @@
               </template>
             </q-input>
             <q-btn color="primary" label="搜索" :disable="loading" @click="handleBasicSearch" />
-            <table-column-selector v-model="visibleColumns" :columns="columns" />
             <q-btn
               outline
               icon="tune"
@@ -448,11 +452,13 @@
                   : '高级查询'
               }}</q-tooltip>
             </q-btn>
-          </div>
+          </template>
 
-          <q-space />
+          <template #column-selector>
+            <table-column-selector v-model="visibleColumns" :columns="columns" />
+          </template>
 
-          <div class="row q-gutter-xs">
+          <template #right-actions>
             <q-btn
               v-for="btn in topButtons"
               :key="btn.id || btn.code"
@@ -461,8 +467,8 @@
               :disable="loading || isButtonDisabled(btn)"
               @click="handleMenuButtonClick(btn)"
             />
-          </div>
-        </div>
+          </template>
+        </standard-table-toolbar>
       </template>
 
       <template v-slot:body-cell-actions="props">
@@ -565,6 +571,7 @@ defineOptions({ name: 'generalization_page' })
 
 import BaseContent from 'components/BaseContent/BaseContent.vue'
 import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
+import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
 import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
 import TablePagination from 'components/Table/TablePagination.vue'
 import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
