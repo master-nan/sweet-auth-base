@@ -170,6 +170,16 @@ describe('organization selector metadata resolver', () => {
     expect(getFieldControlType(linkageField)).toBe('cascader')
   })
 
+  it('renders JSON-backed file metadata with the file upload control', () => {
+    const fileField = {
+      input_type: SysTableFieldInputType.FILE_PICKER,
+      field_type: SysTableFieldType.JSON,
+      field_code: 'attachment',
+    } as TableField
+
+    expect(getFieldControlType(fileField)).toBe('file')
+  })
+
   it('rejects an unknown explicit selector instead of changing legacy rendering', () => {
     expect(
       resolveOrganizationSelectorConfig({

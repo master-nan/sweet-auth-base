@@ -309,6 +309,11 @@ export const queryValueHtmlInputType = (field?: Partial<TableField>): HtmlInputT
 }
 
 export const getFieldControlType = (field: TableField): FieldControlType => {
+  // File metadata is stored as JSON, but its explicit widget must win over the storage type.
+  if (field.input_type === SysTableFieldInputType.FILE_PICKER) {
+    return 'file'
+  }
+
   if (field.field_type === SysTableFieldType.JSON) {
     switch (field.input_type) {
       case SysTableFieldInputType.ARRAY_INPUT:
@@ -348,8 +353,6 @@ export const getFieldControlType = (field: TableField): FieldControlType => {
       return 'year'
     case SysTableFieldInputType.YEAR_MONTH_PICKER:
       return 'year-month'
-    case SysTableFieldInputType.FILE_PICKER:
-      return 'file'
     case SysTableFieldInputType.BOOLEAN:
       return 'boolean'
     case SysTableFieldInputType.JSON_EDITOR:

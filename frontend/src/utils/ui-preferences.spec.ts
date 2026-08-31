@@ -28,6 +28,7 @@ describe('ui preferences', () => {
     expect(defaultUIPreferences()).toEqual({
       version: 1,
       layoutMode: 'split',
+      density: 'comfortable',
       primaryColor: DEFAULT_PRIMARY_COLOR,
       dark: false,
       locale: 'zh-CN',
@@ -48,6 +49,7 @@ describe('ui preferences', () => {
   it('persists a versioned preference object and keeps legacy keys compatible', () => {
     const saved = writeUIPreferences({
       layoutMode: 'full',
+      density: 'compact',
       primaryColor: '#0f766e',
       dark: true,
       locale: 'en-US',
@@ -63,6 +65,7 @@ describe('ui preferences', () => {
   it('falls back safely when stored values are invalid', () => {
     LocalStorage.set(UI_PREFERENCES_KEY, {
       layoutMode: 'unknown',
+      density: 'tiny',
       primaryColor: 'purple',
       dark: 'yes',
       locale: 'fr-FR',

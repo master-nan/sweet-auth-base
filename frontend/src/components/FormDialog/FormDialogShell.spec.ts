@@ -38,5 +38,6 @@ describe('FormDialogShell', () => {
     expect(wrapper.find('.form-dialog-shell__navigation').text()).toContain('章节')
     expect(wrapper.find('.form-dialog-shell__main').text()).toContain('详情内容')
     expect(wrapper.find('.form-dialog-shell__footer').text()).toContain('业务操作')
+    expect(wrapper.find('.form-dialog-shell__close').exists()).toBe(false)
   })
 })

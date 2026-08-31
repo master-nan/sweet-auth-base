@@ -13,7 +13,6 @@
       </div>
       <q-space />
       <slot name="header-actions" />
-      <q-btn icon="close" flat round dense class="form-dialog-shell__close" @click="show = false" />
     </q-card-section>
 
     <q-card-section

@@ -5,11 +5,13 @@ export const UI_PREFERENCES_VERSION = 1
 export const DEFAULT_PRIMARY_COLOR = '#7367f0'
 
 export type LayoutMode = 'split' | 'full'
+export type DisplayDensity = 'comfortable' | 'compact'
 export type SupportedLocale = 'en-US' | 'zh-CN'
 
 export interface UIPreferences {
   version: typeof UI_PREFERENCES_VERSION
   layoutMode: LayoutMode
+  density: DisplayDensity
   primaryColor: string
   dark: boolean
   locale: SupportedLocale
@@ -20,6 +22,9 @@ const hexColorPattern = /^#[0-9a-f]{6}$/i
 
 const isLayoutMode = (value: unknown): value is LayoutMode =>
   value === 'split' || value === 'full'
+
+const isDisplayDensity = (value: unknown): value is DisplayDensity =>
+  value === 'comfortable' || value === 'compact'
 
 const isSupportedLocale = (value: unknown): value is SupportedLocale =>
   value === 'en-US' || value === 'zh-CN'
@@ -32,6 +37,7 @@ const isHexColor = (value: unknown): value is string =>
 export const defaultUIPreferences = (): UIPreferences => ({
   version: UI_PREFERENCES_VERSION,
   layoutMode: 'split',
+  density: 'comfortable',
   primaryColor: DEFAULT_PRIMARY_COLOR,
   dark: (LocalStorage.getItem('dark') as boolean | null) ?? false,
   locale: (LocalStorage.getItem('lang') as SupportedLocale | null) ?? 'zh-CN',
@@ -47,6 +53,7 @@ export const readUIPreferences = (): UIPreferences => {
   return {
     version: UI_PREFERENCES_VERSION,
     layoutMode: isLayoutMode(stored.layoutMode) ? stored.layoutMode : defaults.layoutMode,
+    density: isDisplayDensity(stored.density) ? stored.density : defaults.density,
     primaryColor: isHexColor(stored.primaryColor)
       ? stored.primaryColor
       : defaults.primaryColor,

@@ -200,6 +200,65 @@ input[type='number']::-webkit-inner-spin-button {
   position: relative;
 }
 
+body.app-density--compact {
+  .q-table__top {
+    min-height: 48px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .q-table__bottom {
+    min-height: 42px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  .q-table thead tr,
+  .q-table tbody tr {
+    height: 42px;
+  }
+
+  .q-table th,
+  .q-table td {
+    height: 42px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 13px;
+  }
+
+  .q-toolbar {
+    min-height: 44px;
+  }
+
+  .app-header__tabs {
+    min-height: 38px;
+  }
+
+  .app-drawer .q-item,
+  .q-menu .q-item {
+    min-height: 40px;
+  }
+
+  .q-field--dense:not(.q-field--auto-height) .q-field__control,
+  .q-field--dense .q-field__marginal {
+    min-height: 36px;
+    height: 36px;
+  }
+
+  .q-field--dense.q-field--auto-height .q-field__control {
+    min-height: 36px;
+  }
+
+  .q-field--dense:not(.q-field--auto-height) .q-field__native,
+  .q-field--dense:not(.q-field--auto-height) .q-field__input {
+    min-height: 36px;
+  }
+
+  .q-btn:not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini) {
+    min-height: 34px;
+  }
+}
+
 .body--dark {
   --app-scrollbar-thumb: rgba(148, 163, 184, 0.48);
   --app-scrollbar-thumb-hover: rgba(203, 213, 225, 0.74);
