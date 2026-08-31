@@ -504,4 +504,28 @@ const onLoginClick = async () => {
     margin: 0 -16px 20px;
   }
 }
+
+@media (min-width: 600px) and (max-width: 1023px) and (min-height: 900px) {
+  .login-mobile-brand {
+    margin-bottom: clamp(28px, 3vh, 40px);
+  }
+
+  .login-flow-visual {
+    height: clamp(108px, 10vh, 132px);
+    margin-bottom: clamp(32px, 3.5vh, 46px);
+  }
+
+  .login-kicker {
+    margin-bottom: clamp(22px, 2vh, 28px);
+  }
+
+  .login-welcome p {
+    margin-top: 8px;
+    margin-bottom: clamp(34px, 3.5vh, 48px);
+  }
+
+  .login-form {
+    gap: clamp(20px, 2.2vh, 28px);
+  }
+}
 </style>

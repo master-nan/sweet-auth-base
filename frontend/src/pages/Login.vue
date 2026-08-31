@@ -300,4 +300,10 @@ const onLoginClick = async () => {
     font-size: 10px;
   }
 }
+
+@media (min-width: 600px) and (max-width: 1023px) and (min-height: 900px) {
+  .login-panel-wrap {
+    padding-top: clamp(96px, 11vh, 156px);
+  }
+}
 </style>
