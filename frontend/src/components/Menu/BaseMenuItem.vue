@@ -19,7 +19,7 @@
         @click="handleMenuClick(basePath as string, item)"
       >
         <q-item-section avatar>
-          <q-icon :name="item.meta?.icon as string" />
+          <q-icon :name="item.meta?.icon as string" size="xs" />
         </q-item-section>
         <q-item-section v-if="!isMiniMode">
           {{ item.meta ? displayTitle(item.meta?.title) : '' }}
@@ -58,7 +58,7 @@
         </q-expansion-item>
         <q-item v-else :style="expansionHeaderStyle(basePath as string, item)" clickable v-ripple>
           <q-item-section avatar>
-            <q-icon :name="item.meta?.icon as string" />
+            <q-icon :name="item.meta?.icon as string" size="xs" />
           </q-item-section>
           <q-item-section v-if="!isMiniMode">
             {{ item.meta ? displayTitle(item.meta?.title) : '' }}
@@ -238,6 +238,10 @@ const expansionItemOpen = (basePath: string, item: Route) => {
 
 <style lang="scss" scoped>
 .base-menu-item {
+  :deep(.base-menu-expansion .q-item__section--avatar > .q-icon) {
+    font-size: 20px;
+  }
+
   .base-menu-expansion--active {
     :deep(.q-expansion-item__container > .q-item) {
       color: v-bind(primaryColor) !important;
