@@ -14,7 +14,7 @@
       <div class="app-drawer__brand">
         <toolbar-title
           :title="title"
-          :subtitle="subtitle || '通用低代码底座'"
+          :subtitle="subtitle || t('layout.defaultDescription')"
           :logo="logo || ''"
           class="full-width"
           :mini="is_drawer_mini"
@@ -28,10 +28,12 @@
           round
           dense
           icon="keyboard_double_arrow_left"
-          aria-label="隐藏侧栏"
+          :aria-label="t('layout.hideSidebar')"
           @click="closeDrawer"
         >
-          <q-tooltip anchor="center right" self="center left">隐藏侧栏</q-tooltip>
+          <q-tooltip anchor="center right" self="center left">
+            {{ t('layout.hideSidebar') }}
+          </q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -46,15 +48,18 @@ import ToolbarTitle from 'src/components/Toolbar/ToolbarTitle.vue'
 import BaseMenu from 'src/components/Menu/BaseMenu.vue'
 import { useAppStore } from 'src/stores/app'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'MyDrawer' })
+
+const { t } = useI18n({ useScope: 'global' })
 
 const props = withDefaults(
   defineProps<{ modelValue: boolean; title: string; subtitle?: string; logo?: string }>(),
   {
     modelValue: false,
     title: '',
-    subtitle: '通用低代码底座',
+    subtitle: '',
     logo: '',
   },
 )

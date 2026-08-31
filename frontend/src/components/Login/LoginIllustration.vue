@@ -7,7 +7,9 @@
       </div>
       <div>
         <div class="visual-brand-name">{{ systemName }}</div>
-        <div class="visual-brand-subtitle">{{ systemDescription || '通用低代码底座' }}</div>
+        <div class="visual-brand-subtitle">
+          {{ systemDescription || t('login.defaultDescription') }}
+        </div>
       </div>
     </header>
 
@@ -21,10 +23,12 @@ import { useQuasar } from 'quasar'
 import { useConfigureStore } from 'stores/configure'
 import { createLoginPlatformAnimation } from 'src/components/Login/login-flow-animation'
 import { useLoginLottie } from 'src/components/Login/use-login-lottie'
+import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'LoginIllustration' })
 
 const $q = useQuasar()
+const { t } = useI18n({ useScope: 'global' })
 const configureStore = useConfigureStore()
 const systemName = computed(() => configureStore.getSystemName || 'Sweet Admin')
 const systemLogo = computed(() => configureStore.getSystemLogo || '')

@@ -24,18 +24,22 @@
         round
         icon="refresh"
         color="primary"
-        aria-label="刷新当前视图"
+        :aria-label="t('table.refreshView')"
         :loading="refreshing"
         :disable="disabled"
         @click="$emit('refresh')"
       >
-        <q-tooltip>刷新当前视图</q-tooltip>
+        <q-tooltip>{{ t('table.refreshView') }}</q-tooltip>
       </q-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n({ useScope: 'global' })
+
 withDefaults(
   defineProps<{
     refreshing?: boolean

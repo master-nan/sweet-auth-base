@@ -26,9 +26,9 @@
           dense
           flat
           icon="language"
-          aria-label="切换语言"
+          :aria-label="t('login.switchLanguage')"
         >
-          <q-tooltip>切换语言</q-tooltip>
+          <q-tooltip>{{ t('login.switchLanguage') }}</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
             <q-list dense class="login-language-menu">
               <q-item
@@ -73,36 +73,31 @@
 <script setup lang="ts">
 import type { SignInReq } from 'src/api/services/basic'
 import { useBasicApi } from 'src/api/services/basic'
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from 'src/stores/user'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
-
-const $q = useQuasar()
-
-const isLocalConnection = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-const connectionState =
-  window.location.protocol === 'https:' ? 'secure' : isLocalConnection ? 'local' : 'warning'
-const connectionLabel =
-  connectionState === 'secure'
-    ? '加密连接'
-    : connectionState === 'local'
-      ? '本地连接'
-      : '未加密连接'
-
+import { applyQuasarLanguage } from 'src/i18n/quasar-language'
 import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
 import LoginPanel from 'src/components/Login/LoginPanel.vue'
 import DarkMode from 'src/components/Toolbar/DarkMode.vue'
 import { useLoadingStore } from 'stores/loading'
 import { storeToRefs } from 'pinia'
 
+const $q = useQuasar()
+
+const isLocalConnection = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+const connectionState =
+  window.location.protocol === 'https:' ? 'secure' : isLocalConnection ? 'local' : 'warning'
+
 defineOptions({ name: 'Login' })
 
 const userStore = useUserStore()
 const router = useRouter()
-const { locale } = useI18n({ useScope: 'global' })
+const { locale, t } = useI18n({ useScope: 'global' })
+const connectionLabel = computed(() => t(`login.connection.${connectionState}`))
 const message = ref<string>('')
 const { login } = useBasicApi()
 
@@ -115,6 +110,7 @@ const localeOptions: Array<{ value: SupportedLocale; label: string }> = [
 
 const setLocale = (value: SupportedLocale) => {
   locale.value = value
+  applyQuasarLanguage(value)
   writeUIPreferences({ locale: value })
 }
 
@@ -141,7 +137,7 @@ const onLoginClick = async () => {
   } catch (error) {
     const response = (error as { response?: { data?: { error_message?: string; message?: string } } })
       .response
-    message.value = response?.data?.error_message || response?.data?.message || '登录失败，请重试'
+    message.value = response?.data?.error_message || response?.data?.message || t('login.failed')
   }
 }
 </script>

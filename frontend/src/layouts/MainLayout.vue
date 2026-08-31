@@ -79,6 +79,7 @@ import TagView from 'components/TagView/TagView.vue'
 import { useNotificationStore } from 'src/stores/notification'
 import { useUserStore } from 'src/stores/user'
 import { useSessionRuntimeStore } from 'src/stores/session-runtime'
+import { useI18n } from 'vue-i18n'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()
@@ -87,6 +88,7 @@ const configureStore = useConfigureStore()
 const notificationStore = useNotificationStore()
 const userStore = useUserStore()
 const sessionRuntimeStore = useSessionRuntimeStore()
+const { t } = useI18n({ useScope: 'global' })
 const { layoutMode } = storeToRefs(themeStore)
 themeStore.applyPreferences()
 const route = useRoute()
@@ -97,11 +99,13 @@ const drawerMenuIcon = computed(() => {
   return appStore.is_drawer_mini ? 'keyboard_double_arrow_right' : 'menu_open'
 })
 const drawerMenuLabel = computed(() => {
-  if (!isDrawerOpen.value) return '展开侧栏'
-  return appStore.is_drawer_mini ? '展开侧栏' : '收起为图标栏'
+  if (!isDrawerOpen.value) return t('layout.expandSidebar')
+  return appStore.is_drawer_mini ? t('layout.expandSidebar') : t('layout.collapseSidebar')
 })
 const systemName = computed(() => configureStore.getSystemName || 'Sweet Admin')
-const systemDescription = computed(() => configureStore.getSystemDescription || '通用低代码底座')
+const systemDescription = computed(
+  () => configureStore.getSystemDescription || t('layout.defaultDescription'),
+)
 const systemLogo = computed(() => configureStore.getSystemLogo || '')
 
 const $q = useQuasar()

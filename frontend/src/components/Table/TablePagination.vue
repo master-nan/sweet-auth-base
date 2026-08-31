@@ -1,6 +1,6 @@
 <template>
   <div class="table-pagination row items-center no-wrap">
-    <span class="table-pagination__total">共 {{ formattedTotal }} 条</span>
+    <span class="table-pagination__total">{{ t('table.total', { count: formattedTotal }) }}</span>
     <q-separator vertical class="table-pagination__separator" />
 
     <div class="table-pagination__navigation row items-center no-wrap">
@@ -9,22 +9,22 @@
         round
         dense
         icon="first_page"
-        aria-label="首页"
+        :aria-label="t('table.firstPage')"
         :disable="isFirstPage"
         @click="goToPage(1)"
       >
-        <q-tooltip>首页</q-tooltip>
+        <q-tooltip>{{ t('table.firstPage') }}</q-tooltip>
       </q-btn>
       <q-btn
         flat
         round
         dense
         icon="chevron_left"
-        aria-label="上一页"
+        :aria-label="t('table.previousPage')"
         :disable="isFirstPage"
         @click="goToPage(currentPage - 1)"
       >
-        <q-tooltip>上一页</q-tooltip>
+        <q-tooltip>{{ t('table.previousPage') }}</q-tooltip>
       </q-btn>
 
       <q-input
@@ -32,14 +32,16 @@
         outlined
         dense
         inputmode="numeric"
-        aria-label="当前页"
+        :aria-label="t('table.currentPage')"
         class="table-pagination__page-input"
         input-class="text-center text-weight-medium"
         @keyup.enter="commitPage"
         @blur="commitPage"
       >
         <template #append>
-          <span class="table-pagination__page-total">/ {{ formattedTotalPages }} 页</span>
+          <span class="table-pagination__page-total">
+            {{ t('table.totalPages', { count: formattedTotalPages }) }}
+          </span>
         </template>
       </q-input>
 
@@ -48,22 +50,22 @@
         round
         dense
         icon="chevron_right"
-        aria-label="下一页"
+        :aria-label="t('table.nextPage')"
         :disable="isLastPage"
         @click="goToPage(currentPage + 1)"
       >
-        <q-tooltip>下一页</q-tooltip>
+        <q-tooltip>{{ t('table.nextPage') }}</q-tooltip>
       </q-btn>
       <q-btn
         flat
         round
         dense
         icon="last_page"
-        aria-label="末页"
+        :aria-label="t('table.lastPage')"
         :disable="isLastPage"
         @click="goToPage(totalPages)"
       >
-        <q-tooltip>末页</q-tooltip>
+        <q-tooltip>{{ t('table.lastPage') }}</q-tooltip>
       </q-btn>
     </div>
 
@@ -74,12 +76,14 @@
       dense
       options-dense
       :options="resolvedPageSizeOptions"
-      aria-label="每页条数"
+      :aria-label="t('table.pageSize')"
       class="table-pagination__page-size"
       @update:model-value="onPageSizeChange"
     >
       <template #append>
-        <q-item-label class="table-pagination__page-size-suffix">/ 页</q-item-label>
+        <q-item-label class="table-pagination__page-size-suffix">
+          {{ t('table.pageSizeSuffix') }}
+        </q-item-label>
       </template>
       <template #option="scope">
         <q-item v-bind="scope.itemProps">
@@ -94,6 +98,9 @@
 
 <script lang="ts" setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { locale, t } = useI18n({ useScope: 'global' })
 
 const props = defineProps<{
   page: number
@@ -113,8 +120,8 @@ const currentPageSize = ref(props.pageSize)
 const pageDraft = ref(String(currentPage.value))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / currentPageSize.value)))
-const formattedTotal = computed(() => Math.max(0, props.total).toLocaleString('zh-CN'))
-const formattedTotalPages = computed(() => totalPages.value.toLocaleString('zh-CN'))
+const formattedTotal = computed(() => Math.max(0, props.total).toLocaleString(locale.value))
+const formattedTotalPages = computed(() => totalPages.value.toLocaleString(locale.value))
 const isFirstPage = computed(() => currentPage.value <= 1)
 const isLastPage = computed(() => currentPage.value >= totalPages.value)
 

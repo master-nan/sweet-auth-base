@@ -6,7 +6,7 @@
       dense
       flat
       icon="notifications"
-      aria-label="通知"
+      :aria-label="t('notification.title')"
     >
       <q-badge v-if="store.unreadCount > 0" color="red" floating>
         {{ notificationBadge }}
@@ -20,7 +20,7 @@
       >
         <div class="notification-popover__header row items-center no-wrap">
           <div>
-            <div class="text-subtitle1 text-weight-medium">通知</div>
+            <div class="text-subtitle1 text-weight-medium">{{ t('notification.title') }}</div>
             <div class="text-caption text-grey-7">{{ unreadSummary }}</div>
           </div>
           <q-space />
@@ -29,7 +29,7 @@
             dense
             no-caps
             color="primary"
-            label="全部已读"
+            :label="t('notification.markAllRead')"
             :disable="store.unreadCount === 0"
             @click="markAllRead"
           />
@@ -46,14 +46,21 @@
           >
             <q-icon name="cloud_off" size="32px" color="grey-6" />
             <div class="text-caption text-grey-7">{{ store.error }}</div>
-            <q-btn outline dense color="primary" icon="refresh" label="重试" @click="retry" />
+            <q-btn
+              outline
+              dense
+              color="primary"
+              icon="refresh"
+              :label="t('notification.retry')"
+              @click="retry"
+            />
           </div>
           <div
             v-else-if="store.recentItems.length === 0"
             class="notification-popover__state column flex-center q-gutter-sm"
           >
             <q-icon name="notifications_none" size="36px" color="grey-5" />
-            <div class="text-body2 text-grey-7">暂无通知</div>
+            <div class="text-body2 text-grey-7">{{ t('notification.empty') }}</div>
           </div>
           <q-list v-else separator>
             <q-item
@@ -77,7 +84,10 @@
                 </div>
               </q-item-section>
               <q-item-section v-if="!item.read" side top>
-                <span class="notification-popover__unread-dot" aria-label="未读" />
+                <span
+                  class="notification-popover__unread-dot"
+                  :aria-label="t('notification.unread')"
+                />
               </q-item-section>
             </q-item>
           </q-list>
@@ -91,12 +101,12 @@
             no-caps
             class="full-width"
             color="primary"
-            label="查看全部通知"
+            :label="t('notification.viewAll')"
             @click="viewAll"
           />
         </div>
       </q-menu>
-      <q-tooltip>通知</q-tooltip>
+      <q-tooltip>{{ t('notification.title') }}</q-tooltip>
     </q-btn>
 
     <q-dialog v-model="showDetail">
@@ -109,7 +119,14 @@
               {{ detail ? formatTime(detail.created_at) : '' }}
             </div>
           </div>
-          <q-btn v-close-popup flat round dense icon="close" aria-label="关闭通知详情" />
+          <q-btn
+            v-close-popup
+            flat
+            round
+            dense
+            icon="close"
+            :aria-label="t('notification.closeDetail')"
+          />
         </q-card-section>
         <q-separator />
         <q-card-section class="notification-detail-dialog__content">{{
@@ -134,16 +151,20 @@ import {
   type NotificationSummary,
 } from 'src/api/services/notification'
 import { useNotificationStore } from 'src/stores/notification'
+import { useI18n } from 'vue-i18n'
 
 const store = useNotificationStore()
 const api = useNotificationApi()
 const router = useRouter()
 const $q = useQuasar()
+const { t } = useI18n({ useScope: 'global' })
 const showDetail = ref(false)
 const detail = ref<NotificationDetail | null>(null)
 
 const unreadSummary = computed(() =>
-  store.unreadCount > 0 ? `${store.unreadCount} 条未读` : '没有未读通知',
+  store.unreadCount > 0
+    ? t('notification.unreadCount', { count: store.unreadCount })
+    : t('notification.noUnread'),
 )
 const notificationBadge = computed(() =>
   store.unreadCount > 99 ? '99+' : String(store.unreadCount),
@@ -172,7 +193,7 @@ const openDetail = async (id: number, marked?: NotificationDetail | null) => {
     detail.value = marked || (await api.detail(id)).data || null
     showDetail.value = !!detail.value
   } catch {
-    $q.notify({ type: 'negative', message: '通知详情加载失败' })
+    $q.notify({ type: 'negative', message: t('notification.loadDetailFailed') })
   }
 }
 
@@ -185,9 +206,9 @@ const openNotification = async (item: NotificationSummary) => {
       await router.push(item.action.path)
       return
     }
-    $q.notify({ type: 'warning', message: '目标页面不存在或暂不可用' })
+    $q.notify({ type: 'warning', message: t('notification.targetUnavailable') })
   } else if (item.action && !item.action.available) {
-    $q.notify({ type: 'warning', message: '当前无权访问目标页面' })
+    $q.notify({ type: 'warning', message: t('notification.targetForbidden') })
   }
   await openDetail(item.id, marked)
 }

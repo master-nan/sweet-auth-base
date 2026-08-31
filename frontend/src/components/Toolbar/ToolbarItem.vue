@@ -9,6 +9,7 @@
       dense
       flat
       :icon="$q.fullscreen.isActive ? 'fullscreen_exit' : 'fullscreen'"
+      :aria-label="t('layout.fullScreen')"
       @click="$q.fullscreen.toggle()"
       v-if="$q.screen.gt.sm"
     >
@@ -32,6 +33,7 @@
       dense
       flat
       icon="refresh"
+      :aria-label="t('layout.refresh')"
       @click="appStore.reloadPage(200)"
       v-if="$q.screen.gt.sm"
     >

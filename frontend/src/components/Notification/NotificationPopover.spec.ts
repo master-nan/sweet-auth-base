@@ -1,6 +1,10 @@
 import { defineComponent, h, reactive } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createI18n } from 'vue-i18n'
+import messages from 'src/i18n'
+
+const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages })
 
 const notify = vi.hoisted(() => vi.fn())
 const router = vi.hoisted(() => ({
@@ -107,6 +111,9 @@ const stubs = {
   QCardSection: SlotStub('QCardSection'),
 }
 
+const mountPopover = () =>
+  mount(NotificationPopover, { global: { plugins: [i18n], stubs } })
+
 const summary = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   category: 'SYSTEM',
@@ -135,7 +142,7 @@ describe('NotificationPopover', () => {
   })
 
   it('refreshes unread and recent data when the bell menu opens', async () => {
-    const wrapper = mount(NotificationPopover, { global: { stubs } })
+    const wrapper = mountPopover()
     expect(wrapper.find('[aria-label="通知"] [data-menu]').exists()).toBe(true)
     wrapper.findComponent(QMenuStub).vm.$emit('before-show')
     await wrapper.vm.$nextTick()
@@ -145,7 +152,7 @@ describe('NotificationPopover', () => {
   })
 
   it('renders real unread values and caps counts above 99', async () => {
-    const wrapper = mount(NotificationPopover, { global: { stubs } })
+    const wrapper = mountPopover()
     expect(wrapper.find('[data-badge]').exists()).toBe(false)
 
     store.unreadCount = 5
@@ -173,7 +180,7 @@ describe('NotificationPopover', () => {
       content: '<script>alert(1)</script>',
       source: { module: 'system', type: 'notice' },
     })
-    const wrapper = mount(NotificationPopover, { global: { stubs } })
+    const wrapper = mountPopover()
     expect(wrapper.find('script').exists()).toBe(false)
     expect(wrapper.text()).toContain('<script>alert(1)</script>')
     await wrapper.find('[data-notification-item]').trigger('click')
@@ -189,7 +196,7 @@ describe('NotificationPopover', () => {
       content: '只能查看消息，不能打开目标页面。',
       source: { module: 'system', type: 'notice' },
     })
-    const wrapper = mount(NotificationPopover, { global: { stubs } })
+    const wrapper = mountPopover()
     await wrapper.find('[data-notification-item]').trigger('click')
     expect(notify).toHaveBeenCalledWith({ type: 'warning', message: '当前无权访问目标页面' })
     expect(router.push).not.toHaveBeenCalled()

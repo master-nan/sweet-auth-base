@@ -1,7 +1,11 @@
 import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { createI18n } from 'vue-i18n'
 import TablePagination from './TablePagination.vue'
+import messages from 'src/i18n'
+
+const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages })
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -42,14 +46,15 @@ const InputStub = defineComponent({
 })
 
 const SelectStub = defineComponent({
+  inheritAttrs: false,
   props: { modelValue: Number, options: Array },
   emits: ['update:modelValue'],
-  setup(props, { emit, slots }) {
+  setup(props, { attrs, emit, slots }) {
     return () =>
       h(
         'button',
         {
-          'aria-label': '每页条数',
+          ...attrs,
           type: 'button',
           onClick: () => emit('update:modelValue', 50),
         },
@@ -58,10 +63,17 @@ const SelectStub = defineComponent({
   },
 })
 
-const mountPagination = (page = 1001, pageSize = 20, total = 25_000) =>
-  mount(TablePagination, {
+const mountPagination = (
+  page = 1001,
+  pageSize = 20,
+  total = 25_000,
+  locale: 'en-US' | 'zh-CN' = 'zh-CN',
+) => {
+  i18n.global.locale.value = locale
+  return mount(TablePagination, {
     props: { page, pageSize, total },
     global: {
+      plugins: [i18n],
       stubs: {
         QBtn: ButtonStub,
         QTooltip: true,
@@ -74,6 +86,7 @@ const mountPagination = (page = 1001, pageSize = 20, total = 25_000) =>
       },
     },
   })
+}
 
 describe('TablePagination', () => {
   it('shows the total count and fixed current-page summary', () => {
@@ -94,6 +107,19 @@ describe('TablePagination', () => {
     await wrapper.get('button[aria-label="上一页"]').trigger('click')
 
     expect(wrapper.emitted('update:page')?.map(([page]) => page)).toEqual([1, 2, 1250, 1249])
+  })
+
+  it('updates totals and accessible labels when the locale changes', () => {
+    const wrapper = mountPagination(1, 20, 25_000, 'en-US')
+
+    expect(wrapper.text()).toContain('25,000 items')
+    expect(wrapper.text()).toContain('/ 1,250 pages')
+    expect(wrapper.get('input[aria-label="Current page"]').attributes('aria-label')).toBe(
+      'Current page',
+    )
+    expect(wrapper.get('button[aria-label="Items per page"]').attributes('aria-label')).toBe(
+      'Items per page',
+    )
   })
 
   it('clamps an entered page and resets the page when page size changes', async () => {

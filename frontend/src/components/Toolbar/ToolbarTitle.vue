@@ -11,7 +11,7 @@
     @click="router.push('/')"
   >
     <span class="toolbar-title__logo">
-      <img v-if="logo" :src="logo" alt="系统Logo" />
+      <img v-if="logo" :src="logo" :alt="t('layout.systemLogoAlt')" />
       <q-icon v-else name="admin_panel_settings" />
     </span>
     <span v-if="!mini" class="toolbar-title__text">
@@ -24,14 +24,16 @@
 <script lang="ts" setup>
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const $q = useQuasar()
 const router = useRouter()
+const { t } = useI18n({ useScope: 'global' })
 
 defineOptions({ name: 'ToolbarTitle' })
 withDefaults(defineProps<{ title?: string; subtitle?: string; mini?: boolean; logo?: string }>(), {
   title: '',
-  subtitle: '通用低代码底座',
+  subtitle: '',
   mini: false,
   logo: '',
 })

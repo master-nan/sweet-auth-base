@@ -27,7 +27,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'notifications',
     name: 'notification_center',
     meta: {
-      title: '消息通知中心',
+      title: 'router.notificationCenter',
       icon: 'notifications',
       keepAlive: false,
       isHidden: true,
@@ -39,7 +39,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'query-schemes',
     name: 'query_scheme_manager',
     meta: {
-      title: '查询方案管理',
+      title: 'router.querySchemeManager',
       icon: 'manage_search',
       keepAlive: false,
       isHidden: true,
@@ -51,7 +51,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'detail/:source/:table_code/:id',
     name: 'record_detail',
     meta: {
-      title: '详情',
+      title: 'router.recordDetail',
       icon: 'article',
       keepAlive: false,
       isHidden: true,
@@ -63,7 +63,7 @@ const asyncRoutesChildren: Route[] = [
     path: 'form/:mode/:table_code/:id?',
     name: 'record_form',
     meta: {
-      title: '表单',
+      title: 'router.recordForm',
       icon: 'edit_note',
       keepAlive: false,
       isHidden: true,

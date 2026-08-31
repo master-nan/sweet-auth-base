@@ -34,32 +34,32 @@
                 <q-item-section side>
                   <q-icon name="refresh" size="xs" />
                 </q-item-section>
-                <q-item-section>重载</q-item-section>
+                <q-item-section>{{ t('tagView.reload') }}</q-item-section>
               </q-item>
               <q-separator />
               <q-item clickable v-close-popup @click="removeTagViewOnRight(i)">
                 <q-item-section side>
                   <q-icon name="chevron_right" size="xs" />
                 </q-item-section>
-                <q-item-section>关闭右边</q-item-section>
+                <q-item-section>{{ t('tagView.closeRight') }}</q-item-section>
               </q-item>
               <q-item clickable v-close-popup @click="removeTagViewOnLeft(i)">
                 <q-item-section side>
                   <q-icon name="chevron_left" size="xs" />
                 </q-item-section>
-                <q-item-section>关闭左边</q-item-section>
+                <q-item-section>{{ t('tagView.closeLeft') }}</q-item-section>
               </q-item>
               <q-item clickable v-close-popup @click="removeOtherTagView(i)">
                 <q-item-section side>
                   <q-icon name="highlight_off" size="xs" />
                 </q-item-section>
-                <q-item-section>关闭其他</q-item-section>
+                <q-item-section>{{ t('tagView.closeOthers') }}</q-item-section>
               </q-item>
               <q-item clickable v-close-popup @click="removeAllTagView()">
                 <q-item-section side>
                   <q-icon name="delete_sweep" size="xs" />
                 </q-item-section>
-                <q-item-section>关闭全部</q-item-section>
+                <q-item-section>{{ t('tagView.closeAll') }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>

@@ -2,6 +2,7 @@ import { defineBoot } from '#q-app/wrappers'
 import { createI18n } from 'vue-i18n'
 
 import messages from 'src/i18n'
+import { applyQuasarLanguage } from 'src/i18n/quasar-language'
 import { readUIPreferences } from 'src/utils/ui-preferences'
 
 export type MessageLanguages = keyof typeof messages
@@ -23,6 +24,8 @@ export default defineBoot(({ app }) => {
     legacy: false,
     messages,
   })
+
+  applyQuasarLanguage(preferences.locale)
 
   app.use(i18n)
 })

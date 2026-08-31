@@ -9,6 +9,7 @@
     emit-value
     map-options
     options-dense
+    :aria-label="t('layout.language')"
     @update:model-value="handleSelectLanguage"
   >
     <template v-slot:prepend>
@@ -26,17 +27,20 @@ import {
   writeUIPreferences,
   type SupportedLocale,
 } from 'src/utils/ui-preferences'
+import { applyQuasarLanguage } from 'src/i18n/quasar-language'
 
 defineOptions({ name: 'LangSelector' })
 
-const { locale } = useI18n({ useScope: 'global' })
+const { locale, t } = useI18n({ useScope: 'global' })
 const localeOptions = [
   { value: 'en-US', label: 'English' },
   { value: 'zh-CN', label: '简体中文' },
 ]
 
 const handleSelectLanguage = () => {
-  writeUIPreferences({ locale: locale.value as SupportedLocale })
+  const value = locale.value as SupportedLocale
+  applyQuasarLanguage(value)
+  writeUIPreferences({ locale: value })
 }
 </script>
 

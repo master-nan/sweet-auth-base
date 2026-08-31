@@ -4,6 +4,7 @@
     dense
     flat
     :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'"
+    :aria-label="$q.dark.isActive ? t('layout.lightMode') : t('layout.darkMode')"
     @click="toggle"
   >
     <q-tooltip>{{ $q.dark.isActive ? t('layout.lightMode') : t('layout.darkMode') }}</q-tooltip>

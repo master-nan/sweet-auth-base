@@ -3,12 +3,14 @@
     <div class="login-mobile-brand">
       <div class="login-brand">
         <div class="login-brand-logo">
-          <img v-if="systemLogo" :src="systemLogo" alt="系统Logo" />
+          <img v-if="systemLogo" :src="systemLogo" :alt="t('login.systemLogoAlt')" />
           <q-icon v-else name="admin_panel_settings" />
         </div>
         <div>
           <div class="login-brand-title">{{ systemName }}</div>
-          <div class="login-brand-subtitle">{{ systemDescription || '通用低代码底座' }}</div>
+          <div class="login-brand-subtitle">
+            {{ systemDescription || t('login.defaultDescription') }}
+          </div>
         </div>
       </div>
     </div>
@@ -16,26 +18,26 @@
     <login-flow-visual class="login-flow-visual" />
 
     <q-card-section class="login-body">
-      <div class="login-kicker">账号登录</div>
+      <div class="login-kicker">{{ t('login.accountLogin') }}</div>
       <div class="login-welcome">
-        <h2>欢迎回来</h2>
-        <p>使用你的平台账号继续</p>
+        <h2>{{ t('login.welcome') }}</h2>
+        <p>{{ t('login.continueHint') }}</p>
       </div>
 
       <q-form ref="loginForm" class="login-form" @submit.prevent="onLoginClick">
         <div class="login-field">
-          <label for="login-username">账号</label>
+          <label for="login-username">{{ t('login.username') }}</label>
           <q-input
             id="login-username"
             v-model="username"
-            placeholder="请输入账号"
+            :placeholder="t('login.usernamePlaceholder')"
             dense
             clearable
             outlined
             no-error-icon
             lazy-rules
             hide-bottom-space
-            :rules="[(val) => !!val || '请输入账号']"
+            :rules="[(val) => !!val || t('login.usernameRequired')]"
           >
             <template v-slot:prepend>
               <q-icon size="xs" name="person" />
@@ -44,18 +46,18 @@
         </div>
 
         <div class="login-field">
-          <label for="login-password">密码</label>
+          <label for="login-password">{{ t('login.password') }}</label>
           <q-input
             id="login-password"
             v-model="password"
-            placeholder="请输入密码"
+            :placeholder="t('login.passwordPlaceholder')"
             dense
             outlined
             no-error-icon
             :type="isPwd ? 'password' : 'text'"
             lazy-rules
             hide-bottom-space
-            :rules="[(val) => !!val || '请输入密码']"
+            :rules="[(val) => !!val || t('login.passwordRequired')]"
             autocomplete="off"
           >
             <template v-slot:prepend>
@@ -73,25 +75,25 @@
         </div>
 
         <div v-if="enableCaptcha" class="login-field">
-          <label for="login-captcha">验证码</label>
+          <label for="login-captcha">{{ t('login.captcha') }}</label>
           <q-input
             id="login-captcha"
             v-model="captcha"
             class="login-captcha-field"
-            placeholder="请输入验证码"
+            :placeholder="t('login.captchaPlaceholder')"
             dense
             outlined
             no-error-icon
             lazy-rules
             hide-bottom-space
-            :rules="[(val) => !!val || '请输入验证码']"
+            :rules="[(val) => !!val || t('login.captchaRequired')]"
           >
             <template v-slot:prepend>
               <q-icon size="xs" name="security" />
             </template>
             <template v-slot:append>
               <q-img class="login-captcha-image" :src="captchaImage" @click="fetchCaptcha">
-                <q-tooltip>点击刷新验证码</q-tooltip>
+                <q-tooltip>{{ t('login.captchaRefresh') }}</q-tooltip>
               </q-img>
             </template>
           </q-input>
@@ -105,7 +107,7 @@
           type="submit"
           :loading="loading"
         >
-          登录
+          {{ t('login.submit') }}
         </q-btn>
         <q-banner
           v-if="message !== ''"
@@ -128,6 +130,7 @@ import { useBasicApi } from 'src/api/services/basic'
 import { QForm } from 'quasar'
 import LoginFlowVisual from 'src/components/Login/LoginFlowVisual.vue'
 import { useConfigureStore } from 'stores/configure'
+import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'MyLogin' })
 
@@ -141,6 +144,7 @@ interface Props {
 }
 
 const captchaImage = ref('')
+const { t } = useI18n({ useScope: 'global' })
 
 const configureStore = useConfigureStore()
 const { captchaImg } = useBasicApi()
