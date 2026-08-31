@@ -434,6 +434,15 @@ func TestAuthRefreshSingleUseAndAccountChecks(t *testing.T) {
 	if err != nil || refreshed.RefreshToken == "" || refreshed.MustChangePassword || refreshed.PasswordChangeReason != "" {
 		t.Fatalf("refresh: %+v %v audit=%+v", refreshed, err, subject.audit.events)
 	}
+	for name, value := range map[string]string{"login": login.AccessToken, "refresh": refreshed.AccessToken} {
+		claims, parseErr := subject.tokens.codec.ParseToken(value, subject.tokens.conf)
+		if parseErr != nil {
+			t.Fatalf("parse %s access token: %v", name, parseErr)
+		}
+		if lifetime := claims.ExpiresAt.Sub(claims.IssuedAt); lifetime != time.Hour {
+			t.Fatalf("%s access token lifetime = %s, want %s", name, lifetime, time.Hour)
+		}
+	}
 	originalClaims, err := subject.tokens.codec.ParseToken(login.RefreshToken, subject.tokens.conf)
 	if err != nil {
 		t.Fatal(err)
