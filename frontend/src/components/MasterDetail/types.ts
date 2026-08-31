@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { SysMasterDetailMode } from 'src/types/enum'
 
 export const MasterDetailDisplayMode = {

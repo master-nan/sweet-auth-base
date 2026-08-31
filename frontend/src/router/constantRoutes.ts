@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [

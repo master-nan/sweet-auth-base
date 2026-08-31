@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 /**
  * 列表列格式化工具
  * 统一处理日期时间、字典、布尔、关联表字段的列显示

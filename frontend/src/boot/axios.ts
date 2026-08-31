@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { defineBoot } from '#q-app/wrappers'
 import axios, { type AxiosInstance } from 'axios'
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from 'axios'

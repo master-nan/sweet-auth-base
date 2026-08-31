@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import type { Query, ResponseData } from 'src/types/global'
 import { instance } from 'boot/axios'
 import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'

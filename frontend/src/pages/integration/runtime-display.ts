@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 export const formatRuntimeDateTime = (value?: string | null): string => {
   if (!value || value.startsWith('0001-01-01')) return '-'
   const parsed = new Date(value)

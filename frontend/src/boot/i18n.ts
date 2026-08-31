@@ -1,9 +1,11 @@
 import { defineBoot } from '#q-app/wrappers'
+import { createI18n } from 'vue-i18n'
+import { Lang } from 'quasar'
+import enUS from 'quasar/lang/en-US'
+import zhCN from 'quasar/lang/zh-CN'
 
-import type messages from 'src/i18n'
-import { i18n } from 'src/i18n/runtime/instance'
-import { applyQuasarLanguage } from 'src/i18n/runtime/quasar'
-import { readUIPreferences } from 'src/utils/ui-preferences'
+import messages from 'src/i18n'
+import { readUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
 
 export type MessageLanguages = keyof typeof messages
 // 以当前中文资源定义消息Schema，其他语言必须保持相同键结构。
@@ -16,6 +18,22 @@ declare module 'vue-i18n' {
   export interface DefineNumberFormat {}
 }
 /* eslint-enable @typescript-eslint/no-empty-object-type */
+
+export const i18n = createI18n({
+  locale: 'zh-CN',
+  legacy: false,
+  messages,
+})
+
+export const translate = i18n.global.t as (
+  key: string,
+  named?: Record<string, unknown>,
+) => string
+
+export const applyQuasarLanguage = (locale: SupportedLocale) => {
+  Lang.set(locale === 'en-US' ? enUS : zhCN)
+  document.documentElement.lang = locale
+}
 
 export default defineBoot(({ app }) => {
   const preferences = readUIPreferences()

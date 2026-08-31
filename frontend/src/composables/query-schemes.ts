@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { computed, onScopeDispose, ref } from 'vue'
 import { useQuerySchemeApi } from 'src/api/services/query-scheme'
 import { useQueryScope } from 'src/composables/query-scope'

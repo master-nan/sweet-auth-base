@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { computed, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { useTableApi, type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
 

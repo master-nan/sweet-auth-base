@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { instance } from 'boot/axios'
 import { localLoadingRequestConfig } from 'src/api/request-config'
 import type { ResponseData } from 'src/types/global'

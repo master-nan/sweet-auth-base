@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useTableApi, type TableField } from 'src/api/services/sys-table'

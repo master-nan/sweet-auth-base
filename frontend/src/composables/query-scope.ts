@@ -1,4 +1,4 @@
-import { translate as t } from 'src/i18n/runtime/instance'
+import { translate as t } from 'src/boot/i18n'
 import { computed, ref, type MaybeRefOrGetter, toValue } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from 'src/stores/user'
