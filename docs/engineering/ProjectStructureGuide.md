@@ -681,7 +681,8 @@ Authenticated User -> Runtime API -> User Inbox ---+
 **模块功能与用户能力**
 
 当前Report支持报表定义管理、table/sql dataset配置、参数、sheet/cell/binding设计、设计预览、发布版本、
-运行态查询、后端导出、执行日志和发布为菜单。设计端与运行端共享受控配置解析，不允许任意外部数据源。
+运行态查询、后端导出、执行日志和发布为菜单。多个table dataset可通过主数据集关联树进行左连接或内连接；
+设计端与运行端共享受控配置解析，不允许任意外部数据源。
 
 **核心入口与文件职责**
 
@@ -706,6 +707,7 @@ Authenticated User -> Runtime API -> User Inbox ---+
 
 - 运行态读取已发布版本，不直接使用正在编辑的草稿；菜单发布与Report发布状态共同决定入口。
 - table dataset复用SysTable/Field发现能力；SQL dataset必须经过只读SQL守卫、参数绑定和执行预算。
+- 多table dataset关联必须从主数据集逐层连接，不允许断开、循环或重复引入同一数据集；SQL dataset不参与表关联。
 - 扩展应围绕现有sheet/cell/binding、发布隔离、导出和日志演进，不另建数据源或设计器体系。
 - 当前暂不支持外部数据库数据源、自由画布、图表大屏、打印分页、填报、调度订阅和多数据集复杂联动。
 

@@ -151,6 +151,17 @@
         <div class="join-list">
           <div v-for="join in datasetJoins" :key="join.id" class="join-row">
             <span>{{ joinLabel(join) }}</span>
+            <q-space />
+            <q-btn
+              flat
+              dense
+              round
+              color="primary"
+              icon="edit"
+              @click="$emit('editJoin', join.id)"
+            >
+              <q-tooltip>{{ t('ui.edit') }}</q-tooltip>
+            </q-btn>
             <q-btn
               flat
               dense
@@ -234,18 +245,6 @@
               @update:model-value="emitRuntimePageSize"
             />
           </div>
-          <div class="capability-list">
-            <div>
-              <q-icon name="security" />
-              {{ t('ui.previewAndRunSuccessionMasterTableDataPrivileges') }}
-            </div>
-            <div><q-icon name="table_view" /> {{ t('ui.lineByLineFixedSumbarsOnly') }}</div>
-            <div>
-              <q-icon name="data_object" />
-              {{ t('ui.saveTheSqlDatasetDesignFirstExecutionIsEnabledAfter') }}
-            </div>
-            <div><q-icon name="ios_share" /> {{ t('ui.excelExportStructureReserved') }}</div>
-          </div>
         </div>
       </q-tab-panel>
     </q-tab-panels>
@@ -310,6 +309,7 @@ const emit = defineEmits<{
   updateDatasetName: [datasetId: string, name: string]
   setPrimaryDataset: [datasetId: string]
   addJoin: []
+  editJoin: [id: string]
   removeJoin: [id: string]
   'update:category': [value: string]
   'update:description': [value: string]
@@ -393,8 +393,7 @@ function joinLabel(join: ReportDatasetJoin) {
   font-weight: 900;
 }
 
-.inspector-form,
-.capability-list {
+.inspector-form {
   display: grid;
   gap: 10px;
 }
@@ -415,17 +414,6 @@ function joinLabel(join: ReportDatasetJoin) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
-}
-
-.capability-list div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid #e7ecf6;
-  border-radius: 8px;
-  background: #fff;
-  color: #5f6f88;
 }
 
 .binding-preview {
@@ -449,6 +437,11 @@ function joinLabel(join: ReportDatasetJoin) {
   border: 1px solid #e7ecf6;
   border-radius: 8px;
   background: #fff;
+}
+
+.join-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dataset-role strong,

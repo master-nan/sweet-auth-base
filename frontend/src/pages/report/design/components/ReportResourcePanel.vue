@@ -6,13 +6,27 @@
           <strong>{{ t('ui.dataset') }}</strong>
           <span>{{ datasets.length }} {{ t('ui.dataSets') }}</span>
         </div>
-        <q-btn
-          size="sm"
-          color="primary"
-          icon="add"
-          :label="t('ui.create')"
-          @click="$emit('openDataset')"
-        />
+        <div class="section-actions">
+          <q-btn
+            v-if="datasets.length > 1"
+            flat
+            round
+            dense
+            size="sm"
+            color="primary"
+            icon="add_link"
+            @click="$emit('addJoin')"
+          >
+            <q-tooltip>{{ t('ui.addRelation') }}</q-tooltip>
+          </q-btn>
+          <q-btn
+            size="sm"
+            color="primary"
+            icon="add"
+            :label="t('ui.create')"
+            @click="$emit('openDataset')"
+          />
+        </div>
       </div>
       <div class="dataset-tools">
         <q-input
@@ -178,6 +192,7 @@ const props = defineProps<{
 
 defineEmits<{
   openDataset: []
+  addJoin: []
   selectDataset: [id: string]
   editDataset: [id: string]
   removeDataset: [id: string]
@@ -267,6 +282,12 @@ function parameterTargetLabel(param: ReportParameter) {
 .dataset-card__head {
   display: flex;
   align-items: center;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-head {

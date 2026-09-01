@@ -24,23 +24,45 @@
     />
 
     <main class="designer-workbench">
-      <report-resource-panel
-        :datasets="datasets"
-        :parameters="parameters"
-        :selected-dataset-id="selectedDatasetId"
-        :selected-parameter-id="selectedParameterId"
-        @open-dataset="openDatasetDialog"
-        @select-dataset="selectedDatasetId = $event"
-        @edit-dataset="openDatasetDialog"
-        @remove-dataset="removeDataset"
-        @start-drag-field="startDragField"
-        @end-drag-field="draggingField = null"
-        @bind-field="bindFieldToActiveCell"
-        @add-parameter="addParameter"
-        @select-parameter="selectedParameterId = $event"
-        @edit-parameter="openParameterDialog"
-        @remove-parameter="removeParameter"
-      />
+      <nav class="designer-palette">
+        <q-btn
+          flat
+          round
+          dense
+          icon="tune"
+          :class="{ active: sidePanelTab === 'properties' }"
+          @click="showProperties('cell')"
+        >
+          <q-tooltip>{{ t('ui.cells') }}</q-tooltip>
+        </q-btn>
+        <q-btn
+          flat
+          round
+          dense
+          icon="database"
+          :class="{ active: sidePanelTab === 'dataSource' }"
+          @click="sidePanelTab = 'dataSource'"
+        >
+          <q-tooltip>{{ t('ui.dataset') }}</q-tooltip>
+        </q-btn>
+        <q-separator />
+        <q-btn flat round dense icon="filter_alt" @click="addParameter">
+          <q-tooltip>{{ t('ui.parameters') }}</q-tooltip>
+        </q-btn>
+        <q-btn
+          flat
+          round
+          dense
+          icon="account_tree"
+          :disable="datasets.length < 2"
+          @click="openJoinDialog()"
+        >
+          <q-tooltip>{{ t('ui.dataSetAssociation') }}</q-tooltip>
+        </q-btn>
+        <q-btn flat round dense icon="functions" @click="toggleActiveSummaryRow">
+          <q-tooltip>{{ t('ui.summaryRow') }}</q-tooltip>
+        </q-btn>
+      </nav>
 
       <report-sheet-canvas
         :sheet="sheet"
@@ -75,43 +97,82 @@
         @zoom-out="zoomOut"
       />
 
-      <report-inspector-panel
-        v-model:tab="inspectorTab"
-        v-model:cell-value="activeCellValue"
-        v-model:binding-type="activeBindingType"
-        v-model:binding-dataset-id="activeBindingDatasetId"
-        v-model:binding-field="activeBindingField"
-        v-model:formula="activeFormula"
-        v-model:cell-bold="activeCellBold"
-        v-model:cell-align="activeCellAlign"
-        :active-cell-label="activeCellLabel"
-        :has-active-cell="!!activeCell"
-        :binding-preview="activeBindingPreview"
-        :binding-type-options="reportBindingTypeOptions"
-        :dataset-options="datasetOptions"
-        :active-dataset-field-options="activeDatasetFieldOptions"
-        :align-options="reportAlignOptions"
-        :selected-dataset="selectedDataset"
-        :primary-dataset="primaryDataset"
-        :datasets="datasets"
-        :dataset-joins="datasetJoins"
-        :category="form.category || ''"
-        :description="form.description || ''"
-        :report-kind="form.report_kind"
-        :report-kind-options="reportKindOptions"
-        :runtime-display="form.runtime_display || 'paged'"
-        :runtime-page-size="form.runtime_page_size || 20"
-        :runtime-display-options="reportRuntimeDisplayOptions"
-        @update-dataset-name="updateDatasetName"
-        @set-primary-dataset="setPrimaryDataset"
-        @add-join="openJoinDialog"
-        @remove-join="removeJoin"
-        @update:category="form.category = $event"
-        @update:description="form.description = $event"
-        @update:report-kind="applyReportKind"
-        @update:runtime-display="form.runtime_display = $event"
-        @update:runtime-page-size="form.runtime_page_size = $event"
-      />
+      <aside class="designer-side-panel">
+        <q-tabs
+          v-model="sidePanelTab"
+          dense
+          no-caps
+          align="justify"
+          active-color="primary"
+          indicator-color="primary"
+        >
+          <q-tab name="properties" icon="tune" :label="t('ui.properties')" />
+          <q-tab name="dataSource" icon="database" :label="t('ui.dataSourceTab')" />
+        </q-tabs>
+        <q-separator />
+        <q-tab-panels v-model="sidePanelTab" class="designer-side-panels">
+          <q-tab-panel name="properties">
+            <report-inspector-panel
+              v-model:tab="inspectorTab"
+              v-model:cell-value="activeCellValue"
+              v-model:binding-type="activeBindingType"
+              v-model:binding-dataset-id="activeBindingDatasetId"
+              v-model:binding-field="activeBindingField"
+              v-model:formula="activeFormula"
+              v-model:cell-bold="activeCellBold"
+              v-model:cell-align="activeCellAlign"
+              :active-cell-label="activeCellLabel"
+              :has-active-cell="!!activeCell"
+              :binding-preview="activeBindingPreview"
+              :binding-type-options="reportBindingTypeOptions"
+              :dataset-options="datasetOptions"
+              :active-dataset-field-options="activeDatasetFieldOptions"
+              :align-options="reportAlignOptions"
+              :selected-dataset="selectedDataset"
+              :primary-dataset="primaryDataset"
+              :datasets="datasets"
+              :dataset-joins="datasetJoins"
+              :category="form.category || ''"
+              :description="form.description || ''"
+              :report-kind="form.report_kind"
+              :report-kind-options="reportKindOptions"
+              :runtime-display="form.runtime_display || 'paged'"
+              :runtime-page-size="form.runtime_page_size || 20"
+              :runtime-display-options="reportRuntimeDisplayOptions"
+              @update-dataset-name="updateDatasetName"
+              @set-primary-dataset="setPrimaryDataset"
+              @add-join="openJoinDialog()"
+              @edit-join="openJoinDialog"
+              @remove-join="removeJoin"
+              @update:category="form.category = $event"
+              @update:description="form.description = $event"
+              @update:report-kind="applyReportKind"
+              @update:runtime-display="form.runtime_display = $event"
+              @update:runtime-page-size="form.runtime_page_size = $event"
+            />
+          </q-tab-panel>
+          <q-tab-panel name="dataSource">
+            <report-resource-panel
+              :datasets="datasets"
+              :parameters="parameters"
+              :selected-dataset-id="selectedDatasetId"
+              :selected-parameter-id="selectedParameterId"
+              @open-dataset="openDatasetDialog"
+              @add-join="openJoinDialog()"
+              @select-dataset="selectedDatasetId = $event"
+              @edit-dataset="openDatasetDialog"
+              @remove-dataset="removeDataset"
+              @start-drag-field="startDragField"
+              @end-drag-field="draggingField = null"
+              @bind-field="bindFieldToActiveCell"
+              @add-parameter="addParameter"
+              @select-parameter="selectedParameterId = $event"
+              @edit-parameter="openParameterDialog"
+              @remove-parameter="removeParameter"
+            />
+          </q-tab-panel>
+        </q-tab-panels>
+      </aside>
     </main>
 
     <footer class="designer-statusbar">
@@ -158,6 +219,7 @@
 
     <report-join-dialog
       v-model="joinDialogVisible"
+      :editing="!!editingJoinId"
       :draft="joinDraft"
       :dataset-options="datasetOptions"
       :left-field-options="joinLeftFieldOptions"
@@ -315,6 +377,7 @@ const selectedCellId = ref('2:2')
 const selectionRange = ref<ReportSheetRange | null>(null)
 const selectedParameterId = ref('')
 const inspectorTab = ref<'cell' | 'data' | 'report'>('cell')
+const sidePanelTab = ref<'properties' | 'dataSource'>('dataSource')
 const draggingField = ref<{ datasetId: string; fieldCode: string } | null>(null)
 const datasetDialogVisible = ref(false)
 const editingDatasetId = ref('')
@@ -322,6 +385,7 @@ const sqlFieldsLoading = ref(false)
 const parameterDialogVisible = ref(false)
 const editingParameterId = ref('')
 const joinDialogVisible = ref(false)
+const editingJoinId = ref('')
 const previewDialogVisible = ref(false)
 const versionDialogVisible = ref(false)
 const previewData = ref<ReportPreviewRes>({ columns: [], rows: [], total: 0 })
@@ -607,7 +671,9 @@ function initNewReport() {
   parameters.value = []
   selectedDatasetId.value = ''
   selectedCellId.value = '1:1'
+  sidePanelTab.value = 'dataSource'
   syncForm()
+  datasetDialogVisible.value = true
 }
 
 function createInitialDatasets(sourceCode?: string): ReportDataset[] {
@@ -660,6 +726,7 @@ function ensureDesignerDatasets(sourceDatasets: ReportDataset[]): ReportDataset[
 }
 
 function openDatasetDialog(id = '') {
+  sidePanelTab.value = 'dataSource'
   editingDatasetId.value = id
   const current = datasets.value.find((item) => item.id === id)
   if (current) {
@@ -902,6 +969,7 @@ function bindCell(
   markDetailRow(row)
   selectedCellId.value = reportCellId(row, col)
   inspectorTab.value = 'cell'
+  sidePanelTab.value = 'properties'
   buildLocalPreview()
 }
 
@@ -982,6 +1050,7 @@ function selectCell(row: number, col: number) {
   selectionRange.value = { startRow: row, startCol: col, endRow: row, endCol: col }
   sheet.value.active_cell = selectedCellId.value
   selectedParameterId.value = ''
+  showProperties('cell')
 }
 
 function selectRange(row: number, col: number) {
@@ -995,6 +1064,19 @@ function selectRange(row: number, col: number) {
   selectedCellId.value = reportCellId(row, col)
   sheet.value.active_cell = selectedCellId.value
   selectedParameterId.value = ''
+  showProperties('cell')
+}
+
+function showProperties(tab: 'cell' | 'data' | 'report') {
+  sidePanelTab.value = 'properties'
+  inspectorTab.value = tab
+}
+
+function toggleActiveSummaryRow() {
+  const row = activeCell.value?.row
+  if (!row) return
+  toggleSummaryRow(row)
+  showProperties('cell')
 }
 
 function clearActiveCell() {
@@ -1211,10 +1293,12 @@ function zoomOut() {
 }
 
 function addParameter() {
+  sidePanelTab.value = 'dataSource'
   openParameterDialog('')
 }
 
 function openParameterDialog(id = '') {
+  sidePanelTab.value = 'dataSource'
   const dataset = primaryDataset.value
   const field = dataset?.fields[0]
   if (!dataset || !field) {
@@ -1372,9 +1456,30 @@ function joinLabel(join: ReportDatasetJoin) {
   return `${datasetName(join.left_dataset_id)}.${fieldName(join.left_dataset_id, join.left_field)} ${relation} ${datasetName(join.right_dataset_id)}.${fieldName(join.right_dataset_id, join.right_field)}`
 }
 
-function openJoinDialog() {
+function openJoinDialog(id = '') {
+  sidePanelTab.value = 'properties'
+  inspectorTab.value = 'data'
+  editingJoinId.value = id
+  const current = datasetJoins.value.find((item) => item.id === id)
+  if (current) {
+    joinDraft.left_dataset_id = current.left_dataset_id
+    joinDraft.left_field = current.left_field
+    joinDraft.right_dataset_id = current.right_dataset_id
+    joinDraft.right_field = current.right_field
+    joinDraft.join_type = current.join_type
+    joinDialogVisible.value = true
+    return
+  }
   const left = primaryDataset.value || datasets.value[0]
-  const right = datasets.value.find((item) => item.id !== left?.id) || datasets.value[1]
+  const connectedDatasetIds = new Set<string>([left?.id || ''])
+  datasetJoins.value.forEach((join) => {
+    connectedDatasetIds.add(join.left_dataset_id)
+    connectedDatasetIds.add(join.right_dataset_id)
+  })
+  const right =
+    datasets.value.find((item) => item.id !== left?.id && !connectedDatasetIds.has(item.id)) ||
+    datasets.value.find((item) => item.id !== left?.id) ||
+    datasets.value[1]
   const suggested = suggestJoinFields(left, right)
   joinDraft.left_dataset_id = left?.id || ''
   joinDraft.left_field = suggested.leftField || left?.fields[0]?.code || ''
@@ -1433,19 +1538,41 @@ function confirmJoin() {
     })
     return
   }
-  datasetJoins.value.push({
-    id: `join_${Date.now()}`,
+  const duplicate = datasetJoins.value.find(
+    (join) =>
+      join.id !== editingJoinId.value &&
+      join.left_dataset_id === joinDraft.left_dataset_id &&
+      join.left_field === joinDraft.left_field &&
+      join.right_dataset_id === joinDraft.right_dataset_id &&
+      join.right_field === joinDraft.right_field,
+  )
+  if (duplicate) {
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.datasetAssociationAlreadyExists')
+      },
+    })
+    return
+  }
+  const join: ReportDatasetJoin = {
+    id: editingJoinId.value || `join_${Date.now()}`,
     left_dataset_id: joinDraft.left_dataset_id,
     left_field: joinDraft.left_field,
     right_dataset_id: joinDraft.right_dataset_id,
     right_field: joinDraft.right_field,
     join_type: joinDraft.join_type,
-  })
+  }
+  const index = datasetJoins.value.findIndex((item) => item.id === join.id)
+  if (index === -1) datasetJoins.value.push(join)
+  else datasetJoins.value[index] = join
+  editingJoinId.value = ''
   joinDialogVisible.value = false
 }
 
 function removeJoin(id: string) {
   datasetJoins.value = datasetJoins.value.filter((item) => item.id !== id)
+  if (editingJoinId.value === id) editingJoinId.value = ''
 }
 
 function applyReportKind(kind: ReportKind) {
@@ -1730,6 +1857,18 @@ function validateDatasetJoins() {
     }
   }
 
+  const primaryId = primaryDataset.value?.id || ''
+  const connectedDatasetIds = orderableDatasetJoinIds(datasetJoins.value, primaryId)
+  if (datasetJoins.value.length && !connectedDatasetIds) {
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.datasetAssociationsMustFormATreeFromThePrimaryDataset')
+      },
+    })
+    return false
+  }
+
   if (boundDatasetIds.value.length <= 1) return true
   if (!datasetJoins.value.length) {
     $q.notify({
@@ -1740,12 +1879,7 @@ function validateDatasetJoins() {
     })
     return false
   }
-  const joinedDatasetIds = new Set<string>()
-  datasetJoins.value.forEach((join) => {
-    joinedDatasetIds.add(join.left_dataset_id)
-    joinedDatasetIds.add(join.right_dataset_id)
-  })
-  const unjoinedDataset = boundDatasetIds.value.find((id) => !joinedDatasetIds.has(id))
+  const unjoinedDataset = boundDatasetIds.value.find((id) => !connectedDatasetIds?.has(id))
   if (unjoinedDataset) {
     const datasetName =
       datasets.value.find((item) => item.id === unjoinedDataset)?.name || unjoinedDataset
@@ -1758,6 +1892,25 @@ function validateDatasetJoins() {
     return false
   }
   return true
+}
+
+function orderableDatasetJoinIds(joins: ReportDatasetJoin[], primaryId: string) {
+  if (!primaryId) return null
+  const connected = new Set<string>([primaryId])
+  const remaining = [...joins]
+  while (remaining.length) {
+    const index = remaining.findIndex((join) => {
+      const leftConnected = connected.has(join.left_dataset_id)
+      const rightConnected = connected.has(join.right_dataset_id)
+      return leftConnected !== rightConnected
+    })
+    if (index < 0) return null
+    const [join] = remaining.splice(index, 1)
+    if (!join) return null
+    connected.add(join.left_dataset_id)
+    connected.add(join.right_dataset_id)
+  }
+  return connected
 }
 
 function validateSqlDatasets() {
@@ -1950,8 +2103,63 @@ function goBack() {
 .designer-workbench {
   min-height: 0;
   display: grid;
-  grid-template-columns: 300px minmax(760px, 1fr) 330px;
+  grid-template-columns: 52px minmax(760px, 1fr) 360px;
   overflow: auto;
+}
+
+.designer-palette {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px;
+  border-right: 1px solid #dfe5f2;
+  background: #fff;
+}
+
+.designer-palette .q-btn {
+  color: #64748b;
+}
+
+.designer-palette .q-btn.active {
+  color: var(--q-primary);
+  background: rgba(115, 103, 240, 0.1);
+}
+
+.designer-palette .q-separator {
+  width: 28px;
+}
+
+.designer-side-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 40px 1px minmax(0, 1fr);
+  border-left: 1px solid #dfe5f2;
+  background: #fbfcff;
+  overflow: hidden;
+}
+
+.designer-side-panels {
+  min-height: 0;
+  background: transparent;
+}
+
+.designer-side-panels :deep(.q-panel),
+.designer-side-panels :deep(.q-tab-panel) {
+  height: 100%;
+  min-height: 0;
+}
+
+.designer-side-panels :deep(.q-tab-panel) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.designer-side-panels :deep(.resource-panel),
+.designer-side-panels :deep(.inspector-panel) {
+  height: 100%;
+  border: 0;
 }
 
 .designer-statusbar {
@@ -1991,7 +2199,7 @@ function goBack() {
 
 @media (max-width: 1360px) {
   .designer-workbench {
-    grid-template-columns: 270px minmax(720px, 1fr) 300px;
+    grid-template-columns: 48px minmax(720px, 1fr) 320px;
   }
 }
 </style>

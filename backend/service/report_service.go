@@ -1045,6 +1045,15 @@ func (s *ReportService) validateReportDatasetTables(config reportconfig.Config) 
 			return myerrors.NewValidationError("报表数据集关联暂仅支持表数据集")
 		}
 	}
+	if len(config.DatasetJoins()) > 0 {
+		primary, ok := config.PrimaryTableDataset()
+		if !ok {
+			return myerrors.NewValidationError("报表必须配置 primary table 数据集")
+		}
+		if _, err := reportOrderedDatasetJoins(config, primary.Id); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1149,8 +1158,12 @@ func (s *ReportService) previewJoinedTableDatasets(ctx *gin.Context, snapshot Re
 		if err != nil {
 			return err
 		}
+		orderedJoins, joinOrderErr := reportOrderedDatasetJoins(config, primaryDataset.Id)
+		if joinOrderErr != nil {
+			return joinOrderErr
+		}
 		joinedDatasetIDs := make(map[string]struct{})
-		for _, join := range config.DatasetJoins() {
+		for _, join := range orderedJoins {
 			targetID := reportJoinTargetDatasetID(join, primaryDataset.Id)
 			if targetID != "" {
 				if _, exists := joinedDatasetIDs[targetID]; exists {
@@ -1370,16 +1383,43 @@ func reportSQLColumnType(dbType string) string {
 }
 
 func reportShouldUseJoinedPreview(config reportconfig.Config) bool {
-	if len(config.DatasetJoins()) > 0 {
-		return true
+	return len(config.DatasetJoins()) > 0
+}
+
+func reportOrderedDatasetJoins(config reportconfig.Config, primaryDatasetID string) ([]reportconfig.DatasetJoin, error) {
+	primaryDatasetID = strings.TrimSpace(primaryDatasetID)
+	if primaryDatasetID == "" {
+		return nil, myerrors.NewValidationError("报表主数据集不存在")
 	}
-	tableDatasetCount := 0
-	for _, dataset := range config.Datasets() {
-		if reportconfig.NormalizeDataset(dataset).Type == reportconfig.SourceTypeTable {
-			tableDatasetCount++
+	remaining := append([]reportconfig.DatasetJoin(nil), config.DatasetJoins()...)
+	ordered := make([]reportconfig.DatasetJoin, 0, len(remaining))
+	connected := map[string]struct{}{primaryDatasetID: {}}
+	for len(remaining) > 0 {
+		nextIndex := -1
+		shouldReverse := false
+		for index, join := range remaining {
+			_, leftConnected := connected[strings.TrimSpace(join.LeftDatasetId)]
+			_, rightConnected := connected[strings.TrimSpace(join.RightDatasetId)]
+			if leftConnected != rightConnected {
+				nextIndex = index
+				shouldReverse = rightConnected
+				break
+			}
 		}
+		if nextIndex < 0 {
+			return nil, myerrors.NewValidationError("报表数据集关联必须从主数据集逐层连接，不能存在断开或循环关联")
+		}
+		join := remaining[nextIndex]
+		if shouldReverse {
+			join.LeftDatasetId, join.RightDatasetId = join.RightDatasetId, join.LeftDatasetId
+			join.LeftField, join.RightField = join.RightField, join.LeftField
+		}
+		ordered = append(ordered, join)
+		connected[strings.TrimSpace(join.LeftDatasetId)] = struct{}{}
+		connected[strings.TrimSpace(join.RightDatasetId)] = struct{}{}
+		remaining = append(remaining[:nextIndex], remaining[nextIndex+1:]...)
 	}
-	return tableDatasetCount > 1
+	return ordered, nil
 }
 
 func reportDatasetAliases(config reportconfig.Config, primaryDatasetID string, primaryTableCode string) map[string]string {

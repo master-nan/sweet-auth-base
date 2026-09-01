@@ -1,79 +1,15 @@
 <template>
   <base-content class="q-pa-sm report-manage-page">
     <div class="report-workspace">
-      <section class="report-head">
-        <div>
-          <div class="report-title">{{ t('ui.reportManagement') }}</div>
-          <div class="report-caption">
-            {{ t('ui.manageDraftStatementsIssueDisableAndDesignAccessAndBusiness') }}
-          </div>
-        </div>
-        <div class="report-head-actions">
-          <q-input
-            v-model="query.quick_query!.keyword"
-            dense
-            outlined
-            clearable
-            debounce="300"
-            class="report-search"
-            :placeholder="t('ui.searchReportNameCodeCategory')"
-            @keyup.enter="handleSearch"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-          <q-btn
-            v-if="canCreateReport"
-            color="primary"
-            icon="add"
-            :label="t('ui.newReport')"
-            @click="openDesigner()"
-          />
-          <q-btn
-            outline
-            color="primary"
-            icon="refresh"
-            :label="t('ui.refresh')"
-            @click="fetchData"
-          />
-        </div>
-      </section>
-
-      <section class="report-metrics">
-        <div class="metric-item">
-          <q-icon name="assessment" />
-          <div>
-            <strong>{{ publishedCount }}</strong>
-            <span>{{ t('ui.publishedReports') }}</span>
-          </div>
-        </div>
-        <div class="metric-item">
-          <q-icon name="folder_special" />
-          <div>
-            <strong>{{ categories.length }}</strong>
-            <span>{{ t('ui.reportCategory') }}</span>
-          </div>
-        </div>
-        <div class="metric-item">
-          <q-icon name="dataset" />
-          <div>
-            <strong>{{ dataSourceCount }}</strong>
-            <span>{{ t('ui.availableDatasets') }}</span>
-          </div>
-        </div>
-        <div class="metric-item">
-          <q-icon name="security" />
-          <div>
-            <strong>{{ permissionCount }}</strong>
-            <span>{{ t('ui.inheritDataPermissions') }}</span>
-          </div>
-        </div>
-      </section>
-
       <section class="report-main-grid">
         <aside class="category-panel">
-          <div class="section-title">{{ t('ui.categoryFilter') }}</div>
+          <div class="category-head">
+            <q-icon name="folder_open" color="primary" />
+            <div>
+              <div class="section-title">{{ t('ui.reportCategory') }}</div>
+              <span>{{ total }} {{ t('ui.okay') }}</span>
+            </div>
+          </div>
           <button
             class="category-item"
             :class="{ active: activeCategory === '' }"
@@ -92,44 +28,48 @@
             <span>{{ category.name }}</span>
             <q-badge color="primary" outline>{{ category.count }}</q-badge>
           </button>
-
-          <q-separator class="q-my-md" />
-
-          <div class="section-title">{{ t('ui.quickProcess') }}</div>
-          <div class="flow-list">
-            <div class="flow-step">
-              <b>1</b><span>{{ t('ui.newReportAndSelectDataSet') }}</span>
-            </div>
-            <div class="flow-step">
-              <b>2</b
-              ><span>{{ t('ui.enterTheDesignerConfigurationParametersComponentsAndFields') }}</span>
-            </div>
-            <div class="flow-step">
-              <b>3</b><span>{{ t('ui.runPreviewsInheritMenuDataPrivileges') }}</span>
-            </div>
-            <div class="flow-step">
-              <b>4</b><span>{{ t('ui.publishedForBusinessRoleUse') }}</span>
-            </div>
-          </div>
         </aside>
 
         <section class="report-list-panel">
           <div class="list-head">
             <div>
               <div class="section-title">{{ t('ui.reportManagement') }}</div>
-              <div class="report-caption">
-                {{ t('ui.maintainsTheDraftReleaseAndDecommissioningStateAndDesignConfigurations') }}
-              </div>
             </div>
-            <q-select
-              v-model="statusFilter"
-              dense
-              outlined
-              emit-value
-              map-options
-              class="status-filter"
-              :options="statusOptions"
-            />
+            <div class="report-head-actions">
+              <q-input
+                v-model="query.quick_query!.keyword"
+                dense
+                outlined
+                clearable
+                debounce="300"
+                class="report-search"
+                :placeholder="t('ui.searchReportNameCodeCategory')"
+                @keyup.enter="handleSearch"
+              >
+                <template #prepend>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+              <q-select
+                v-model="statusFilter"
+                dense
+                outlined
+                emit-value
+                map-options
+                class="status-filter"
+                :options="statusOptions"
+              />
+              <q-btn
+                v-if="canCreateReport"
+                color="primary"
+                icon="add"
+                :label="t('ui.newReport')"
+                @click="openDesigner()"
+              />
+              <q-btn flat round color="primary" icon="refresh" @click="fetchData">
+                <q-tooltip>{{ t('ui.refresh') }}</q-tooltip>
+              </q-btn>
+            </div>
           </div>
 
           <q-table
@@ -138,7 +78,7 @@
             separator="cell"
             row-key="id"
             class="report-table"
-            :dense="$q.screen.lt.md"
+            dense
             :rows="filteredRows"
             :columns="columns"
             :loading="loading"
@@ -387,7 +327,6 @@ const rows = ref<Report[]>([])
 const total = ref(0)
 const activeCategory = ref('')
 const statusFilter = ref<'all' | ReportStatus>('all')
-const dataSourceCount = ref(0)
 const runtimeVisible = ref(false)
 const runtimeReport = ref<Report | null>(null)
 const versionDialogVisible = ref(false)
@@ -505,15 +444,8 @@ const emptyText = computed(() =>
     : t('ui.noStatementsAreAvailable'),
 )
 
-const publishedCount = computed(
-  () => rows.value.filter((item) => item.status === 'published').length,
-)
-const permissionCount = computed(
-  () => rows.value.filter((item) => item.permission_table_code).length,
-)
-
 onMounted(() => {
-  void Promise.all([fetchData(), loadDataSources()])
+  void fetchData()
 })
 
 function handleSearch() {
@@ -560,21 +492,6 @@ function resetToFirstPageOrFetch() {
     return
   }
   void fetchData()
-}
-
-async function loadDataSources() {
-  try {
-    const res = await reportApi.queryDataSources()
-    dataSourceCount.value = res.total ?? res.data.length
-  } catch {
-    dataSourceCount.value = 0
-    $q.notify({
-      type: 'warning',
-      get message() {
-        return t('ui.failedToLoadDatasetsDataSourcesMayBeUnavailableIn')
-      },
-    })
-  }
 }
 
 function openDesigner(row?: Report) {
@@ -840,36 +757,10 @@ watch(
 
 .report-workspace {
   min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.report-head,
-.report-list-panel,
-.category-panel {
   border: 1px solid #dfe5f2;
   border-radius: 8px;
   background: #fff;
-}
-
-.report-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-}
-
-.report-title {
-  font-size: 22px;
-  font-weight: 800;
-  color: #172033;
-}
-
-.report-caption {
-  margin-top: 4px;
-  color: #71809a;
-  line-height: 1.5;
+  overflow: hidden;
 }
 
 .report-head-actions {
@@ -884,55 +775,33 @@ watch(
   width: 280px;
 }
 
-.report-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metric-item {
-  min-height: 88px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid #dfe5f2;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.metric-item .q-icon {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  color: var(--q-primary);
-  background: #f0eeff;
-}
-
-.metric-item strong {
-  display: block;
-  font-size: 26px;
-  line-height: 1;
-}
-
-.metric-item span {
-  display: block;
-  margin-top: 6px;
-  color: #71809a;
-}
-
 .report-main-grid {
-  flex: 1;
-  min-height: 0;
+  min-height: calc(100vh - 176px);
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 220px minmax(0, 1fr);
 }
 
 .category-panel {
-  padding: 14px;
+  padding: 14px 10px;
+  border-right: 1px solid #dfe5f2;
+  background: #fbfcff;
+}
+
+.category-head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 10px;
+}
+
+.category-head .q-icon {
+  font-size: 24px;
+}
+
+.category-head span {
+  color: #71809a;
+  font-size: 12px;
 }
 
 .section-title {
@@ -943,49 +812,24 @@ watch(
 
 .category-item {
   width: 100%;
-  min-height: 44px;
-  margin-top: 8px;
+  min-height: 38px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border: 1px solid #dfe5f2;
-  border-radius: 8px;
-  background: #fbfcff;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: #172033;
-  padding: 0 12px;
+  padding: 0 10px;
   cursor: pointer;
 }
 
 .category-item.active {
-  border-color: var(--q-primary);
-  background: #f7f5ff;
+  background: rgba(115, 103, 240, 0.1);
   color: var(--q-primary);
   font-weight: 800;
-}
-
-.flow-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.flow-step {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 8px;
-  align-items: start;
-  color: #5f6f88;
-}
-
-.flow-step b {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--q-primary);
-  color: #fff;
 }
 
 .report-list-panel {
@@ -995,7 +839,7 @@ watch(
 }
 
 .list-head {
-  min-height: 70px;
+  min-height: 66px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1010,6 +854,14 @@ watch(
 
 .report-table {
   flex: 1;
+}
+
+.report-table :deep(thead tr) {
+  height: 42px;
+}
+
+.report-table :deep(tbody tr) {
+  height: 48px;
 }
 
 .report-name-cell {
@@ -1038,18 +890,27 @@ watch(
 }
 
 @media (max-width: 1200px) {
-  .report-metrics,
   .report-main-grid {
     grid-template-columns: 1fr;
   }
 
-  .report-head {
+  .category-panel {
+    border-right: 0;
+    border-bottom: 1px solid #dfe5f2;
+  }
+
+  .list-head {
+    align-items: stretch;
     flex-direction: column;
   }
 
   .report-head-actions,
   .report-search {
     width: 100%;
+  }
+
+  .report-head-actions {
+    justify-content: flex-start;
   }
 }
 </style>

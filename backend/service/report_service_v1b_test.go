@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/dto/response"
 	"backend/enum"
+	"backend/internal/reportconfig"
 	"backend/model"
 	"backend/repository"
 	"bytes"
@@ -22,6 +23,68 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestReportOrderedDatasetJoinsOrdersAndOrientsFromPrimary(t *testing.T) {
+	config := reportconfig.Config{Query: reportconfig.QueryConfig{DatasetJoins: []reportconfig.DatasetJoin{
+		{
+			Id:             "company_region",
+			LeftDatasetId:  "region",
+			LeftField:      "id",
+			RightDatasetId: "company",
+			RightField:     "region_id",
+		},
+		{
+			Id:             "order_company",
+			LeftDatasetId:  "main",
+			LeftField:      "company_id",
+			RightDatasetId: "company",
+			RightField:     "id",
+		},
+	}}}
+
+	joins, err := reportOrderedDatasetJoins(config, "main")
+	if err != nil {
+		t.Fatalf("order dataset joins: %v", err)
+	}
+	if len(joins) != 2 || joins[0].Id != "order_company" || joins[1].Id != "company_region" {
+		t.Fatalf("unexpected join order: %#v", joins)
+	}
+	if joins[1].LeftDatasetId != "company" || joins[1].LeftField != "region_id" || joins[1].RightDatasetId != "region" || joins[1].RightField != "id" {
+		t.Fatalf("second join should point from the connected dataset to the new dataset: %#v", joins[1])
+	}
+}
+
+func TestReportOrderedDatasetJoinsRejectsInvalidGraphs(t *testing.T) {
+	tests := []struct {
+		name  string
+		joins []reportconfig.DatasetJoin
+	}{
+		{
+			name: "disconnected",
+			joins: []reportconfig.DatasetJoin{
+				{Id: "main_company", LeftDatasetId: "main", RightDatasetId: "company"},
+				{Id: "region_department", LeftDatasetId: "region", RightDatasetId: "department"},
+			},
+		},
+		{
+			name: "cycle",
+			joins: []reportconfig.DatasetJoin{
+				{Id: "main_company", LeftDatasetId: "main", RightDatasetId: "company"},
+				{Id: "company_region", LeftDatasetId: "company", RightDatasetId: "region"},
+				{Id: "region_main", LeftDatasetId: "region", RightDatasetId: "main"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := reportconfig.Config{Query: reportconfig.QueryConfig{DatasetJoins: tt.joins}}
+			if _, err := reportOrderedDatasetJoins(config, "main"); err == nil || !strings.Contains(err.Error(), "断开或循环") {
+				t.Fatalf("invalid join graph should be rejected, got %v", err)
+			}
+		})
+	}
+}
 
 func TestReportV1BExportStatusRulesAndLogs(t *testing.T) {
 	env := newReportV1ATestEnv(t, reportV1AUser(false))

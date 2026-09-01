@@ -6,11 +6,8 @@
   >
     <q-card class="join-dialog">
       <q-card-section class="dialog-head">
-        <div>
-          <div class="dialog-title">{{ t('ui.newDataSetAssociation') }}</div>
-          <div class="dialog-caption">
-            {{ t('ui.toDescribeTheNumberingRelationshipsBetweenMultipleDataSetsSuch') }}
-          </div>
+        <div class="dialog-title">
+          {{ editing ? t('ui.dataSetAssociation') : t('ui.newDataSetAssociation') }}
         </div>
         <q-btn flat round dense icon="close" @click="$emit('update:modelValue', false)" />
       </q-card-section>
@@ -74,7 +71,7 @@
           color="primary"
           unelevated
           icon="add_link"
-          :label="t('ui.addAssociation')"
+          :label="editing ? t('ui.save') : t('ui.addAssociation')"
           @click="$emit('confirm')"
         />
       </q-card-actions>
@@ -93,6 +90,7 @@ type Option<T = string> = { label: string; value: T }
 
 defineProps<{
   modelValue: boolean
+  editing?: boolean
   draft: {
     left_dataset_id: string
     left_field: string
@@ -133,10 +131,6 @@ defineEmits<{
 .dialog-title {
   font-size: 20px;
   font-weight: 900;
-}
-
-.dialog-caption {
-  color: #71809a;
 }
 
 .dialog-form {
