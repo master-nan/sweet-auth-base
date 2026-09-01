@@ -7,7 +7,7 @@
             <q-icon name="folder_open" color="primary" />
             <div>
               <div class="section-title">{{ t('ui.reportCategory') }}</div>
-              <span>{{ total }} {{ t('ui.okay') }}</span>
+              <span>{{ categoryTotal }} {{ t('ui.okay') }}</span>
             </div>
           </div>
           <button
@@ -16,16 +16,16 @@
             @click="selectCategory('')"
           >
             <span>{{ t('ui.allReports') }}</span>
-            <q-badge color="primary" outline>{{ rows.length }}</q-badge>
+            <q-badge color="primary" outline>{{ categoryTotal }}</q-badge>
           </button>
           <button
             v-for="category in categories"
-            :key="category.name"
+            :key="category.key"
             class="category-item"
-            :class="{ active: activeCategory === category.name }"
-            @click="selectCategory(category.name)"
+            :class="{ active: activeCategory === category.key }"
+            @click="selectCategory(category.key)"
           >
-            <span>{{ category.name }}</span>
+            <span>{{ category.label }}</span>
             <q-badge color="primary" outline>{{ category.count }}</q-badge>
           </button>
         </aside>
@@ -271,6 +271,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
 import type { Query } from 'src/types/global'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
 import {
   defaultReportSheet,
   useReportApi,
@@ -325,6 +326,8 @@ const pagination = ref({
 
 const rows = ref<Report[]>([])
 const total = ref(0)
+const categoryRows = ref<Report[]>([])
+const categoryTotal = ref(0)
 const activeCategory = ref('')
 const statusFilter = ref<'all' | ReportStatus>('all')
 const runtimeVisible = ref(false)
@@ -428,12 +431,17 @@ const columns = computed<QTableProps['columns']>(() => [
 ])
 
 const categories = computed(() => {
-  const map = new Map<string, number>()
-  rows.value.forEach((item) => {
-    const name = item.category || t('ui.uncategorized')
-    map.set(name, (map.get(name) || 0) + 1)
+  const map = new Map<string, { label: string; count: number }>()
+  categoryRows.value.forEach((item) => {
+    const category = item.category?.trim()
+    const key = category || uncategorizedCategoryKey
+    const current = map.get(key)
+    map.set(key, {
+      label: category || t('ui.uncategorized'),
+      count: (current?.count || 0) + 1,
+    })
   })
-  return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+  return Array.from(map.entries()).map(([key, value]) => ({ key, ...value }))
 })
 
 const filteredRows = computed(() => rows.value)
@@ -454,15 +462,21 @@ function handleSearch() {
 
 async function fetchData() {
   try {
-    query.value.filters = buildListFilters()
-    const res = await reportApi.queryReports(query.value)
+    const [res, categoryRes] = await Promise.all([
+      reportApi.queryReports(buildListQuery()),
+      reportApi.queryReports(buildCategoryQuery()),
+    ])
     rows.value = res.data || []
     total.value = res.total ?? rows.value.length
+    categoryRows.value = categoryRes.data || []
+    categoryTotal.value = categoryRes.total ?? categoryRows.value.length
     pagination.value.page = query.value.page
     pagination.value.rowsNumber = total.value
   } catch {
     rows.value = []
     total.value = 0
+    categoryRows.value = []
+    categoryTotal.value = 0
     pagination.value.rowsNumber = 0
     $q.notify({
       type: 'negative',
@@ -473,10 +487,58 @@ async function fetchData() {
   }
 }
 
+const uncategorizedCategoryKey = '__report_uncategorized__'
+
+function buildListQuery(): Query {
+  return {
+    ...query.value,
+    expressions:
+      activeCategory.value === uncategorizedCategoryKey
+        ? [
+            {
+              logic: ExpressionLogic.OR,
+              rules: [
+                {
+                  field: 'category',
+                  expression_type: ExpressionType.EQ,
+                  value: '',
+                  type: SysTableFieldType.VARCHAR,
+                },
+                {
+                  field: 'category',
+                  expression_type: ExpressionType.IS_NULL,
+                  value: null,
+                  type: SysTableFieldType.VARCHAR,
+                },
+              ],
+            },
+          ]
+        : [],
+    filters: buildListFilters(),
+  }
+}
+
+function buildCategoryQuery(): Query {
+  return {
+    ...query.value,
+    page: 1,
+    num: 5000,
+    expressions: [],
+    filters: buildCategoryFilters(),
+  }
+}
+
 function buildListFilters() {
+  const filters = buildCategoryFilters()
+  if (activeCategory.value && activeCategory.value !== uncategorizedCategoryKey) {
+    filters.category = activeCategory.value
+  }
+  return filters
+}
+
+function buildCategoryFilters() {
   const filters: Record<string, string> = {}
   if (statusFilter.value !== 'all') filters.status = statusFilter.value
-  if (activeCategory.value) filters.category = activeCategory.value
   return filters
 }
 

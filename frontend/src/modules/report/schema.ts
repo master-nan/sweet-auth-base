@@ -60,7 +60,16 @@ export const reportParameterDefaultsForField = (
 }
 
 export const createBlankReportSheet = (rows = 24, cols = 12): ReportSheetConfig => {
-  return { rows, cols, scale: 0.85, detail_rows: [], summary_rows: [], cells: [] }
+  return {
+    rows,
+    cols,
+    scale: 0.85,
+    detail_rows: [],
+    summary_rows: [],
+    column_widths: {},
+    row_heights: {},
+    cells: [],
+  }
 }
 
 export const defaultReportSheet = (): ReportSheetConfig => createBlankReportSheet()
@@ -89,7 +98,25 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
   if (sheet?.scale) blank.scale = sheet.scale
   blank.detail_rows = normalizeSheetRows(sheet?.detail_rows, rows)
   blank.summary_rows = normalizeSheetRows(sheet?.summary_rows, rows)
+  blank.column_widths = normalizeSheetSizes(sheet?.column_widths, cols, 64, 360)
+  blank.row_heights = normalizeSheetSizes(sheet?.row_heights, rows, 28, 160)
   return blank
+}
+
+const normalizeSheetSizes = (
+  sizes: Record<string, number> | undefined,
+  maxIndex: number,
+  min: number,
+  max: number,
+) => {
+  const normalized: Record<string, number> = {}
+  Object.entries(sizes || {}).forEach(([rawIndex, rawSize]) => {
+    const index = Number(rawIndex)
+    const size = Number(rawSize)
+    if (!Number.isInteger(index) || index < 1 || index > maxIndex || !Number.isFinite(size)) return
+    normalized[String(index)] = Math.min(Math.max(Math.round(size), min), max)
+  })
+  return normalized
 }
 
 const normalizeSheetRows = (rows: number[] | undefined, maxRows: number) => {

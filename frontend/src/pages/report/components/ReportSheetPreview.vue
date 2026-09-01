@@ -183,8 +183,15 @@ const renderPlan = computed(() => {
 })
 
 const gridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${sourceColCount.value}, 118px)`,
-  gridTemplateRows: `repeat(${Math.max(renderRowCount.value, 1)}, minmax(42px, auto))`,
+  gridTemplateColumns: Array.from(
+    { length: sourceColCount.value },
+    (_, index) =>
+      `${props.sheet.column_widths?.[String(usedBounds.value.minCol + index)] || 118}px`,
+  ).join(' '),
+  gridTemplateRows: Array.from({ length: Math.max(renderRowCount.value, 1) }, (_, index) => {
+    const sourceRow = renderPlan.value.find((item) => item.renderRow === index + 1)?.sourceRow
+    return `${props.sheet.row_heights?.[String(sourceRow || 0)] || 42}px`
+  }).join(' '),
 }))
 
 const renderRowCount = computed(() =>
@@ -333,7 +340,7 @@ function cellStyle(cell: ReportSheetCell) {
 }
 
 .report-sheet-preview__cell {
-  min-height: 42px;
+  min-height: 0;
   padding: 8px 10px;
   border-right: 1px solid #dfe5f2;
   border-bottom: 1px solid #dfe5f2;

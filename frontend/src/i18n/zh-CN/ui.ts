@@ -88,6 +88,9 @@ const ui = {
   associationPreview: '关联预览',
   associationSelection: '关联选择',
   associationValueUnsolved: '关联值未解析',
+  alignCenter: '居中对齐',
+  alignLeft: '左对齐',
+  alignRight: '右对齐',
   atLeastOneOfThem: '至少选择一项',
   attempts: 'Attempt 记录',
   attributionInformation: '归属信息',
@@ -119,6 +122,7 @@ const ui = {
   batchStatus: '批次状态',
   bindingType: '绑定类型',
   bindTableEncoding: '绑定表编码',
+  bold: '加粗',
   boolean: '布尔',
   browser: '浏览器',
   browseTwoOrganizationalTreesOfCorporateAndRegulatoryStructures:
@@ -150,6 +154,7 @@ const ui = {
   cascadeSelection: '级联选择',
   category: '分类',
   categoryFilter: '分类筛选',
+  cellBackground: '单元格背景色',
   cellPhoneNumber: '手机号',
   cells: '单元格',
   certificateName: '凭证名称',
@@ -349,6 +354,8 @@ const ui = {
   delayInRetrying: '重试延迟',
   delete: '删除',
   deleteChildData: '删除子数据',
+  deleteCurrentColumn: '删除当前列',
+  deleteCurrentRow: '删除当前行',
   deleteField: '删除字段',
   deleteIndex: '删除索引',
   deleteParameter: '删除参数',
@@ -414,6 +421,7 @@ const ui = {
   downloadMp4Video: '下载 MP4 视频',
   downloadsAreUploadedDirectlyByTheNextStepAndDo: '下载后直接按下方步骤上传，不需要自行寻找样例。',
   downloadSmallFile: '下载小文件',
+  dropHere: '放到这里',
   downloadsMp4OpensTheSamplePageAndEditsTheFunction:
     '下载 MP4，打开样例页面并编辑“功能验证-上传测试”记录。',
   downloadsTheSmallFilesProvidedOnThePageOpensThe:
@@ -643,6 +651,7 @@ const ui = {
   insertColumnsRight: '右侧插入列',
   insertRowBelow: '下方插入行',
   integer: '整数',
+  italic: '斜体',
   integratedCertificate: '集成凭证',
   integratedVoucherDetails: '集成凭证详情',
   integrationExecutionId: '集成执行ID',
@@ -1698,6 +1707,7 @@ const ui = {
   recordDoesNotExist: '记录不存在',
   recordsDoNotExistOrAreNotAccessible: '记录不存在或无权访问',
   reduction: '减少',
+  redo: '重做',
   reEntryOpensTheFunctionalAuthenticationOrderPageFromDevelopment:
     '重新登录后从“开发管理”打开功能验证订单页面。',
   refresh: '刷新',
@@ -1766,6 +1776,8 @@ const ui = {
   reSelectFilesAndInterruptUploadsToConfirmThatIncomplete:
     '重新选择文件并中断上传，确认未完成上传不会写入业务记录。',
   reset: '重置',
+  resizeColumn: '调整列宽',
+  resizeRow: '调整行高',
   resourceAction: '资源操作',
   resourceCode: '资源编码',
   resourceId: '资源ID',
@@ -2038,6 +2050,7 @@ const ui = {
   testFile: '测试文件',
   testInbox: '测试收件邮箱',
   text: '文本',
+  textColor: '文字颜色',
   theAdministratorSeesTheCompleteData: '管理员看到完整数据。',
   theAttributionDefinitionOnlyDescribesTheBusinessAttributionOfThe:
     '归属定义只描述资源记录的业务归属，不保存SQL或字段表达式',
@@ -2174,6 +2187,7 @@ const ui = {
   unavailable: '不可用',
   unbound: '未绑定',
   uncategorized: '未分类',
+  undo: '撤销',
   undoTheCurrentProgramChanges: '撤销当前方案修改',
   unifiedSocialCreditCode: '统一社会信用代码',
   uniqueIndex: '唯一索引',

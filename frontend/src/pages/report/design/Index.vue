@@ -68,12 +68,22 @@
         :sheet="sheet"
         :selected-cell-id="selectedCellId"
         :selection-range="selectionRange"
+        :can-undo="canUndo"
+        :can-redo="canRedo"
         :active-bold="!!activeCell?.style?.bold"
+        :active-italic="!!activeCell?.style?.italic"
+        :active-text-color="activeCell?.style?.color || '#172033'"
+        :active-background-color="activeCell?.style?.background || '#ffffff'"
         :scale="sheet.scale || 0.85"
         :datasets="datasets"
         :dataset-joins="datasetJoins"
         :field-dragging="!!draggingField"
+        @undo="undoSheetChange"
+        @redo="redoSheetChange"
         @toggle-bold="toggleBold"
+        @toggle-italic="toggleItalic"
+        @set-text-color="setTextColor"
+        @set-background-color="setBackgroundColor"
         @set-align="setAlign"
         @merge-right="mergeRight"
         @merge-selection="mergeSelection"
@@ -91,6 +101,11 @@
         @unmerge-cell="unmergeCellAt"
         @insert-row-after="insertRowAfter"
         @insert-col-after="insertColAfter"
+        @delete-row="deleteRow"
+        @delete-col="deleteCol"
+        @paste-cells="pasteCells"
+        @resize-column="resizeColumn"
+        @resize-row="resizeRow"
         @toggle-summary-row="toggleSummaryRow"
         @toggle-detail-row="toggleDetailRow"
         @zoom-in="zoomIn"
@@ -296,7 +311,7 @@ import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'report_design' })
 
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -345,9 +360,15 @@ import {
   reportBindingText,
   reportCellId,
   reportColumnName,
+  reportDeleteSheetColumn,
+  reportDeleteSheetRow,
+  reportInsertSheetColumn,
+  reportInsertSheetRow,
   reportNormalizeSheetRange,
+  reportPasteSheetCells,
   reportSheetCellAt,
   reportSheetCellSpan,
+  type ReportSheetClipboardCell,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
 import {
@@ -391,6 +412,11 @@ const versionDialogVisible = ref(false)
 const previewData = ref<ReportPreviewRes>({ columns: [], rows: [], total: 0 })
 const publishedVersionId = ref<number | undefined>(undefined)
 const publishedVersionNo = ref<number | undefined>(undefined)
+const undoStack = ref<ReportSheetConfig[]>([])
+const redoStack = ref<ReportSheetConfig[]>([])
+const historyReady = ref(false)
+const historyRestoring = ref(false)
+let lastHistorySnapshot = defaultReportSheet()
 
 const form = reactive<ReportSaveReq>({
   report_name: '',
@@ -582,11 +608,30 @@ const activeCellAlign = computed<'left' | 'center' | 'right'>({
   get: () => activeCell.value?.style?.align || 'left',
   set: (value) => patchCellStyle({ align: value }),
 })
+const canUndo = computed(() => undoStack.value.length > 0)
+const canRedo = computed(() => redoStack.value.length > 0)
+
+watch(
+  () => sheetHistorySignature(sheet.value),
+  () => {
+    const current = cloneSheet(sheet.value)
+    if (!historyReady.value || historyRestoring.value) {
+      lastHistorySnapshot = current
+      return
+    }
+    undoStack.value.push(lastHistorySnapshot)
+    if (undoStack.value.length > 100) undoStack.value.shift()
+    redoStack.value = []
+    lastHistorySnapshot = current
+  },
+  { flush: 'post' },
+)
 
 onMounted(async () => {
   await loadDataSources()
   await loadReport()
   buildLocalPreview()
+  await resetSheetHistory()
 })
 
 async function loadDataSources() {
@@ -1015,9 +1060,18 @@ function patchBinding(patch: Partial<NonNullable<ReportSheetCell['binding']>>) {
 }
 
 function patchCellStyle(patch: Partial<NonNullable<ReportSheetCell['style']>>) {
-  const cell = activeCell.value
-  if (!cell) return
-  patchActiveCell({ style: { ...(cell.style || {}), ...patch } })
+  const range = selectionRange.value
+  if (!range) {
+    const cell = activeCell.value
+    if (!cell) return
+    patchActiveCell({ style: { ...(cell.style || {}), ...patch } })
+    buildLocalPreview()
+    return
+  }
+  const bounds = reportNormalizeSheetRange(range)
+  cellsInBounds(bounds).forEach((cell) => {
+    patchCell(cell.row, cell.col, { style: { ...(cell.style || {}), ...patch } })
+  })
   buildLocalPreview()
 }
 
@@ -1088,6 +1142,18 @@ function clearActiveCell() {
 
 function toggleBold() {
   activeCellBold.value = !activeCellBold.value
+}
+
+function toggleItalic() {
+  patchCellStyle({ italic: !activeCell.value?.style?.italic })
+}
+
+function setTextColor(value: string) {
+  if (value) patchCellStyle({ color: value })
+}
+
+function setBackgroundColor(value: string) {
+  if (value) patchCellStyle({ background: value })
 }
 
 function setAlign(value: 'left' | 'center' | 'right') {
@@ -1225,18 +1291,7 @@ function addRow() {
 }
 
 function insertRowAfter(row: number) {
-  sheet.value.cells = sheet.value.cells.map((cell) =>
-    cell.row > row
-      ? { ...cell, row: cell.row + 1, id: reportCellId(cell.row + 1, cell.col) }
-      : cell,
-  )
-  sheet.value.rows += 1
-  sheet.value.summary_rows = (sheet.value.summary_rows || []).map((item) =>
-    item > row ? item + 1 : item,
-  )
-  sheet.value.detail_rows = (sheet.value.detail_rows || []).map((item) =>
-    item > row ? item + 1 : item,
-  )
+  sheet.value = reportInsertSheetRow(sheet.value, row)
   buildLocalPreview()
 }
 
@@ -1246,13 +1301,61 @@ function addCol() {
 }
 
 function insertColAfter(col: number) {
-  sheet.value.cells = sheet.value.cells.map((cell) =>
-    cell.col > col
-      ? { ...cell, col: cell.col + 1, id: reportCellId(cell.row, cell.col + 1) }
-      : cell,
-  )
-  sheet.value.cols += 1
+  sheet.value = reportInsertSheetColumn(sheet.value, col)
   buildLocalPreview()
+}
+
+function deleteRow(row: number) {
+  const next = reportDeleteSheetRow(sheet.value, row)
+  if (next.rows === sheet.value.rows) return
+  sheet.value = next
+  selectCell(Math.min(row, next.rows), Math.min(activeCell.value?.col || 1, next.cols))
+  buildLocalPreview()
+}
+
+function deleteCol(col: number) {
+  const next = reportDeleteSheetColumn(sheet.value, col)
+  if (next.cols === sheet.value.cols) return
+  sheet.value = next
+  selectCell(Math.min(activeCell.value?.row || 1, next.rows), Math.min(col, next.cols))
+  buildLocalPreview()
+}
+
+function pasteCells(matrix: ReportSheetClipboardCell[][]) {
+  if (!matrix.length || !matrix.some((row) => row.length)) return
+  const bounds = selectionRange.value
+    ? reportNormalizeSheetRange(selectionRange.value)
+    : reportNormalizeSheetRange({
+        startRow: activeCell.value?.row || 1,
+        startCol: activeCell.value?.col || 1,
+        endRow: activeCell.value?.row || 1,
+        endCol: activeCell.value?.col || 1,
+      })
+  sheet.value = reportPasteSheetCells(sheet.value, bounds.minRow, bounds.minCol, matrix)
+  const maxColumns = Math.max(...matrix.map((row) => row.length), 1)
+  selectionRange.value = {
+    startRow: bounds.minRow,
+    startCol: bounds.minCol,
+    endRow: Math.min(bounds.minRow + matrix.length - 1, sheet.value.rows),
+    endCol: Math.min(bounds.minCol + maxColumns - 1, sheet.value.cols),
+  }
+  selectedCellId.value = reportCellId(bounds.minRow, bounds.minCol)
+  sheet.value.active_cell = selectedCellId.value
+  buildLocalPreview()
+}
+
+function resizeColumn(col: number, width: number) {
+  sheet.value.column_widths = {
+    ...(sheet.value.column_widths || {}),
+    [String(col)]: width,
+  }
+}
+
+function resizeRow(row: number, height: number) {
+  sheet.value.row_heights = {
+    ...(sheet.value.row_heights || {}),
+    [String(row)]: height,
+  }
 }
 
 function toggleSummaryRow(row: number) {
@@ -1290,6 +1393,55 @@ function zoomIn() {
 
 function zoomOut() {
   sheet.value.scale = Math.max((sheet.value.scale || 0.85) - 0.1, 0.5)
+}
+
+function sheetHistorySignature(value: ReportSheetConfig) {
+  const editable = { ...value, active_cell: undefined, scale: undefined }
+  return JSON.stringify(editable)
+}
+
+function cloneSheet(value: ReportSheetConfig) {
+  return normalizeReportSheet(JSON.parse(JSON.stringify(value)) as ReportSheetConfig)
+}
+
+async function resetSheetHistory() {
+  historyReady.value = false
+  await nextTick()
+  undoStack.value = []
+  redoStack.value = []
+  lastHistorySnapshot = cloneSheet(sheet.value)
+  historyReady.value = true
+}
+
+async function undoSheetChange() {
+  const previous = undoStack.value.pop()
+  if (!previous) return
+  redoStack.value.push(cloneSheet(sheet.value))
+  await restoreSheetSnapshot(previous)
+}
+
+async function redoSheetChange() {
+  const next = redoStack.value.pop()
+  if (!next) return
+  undoStack.value.push(cloneSheet(sheet.value))
+  await restoreSheetSnapshot(next)
+}
+
+async function restoreSheetSnapshot(snapshot: ReportSheetConfig) {
+  historyRestoring.value = true
+  const restored = cloneSheet(snapshot)
+  restored.scale = sheet.value.scale
+  const [rawRow, rawCol] = selectedCellId.value.split(':').map(Number)
+  const row = Math.min(Math.max(rawRow || 1, 1), restored.rows)
+  const col = Math.min(Math.max(rawCol || 1, 1), restored.cols)
+  selectedCellId.value = reportCellId(row, col)
+  selectionRange.value = { startRow: row, startCol: col, endRow: row, endCol: col }
+  restored.active_cell = selectedCellId.value
+  sheet.value = restored
+  buildLocalPreview()
+  await nextTick()
+  lastHistorySnapshot = cloneSheet(sheet.value)
+  historyRestoring.value = false
 }
 
 function addParameter() {

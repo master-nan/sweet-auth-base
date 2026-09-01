@@ -2,8 +2,12 @@
   <section class="canvas-panel">
     <div class="canvas-toolbar">
       <div class="toolbar-group">
-        <q-btn flat dense icon="undo" disable />
-        <q-btn flat dense icon="redo" disable />
+        <q-btn flat dense icon="undo" :disable="!canUndo" @click="$emit('undo')">
+          <q-tooltip>{{ t('ui.undo') }}</q-tooltip>
+        </q-btn>
+        <q-btn flat dense icon="redo" :disable="!canRedo" @click="$emit('redo')">
+          <q-tooltip>{{ t('ui.redo') }}</q-tooltip>
+        </q-btn>
         <q-separator vertical />
         <q-btn
           flat
@@ -11,10 +15,53 @@
           icon="format_bold"
           :color="activeBold ? 'primary' : 'dark'"
           @click="$emit('toggleBold')"
-        />
-        <q-btn flat dense icon="format_align_left" @click="$emit('setAlign', 'left')" />
-        <q-btn flat dense icon="format_align_center" @click="$emit('setAlign', 'center')" />
-        <q-btn flat dense icon="format_align_right" @click="$emit('setAlign', 'right')" />
+        >
+          <q-tooltip>{{ t('ui.bold') }}</q-tooltip>
+        </q-btn>
+        <q-btn
+          flat
+          dense
+          icon="format_italic"
+          :color="activeItalic ? 'primary' : 'dark'"
+          @click="$emit('toggleItalic')"
+        >
+          <q-tooltip>{{ t('ui.italic') }}</q-tooltip>
+        </q-btn>
+        <q-btn flat dense icon="format_color_text">
+          <span class="color-swatch" :style="{ background: activeTextColor }" />
+          <q-tooltip>{{ t('ui.textColor') }}</q-tooltip>
+          <q-popup-proxy>
+            <q-color
+              :model-value="activeTextColor"
+              no-header
+              no-footer
+              default-view="palette"
+              @update:model-value="setTextColor"
+            />
+          </q-popup-proxy>
+        </q-btn>
+        <q-btn flat dense icon="format_color_fill">
+          <span class="color-swatch" :style="{ background: activeBackgroundColor }" />
+          <q-tooltip>{{ t('ui.cellBackground') }}</q-tooltip>
+          <q-popup-proxy>
+            <q-color
+              :model-value="activeBackgroundColor"
+              no-header
+              no-footer
+              default-view="palette"
+              @update:model-value="setBackgroundColor"
+            />
+          </q-popup-proxy>
+        </q-btn>
+        <q-btn flat dense icon="format_align_left" @click="$emit('setAlign', 'left')">
+          <q-tooltip>{{ t('ui.alignLeft') }}</q-tooltip>
+        </q-btn>
+        <q-btn flat dense icon="format_align_center" @click="$emit('setAlign', 'center')">
+          <q-tooltip>{{ t('ui.alignCenter') }}</q-tooltip>
+        </q-btn>
+        <q-btn flat dense icon="format_align_right" @click="$emit('setAlign', 'right')">
+          <q-tooltip>{{ t('ui.alignRight') }}</q-tooltip>
+        </q-btn>
         <q-separator vertical />
         <q-btn
           flat
@@ -70,20 +117,25 @@
           :label="t('ui.column')"
           @click="$emit('addCol')"
         />
-        <q-btn flat round dense icon="zoom_out" @click="$emit('zoomOut')" />
+        <q-btn flat round dense icon="zoom_out" @click="$emit('zoomOut')">
+          <q-tooltip>{{ t('ui.zoomOut') }}</q-tooltip>
+        </q-btn>
         <q-chip square outline color="primary">{{ Math.round(scale * 100) }}%</q-chip>
-        <q-btn flat round dense icon="zoom_in" @click="$emit('zoomIn')" />
+        <q-btn flat round dense icon="zoom_in" @click="$emit('zoomIn')">
+          <q-tooltip>{{ t('ui.zoomIn') }}</q-tooltip>
+        </q-btn>
       </div>
     </div>
 
-    <div ref="sheetScrollRef" class="sheet-scroll" @scroll="closeContextMenu">
-      <div
-        class="sheet-grid"
-        :style="{
-          gridTemplateColumns: `42px repeat(${sheet.cols}, 118px)`,
-          zoom: scale,
-        }"
-      >
+    <div
+      ref="sheetScrollRef"
+      class="sheet-scroll"
+      @scroll="closeContextMenu"
+      @copy="handleCopy"
+      @cut="handleCut"
+      @paste="handlePaste"
+    >
+      <div class="sheet-grid" :style="gridStyle">
         <div class="sheet-corner" />
         <div
           v-for="header in columnHeaders"
@@ -92,6 +144,11 @@
           :style="header.style"
         >
           {{ header.label }}
+          <span
+            class="sheet-col-resizer"
+            :title="t('ui.resizeColumn')"
+            @mousedown.stop.prevent="startColumnResize($event, header.col)"
+          />
         </div>
         <template v-for="renderRow in renderRows" :key="renderRow.key">
           <div
@@ -100,6 +157,11 @@
             :style="renderRow.headerStyle"
           >
             {{ renderRow.row }}
+            <span
+              class="sheet-row-resizer"
+              :title="t('ui.resizeRow')"
+              @mousedown.stop.prevent="startRowResize($event, renderRow.row)"
+            />
             <q-tooltip v-if="renderRow.detail">{{ t('ui.linesRunOnALineByLineBasis') }}</q-tooltip>
             <q-tooltip v-else-if="renderRow.summary">{{
               t('ui.summarizeRowsAggregatingCurrentDataOnRunningTime')
@@ -118,6 +180,7 @@
               }"
               :style="renderCell.style"
               :data-cell-id="renderCell.id"
+              :data-drop-label="t('ui.dropHere')"
               role="button"
               tabindex="0"
               @click="handleCellClick(renderCell.row, renderCell.col, $event)"
@@ -178,6 +241,12 @@
         <button type="button" @click="runContextAction('insertCol')">
           <q-icon name="view_column" /> {{ t('ui.insertColumnsRight') }}
         </button>
+        <button type="button" @click="runContextAction('deleteRow')">
+          <q-icon name="delete_sweep" /> {{ t('ui.deleteCurrentRow') }}
+        </button>
+        <button type="button" @click="runContextAction('deleteCol')">
+          <q-icon name="delete_sweep" /> {{ t('ui.deleteCurrentColumn') }}
+        </button>
         <div class="sheet-context-menu__separator" />
         <button type="button" @click="runContextAction('summary')">
           <q-icon name="functions" />
@@ -195,7 +264,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import type {
   ReportDataset,
   ReportDatasetJoin,
@@ -207,17 +276,25 @@ import {
   reportColumnName,
   reportNormalizeSheetRange,
   reportCellId,
+  reportSheetClipboardMatrix,
   reportSheetCellSpan,
+  type ReportSheetClipboardCell,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
 
 const { t } = useI18n({ useScope: 'global' })
+const reportClipboardMime = 'application/x-sweet-report-cells'
 
 const props = defineProps<{
   sheet: ReportSheetConfig
   selectedCellId: string
   selectionRange: ReportSheetRange | null
+  canUndo: boolean
+  canRedo: boolean
   activeBold: boolean
+  activeItalic: boolean
+  activeTextColor: string
+  activeBackgroundColor: string
   scale: number
   datasets: ReportDataset[]
   datasetJoins: ReportDatasetJoin[]
@@ -225,7 +302,12 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  undo: []
+  redo: []
   toggleBold: []
+  toggleItalic: []
+  setTextColor: [value: string]
+  setBackgroundColor: [value: string]
   setAlign: [value: 'left' | 'center' | 'right']
   mergeRight: []
   mergeSelection: []
@@ -243,6 +325,11 @@ const emit = defineEmits<{
   unmergeCell: [row: number, col: number]
   insertRowAfter: [row: number]
   insertColAfter: [col: number]
+  deleteRow: [row: number]
+  deleteCol: [col: number]
+  pasteCells: [matrix: ReportSheetClipboardCell[][]]
+  resizeColumn: [col: number, width: number]
+  resizeRow: [row: number, height: number]
   toggleSummaryRow: [row: number]
   toggleDetailRow: [row: number]
   zoomIn: []
@@ -260,6 +347,19 @@ const contextMenu = reactive({
   left: 0,
   top: 0,
 })
+const resizeState = reactive<{
+  axis: 'column' | 'row' | null
+  index: number
+  startPointer: number
+  startSize: number
+  currentSize: number
+}>({
+  axis: null,
+  index: 0,
+  startPointer: 0,
+  startSize: 0,
+  currentSize: 0,
+})
 const hasRangeSelection = computed(() => {
   if (!props.selectionRange) return false
   const bounds = reportNormalizeSheetRange(props.selectionRange)
@@ -272,6 +372,17 @@ const detailRows = computed(() => new Set(props.sheet.detail_rows || []))
 const selectionBounds = computed(() =>
   props.selectionRange ? reportNormalizeSheetRange(props.selectionRange) : null,
 )
+const gridStyle = computed(() => ({
+  gridTemplateColumns: [
+    '42px',
+    ...Array.from({ length: props.sheet.cols }, (_, index) => `${columnWidth(index + 1)}px`),
+  ].join(' '),
+  gridTemplateRows: [
+    '32px',
+    ...Array.from({ length: props.sheet.rows }, (_, index) => `${rowHeight(index + 1)}px`),
+  ].join(' '),
+  zoom: props.scale,
+}))
 
 const cellMap = computed(() => {
   const map = new Map<string, ReportSheetCell>()
@@ -304,6 +415,7 @@ const columnHeaders = computed(() =>
     const col = index + 1
     return {
       key: `head-${col}`,
+      col,
       label: reportColumnName(col),
       style: {
         gridColumn: col + 1,
@@ -388,6 +500,127 @@ function isSelectedCell(row: number, col: number) {
   )
 }
 
+function setTextColor(value: string | null) {
+  if (value) emit('setTextColor', value)
+}
+
+function setBackgroundColor(value: string | null) {
+  if (value) emit('setBackgroundColor', value)
+}
+
+function columnWidth(col: number) {
+  if (resizeState.axis === 'column' && resizeState.index === col) return resizeState.currentSize
+  return props.sheet.column_widths?.[String(col)] || 118
+}
+
+function rowHeight(row: number) {
+  if (resizeState.axis === 'row' && resizeState.index === row) return resizeState.currentSize
+  return props.sheet.row_heights?.[String(row)] || 42
+}
+
+function startColumnResize(event: MouseEvent, col: number) {
+  startResize('column', col, event.clientX, columnWidth(col))
+}
+
+function startRowResize(event: MouseEvent, row: number) {
+  startResize('row', row, event.clientY, rowHeight(row))
+}
+
+function startResize(
+  axis: 'column' | 'row',
+  index: number,
+  startPointer: number,
+  startSize: number,
+) {
+  resizeState.axis = axis
+  resizeState.index = index
+  resizeState.startPointer = startPointer
+  resizeState.startSize = startSize
+  resizeState.currentSize = startSize
+  window.addEventListener('mousemove', handleResizeMove)
+  window.addEventListener('mouseup', finishResize, { once: true })
+}
+
+function handleResizeMove(event: MouseEvent) {
+  if (!resizeState.axis) return
+  const pointer = resizeState.axis === 'column' ? event.clientX : event.clientY
+  const delta = (pointer - resizeState.startPointer) / Math.max(props.scale, 0.1)
+  const min = resizeState.axis === 'column' ? 64 : 28
+  const max = resizeState.axis === 'column' ? 360 : 160
+  resizeState.currentSize = Math.min(Math.max(Math.round(resizeState.startSize + delta), min), max)
+}
+
+function finishResize() {
+  window.removeEventListener('mousemove', handleResizeMove)
+  if (resizeState.axis === 'column') {
+    emit('resizeColumn', resizeState.index, resizeState.currentSize)
+  } else if (resizeState.axis === 'row') {
+    emit('resizeRow', resizeState.index, resizeState.currentSize)
+  }
+  resizeState.axis = null
+}
+
+function handleCopy(event: ClipboardEvent) {
+  if (editingCellId.value || !event.clipboardData || !selectionBounds.value) return
+  const matrix = reportSheetClipboardMatrix(props.sheet, selectionBounds.value)
+  event.clipboardData.setData(reportClipboardMime, JSON.stringify(matrix))
+  event.clipboardData.setData(
+    'text/plain',
+    matrix.map((row) => row.map((cell) => cell.value || '').join('\t')).join('\n'),
+  )
+  event.preventDefault()
+}
+
+function handleCut(event: ClipboardEvent) {
+  if (editingCellId.value) return
+  handleCopy(event)
+  if (event.defaultPrevented) emit('clearSelection')
+}
+
+function handlePaste(event: ClipboardEvent) {
+  if (editingCellId.value || !event.clipboardData) return
+  const custom = event.clipboardData.getData(reportClipboardMime)
+  const matrix = custom
+    ? parseClipboardMatrix(custom)
+    : textClipboardMatrix(event.clipboardData.getData('text/plain'))
+  if (!matrix.length) return
+  event.preventDefault()
+  emit('pasteCells', matrix)
+}
+
+function parseClipboardMatrix(value: string): ReportSheetClipboardCell[][] {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((row) => {
+      if (!Array.isArray(row)) return []
+      return row.map((cell) => normalizeClipboardCell(cell))
+    })
+  } catch {
+    return []
+  }
+}
+
+function normalizeClipboardCell(value: unknown): ReportSheetClipboardCell {
+  if (!value || typeof value !== 'object') return { value: '' }
+  const cell = value as Partial<ReportSheetClipboardCell>
+  return {
+    value: typeof cell.value === 'string' ? cell.value : String(cell.value || ''),
+    ...(cell.binding ? { binding: { ...cell.binding } } : {}),
+    ...(cell.style ? { style: { ...cell.style } } : {}),
+    ...(cell.colspan ? { colspan: Number(cell.colspan) } : {}),
+    ...(cell.rowspan ? { rowspan: Number(cell.rowspan) } : {}),
+  }
+}
+
+function textClipboardMatrix(value: string): ReportSheetClipboardCell[][] {
+  if (!value) return []
+  return value
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((row) => row.split('\t').map((cell) => ({ value: cell })))
+}
+
 function startEdit(row: number, col: number) {
   const cell = cellAt(row, col)
   editingCellId.value = cell.id
@@ -405,6 +638,7 @@ function handleCellClick(row: number, col: number, event: MouseEvent) {
 }
 
 function handleCellKeydown(event: KeyboardEvent, row: number, col: number) {
+  if (event.target instanceof HTMLInputElement) return
   if (event.key === 'Enter') {
     event.preventDefault()
     startEdit(row, col)
@@ -416,9 +650,20 @@ function handleCellKeydown(event: KeyboardEvent, row: number, col: number) {
     return
   }
   if (event.metaKey || event.ctrlKey) {
-    if (event.key.toLowerCase() === 'b') {
+    const key = event.key.toLowerCase()
+    if (key === 'z') {
+      event.preventDefault()
+      if (event.shiftKey) emit('redo')
+      else emit('undo')
+    } else if (key === 'y') {
+      event.preventDefault()
+      emit('redo')
+    } else if (key === 'b') {
       event.preventDefault()
       emit('toggleBold')
+    } else if (key === 'i') {
+      event.preventDefault()
+      emit('toggleItalic')
     }
     return
   }
@@ -478,7 +723,7 @@ function openContextMenu(row: number, col: number, event: MouseEvent) {
     rect && scrollEl ? event.clientX - rect.left + scrollEl.scrollLeft : event.offsetX
   contextMenu.top = rect && scrollEl ? event.clientY - rect.top + scrollEl.scrollTop : event.offsetY
   contextMenu.visible = true
-  emit('selectCell', row, col)
+  if (!isSelectedCell(row, col)) emit('selectCell', row, col)
 }
 
 function closeContextMenu() {
@@ -494,6 +739,8 @@ function runContextAction(
     | 'unmerge'
     | 'insertRow'
     | 'insertCol'
+    | 'deleteRow'
+    | 'deleteCol'
     | 'summary'
     | 'detail',
 ) {
@@ -506,6 +753,8 @@ function runContextAction(
   else if (action === 'unmerge') emit('unmergeCell', row, col)
   else if (action === 'insertRow') emit('insertRowAfter', row)
   else if (action === 'insertCol') emit('insertColAfter', col)
+  else if (action === 'deleteRow') emit('deleteRow', row)
+  else if (action === 'deleteCol') emit('deleteCol', col)
   else if (action === 'summary') emit('toggleSummaryRow', row)
   else emit('toggleDetailRow', row)
 }
@@ -515,6 +764,11 @@ function joinLabel(join: ReportDatasetJoin) {
   const right = props.datasets.find((item) => item.id === join.right_dataset_id)
   return `${left?.name || join.left_dataset_id}.${join.left_field} ${join.join_type.toUpperCase()} ${right?.name || join.right_dataset_id}.${join.right_field}`
 }
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mousemove', handleResizeMove)
+  window.removeEventListener('mouseup', finishResize)
+})
 </script>
 
 <style scoped lang="scss">
@@ -550,6 +804,15 @@ function joinLabel(join: ReportDatasetJoin) {
   max-width: 260px;
 }
 
+.color-swatch {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  width: 15px;
+  height: 4px;
+  border: 1px solid rgba(23, 32, 51, 0.24);
+}
+
 .sheet-scroll {
   min-width: 0;
   min-height: 0;
@@ -562,7 +825,6 @@ function joinLabel(join: ReportDatasetJoin) {
   width: max-content;
   min-width: 980px;
   display: grid;
-  grid-auto-rows: 42px;
   border: 1px solid #cfd6e6;
   background: #fff;
   box-shadow: 0 16px 36px rgba(24, 32, 51, 0.08);
@@ -599,10 +861,30 @@ function joinLabel(join: ReportDatasetJoin) {
   z-index: 6;
 }
 
+.sheet-col-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
 .sheet-row-head {
   left: 0;
   z-index: 5;
   box-shadow: 1px 0 0 #dfe5f2;
+}
+
+.sheet-row-resizer {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
+  z-index: 2;
 }
 
 .sheet-cell {
@@ -652,7 +934,7 @@ function joinLabel(join: ReportDatasetJoin) {
 }
 
 .sheet-cell.drop-target::after {
-  content: '放到这里';
+  content: attr(data-drop-label);
   position: absolute;
   right: 8px;
   bottom: 5px;

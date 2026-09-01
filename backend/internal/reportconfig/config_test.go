@@ -18,7 +18,7 @@ func TestParseReportConfigWithDatasetJoins(t *testing.T) {
 				{"id":"j1","left_dataset_id":"waybill","left_field":"company_id","right_dataset_id":"company","right_field":"id","join_type":"left"}
 			]
 		}`)),
-		datatypes.JSON([]byte(`{"view":"sheet","sheet":{"rows":8,"cols":6,"cells":[]}}`)),
+		datatypes.JSON([]byte(`{"view":"sheet","sheet":{"rows":8,"cols":6,"column_widths":{"2":160},"row_heights":{"3":56},"cells":[]}}`)),
 	)
 	if err != nil {
 		t.Fatalf("parse config: %v", err)
@@ -30,6 +30,9 @@ func TestParseReportConfigWithDatasetJoins(t *testing.T) {
 	joins := config.DatasetJoins()
 	if len(joins) != 1 || joins[0].LeftField != "company_id" || joins[0].RightField != "id" {
 		t.Fatalf("unexpected joins: %#v", joins)
+	}
+	if config.Layout.Sheet.ColumnWidths["2"] != 160 || config.Layout.Sheet.RowHeights["3"] != 56 {
+		t.Fatalf("unexpected sheet sizes: %#v %#v", config.Layout.Sheet.ColumnWidths, config.Layout.Sheet.RowHeights)
 	}
 }
 

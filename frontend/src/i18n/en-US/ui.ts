@@ -91,6 +91,9 @@ const ui = {
   associationPreview: 'Association Preview',
   associationSelection: 'Association Selection',
   associationValueUnsolved: 'Association value unsolved',
+  alignCenter: 'Align Center',
+  alignLeft: 'Align Left',
+  alignRight: 'Align Right',
   atLeastOneOfThem: 'At least one of them.',
   attempts: 'Attempts',
   attributionInformation: 'Attribution information',
@@ -122,6 +125,7 @@ const ui = {
   batchStatus: 'Batch Status',
   bindingType: 'Binding Type',
   bindTableEncoding: 'Bind Table Encoding',
+  bold: 'Bold',
   boolean: 'Boolean',
   browser: 'Browser',
   browseTwoOrganizationalTreesOfCorporateAndRegulatoryStructures:
@@ -156,6 +160,7 @@ const ui = {
   cascadeSelection: 'Cascade Selection',
   category: 'Category',
   categoryFilter: 'Category Filter',
+  cellBackground: 'Cell Background',
   cellPhoneNumber: 'Cell phone number',
   cells: 'Cells',
   certificateName: 'Certificate Name',
@@ -371,6 +376,8 @@ const ui = {
   delayInRetrying: 'Delay in retrying',
   delete: 'Delete',
   deleteChildData: 'Delete Child Data',
+  deleteCurrentColumn: 'Delete Current Column',
+  deleteCurrentRow: 'Delete Current Row',
   deleteField: 'Delete Field',
   deleteIndex: 'Delete Index',
   deleteParameter: 'Delete Parameter',
@@ -440,6 +447,7 @@ const ui = {
   downloadsAreUploadedDirectlyByTheNextStepAndDo:
     'Downloads are uploaded directly by the next step and do not require a search for a sample.',
   downloadSmallFile: 'Download Small File',
+  dropHere: 'Drop Here',
   downloadsMp4OpensTheSamplePageAndEditsTheFunction:
     'Downloads MP4, opens the sample page and edits the Function Validation-Export Test record.',
   downloadsTheSmallFilesProvidedOnThePageOpensThe:
@@ -682,6 +690,7 @@ const ui = {
   insertColumnsRight: 'Insert Columns Right',
   insertRowBelow: 'Insert Row Below',
   integer: 'Integer',
+  italic: 'Italic',
   integratedCertificate: 'Integrated Certificate',
   integratedVoucherDetails: 'Integrated voucher details',
   integrationExecutionId: 'Integration Execution ID',
@@ -1805,6 +1814,7 @@ const ui = {
   recordDoesNotExist: 'Record does not exist',
   recordsDoNotExistOrAreNotAccessible: 'Records do not exist or are not accessible',
   reduction: 'Reduction',
+  redo: 'Redo',
   reEntryOpensTheFunctionalAuthenticationOrderPageFromDevelopment:
     'Re-entry opens the functional authentication order page from Development Management.',
   refresh: 'Refresh',
@@ -1874,6 +1884,8 @@ const ui = {
   reSelectFilesAndInterruptUploadsToConfirmThatIncomplete:
     'Re-select files and interrupt uploads to confirm that incomplete uploads will not be written in the business records.',
   reset: 'Reset',
+  resizeColumn: 'Resize Column',
+  resizeRow: 'Resize Row',
   resourceAction: 'Resource Action',
   resourceCode: 'Resource Code',
   resourceId: 'Resource ID',
@@ -2157,6 +2169,7 @@ const ui = {
   testFile: 'Test File',
   testInbox: 'Test Inbox',
   text: 'Text',
+  textColor: 'Text Color',
   theAdministratorSeesTheCompleteData: 'The administrator sees the complete data.',
   theAttributionDefinitionOnlyDescribesTheBusinessAttributionOfThe:
     'The attribution definition only describes the business attribution of the resource records, without saving SQL or field expression',
@@ -2329,6 +2342,7 @@ const ui = {
   unavailable: 'Unavailable',
   unbound: 'Unbound',
   uncategorized: 'Uncategorized',
+  undo: 'Undo',
   undoTheCurrentProgramChanges: 'Undo the current program changes',
   unifiedSocialCreditCode: 'Unified social credit code',
   uniqueIndex: 'Unique Index',

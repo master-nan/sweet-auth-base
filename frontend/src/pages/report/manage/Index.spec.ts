@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ExpressionLogic, ExpressionType } from 'src/types/enum'
 
 const permissionCodes = vi.hoisted(() => [] as string[])
 const reportApi = vi.hoisted(() => ({
@@ -120,8 +121,62 @@ describe('report management capabilities', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-icon="add"]').exists()).toBe(true)
-    for (const icon of ['design_services', 'content_copy', 'publish', 'history', 'pause_circle', 'delete']) {
+    for (const icon of [
+      'design_services',
+      'content_copy',
+      'publish',
+      'history',
+      'pause_circle',
+      'delete',
+    ]) {
       expect(wrapper.find(`[data-icon="${icon}"]`).exists()).toBe(true)
     }
+  })
+
+  it('keeps the category summary and queries uncategorized reports by empty value', async () => {
+    const uncategorized = {
+      id: 2,
+      report_name: '未分类报表',
+      report_code: 'uncategorized_report',
+      report_kind: 'detail',
+      category: '',
+      status: 'draft',
+    }
+    const categorized = {
+      id: 3,
+      report_name: '审计报表',
+      report_code: 'audit_report',
+      report_kind: 'detail',
+      category: '系统审计',
+      status: 'published',
+    }
+    reportApi.queryReports
+      .mockResolvedValueOnce({ data: [uncategorized, categorized], total: 2 })
+      .mockResolvedValueOnce({ data: [uncategorized, categorized], total: 2 })
+      .mockResolvedValueOnce({ data: [uncategorized], total: 1 })
+      .mockResolvedValueOnce({ data: [uncategorized, categorized], total: 2 })
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.findAll('.category-item')).toHaveLength(3)
+    await wrapper.findAll('.category-item')[1]!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('.category-item')).toHaveLength(3)
+    const listQuery = reportApi.queryReports.mock.calls[2]![0]
+    expect(listQuery.filters).not.toHaveProperty('category')
+    expect(listQuery.expressions[0].logic).toBe(ExpressionLogic.OR)
+    expect(listQuery.expressions[0].rules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'category',
+          expression_type: ExpressionType.EQ,
+          value: '',
+        }),
+        expect.objectContaining({ field: 'category', expression_type: ExpressionType.IS_NULL }),
+      ]),
+    )
+    expect(reportApi.queryReports.mock.calls[3]![0].filters).not.toHaveProperty('category')
   })
 })

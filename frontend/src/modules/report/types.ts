@@ -22,13 +22,7 @@ export type ReportLayoutAreaType =
   | 'footer'
 export type ReportLayoutAreaItemType = 'static_text' | 'parameter' | 'field' | 'summary' | 'runtime'
 export type ReportLayoutAreaItemAlign = 'left' | 'center' | 'right'
-export type ReportLayoutAreaItemFormat =
-  | 'text'
-  | 'number'
-  | 'amount'
-  | 'date'
-  | 'datetime'
-  | 'dict'
+export type ReportLayoutAreaItemFormat = 'text' | 'number' | 'amount' | 'date' | 'datetime' | 'dict'
 export type ReportLayoutAreaAggregate = 'none' | 'sum' | 'count'
 
 export interface ReportField {
@@ -103,6 +97,8 @@ export interface ReportSheetConfig {
   active_cell?: string | undefined
   detail_rows?: number[] | undefined
   summary_rows?: number[] | undefined
+  column_widths?: Record<string, number> | undefined
+  row_heights?: Record<string, number> | undefined
   cells: ReportSheetCell[]
 }
 
