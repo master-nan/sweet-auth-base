@@ -1,6 +1,7 @@
 .PHONY: help verify ci-check release-check secret-scan docs-check scripts-test backend-test frontend-ci external-preflight db-migrate db-seed db-migrate-external db-seed-external docker-build-backend-assets docker-build-frontend-assets docker-build-assets docker-prepare-local-database docker-up docker-rebuild-backend docker-rebuild-frontend docker-up-external docker-rebuild-backend-external docker-rebuild-frontend-external docker-down docker-logs
 
 APP_BASE_PATH ?= /sweet_admin
+GO_CI_TOOLCHAIN ?= go$(shell awk '$$1 == "go" { print $$2; exit }' backend/go.mod)
 EXTERNAL_ENV_FILE ?= .env.external
 EXTERNAL_DOCKER_COMPOSE = docker compose --env-file "$(EXTERNAL_ENV_FILE)" -f docker-compose.external.yml
 EXTERNAL_PREFLIGHT = SWEET_ADMIN_PREFLIGHT_REQUIRE_STARTUP_WRITES_DISABLED=true node scripts/preflight-external.mjs "$(EXTERNAL_ENV_FILE)"
@@ -52,13 +53,13 @@ ci-check:
 	$(MAKE) secret-scan
 	$(MAKE) docs-check
 	$(MAKE) scripts-test
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test ./... -count=1
+	@cd backend && GOTOOLCHAIN=$(GO_CI_TOOLCHAIN) SWEET_REQUIRE_POSTGRES_TESTS=true go test ./... -count=1
 	cd frontend && yarn quasar prepare && yarn test
 	$(MAKE) frontend-ci
 
 release-check: ci-check
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -p=1 ./... -count=3
-	@cd backend && SWEET_REQUIRE_POSTGRES_TESTS=true go test -race -p=1 ./... -count=1
+	@cd backend && GOTOOLCHAIN=$(GO_CI_TOOLCHAIN) SWEET_REQUIRE_POSTGRES_TESTS=true go test -p=1 ./... -count=3
+	@cd backend && GOTOOLCHAIN=$(GO_CI_TOOLCHAIN) SWEET_REQUIRE_POSTGRES_TESTS=true go test -race -p=1 ./... -count=1
 
 secret-scan:
 	node scripts/check-tracked-secrets.mjs

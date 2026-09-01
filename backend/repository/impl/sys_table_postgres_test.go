@@ -4,6 +4,7 @@ import (
 	"backend/internal/database"
 	testutil "backend/internal/test"
 	"backend/model"
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestSysTableRepositoryPostgreSQLDDLAndRollback(t *testing.T) {
 	if err := repo.SetTableColumnComment(db, "metadata_ddl_target", "title", "显示标题"); err != nil {
 		t.Fatalf("set metadata column comment: %v", err)
 	}
-	columns, err := repo.FetchTableMetadata(t.Context(), db, schemaName, "metadata_ddl_target")
+	columns, err := repo.FetchTableMetadata(context.Background(), db, schemaName, "metadata_ddl_target")
 	if err != nil {
 		t.Fatalf("fetch metadata column comments: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestSysTableRepositoryPostgreSQLDDLAndRollback(t *testing.T) {
 	if updated, err := database.SyncMetadataColumnComments(db, "metadata_ddl_target"); err != nil || updated != 1 {
 		t.Fatalf("sync metadata column comments updated=%d err=%v", updated, err)
 	}
-	columns, err = repo.FetchTableMetadata(t.Context(), db, schemaName, "metadata_ddl_target")
+	columns, err = repo.FetchTableMetadata(context.Background(), db, schemaName, "metadata_ddl_target")
 	if err != nil {
 		t.Fatalf("fetch synchronized column comments: %v", err)
 	}
