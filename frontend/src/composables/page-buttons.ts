@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { translate } from 'boot/i18n'
 import { useUserStore } from 'src/stores/user'
 import type { MenuButton } from 'src/api/services/sys-menu'
 import { SysMenuButtonPosition } from 'src/types/enum'
@@ -7,6 +8,7 @@ import {
   findButtonCapability,
   resolvePageButtons,
 } from 'src/utils/menu-button'
+import { resolveMenuButtonLabel } from 'src/utils/menu-button-display'
 
 export function usePageButtons(route_name: string) {
   const userStore = useUserStore()
@@ -14,7 +16,12 @@ export function usePageButtons(route_name: string) {
   const grantedCapabilityCodes = computed(() => new Set(userStore.buttons))
   const hasGrantedCapability = (code: string) => grantedCapabilityCodes.value.has(code)
 
-  const all_buttons = computed(() => resolvePageButtons(userStore.menus, route_name))
+  const all_buttons = computed(() =>
+    resolvePageButtons(userStore.menus, route_name).map((button) => ({
+      ...button,
+      name: resolveMenuButtonLabel(button, translate),
+    })),
+  )
 
   const line_buttons = computed(() =>
     all_buttons.value.filter((btn) => btn.position === SysMenuButtonPosition.LINE),

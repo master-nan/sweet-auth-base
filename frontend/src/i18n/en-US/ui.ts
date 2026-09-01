@@ -25,6 +25,10 @@ const ui = {
   addIndex: 'Add Index',
   addInterfacePermissions: 'Add Interface Permissions',
   addParameters: 'Add Parameters',
+  addDataResource: 'Add Resource',
+  addOwnershipDefinition: 'Add Ownership Definition',
+  addPermissionGrant: 'Add Grant',
+  addPermissionPolicy: 'Add Policy',
   addRelation: 'Add Relation',
   addressSummary: 'Address Summary',
   addRule: 'Add Rule',
@@ -163,6 +167,9 @@ const ui = {
   checkInterfaceCallsAndSynchronizedProcessingResults:
     'Check interface calls and synchronized processing results',
   checkObject: 'Check Object',
+  checkDataResource: 'Check Resource',
+  checkPermissionGrant: 'Check Grant',
+  checkPermissionPolicy: 'Check Policy',
   checkpointMode: 'Checkpoint Mode *',
   checkResourceStrategyAndAuthorizationConfigurationBeforeUsing:
     'Check resource, strategy and authorization configuration before using',
@@ -220,6 +227,8 @@ const ui = {
   configurationEnabled: 'Configuration Enabled',
   configurationRefreshed: 'Configuration refreshed',
   configure: 'Configure',
+  configureDataResourceOperations: 'Configure Resource Operations',
+  configurePermissionPolicyRules: 'Configure Policy Rules',
   configureAtLeastOnePolicyRule: 'Configure at least one policy rule',
   configureButtonPrivilegesAfterSelectingTheLeftMenu:
     'Configure button privileges after selecting the left menu',
@@ -444,6 +453,8 @@ const ui = {
   durationMs: 'Duration (ms)',
   dynamicValue: 'Dynamic value',
   edit: 'Edit',
+  editDataResource: 'Edit Resource',
+  editPermissionPolicy: 'Edit Policy',
   editAssociation: 'Edit Association',
   editCurrentRecord: 'Edit Current Record',
   editData: 'Edit Data',
