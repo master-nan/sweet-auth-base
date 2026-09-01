@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -50,6 +51,8 @@ func migrationSteps() []migrationStep {
 		migrateIntegrationReferenceIntegritySchema,
 		migrateUserSessionSchema,
 		migrateUserSessionAuditFields,
+		migrateNotificationStandardBaseFields,
+		syncMetadataColumnComments,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -133,8 +136,6 @@ func migrateNotificationCenterSchema(db *gorm.DB) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS ux_notification_source_dedup
 			ON notification (source_module, dedup_key)
 			WHERE dedup_key IS NOT NULL AND dedup_key <> ''`,
-		`CREATE INDEX IF NOT EXISTS idx_notification_created
-			ON notification (created_at DESC, id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_notification_recipient_user_created
 			ON notification_recipient (user_id, created_at DESC, notification_id DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_notification_recipient_user_unread
@@ -145,6 +146,16 @@ func migrateNotificationCenterSchema(db *gorm.DB) error {
 		if err := db.Exec(statement).Error; err != nil {
 			return fmt.Errorf("migrate notification center schema: %w", err)
 		}
+	}
+	createdColumn := "created_at"
+	if db.Migrator().HasColumn("notification", "gmt_create") {
+		createdColumn = "gmt_create"
+	}
+	if err := db.Exec(fmt.Sprintf(
+		`CREATE INDEX IF NOT EXISTS idx_notification_created ON notification (%s DESC, id DESC)`,
+		pq.QuoteIdentifier(createdColumn),
+	)).Error; err != nil {
+		return fmt.Errorf("migrate notification center schema: %w", err)
 	}
 	return nil
 }
@@ -387,6 +398,9 @@ func platformSeedSteps() []seedStep {
 		}},
 		seedStep{name: "sys_table_relation_metadata", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedSystemTableRelations(db, sf)
+		}},
+		seedStep{name: "metadata_column_comments", run: func(db *gorm.DB, _ *config.Server, _ *utils.Snowflake) error {
+			return syncMetadataColumnComments(db)
 		}},
 		seedStep{name: "functional_permission_projection", run: func(db *gorm.DB, _ *config.Server, sf *utils.Snowflake) error {
 			return seedFunctionalPermissionProjection(db, sf)

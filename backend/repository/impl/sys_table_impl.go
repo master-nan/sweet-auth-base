@@ -227,6 +227,10 @@ func (s *SysTableRepositoryImpl) CreateTableColumn(tx *gorm.DB, tableCode string
 	return tx.Exec(addColumnSQL).Error
 }
 
+func (s *SysTableRepositoryImpl) SetTableColumnComment(tx *gorm.DB, tableCode, fieldCode, comment string) error {
+	return database.SetColumnComment(tx, tableCode, fieldCode, comment)
+}
+
 // DropTableColumn 删除实体字段
 func (s *SysTableRepositoryImpl) DropTableColumn(tx *gorm.DB, tableCode string, fieldCode string) error {
 	tableName := util.GetTableName(tx, tableCode)
@@ -271,8 +275,16 @@ SELECT
 	COALESCE(c.udt_name, c.data_type) AS "COLUMN_TYPE",
 	CASE WHEN pk.column_name IS NULL THEN '' ELSE 'PRI' END AS "COLUMN_KEY",
 	'' AS "EXTRA",
-	'' AS "COLUMN_COMMENT"
+	COALESCE(col_description(table_class.oid, table_attribute.attnum), '') AS "COLUMN_COMMENT"
 FROM information_schema.columns c
+LEFT JOIN pg_namespace table_namespace
+	ON table_namespace.nspname = c.table_schema
+LEFT JOIN pg_class table_class
+	ON table_class.relnamespace = table_namespace.oid
+	AND table_class.relname = c.table_name
+LEFT JOIN pg_attribute table_attribute
+	ON table_attribute.attrelid = table_class.oid
+	AND table_attribute.attname = c.column_name
 LEFT JOIN (
 	SELECT kcu.table_schema, kcu.table_name, kcu.column_name
 	FROM information_schema.table_constraints tc

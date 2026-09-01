@@ -152,8 +152,10 @@ func notificationMenuRoutePath(
 
 func (repositoryImpl *NotificationRepositoryImpl) UnreadCount(ctx context.Context, userId int) (int64, error) {
 	var count int64
-	err := repositoryImpl.db.WithContext(ctx).Model(&model.NotificationRecipient{}).
-		Where("user_id = ? AND read_at IS NULL", userId).
+	err := repositoryImpl.db.WithContext(ctx).Table("notification_recipient AS recipient").
+		Joins("JOIN notification ON notification.id = recipient.notification_id").
+		Where("recipient.user_id = ? AND recipient.read_at IS NULL", userId).
+		Where("notification.state = TRUE AND notification.gmt_delete IS NULL").
 		Count(&count).Error
 	return count, err
 }
@@ -163,8 +165,9 @@ func notificationRecordQuery(db *gorm.DB) *gorm.DB {
 		Select(`notification.id, notification.category, notification.level, notification.title,
 			notification.content, notification.source_module, notification.source_type,
 			notification.source_id, notification.action_menu_name, notification.action_path,
-			recipient.read_at, notification.created_at`).
-		Joins("JOIN notification ON notification.id = recipient.notification_id")
+			recipient.read_at, notification.gmt_create AS created_at`).
+		Joins("JOIN notification ON notification.id = recipient.notification_id").
+		Where("notification.state = TRUE AND notification.gmt_delete IS NULL")
 }
 
 func (repositoryImpl *NotificationRepositoryImpl) Recent(

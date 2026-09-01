@@ -27,6 +27,7 @@ import (
 const maxAuditPayloadLength = 64 * 1024
 const maxAuditErrorCodeLength = 64
 const maxAuditErrorMessageLength = 2048
+const accessLogWriteTimeout = 3 * time.Second
 
 const (
 	accessAuditResultSuccess = "success"
@@ -119,7 +120,9 @@ func LogHandler(logService accessLogWriter) gin.HandlerFunc {
 			Response:     sanitizeAccessLogPayload(c.Request.URL.Path, responseBody),
 		}
 		if !AccessAuditPersisted(c) {
-			err := logService.CreateAccessLog(c.Request.Context(), accessLog)
+			writeContext, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), accessLogWriteTimeout)
+			err := logService.CreateAccessLog(writeContext, accessLog)
+			cancel()
 			if err != nil {
 				zap.L().Error(
 					"access log storage failed",

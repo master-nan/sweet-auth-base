@@ -14,12 +14,14 @@ import (
 )
 
 type captureAccessLogWriter struct {
-	logs []model.AccessLog
-	err  error
+	logs        []model.AccessLog
+	contextErrs []error
+	err         error
 }
 
-func (writer *captureAccessLogWriter) CreateAccessLog(_ context.Context, log model.AccessLog) error {
+func (writer *captureAccessLogWriter) CreateAccessLog(ctx context.Context, log model.AccessLog) error {
 	writer.logs = append(writer.logs, log)
+	writer.contextErrs = append(writer.contextErrs, ctx.Err())
 	return writer.err
 }
 
@@ -168,6 +170,25 @@ func TestLogHandlerDoesNotDuplicateCommittedTransactionalAudit(t *testing.T) {
 	}
 	if len(writer.logs) != 0 {
 		t.Fatalf("request middleware duplicated %d transactional audit records", len(writer.logs))
+	}
+}
+
+func TestLogHandlerPersistsAfterRequestContextCancellation(t *testing.T) {
+	writer := &captureAccessLogWriter{}
+	engine := newLogBaselineEngine(t, writer)
+	requestContext, cancel := context.WithCancel(context.Background())
+	engine.GET("/baseline/cancelled", func(ctx *gin.Context) {
+		cancel()
+		ctx.Set("response", response.NewResponse())
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/baseline/cancelled", nil).WithContext(requestContext)
+	engine.ServeHTTP(recorder, request)
+
+	_ = onlyCapturedAccessLog(t, writer)
+	if len(writer.contextErrs) != 1 || writer.contextErrs[0] != nil {
+		t.Fatalf("access log inherited canceled request context: %#v", writer.contextErrs)
 	}
 }
 

@@ -497,7 +497,8 @@ func equalIntSets(left, right []int) bool {
 
 func notificationFromCommand(id int, command NotificationCommand) model.Notification {
 	value := model.Notification{
-		Id: id, Category: command.Category, Level: command.Level,
+		Basic: model.Basic{Id: id, State: true},
+		Category: command.Category, Level: command.Level,
 		Title: command.Title, Content: command.Content,
 		SourceModule: command.SourceModule, SourceType: command.SourceType, SourceId: command.SourceId,
 		ActionMenuName: command.ActionMenuName, ActionPath: command.ActionPath,

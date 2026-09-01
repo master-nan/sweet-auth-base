@@ -58,6 +58,25 @@ export const refreshClient = axios.create({
 
 let refreshPromise: Promise<string> | null = null
 
+const proactiveRefreshWindowMs = 30_000
+
+export function accessTokenNeedsRefresh(
+  value: string,
+  now = Date.now(),
+  refreshWindowMs = proactiveRefreshWindowMs,
+) {
+  try {
+    const payload = value.split('.')[1]
+    if (!payload) return false
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const normalized = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+    const claims = JSON.parse(atob(normalized)) as { exp?: number }
+    return typeof claims.exp === 'number' && claims.exp * 1000 <= now + refreshWindowMs
+  } catch {
+    return false
+  }
+}
+
 export function refreshAccessToken() {
   if (refreshPromise) return refreshPromise
   refreshPromise = refreshClient
@@ -128,7 +147,7 @@ function notifyRequestError(message: string, key: string) {
 }
 
 instance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
+  async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
     // 针对特定API设置更长的超时时间
     if (config.url?.includes('/large-data') || config.url?.includes('/export')) {
       config.timeout = 60000 // 60秒
@@ -148,7 +167,16 @@ instance.interceptors.request.use(
     } else {
       loadingStore.setLoading(true)
     }
-    const token = userStore.getLoginToken
+    let token = userStore.getLoginToken
+    if (token && accessTokenNeedsRefresh(token) && canRefreshRequest(config)) {
+      try {
+        token = await refreshAccessToken()
+      } catch (error) {
+        loadingStore.setLoading(false)
+        userStore.setLogout()
+        throw error
+      }
+    }
     const sessionConfig = config as SessionBoundRequestConfig
     sessionConfig.sweetSessionToken = token
     sessionConfig.sweetSessionGeneration = userStore.session_generation

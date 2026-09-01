@@ -185,7 +185,7 @@ func TestNotificationServiceActionAvailabilityAndDTO(t *testing.T) {
 	}
 
 	invalidStored := model.Notification{
-		Id: 9901, Category: model.NotificationCategoryIntegration, Level: model.NotificationLevelWarning,
+		Basic: model.Basic{Id: 9901, State: true}, Category: model.NotificationCategoryIntegration, Level: model.NotificationLevelWarning,
 		Title: "异常历史跳转", Content: "内容仍然可见。", SourceModule: "integration", SourceType: "execution",
 		ActionMenuName: menu.Name, ActionPath: "/admin/integration/credential",
 	}

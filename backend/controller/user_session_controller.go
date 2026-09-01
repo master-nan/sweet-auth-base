@@ -172,6 +172,10 @@ func (u *UserSessionController) Events(ctx *gin.Context) {
 	}
 	expiresAt, _ := ctx.Get("token_expires_at")
 	accessExpiresAt, _ := expiresAt.(time.Time)
+	if err := http.NewResponseController(ctx.Writer).SetWriteDeadline(time.Time{}); err != nil {
+		_ = ctx.Error(appErrors.WrapSystemError(err))
+		return
+	}
 	ctx.Header("Content-Type", "text/event-stream")
 	ctx.Header("Cache-Control", "no-cache")
 	ctx.Header("Connection", "keep-alive")
@@ -187,8 +191,8 @@ func (u *UserSessionController) Events(ctx *gin.Context) {
 		case <-ctx.Request.Context().Done():
 			return
 		case now := <-ticker.C:
-			if !accessExpiresAt.IsZero() && !now.Before(accessExpiresAt) {
-				writeSessionEvent(ctx, "access_expired", map[string]string{"message": "Access Token 已到期"})
+			if !accessExpiresAt.IsZero() && !now.Before(accessExpiresAt.Add(-30*time.Second)) {
+				writeSessionEvent(ctx, "access_expiring", map[string]string{"message": "Access Token 即将到期"})
 				return
 			}
 			active, err := u.sessions.IsActive(userID, sessionID)

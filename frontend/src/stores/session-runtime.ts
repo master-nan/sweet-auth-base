@@ -40,7 +40,13 @@ export const useSessionRuntimeStore = defineStore('session-runtime', {
         if (document.visibilityState === 'visible') void this.sendHeartbeat()
       }
       document.addEventListener('visibilitychange', this.visibilityHandler)
-      void this.runEventStream(userStore.session_generation)
+      void this.startEventStream(userStore.session_generation)
+    },
+
+    async startEventStream(generation: number) {
+      await this.sendHeartbeat()
+      if (!this.running || generation !== useUserStore().session_generation) return
+      await this.runEventStream(generation)
     },
 
     async sendHeartbeat() {
@@ -119,7 +125,7 @@ export const useSessionRuntimeStore = defineStore('session-runtime', {
         useUserStore().setLogout()
         return false
       }
-      if (message.event === 'access_expired') {
+      if (message.event === 'access_expiring' || message.event === 'access_expired') {
         try {
           await refreshAccessToken()
         } catch {

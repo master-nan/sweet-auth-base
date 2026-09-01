@@ -115,6 +115,8 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"integration_reference_integrity",
 		"user_session_schema",
 		"user_session_audit_fields",
+		"notification_standard_base_fields",
+		"metadata_column_comments",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)
@@ -136,6 +138,7 @@ func TestPlatformSeedStepsRegistersMetadataAndPermissionBaselineOrder(t *testing
 		"query_scheme_foundation",
 		"data_permission_dictionary_and_metadata",
 		"sys_table_relation_metadata",
+		"metadata_column_comments",
 		"functional_permission_projection",
 		"rebuildable_cache_flush",
 	}

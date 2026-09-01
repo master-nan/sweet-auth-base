@@ -2259,6 +2259,7 @@ func systemTableMetadataSeeds() []systemTableMetadataSeed {
 		{code: integrationSyncBatchTableCode, name: "同步批次"},
 		{code: integrationExecutionTableCode, name: "执行记录"},
 		{code: integrationLogTableCode, name: "调用日志"},
+		{code: "notification", name: "站内通知"},
 		{code: "casbin_rule", name: "接口权限规则"},
 	}
 }
@@ -2816,6 +2817,18 @@ func shouldUpdateSystemFieldName(existingName, tableCode, fieldCode string) bool
 }
 
 var systemTableFieldDisplayNameMap = map[string]map[string]string{
+	"notification": {
+		"category":         "通知分类",
+		"level":            "通知级别",
+		"title":            "标题",
+		"content":          "内容",
+		"source_module":    "来源模块",
+		"source_type":      "来源类型",
+		"source_id":        "来源ID",
+		"action_menu_name": "操作菜单",
+		"action_path":      "操作路径",
+		"dedup_key":        "去重键",
+	},
 	externalSystemTableCode: {
 		"system_code":      "系统编码",
 		"name":             "系统名称",

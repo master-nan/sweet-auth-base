@@ -22,6 +22,10 @@ type BufferedResponseWriter struct {
 	Truncated    bool
 }
 
+func (w *BufferedResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (w *BufferedResponseWriter) Write(b []byte) (int, error) {
 	w.capture(b)
 	return w.ResponseWriter.Write(b)

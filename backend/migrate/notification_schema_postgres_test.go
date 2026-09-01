@@ -36,8 +36,14 @@ func TestNotificationPostgreSQLSchemaAndRuntimeContract(t *testing.T) {
 	if err := migrateNotificationCenterSchema(db); err != nil {
 		t.Fatalf("migrate notification schema: %v", err)
 	}
+	if err := migrateNotificationStandardBaseFields(db); err != nil {
+		t.Fatalf("migrate notification standard fields: %v", err)
+	}
 	if err := migrateNotificationCenterSchema(db); err != nil {
 		t.Fatalf("repeat notification migration: %v", err)
+	}
+	if err := migrateNotificationStandardBaseFields(db); err != nil {
+		t.Fatalf("repeat notification standard fields: %v", err)
 	}
 
 	assertNotificationPostgresChecks(t, db)
@@ -212,6 +218,17 @@ func assertNotificationPostgresActionContract(
 
 func assertNotificationPostgresChecks(t *testing.T, db *gorm.DB) {
 	t.Helper()
+	for _, field := range []string{
+		"gmt_create", "create_user", "create_name", "gmt_modify", "modify_user", "modify_name",
+		"gmt_delete", "delete_user", "delete_name", "state",
+	} {
+		if !db.Migrator().HasColumn("notification", field) {
+			t.Fatalf("notification missing standard field %s", field)
+		}
+	}
+	if db.Migrator().HasColumn("notification", "created_at") {
+		t.Fatal("notification retained legacy created_at column")
+	}
 	base := `INSERT INTO notification (
 		id, category, level, title, content, source_module, source_type
 	) VALUES (?, ?, ?, ?, ?, ?, ?)`

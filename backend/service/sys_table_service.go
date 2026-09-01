@@ -185,8 +185,20 @@ func (s *SysTableService) CreateTable(ctx context.Context, req request.TableCrea
 		if e := s.sysTableRepo.CreateTable(tx, data.TableCode, dynamicModel); e != nil {
 			return e
 		}
-		return nil
+		return s.syncTableFieldComments(tx, data.TableCode, fields)
 	})
+}
+
+func (s *SysTableService) syncTableFieldComments(tx *gorm.DB, tableCode string, fields []model.SysTableField) error {
+	for _, field := range fields {
+		if !s.sysTableRepo.HasTableColumn(tx, tableCode, field.FieldCode) {
+			continue
+		}
+		if err := s.sysTableRepo.SetTableColumnComment(tx, tableCode, field.FieldCode, field.FieldName); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newBaseTableFields(tableID int) []model.SysTableField {
@@ -433,7 +445,7 @@ func (s *SysTableService) CreateTableField(ctx context.Context, req request.Tabl
 		if e := s.sysTableFieldRepo.Create(tx, &data); e != nil {
 			return e
 		}
-		return nil
+		return s.syncTableFieldComments(tx, table.TableCode, []model.SysTableField{data})
 	})
 	if err != nil {
 		return err
@@ -582,7 +594,10 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 			}); e != nil {
 				return e
 			}
-			return nil
+			return s.syncTableFieldComments(tx, table.TableCode, []model.SysTableField{{
+				FieldCode: req.FieldCode,
+				FieldName: req.FieldName,
+			}})
 		})
 		if err != nil {
 			return err
@@ -1522,35 +1537,40 @@ func (s *SysTableService) SyncTableFields(ctx context.Context, tableCode string)
 		missing = append(missing, fields[i])
 	}
 
-	if len(missing) == 0 && len(toUpdate) == 0 {
-		return nil
+	changed := len(missing) > 0 || len(toUpdate) > 0
+	if changed {
+		selectRepo := s.sysTableFieldRepo.WithSelect(
+			"is_list_show",
+			"is_insert_show",
+			"is_update_show",
+			"is_quick_search",
+			"is_advanced_search",
+		)
+		err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
+			if len(missing) > 0 {
+				if e := s.sysTableFieldRepo.Create(tx, &missing); e != nil {
+					return e
+				}
+			}
+			for _, item := range toUpdate {
+				if e := selectRepo.Update(tx, &item.Field, item.Id); e != nil {
+					return e
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
 	}
 
-	selectRepo := s.sysTableFieldRepo.WithSelect(
-		"is_list_show",
-		"is_insert_show",
-		"is_update_show",
-		"is_quick_search",
-		"is_advanced_search",
-	)
-	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
-		if len(missing) > 0 {
-			if e := s.sysTableFieldRepo.Create(tx, &missing); e != nil {
-				return e
-			}
-		}
-		for _, item := range toUpdate {
-			if e := selectRepo.Update(tx, &item.Field, item.Id); e != nil {
-				return e
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	commentFields := append(append([]model.SysTableField{}, existingFields...), missing...)
+	if err := s.syncTableFieldComments(s.sysTableRepo.DBWithContext(ctx), table.TableCode, commentFields); err != nil {
 		return err
 	}
-
-	s.RefreshCache(table.Id)
+	if changed {
+		s.RefreshCache(table.Id)
+	}
 	return nil
 }
 

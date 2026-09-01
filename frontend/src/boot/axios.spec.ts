@@ -42,7 +42,7 @@ vi.mock('src/stores/user', () => ({
   }),
 }))
 
-import { instance, refreshClient } from './axios'
+import { accessTokenNeedsRefresh, instance, refreshClient } from './axios'
 
 const response = <T>(
   config: InternalAxiosRequestConfig,
@@ -67,6 +67,47 @@ describe('Axios access token refresh', () => {
     session.syncPersistedSession.mockReset()
     loading.setLoading.mockReset()
     notifications.create.mockReset()
+  })
+
+  const tokenWithExpiry = (expiresAtSeconds: number) => {
+    const payload = btoa(JSON.stringify({ exp: expiresAtSeconds }))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+    return `header.${payload}.signature`
+  }
+
+  it('detects access tokens that are expired or close to expiry', () => {
+    const now = Date.UTC(2026, 8, 1, 8, 0, 0)
+    expect(accessTokenNeedsRefresh(tokenWithExpiry(now / 1000 - 1), now)).toBe(true)
+    expect(accessTokenNeedsRefresh(tokenWithExpiry(now / 1000 + 20), now)).toBe(true)
+    expect(accessTokenNeedsRefresh(tokenWithExpiry(now / 1000 + 60), now)).toBe(false)
+    expect(accessTokenNeedsRefresh('not-a-jwt', now)).toBe(false)
+  })
+
+  it('refreshes a near-expiry token before sending a protected request', async () => {
+    session.token = tokenWithExpiry(Math.floor(Date.now() / 1000) + 10)
+    storage.set('access_token', session.token)
+    let receivedAuthorization = ''
+
+    refreshClient.defaults.adapter = (config) =>
+      Promise.resolve(
+        response(config, 200, {
+          success: true,
+          data: { access_token: 'proactively-refreshed-token' },
+        }),
+      )
+    instance.defaults.adapter = (config) => {
+      const authorization = config.headers.get('Authorization')
+      receivedAuthorization = typeof authorization === 'string' ? authorization : ''
+      return Promise.resolve(response(config, 200, { success: true }))
+    }
+
+    await instance.get('/protected/proactive')
+
+    expect(session.replaceAccessToken).toHaveBeenCalledOnce()
+    expect(receivedAuthorization).toBe('Bearer proactively-refreshed-token')
+    expect(session.setLogout).not.toHaveBeenCalled()
   })
 
   it('refreshes once and retries all 10 requests after concurrent 401 responses', async () => {

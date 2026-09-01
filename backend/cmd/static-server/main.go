@@ -36,14 +36,14 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/sweet_admin", func(w http.ResponseWriter, r *http.Request) {
 		if proxy != nil && shouldProxyToBackend(r.URL.Path) {
-			proxy.ServeHTTP(w, r)
+			serveBackendProxy(proxy, w, r)
 			return
 		}
 		sweetAdminHandler.ServeHTTP(w, r)
 	})
 	mux.HandleFunc("/sweet_admin/", func(w http.ResponseWriter, r *http.Request) {
 		if proxy != nil && shouldProxyToBackend(r.URL.Path) {
-			proxy.ServeHTTP(w, r)
+			serveBackendProxy(proxy, w, r)
 			return
 		}
 		sweetAdminHandler.ServeHTTP(w, r)
@@ -94,6 +94,20 @@ func shouldProxyToBackend(path string) bool {
 		}
 	}
 	return false
+}
+
+func serveBackendProxy(proxy http.Handler, writer http.ResponseWriter, request *http.Request) {
+	if isStreamingBackendPath(request.URL.Path) {
+		if err := http.NewResponseController(writer).SetWriteDeadline(time.Time{}); err != nil {
+			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+	}
+	proxy.ServeHTTP(writer, request)
+}
+
+func isStreamingBackendPath(path string) bool {
+	return path == "/sweet_admin/admin/runtime/session/events"
 }
 
 func newStaticHandler(root string, fs http.FileSystem, fileServer http.Handler, prefix string) http.Handler {

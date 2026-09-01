@@ -36,6 +36,7 @@ type SysTableRepository interface {
 	ModifyTableColumn(*gorm.DB, string, string, string) error
 	ChangeTableColumn(*gorm.DB, string, string, string, string) error
 	CreateTableColumn(*gorm.DB, string, string, string) error
+	SetTableColumnComment(*gorm.DB, string, string, string) error
 	CreateTable(*gorm.DB, string, any) error
 	CreateView(*gorm.DB, string, string) error
 	CreateTableIndex(*gorm.DB, bool, string, string, string) error

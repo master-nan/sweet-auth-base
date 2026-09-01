@@ -36,6 +36,21 @@ func TestShouldProxyToBackend(t *testing.T) {
 	}
 }
 
+func TestIsStreamingBackendPath(t *testing.T) {
+	if !isStreamingBackendPath("/sweet_admin/admin/runtime/session/events") {
+		t.Fatal("session event endpoint must bypass the static server write deadline")
+	}
+	for _, path := range []string{
+		"/sweet_admin/admin/runtime/session/heartbeat",
+		"/sweet_admin/admin/runtime/notifications/unread-count",
+		"/sweet_admin/admin/runtime/session/events/extra",
+	} {
+		if isStreamingBackendPath(path) {
+			t.Fatalf("non-streaming path %s bypassed the write deadline", path)
+		}
+	}
+}
+
 func TestServeStaticStopsOnContextCancellation(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

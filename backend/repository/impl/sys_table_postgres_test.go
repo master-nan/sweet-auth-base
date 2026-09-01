@@ -53,6 +53,58 @@ func TestSysTableRepositoryPostgreSQLDDLAndRollback(t *testing.T) {
 	if repo.HasTableColumn(db, "metadata_ddl_target", "display_name") || !repo.HasTableColumn(db, "metadata_ddl_target", "title") {
 		t.Fatal("PostgreSQL metadata column rename did not converge")
 	}
+	if err := repo.SetTableColumnComment(db, "metadata_ddl_target", "title", "显示标题"); err != nil {
+		t.Fatalf("set metadata column comment: %v", err)
+	}
+	columns, err := repo.FetchTableMetadata(t.Context(), db, schemaName, "metadata_ddl_target")
+	if err != nil {
+		t.Fatalf("fetch metadata column comments: %v", err)
+	}
+	foundComment := false
+	for _, column := range columns {
+		if column.ColumnName == "title" && column.ColumnComment == "显示标题" {
+			foundComment = true
+			break
+		}
+	}
+	if !foundComment {
+		t.Fatalf("physical column comment not returned: %+v", columns)
+	}
+	if err := db.Exec(`CREATE TABLE sys_table (
+		id bigint PRIMARY KEY, table_code varchar(128) NOT NULL, gmt_delete timestamptz
+	)`).Error; err != nil {
+		t.Fatalf("create table metadata fixture: %v", err)
+	}
+	if err := db.Exec(`CREATE TABLE sys_table_field (
+		id bigint PRIMARY KEY, table_id bigint NOT NULL, field_code varchar(128) NOT NULL,
+		field_name varchar(128) NOT NULL, gmt_delete timestamptz
+	)`).Error; err != nil {
+		t.Fatalf("create field metadata fixture: %v", err)
+	}
+	if err := db.Exec(`INSERT INTO sys_table (id, table_code) VALUES (1, 'metadata_ddl_target')`).Error; err != nil {
+		t.Fatalf("insert table metadata fixture: %v", err)
+	}
+	if err := db.Exec(`INSERT INTO sys_table_field (id, table_id, field_code, field_name)
+		VALUES (1, 1, 'title', '同步标题')`).Error; err != nil {
+		t.Fatalf("insert field metadata fixture: %v", err)
+	}
+	if updated, err := database.SyncMetadataColumnComments(db, "metadata_ddl_target"); err != nil || updated != 1 {
+		t.Fatalf("sync metadata column comments updated=%d err=%v", updated, err)
+	}
+	columns, err = repo.FetchTableMetadata(t.Context(), db, schemaName, "metadata_ddl_target")
+	if err != nil {
+		t.Fatalf("fetch synchronized column comments: %v", err)
+	}
+	foundComment = false
+	for _, column := range columns {
+		if column.ColumnName == "title" && column.ColumnComment == "同步标题" {
+			foundComment = true
+			break
+		}
+	}
+	if !foundComment {
+		t.Fatalf("metadata column comment was not synchronized: %+v", columns)
+	}
 
 	if err := repo.CreateTableIndex(db, true, "uidx_metadata_ddl_code", "metadata_ddl_target", "code"); err != nil {
 		t.Fatalf("create metadata index: %v", err)
