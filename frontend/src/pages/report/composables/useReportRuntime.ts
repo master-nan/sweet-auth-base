@@ -23,6 +23,7 @@ export function useReportRuntime() {
   const runtimeLoading = ref(false)
   const runtimeKeyword = ref('')
   const runtimeFilterValues = ref<Record<string, ReportRuntimeFilterValue>>({})
+  const runtimeMenuIdOverride = ref(0)
   const runtimePagination = ref({
     page: 1,
     rowsPerPage: 20,
@@ -52,7 +53,9 @@ export function useReportRuntime() {
   const runtimeSourceCode = computed(() =>
     String(runtimePrimaryDataset.value?.source_code || runtimeReport.value?.data_source_id || ''),
   )
-  const runtimeMenuId = computed(() => runtimeReport.value?.permission_menu_id || 0)
+  const runtimeMenuId = computed(
+    () => runtimeMenuIdOverride.value || runtimeReport.value?.permission_menu_id || 0,
+  )
   const runtimeVersionNo = computed(() => runtimeData.value.meta?.version_no)
   const runtimeParameters = computed<ReportParameter[]>(() => {
     const report = runtimeReport.value
@@ -61,8 +64,9 @@ export function useReportRuntime() {
       : report?.query_config?.parameters || []
   })
 
-  function openRuntime(report: Report, defaultPageSize?: number) {
+  function openRuntime(report: Report, defaultPageSize?: number, menuId = 0) {
     runtimeReport.value = report
+    runtimeMenuIdOverride.value = menuId
     runtimeKeyword.value = ''
     runtimeFilterValues.value = buildRuntimeDefaultFilters()
     runtimeData.value = { columns: [], rows: [], total: 0 }
@@ -75,6 +79,7 @@ export function useReportRuntime() {
 
   function clearRuntime() {
     runtimeReport.value = null
+    runtimeMenuIdOverride.value = 0
     runtimeKeyword.value = ''
     runtimeFilterValues.value = {}
     runtimeData.value = { columns: [], rows: [], total: 0 }

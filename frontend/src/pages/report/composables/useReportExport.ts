@@ -5,6 +5,7 @@ import { useReportApi, type Report, type ReportExportReq } from 'src/api/service
 import { downloadBlob } from 'src/utils/download'
 
 type ReportExportOptions = {
+  menuId?: number
   keyword?: string
   parameters?: Record<string, unknown>
   total?: number
@@ -40,7 +41,7 @@ export function useReportExport() {
     return {
       format: 'csv',
       dataset_id: dataset?.id || '',
-      menu_id: report.permission_menu_id || 0,
+      menu_id: options.menuId || report.permission_menu_id || 0,
       parameters: options.parameters || {},
       query: {
         page: 1,

@@ -40,6 +40,7 @@ var catalog = []Definition{
 	{Version: 22, Key: "user_session_audit_fields", Contract: "v1|user-session-audit-fields|username-snapshot|closure-operator|deleted-account-history|filtered-csv-export", Checksum: "3627d65700efeb1f4a395212b18c0f92960f5f5ec34eb4fb652e2280e66a5e9e"},
 	{Version: 23, Key: "notification_standard_base_fields", Contract: "v1|notification-standard-base-fields|rename-created-at|basic-audit-columns|active-soft-delete-index", Checksum: "b54042618cfb601910ce81eff48bcf157be5600d3dd670d2e4781a82b199f98e"},
 	{Version: 24, Key: "metadata_column_comments", Contract: "v1|metadata-column-comments|historical-backfill|seed-bootstrap|low-code-create-update-sync", Checksum: "5cc084f0a7c8c4b6b07300809a11f89a2d2eca995341d518518dbd780110b129"},
+	{Version: 25, Key: "unify_report_runtime_component", Contract: "v1|unify-report-runtime-component|report-menu-component|remove-v2-runtime", Checksum: "1aae2d369d5459ea872516d42d25cd134cadec41cc11a1340cd06047fe2340b2"},
 }
 
 var managedTables = []string{

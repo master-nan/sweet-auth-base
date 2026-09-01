@@ -9944,14 +9944,23 @@
 
 ### [`frontend/src/pages/report/components/ReportRuntimeDialog.vue`](../../frontend/src/pages/report/components/ReportRuntimeDialog.vue)
 
-- **文件职责：** 报表的对话框组件，承载一次完整的查看或编辑交互。
+- **文件职责：** 报表运行对话框，复用统一的Sheet运行视图。
 - **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
 - **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
 
 | 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
 | --- | --- | --- | --- |
-| [`handleDialogValue`](../../frontend/src/pages/report/components/ReportRuntimeDialog.vue#L77) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`exportCurrentRuntime`](../../frontend/src/pages/report/components/ReportRuntimeDialog.vue#L82) | 实现 `export Current Runtime` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
+| [`handleDialogValue`](../../frontend/src/pages/report/components/ReportRuntimeDialog.vue#L38) | 同步对话框显示状态。 | 关闭按钮、遮罩关闭或父组件更新显示状态时调用。 | 核对重复关闭事件和运行状态清理。 |
+
+### [`frontend/src/pages/report/components/ReportRuntimeView.vue`](../../frontend/src/pages/report/components/ReportRuntimeView.vue)
+
+- **文件职责：** 报表预览与正式运行共享的Sheet运行视图，统一查询条件、权限菜单上下文、分页和导出。
+- **何时使用：** 修改报表运行展示、查询条件或导出交互时使用。
+- **后续扩展：** 继续复用ReportSheetPreview与现有运行composable，不另建并行Runtime Shell。
+
+| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
+| --- | --- | --- | --- |
+| [`exportCurrentRuntime`](../../frontend/src/pages/report/components/ReportRuntimeView.vue#L223) | 按当前查询条件和菜单权限上下文导出运行结果。 | 用户点击导出按钮时调用。 | 核对menu_id、参数、总行数和导出权限。 |
 
 ### [`frontend/src/pages/report/components/ReportSheetPreview.vue`](../../frontend/src/pages/report/components/ReportSheetPreview.vue)
 
@@ -10264,168 +10273,17 @@
 | [`statusLabel`](../../frontend/src/pages/report/manage/Index.vue#L323) | 实现 `status Label` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
 | [`statusColor`](../../frontend/src/pages/report/manage/Index.vue#L332) | 实现 `status Color` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
 
-### [`frontend/src/pages/report-v2/components/ReportDataTable.vue`](../../frontend/src/pages/report-v2/components/ReportDataTable.vue)
+### [`frontend/src/pages/report/runtime/ReportRuntimePage.vue`](../../frontend/src/pages/report/runtime/ReportRuntimePage.vue)
 
-- **文件职责：** 报表前端页面文件，集中保存 Report Data Table 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-该文件没有命名函数或方法，主要提供类型、常量、模板、样式或声明。
-
-### [`frontend/src/pages/report-v2/components/ReportFilterBar.vue`](../../frontend/src/pages/report-v2/components/ReportFilterBar.vue)
-
-- **文件职责：** 报表前端页面文件，集中保存 Report Filter Bar 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-该文件没有命名函数或方法，主要提供类型、常量、模板、样式或声明。
-
-### [`frontend/src/pages/report-v2/components/ReportParameterForm.vue`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue)
-
-- **文件职责：** 报表前端页面文件，集中保存 Report Parameter Form 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
+- **文件职责：** 已发布报表菜单的正式运行页，按路由中的reportId与menuId读取报表并复用统一Sheet运行视图。
+- **何时使用：** 修改报表菜单运行入口、加载状态或路由上下文时使用。
+- **后续扩展：** 保持页面只负责编排路由和加载状态，运行展示继续留在ReportRuntimeView。
 
 | 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
 | --- | --- | --- | --- |
-| [`controlMetas`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L20) | 实现 `control Metas` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`controlMeta`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L31) | 实现 `control Meta` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`valueOf`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L45) | 实现 `value Of` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`inputValueOf`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L49) | 实现 `input Value Of` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`updateValue`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L55) | 校验并更新报表状态。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`normalizeInputValue`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L62) | 把输入转换为报表统一格式。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`fallbackControlType`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L69) | 实现 `fallback Control Type` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`fallbackHtmlInputType`](../../frontend/src/pages/report-v2/components/ReportParameterForm.vue#L78) | 实现 `fallback Html Input Type` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue)
-
-- **文件职责：** 报表的对话框组件，承载一次完整的查看或编辑交互。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`handleDialogValue`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L52) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resetForm`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L57) | 实现 `reset Form` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`clearState`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L67) | 删除或清理报表数据。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`parentMenuQuery`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L80) | 实现 `parent Menu Query` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`menuTitle`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L91) | 实现 `menu Title` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`isDirectoryMenu`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L95) | 判断报表是否满足指定条件。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`collectParentOptions`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L101) | 实现 `collect Parent Options` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`loadParentMenus`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L119) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`filterParentOptions`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L140) | 实现 `filter Parent Options` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`submit`](../../frontend/src/pages/report-v2/components/ReportPublishMenuDialog.vue#L154) | 实现 `submit` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/components/ReportRuntimeShell.vue`](../../frontend/src/pages/report-v2/components/ReportRuntimeShell.vue)
-
-- **文件职责：** 报表前端页面文件，集中保存 Report Runtime Shell 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`parameters`](../../frontend/src/pages/report-v2/components/ReportRuntimeShell.vue#L46) | 实现 `parameters` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`parameterValues`](../../frontend/src/pages/report-v2/components/ReportRuntimeShell.vue#L47) | 实现 `parameter Values` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`controlMetas`](../../frontend/src/pages/report-v2/components/ReportRuntimeShell.vue#L48) | 实现 `control Metas` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/composables/useReportExport.ts`](../../frontend/src/pages/report-v2/composables/useReportExport.ts)
-
-- **文件职责：** 报表前端页面文件，集中保存 use Report Export 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`useReportExport`](../../frontend/src/pages/report-v2/composables/useReportExport.ts#L10) | 实现 `use Report Export` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`buildExportReq`](../../frontend/src/pages/report-v2/composables/useReportExport.ts#L14) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`exportReport`](../../frontend/src/pages/report-v2/composables/useReportExport.ts#L34) | 实现 `export Report` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/composables/useReportParameterControls.ts`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts)
-
-- **文件职责：** 报表前端页面文件，集中保存 use Report Parameter Controls 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`useReportParameterControls`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L46) | 实现 `use Report Parameter Controls` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`loadControls`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L56) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`loadTableFields`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L79) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`loadDictOptions`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L108) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`buildControlMeta`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L121) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`inferControlType`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L155) | 实现 `infer Control Type` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resolveDatasets`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L167) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resolveParameterDataset`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L174) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`matchField`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L183) | 实现 `match Field` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`normalizeFieldControlType`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L187) | 把输入转换为报表统一格式。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`fallbackControlType`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L196) | 实现 `fallback Control Type` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`fallbackHtmlInputType`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L205) | 实现 `fallback Html Input Type` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`normalizeOptions`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L212) | 把输入转换为报表统一格式。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`booleanOptions`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L225) | 实现 `boolean Options` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`readDefaultValue`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L232) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`readString`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L240) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`readBoolean`](../../frontend/src/pages/report-v2/composables/useReportParameterControls.ts#L249) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/composables/useReportQuery.ts`](../../frontend/src/pages/report-v2/composables/useReportQuery.ts)
-
-- **文件职责：** 报表前端页面文件，集中保存 use Report Query 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`useReportQuery`](../../frontend/src/pages/report-v2/composables/useReportQuery.ts#L3) | 实现 `use Report Query` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resetQuery`](../../frontend/src/pages/report-v2/composables/useReportQuery.ts#L18) | 实现 `reset Query` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/composables/useReportRuntime.ts`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts)
-
-- **文件职责：** 报表前端页面文件，集中保存 use Report Runtime 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`useReportRuntime`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L23) | 实现 `use Report Runtime` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resolveParameters`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L37) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resolvePrimaryDataset`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L44) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`initRuntime`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L51) | 实现 `init Runtime` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`buildDefaultParameterValues`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L59) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`buildParameterPayload`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L77) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`buildRunReq`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L92) | 根据当前上下文计算或组装报表结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`runReport`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L110) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`setParameterValue`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L124) | 校验并更新报表状态。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`setParameterValues`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L128) | 校验并更新报表状态。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resetRuntimeFilters`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L132) | 实现 `reset Runtime Filters` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`resetRuntime`](../../frontend/src/pages/report-v2/composables/useReportRuntime.ts#L141) | 实现 `reset Runtime` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-
-### [`frontend/src/pages/report-v2/mock/index.ts`](../../frontend/src/pages/report-v2/mock/index.ts)
-
-- **文件职责：** 报表前端页面文件，集中保存 index 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-该文件没有命名函数或方法，主要提供类型、常量、模板、样式或声明。
-
-### [`frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue)
-
-- **文件职责：** 报表前端页面文件，集中保存 Report Runtime Page 对应的实现和稳定边界。
-- **何时使用：** 修改用户实际操作流程时使用，优先复用现有 Table、Detail、Form 和权限组件。
-- **后续扩展：** 先沿用同目录页面和 Quasar 组件写法，并同步权限、加载、空状态、错误和暗色模式。
-
-| 方法 | 作用 | 何时调用、怎么用 | 修改时检查 |
-| --- | --- | --- | --- |
-| [`loadReport`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L95) | 读取报表数据并返回受控结果。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`handleRun`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L124) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`handleSearch`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L137) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`handleReset`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L142) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`handleExport`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L147) | 执行报表的主要处理流程。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`updatePage`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L162) | 校验并更新报表状态。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`updatePageSize`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L167) | 校验并更新报表状态。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`goBack`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L173) | 实现 `go Back` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`firstNumber`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L177) | 实现 `first Number` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`firstString`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L187) | 实现 `first String` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`warnMissingMenuId`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L196) | 实现 `warn Missing Menu Id` 对应的报表规则或操作。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
-| [`toTableColumn`](../../frontend/src/pages/report-v2/runtime/ReportRuntimePage.vue#L205) | 在报表的模型、DTO 或展示结构之间转换。 | 由模板事件、生命周期、computed/watch 或同文件流程调用；修改时同时检查 loading、错误和权限状态。 | 核对权限、加载、空状态、错误、分页、滚动、亮色和暗色。 |
+| [`loadReport`](../../frontend/src/pages/report/runtime/ReportRuntimePage.vue#L57) | 使用路由报表ID和菜单ID加载正式运行配置。 | 页面挂载或路由上下文变化时调用。 | 核对菜单权限、错误提示和重复加载。 |
+| [`goBack`](../../frontend/src/pages/report/runtime/ReportRuntimePage.vue#L79) | 从加载失败状态返回上一页。 | 用户点击返回时调用。 | 核对浏览器历史为空时的行为。 |
+| [`firstNumber`](../../frontend/src/pages/report/runtime/ReportRuntimePage.vue#L83) | 从路由参数候选值中读取有效正整数。 | 解析reportId与menuId时调用。 | 核对数组查询参数和非法值。 |
 
 ### [`frontend/src/pages/system/application/Index.vue`](../../frontend/src/pages/system/application/Index.vue)
 

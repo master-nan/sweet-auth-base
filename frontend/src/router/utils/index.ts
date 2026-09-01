@@ -37,13 +37,13 @@ export default function constructionRouters(router: Route[], backendMenus?: Menu
   })
 }
 
-const reportRuntimeComponent = 'pages/report-v2/runtime/ReportRuntimePage.vue'
+const reportRuntimeComponent = 'pages/report/runtime/ReportRuntimePage.vue'
 
 const componentMap: Record<string, any> = {
   'src/components/Layout/Layout.vue': layout,
   'pages/develop/generalization/Index.vue': () => import('pages/develop/generalization/Index.vue'),
   'pages/system/data-permission/Index.vue': () => import('pages/system/data-permission/Index.vue'),
-  [reportRuntimeComponent]: () => import('pages/report-v2/runtime/ReportRuntimePage.vue'),
+  [reportRuntimeComponent]: () => import('pages/report/runtime/ReportRuntimePage.vue'),
 }
 
 type ReportMenuOption = {
@@ -162,7 +162,7 @@ function menuToReportRoute(menu: Menu): Route | null {
     return null
   }
   if (menu.component !== reportRuntimeComponent) {
-    console.warn('报表菜单 component 不是 V2 RuntimePage，已跳过动态路由生成:', menu.component, menu)
+    console.warn('报表菜单 component 不是正式运行页，已跳过动态路由生成:', menu.component, menu)
     return null
   }
   const component = componentMap[menu.component]

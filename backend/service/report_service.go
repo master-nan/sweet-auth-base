@@ -44,7 +44,7 @@ const (
 	reportRuntimeRun           = "runtime_run"
 	reportRuntimeExport        = "runtime_export"
 	reportExportFormatCSV      = "csv"
-	reportRuntimeComponent     = "pages/report-v2/runtime/ReportRuntimePage.vue"
+	reportRuntimeComponent     = "pages/report/runtime/ReportRuntimePage.vue"
 	reportDefaultMenuIcon      = "assessment"
 	reportSuperAdminRoleName   = "super_admin"
 

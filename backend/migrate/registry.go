@@ -53,6 +53,7 @@ func migrationSteps() []migrationStep {
 		migrateUserSessionAuditFields,
 		migrateNotificationStandardBaseFields,
 		syncMetadataColumnComments,
+		unifyReportRuntimeComponent,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {

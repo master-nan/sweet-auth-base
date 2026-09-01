@@ -694,8 +694,7 @@ Authenticated User -> Runtime API -> User Inbox ---+
 | `internal/reportconfig/config.go` | query_config、layout_config、dataset、sheet/cell/binding解析校验 |
 | `repository/report.go` | 定义、版本、执行日志和发布状态持久化合同 |
 | `controller/report_controller.go` | Report HTTP入口、文件导出和当前Gin上下文适配 |
-| `frontend/src/pages/report/` | 当前报表管理、设计、版本和Runtime预览入口 |
-| `frontend/src/pages/report-v2/` | 当前轻量Sheet工作台、Designer和Runtime Shell |
+| `frontend/src/pages/report/` | 报表管理、Sheet设计、版本、预览与正式运行入口 |
 | `frontend/src/modules/report/` | Sheet Schema、单元格算法、选项和类型合同 |
 | `frontend/src/api/services/report.ts` | Report API及导出封装 |
 

@@ -444,31 +444,6 @@ const asyncRoutesChildren: Route[] = [
       },
     ],
   },
-  {
-    component: layout,
-    path: 'report-v2',
-    name: 'report_v2',
-    meta: {
-      title: 'Report',
-      icon: 'assessment',
-      isHidden: true,
-      isOpen: false,
-    },
-    children: [
-      {
-        component: () => import('pages/report-v2/runtime/ReportRuntimePage.vue'),
-        path: 'runtime/:id',
-        name: 'report_v2_runtime',
-        meta: {
-          title: 'Report V2 Runtime',
-          icon: 'play_circle',
-          keepAlive: false,
-          isHidden: true,
-          showTag: true,
-        },
-      },
-    ],
-  },
 ]
 
 const asyncRootRoute: Route[] = [
