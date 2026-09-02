@@ -80,15 +80,16 @@ type Parameter struct {
 }
 
 type SheetConfig struct {
-	Rows         int            `json:"rows"`
-	Cols         int            `json:"cols"`
-	Scale        float64        `json:"scale"`
-	ActiveCell   string         `json:"active_cell"`
-	DetailRows   []int          `json:"detail_rows"`
-	SummaryRows  []int          `json:"summary_rows"`
-	ColumnWidths map[string]int `json:"column_widths"`
-	RowHeights   map[string]int `json:"row_heights"`
-	Cells        []SheetCell    `json:"cells"`
+	Rows             int            `json:"rows"`
+	Cols             int            `json:"cols"`
+	Scale            float64        `json:"scale"`
+	ActiveCell       string         `json:"active_cell"`
+	DetailRows       []int          `json:"detail_rows"`
+	SummaryRows      []int          `json:"summary_rows"`
+	GroupSummaryRows []int          `json:"group_summary_rows"`
+	ColumnWidths     map[string]int `json:"column_widths"`
+	RowHeights       map[string]int `json:"row_heights"`
+	Cells            []SheetCell    `json:"cells"`
 }
 
 type SheetCell struct {

@@ -153,7 +153,11 @@
         <template v-for="renderRow in renderRows" :key="renderRow.key">
           <div
             class="sheet-row-head"
-            :class="{ detail: renderRow.detail, summary: renderRow.summary }"
+            :class="{
+              detail: renderRow.detail,
+              summary: renderRow.summary,
+              'group-summary': renderRow.groupSummary,
+            }"
             :style="renderRow.headerStyle"
           >
             {{ renderRow.row }}
@@ -163,6 +167,9 @@
               @mousedown.stop.prevent="startRowResize($event, renderRow.row)"
             />
             <q-tooltip v-if="renderRow.detail">{{ t('ui.linesRunOnALineByLineBasis') }}</q-tooltip>
+            <q-tooltip v-else-if="renderRow.groupSummary">{{
+              t('ui.groupSummaryRowDescription')
+            }}</q-tooltip>
             <q-tooltip v-else-if="renderRow.summary">{{
               t('ui.summarizeRowsAggregatingCurrentDataOnRunningTime')
             }}</q-tooltip>
@@ -176,7 +183,9 @@
                 bound: renderCell.bound,
                 detail: renderCell.detail,
                 summary: renderCell.summary,
+                'group-summary': renderCell.groupSummary,
                 'drop-target': dragOverCellId === renderCell.id,
+                'fill-target': renderCell.fillTarget,
               }"
               :style="renderCell.style"
               :data-cell-id="renderCell.id"
@@ -203,6 +212,12 @@
                 @blur="commitEdit(renderCell.row, renderCell.col)"
               />
               <span v-else>{{ renderCell.value }}</span>
+              <span
+                v-if="renderCell.active && renderCell.fillable && editingCellId !== renderCell.id"
+                class="sheet-fill-handle"
+                :title="t('ui.dragFillCells')"
+                @mousedown.stop.prevent="startFillDrag(renderCell.row, renderCell.col)"
+              />
             </div>
           </template>
         </template>
@@ -251,6 +266,14 @@
         <button type="button" @click="runContextAction('summary')">
           <q-icon name="functions" />
           {{ isSummaryRow(contextMenu.row) ? t('ui.ungroupRows') : t('ui.setAsSummaryRows') }}
+        </button>
+        <button type="button" @click="runContextAction('groupSummary')">
+          <q-icon name="functions" />
+          {{
+            isGroupSummaryRow(contextMenu.row)
+              ? t('ui.changeToGlobalSummaryRow')
+              : t('ui.setAsGroupSummaryRow')
+          }}
         </button>
         <button type="button" @click="runContextAction('detail')">
           <q-icon name="view_stream" />
@@ -328,9 +351,11 @@ const emit = defineEmits<{
   deleteRow: [row: number]
   deleteCol: [col: number]
   pasteCells: [matrix: ReportSheetClipboardCell[][]]
+  fillCells: [sourceRow: number, sourceCol: number, targetRow: number, targetCol: number]
   resizeColumn: [col: number, width: number]
   resizeRow: [row: number, height: number]
   toggleSummaryRow: [row: number]
+  toggleGroupSummaryRow: [row: number]
   toggleDetailRow: [row: number]
   zoomIn: []
   zoomOut: []
@@ -360,6 +385,13 @@ const resizeState = reactive<{
   startSize: 0,
   currentSize: 0,
 })
+const fillState = reactive({
+  active: false,
+  sourceRow: 0,
+  sourceCol: 0,
+  targetRow: 0,
+  targetCol: 0,
+})
 const hasRangeSelection = computed(() => {
   if (!props.selectionRange) return false
   const bounds = reportNormalizeSheetRange(props.selectionRange)
@@ -367,6 +399,7 @@ const hasRangeSelection = computed(() => {
 })
 
 const summaryRows = computed(() => new Set(props.sheet.summary_rows || []))
+const groupSummaryRows = computed(() => new Set(props.sheet.group_summary_rows || []))
 const detailRows = computed(() => new Set(props.sheet.detail_rows || []))
 
 const selectionBounds = computed(() =>
@@ -429,22 +462,24 @@ const renderRows = computed(() =>
   Array.from({ length: props.sheet.rows }, (_, index) => {
     const row = index + 1
     const summary = summaryRows.value.has(row)
+    const groupSummary = groupSummaryRows.value.has(row)
     const detail = detailRows.value.has(row)
     return {
       key: `row-${row}`,
       row,
       detail,
       summary,
+      groupSummary,
       headerStyle: {
         gridColumn: 1,
         gridRow: row + 1,
       },
-      cells: renderCellsForRow(row, detail, summary),
+      cells: renderCellsForRow(row, detail, summary, groupSummary),
     }
   }),
 )
 
-function renderCellsForRow(row: number, detail: boolean, summary: boolean) {
+function renderCellsForRow(row: number, detail: boolean, summary: boolean, groupSummary: boolean) {
   const cells = []
   for (let col = 1; col <= props.sheet.cols; col += 1) {
     if (coveredCells.value.has(cellKey(row, col))) continue
@@ -458,12 +493,18 @@ function renderCellsForRow(row: number, detail: boolean, summary: boolean) {
       id: cell.id,
       row,
       col,
-      value: cell.value || '',
+      value:
+        cell.binding?.type === 'formula'
+          ? normalizeFormulaDisplay(cell.binding.formula || cell.value)
+          : cell.value || '',
       active: props.selectedCellId === cell.id,
       selected: isSelectedCell(row, col),
       bound: Boolean(cell.binding?.field),
+      fillable: rowspan === 1 && colspan === 1,
+      fillTarget: fillState.active && row === fillState.targetRow && col === fillState.targetCol,
       detail,
       summary,
+      groupSummary,
       style: {
         ...reportCellStyle(cell),
         gridColumn: `${cell.col + 1} / span ${colspan}`,
@@ -487,6 +528,12 @@ function cellAt(row: number, col: number): ReportSheetCell {
 
 function cellKey(row: number, col: number) {
   return `${row}:${col}`
+}
+
+function normalizeFormulaDisplay(value: string) {
+  const formula = value.trim()
+  if (!formula) return ''
+  return formula.startsWith('=') ? formula : `=${formula}`
 }
 
 function isSelectedCell(row: number, col: number) {
@@ -624,7 +671,10 @@ function textClipboardMatrix(value: string): ReportSheetClipboardCell[][] {
 function startEdit(row: number, col: number) {
   const cell = cellAt(row, col)
   editingCellId.value = cell.id
-  editingValue.value = cell.value || ''
+  editingValue.value =
+    cell.binding?.type === 'formula'
+      ? normalizeFormulaDisplay(cell.binding.formula || cell.value)
+      : cell.value || ''
   emit('selectCell', row, col)
 }
 
@@ -706,12 +756,52 @@ function handleDrop(row: number, col: number) {
   emit('dropField', row, col)
 }
 
+function startFillDrag(row: number, col: number) {
+  fillState.active = true
+  fillState.sourceRow = row
+  fillState.sourceCol = col
+  fillState.targetRow = row
+  fillState.targetCol = col
+  window.addEventListener('mousemove', handleFillMove)
+  window.addEventListener('mouseup', finishFillDrag, { once: true })
+}
+
+function handleFillMove(event: MouseEvent) {
+  if (!fillState.active) return
+  const target = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest<HTMLElement>('[data-cell-id]')
+  if (!target) return
+  const [rowText, colText] = (target.dataset.cellId || '').split(':')
+  const row = Number(rowText)
+  const col = Number(colText)
+  if (!Number.isInteger(row) || !Number.isInteger(col)) return
+
+  const rowDistance = Math.abs(row - fillState.sourceRow)
+  const colDistance = Math.abs(col - fillState.sourceCol)
+  fillState.targetRow = rowDistance >= colDistance ? row : fillState.sourceRow
+  fillState.targetCol = rowDistance >= colDistance ? fillState.sourceCol : col
+}
+
+function finishFillDrag() {
+  window.removeEventListener('mousemove', handleFillMove)
+  if (!fillState.active) return
+  const { sourceRow, sourceCol, targetRow, targetCol } = fillState
+  fillState.active = false
+  if (sourceRow === targetRow && sourceCol === targetCol) return
+  emit('fillCells', sourceRow, sourceCol, targetRow, targetCol)
+}
+
 function isSummaryRow(row: number) {
   return summaryRows.value.has(row)
 }
 
 function isDetailRow(row: number) {
   return detailRows.value.has(row)
+}
+
+function isGroupSummaryRow(row: number) {
+  return groupSummaryRows.value.has(row)
 }
 
 function openContextMenu(row: number, col: number, event: MouseEvent) {
@@ -742,6 +832,7 @@ function runContextAction(
     | 'deleteRow'
     | 'deleteCol'
     | 'summary'
+    | 'groupSummary'
     | 'detail',
 ) {
   const { row, col } = contextMenu
@@ -756,6 +847,7 @@ function runContextAction(
   else if (action === 'deleteRow') emit('deleteRow', row)
   else if (action === 'deleteCol') emit('deleteCol', col)
   else if (action === 'summary') emit('toggleSummaryRow', row)
+  else if (action === 'groupSummary') emit('toggleGroupSummaryRow', row)
   else emit('toggleDetailRow', row)
 }
 
@@ -768,6 +860,8 @@ function joinLabel(join: ReportDatasetJoin) {
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleResizeMove)
   window.removeEventListener('mouseup', finishResize)
+  window.removeEventListener('mousemove', handleFillMove)
+  window.removeEventListener('mouseup', finishFillDrag)
 })
 </script>
 
@@ -921,6 +1015,25 @@ onBeforeUnmount(() => {
   outline-offset: -2px;
 }
 
+.sheet-fill-handle {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid #fff;
+  background: var(--q-primary);
+  cursor: crosshair;
+  z-index: 3;
+}
+
+.sheet-cell.fill-target {
+  position: relative;
+  z-index: 2;
+  outline: 2px dashed var(--q-primary);
+  outline-offset: -3px;
+}
+
 .sheet-cell.bound {
   background: #fbfaff;
 }
@@ -968,6 +1081,15 @@ onBeforeUnmount(() => {
 
 .sheet-row-head.summary {
   color: #b7791f;
+}
+
+.sheet-row-head.group-summary,
+.sheet-cell.group-summary {
+  background: #eefbf6;
+}
+
+.sheet-row-head.group-summary {
+  color: #187a5b;
 }
 
 .sheet-context-menu {

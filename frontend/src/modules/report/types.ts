@@ -3,7 +3,16 @@ import type { Basic, Query } from 'src/types/global'
 export type ReportStatus = 'draft' | 'published' | 'disabled'
 export type ReportKind = 'detail' | 'summary'
 export type ReportDatasetType = 'table' | 'sql'
-export type ReportCellBindingType = 'static' | 'field' | 'group' | 'sum' | 'count' | 'formula'
+export type ReportCellBindingType =
+  | 'static'
+  | 'field'
+  | 'group'
+  | 'sum'
+  | 'count'
+  | 'avg'
+  | 'max'
+  | 'min'
+  | 'formula'
 export type ReportParameterType = 'text' | 'select' | 'date' | 'date_range' | 'number'
 export type ReportParameterOperator = 'eq' | 'like' | 'between' | 'gte' | 'lte'
 export type ReportDatasetJoinType = 'left' | 'inner'
@@ -97,6 +106,7 @@ export interface ReportSheetConfig {
   active_cell?: string | undefined
   detail_rows?: number[] | undefined
   summary_rows?: number[] | undefined
+  group_summary_rows?: number[] | undefined
   column_widths?: Record<string, number> | undefined
   row_heights?: Record<string, number> | undefined
   cells: ReportSheetCell[]
@@ -306,6 +316,20 @@ export interface ReportPreviewMeta {
   version_no?: number
 }
 
+export interface ReportRuntimeConfig {
+  report_name?: string
+  description?: string
+  category?: string
+  view?: 'sheet'
+  title?: string
+  subtitle?: string
+  kind?: ReportKind
+  parameters?: ReportParameter[]
+  sheet?: ReportSheetConfig
+  runtime_display?: ReportRuntimeDisplayMode
+  runtime_page_size?: number
+}
+
 export interface ReportPreviewRes {
   columns: ReportField[]
   rows: Record<string, unknown>[]
@@ -313,4 +337,5 @@ export interface ReportPreviewRes {
   datasets?: ReportDataset[]
   joins?: ReportDatasetJoin[]
   meta?: ReportPreviewMeta
+  runtime_config?: ReportRuntimeConfig
 }

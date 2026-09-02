@@ -2,7 +2,12 @@
   <aside class="inspector-panel">
     <q-tabs
       :model-value="tab"
+      class="inspector-nav"
       dense
+      inline-label
+      narrow-indicator
+      no-caps
+      align="justify"
       active-color="primary"
       indicator-color="primary"
       @update:model-value="emitTab"
@@ -19,6 +24,7 @@
         <div class="inspector-title">{{ t('ui.cells') }} {{ activeCellLabel }}</div>
         <div v-if="hasActiveCell" class="inspector-form">
           <q-input
+            v-if="bindingType !== 'formula'"
             :model-value="cellValue"
             dense
             outlined
@@ -39,31 +45,37 @@
             :options="bindingTypeOptions"
             @update:model-value="emitBindingType"
           />
-          <q-select
-            :model-value="bindingDatasetId"
-            dense
-            outlined
-            emit-value
-            map-options
-            :label="t('ui.dataset')"
-            :options="datasetOptions"
-            @update:model-value="$emit('update:bindingDatasetId', String($event || ''))"
-          />
-          <q-select
-            :model-value="bindingField"
-            dense
-            outlined
-            emit-value
-            map-options
-            :label="t('ui.dataField')"
-            :options="activeDatasetFieldOptions"
-            @update:model-value="$emit('update:bindingField', String($event || ''))"
-          />
+          <template v-if="bindingType !== 'static' && bindingType !== 'formula'">
+            <q-select
+              :model-value="bindingDatasetId"
+              dense
+              outlined
+              emit-value
+              map-options
+              :label="t('ui.dataset')"
+              :options="datasetOptions"
+              @update:model-value="$emit('update:bindingDatasetId', String($event || ''))"
+            />
+            <q-select
+              :model-value="bindingField"
+              dense
+              outlined
+              emit-value
+              map-options
+              :label="t('ui.dataField')"
+              :options="activeDatasetFieldOptions"
+              @update:model-value="$emit('update:bindingField', String($event || ''))"
+            />
+          </template>
           <q-input
+            v-if="bindingType === 'formula'"
             :model-value="formula"
             dense
             outlined
             :label="t('ui.formulaExpression')"
+            :hint="t('ui.formulaSyntaxHint')"
+            :error="!!formulaError"
+            :error-message="formulaError"
             @update:model-value="$emit('update:formula', String($event || ''))"
           />
           <div class="style-grid">
@@ -152,14 +164,7 @@
           <div v-for="join in datasetJoins" :key="join.id" class="join-row">
             <span>{{ joinLabel(join) }}</span>
             <q-space />
-            <q-btn
-              flat
-              dense
-              round
-              color="primary"
-              icon="edit"
-              @click="$emit('editJoin', join.id)"
-            >
+            <q-btn flat dense round color="primary" icon="edit" @click="$emit('editJoin', join.id)">
               <q-tooltip>{{ t('ui.edit') }}</q-tooltip>
             </q-btn>
             <q-btn
@@ -278,6 +283,7 @@ const props = defineProps<{
   bindingDatasetId: string
   bindingField: string
   formula: string
+  formulaError: string
   cellBold: boolean
   cellAlign: NonNullable<ReportCellStyle['align']>
   bindingTypeOptions: Array<Option<ReportCellBindingType>>
@@ -329,6 +335,9 @@ function emitBindingType(value: unknown) {
     value === 'group' ||
     value === 'sum' ||
     value === 'count' ||
+    value === 'avg' ||
+    value === 'max' ||
+    value === 'min' ||
     value === 'formula'
   ) {
     emit('update:bindingType', value)
@@ -379,8 +388,31 @@ function joinLabel(join: ReportDatasetJoin) {
 .inspector-panel {
   min-height: 0;
   overflow: auto;
-  border-left: 1px solid #dfe5f2;
   background: #fbfcff;
+}
+
+.inspector-nav {
+  min-height: 42px;
+  background: #fff;
+}
+
+.inspector-nav :deep(.q-tab) {
+  min-height: 42px;
+  padding: 0 8px;
+}
+
+.inspector-nav :deep(.q-tab__content) {
+  min-width: 0;
+  gap: 5px;
+}
+
+.inspector-nav :deep(.q-icon) {
+  font-size: 18px;
+}
+
+.inspector-nav :deep(.q-tab__label) {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .inspector-tabs {
@@ -388,8 +420,8 @@ function joinLabel(join: ReportDatasetJoin) {
 }
 
 .inspector-title {
-  margin-bottom: 14px;
-  font-size: 16px;
+  margin-bottom: 12px;
+  font-size: 15px;
   font-weight: 900;
 }
 

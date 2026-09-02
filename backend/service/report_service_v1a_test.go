@@ -93,6 +93,9 @@ func TestReportV1APublishRunUsesVersionSnapshot(t *testing.T) {
 	if !hasReportColumn(run1.Columns, "name") || hasReportColumn(run1.Columns, "amount") {
 		t.Fatalf("first run should use name snapshot columns: %#v", run1.Columns)
 	}
+	if value := reportRuntimeSheetCellValue(t, run1.RuntimeConfig, "A1"); value != "名称" {
+		t.Fatalf("first run should return published sheet layout, got A1=%q", value)
+	}
 
 	amountQuery, amountLayout := reportV1ATableConfig("amount")
 	if err := env.db.Model(&model.ReportDefinition{}).
@@ -111,6 +114,9 @@ func TestReportV1APublishRunUsesVersionSnapshot(t *testing.T) {
 	if !hasReportColumn(runAfterDraftEdit.Columns, "name") || hasReportColumn(runAfterDraftEdit.Columns, "amount") {
 		t.Fatalf("run must ignore unpublished draft config: %#v", runAfterDraftEdit.Columns)
 	}
+	if value := reportRuntimeSheetCellValue(t, runAfterDraftEdit.RuntimeConfig, "A1"); value != "名称" {
+		t.Fatalf("run layout must ignore unpublished draft config, got A1=%q", value)
+	}
 
 	published2, err := env.svc.PublishReport(env.ctx, report.Id, request.ReportPublishReq{ChangeLog: "publish amount"})
 	if err != nil {
@@ -128,6 +134,9 @@ func TestReportV1APublishRunUsesVersionSnapshot(t *testing.T) {
 	}
 	if !hasReportColumn(run2.Columns, "amount") || hasReportColumn(run2.Columns, "name") {
 		t.Fatalf("second run should use amount snapshot columns: %#v", run2.Columns)
+	}
+	if value := reportRuntimeSheetCellValue(t, run2.RuntimeConfig, "A1"); value != "金额" {
+		t.Fatalf("second run should return second published sheet layout, got A1=%q", value)
 	}
 	var oldVersion model.ReportDefinitionVersion
 	if err := env.db.First(&oldVersion, published1.VersionId).Error; err != nil {
@@ -164,6 +173,26 @@ func TestReportV1ASQLDatasetRequiresSuperAdmin(t *testing.T) {
 	}
 	if _, err := env.svc.RunReport(env.ctx, report.Id, request.ReportPreviewReq{}); err == nil || !strings.Contains(err.Error(), "无权限") {
 		t.Fatalf("non-super-admin should not run SQL dataset, got %v", err)
+	}
+}
+
+func TestReportV1ASQLRuntimeConfigOmitsSQLText(t *testing.T) {
+	env := newReportV1ATestEnv(t, reportV1AUser(true))
+	queryConfig, layoutConfig := reportV1ASQLConfig()
+	report := env.createReport(t, "v1a_sql_runtime_config", reportStatusDraft, queryConfig, layoutConfig)
+
+	preview, err := env.svc.DesignPreview(env.ctx, report.Id, request.ReportPreviewReq{DatasetId: "sql_1"})
+	if err != nil {
+		t.Fatalf("design-preview sql report as super admin: %v", err)
+	}
+	if len(preview.RuntimeConfig) == 0 {
+		t.Fatal("runtime config should be returned")
+	}
+	if strings.Contains(strings.ToLower(string(preview.RuntimeConfig)), "select id") {
+		t.Fatalf("runtime config must not expose SQL text: %s", string(preview.RuntimeConfig))
+	}
+	if value := reportRuntimeSheetCellValue(t, preview.RuntimeConfig, "A1"); value != "名称" {
+		t.Fatalf("runtime config should include sheet layout, got A1=%q", value)
 	}
 }
 
@@ -389,6 +418,27 @@ func reportV1ATableConfig(field string) (datatypes.JSON, datatypes.JSON) {
 		"sheet":{"rows":8,"cols":6,"cells":[{"id":"A1","row":1,"col":1,"value":"%s","binding":{"type":"field","dataset_id":"main","field":"%s"}}]}
 	}`, field, label, fieldType, label, field)))
 	return queryConfig, layoutConfig
+}
+
+func reportRuntimeSheetCellValue(t *testing.T, raw json.RawMessage, cellID string) string {
+	t.Helper()
+	var config struct {
+		Sheet struct {
+			Cells []struct {
+				Id    string `json:"id"`
+				Value string `json:"value"`
+			} `json:"cells"`
+		} `json:"sheet"`
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatalf("decode runtime config: %v raw=%s", err, string(raw))
+	}
+	for _, cell := range config.Sheet.Cells {
+		if cell.Id == cellID {
+			return cell.Value
+		}
+	}
+	return ""
 }
 
 func reportV1ASQLConfig() (datatypes.JSON, datatypes.JSON) {

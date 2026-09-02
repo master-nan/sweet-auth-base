@@ -2,13 +2,10 @@
   <div class="runtime-view">
     <div class="runtime-head">
       <div>
-        <div class="report-title">{{ runtimeReport?.report_name || runtimeTitle }}</div>
-        <div class="report-caption">
-          {{ runtimeReport?.data_source_name || '-' }} ·
-          {{
-            runtimeReport?.description || t('ui.runPreviewSessionsToApplyBackendDataPrivileges')
-          }}
+        <div class="report-title">
+          {{ runtimeConfig?.report_name || runtimeReport?.report_name || runtimeTitle }}
         </div>
+        <div class="report-caption">{{ runtimeSourceName }} · {{ runtimeDescription }}</div>
         <q-chip
           v-if="runtimeVersionNo"
           dense
@@ -109,7 +106,7 @@
         :datasets="runtimeDatasets"
         :preview-data="runtimeData"
         :loading="runtimeLoading"
-        :report-kind="runtimeReport?.report_kind || 'detail'"
+        :report-kind="runtimeConfig?.kind || runtimeReport?.report_kind || 'detail'"
       />
       <div v-if="runtimeDisplayMode === 'paged'" class="runtime-pagination">
         <table-pagination
@@ -170,6 +167,7 @@ const {
   runtimeFilterValues,
   runtimePagination,
   runtimeRows,
+  runtimeConfig,
   runtimeDatasets,
   runtimeSheet,
   runtimeDisplayMode,
@@ -191,6 +189,19 @@ const { exporting, exportRuntimeCsv } = useReportExport()
 const runtimeTitle = computed(() =>
   props.mode === 'manage' ? t('ui.reportRunPreview') : t('ui.reportRun'),
 )
+const runtimeSourceName = computed(
+  () =>
+    runtimeDatasets.value.find((dataset) => dataset.primary)?.source_code ||
+    runtimeDatasets.value[0]?.source_code ||
+    runtimeReport.value?.data_source_name ||
+    '-',
+)
+const runtimeDescription = computed(() => {
+  if (runtimeConfig.value) {
+    return runtimeConfig.value.description || t('ui.runPreviewSessionsToApplyBackendDataPrivileges')
+  }
+  return runtimeReport.value?.description || t('ui.runPreviewSessionsToApplyBackendDataPrivileges')
+})
 
 watch(
   () => [props.active, props.report?.id, props.menuId] as const,

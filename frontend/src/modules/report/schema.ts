@@ -66,6 +66,7 @@ export const createBlankReportSheet = (rows = 24, cols = 12): ReportSheetConfig 
     scale: 0.85,
     detail_rows: [],
     summary_rows: [],
+    group_summary_rows: [],
     column_widths: {},
     row_heights: {},
     cells: [],
@@ -97,7 +98,11 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
   if (sheet?.active_cell) blank.active_cell = sheet.active_cell
   if (sheet?.scale) blank.scale = sheet.scale
   blank.detail_rows = normalizeSheetRows(sheet?.detail_rows, rows)
-  blank.summary_rows = normalizeSheetRows(sheet?.summary_rows, rows)
+  blank.group_summary_rows = normalizeSheetRows(sheet?.group_summary_rows, rows)
+  blank.summary_rows = normalizeSheetRows(
+    [...(sheet?.summary_rows || []), ...blank.group_summary_rows],
+    rows,
+  )
   blank.column_widths = normalizeSheetSizes(sheet?.column_widths, cols, 64, 360)
   blank.row_heights = normalizeSheetSizes(sheet?.row_heights, rows, 28, 160)
   return blank
@@ -133,6 +138,7 @@ export const hasReportCellConfig = (cell: Partial<ReportSheetCell>) =>
     cell.value ||
       cell.binding?.field ||
       cell.binding?.formula ||
+      (cell.binding?.type && cell.binding.type !== 'static') ||
       (cell.style && Object.keys(cell.style).length > 0) ||
       (cell.colspan && cell.colspan > 1) ||
       (cell.rowspan && cell.rowspan > 1),

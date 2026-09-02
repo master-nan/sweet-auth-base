@@ -67,6 +67,24 @@ export const reportBindingTypeOptions: Array<{ label: string; value: ReportCellB
   },
   {
     get label() {
+      return t('ui.averageValue')
+    },
+    value: 'avg',
+  },
+  {
+    get label() {
+      return t('ui.maximumValue')
+    },
+    value: 'max',
+  },
+  {
+    get label() {
+      return t('ui.minimumValue')
+    },
+    value: 'min',
+  },
+  {
+    get label() {
       return t('ui.formula')
     },
     value: 'formula',

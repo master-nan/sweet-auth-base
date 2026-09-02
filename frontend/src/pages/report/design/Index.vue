@@ -27,9 +27,9 @@
       <nav class="designer-palette">
         <q-btn
           flat
-          round
           dense
           icon="tune"
+          :aria-label="t('ui.properties')"
           :class="{ active: sidePanelTab === 'properties' }"
           @click="showProperties('cell')"
         >
@@ -37,29 +37,35 @@
         </q-btn>
         <q-btn
           flat
-          round
           dense
-          icon="database"
+          icon="storage"
+          :aria-label="t('ui.dataSourceTab')"
           :class="{ active: sidePanelTab === 'dataSource' }"
           @click="sidePanelTab = 'dataSource'"
         >
           <q-tooltip>{{ t('ui.dataset') }}</q-tooltip>
         </q-btn>
         <q-separator />
-        <q-btn flat round dense icon="filter_alt" @click="addParameter">
+        <q-btn flat dense icon="filter_alt" :aria-label="t('ui.parameters')" @click="addParameter">
           <q-tooltip>{{ t('ui.parameters') }}</q-tooltip>
         </q-btn>
         <q-btn
           flat
-          round
           dense
           icon="account_tree"
+          :aria-label="t('ui.dataSetAssociation')"
           :disable="datasets.length < 2"
           @click="openJoinDialog()"
         >
           <q-tooltip>{{ t('ui.dataSetAssociation') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round dense icon="functions" @click="toggleActiveSummaryRow">
+        <q-btn
+          flat
+          dense
+          icon="functions"
+          :aria-label="t('ui.summaryRow')"
+          @click="toggleActiveSummaryRow"
+        >
           <q-tooltip>{{ t('ui.summaryRow') }}</q-tooltip>
         </q-btn>
       </nav>
@@ -104,9 +110,11 @@
         @delete-row="deleteRow"
         @delete-col="deleteCol"
         @paste-cells="pasteCells"
+        @fill-cells="fillCells"
         @resize-column="resizeColumn"
         @resize-row="resizeRow"
         @toggle-summary-row="toggleSummaryRow"
+        @toggle-group-summary-row="toggleGroupSummaryRow"
         @toggle-detail-row="toggleDetailRow"
         @zoom-in="zoomIn"
         @zoom-out="zoomOut"
@@ -115,14 +123,17 @@
       <aside class="designer-side-panel">
         <q-tabs
           v-model="sidePanelTab"
+          class="side-panel-tabs"
           dense
+          inline-label
+          narrow-indicator
           no-caps
           align="justify"
           active-color="primary"
           indicator-color="primary"
         >
           <q-tab name="properties" icon="tune" :label="t('ui.properties')" />
-          <q-tab name="dataSource" icon="database" :label="t('ui.dataSourceTab')" />
+          <q-tab name="dataSource" icon="storage" :label="t('ui.dataSourceTab')" />
         </q-tabs>
         <q-separator />
         <q-tab-panels v-model="sidePanelTab" class="designer-side-panels">
@@ -134,6 +145,7 @@
               v-model:binding-dataset-id="activeBindingDatasetId"
               v-model:binding-field="activeBindingField"
               v-model:formula="activeFormula"
+              :formula-error="activeFormulaError"
               v-model:cell-bold="activeCellBold"
               v-model:cell-align="activeCellAlign"
               :active-cell-label="activeCellLabel"
@@ -362,12 +374,14 @@ import {
   reportColumnName,
   reportDeleteSheetColumn,
   reportDeleteSheetRow,
+  reportFillSheetCells,
   reportInsertSheetColumn,
   reportInsertSheetRow,
   reportNormalizeSheetRange,
   reportPasteSheetCells,
   reportSheetCellAt,
   reportSheetCellSpan,
+  reportValidateFormula,
   type ReportSheetClipboardCell,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
@@ -524,6 +538,7 @@ const activeDatasetFieldOptions = computed(() =>
 )
 const activeBindingPreview = computed(() => {
   const binding = activeCell.value?.binding
+  if (binding?.type === 'formula') return normalizeFormulaDisplay(binding.formula || '')
   if (!binding?.dataset_id || !binding.field) return ''
   const dataset = datasets.value.find((item) => item.id === binding.dataset_id)
   const field = dataset?.fields.find((item) => item.code === binding.field)
@@ -561,14 +576,33 @@ const joinRightFieldOptions = computed(() => datasetFieldOptions(joinDraft.right
 const activeCellValue = computed({
   get: () => activeCell.value?.value || '',
   set: (value: string) => {
-    patchActiveCell({ value })
+    const cell = activeCell.value
+    if (cell?.binding?.type === 'formula') {
+      patchActiveCell({
+        value: normalizeFormulaDisplay(value),
+        binding: { ...cell.binding, formula: value },
+      })
+    } else {
+      patchActiveCell({ value })
+    }
     buildLocalPreview()
   },
 })
 const activeBindingType = computed<ReportCellBindingType>({
   get: () => activeCell.value?.binding?.type || 'static',
   set: (value) => {
-    patchBinding({ type: value })
+    const cell = activeCell.value
+    if (!cell) return
+    if (value === 'formula') {
+      patchActiveCell({
+        binding: {
+          type: 'formula',
+          formula: cell.binding?.formula || '',
+        },
+      })
+    } else {
+      patchBinding({ type: value })
+    }
     refreshActiveCellBindingText()
   },
 })
@@ -596,9 +630,23 @@ const activeBindingField = computed({
 const activeFormula = computed({
   get: () => activeCell.value?.binding?.formula || '',
   set: (value: string) => {
-    patchBinding({ formula: value })
+    const cell = activeCell.value
+    if (!cell) return
+    patchActiveCell({
+      value: normalizeFormulaDisplay(value),
+      binding: {
+        ...(cell.binding || {}),
+        type: 'formula',
+        formula: value,
+      },
+    })
     buildLocalPreview()
   },
+})
+const activeFormulaError = computed(() => {
+  const formula = activeFormula.value.trim()
+  if (!formula) return ''
+  return formulaErrorMessage(reportValidateFormula(formula))
 })
 const activeCellBold = computed({
   get: () => !!activeCell.value?.style?.bold,
@@ -1043,7 +1091,15 @@ function patchActiveCell(patch: Partial<ReportSheetCell>) {
 }
 
 function updateCellValue(row: number, col: number, value: string) {
-  patchCell(row, col, { value })
+  const cell = cellAt(row, col)
+  if (cell.binding?.type === 'formula') {
+    patchCell(row, col, {
+      value: normalizeFormulaDisplay(value),
+      binding: { ...cell.binding, formula: value },
+    })
+  } else {
+    patchCell(row, col, { value })
+  }
   buildLocalPreview()
 }
 
@@ -1078,6 +1134,14 @@ function patchCellStyle(patch: Partial<NonNullable<ReportSheetCell['style']>>) {
 function refreshActiveCellBindingText() {
   const cell = activeCell.value
   const binding = cell?.binding
+  if (cell && binding?.type === 'formula') {
+    const nextValue = normalizeFormulaDisplay(binding.formula || '')
+    if (!cell.value || isGeneratedBindingValue(cell.value) || cell.value.startsWith('=')) {
+      patchActiveCell({ value: nextValue })
+    }
+    buildLocalPreview()
+    return
+  }
   if (!cell || !binding?.dataset_id || !binding.field) return
   const dataset = datasets.value.find((item) => item.id === binding.dataset_id)
   const field = dataset?.fields.find((item) => item.code === binding.field)
@@ -1089,10 +1153,23 @@ function refreshActiveCellBindingText() {
   buildLocalPreview()
 }
 
+function normalizeFormulaDisplay(value: string) {
+  const formula = value.trim()
+  if (!formula) return ''
+  return formula.startsWith('=') ? formula : `=${formula}`
+}
+
+function formulaErrorMessage(error: ReturnType<typeof reportValidateFormula>) {
+  if (!error) return ''
+  if (error === 'division_by_zero') return t('ui.formulaDivisionByZero')
+  if (error === 'circular_reference') return t('ui.formulaCircularReference')
+  return t('ui.formulaSyntaxError')
+}
+
 function isGeneratedBindingValue(value: string) {
   return datasets.value.some((dataset) =>
     dataset.fields.some((field) =>
-      ['field', 'group', 'sum', 'count', 'formula'].some(
+      ['field', 'group', 'sum', 'count', 'avg', 'max', 'min', 'formula'].some(
         (type) => reportBindingText(type as ReportCellBindingType, dataset, field) === value,
       ),
     ),
@@ -1344,6 +1421,19 @@ function pasteCells(matrix: ReportSheetClipboardCell[][]) {
   buildLocalPreview()
 }
 
+function fillCells(sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) {
+  sheet.value = reportFillSheetCells(sheet.value, sourceRow, sourceCol, targetRow, targetCol)
+  selectionRange.value = {
+    startRow: sourceRow,
+    startCol: sourceCol,
+    endRow: targetRow,
+    endCol: targetCol,
+  }
+  selectedCellId.value = reportCellId(targetRow, targetCol)
+  sheet.value.active_cell = selectedCellId.value
+  buildLocalPreview()
+}
+
 function resizeColumn(col: number, width: number) {
   sheet.value.column_widths = {
     ...(sheet.value.column_widths || {}),
@@ -1360,12 +1450,33 @@ function resizeRow(row: number, height: number) {
 
 function toggleSummaryRow(row: number) {
   const rows = new Set(sheet.value.summary_rows || [])
-  if (rows.has(row)) rows.delete(row)
-  else rows.add(row)
+  if (rows.has(row)) {
+    rows.delete(row)
+    sheet.value.group_summary_rows = (sheet.value.group_summary_rows || []).filter(
+      (item) => item !== row,
+    )
+  } else {
+    rows.add(row)
+  }
   sheet.value.summary_rows = [...rows].sort((a, b) => a - b)
   if (rows.has(row)) {
     sheet.value.detail_rows = (sheet.value.detail_rows || []).filter((item) => item !== row)
   }
+  buildLocalPreview()
+}
+
+function toggleGroupSummaryRow(row: number) {
+  const groupRows = new Set(sheet.value.group_summary_rows || [])
+  const summaryRows = new Set(sheet.value.summary_rows || [])
+  if (groupRows.has(row)) {
+    groupRows.delete(row)
+  } else {
+    groupRows.add(row)
+    summaryRows.add(row)
+    sheet.value.detail_rows = (sheet.value.detail_rows || []).filter((item) => item !== row)
+  }
+  sheet.value.group_summary_rows = [...groupRows].sort((a, b) => a - b)
+  sheet.value.summary_rows = [...summaryRows].sort((a, b) => a - b)
   buildLocalPreview()
 }
 
@@ -1376,6 +1487,9 @@ function toggleDetailRow(row: number) {
   sheet.value.detail_rows = [...rows].sort((a, b) => a - b)
   if (rows.has(row)) {
     sheet.value.summary_rows = (sheet.value.summary_rows || []).filter((item) => item !== row)
+    sheet.value.group_summary_rows = (sheet.value.group_summary_rows || []).filter(
+      (item) => item !== row,
+    )
   }
   buildLocalPreview()
 }
@@ -1385,6 +1499,9 @@ function markDetailRow(row: number) {
   rows.add(row)
   sheet.value.detail_rows = [...rows].sort((a, b) => a - b)
   sheet.value.summary_rows = (sheet.value.summary_rows || []).filter((item) => item !== row)
+  sheet.value.group_summary_rows = (sheet.value.group_summary_rows || []).filter(
+    (item) => item !== row,
+  )
 }
 
 function zoomIn() {
@@ -2085,12 +2202,24 @@ function validateBoundCells() {
     if (!binding || binding.type === 'static') continue
     const label = `${reportColumnName(cell.col)}${cell.row}`
     if (binding.type === 'formula') {
-      if (!binding.formula?.trim() && !cell.value?.trim()) {
+      const formula = binding.formula?.trim() || cell.value?.trim() || ''
+      if (!formula) {
         $q.notify({
           type: 'warning',
           get message() {
             return t('ui.theFormulaForCellIsEmpty', { label: label })
           },
+        })
+        return false
+      }
+      const formulaError = reportValidateFormula(formula)
+      if (formulaError) {
+        $q.notify({
+          type: 'warning',
+          message: t('ui.cellFormulaValidationFailed', {
+            label,
+            reason: formulaErrorMessage(formulaError),
+          }),
         })
         return false
       }
@@ -2116,11 +2245,13 @@ function validateBoundCells() {
       })
       return false
     }
-    if (binding.type === 'sum' && !isNumericReportField(field)) {
+    if ((binding.type === 'sum' || binding.type === 'avg') && !isNumericReportField(field)) {
       $q.notify({
         type: 'warning',
         get message() {
-          return t('ui.theSumOfCellsShouldSelectANumericalField', { label: label })
+          return t('ui.theNumericalAggregationCellShouldSelectANumericalField', {
+            label: label,
+          })
         },
       })
       return false
@@ -2264,32 +2395,62 @@ function goBack() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 6px;
+  gap: 6px;
+  padding: 8px 6px;
   border-right: 1px solid #dfe5f2;
   background: #fff;
 }
 
 .designer-palette .q-btn {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 6px;
   color: #64748b;
 }
 
 .designer-palette .q-btn.active {
   color: var(--q-primary);
   background: rgba(115, 103, 240, 0.1);
+  box-shadow: inset 3px 0 0 var(--q-primary);
 }
 
 .designer-palette .q-separator {
   width: 28px;
+  margin: 2px 0;
 }
 
 .designer-side-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: 40px 1px minmax(0, 1fr);
+  grid-template-rows: 44px 1px minmax(0, 1fr);
   border-left: 1px solid #dfe5f2;
   background: #fbfcff;
   overflow: hidden;
+}
+
+.side-panel-tabs {
+  min-height: 44px;
+  background: #fff;
+}
+
+.side-panel-tabs :deep(.q-tab) {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.side-panel-tabs :deep(.q-tab__content) {
+  min-width: 0;
+  gap: 6px;
+}
+
+.side-panel-tabs :deep(.q-icon) {
+  font-size: 19px;
+}
+
+.side-panel-tabs :deep(.q-tab__label) {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .designer-side-panels {

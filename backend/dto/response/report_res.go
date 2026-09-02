@@ -1,12 +1,15 @@
 package response
 
+import "encoding/json"
+
 type ReportPreviewRes struct {
-	Columns  []ReportPreviewColumn    `json:"columns"`
-	Rows     []map[string]interface{} `json:"rows"`
-	Total    int                      `json:"total"`
-	Meta     ReportPreviewMeta        `json:"meta"`
-	Datasets []ReportPreviewDataset   `json:"datasets,omitempty"`
-	Joins    []ReportPreviewJoin      `json:"joins,omitempty"`
+	Columns       []ReportPreviewColumn    `json:"columns"`
+	Rows          []map[string]interface{} `json:"rows"`
+	Total         int                      `json:"total"`
+	Meta          ReportPreviewMeta        `json:"meta"`
+	Datasets      []ReportPreviewDataset   `json:"datasets,omitempty"`
+	Joins         []ReportPreviewJoin      `json:"joins,omitempty"`
+	RuntimeConfig json.RawMessage          `json:"runtime_config,omitempty"`
 }
 
 type ReportDataSourceRes struct {

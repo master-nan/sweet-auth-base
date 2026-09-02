@@ -9,6 +9,7 @@ import {
   type ReportParameter,
   type ReportPreviewReq,
   type ReportPreviewRes,
+  type ReportRuntimeConfig,
   type ReportSheetConfig,
 } from 'src/api/services/report'
 
@@ -31,19 +32,32 @@ export function useReportRuntime() {
   })
 
   const runtimeRows = computed(() => runtimeData.value.rows)
+  const runtimeConfig = computed<ReportRuntimeConfig | undefined>(
+    () => runtimeData.value.runtime_config,
+  )
   const runtimeDatasets = computed<ReportDataset[]>(() =>
-    runtimeReport.value?.layout_config?.datasets?.length
-      ? runtimeReport.value.layout_config.datasets
-      : runtimeData.value.datasets || [],
+    runtimeData.value.datasets?.length
+      ? runtimeData.value.datasets
+      : runtimeReport.value?.layout_config?.datasets || [],
   )
   const runtimeSheet = computed<ReportSheetConfig>(
-    () => runtimeReport.value?.layout_config?.sheet || defaultReportSheet(),
+    () =>
+      runtimeConfig.value?.sheet ||
+      runtimeReport.value?.layout_config?.sheet ||
+      defaultReportSheet(),
   )
   const runtimeDisplayMode = computed(
-    () => runtimeReport.value?.layout_config?.runtime_display || 'paged',
+    () =>
+      runtimeConfig.value?.runtime_display ||
+      runtimeReport.value?.layout_config?.runtime_display ||
+      'paged',
   )
   const runtimeConfiguredPageSize = computed(() =>
-    Number(runtimeReport.value?.layout_config?.runtime_page_size || 20),
+    Number(
+      runtimeConfig.value?.runtime_page_size ||
+        runtimeReport.value?.layout_config?.runtime_page_size ||
+        20,
+    ),
   )
   const runtimePrimaryDataset = computed(() => {
     const datasets = runtimeDatasets.value
@@ -58,6 +72,7 @@ export function useReportRuntime() {
   )
   const runtimeVersionNo = computed(() => runtimeData.value.meta?.version_no)
   const runtimeParameters = computed<ReportParameter[]>(() => {
+    if (runtimeConfig.value) return runtimeConfig.value.parameters || []
     const report = runtimeReport.value
     return report?.layout_config?.parameters?.length
       ? report.layout_config.parameters
@@ -197,6 +212,7 @@ export function useReportRuntime() {
     runtimeFilterValues,
     runtimePagination,
     runtimeRows,
+    runtimeConfig,
     runtimeDatasets,
     runtimeSheet,
     runtimeDisplayMode,

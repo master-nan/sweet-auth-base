@@ -59,6 +59,8 @@ type ReportExecutionSnapshot struct {
 	VersionNo           int
 	Code                string
 	Name                string
+	Description         string
+	Category            string
 	SourceType          string
 	SourceCode          string
 	PermissionMenuId    int
@@ -778,6 +780,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 				writeFailure(err)
 				return response.ReportPreviewRes{}, err
 			}
+			preview.RuntimeConfig = reportPreviewRuntimeConfig(config, snapshot)
 			writeSuccess(len(preview.Rows))
 			return preview, nil
 		}
@@ -788,6 +791,7 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 			writeFailure(err)
 			return response.ReportPreviewRes{}, err
 		}
+		preview.RuntimeConfig = reportPreviewRuntimeConfig(config, snapshot)
 		writeSuccess(len(preview.Rows))
 		return preview, nil
 	}
@@ -852,8 +856,9 @@ func (s *ReportService) executeReportSnapshotWithOptions(ctx *gin.Context, snaps
 			DatasetType: reportSourceTypeTable,
 			AppliedMenu: query.MenuId,
 		},
-		Datasets: reportPreviewDatasets(config, snapshot, columns),
-		Joins:    reportConfigDatasetJoins(config),
+		Datasets:      reportPreviewDatasets(config, snapshot, columns),
+		Joins:         reportConfigDatasetJoins(config),
+		RuntimeConfig: reportPreviewRuntimeConfig(config, snapshot),
 	}
 	writeSuccess(len(result.Data))
 	return preview, nil
@@ -1520,7 +1525,7 @@ func reportJoinedPreviewSelections(config reportconfig.Config, primaryDatasetID 
 			continue
 		}
 		switch strings.TrimSpace(binding.Type) {
-		case "", "field", "group", "sum", "count":
+		case "", "field", "group", "sum", "count", "avg", "max", "min":
 		default:
 			continue
 		}
@@ -2154,6 +2159,8 @@ func reportSnapshotFromDefinition(report model.ReportDefinition, runtimeType str
 		VersionNo:           0,
 		Code:                report.Code,
 		Name:                report.Name,
+		Description:         report.Description,
+		Category:            report.Category,
 		SourceType:          report.SourceType,
 		SourceCode:          report.SourceCode,
 		PermissionMenuId:    report.PermissionMenuId,
@@ -2171,6 +2178,8 @@ func reportSnapshotFromVersion(version model.ReportDefinitionVersion, runtimeTyp
 		VersionNo:           version.VersionNo,
 		Code:                version.ReportCode,
 		Name:                version.ReportName,
+		Description:         version.Description,
+		Category:            version.Category,
 		SourceType:          version.SourceType,
 		SourceCode:          version.SourceCode,
 		PermissionMenuId:    version.PermissionMenuId,
@@ -2186,6 +2195,8 @@ func reportDefinitionFromSnapshot(snapshot ReportExecutionSnapshot) model.Report
 		Basic:               model.Basic{Id: snapshot.ReportId, State: true},
 		Code:                snapshot.Code,
 		Name:                snapshot.Name,
+		Description:         snapshot.Description,
+		Category:            snapshot.Category,
 		SourceType:          snapshot.SourceType,
 		SourceCode:          snapshot.SourceCode,
 		PermissionMenuId:    snapshot.PermissionMenuId,
@@ -2193,6 +2204,39 @@ func reportDefinitionFromSnapshot(snapshot ReportExecutionSnapshot) model.Report
 		QueryConfig:         cloneReportJSON(snapshot.QueryConfig),
 		LayoutConfig:        cloneReportJSON(snapshot.LayoutConfig),
 	}
+}
+
+func reportPreviewRuntimeConfig(config reportconfig.Config, snapshot ReportExecutionSnapshot) json.RawMessage {
+	payload := struct {
+		ReportName      string                   `json:"report_name"`
+		Description     string                   `json:"description,omitempty"`
+		Category        string                   `json:"category,omitempty"`
+		View            string                   `json:"view,omitempty"`
+		Title           string                   `json:"title,omitempty"`
+		Subtitle        string                   `json:"subtitle,omitempty"`
+		Kind            string                   `json:"kind,omitempty"`
+		Parameters      []reportconfig.Parameter `json:"parameters,omitempty"`
+		Sheet           reportconfig.SheetConfig `json:"sheet"`
+		RuntimeDisplay  string                   `json:"runtime_display,omitempty"`
+		RuntimePageSize int                      `json:"runtime_page_size,omitempty"`
+	}{
+		ReportName:      snapshot.Name,
+		Description:     snapshot.Description,
+		Category:        snapshot.Category,
+		View:            config.Layout.View,
+		Title:           config.Layout.Title,
+		Subtitle:        config.Layout.Subtitle,
+		Kind:            config.Layout.Kind,
+		Parameters:      config.Parameters(),
+		Sheet:           config.Layout.Sheet,
+		RuntimeDisplay:  config.Layout.RuntimeDisplay,
+		RuntimePageSize: config.Layout.RuntimePageSize,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil
+	}
+	return raw
 }
 
 func cloneReportJSON(raw datatypes.JSON) datatypes.JSON {

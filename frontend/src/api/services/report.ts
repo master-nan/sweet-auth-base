@@ -28,6 +28,7 @@ import type {
   ReportPreviewReq,
   ReportPreviewRes,
   ReportQueryConfig,
+  ReportRuntimeConfig,
   ReportSaveReq,
   ReportVersion,
 } from 'src/modules/report/types'
@@ -74,6 +75,7 @@ export type {
   ReportQuery,
   ReportQueryConfig,
   ReportRuntimeDisplayMode,
+  ReportRuntimeConfig,
   ReportRuntimeType,
   ReportSaveReq,
   ReportSheetCell,
@@ -125,6 +127,7 @@ interface BackendReportPreview {
   datasets?: Array<ReportDataset & { source_code?: string }>
   joins?: ReportDatasetJoin[]
   meta?: ReportPreviewRes['meta']
+  runtime_config?: ReportRuntimeConfig
 }
 
 interface BackendReportDataSource {
@@ -363,6 +366,18 @@ const toPreview = (data: BackendReportPreview): ReportPreviewRes => ({
   })),
   joins: data.joins || [],
   ...(data.meta ? { meta: data.meta } : {}),
+  ...(data.runtime_config
+    ? {
+        runtime_config: {
+          ...data.runtime_config,
+          kind: normalizeReportKind(data.runtime_config.kind),
+          sheet: normalizeReportSheet(data.runtime_config.sheet),
+          parameters: data.runtime_config.parameters || [],
+          runtime_display: data.runtime_config.runtime_display || 'paged',
+          runtime_page_size: Number(data.runtime_config.runtime_page_size || 20),
+        },
+      }
+    : {}),
 })
 
 export const useReportApi = () => {
