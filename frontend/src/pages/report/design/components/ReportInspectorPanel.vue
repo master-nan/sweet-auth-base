@@ -92,12 +92,16 @@
           />
           </section>
           <section class="setting-section style-row">
-            <q-toggle
-              :model-value="cellBold"
-              dense
-              :label="t('ui.putItOn')"
-              @update:model-value="$emit('update:cellBold', !!$event)"
-            />
+            <div class="toggle-field">
+              <span>{{ t('ui.putItOn') }}</span>
+              <q-toggle
+                :model-value="cellBold"
+                dense
+                size="sm"
+                :aria-label="t('ui.putItOn')"
+                @update:model-value="$emit('update:cellBold', !!$event)"
+              />
+            </div>
             <q-select
               :model-value="cellAlign"
               dense
@@ -544,7 +548,22 @@ const bindingTypeLabel = computed(
 }
 
 .runtime-grid {
-  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.toggle-field {
+  min-width: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  border: 1px solid #cfd6e6;
+  border-radius: 4px;
+  background: #fff;
+  color: #263248;
+  font-size: 12px;
 }
 
 .empty-note {

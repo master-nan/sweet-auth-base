@@ -40,8 +40,15 @@
           />
         </section>
 
+        <div class="join-arrow" aria-hidden="true">
+          <q-icon name="arrow_forward" />
+        </div>
+
         <div class="join-operator">
-          <q-icon name="compare_arrows" />
+          <div class="join-side__title">
+            <q-icon name="compare_arrows" />
+            <span>{{ t('ui.relationMode') }}</span>
+          </div>
           <q-select
             :model-value="draft.join_type"
             dense
@@ -52,6 +59,10 @@
             :options="joinTypeOptions"
             @update:model-value="$emit('update:joinType', $event as ReportDatasetJoinType)"
           />
+        </div>
+
+        <div class="join-arrow" aria-hidden="true">
+          <q-icon name="arrow_forward" />
         </div>
 
         <section class="join-side">
@@ -134,7 +145,8 @@ defineEmits<{
 
 <style scoped lang="scss">
 .join-dialog {
-  width: min(760px, 92vw);
+  width: min(920px, calc(100vw - 32px));
+  max-width: 920px;
 }
 
 .dialog-head {
@@ -152,20 +164,18 @@ defineEmits<{
 
 .join-builder {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr);
+  grid-template-columns:
+    minmax(220px, 1fr) 28px minmax(150px, 180px) 28px
+    minmax(220px, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 18px;
+  gap: 10px;
+  padding: 20px;
 }
 
 .join-side {
   min-width: 0;
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border: 1px solid #e1e7f1;
-  border-radius: 8px;
-  background: #fbfcff;
 }
 
 .join-side__title {
@@ -183,26 +193,58 @@ defineEmits<{
 }
 
 .join-operator {
+  min-width: 0;
   display: grid;
-  gap: 8px;
-  text-align: center;
+  gap: 10px;
 }
 
-.join-operator > .q-icon {
-  justify-self: center;
+.join-arrow {
+  display: grid;
+  place-items: center;
   color: var(--q-primary);
-  font-size: 24px;
 }
 
-@media (max-width: 680px) {
+.join-arrow .q-icon {
+  font-size: 20px;
+}
+
+.join-side :deep(.q-field),
+.join-operator :deep(.q-field) {
+  width: 100%;
+  min-width: 0;
+}
+
+.join-side :deep(.q-field__native),
+.join-side :deep(.q-field__native > span),
+.join-operator :deep(.q-field__native),
+.join-operator :deep(.q-field__native > span) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join-side :deep(.q-field--dense .q-field__control),
+.join-side :deep(.q-field--dense .q-field__marginal),
+.join-operator :deep(.q-field--dense .q-field__control),
+.join-operator :deep(.q-field--dense .q-field__marginal) {
+  min-height: 42px;
+  height: 42px;
+}
+
+.join-dialog :deep(.q-card__actions) {
+  min-height: 58px;
+  padding: 10px 20px;
+  border-top: 1px solid #e7ecf6;
+}
+
+@media (max-width: 760px) {
   .join-builder {
     grid-template-columns: 1fr;
   }
 
-  .join-operator {
-    grid-template-columns: 28px minmax(0, 1fr);
-    align-items: center;
-    text-align: left;
+  .join-arrow .q-icon {
+    transform: rotate(90deg);
   }
 }
 </style>
