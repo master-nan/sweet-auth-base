@@ -137,7 +137,7 @@
         </q-tabs>
         <q-separator />
         <q-tab-panels v-model="sidePanelTab" class="designer-side-panels">
-          <q-tab-panel name="properties">
+          <q-tab-panel name="properties" class="side-panel-page">
             <report-inspector-panel
               v-model:tab="inspectorTab"
               v-model:cell-value="activeCellValue"
@@ -178,7 +178,7 @@
               @update:runtime-page-size="form.runtime_page_size = $event"
             />
           </q-tab-panel>
-          <q-tab-panel name="dataSource">
+          <q-tab-panel name="dataSource" class="side-panel-page">
             <report-resource-panel
               :datasets="datasets"
               :parameters="parameters"
@@ -2458,13 +2458,14 @@ function goBack() {
   background: transparent;
 }
 
-.designer-side-panels :deep(.q-panel),
-.designer-side-panels :deep(.q-tab-panel) {
+.designer-side-panels :deep(> .q-panel) {
   height: 100%;
   min-height: 0;
 }
 
-.designer-side-panels :deep(.q-tab-panel) {
+.designer-side-panels :deep(.side-panel-page) {
+  height: 100%;
+  min-height: 0;
   padding: 0;
   overflow: hidden;
 }
