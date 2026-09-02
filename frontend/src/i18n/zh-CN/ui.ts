@@ -374,6 +374,8 @@ const ui = {
   designVersionIsIsolatedFromThePublishedRunOffVersion: '设计版本与已发布运行版本隔离。',
   detailActions: '详情操作',
   detailRow: '明细行',
+  groupSummaryRow: '分组小计行',
+  normalRow: '普通行',
   details: '详情',
   detailsEditingAndRemovalOfInterfacesAreEquallyNotSubject: '详情、编辑和删除接口同样不能越权。',
   detailsInPlace: '详情占位',

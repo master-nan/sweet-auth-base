@@ -397,6 +397,8 @@ const ui = {
     'Design version is isolated from the published run-off version.',
   detailActions: 'Detail Actions',
   detailRow: 'Detail Row',
+  groupSummaryRow: 'Group Summary Row',
+  normalRow: 'Normal Row',
   details: 'Details',
   detailsEditingAndRemovalOfInterfacesAreEquallyNotSubject:
     'Details, editing and removal of interfaces are equally not subject to overstepping.',

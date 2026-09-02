@@ -85,6 +85,36 @@
           :label="t('ui.clearSelection')"
           @click="$emit('clearSelection')"
         />
+        <q-separator vertical />
+        <q-btn-dropdown
+          flat
+          dense
+          no-caps
+          class="row-type-control"
+          :color="activeRowType === 'normal' ? 'dark' : 'primary'"
+          :icon="activeRowTypeMeta.icon"
+          :label="activeRowTypeMeta.label"
+        >
+          <q-list dense class="row-type-menu">
+            <q-item
+              v-for="option in rowTypeOptions"
+              :key="option.value"
+              v-close-popup
+              clickable
+              :active="activeRowType === option.value"
+              active-class="text-primary bg-grey-2"
+              @click="setActiveRowType(option.value)"
+            >
+              <q-item-section avatar>
+                <q-icon :name="option.icon" />
+              </q-item-section>
+              <q-item-section>{{ option.label }}</q-item-section>
+              <q-item-section v-if="activeRowType === option.value" side>
+                <q-icon name="check" color="primary" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-btn-dropdown>
       </div>
       <div class="toolbar-group">
         <q-chip
@@ -160,7 +190,13 @@
             }"
             :style="renderRow.headerStyle"
           >
-            {{ renderRow.row }}
+            <span class="sheet-row-number">{{ renderRow.row }}</span>
+            <q-icon
+              v-if="renderRow.roleIcon"
+              class="sheet-row-role"
+              :name="renderRow.roleIcon"
+              :title="renderRow.roleLabel"
+            />
             <span
               class="sheet-row-resizer"
               :title="t('ui.resizeRow')"
@@ -211,7 +247,15 @@
                 @keydown.esc.stop.prevent="cancelEdit"
                 @blur="commitEdit(renderCell.row, renderCell.col)"
               />
-              <span v-else>{{ renderCell.value }}</span>
+              <template v-else>
+                <q-icon
+                  v-if="renderCell.bindingIcon"
+                  class="sheet-cell__binding-icon"
+                  :name="renderCell.bindingIcon"
+                  :title="renderCell.bindingLabel"
+                />
+                <span>{{ renderCell.value }}</span>
+              </template>
               <span
                 v-if="renderCell.active && renderCell.fillable && editingCellId !== renderCell.id"
                 class="sheet-fill-handle"
@@ -401,6 +445,24 @@ const hasRangeSelection = computed(() => {
 const summaryRows = computed(() => new Set(props.sheet.summary_rows || []))
 const groupSummaryRows = computed(() => new Set(props.sheet.group_summary_rows || []))
 const detailRows = computed(() => new Set(props.sheet.detail_rows || []))
+type ReportRowType = 'normal' | 'detail' | 'groupSummary' | 'summary'
+
+const rowTypeOptions = computed<Array<{ value: ReportRowType; label: string; icon: string }>>(
+  () => [
+    { value: 'normal', label: t('ui.normalRow'), icon: 'horizontal_rule' },
+    { value: 'detail', label: t('ui.detailRow'), icon: 'south' },
+    { value: 'groupSummary', label: t('ui.groupSummaryRow'), icon: 'functions' },
+    { value: 'summary', label: t('ui.summaryRow'), icon: 'calculate' },
+  ],
+)
+const activeRow = computed(() => {
+  const [row] = props.selectedCellId.split(':').map(Number)
+  return Math.min(Math.max(row || 1, 1), props.sheet.rows)
+})
+const activeRowType = computed<ReportRowType>(() => rowTypeAt(activeRow.value))
+const activeRowTypeMeta = computed(
+  () => rowTypeOptions.value.find((option) => option.value === activeRowType.value)!,
+)
 
 const selectionBounds = computed(() =>
   props.selectionRange ? reportNormalizeSheetRange(props.selectionRange) : null,
@@ -464,12 +526,15 @@ const renderRows = computed(() =>
     const summary = summaryRows.value.has(row)
     const groupSummary = groupSummaryRows.value.has(row)
     const detail = detailRows.value.has(row)
+    const role = rowTypeMeta(rowTypeAt(row))
     return {
       key: `row-${row}`,
       row,
       detail,
       summary,
       groupSummary,
+      roleIcon: role.value === 'normal' ? '' : role.icon,
+      roleLabel: role.label,
       headerStyle: {
         gridColumn: 1,
         gridRow: row + 1,
@@ -500,6 +565,8 @@ function renderCellsForRow(row: number, detail: boolean, summary: boolean, group
       active: props.selectedCellId === cell.id,
       selected: isSelectedCell(row, col),
       bound: Boolean(cell.binding?.field),
+      bindingIcon: reportBindingIcon(cell),
+      bindingLabel: reportBindingLabel(cell),
       fillable: rowspan === 1 && colspan === 1,
       fillTarget: fillState.active && row === fillState.targetRow && col === fillState.targetCol,
       detail,
@@ -804,6 +871,53 @@ function isGroupSummaryRow(row: number) {
   return groupSummaryRows.value.has(row)
 }
 
+function rowTypeAt(row: number): ReportRowType {
+  if (groupSummaryRows.value.has(row)) return 'groupSummary'
+  if (summaryRows.value.has(row)) return 'summary'
+  if (detailRows.value.has(row)) return 'detail'
+  return 'normal'
+}
+
+function rowTypeMeta(type: ReportRowType) {
+  return rowTypeOptions.value.find((option) => option.value === type)!
+}
+
+function setActiveRowType(type: ReportRowType) {
+  const current = activeRowType.value
+  const row = activeRow.value
+  if (type === current) return
+  if (type === 'normal') {
+    if (current === 'detail') emit('toggleDetailRow', row)
+    else if (current === 'groupSummary') {
+      emit('toggleGroupSummaryRow', row)
+      emit('toggleSummaryRow', row)
+    } else emit('toggleSummaryRow', row)
+    return
+  }
+  if (type === 'detail') emit('toggleDetailRow', row)
+  else if (type === 'groupSummary') emit('toggleGroupSummaryRow', row)
+  else if (current === 'groupSummary') emit('toggleGroupSummaryRow', row)
+  else emit('toggleSummaryRow', row)
+}
+
+function reportBindingIcon(cell: ReportSheetCell) {
+  const type = cell.binding?.type
+  if (!type || type === 'static') return ''
+  if (type === 'field') return 'south'
+  if (type === 'group') return 'account_tree'
+  if (type === 'formula') return 'calculate'
+  return 'functions'
+}
+
+function reportBindingLabel(cell: ReportSheetCell) {
+  const type = cell.binding?.type
+  if (!type || type === 'static') return ''
+  if (type === 'field') return t('ui.field')
+  if (type === 'group') return t('ui.groupFields')
+  if (type === 'formula') return t('ui.formula')
+  return t('ui.summaryRow')
+}
+
 function openContextMenu(row: number, col: number, event: MouseEvent) {
   const scrollEl = sheetScrollRef.value
   const rect = scrollEl?.getBoundingClientRect()
@@ -882,12 +996,14 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  overflow-x: auto;
   padding: 8px 12px;
   border-bottom: 1px solid #dfe5f2;
   background: rgba(255, 255, 255, 0.96);
 }
 
 .toolbar-group {
+  flex: 0 0 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -896,6 +1012,14 @@ onBeforeUnmount(() => {
 
 .toolbar-group .q-chip {
   max-width: 260px;
+}
+
+.row-type-control {
+  min-width: 108px;
+}
+
+.row-type-menu {
+  min-width: 180px;
 }
 
 .color-swatch {
@@ -968,7 +1092,13 @@ onBeforeUnmount(() => {
 .sheet-row-head {
   left: 0;
   z-index: 5;
+  grid-template-columns: auto 14px;
+  column-gap: 3px;
   box-shadow: 1px 0 0 #dfe5f2;
+}
+
+.sheet-row-role {
+  font-size: 13px;
 }
 
 .sheet-row-resizer {
@@ -995,6 +1125,13 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sheet-cell__binding-icon {
+  flex: 0 0 auto;
+  margin-right: 4px;
+  color: var(--q-primary);
+  font-size: 14px;
 }
 
 .sheet-cell__editor {
