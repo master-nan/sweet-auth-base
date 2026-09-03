@@ -62,7 +62,7 @@ func TestReportCreateRejectsMissingJoinedTableDataset(t *testing.T) {
 				{"id":"main","name":"订单","type":"table","source_code":"demo_order","primary":true},
 				{"id":"company","name":"公司","type":"table","source_code":"missing_company"}
 			],
-			"dataset_joins":[{"id":"j1","left_dataset_id":"main","left_field":"company_id","right_dataset_id":"company","right_field":"id","join_type":"left"}]
+			"dataset_joins":[{"id":"j1","left_dataset_id":"main","right_dataset_id":"company","join_type":"left","conditions":[{"left_field":"company_id","right_field":"id"},{"left_field":"id","right_field":"id"}]}]
 		}`)),
 		LayoutConfig: datatypes.JSON([]byte(`{"view":"sheet","sheet":{"rows":8,"cols":6,"cells":[]}}`)),
 	})
@@ -231,7 +231,7 @@ func TestReportJoinedPreviewSelectionsUsesSheetBindings(t *testing.T) {
 				{"id":"main","name":"订单","type":"table","source_code":"demo_order","primary":true},
 				{"id":"company","name":"公司","type":"table","source_code":"demo_company"}
 			],
-			"dataset_joins":[{"id":"j1","left_dataset_id":"main","left_field":"company_id","right_dataset_id":"company","right_field":"id","join_type":"left"}]
+			"dataset_joins":[{"id":"j1","left_dataset_id":"main","right_dataset_id":"company","join_type":"left","conditions":[{"left_field":"company_id","right_field":"id"},{"left_field":"id","right_field":"id"}]}]
 		}`)),
 		datatypes.JSON([]byte(`{
 			"view":"sheet",
@@ -255,7 +255,7 @@ func TestReportJoinedPreviewSelectionsUsesSheetBindings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build join sql: %v", err)
 	}
-	if !strings.Contains(joinSQL, `LEFT JOIN "demo_company" AS "rds_2"`) || !strings.Contains(joinSQL, `"demo_order"."company_id" = "rds_2"."id"`) {
+	if !strings.Contains(joinSQL, `LEFT JOIN "demo_company" AS "rds_2"`) || !strings.Contains(joinSQL, `"demo_order"."company_id" = "rds_2"."id" AND "demo_order"."id" = "rds_2"."id"`) {
 		t.Fatalf("unexpected join sql: %s", joinSQL)
 	}
 	selections, columns, err := reportJoinedPreviewSelections(config, "main", primaryTable, map[string]model.SysTable{

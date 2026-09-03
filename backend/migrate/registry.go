@@ -54,6 +54,7 @@ func migrationSteps() []migrationStep {
 		migrateNotificationStandardBaseFields,
 		syncMetadataColumnComments,
 		unifyReportRuntimeComponent,
+		purgeHistoricalReportRecords,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {

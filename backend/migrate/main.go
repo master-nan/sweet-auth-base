@@ -11,7 +11,6 @@ import (
 	"backend/internal/utils"
 	"backend/model"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -20,7 +19,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -29,11 +27,6 @@ import (
 )
 
 const lowCodeCrudButtonTemplateScene = "lowcode_crud"
-
-const (
-	reportMigrationStatusPublished = "published"
-	reportMigrationStatusArchived  = "archived"
-)
 
 func main() {
 	if err := executeMigrationCommand(os.Args); err != nil {
@@ -1024,12 +1017,6 @@ func seedMenusAndRole(db *gorm.DB, sf *utils.Snowflake) error {
 	if err := seedBuiltinMenuButtons(db, sf, role.Id, role.Name, menuByName); err != nil {
 		return err
 	}
-	if err := seedReportDefinitions(db, sf); err != nil {
-		return err
-	}
-	if err := backfillReportDefinitionVersions(db, sf); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -1251,182 +1238,6 @@ func seedRole(db *gorm.DB, sf *utils.Snowflake) (model.SysRole, error) {
 		return model.SysRole{}, err
 	}
 	return role, nil
-}
-
-func seedReportDefinitions(db *gorm.DB, sf *utils.Snowflake) error {
-	if !db.Migrator().HasTable(&model.ReportDefinition{}) {
-		return nil
-	}
-	seed := model.ReportDefinition{
-		Code:                "access_log_overview",
-		Name:                "访问日志概览",
-		Description:         "基于访问日志的报表样例，用于验证报表中心和数据权限链路",
-		Category:            "系统审计",
-		Status:              "published",
-		SourceType:          "table",
-		SourceCode:          "access_log",
-		PermissionTableCode: "access_log",
-		QueryConfig: datatypes.JSON([]byte(`{
-			"fields":[
-				{"name":"用户","code":"user_name","type":"string","role":"dimension"},
-				{"name":"方法","code":"method","type":"string","role":"dimension"},
-				{"name":"路径","code":"url","type":"string","role":"dimension"},
-				{"name":"状态码","code":"status_code","type":"number","role":"metric","aggregate":"count"},
-				{"name":"结果","code":"success","type":"boolean","role":"dimension"}
-			],
-			"parameters":[
-				{"id":"param_keyword","label":"关键字","field":"url","type":"text","operator":"like","placeholder":"输入路径或用户关键字"}
-			]
-		}`)),
-		LayoutConfig: datatypes.JSON([]byte(`{
-			"view":"sheet",
-			"title":"访问日志概览",
-			"subtitle":"按当前账号权限范围查看系统访问记录",
-			"kind":"detail",
-			"parameters":[
-				{"id":"param_keyword","label":"关键字","field":"url","type":"text","operator":"like","placeholder":"输入路径或用户关键字"}
-			],
-			"widgets":[
-				{"id":"widget_table","type":"table","title":"访问日志明细","fields":["user_name","method","url","status_code","success"],"options":{"height":320}},
-				{"id":"widget_metric","type":"metric","title":"访问次数","fields":["status_code"],"options":{"aggregate":"count"}}
-			]
-		}`)),
-		Remark: "系统初始化示例",
-	}
-	var existing model.ReportDefinition
-	err := db.Where("code = ?", seed.Code).First(&existing).Error
-	if err == nil {
-		return db.Model(&model.ReportDefinition{}).Where("id = ?", existing.Id).Updates(map[string]interface{}{
-			"name":                  seed.Name,
-			"description":           seed.Description,
-			"category":              seed.Category,
-			"status":                seed.Status,
-			"source_type":           seed.SourceType,
-			"source_code":           seed.SourceCode,
-			"permission_table_code": seed.PermissionTableCode,
-			"query_config":          seed.QueryConfig,
-			"layout_config":         seed.LayoutConfig,
-			"remark":                seed.Remark,
-			"state":                 true,
-			"gmt_modify":            model.Now(),
-		}).Error
-	}
-	if err != gorm.ErrRecordNotFound {
-		return err
-	}
-	id, err := newMigrationID(sf)
-	if err != nil {
-		return err
-	}
-	seed.Id = id
-	seed.State = true
-	return db.Create(&seed).Error
-}
-
-func backfillReportDefinitionVersions(db *gorm.DB, sf *utils.Snowflake) error {
-	if !db.Migrator().HasTable(&model.ReportDefinition{}) || !db.Migrator().HasTable(&model.ReportDefinitionVersion{}) {
-		return nil
-	}
-	var reports []model.ReportDefinition
-	if err := db.Where("status = ? AND COALESCE(published_version_id, 0) = 0", "published").Find(&reports).Error; err != nil {
-		return err
-	}
-	for _, report := range reports {
-		if !json.Valid(report.QueryConfig) || !json.Valid(report.LayoutConfig) {
-			log.Printf("skip report version backfill: report_id=%d code=%s has invalid query_config/layout_config", report.Id, report.Code)
-			continue
-		}
-		existing, found, err := selectReportVersionForBackfill(db, report.Id)
-		if err != nil {
-			return err
-		}
-		if found {
-			if err := db.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Model(&model.ReportDefinitionVersion{}).
-					Where("report_id = ? AND id <> ?", report.Id, existing.Id).
-					Update("status", reportMigrationStatusArchived).Error; err != nil {
-					return err
-				}
-				if err := tx.Model(&model.ReportDefinitionVersion{}).
-					Where("id = ?", existing.Id).
-					Updates(map[string]any{
-						"status": reportMigrationStatusPublished,
-						"state":  true,
-					}).Error; err != nil {
-					return err
-				}
-				return tx.Model(&model.ReportDefinition{}).
-					Where("id = ? AND COALESCE(published_version_id, 0) = 0", report.Id).
-					Update("published_version_id", existing.Id).Error
-			}); err != nil {
-				return err
-			}
-			continue
-		}
-		id, err := newMigrationID(sf)
-		if err != nil {
-			return err
-		}
-		publishedAt := model.CustomTime(model.Now())
-		version := model.ReportDefinitionVersion{
-			Basic:               model.Basic{Id: id, State: true},
-			ReportId:            report.Id,
-			VersionNo:           1,
-			ReportCode:          report.Code,
-			ReportName:          report.Name,
-			Description:         report.Description,
-			Category:            report.Category,
-			SourceType:          report.SourceType,
-			SourceCode:          report.SourceCode,
-			PermissionMenuId:    report.PermissionMenuId,
-			PermissionTableCode: report.PermissionTableCode,
-			QueryConfig:         report.QueryConfig,
-			LayoutConfig:        report.LayoutConfig,
-			Status:              reportMigrationStatusPublished,
-			PublishedAt:         publishedAt,
-			PublishedBy:         0,
-			PublishedName:       "migration",
-			ChangeLog:           "历史 published 报表初始版本回填",
-		}
-		if err := db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Create(&version).Error; err != nil {
-				return err
-			}
-			return tx.Model(&model.ReportDefinition{}).
-				Where("id = ? AND COALESCE(published_version_id, 0) = 0", report.Id).
-				Update("published_version_id", version.Id).Error
-		}); err != nil {
-			if strings.Contains(err.Error(), "uni_report_definition_version_no") {
-				log.Printf("skip duplicate report version backfill: report_id=%d code=%s", report.Id, report.Code)
-				continue
-			}
-			return err
-		}
-	}
-	return nil
-}
-
-func selectReportVersionForBackfill(db *gorm.DB, reportId int) (model.ReportDefinitionVersion, bool, error) {
-	var version model.ReportDefinitionVersion
-	err := db.Where("report_id = ? AND status = ?", reportId, reportMigrationStatusPublished).
-		Order("version_no DESC").
-		First(&version).Error
-	if err == nil {
-		return version, true, nil
-	}
-	if err != gorm.ErrRecordNotFound {
-		return model.ReportDefinitionVersion{}, false, err
-	}
-	err = db.Where("report_id = ?", reportId).
-		Order("version_no DESC").
-		First(&version).Error
-	if err == nil {
-		return version, true, nil
-	}
-	if err == gorm.ErrRecordNotFound {
-		return model.ReportDefinitionVersion{}, false, nil
-	}
-	return model.ReportDefinitionVersion{}, false, err
 }
 
 func seedPrimaryId(db *gorm.DB, modelValue interface{}, desired int, sf *utils.Snowflake) (int, error) {

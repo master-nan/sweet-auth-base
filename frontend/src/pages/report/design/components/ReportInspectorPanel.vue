@@ -32,64 +32,69 @@
         </div>
         <div v-if="hasActiveCell" class="panel-stack">
           <section class="setting-section">
-          <q-input
-            v-if="bindingType !== 'formula'"
-            :model-value="cellValue"
-            dense
-            outlined
-            :label="t('ui.titleAlien')"
-            @update:model-value="$emit('update:cellValue', String($event || ''))"
-          />
-          <div v-if="bindingPreview" class="binding-preview">
-            <q-icon name="data_object" />
-            <span>{{ bindingPreview }}</span>
-          </div>
-          <q-select
-            :model-value="bindingType"
-            dense
-            outlined
-            emit-value
-            map-options
-            :label="t('ui.bindingType')"
-            :options="bindingTypeOptions"
-            @update:model-value="emitBindingType"
-          />
-          <div
-            v-if="bindingType !== 'static' && bindingType !== 'formula'"
-            class="two-column-grid"
-          >
+            <q-input
+              v-if="bindingType !== 'formula'"
+              class="inspector-control"
+              :model-value="cellValue"
+              dense
+              outlined
+              :label="t('ui.titleAlien')"
+              @update:model-value="$emit('update:cellValue', String($event || ''))"
+            />
+            <div v-if="bindingPreview" class="binding-preview">
+              <q-icon name="data_object" />
+              <span>{{ bindingPreview }}</span>
+            </div>
             <q-select
-              :model-value="bindingDatasetId"
+              class="inspector-control"
+              :model-value="bindingType"
               dense
               outlined
               emit-value
               map-options
-              :label="t('ui.dataset')"
-              :options="datasetOptions"
-              @update:model-value="$emit('update:bindingDatasetId', String($event || ''))"
+              :label="t('ui.bindingType')"
+              :options="bindingTypeOptions"
+              @update:model-value="emitBindingType"
             />
-            <q-select
-              :model-value="bindingField"
+            <div
+              v-if="bindingType !== 'static' && bindingType !== 'formula'"
+              class="two-column-grid"
+            >
+              <q-select
+                class="inspector-control"
+                :model-value="bindingDatasetId"
+                dense
+                outlined
+                emit-value
+                map-options
+                :label="t('ui.dataset')"
+                :options="datasetOptions"
+                @update:model-value="$emit('update:bindingDatasetId', String($event || ''))"
+              />
+              <q-select
+                class="inspector-control"
+                :model-value="bindingField"
+                dense
+                outlined
+                emit-value
+                map-options
+                :label="t('ui.dataField')"
+                :options="activeDatasetFieldOptions"
+                @update:model-value="$emit('update:bindingField', String($event || ''))"
+              />
+            </div>
+            <q-input
+              v-if="bindingType === 'formula'"
+              class="inspector-control"
+              :model-value="formula"
               dense
               outlined
-              emit-value
-              map-options
-              :label="t('ui.dataField')"
-              :options="activeDatasetFieldOptions"
-              @update:model-value="$emit('update:bindingField', String($event || ''))"
+              :label="t('ui.formulaExpression')"
+              :hint="t('ui.formulaSyntaxHint')"
+              :error="!!formulaError"
+              :error-message="formulaError"
+              @update:model-value="$emit('update:formula', String($event || ''))"
             />
-          </div>
-          <q-input
-            v-if="bindingType === 'formula'"
-            :model-value="formula"
-            dense
-            outlined
-            :label="t('ui.formulaExpression')"
-            :hint="t('ui.formulaSyntaxHint')"
-            :error="!!formulaError"
-            :error-message="formulaError"
-            @update:model-value="$emit('update:formula', String($event || ''))"
-          />
           </section>
           <section class="setting-section style-row">
             <div class="toggle-field">
@@ -103,6 +108,7 @@
               />
             </div>
             <q-select
+              class="inspector-control"
               :model-value="cellAlign"
               dense
               outlined
@@ -130,6 +136,7 @@
         <div v-if="selectedDataset" class="panel-stack">
           <section class="setting-section dataset-settings">
             <q-input
+              class="inspector-control"
               :model-value="selectedDataset.name"
               dense
               outlined
@@ -182,9 +189,11 @@
             <div class="join-list">
               <div v-for="join in datasetJoins" :key="join.id" class="join-row">
                 <div class="join-row__body">
-                  <span>{{ joinEndpoint(join.left_dataset_id, join.left_field) }}</span>
                   <q-badge outline color="primary">{{ joinTypeLabel(join) }}</q-badge>
-                  <span>{{ joinEndpoint(join.right_dataset_id, join.right_field) }}</span>
+                  <span v-for="(condition, index) in join.conditions" :key="index">
+                    {{ joinEndpoint(join.left_dataset_id, condition.left_field) }} =
+                    {{ joinEndpoint(join.right_dataset_id, condition.right_field) }}
+                  </span>
                 </div>
                 <div class="row-actions">
                   <q-btn
@@ -230,6 +239,7 @@
           <section class="setting-section report-settings">
             <div class="two-column-grid">
               <q-input
+                class="inspector-control"
                 :model-value="category"
                 dense
                 outlined
@@ -237,6 +247,7 @@
                 @update:model-value="$emit('update:category', String($event || ''))"
               />
               <q-select
+                class="inspector-control"
                 :model-value="reportKind"
                 dense
                 outlined
@@ -250,6 +261,7 @@
               </q-select>
             </div>
             <q-input
+              class="inspector-control inspector-control--multiline"
               :model-value="description"
               dense
               outlined
@@ -268,10 +280,13 @@
           </section>
           <section class="setting-section">
             <div class="section-head single-line">
-              <div><strong>{{ t('ui.runTimeConfiguration') }}</strong></div>
+              <div>
+                <strong>{{ t('ui.runTimeConfiguration') }}</strong>
+              </div>
             </div>
             <div class="runtime-grid">
               <q-select
+                class="inspector-control"
                 :model-value="runtimeDisplay"
                 dense
                 outlined
@@ -282,6 +297,7 @@
                 @update:model-value="emitRuntimeDisplay"
               />
               <q-input
+                class="inspector-control"
                 :model-value="runtimePageSize"
                 dense
                 outlined
@@ -543,7 +559,7 @@ const bindingTypeLabel = computed(
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -553,7 +569,7 @@ const bindingTypeLabel = computed(
 
 .toggle-field {
   min-width: 0;
-  min-height: 38px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -590,7 +606,7 @@ const bindingTypeLabel = computed(
 }
 
 .definition-row {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -719,15 +735,15 @@ const bindingTypeLabel = computed(
   resize: none;
 }
 
-.setting-section :deep(.q-field--dense .q-field__control),
-.setting-section :deep(.q-field--dense .q-field__marginal) {
-  min-height: 38px;
-  height: 38px;
+.inspector-control :deep(.q-field__control),
+.inspector-control :deep(.q-field__marginal) {
+  min-height: 42px;
+  height: 42px;
 }
 
-.setting-section :deep(.q-field--auto-height.q-field--dense .q-field__control),
-.setting-section :deep(.q-field--auto-height.q-field--dense .q-field__native) {
-  min-height: 38px;
+.inspector-control--multiline :deep(.q-field__control),
+.inspector-control--multiline :deep(.q-field__native) {
+  min-height: 66px;
   height: auto;
 }
 

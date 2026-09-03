@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { createBlankReportSheet, hasReportCellConfig, makeReportCellId } from './schema'
 import {
+  buildReportLocalPreview,
+  collectReportUsedFields,
   reportDeleteSheetColumn,
   reportDeleteSheetRow,
   reportEvaluateFormula,
@@ -18,6 +20,28 @@ import {
 import type { ReportDataset, ReportSheetCell } from './types'
 
 describe('report sheet structure editing', () => {
+  it('does not invent runtime fields or rows for a static sheet', () => {
+    const datasets: ReportDataset[] = [
+      {
+        id: 'main',
+        name: '订单',
+        type: 'table',
+        source_code: 'sales_order',
+        primary: true,
+        fields: [{ name: '订单号', code: 'order_no', type: 'varchar' }],
+      },
+    ]
+    const sheet = createBlankReportSheet(8, 6)
+    sheet.cells = [{ id: makeReportCellId(1, 1), row: 1, col: 1, value: '静态标题' }]
+
+    expect(collectReportUsedFields(datasets, sheet)).toEqual([])
+    expect(buildReportLocalPreview(datasets, sheet)).toMatchObject({
+      columns: [],
+      rows: [],
+      total: 0,
+    })
+  })
+
   it('keeps an incomplete non-static binding while an empty cell is being configured', () => {
     expect(hasReportCellConfig({ binding: { type: 'formula', formula: '' } })).toBe(true)
     expect(hasReportCellConfig({ binding: { type: 'field' } })).toBe(true)

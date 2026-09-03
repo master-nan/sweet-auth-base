@@ -49,12 +49,16 @@ type Dataset struct {
 }
 
 type DatasetJoin struct {
-	Id             string `json:"id"`
-	LeftDatasetId  string `json:"left_dataset_id"`
-	LeftField      string `json:"left_field"`
-	RightDatasetId string `json:"right_dataset_id"`
-	RightField     string `json:"right_field"`
-	JoinType       string `json:"join_type"`
+	Id             string                 `json:"id"`
+	LeftDatasetId  string                 `json:"left_dataset_id"`
+	RightDatasetId string                 `json:"right_dataset_id"`
+	JoinType       string                 `json:"join_type"`
+	Conditions     []DatasetJoinCondition `json:"conditions"`
+}
+
+type DatasetJoinCondition struct {
+	LeftField  string `json:"left_field"`
+	RightField string `json:"right_field"`
 }
 
 type Field struct {
@@ -146,10 +150,17 @@ func (c Config) Datasets() []Dataset {
 }
 
 func (c Config) DatasetJoins() []DatasetJoin {
+	var joins []DatasetJoin
 	if len(c.Layout.DatasetJoins) > 0 {
-		return c.Layout.DatasetJoins
+		joins = c.Layout.DatasetJoins
+	} else {
+		joins = c.Query.DatasetJoins
 	}
-	return c.Query.DatasetJoins
+	normalized := make([]DatasetJoin, 0, len(joins))
+	for _, join := range joins {
+		normalized = append(normalized, NormalizeDatasetJoin(join))
+	}
+	return normalized
 }
 
 func (c Config) Parameters() []Parameter {
@@ -216,11 +227,10 @@ func validateDatasetJoins(datasets []Dataset, joins []DatasetJoin) error {
 		}
 	}
 	for _, join := range joins {
-		leftID := strings.TrimSpace(join.LeftDatasetId)
-		rightID := strings.TrimSpace(join.RightDatasetId)
-		leftField := strings.TrimSpace(join.LeftField)
-		rightField := strings.TrimSpace(join.RightField)
-		if leftID == "" || rightID == "" || leftField == "" || rightField == "" {
+		join = NormalizeDatasetJoin(join)
+		leftID := join.LeftDatasetId
+		rightID := join.RightDatasetId
+		if leftID == "" || rightID == "" || len(join.Conditions) == 0 {
 			return myerrors.NewValidationError("报表数据集关联配置不完整")
 		}
 		if leftID == rightID {
@@ -237,8 +247,35 @@ func validateDatasetJoins(datasets []Dataset, joins []DatasetJoin) error {
 		default:
 			return myerrors.NewValidationError("报表数据集关联类型不合法")
 		}
+		seenConditions := make(map[string]struct{}, len(join.Conditions))
+		for _, condition := range join.Conditions {
+			if condition.LeftField == "" || condition.RightField == "" {
+				return myerrors.NewValidationError("报表数据集关联条件不完整")
+			}
+			key := condition.LeftField + "\x00" + condition.RightField
+			if _, exists := seenConditions[key]; exists {
+				return myerrors.NewValidationError("报表数据集关联条件重复")
+			}
+			seenConditions[key] = struct{}{}
+		}
 	}
 	return nil
+}
+
+func NormalizeDatasetJoin(join DatasetJoin) DatasetJoin {
+	join.Id = strings.TrimSpace(join.Id)
+	join.LeftDatasetId = strings.TrimSpace(join.LeftDatasetId)
+	join.RightDatasetId = strings.TrimSpace(join.RightDatasetId)
+	join.JoinType = strings.ToLower(strings.TrimSpace(join.JoinType))
+	conditions := make([]DatasetJoinCondition, 0, len(join.Conditions))
+	for _, condition := range join.Conditions {
+		conditions = append(conditions, DatasetJoinCondition{
+			LeftField:  strings.TrimSpace(condition.LeftField),
+			RightField: strings.TrimSpace(condition.RightField),
+		})
+	}
+	join.Conditions = conditions
+	return join
 }
 
 func NormalizeDataset(dataset Dataset) Dataset {

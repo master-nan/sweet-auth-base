@@ -25,13 +25,11 @@ export const i18n = createI18n({
   messages,
 })
 
-export const translate = i18n.global.t as (
-  key: string,
-  named?: Record<string, unknown>,
-) => string
+export const translate = i18n.global.t as (key: string, named?: Record<string, unknown>) => string
 
 export const applyQuasarLanguage = (locale: SupportedLocale) => {
-  Lang.set(locale === 'en-US' ? enUS : zhCN)
+  const language = locale === 'en-US' ? enUS : zhCN
+  Lang.set(language as Parameters<typeof Lang.set>[0])
   document.documentElement.lang = locale
 }
 

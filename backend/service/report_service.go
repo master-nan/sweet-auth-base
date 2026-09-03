@@ -1417,7 +1417,9 @@ func reportOrderedDatasetJoins(config reportconfig.Config, primaryDatasetID stri
 		join := remaining[nextIndex]
 		if shouldReverse {
 			join.LeftDatasetId, join.RightDatasetId = join.RightDatasetId, join.LeftDatasetId
-			join.LeftField, join.RightField = join.RightField, join.LeftField
+			for index := range join.Conditions {
+				join.Conditions[index].LeftField, join.Conditions[index].RightField = join.Conditions[index].RightField, join.Conditions[index].LeftField
+			}
 		}
 		ordered = append(ordered, join)
 		connected[strings.TrimSpace(join.LeftDatasetId)] = struct{}{}
@@ -1444,6 +1446,7 @@ func reportDatasetAliases(config reportconfig.Config, primaryDatasetID string, p
 }
 
 func reportJoinSQL(join reportconfig.DatasetJoin, primaryDatasetID string, primaryTableCode string, datasetByID map[string]reportconfig.Dataset, tableByDatasetID map[string]model.SysTable, aliasByDatasetID map[string]string) (string, error) {
+	join = reportconfig.NormalizeDatasetJoin(join)
 	leftID := strings.TrimSpace(join.LeftDatasetId)
 	rightID := strings.TrimSpace(join.RightDatasetId)
 	leftDataset, leftOK := datasetByID[leftID]
@@ -1459,11 +1462,16 @@ func reportJoinSQL(join reportconfig.DatasetJoin, primaryDatasetID string, prima
 	if !leftTableOK || !rightTableOK {
 		return "", myerrors.NewValidationError("报表数据集关联表不存在")
 	}
-	if _, ok := reportFindTableField(leftTable, join.LeftField); !ok {
-		return "", myerrors.NewValidationError("报表数据集关联左字段不存在")
+	if len(join.Conditions) == 0 {
+		return "", myerrors.NewValidationError("报表数据集关联条件不存在")
 	}
-	if _, ok := reportFindTableField(rightTable, join.RightField); !ok {
-		return "", myerrors.NewValidationError("报表数据集关联右字段不存在")
+	for _, condition := range join.Conditions {
+		if _, ok := reportFindTableField(leftTable, condition.LeftField); !ok {
+			return "", myerrors.NewValidationError("报表数据集关联左字段不存在")
+		}
+		if _, ok := reportFindTableField(rightTable, condition.RightField); !ok {
+			return "", myerrors.NewValidationError("报表数据集关联右字段不存在")
+		}
 	}
 	targetID := reportJoinTargetDatasetID(join, primaryDatasetID)
 	targetTable := rightTable
@@ -1477,16 +1485,20 @@ func reportJoinSQL(join reportconfig.DatasetJoin, primaryDatasetID string, prima
 	if !isSafeReportIdentifier(targetAlias) {
 		return "", myerrors.NewValidationError("报表数据集关联别名不合法")
 	}
-	leftExpr := reportDatasetFieldExpr(leftID, join.LeftField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
-	rightExpr := reportDatasetFieldExpr(rightID, join.RightField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
-	if leftExpr == "" || rightExpr == "" {
-		return "", myerrors.NewValidationError("报表数据集关联字段不合法")
+	onConditions := make([]string, 0, len(join.Conditions))
+	for _, condition := range join.Conditions {
+		leftExpr := reportDatasetFieldExpr(leftID, condition.LeftField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
+		rightExpr := reportDatasetFieldExpr(rightID, condition.RightField, primaryDatasetID, primaryTableCode, aliasByDatasetID)
+		if leftExpr == "" || rightExpr == "" {
+			return "", myerrors.NewValidationError("报表数据集关联字段不合法")
+		}
+		onConditions = append(onConditions, fmt.Sprintf("%s = %s", leftExpr, rightExpr))
 	}
 	joinType := "LEFT"
 	if strings.EqualFold(strings.TrimSpace(join.JoinType), "inner") {
 		joinType = "INNER"
 	}
-	return fmt.Sprintf("%s JOIN %s AS %s ON %s = %s", joinType, quoteReportIdentifier(targetTable.TableCode), quoteReportIdentifier(targetAlias), leftExpr, rightExpr), nil
+	return fmt.Sprintf("%s JOIN %s AS %s ON %s", joinType, quoteReportIdentifier(targetTable.TableCode), quoteReportIdentifier(targetAlias), strings.Join(onConditions, " AND ")), nil
 }
 
 func reportJoinTargetDatasetID(join reportconfig.DatasetJoin, primaryDatasetID string) string {
@@ -2506,6 +2518,13 @@ func reportConfigDatasetJoins(config reportconfig.Config) []response.ReportPrevi
 	}
 	result := make([]response.ReportPreviewJoin, 0, len(joins))
 	for _, join := range joins {
+		conditions := make([]response.ReportPreviewJoinCondition, 0, len(join.Conditions))
+		for _, condition := range join.Conditions {
+			conditions = append(conditions, response.ReportPreviewJoinCondition{
+				LeftField:  strings.TrimSpace(condition.LeftField),
+				RightField: strings.TrimSpace(condition.RightField),
+			})
+		}
 		joinType := strings.ToLower(strings.TrimSpace(join.JoinType))
 		if joinType == "" {
 			joinType = "left"
@@ -2513,10 +2532,9 @@ func reportConfigDatasetJoins(config reportconfig.Config) []response.ReportPrevi
 		result = append(result, response.ReportPreviewJoin{
 			Id:             strings.TrimSpace(join.Id),
 			LeftDatasetId:  strings.TrimSpace(join.LeftDatasetId),
-			LeftField:      strings.TrimSpace(join.LeftField),
 			RightDatasetId: strings.TrimSpace(join.RightDatasetId),
-			RightField:     strings.TrimSpace(join.RightField),
 			JoinType:       joinType,
+			Conditions:     conditions,
 		})
 	}
 	return result

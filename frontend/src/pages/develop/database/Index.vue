@@ -859,6 +859,7 @@ import {
   type TableRelationUpdateReq,
 } from 'src/api/services/sys-table'
 import type { Query } from 'src/types/global'
+import { primitiveText } from 'src/utils/primitive-text'
 import {
   SysTableFieldCategory,
   SysTableFieldCategoryMap,
@@ -1021,7 +1022,7 @@ const DB_IDENTIFIER_MAX_LENGTH = 64
 const dbIdentifierPattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 const validateDBIdentifier = (label: string, value: unknown, required = true) => {
-  const text = String(value ?? '').trim()
+  const text = primitiveText(value).trim()
   if (!text) return required ? t('ui.namedFieldRequired', { label: label }) : ''
   if (text.length > DB_IDENTIFIER_MAX_LENGTH) {
     return t('ui.databaseIdentifierLengthExceeded', {
@@ -1315,7 +1316,8 @@ const structureRelationColumns: QTableProps['columns'] = [
 
 const enumLabel = (map: Record<string, string>, value: unknown, fallback = '-') => {
   if (value === undefined || value === null || value === '') return fallback
-  return map[String(value)] ?? String(value)
+  const text = primitiveText(value, fallback)
+  return map[text] ?? text
 }
 
 const fieldTypeLabel = (field: TableField) => {
@@ -1467,7 +1469,7 @@ const fieldConstraintTags = (field: TableField): StructureTag[] => {
       },
       tone: 'warn',
     })
-  if (field.field_category && field.field_category !== SysTableFieldCategory.NORMAL) {
+  if (field.field_category && field.field_category !== String(SysTableFieldCategory.NORMAL)) {
     tags.push({ label: fieldCategoryLabel(field), tone: 'warn' })
   }
   return tags.length > 0
@@ -1482,10 +1484,7 @@ const fieldConstraintTags = (field: TableField): StructureTag[] => {
       ]
 }
 
-const normalizeSearch = (value: unknown) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase()
+const normalizeSearch = (value: unknown) => primitiveText(value).trim().toLowerCase()
 
 const structureSearchText = computed(() => normalizeSearch(structureKeyword.value))
 

@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { primitiveText } from 'src/utils/primitive-text'
 
 import { computed, ref, watch } from 'vue'
 import { ExpressionLogic, ExpressionTypeMap } from 'src/types/enum'
@@ -88,11 +89,13 @@ const singleValueLabel = (rule: QueryRule, value: unknown, pointer: string) => {
   if (binding) return bindingLabel(binding)
   const field = fieldMap.value.get(rule.field)
   if (field?.dict_code)
-    return dictStore.getDictLabel(field.dict_code, value) || String(value ?? '-')
+    return dictStore.getDictLabel(field.dict_code, value) || primitiveText(value, '-')
   if (field?.relation)
-    return relationLabels.value[rule.field]?.[String(value)] || t('ui.associationValueUnsolved')
+    return (
+      relationLabels.value[rule.field]?.[primitiveText(value)] || t('ui.associationValueUnsolved')
+    )
   if (value === null || value === undefined || value === '') return t('ui.noNeedToFill')
-  return String(value)
+  return primitiveText(value, '-')
 }
 
 const valueLabel = (rule: QueryRule, pointer: string) => {

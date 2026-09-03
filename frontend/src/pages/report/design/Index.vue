@@ -71,54 +71,24 @@
       </nav>
 
       <report-sheet-canvas
+        v-if="designerReady"
         :sheet="sheet"
         :selected-cell-id="selectedCellId"
-        :selection-range="selectionRange"
-        :can-undo="canUndo"
-        :can-redo="canRedo"
-        :active-bold="!!activeCell?.style?.bold"
-        :active-italic="!!activeCell?.style?.italic"
-        :active-text-color="activeCell?.style?.color || '#172033'"
-        :active-background-color="activeCell?.style?.background || '#ffffff'"
-        :scale="sheet.scale || 0.85"
         :datasets="datasets"
         :dataset-joins="datasetJoins"
         :field-dragging="!!draggingField"
-        @undo="undoSheetChange"
-        @redo="redoSheetChange"
-        @toggle-bold="toggleBold"
-        @toggle-italic="toggleItalic"
-        @set-text-color="setTextColor"
-        @set-background-color="setBackgroundColor"
-        @set-align="setAlign"
-        @merge-right="mergeRight"
-        @merge-selection="mergeSelection"
-        @unmerge-active-cell="unmergeActiveCell"
-        @clear-active-cell="clearActiveCell"
-        @clear-selection="clearSelection"
-        @add-row="addRow"
-        @add-col="addCol"
+        @update:sheet="applyUniverSheet"
         @select-cell="selectCell"
         @select-range="selectRange"
         @drop-field="dropField"
-        @update-cell-value="updateCellValue"
-        @clear-cell="clearCellAt"
-        @merge-cell-right="mergeCellRightAt"
-        @unmerge-cell="unmergeCellAt"
-        @insert-row-after="insertRowAfter"
-        @insert-col-after="insertColAfter"
-        @delete-row="deleteRow"
-        @delete-col="deleteCol"
-        @paste-cells="pasteCells"
-        @fill-cells="fillCells"
-        @resize-column="resizeColumn"
-        @resize-row="resizeRow"
+        @move-bound-cell="moveBoundCell"
         @toggle-summary-row="toggleSummaryRow"
         @toggle-group-summary-row="toggleGroupSummaryRow"
         @toggle-detail-row="toggleDetailRow"
-        @zoom-in="zoomIn"
-        @zoom-out="zoomOut"
       />
+      <div v-else class="designer-canvas-loading">
+        <q-spinner color="primary" size="36px" />
+      </div>
 
       <aside class="designer-side-panel">
         <q-tabs
@@ -253,10 +223,9 @@
       :right-field-options="joinRightFieldOptions"
       :join-type-options="reportDatasetJoinTypeOptions"
       @update:left-dataset-id="handleJoinLeftDatasetChange"
-      @update:left-field="joinDraft.left_field = $event"
       @update:right-dataset-id="handleJoinRightDatasetChange"
-      @update:right-field="joinDraft.right_field = $event"
       @update:join-type="joinDraft.join_type = $event"
+      @update:conditions="joinDraft.conditions = $event"
       @confirm="confirmJoin"
     />
 
@@ -267,7 +236,7 @@
             <div class="dialog-title">{{ t('ui.runPreview') }}</div>
             <div class="dialog-caption">
               {{
-                form.id
+                previewUsingBackend
                   ? t('ui.realDataPreviewBackendDataPermissions')
                   : t('ui.previewOfLocalStructuresWithoutSavingReports')
               }}
@@ -277,7 +246,7 @@
         </q-card-section>
         <q-card-section>
           <div class="preview-meta">
-            <q-chip dense square color="primary" text-color="white">
+            <q-chip v-if="previewUsingBackend" dense square color="primary" text-color="white">
               {{ previewData.total }} {{ t('ui.okay') }}
             </q-chip>
             <q-chip v-if="previewData.meta?.version_no" dense square outline color="primary">
@@ -323,7 +292,7 @@ import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'report_design' })
 
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -333,6 +302,7 @@ import {
   type ReportCellBindingType,
   type ReportDataSource,
   type ReportDatasetJoin,
+  type ReportDatasetJoinCondition,
   type ReportDatasetJoinType,
   type ReportDataset,
   type ReportDatasetType,
@@ -372,17 +342,9 @@ import {
   reportBindingText,
   reportCellId,
   reportColumnName,
-  reportDeleteSheetColumn,
-  reportDeleteSheetRow,
-  reportFillSheetCells,
-  reportInsertSheetColumn,
-  reportInsertSheetRow,
   reportNormalizeSheetRange,
-  reportPasteSheetCells,
   reportSheetCellAt,
-  reportSheetCellSpan,
   reportValidateFormula,
-  type ReportSheetClipboardCell,
   type ReportSheetRange,
 } from 'src/modules/report/sheet'
 import {
@@ -402,6 +364,8 @@ const reportId = computed(() => Number(route.query.id || 0))
 const saving = ref(false)
 const publishing = ref(false)
 const previewLoading = ref(false)
+const previewUsingBackend = ref(false)
+const designerReady = ref(false)
 const dataSources = ref<ReportDataSource[]>([])
 const datasets = ref<ReportDataset[]>([])
 const datasetJoins = ref<ReportDatasetJoin[]>([])
@@ -426,12 +390,6 @@ const versionDialogVisible = ref(false)
 const previewData = ref<ReportPreviewRes>({ columns: [], rows: [], total: 0 })
 const publishedVersionId = ref<number | undefined>(undefined)
 const publishedVersionNo = ref<number | undefined>(undefined)
-const undoStack = ref<ReportSheetConfig[]>([])
-const redoStack = ref<ReportSheetConfig[]>([])
-const historyReady = ref(false)
-const historyRestoring = ref(false)
-let lastHistorySnapshot = defaultReportSheet()
-
 const form = reactive<ReportSaveReq>({
   report_name: '',
   report_code: '',
@@ -487,16 +445,14 @@ const parameterDraft = reactive<{
 
 const joinDraft = reactive<{
   left_dataset_id: string
-  left_field: string
   right_dataset_id: string
-  right_field: string
   join_type: ReportDatasetJoinType
+  conditions: ReportDatasetJoinCondition[]
 }>({
   left_dataset_id: '',
-  left_field: '',
   right_dataset_id: '',
-  right_field: '',
   join_type: 'left',
+  conditions: [{ left_field: '', right_field: '' }],
 })
 
 const sqlDraftFields = ref<ReportField[]>([])
@@ -656,30 +612,14 @@ const activeCellAlign = computed<'left' | 'center' | 'right'>({
   get: () => activeCell.value?.style?.align || 'left',
   set: (value) => patchCellStyle({ align: value }),
 })
-const canUndo = computed(() => undoStack.value.length > 0)
-const canRedo = computed(() => redoStack.value.length > 0)
-
-watch(
-  () => sheetHistorySignature(sheet.value),
-  () => {
-    const current = cloneSheet(sheet.value)
-    if (!historyReady.value || historyRestoring.value) {
-      lastHistorySnapshot = current
-      return
-    }
-    undoStack.value.push(lastHistorySnapshot)
-    if (undoStack.value.length > 100) undoStack.value.shift()
-    redoStack.value = []
-    lastHistorySnapshot = current
-  },
-  { flush: 'post' },
-)
-
 onMounted(async () => {
-  await loadDataSources()
-  await loadReport()
-  buildLocalPreview()
-  await resetSheetHistory()
+  try {
+    await loadDataSources()
+    await loadReport()
+    buildLocalPreview()
+  } finally {
+    designerReady.value = true
+  }
 })
 
 async function loadDataSources() {
@@ -1036,6 +976,31 @@ function dropField(row: number, col: number) {
   draggingField.value = null
 }
 
+function moveBoundCell(sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) {
+  if (sourceRow === targetRow && sourceCol === targetCol) return
+  const source = cellAt(sourceRow, sourceCol)
+  if (!source.binding || source.binding.type === 'static') return
+  const target = cellAt(targetRow, targetCol)
+  patchCell(targetRow, targetCol, {
+    value: source.value,
+    binding: { ...source.binding },
+    style: { ...(target.style || {}), ...(source.style || {}) },
+  })
+  const sourceStyle = { ...(source.style || {}) }
+  delete sourceStyle.color
+  delete sourceStyle.bold
+  patchCell(sourceRow, sourceCol, { value: '', binding: undefined, style: sourceStyle })
+  const sourceStillBound = sheet.value.cells.some(
+    (cell) => cell.row === sourceRow && cell.binding && cell.binding.type !== 'static',
+  )
+  if (!sourceStillBound) {
+    sheet.value.detail_rows = (sheet.value.detail_rows || []).filter((row) => row !== sourceRow)
+  }
+  markDetailRow(targetRow)
+  selectCell(targetRow, targetCol)
+  buildLocalPreview()
+}
+
 function bindFieldToActiveCell(dataset: ReportDataset, field: ReportField) {
   const cell = activeCell.value
   if (!cell) return
@@ -1090,16 +1055,8 @@ function patchActiveCell(patch: Partial<ReportSheetCell>) {
   patchCell(cell.row, cell.col, patch)
 }
 
-function updateCellValue(row: number, col: number, value: string) {
-  const cell = cellAt(row, col)
-  if (cell.binding?.type === 'formula') {
-    patchCell(row, col, {
-      value: normalizeFormulaDisplay(value),
-      binding: { ...cell.binding, formula: value },
-    })
-  } else {
-    patchCell(row, col, { value })
-  }
+function applyUniverSheet(value: ReportSheetConfig) {
+  sheet.value = value
   buildLocalPreview()
 }
 
@@ -1184,16 +1141,8 @@ function selectCell(row: number, col: number) {
   showProperties('cell')
 }
 
-function selectRange(row: number, col: number) {
-  const active = activeCell.value || cellAt(row, col)
-  selectionRange.value = {
-    startRow: active.row,
-    startCol: active.col,
-    endRow: row,
-    endCol: col,
-  }
-  selectedCellId.value = reportCellId(row, col)
-  sheet.value.active_cell = selectedCellId.value
+function selectRange(range: ReportSheetRange) {
+  selectionRange.value = range
   selectedParameterId.value = ''
   showProperties('cell')
 }
@@ -1210,148 +1159,6 @@ function toggleActiveSummaryRow() {
   showProperties('cell')
 }
 
-function clearActiveCell() {
-  const cell = activeCell.value
-  if (!cell) return
-  patchActiveCell({ value: '', binding: undefined, style: {}, rowspan: 1, colspan: 1 })
-  buildLocalPreview()
-}
-
-function toggleBold() {
-  activeCellBold.value = !activeCellBold.value
-}
-
-function toggleItalic() {
-  patchCellStyle({ italic: !activeCell.value?.style?.italic })
-}
-
-function setTextColor(value: string) {
-  if (value) patchCellStyle({ color: value })
-}
-
-function setBackgroundColor(value: string) {
-  if (value) patchCellStyle({ background: value })
-}
-
-function setAlign(value: 'left' | 'center' | 'right') {
-  activeCellAlign.value = value
-}
-
-function mergeRight() {
-  const cell = activeCell.value
-  if (!cell || cell.col >= sheet.value.cols) return
-  const nextCol = cell.col + (cell.colspan || 1)
-  if (nextCol <= sheet.value.cols && cellHasContent(cellAt(cell.row, nextCol))) {
-    $q.notify({
-      type: 'warning',
-      get message() {
-        return t('ui.rightCellAlreadyHasContentSelectTheAreaToMerge')
-      },
-    })
-    return
-  }
-  patchActiveCell({ colspan: Math.min((cell.colspan || 1) + 1, sheet.value.cols - cell.col + 1) })
-  buildLocalPreview()
-}
-
-function mergeSelection() {
-  const range = selectionRange.value
-  if (!range) return
-  const bounds = reportNormalizeSheetRange(range)
-  if (bounds.maxRow === bounds.minRow && bounds.maxCol === bounds.minCol) {
-    $q.notify({
-      type: 'warning',
-      get message() {
-        return t('ui.pleaseHoldShiftToSelectTheCellRangeToMerge')
-      },
-    })
-    return
-  }
-  const anchor = cellAt(bounds.minRow, bounds.minCol)
-  const blocked = cellsInBounds(bounds).some((cell) => {
-    if (cell.row === anchor.row && cell.col === anchor.col) return false
-    return cellHasContent(cell)
-  })
-  if (blocked) {
-    $q.notify({
-      type: 'warning',
-      get message() {
-        return t('ui.theContentsOfTheConsolidationAreaAreAvailablePleaseClear')
-      },
-    })
-    return
-  }
-  cellsInBounds(bounds).forEach((cell) => {
-    if (cell.row === anchor.row && cell.col === anchor.col) return
-    patchCell(cell.row, cell.col, {
-      value: '',
-      binding: undefined,
-      style: {},
-      rowspan: 1,
-      colspan: 1,
-    })
-  })
-  patchCell(anchor.row, anchor.col, {
-    rowspan: bounds.maxRow - bounds.minRow + 1,
-    colspan: bounds.maxCol - bounds.minCol + 1,
-  })
-  selectedCellId.value = anchor.id
-  selectionRange.value = {
-    startRow: anchor.row,
-    startCol: anchor.col,
-    endRow: anchor.row,
-    endCol: anchor.col,
-  }
-  buildLocalPreview()
-}
-
-function unmergeActiveCell() {
-  const cell = activeCell.value
-  if (!cell) return
-  unmergeCellAt(cell.row, cell.col)
-}
-
-function clearSelection() {
-  const range = selectionRange.value
-  if (!range) {
-    clearActiveCell()
-    return
-  }
-  const bounds = reportNormalizeSheetRange(range)
-  cellsInBounds(bounds).forEach((cell) => {
-    patchCell(cell.row, cell.col, {
-      value: '',
-      binding: undefined,
-      style: {},
-      rowspan: 1,
-      colspan: 1,
-    })
-  })
-  buildLocalPreview()
-}
-
-function clearCellAt(row: number, col: number) {
-  patchCell(row, col, { value: '', binding: undefined, style: {}, rowspan: 1, colspan: 1 })
-  buildLocalPreview()
-}
-
-function mergeCellRightAt(row: number, col: number) {
-  selectCell(row, col)
-  mergeRight()
-}
-
-function unmergeCellAt(row: number, col: number) {
-  const cell = cellAt(row, col)
-  const span = reportSheetCellSpan(cell, { maxRow: sheet.value.rows, maxCol: sheet.value.cols })
-  if (span.rowspan === 1 && span.colspan === 1) return
-  patchCell(row, col, { rowspan: 1, colspan: 1 })
-  buildLocalPreview()
-}
-
-function cellHasContent(cell: ReportSheetCell) {
-  return Boolean(cell.value || cell.binding?.field || cell.binding?.formula)
-}
-
 function cellsInBounds(bounds: ReturnType<typeof reportNormalizeSheetRange>) {
   const cells: ReportSheetCell[] = []
   for (let row = bounds.minRow; row <= bounds.maxRow; row += 1) {
@@ -1360,92 +1167,6 @@ function cellsInBounds(bounds: ReturnType<typeof reportNormalizeSheetRange>) {
     }
   }
   return cells
-}
-
-function addRow() {
-  sheet.value.rows += 1
-  buildLocalPreview()
-}
-
-function insertRowAfter(row: number) {
-  sheet.value = reportInsertSheetRow(sheet.value, row)
-  buildLocalPreview()
-}
-
-function addCol() {
-  sheet.value.cols += 1
-  buildLocalPreview()
-}
-
-function insertColAfter(col: number) {
-  sheet.value = reportInsertSheetColumn(sheet.value, col)
-  buildLocalPreview()
-}
-
-function deleteRow(row: number) {
-  const next = reportDeleteSheetRow(sheet.value, row)
-  if (next.rows === sheet.value.rows) return
-  sheet.value = next
-  selectCell(Math.min(row, next.rows), Math.min(activeCell.value?.col || 1, next.cols))
-  buildLocalPreview()
-}
-
-function deleteCol(col: number) {
-  const next = reportDeleteSheetColumn(sheet.value, col)
-  if (next.cols === sheet.value.cols) return
-  sheet.value = next
-  selectCell(Math.min(activeCell.value?.row || 1, next.rows), Math.min(col, next.cols))
-  buildLocalPreview()
-}
-
-function pasteCells(matrix: ReportSheetClipboardCell[][]) {
-  if (!matrix.length || !matrix.some((row) => row.length)) return
-  const bounds = selectionRange.value
-    ? reportNormalizeSheetRange(selectionRange.value)
-    : reportNormalizeSheetRange({
-        startRow: activeCell.value?.row || 1,
-        startCol: activeCell.value?.col || 1,
-        endRow: activeCell.value?.row || 1,
-        endCol: activeCell.value?.col || 1,
-      })
-  sheet.value = reportPasteSheetCells(sheet.value, bounds.minRow, bounds.minCol, matrix)
-  const maxColumns = Math.max(...matrix.map((row) => row.length), 1)
-  selectionRange.value = {
-    startRow: bounds.minRow,
-    startCol: bounds.minCol,
-    endRow: Math.min(bounds.minRow + matrix.length - 1, sheet.value.rows),
-    endCol: Math.min(bounds.minCol + maxColumns - 1, sheet.value.cols),
-  }
-  selectedCellId.value = reportCellId(bounds.minRow, bounds.minCol)
-  sheet.value.active_cell = selectedCellId.value
-  buildLocalPreview()
-}
-
-function fillCells(sourceRow: number, sourceCol: number, targetRow: number, targetCol: number) {
-  sheet.value = reportFillSheetCells(sheet.value, sourceRow, sourceCol, targetRow, targetCol)
-  selectionRange.value = {
-    startRow: sourceRow,
-    startCol: sourceCol,
-    endRow: targetRow,
-    endCol: targetCol,
-  }
-  selectedCellId.value = reportCellId(targetRow, targetCol)
-  sheet.value.active_cell = selectedCellId.value
-  buildLocalPreview()
-}
-
-function resizeColumn(col: number, width: number) {
-  sheet.value.column_widths = {
-    ...(sheet.value.column_widths || {}),
-    [String(col)]: width,
-  }
-}
-
-function resizeRow(row: number, height: number) {
-  sheet.value.row_heights = {
-    ...(sheet.value.row_heights || {}),
-    [String(row)]: height,
-  }
 }
 
 function toggleSummaryRow(row: number) {
@@ -1502,63 +1223,6 @@ function markDetailRow(row: number) {
   sheet.value.group_summary_rows = (sheet.value.group_summary_rows || []).filter(
     (item) => item !== row,
   )
-}
-
-function zoomIn() {
-  sheet.value.scale = Math.min((sheet.value.scale || 0.85) + 0.1, 1.5)
-}
-
-function zoomOut() {
-  sheet.value.scale = Math.max((sheet.value.scale || 0.85) - 0.1, 0.5)
-}
-
-function sheetHistorySignature(value: ReportSheetConfig) {
-  const editable = { ...value, active_cell: undefined, scale: undefined }
-  return JSON.stringify(editable)
-}
-
-function cloneSheet(value: ReportSheetConfig) {
-  return normalizeReportSheet(JSON.parse(JSON.stringify(value)) as ReportSheetConfig)
-}
-
-async function resetSheetHistory() {
-  historyReady.value = false
-  await nextTick()
-  undoStack.value = []
-  redoStack.value = []
-  lastHistorySnapshot = cloneSheet(sheet.value)
-  historyReady.value = true
-}
-
-async function undoSheetChange() {
-  const previous = undoStack.value.pop()
-  if (!previous) return
-  redoStack.value.push(cloneSheet(sheet.value))
-  await restoreSheetSnapshot(previous)
-}
-
-async function redoSheetChange() {
-  const next = redoStack.value.pop()
-  if (!next) return
-  undoStack.value.push(cloneSheet(sheet.value))
-  await restoreSheetSnapshot(next)
-}
-
-async function restoreSheetSnapshot(snapshot: ReportSheetConfig) {
-  historyRestoring.value = true
-  const restored = cloneSheet(snapshot)
-  restored.scale = sheet.value.scale
-  const [rawRow, rawCol] = selectedCellId.value.split(':').map(Number)
-  const row = Math.min(Math.max(rawRow || 1, 1), restored.rows)
-  const col = Math.min(Math.max(rawCol || 1, 1), restored.cols)
-  selectedCellId.value = reportCellId(row, col)
-  selectionRange.value = { startRow: row, startCol: col, endRow: row, endCol: col }
-  restored.active_cell = selectedCellId.value
-  sheet.value = restored
-  buildLocalPreview()
-  await nextTick()
-  lastHistorySnapshot = cloneSheet(sheet.value)
-  historyRestoring.value = false
 }
 
 function addParameter() {
@@ -1722,7 +1386,11 @@ function fieldName(datasetId: string, fieldCode: string) {
 
 function joinLabel(join: ReportDatasetJoin) {
   const relation = join.join_type === 'inner' ? '=' : '⇐'
-  return `${datasetName(join.left_dataset_id)}.${fieldName(join.left_dataset_id, join.left_field)} ${relation} ${datasetName(join.right_dataset_id)}.${fieldName(join.right_dataset_id, join.right_field)}`
+  const condition = join.conditions[0]
+  if (!condition)
+    return `${datasetName(join.left_dataset_id)} ${relation} ${datasetName(join.right_dataset_id)}`
+  const suffix = join.conditions.length > 1 ? ` +${join.conditions.length - 1}` : ''
+  return `${datasetName(join.left_dataset_id)}.${fieldName(join.left_dataset_id, condition.left_field)} ${relation} ${datasetName(join.right_dataset_id)}.${fieldName(join.right_dataset_id, condition.right_field)}${suffix}`
 }
 
 function openJoinDialog(id = '') {
@@ -1732,10 +1400,9 @@ function openJoinDialog(id = '') {
   const current = datasetJoins.value.find((item) => item.id === id)
   if (current) {
     joinDraft.left_dataset_id = current.left_dataset_id
-    joinDraft.left_field = current.left_field
     joinDraft.right_dataset_id = current.right_dataset_id
-    joinDraft.right_field = current.right_field
     joinDraft.join_type = current.join_type
+    joinDraft.conditions = current.conditions.map((condition) => ({ ...condition }))
     joinDialogVisible.value = true
     return
   }
@@ -1751,10 +1418,14 @@ function openJoinDialog(id = '') {
     datasets.value[1]
   const suggested = suggestJoinFields(left, right)
   joinDraft.left_dataset_id = left?.id || ''
-  joinDraft.left_field = suggested.leftField || left?.fields[0]?.code || ''
   joinDraft.right_dataset_id = right?.id || ''
-  joinDraft.right_field = suggested.rightField || right?.fields[0]?.code || ''
   joinDraft.join_type = 'left'
+  joinDraft.conditions = [
+    {
+      left_field: suggested.leftField || left?.fields[0]?.code || '',
+      right_field: suggested.rightField || right?.fields[0]?.code || '',
+    },
+  ]
   joinDialogVisible.value = true
 }
 
@@ -1783,21 +1454,35 @@ function reportSourceKey(dataset: ReportDataset) {
 
 function handleJoinLeftDatasetChange(id: string) {
   joinDraft.left_dataset_id = id
-  joinDraft.left_field = datasets.value.find((item) => item.id === id)?.fields[0]?.code || ''
+  const firstField = datasets.value.find((item) => item.id === id)?.fields[0]?.code || ''
+  joinDraft.conditions = joinDraft.conditions.map((condition) => ({
+    ...condition,
+    left_field: firstField,
+  }))
 }
 
 function handleJoinRightDatasetChange(id: string) {
   joinDraft.right_dataset_id = id
-  joinDraft.right_field = datasets.value.find((item) => item.id === id)?.fields[0]?.code || ''
+  const firstField = datasets.value.find((item) => item.id === id)?.fields[0]?.code || ''
+  joinDraft.conditions = joinDraft.conditions.map((condition) => ({
+    ...condition,
+    right_field: firstField,
+  }))
 }
 
 function confirmJoin() {
+  const conditions = joinDraft.conditions
+    .map((condition) => ({
+      left_field: condition.left_field.trim(),
+      right_field: condition.right_field.trim(),
+    }))
+    .filter((condition) => condition.left_field || condition.right_field)
   if (
     !joinDraft.left_dataset_id ||
-    !joinDraft.left_field ||
     !joinDraft.right_dataset_id ||
-    !joinDraft.right_field ||
-    joinDraft.left_dataset_id === joinDraft.right_dataset_id
+    joinDraft.left_dataset_id === joinDraft.right_dataset_id ||
+    !conditions.length ||
+    conditions.some((condition) => !condition.left_field || !condition.right_field)
   ) {
     $q.notify({
       type: 'warning',
@@ -1807,13 +1492,24 @@ function confirmJoin() {
     })
     return
   }
+  const conditionKeys = new Set(
+    conditions.map((condition) => `${condition.left_field}:${condition.right_field}`),
+  )
+  if (conditionKeys.size !== conditions.length) {
+    $q.notify({
+      type: 'warning',
+      get message() {
+        return t('ui.checkTheDatasetCorrelationFieldWhichMustBeFromThe')
+      },
+    })
+    return
+  }
   const duplicate = datasetJoins.value.find(
     (join) =>
       join.id !== editingJoinId.value &&
       join.left_dataset_id === joinDraft.left_dataset_id &&
-      join.left_field === joinDraft.left_field &&
       join.right_dataset_id === joinDraft.right_dataset_id &&
-      join.right_field === joinDraft.right_field,
+      JSON.stringify(join.conditions) === JSON.stringify(conditions),
   )
   if (duplicate) {
     $q.notify({
@@ -1827,10 +1523,9 @@ function confirmJoin() {
   const join: ReportDatasetJoin = {
     id: editingJoinId.value || `join_${Date.now()}`,
     left_dataset_id: joinDraft.left_dataset_id,
-    left_field: joinDraft.left_field,
     right_dataset_id: joinDraft.right_dataset_id,
-    right_field: joinDraft.right_field,
     join_type: joinDraft.join_type,
+    conditions,
   }
   const index = datasetJoins.value.findIndex((item) => item.id === join.id)
   if (index === -1) datasetJoins.value.push(join)
@@ -1868,8 +1563,18 @@ async function preview() {
     })
     return
   }
+  if (!usedFields.value.length) {
+    syncForm()
+    if (!validateReport(false)) return
+    previewUsingBackend.value = false
+    previewLoading.value = false
+    buildLocalPreview()
+    previewDialogVisible.value = true
+    return
+  }
   const id = await saveReport('draft', { strict: true, notify: false })
   if (!id) return
+  previewUsingBackend.value = true
   previewDialogVisible.value = true
   previewLoading.value = true
   try {
@@ -1882,6 +1587,7 @@ async function preview() {
     })
     previewData.value = res
   } catch (error) {
+    previewUsingBackend.value = false
     buildLocalPreview()
     const message =
       error instanceof Error && error.message
@@ -2113,9 +1819,17 @@ function validateDatasetJoins() {
       })
       return false
     }
-    const leftFieldExists = leftDataset.fields.some((field) => field.code === join.left_field)
-    const rightFieldExists = rightDataset.fields.some((field) => field.code === join.right_field)
-    if (!leftFieldExists || !rightFieldExists) {
+    const conditionsValid =
+      join.conditions.length > 0 &&
+      join.conditions.every(
+        (condition) =>
+          leftDataset.fields.some((field) => field.code === condition.left_field) &&
+          rightDataset.fields.some((field) => field.code === condition.right_field),
+      )
+    const conditionKeys = new Set(
+      join.conditions.map((condition) => `${condition.left_field}:${condition.right_field}`),
+    )
+    if (!conditionsValid || conditionKeys.size !== join.conditions.length) {
       $q.notify({
         type: 'warning',
         get message() {
@@ -2427,6 +2141,14 @@ function goBack() {
   border-left: 1px solid #dfe5f2;
   background: #fbfcff;
   overflow: hidden;
+}
+
+.designer-canvas-loading {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  background: #fff;
 }
 
 .side-panel-tabs {

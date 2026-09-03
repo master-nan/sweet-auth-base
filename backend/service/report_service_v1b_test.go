@@ -29,16 +29,18 @@ func TestReportOrderedDatasetJoinsOrdersAndOrientsFromPrimary(t *testing.T) {
 		{
 			Id:             "company_region",
 			LeftDatasetId:  "region",
-			LeftField:      "id",
 			RightDatasetId: "company",
-			RightField:     "region_id",
+			Conditions: []reportconfig.DatasetJoinCondition{
+				{LeftField: "id", RightField: "region_id"},
+			},
 		},
 		{
 			Id:             "order_company",
 			LeftDatasetId:  "main",
-			LeftField:      "company_id",
 			RightDatasetId: "company",
-			RightField:     "id",
+			Conditions: []reportconfig.DatasetJoinCondition{
+				{LeftField: "company_id", RightField: "id"},
+			},
 		},
 	}}}
 
@@ -49,7 +51,7 @@ func TestReportOrderedDatasetJoinsOrdersAndOrientsFromPrimary(t *testing.T) {
 	if len(joins) != 2 || joins[0].Id != "order_company" || joins[1].Id != "company_region" {
 		t.Fatalf("unexpected join order: %#v", joins)
 	}
-	if joins[1].LeftDatasetId != "company" || joins[1].LeftField != "region_id" || joins[1].RightDatasetId != "region" || joins[1].RightField != "id" {
+	if joins[1].LeftDatasetId != "company" || joins[1].Conditions[0].LeftField != "region_id" || joins[1].RightDatasetId != "region" || joins[1].Conditions[0].RightField != "id" {
 		t.Fatalf("second join should point from the connected dataset to the new dataset: %#v", joins[1])
 	}
 }
@@ -500,7 +502,7 @@ func reportV1BJoinedConfig() (datatypes.JSON, datatypes.JSON) {
 				{"code":"company_name","name":"公司名称","type":"string"}
 			]}
 		],
-		"dataset_joins":[{"id":"j1","left_dataset_id":"main","left_field":"company_id","right_dataset_id":"company","right_field":"id","join_type":"left"}],
+		"dataset_joins":[{"id":"j1","left_dataset_id":"main","right_dataset_id":"company","join_type":"left","conditions":[{"left_field":"company_id","right_field":"id"}]}],
 		"fields":[],
 		"parameters":[]
 	}`))
@@ -510,7 +512,7 @@ func reportV1BJoinedConfig() (datatypes.JSON, datatypes.JSON) {
 			{"id":"main","name":"订单","type":"table","source_code":"demo_order","primary":true},
 			{"id":"company","name":"公司","type":"table","source_code":"demo_company"}
 		],
-		"dataset_joins":[{"id":"j1","left_dataset_id":"main","left_field":"company_id","right_dataset_id":"company","right_field":"id","join_type":"left"}],
+		"dataset_joins":[{"id":"j1","left_dataset_id":"main","right_dataset_id":"company","join_type":"left","conditions":[{"left_field":"company_id","right_field":"id"}]}],
 		"parameters":[],
 		"sheet":{"rows":8,"cols":6,"cells":[
 			{"id":"A1","row":1,"col":1,"value":"订单名称","binding":{"type":"field","dataset_id":"main","field":"name"}},

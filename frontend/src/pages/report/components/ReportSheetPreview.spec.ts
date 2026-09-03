@@ -6,6 +6,37 @@ import type { ReportDataset } from 'src/modules/report/types'
 import ReportSheetPreview from './ReportSheetPreview.vue'
 
 describe('ReportSheetPreview', () => {
+  it('keeps a static detail-marked row once and preserves its sheet dimensions', () => {
+    const sheet = createBlankReportSheet(8, 6)
+    sheet.detail_rows = [1]
+    sheet.column_widths = { '1': 180, '2': 96 }
+    sheet.row_heights = { '1': 54 }
+    sheet.cells = [
+      { id: makeReportCellId(1, 1), row: 1, col: 1, value: '静态一' },
+      { id: makeReportCellId(1, 2), row: 1, col: 2, value: '静态二' },
+    ]
+
+    const wrapper = mount(ReportSheetPreview, {
+      props: {
+        sheet,
+        datasets: [],
+        reportKind: 'detail',
+        previewData: {
+          columns: [],
+          rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
+          total: 3,
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.report-sheet-preview__cell').map((cell) => cell.text())).toEqual([
+      '静态一',
+      '静态二',
+    ])
+    expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('180px 96px')
+    expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('54px')
+  })
+
   it('renders a subtotal for each data group and one global total', () => {
     const datasets: ReportDataset[] = [
       {

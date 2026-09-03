@@ -53,13 +53,17 @@ export interface ReportDataset {
   primary?: boolean
 }
 
+export interface ReportDatasetJoinCondition {
+  left_field: string
+  right_field: string
+}
+
 export interface ReportDatasetJoin {
   id: string
   left_dataset_id: string
-  left_field: string
   right_dataset_id: string
-  right_field: string
   join_type: ReportDatasetJoinType
+  conditions: ReportDatasetJoinCondition[]
 }
 
 export interface ReportParameter {
@@ -79,6 +83,7 @@ export interface ReportCellStyle {
   align?: 'left' | 'center' | 'right'
   background?: string
   color?: string
+  univer?: Record<string, unknown>
 }
 
 export interface ReportCellBinding {

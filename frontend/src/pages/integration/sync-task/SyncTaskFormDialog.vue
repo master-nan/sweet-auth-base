@@ -280,6 +280,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { primitiveText } from 'src/utils/primitive-text'
 
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
@@ -603,10 +604,10 @@ function applyPlan(plan: SyncExecutionInputPlan) {
     if (value !== undefined) {
       selectedStaticKeys.value.push(key)
       staticValues[key] = Array.isArray(value)
-        ? value.join(',')
+        ? value.map((item) => primitiveText(item)).join(',')
         : typeof value === 'boolean'
           ? value
-          : String(value)
+          : primitiveText(value)
     }
   }
   if (plan.window_start_binding) {

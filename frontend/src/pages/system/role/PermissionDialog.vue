@@ -699,7 +699,7 @@ const fallbackButtonIcon = (button: MenuButton) => {
 
 const derivedButtonApi = (button: MenuButton) => {
   const action = (button.event_action || '').trim()
-  if (action === SysMenuButtonEventAction.DETAIL && !button.api_path) {
+  if (action === String(SysMenuButtonEventAction.DETAIL) && !button.api_path) {
     return t('ui.openTheCurrentRecordDetailsPage')
   }
   return ''

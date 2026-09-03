@@ -880,7 +880,6 @@ export const reportCellStyle = (cell: ReportSheetCell) => {
 
 export const collectReportUsedFields = (datasets: ReportDataset[], sheet: ReportSheetConfig) => {
   const used = new Map<string, ReportField>()
-  const primary = datasets.find((item) => item.primary) || datasets[0]
   sheet.cells.forEach((cell) => {
     const binding = cell.binding
     if (!binding?.field || !binding.dataset_id) return
@@ -889,9 +888,6 @@ export const collectReportUsedFields = (datasets: ReportDataset[], sheet: Report
     const field = dataset.fields.find((item) => item.code === binding.field)
     if (field) used.set(`${dataset.id}:${field.code}`, field)
   })
-  if (used.size === 0 && primary) {
-    primary.fields.slice(0, 6).forEach((field) => used.set(field.code, field))
-  }
   return [...used.values()]
 }
 
@@ -911,26 +907,23 @@ export const buildReportLocalPreview = (
   sheet: ReportSheetConfig,
 ): ReportPreviewRes => {
   const boundFields = reportBoundFields(datasets, sheet)
-  const fallbackDataset = datasets.find((item) => item.primary) || datasets[0]
-  const fallbackFields =
-    boundFields.length || !fallbackDataset
-      ? boundFields
-      : fallbackDataset.fields.slice(0, 6).map((field) => ({ dataset: fallbackDataset, field }))
 
   return {
-    columns: fallbackFields.map((item) => item.field),
+    columns: boundFields.map((item) => item.field),
     datasets,
-    rows: [1, 2, 3].map((id) => {
-      const row: Record<string, unknown> = { id }
-      fallbackFields.forEach(({ dataset, field }, index) => {
-        const value = reportSampleCellValue(field, id, index)
-        row[reportRuntimeColumnAlias(dataset.id, field.code)] = value
-        row[reportRuntimeColumnAlias(dataset.source_code, field.code)] = value
-        row[field.code] = value
-      })
-      return row
-    }),
-    total: 3,
+    rows: boundFields.length
+      ? [1, 2, 3].map((id) => {
+          const row: Record<string, unknown> = { id }
+          boundFields.forEach(({ dataset, field }, index) => {
+            const value = reportSampleCellValue(field, id, index)
+            row[reportRuntimeColumnAlias(dataset.id, field.code)] = value
+            row[reportRuntimeColumnAlias(dataset.source_code, field.code)] = value
+            row[field.code] = value
+          })
+          return row
+        })
+      : [],
+    total: boundFields.length ? 3 : 0,
   }
 }
 

@@ -46,6 +46,7 @@ export type {
   ReportDataSource,
   ReportDataset,
   ReportDatasetJoin,
+  ReportDatasetJoinCondition,
   ReportDatasetJoinType,
   ReportDatasetType,
   ReportDesignerMode,
@@ -119,6 +120,28 @@ interface BackendReportColumn {
   type?: string
   code?: string
 }
+
+const normalizeDatasetJoin = (
+  join: Partial<ReportDatasetJoin>,
+  index: number,
+): ReportDatasetJoin => {
+  const conditions = (join.conditions || [])
+    .map((condition) => ({
+      left_field: String(condition.left_field || '').trim(),
+      right_field: String(condition.right_field || '').trim(),
+    }))
+    .filter((condition) => condition.left_field && condition.right_field)
+  return {
+    id: String(join.id || `join_${index + 1}`),
+    left_dataset_id: String(join.left_dataset_id || '').trim(),
+    right_dataset_id: String(join.right_dataset_id || '').trim(),
+    join_type: join.join_type === 'inner' ? 'inner' : 'left',
+    conditions,
+  }
+}
+
+const normalizeDatasetJoins = (joins: Partial<ReportDatasetJoin>[] = []) =>
+  joins.map(normalizeDatasetJoin)
 
 interface BackendReportPreview {
   columns: BackendReportColumn[]
@@ -198,6 +221,9 @@ const toReport = (item: BackendReport): Report => {
     ? fields
     : fallbackWidgetFields.map((code) => toField({ field: code, label: code }))
   const datasets = resolveDatasets(item, queryFields)
+  const sourceDatasetJoins =
+    item.query_config?.dataset_joins || item.layout_config?.dataset_joins || []
+  const datasetJoins = normalizeDatasetJoins(sourceDatasetJoins)
   const layout = {
     ...createReportLayout({ name: item.name, description: item.description || '' }),
     ...(item.layout_config || {}),
@@ -216,7 +242,7 @@ const toReport = (item: BackendReport): Report => {
     query_config: {
       version: item.query_config?.version || REPORT_SCHEMA_VERSION,
       datasets,
-      dataset_joins: item.query_config?.dataset_joins || layout.dataset_joins || [],
+      dataset_joins: datasetJoins,
       fields: queryFields,
       parameters: item.query_config?.parameters || layout.parameters || [],
     },
@@ -226,7 +252,7 @@ const toReport = (item: BackendReport): Report => {
       kind,
       runtime_display: layout.runtime_display || 'paged',
       runtime_page_size: Number(layout.runtime_page_size || 20),
-      dataset_joins: item.query_config?.dataset_joins || layout.dataset_joins || [],
+      dataset_joins: datasetJoins,
       parameters: item.query_config?.parameters || layout.parameters || [],
     },
     status: normalizeReportStatus(item.status || (item.remark === 'draft' ? 'draft' : 'published')),
@@ -261,8 +287,9 @@ const toBackendReport = (req: ReportSaveReq) => {
   const primary = primaryTableDataset(datasets)
   const sourceCode = primary?.source_code || String(req.data_source_id || '')
   const sourceLayout = req.layout_config
-  const datasetJoins =
-    req.dataset_joins || req.query_config?.dataset_joins || sourceLayout?.dataset_joins || []
+  const datasetJoins = normalizeDatasetJoins(
+    req.dataset_joins || req.query_config?.dataset_joins || sourceLayout?.dataset_joins || [],
+  )
   const parameters =
     req.parameters || req.query_config?.parameters || sourceLayout?.parameters || []
   const layoutConfig: ReportLayoutConfig = {
@@ -364,7 +391,7 @@ const toPreview = (data: BackendReportPreview): ReportPreviewRes => ({
     fields: (dataset.fields || []).map(toField),
     ...(dataset.source_code ? { source_code: dataset.source_code } : {}),
   })),
-  joins: data.joins || [],
+  joins: normalizeDatasetJoins(data.joins || []),
   ...(data.meta ? { meta: data.meta } : {}),
   ...(data.runtime_config
     ? {

@@ -99,15 +99,15 @@ const sourceColCount = computed(() =>
 
 const detailRows = computed(() => {
   const configured = props.sheet.detail_rows?.filter(
-    (row) => row >= 1 && row <= props.sheet.rows && rowHasTemplateContent(row),
+    (row) => row >= 1 && row <= props.sheet.rows && rowHasRepeatableBinding(row),
   )
   if (configured?.length) return [...new Set(configured)].sort((a, b) => a - b)
 
   const rows = new Set<number>()
   props.sheet.cells.forEach((cell) => {
     if (
-      (cell.binding?.field || cell.binding?.formula) &&
-      cell.binding.type !== 'static' &&
+      cell.binding?.field &&
+      ['field', 'group'].includes(cell.binding.type) &&
       !props.sheet.summary_rows?.includes(cell.row)
     ) {
       rows.add(cell.row)
@@ -124,28 +124,6 @@ const groupSummaryRows = computed(
       ),
     ),
 )
-
-const configuredRows = computed(() => {
-  const rows = new Set<number>()
-  ;(props.sheet.detail_rows || []).forEach((row) => {
-    if (rowHasTemplateContent(row)) rows.add(row)
-  })
-  ;(props.sheet.summary_rows || []).forEach((row) => {
-    if (rowHasTemplateContent(row)) rows.add(row)
-  })
-  props.sheet.cells.forEach((cell) => {
-    if (
-      cell.value ||
-      cell.binding?.field ||
-      cell.binding?.formula ||
-      (cell.colspan && cell.colspan > 1) ||
-      (cell.rowspan && cell.rowspan > 1)
-    ) {
-      rows.add(cell.row)
-    }
-  })
-  return [...rows].sort((a, b) => a - b)
-})
 
 const detailRowGroups = computed(() => {
   const groups: number[][] = []
@@ -171,7 +149,10 @@ const renderPlan = computed(() => {
   const rowsInDetailGroup = new Set(detailRowGroups.value.flat())
   let renderRow = 1
 
-  const sourceRows = configuredRows.value.length ? configuredRows.value : [usedBounds.value.minRow]
+  const sourceRows = Array.from(
+    { length: usedBounds.value.maxRow - usedBounds.value.minRow + 1 },
+    (_, index) => usedBounds.value.minRow + index,
+  )
   for (let index = 0; index < sourceRows.length; index += 1) {
     const sourceRow = sourceRows[index]!
     const detailGroup = groupByStart.get(sourceRow)
@@ -228,11 +209,11 @@ const gridStyle = computed(() => ({
   gridTemplateColumns: Array.from(
     { length: sourceColCount.value },
     (_, index) =>
-      `${props.sheet.column_widths?.[String(usedBounds.value.minCol + index)] || 118}px`,
+      `${props.sheet.column_widths?.[String(usedBounds.value.minCol + index)] || 120}px`,
   ).join(' '),
   gridTemplateRows: Array.from({ length: Math.max(renderRowCount.value, 1) }, (_, index) => {
     const sourceRow = renderPlan.value.find((item) => item.renderRow === index + 1)?.sourceRow
-    return `${props.sheet.row_heights?.[String(sourceRow || 0)] || 42}px`
+    return `${props.sheet.row_heights?.[String(sourceRow || 0)] || 34}px`
   }).join(' '),
 }))
 
@@ -306,6 +287,15 @@ function rowHasTemplateContent(sourceRow: number) {
     }
   }
   return false
+}
+
+function rowHasRepeatableBinding(sourceRow: number) {
+  return props.sheet.cells.some(
+    (cell) =>
+      cell.row === sourceRow &&
+      cell.binding?.field &&
+      ['field', 'group'].includes(cell.binding.type),
+  )
 }
 
 function cellAt(row: number, col: number): ReportSheetCell {
@@ -443,15 +433,55 @@ function aggregateCellValue(cell: ReportSheetCell) {
 
 function cellStyle(cell: ReportSheetCell) {
   const style = cell.style || {}
+  const univer = style.univer || {}
   const align = style.align || 'left'
+  const verticalAlign = Number(univer.vt || 0)
+  const wrapStrategy = Number(univer.tb || 0)
+  const padding = univer.pd as { t?: number; r?: number; b?: number; l?: number } | null | undefined
+  const decorations = [
+    isUniverDecorationEnabled(univer.ul) ? 'underline' : '',
+    isUniverDecorationEnabled(univer.st) ? 'line-through' : '',
+  ].filter(Boolean)
   return {
     textAlign: align,
     justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
+    alignItems: verticalAlign === 1 ? 'flex-start' : verticalAlign === 3 ? 'flex-end' : 'center',
     fontWeight: style.bold ? 800 : 500,
     fontStyle: style.italic ? 'italic' : 'normal',
+    fontFamily: typeof univer.ff === 'string' ? univer.ff : undefined,
+    fontSize: typeof univer.fs === 'number' ? `${univer.fs}pt` : undefined,
+    textDecoration: decorations.length ? decorations.join(' ') : undefined,
+    whiteSpace: wrapStrategy === 3 ? 'pre-wrap' : 'nowrap',
+    overflow: wrapStrategy === 1 ? 'visible' : 'hidden',
+    wordBreak: wrapStrategy === 3 ? 'break-word' : undefined,
+    padding:
+      padding && Object.values(padding).some((value) => typeof value === 'number')
+        ? `${padding.t ?? 0}px ${padding.r ?? 0}px ${padding.b ?? 0}px ${padding.l ?? 0}px`
+        : undefined,
+    borderTop: univerBorder(univer.bd, 't'),
+    borderRight: univerBorder(univer.bd, 'r'),
+    borderBottom: univerBorder(univer.bd, 'b'),
+    borderLeft: univerBorder(univer.bd, 'l'),
     background: style.background || undefined,
     color: style.color || '#172033',
   }
+}
+
+function isUniverDecorationEnabled(value: unknown) {
+  return Boolean(value && typeof value === 'object' && 's' in value && value.s === 1)
+}
+
+function univerBorder(value: unknown, side: 't' | 'r' | 'b' | 'l') {
+  if (!value || typeof value !== 'object' || !(side in value)) return undefined
+  const borders = value as Record<
+    string,
+    { s?: number; cl?: { rgb?: string | null } } | null | undefined
+  >
+  const border = borders[side]
+  if (!border?.s) return undefined
+  const width = border.s >= 13 ? 3 : border.s >= 8 ? 2 : 1
+  const lineStyle = border.s === 3 ? 'dotted' : border.s >= 4 && border.s <= 6 ? 'dashed' : 'solid'
+  return `${width}px ${lineStyle} ${border.cl?.rgb || '#9aa5b8'}`
 }
 </script>
 
@@ -475,12 +505,17 @@ function cellStyle(cell: ReportSheetCell) {
 
 .report-sheet-preview__scroll {
   max-height: min(62vh, 720px);
+  padding: 18px;
+  background: #f6f8fc;
   overflow: auto;
 }
 
 .report-sheet-preview__grid {
-  min-width: 100%;
+  width: max-content;
+  min-width: max-content;
   display: grid;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(23, 32, 51, 0.08);
 }
 
 .report-sheet-preview__cell {
@@ -495,23 +530,6 @@ function cellStyle(cell: ReportSheetCell) {
   vertical-align: middle;
   display: flex;
   align-items: center;
-}
-
-.report-sheet-preview__cell.is-bound {
-  background: #fbfaff;
-}
-
-.report-sheet-preview__cell.is-detail {
-  background: #fff;
-}
-
-.report-sheet-preview__cell.is-summary {
-  background: #fff8e8;
-  font-weight: 800;
-}
-
-.report-sheet-preview__cell.is-group-summary {
-  background: #eefbf6;
 }
 
 .report-sheet-preview__cell.is-empty {

@@ -50,12 +50,16 @@ type ReportPreviewDataset struct {
 }
 
 type ReportPreviewJoin struct {
-	Id             string `json:"id"`
-	LeftDatasetId  string `json:"left_dataset_id"`
-	LeftField      string `json:"left_field"`
-	RightDatasetId string `json:"right_dataset_id"`
-	RightField     string `json:"right_field"`
-	JoinType       string `json:"join_type"`
+	Id             string                       `json:"id"`
+	LeftDatasetId  string                       `json:"left_dataset_id"`
+	RightDatasetId string                       `json:"right_dataset_id"`
+	JoinType       string                       `json:"join_type"`
+	Conditions     []ReportPreviewJoinCondition `json:"conditions"`
+}
+
+type ReportPreviewJoinCondition struct {
+	LeftField  string `json:"left_field"`
+	RightField string `json:"right_field"`
 }
 
 type ReportPublishRes struct {

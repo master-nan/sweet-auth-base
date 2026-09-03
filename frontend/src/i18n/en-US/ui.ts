@@ -30,6 +30,9 @@ const ui = {
   addPermissionGrant: 'Add Grant',
   addPermissionPolicy: 'Add Policy',
   addRelation: 'Add Relation',
+  addCondition: 'Add Condition',
+  associationConditions: 'Join Conditions',
+  dragTheBoundFieldToAnotherCell: 'Drag to another cell',
   addressSummary: 'Address Summary',
   addRule: 'Add Rule',
   addSubdata: 'Add Subdata',
@@ -399,6 +402,7 @@ const ui = {
   detailRow: 'Detail Row',
   groupSummaryRow: 'Group Summary Row',
   normalRow: 'Normal Row',
+  reportRowTypeHint: 'Row type controls runtime expansion and aggregation',
   details: 'Details',
   detailsEditingAndRemovalOfInterfacesAreEquallyNotSubject:
     'Details, editing and removal of interfaces are equally not subject to overstepping.',

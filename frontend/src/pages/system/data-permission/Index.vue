@@ -412,8 +412,8 @@ const permissionSections: Array<{
 ]
 const listTabs: ListTabName[] = ['resources', 'ownerships', 'policies', 'grants']
 const activeTab = ref<ActiveTabName>('resources')
-const currentSection = computed(
-  () => permissionSections.find((section) => section.name === activeTab.value)!,
+const currentSection = computed(() =>
+  permissionSections.find((section) => section.name === activeTab.value)!,
 )
 const loadingByTab = reactive<Record<ListTabName, boolean>>({
   resources: false,
@@ -1085,22 +1085,24 @@ const toggleResource = (row: DataResource) => {
           })
         : t('ui.confirmDataPermissionToDisable', { value1: row.name })
     },
-  }).onOk(async () => {
-    const result = await api.setResourcePermission(row.id, enabled)
-    if (!result.data.valid) {
+  }).onOk(() => {
+    void (async () => {
+      const result = await api.setResourcePermission(row.id, enabled)
+      if (!result.data.valid) {
+        $q.notify({
+          type: 'negative',
+          message: result.data.errors.map((item) => item.message).join('；'),
+        })
+        return
+      }
       $q.notify({
-        type: 'negative',
-        message: result.data.errors.map((item) => item.message).join('；'),
+        type: 'positive',
+        get message() {
+          return enabled ? t('ui.dataPermissionsEnabled') : t('ui.dataPermissionsDisabled')
+        },
       })
-      return
-    }
-    $q.notify({
-      type: 'positive',
-      get message() {
-        return enabled ? t('ui.dataPermissionsEnabled') : t('ui.dataPermissionsDisabled')
-      },
-    })
-    await fetchTab('resources')
+      await fetchTab('resources')
+    })()
   })
 }
 const toggleOwnership = (row: DataOwnership) => {
@@ -1112,15 +1114,17 @@ const toggleOwnership = (row: DataOwnership) => {
     get message() {
       return t('ui.confirmThatIsDisabled', { value1: row.ownership_code })
     },
-  }).onOk(async () => {
-    await api.disableOwnership(row.id)
-    $q.notify({
-      type: 'positive',
-      get message() {
-        return t('ui.ownershipDefinitionDisabled')
-      },
-    })
-    await fetchTab('ownerships')
+  }).onOk(() => {
+    void (async () => {
+      await api.disableOwnership(row.id)
+      $q.notify({
+        type: 'positive',
+        get message() {
+          return t('ui.ownershipDefinitionDisabled')
+        },
+      })
+      await fetchTab('ownerships')
+    })()
   })
 }
 const togglePolicy = (row: DataPolicy) => {
@@ -1135,24 +1139,26 @@ const togglePolicy = (row: DataPolicy) => {
         value2: row.name,
       })
     },
-  }).onOk(async () => {
-    const result = await api.setPolicyState(row.id, enabled)
-    if (!result.data.valid) {
-      $q.notify({
-        type: 'negative',
-        message: result.data.errors.map((item) => item.message).join('；'),
-      })
-      return
-    }
-    $q.notify({
-      type: 'positive',
-      get message() {
-        return t('ui.permissionPolicyActionResult', {
-          value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+  }).onOk(() => {
+    void (async () => {
+      const result = await api.setPolicyState(row.id, enabled)
+      if (!result.data.valid) {
+        $q.notify({
+          type: 'negative',
+          message: result.data.errors.map((item) => item.message).join('；'),
         })
-      },
-    })
-    await fetchTab('policies')
+        return
+      }
+      $q.notify({
+        type: 'positive',
+        get message() {
+          return t('ui.permissionPolicyActionResult', {
+            value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+          })
+        },
+      })
+      await fetchTab('policies')
+    })()
   })
 }
 const toggleGrant = (row: DataGrant) => {
@@ -1166,22 +1172,26 @@ const toggleGrant = (row: DataGrant) => {
         value1: enabled ? t('ui.enabled') : t('ui.disabled'),
       })
     },
-  }).onOk(async () => {
-    const result = await api.setGrantState(row.id, enabled)
-    if (!result.data.valid) {
+  }).onOk(() => {
+    void (async () => {
+      const result = await api.setGrantState(row.id, enabled)
+      if (!result.data.valid) {
+        $q.notify({
+          type: 'negative',
+          message: result.data.errors.map((item) => item.message).join('；'),
+        })
+        return
+      }
       $q.notify({
-        type: 'negative',
-        message: result.data.errors.map((item) => item.message).join('；'),
+        type: 'positive',
+        get message() {
+          return t('ui.permissionGrantActionResult', {
+            value1: enabled ? t('ui.enabled') : t('ui.disabled'),
+          })
+        },
       })
-      return
-    }
-    $q.notify({
-      type: 'positive',
-      get message() {
-        return t('ui.permissionGrantActionResult', { value1: enabled ? t('ui.enabled') : t('ui.disabled') })
-      },
-    })
-    await fetchTab('grants')
+      await fetchTab('grants')
+    })()
   })
 }
 
