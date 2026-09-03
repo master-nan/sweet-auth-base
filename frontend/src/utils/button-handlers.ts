@@ -1,6 +1,6 @@
-import { translate as t } from 'src/boot/i18n'
-import { SysMenuButtonEventAction } from 'src/types/enum'
-import type { MenuButton } from 'src/api/services/sys-menu'
+import { translate as t } from '@/boot/i18n'
+import { SysMenuButtonEventAction } from '@/types/enum'
+import type { MenuButton } from '@/api/services/sys-menu'
 
 export type PageActionHandler<Row> = (row: Row | undefined, button: MenuButton) => void
 export type PageActionHandlers<Row> = Partial<Record<string, PageActionHandler<Row>>>

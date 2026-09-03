@@ -31,8 +31,8 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoleApi, type Role } from 'src/api/services/sys-role'
-import SweetSelect from 'src/components/Select/SweetSelect.vue'
+import { useRoleApi, type Role } from '@/api/services/sys-role'
+import SweetSelect from '@/components/Select/SweetSelect.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 

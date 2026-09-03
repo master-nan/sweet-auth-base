@@ -193,7 +193,7 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import {
   type DataGrant,
   type DataOwnership,
@@ -201,8 +201,8 @@ import {
   type DataResource,
   type DataResourceOperationItem,
   useDataPermissionConfigApi,
-} from 'src/api/services/data-permission-config'
-import type { Query } from 'src/types/global'
+} from '@/api/services/data-permission-config'
+import type { Query } from '@/types/global'
 
 const { t } = useI18n({ useScope: 'global' })
 

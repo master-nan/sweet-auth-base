@@ -17,7 +17,7 @@ defineOptions({ name: 'DarkMode' })
 import { Dark } from 'quasar'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
-import { useThemeStore } from 'src/stores/theme'
+import { useThemeStore } from '@/stores/theme'
 
 const $q = useQuasar()
 const themeStore = useThemeStore()

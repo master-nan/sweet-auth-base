@@ -78,12 +78,12 @@
 defineOptions({ name: 'ToolbarItem' })
 
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from 'src/stores/user'
-import DarkMode from 'src/components/Toolbar/DarkMode.vue'
-import { useAppStore } from 'src/stores/app'
-import LangSelector from 'src/components/Toolbar/LangSelector.vue'
+import { useUserStore } from '@/stores/user'
+import DarkMode from '@/components/Toolbar/DarkMode.vue'
+import { useAppStore } from '@/stores/app'
+import LangSelector from '@/components/Toolbar/LangSelector.vue'
 import { useQuasar } from 'quasar'
-import NotificationPopover from 'src/components/Notification/NotificationPopover.vue'
+import NotificationPopover from '@/components/Notification/NotificationPopover.vue'
 
 const $q = useQuasar()
 const emit = defineEmits<{ 'open-settings': [] }>()

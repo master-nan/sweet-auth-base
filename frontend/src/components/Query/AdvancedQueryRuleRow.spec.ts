@@ -2,24 +2,24 @@ import { defineComponent, h, nextTick } from 'vue'
 import { shallowMount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {
     get: vi.fn(),
   },
 }))
 
-import AdvancedQueryRuleRow from 'src/components/Query/AdvancedQueryRuleRow.vue'
+import AdvancedQueryRuleRow from '@/components/Query/AdvancedQueryRuleRow.vue'
 import {
   ExpressionLogic,
   ExpressionType,
   SysTableFieldInputType,
   SysTableFieldType,
-} from 'src/types/enum'
-import type { QueryRule } from 'src/types/global'
+} from '@/types/enum'
+import type { QueryRule } from '@/types/global'
 import type {
   OrganizationSelectorRuntimeConfig,
   OrganizationSelectorType,
-} from 'src/types/organization-selector'
+} from '@/types/organization-selector'
 
 const OrganizationSelectStub = defineComponent({
   name: 'OrganizationSelect',

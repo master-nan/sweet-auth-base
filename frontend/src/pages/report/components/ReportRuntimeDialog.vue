@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Report } from 'src/api/services/report'
+import type { Report } from '@/api/services/report'
 import ReportRuntimeView from './ReportRuntimeView.vue'
 
 withDefaults(

@@ -1,5 +1,5 @@
 import { computed, type ComputedRef } from 'vue'
-import { useUserStore } from 'src/stores/user'
+import { useUserStore } from '@/stores/user'
 import {
   resolveOrganizationDetailMode,
   type OrganizationDetailMode,

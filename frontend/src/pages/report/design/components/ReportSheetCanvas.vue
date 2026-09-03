@@ -109,14 +109,14 @@ import { useQuasar } from 'quasar'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { ReportDataset, ReportDatasetJoin, ReportSheetConfig } from 'src/api/services/report'
-import { reportColumnName, type ReportSheetRange } from 'src/modules/report/sheet'
+import type { ReportDataset, ReportDatasetJoin, ReportSheetConfig } from '@/api/services/report'
+import { reportColumnName, type ReportSheetRange } from '@/modules/report/sheet'
 import {
   copyReportUniverCellMetadata,
   getReportUniverFillSourceIndex,
   reportSheetToUniverSnapshot,
   univerSnapshotToReportSheet,
-} from 'src/modules/report/univer'
+} from '@/modules/report/univer'
 
 type ReportRowType = 'normal' | 'detail' | 'groupSummary' | 'summary'
 

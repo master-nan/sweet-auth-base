@@ -1,4 +1,4 @@
-import type { Menu, MenuButton } from 'src/api/services/sys-menu'
+import type { Menu, MenuButton } from '@/api/services/sys-menu'
 
 export function isPageButton(button: MenuButton): boolean {
   return button.is_button

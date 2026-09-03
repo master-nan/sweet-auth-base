@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTableQueryState } from './table-query-state'
-import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
-import type { Query } from 'src/types/global'
+import { QuerySchemeType, QuerySchemeValidationStatus } from '@/modules/query-scheme/types'
+import type { Query } from '@/types/global'
 
 const api = vi.hoisted(() => ({
   available: vi.fn(),
@@ -17,8 +17,8 @@ const scope = vi.hoisted(() => ({
   available: { value: true },
   loadScope: vi.fn(),
 }))
-vi.mock('src/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
-vi.mock('src/composables/query-scope', () => ({ useQueryScope: () => scope }))
+vi.mock('@/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
+vi.mock('@/composables/query-scope', () => ({ useQueryScope: () => scope }))
 
 import { useQuerySchemes } from './query-schemes'
 

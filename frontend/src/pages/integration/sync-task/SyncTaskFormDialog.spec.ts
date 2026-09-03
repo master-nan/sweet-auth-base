@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({ getInterfaceDefinition: vi.fn() }))
 vi.mock('quasar', () => ({}))
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
 import SyncTaskFormDialog from './SyncTaskFormDialog.vue'
 
 const FieldStub = defineComponent({

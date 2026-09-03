@@ -319,18 +319,18 @@ import {
   ExpressionType,
   ExpressionTypeMap,
   SysTableFieldType,
-} from 'src/types/enum'
-import type { Query, QueryRule } from 'src/types/global'
-import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+} from '@/types/enum'
+import type { Query, QueryRule } from '@/types/global'
+import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
 import {
   coerceFieldValue,
   isBooleanFieldMetadata,
   parseLinkageConfig,
   queryValueHtmlInputType,
   resolveOrganizationSelectorConfig,
-} from 'src/utils/field-metadata'
+} from '@/utils/field-metadata'
 import {
   isIncompleteQueryRule,
   isMultiValueExpressionType,
@@ -339,16 +339,16 @@ import {
   splitMultiValueText,
   normalizeQuerySchemePayload,
   queryExpressionDepth,
-} from 'src/utils/query-state'
-import type { TableField } from 'src/api/services/sys-table'
+} from '@/utils/query-state'
+import type { TableField } from '@/api/services/sys-table'
 import {
   QUERY_SCHEME_BINDING_LABELS,
   type QuerySchemeBinding,
-} from 'src/modules/query-scheme/types'
-import { findMenuByName, toPositiveMenuId } from 'src/utils/menu-context'
+} from '@/modules/query-scheme/types'
+import { findMenuByName, toPositiveMenuId } from '@/utils/menu-context'
 import AdvancedQueryRuleRow from './AdvancedQueryRuleRow.vue'
-import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
-import { Router } from 'src/router'
+import QuerySchemePreview from '@/components/QueryScheme/QuerySchemePreview.vue'
+import { Router } from '@/router'
 
 const { t } = useI18n({ useScope: 'global' })
 

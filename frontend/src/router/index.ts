@@ -1,4 +1,4 @@
-import { route } from 'quasar/wrappers'
+import { defineRouter } from '#q-app'
 import {
   createMemoryHistory,
   createRouter,
@@ -29,10 +29,12 @@ function reloadOnceForFreshAssets() {
   window.location.reload()
 }
 
-export default route(function (/* { store, ssrContext } */) {
-  const createHistory = process.env.SERVER
+export default defineRouter(function (/* { store, ssrContext } */) {
+  const createHistory = import.meta.env.QUASAR_SERVER
     ? createMemoryHistory
-    : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory)
+    : import.meta.env.VUE_ROUTER_MODE === 'history'
+      ? createWebHistory
+      : createWebHashHistory
 
   Router = createRouter({
     scrollBehavior: () => ({
@@ -42,7 +44,7 @@ export default route(function (/* { store, ssrContext } */) {
     routes: constantRoutes,
 
     // Router模式和publicPath由Quasar构建配置统一决定。
-    history: createHistory(process.env.VUE_ROUTER_BASE)
+    history: createHistory(import.meta.env.VUE_ROUTER_BASE)
   })
   Router.onError((error) => {
     if (isDynamicImportError(error)) {

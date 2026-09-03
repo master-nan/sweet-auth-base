@@ -82,30 +82,30 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
 import {
   getSyncBatchDetail,
   getSyncBatchError,
   querySyncRecords,
   type SyncBatchDetail,
   type SyncRecordListItem,
-} from 'src/api/services/org'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { usePageButtons } from 'src/composables/page-buttons'
-import OrganizationRecordDetailContent from 'src/pages/organization/components/OrganizationRecordDetailContent.vue'
-import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
+} from '@/api/services/org'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { usePageButtons } from '@/composables/page-buttons'
+import OrganizationRecordDetailContent from '@/pages/organization/components/OrganizationRecordDetailContent.vue'
+import OrganizationRecordDetailDialog from '@/pages/organization/components/OrganizationRecordDetailDialog.vue'
 import type {
   OrganizationDetailItem,
   OrganizationDetailSection,
-} from 'src/pages/organization/components/organization-record-detail'
+} from '@/pages/organization/components/organization-record-detail'
 import {
   createOrganizationQuery,
   formatOrganizationDateTime,
   formatOrganizationValue,
   organizationSyncObjectLabel,
   organizationStatusColor,
-} from 'src/pages/organization/organization-list-page'
-import { useDictStore } from 'src/stores/dict'
+} from '@/pages/organization/organization-list-page'
+import { useDictStore } from '@/stores/dict'
 
 const { t } = useI18n({ useScope: 'global' })
 

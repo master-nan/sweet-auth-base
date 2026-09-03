@@ -1,10 +1,10 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
-import { useQuerySchemes, type SchemeAwareQueryState } from 'src/composables/query-schemes'
-import type { QuerySchemePayloadV1, QuerySchemeSummary } from 'src/modules/query-scheme/types'
-import type { Query } from 'src/types/global'
+import { useQuerySchemes, type SchemeAwareQueryState } from '@/composables/query-schemes'
+import type { QuerySchemePayloadV1, QuerySchemeSummary } from '@/modules/query-scheme/types'
+import type { Query } from '@/types/global'
 
 export const QUERY_SCHEME_NAVIGATION_STATE_KEY = 'query_scheme_id'
 

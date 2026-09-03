@@ -1,7 +1,7 @@
-import { translate as t } from 'src/boot/i18n'
-import { instance } from 'boot/axios'
-import type { Basic, Query, ResponseData } from 'src/types/global'
-import { parseBlobJsonError, parseContentDispositionFilename } from 'src/utils/download'
+import { translate as t } from '@/boot/i18n'
+import { instance } from '@/boot/axios'
+import type { Basic, Query, ResponseData } from '@/types/global'
+import { parseBlobJsonError, parseContentDispositionFilename } from '@/utils/download'
 import {
   createReportLayout,
   defaultReportSheet,
@@ -11,7 +11,7 @@ import {
   normalizeReportSheet,
   primaryTableDataset,
   REPORT_SCHEMA_VERSION,
-} from 'src/modules/report/schema'
+} from '@/modules/report/schema'
 import type {
   Report,
   ReportDataSource,
@@ -31,13 +31,13 @@ import type {
   ReportRuntimeConfig,
   ReportSaveReq,
   ReportVersion,
-} from 'src/modules/report/types'
+} from '@/modules/report/types'
 
 export {
   createBlankReportSheet as createBlankSheet,
   defaultReportSheet,
   makeReportCellId,
-} from 'src/modules/report/schema'
+} from '@/modules/report/schema'
 export type {
   Report,
   ReportCellBinding,
@@ -83,7 +83,7 @@ export type {
   ReportSheetConfig,
   ReportStatus,
   ReportVersion,
-} from 'src/modules/report/types'
+} from '@/modules/report/types'
 
 interface BackendReport extends Basic {
   code: string

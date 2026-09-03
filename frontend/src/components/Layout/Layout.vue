@@ -8,7 +8,7 @@
 
 <script lang="ts" setup>
 defineOptions({ name: 'MyLayout' })
-import { useKeepAliveStore } from 'src/stores/keep-alive'
+import { useKeepAliveStore } from '@/stores/keep-alive'
 
 const keepAliveStore = useKeepAliveStore()
 </script>

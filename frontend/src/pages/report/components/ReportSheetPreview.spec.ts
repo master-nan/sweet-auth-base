@@ -1,8 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 
-import { createBlankReportSheet, makeReportCellId } from 'src/modules/report/schema'
-import type { ReportDataset } from 'src/modules/report/types'
+import { createBlankReportSheet, makeReportCellId } from '@/modules/report/schema'
+import type { ReportDataset } from '@/modules/report/types'
 import ReportSheetPreview from './ReportSheetPreview.vue'
 
 describe('ReportSheetPreview', () => {

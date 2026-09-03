@@ -316,16 +316,16 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import type { TableField } from 'src/api/services/sys-table'
-import CascaderSelect from 'src/components/Cascader/CascaderSelect.vue'
-import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
-import FileUpload from 'src/components/FileUpload/FileUpload.vue'
-import LinkageConfigEditor from 'src/components/FormDialog/LinkageConfigEditor.vue'
-import ArrayInput from 'src/components/JsonEditor/ArrayInput.vue'
-import JsonEditor from 'src/components/JsonEditor/JsonEditor.vue'
-import KeyValueEditor from 'src/components/JsonEditor/KeyValueEditor.vue'
-import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
-import type { resolveOrganizationSelectorConfig } from 'src/utils/field-metadata'
+import type { TableField } from '@/api/services/sys-table'
+import CascaderSelect from '@/components/Cascader/CascaderSelect.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
+import FileUpload from '@/components/FileUpload/FileUpload.vue'
+import LinkageConfigEditor from '@/components/FormDialog/LinkageConfigEditor.vue'
+import ArrayInput from '@/components/JsonEditor/ArrayInput.vue'
+import JsonEditor from '@/components/JsonEditor/JsonEditor.vue'
+import KeyValueEditor from '@/components/JsonEditor/KeyValueEditor.vue'
+import OrganizationSelect from '@/components/Select/OrganizationSelect.vue'
+import type { resolveOrganizationSelectorConfig } from '@/utils/field-metadata'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -388,7 +388,7 @@ const emit = defineEmits<{
 }>()
 
 const RichTextEditor = defineAsyncComponent(
-  () => import('src/components/RichTextEditor/RichTextEditor.vue'),
+  () => import('@/components/RichTextEditor/RichTextEditor.vue'),
 )
 
 const value = computed({

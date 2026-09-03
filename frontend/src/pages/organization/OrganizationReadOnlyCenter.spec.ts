@@ -10,9 +10,9 @@ const apiMocks = vi.hoisted(() => ({
   getOrgUnitDetail: vi.fn(),
 }))
 
-vi.mock('src/api/services/org', () => apiMocks)
+vi.mock('@/api/services/org', () => apiMocks)
 
-vi.mock('src/stores/dict', () => ({
+vi.mock('@/stores/dict', () => ({
   useDictStore: () => ({
     loadDicts: vi.fn().mockResolvedValue(undefined),
     getDictLabel: (_dictCode: string, value: unknown) =>
@@ -22,13 +22,13 @@ vi.mock('src/stores/dict', () => ({
   }),
 }))
 
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => {
     throw new Error('平台刷新不应读取 MenuButton')
   },
 }))
 
-import StructurePage from 'src/pages/organization/structure/Index.vue'
+import StructurePage from '@/pages/organization/structure/Index.vue'
 
 const SlotHostStub = defineComponent({
   name: 'SlotHostStub',

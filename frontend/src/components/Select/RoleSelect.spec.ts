@@ -6,7 +6,7 @@ const roleApi = vi.hoisted(() => ({
   queryRole: vi.fn(),
   queryRoleById: vi.fn(),
 }))
-vi.mock('src/api/services/sys-role', () => ({ useRoleApi: () => roleApi }))
+vi.mock('@/api/services/sys-role', () => ({ useRoleApi: () => roleApi }))
 
 import RoleSelect from './RoleSelect.vue'
 

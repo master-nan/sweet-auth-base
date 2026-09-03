@@ -1,4 +1,4 @@
-import type { Basic, Query } from 'src/types/global'
+import type { Basic, Query } from '@/types/global'
 
 export type ReportStatus = 'draft' | 'published' | 'disabled'
 export type ReportKind = 'detail' | 'summary'

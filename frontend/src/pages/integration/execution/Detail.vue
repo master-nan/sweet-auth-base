@@ -116,18 +116,18 @@ import { useI18n } from 'vue-i18n'
 defineOptions({ name: 'integration_execution_detail_page' })
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
-import DetailPageShell from 'src/components/Detail/DetailPageShell.vue'
-import type { DetailFieldItem } from 'src/components/Detail/types'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import DetailFieldGrid from '@/components/Detail/DetailFieldGrid.vue'
+import DetailPageShell from '@/components/Detail/DetailPageShell.vue'
+import type { DetailFieldItem } from '@/components/Detail/types'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
   type IntegrationExecutionDetail,
   type IntegrationLogListItem,
-} from 'src/api/services/integration'
-import { usePageButtons } from 'src/composables/page-buttons'
+} from '@/api/services/integration'
+import { usePageButtons } from '@/composables/page-buttons'
 import type { QTableProps } from 'quasar'
-import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import { formatRetryReason, formatRuntimeDateTime } from '@/pages/integration/runtime-display'
 
 const { t } = useI18n({ useScope: 'global' })
 

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { nextTick } from 'vue'
-import { readUIPreferences, writeUIPreferences } from 'src/utils/ui-preferences'
+import { readUIPreferences, writeUIPreferences } from '@/utils/ui-preferences'
 
 interface APP {
   reload_flag: boolean

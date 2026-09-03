@@ -38,18 +38,18 @@ const permissions = vi.hoisted(() => ({
 }))
 const notify = vi.hoisted(() => vi.fn())
 const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
-vi.mock('src/composables/query-scheme-page', async () => {
-  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
+vi.mock('@/composables/query-scheme-page', async () => {
+  const { createQuerySchemePageStub } = await import('@/test/query-scheme-page-stub')
   return {
     useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
 })
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } }, notify }) }))
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => api }))
-vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => api }))
+vi.mock('@/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     top_buttons: computed(() => buttons.top),
     line_buttons: computed(() => buttons.line),
@@ -57,19 +57,19 @@ vi.mock('src/composables/page-buttons', () => ({
     hasGrantedCapability: (code: string) => permissions.values.includes(code),
   }),
 }))
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({
     confirmAction: () => ({ onOk: (callback: () => void) => callback() }),
   }),
 }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
-vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./SyncTaskFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./SyncTaskDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 import Page from './Index.vue'
-import type { SyncTaskListItem } from 'src/api/services/integration'
+import type { SyncTaskListItem } from '@/api/services/integration'
 const Slot = defineComponent({
   setup(_, { slots }) {
     return () => h('div', slots.default?.())

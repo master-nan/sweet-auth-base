@@ -84,15 +84,15 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed } from 'vue'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
-import type { OrganizationDetailMode } from 'src/pages/organization/organization-detail-mode'
+import type { MenuButton } from '@/api/services/sys-menu'
+import DetailFieldGrid from '@/components/Detail/DetailFieldGrid.vue'
+import type { OrganizationDetailMode } from '@/pages/organization/organization-detail-mode'
 import type {
   OrganizationDetailItem,
   OrganizationDetailSection,
 } from './organization-record-detail'
-import { evaluateButtonDisabled } from 'src/utils/button-handlers'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import { evaluateButtonDisabled } from '@/utils/button-handlers'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
 
 const { t } = useI18n({ useScope: 'global' })
 

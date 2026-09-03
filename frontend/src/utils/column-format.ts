@@ -1,18 +1,18 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 /**
  * 列表列格式化工具
  * 统一处理日期时间、字典、布尔、关联表字段的列显示
  */
-import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
-import type { TableField } from 'src/api/services/sys-table'
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
-import type { TableColumn } from 'src/types/global'
-import { parseLinkageConfig } from 'src/utils/field-metadata'
-import { useUserStore } from 'src/stores/user'
-import { findMenuByName, toPositiveMenuId } from 'src/utils/menu-context'
-import { Router } from 'src/router'
+import { SysTableFieldType, SysTableFieldInputType } from '@/types/enum'
+import type { TableField } from '@/api/services/sys-table'
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
+import type { TableColumn } from '@/types/global'
+import { parseLinkageConfig } from '@/utils/field-metadata'
+import { useUserStore } from '@/stores/user'
+import { findMenuByName, toPositiveMenuId } from '@/utils/menu-context'
+import { Router } from '@/router'
 
-export { parseLinkageConfig } from 'src/utils/field-metadata'
+export { parseLinkageConfig } from '@/utils/field-metadata'
 
 // ─── 日期时间格式化 ───────────────────────────────────
 

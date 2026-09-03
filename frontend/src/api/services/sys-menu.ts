@@ -1,11 +1,11 @@
-import type { Basic, Query, ResponseData } from 'src/types/global'
+import type { Basic, Query, ResponseData } from '@/types/global'
 import type {
   SysDetailOpenMode,
   SysMenuButtonDisplayMode,
   SysMenuButtonPosition,
-} from 'src/types/enum'
-import { type Role } from 'src/api/services/sys-role'
-import { instance } from 'boot/axios'
+} from '@/types/enum'
+import { type Role } from '@/api/services/sys-role'
+import { instance } from '@/boot/axios'
 
 export interface MenuButton extends Basic {
   menu_id: number

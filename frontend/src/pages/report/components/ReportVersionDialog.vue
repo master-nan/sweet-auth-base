@@ -96,7 +96,7 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
-import { useReportApi, type ReportVersion } from 'src/api/services/report'
+import { useReportApi, type ReportVersion } from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

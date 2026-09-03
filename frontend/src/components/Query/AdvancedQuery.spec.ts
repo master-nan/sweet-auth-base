@@ -1,9 +1,9 @@
 import { defineComponent, h, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
-import type { Query, QueryRule } from 'src/types/global'
-import type { OrganizationSelectorType } from 'src/types/organization-selector'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
+import type { Query, QueryRule } from '@/types/global'
+import type { OrganizationSelectorType } from '@/types/organization-selector'
 
 const loadDictsMock = vi.hoisted(() => vi.fn())
 const notifyMock = vi.hoisted(() => vi.fn())
@@ -21,30 +21,30 @@ vi.mock('quasar', () => ({
   }),
 }))
 
-vi.mock('src/stores/dict', () => ({
+vi.mock('@/stores/dict', () => ({
   useDictStore: () => ({
     getDictOptions: () => [],
     loadDicts: loadDictsMock,
   }),
 }))
 
-vi.mock('src/stores/user', () => ({
+vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     menus: [],
   }),
 }))
 
-vi.mock('src/router', () => ({
+vi.mock('@/router', () => ({
   Router: { currentRoute: { value: { name: '' } } },
 }))
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {
     post: postMock,
   },
 }))
 
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
 
 const SlotStub = defineComponent({
   setup(_, { slots }) {

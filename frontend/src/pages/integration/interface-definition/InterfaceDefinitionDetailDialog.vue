@@ -84,15 +84,15 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
-import type { DetailFieldItem } from 'src/components/Detail/types'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import DetailFieldGrid from '@/components/Detail/DetailFieldGrid.vue'
+import type { DetailFieldItem } from '@/components/Detail/types'
 import {
   type InterfaceDefinitionDetail,
   type InterfaceInputDataType,
   type InterfaceInputLocation,
   useIntegrationApi,
-} from 'src/api/services/integration'
+} from '@/api/services/integration'
 
 const { t } = useI18n({ useScope: 'global' })
 

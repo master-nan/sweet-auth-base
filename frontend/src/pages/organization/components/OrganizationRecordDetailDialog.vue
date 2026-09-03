@@ -100,12 +100,12 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import DetailFieldGrid from 'src/components/Detail/DetailFieldGrid.vue'
-import DetailSectionNavigation from 'src/components/Detail/DetailSectionNavigation.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import { evaluateButtonDisabled } from 'src/utils/button-handlers'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+import type { MenuButton } from '@/api/services/sys-menu'
+import DetailFieldGrid from '@/components/Detail/DetailFieldGrid.vue'
+import DetailSectionNavigation from '@/components/Detail/DetailSectionNavigation.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import { evaluateButtonDisabled } from '@/utils/button-handlers'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
 import OrganizationRecordDetailContent from './OrganizationRecordDetailContent.vue'
 import type { OrganizationDetailMode } from '../organization-detail-mode'
 import type {

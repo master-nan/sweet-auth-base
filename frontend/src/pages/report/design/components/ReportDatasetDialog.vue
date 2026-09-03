@@ -144,7 +144,7 @@ import type {
   ReportDataset,
   ReportDatasetType,
   ReportField,
-} from 'src/api/services/report'
+} from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

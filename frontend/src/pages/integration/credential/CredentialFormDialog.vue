@@ -150,14 +150,14 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
-import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import type {
   CredentialDetail,
   CredentialSecret,
   CredentialType,
   ExternalSystemListItem,
-} from 'src/api/services/integration'
+} from '@/api/services/integration'
 
 const { t } = useI18n({ useScope: 'global' })
 

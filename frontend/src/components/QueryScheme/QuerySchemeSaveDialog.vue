@@ -60,7 +60,7 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { QuerySchemeType, type QuerySchemeSource } from 'src/modules/query-scheme/types'
+import { QuerySchemeType, type QuerySchemeSource } from '@/modules/query-scheme/types'
 
 const { t } = useI18n({ useScope: 'global' })
 

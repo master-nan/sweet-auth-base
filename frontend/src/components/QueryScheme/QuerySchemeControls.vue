@@ -60,15 +60,15 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref } from 'vue'
-import type { TableField } from 'src/api/services/sys-table'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QueryQuickPresets from 'src/components/QueryScheme/QueryQuickPresets.vue'
-import QuerySchemeSaveDialog from 'src/components/QueryScheme/QuerySchemeSaveDialog.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import type { QuerySchemePageController } from 'src/composables/query-scheme-page'
-import type { TableQueryState } from 'src/composables/table-query-state'
-import type { Query } from 'src/types/global'
-import { countEffectiveQueryRules } from 'src/utils/query-state'
+import type { TableField } from '@/api/services/sys-table'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
+import QueryQuickPresets from '@/components/QueryScheme/QueryQuickPresets.vue'
+import QuerySchemeSaveDialog from '@/components/QueryScheme/QuerySchemeSaveDialog.vue'
+import QuerySchemeSelector from '@/components/QueryScheme/QuerySchemeSelector.vue'
+import type { QuerySchemePageController } from '@/composables/query-scheme-page'
+import type { TableQueryState } from '@/composables/table-query-state'
+import type { Query } from '@/types/global'
+import { countEffectiveQueryRules } from '@/utils/query-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

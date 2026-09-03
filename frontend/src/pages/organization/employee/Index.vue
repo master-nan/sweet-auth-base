@@ -217,12 +217,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   bindEmployeeUser,
   getEmployeeDetail,
@@ -236,29 +236,29 @@ import {
   type EmployeeListItem,
   type EmployeeQueryRequest,
   type EmployeeUserOption,
-} from 'src/api/services/org'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import { useDictStore } from 'src/stores/dict'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { resolveRuntimeColumns } from 'src/utils/column-format'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
-import type { TableColumn } from 'src/types/global'
-import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import AssignmentScopeSwitch from 'src/pages/organization/employee/AssignmentScopeSwitch.vue'
-import type { OrganizationDetailSection } from 'src/pages/organization/components/organization-record-detail'
-import { useOrganizationDetailMode } from 'src/pages/organization/use-organization-detail-mode'
+} from '@/api/services/org'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import { useDictStore } from '@/stores/dict'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { resolveRuntimeColumns } from '@/utils/column-format'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
+import type { TableColumn } from '@/types/global'
+import OrganizationRecordDetailDialog from '@/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import AssignmentScopeSwitch from '@/pages/organization/employee/AssignmentScopeSwitch.vue'
+import type { OrganizationDetailSection } from '@/pages/organization/components/organization-record-detail'
+import { useOrganizationDetailMode } from '@/pages/organization/use-organization-detail-mode'
 import {
   createOrganizationQuery,
   formatOrganizationDate,
   formatOrganizationDateTime,
   formatOrganizationValue,
   organizationStatusColor,
-} from 'src/pages/organization/organization-list-page'
+} from '@/pages/organization/organization-list-page'
 
 const { t } = useI18n({ useScope: 'global' })
 

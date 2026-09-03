@@ -171,58 +171,58 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import DetailPageShell from 'src/components/Detail/DetailPageShell.vue'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
-import OrganizationSyncBatchDetail from 'src/pages/organization/sync-batch/Detail.vue'
-import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
-import { useFileApi } from 'src/api/services/file'
-import { useGeneralizationApi } from 'src/api/services/generalization'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useDictStore } from 'src/stores/dict'
-import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
-import { useTagViewStore } from 'src/stores/tagView'
-import { useUserStore } from 'src/stores/user'
-import { useLoadingStore } from 'src/stores/loading'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import DetailPageShell from '@/components/Detail/DetailPageShell.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import FileDisplay from '@/components/FileUpload/FileDisplay.vue'
+import OrganizationSyncBatchDetail from '@/pages/organization/sync-batch/Detail.vue'
+import { useAccessLogApi, type AccessLog } from '@/api/services/access-log'
+import { useFileApi } from '@/api/services/file'
+import { useGeneralizationApi } from '@/api/services/generalization'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { type RuntimeTableMetadata, type TableField } from '@/api/services/sys-table'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useDictStore } from '@/stores/dict'
+import { useBreadcrumbsStore } from '@/stores/breadcrumbs'
+import { useTagViewStore } from '@/stores/tagView'
+import { useUserStore } from '@/stores/user'
+import { useLoadingStore } from '@/stores/loading'
 import {
   SysMenuButtonPosition,
   SysTableFieldInputType,
   SysTableFieldType,
   SysTableFieldTypeMap,
-} from 'src/types/enum'
-import type { RouteData } from 'src/types'
+} from '@/types/enum'
+import type { RouteData } from '@/types'
 import {
   findMenuByName,
   findMenuByTableCode,
   findMenuPathByTableCode,
   findMenuTrailById,
-} from 'src/utils/menu-context'
-import { hasButtonActionCapability, isAvailablePageButton } from 'src/utils/menu-button'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+} from '@/utils/menu-context'
+import { hasButtonActionCapability, isAvailablePageButton } from '@/utils/menu-button'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
 import {
   evaluateButtonDisabled,
   executeButtonAction,
   runAfterHooks,
   runBeforeHooks,
   type ButtonActionContext,
-} from 'src/utils/button-handlers'
+} from '@/utils/button-handlers'
 import {
   buildColumnFormat,
   buildRelationLookups,
   hydrateRelationLookups,
   type LookupMap,
-} from 'src/utils/column-format'
-import { hydrateRichTextFileUrls } from 'src/utils/rich-text-files'
+} from '@/utils/column-format'
+import { hydrateRichTextFileUrls } from '@/utils/rich-text-files'
 import {
   getFieldDetailSpan,
   isDetailFieldVisible,
   normalizeFieldLabel,
-} from 'src/utils/field-layout'
-import { parseParamsSchema } from 'src/utils/params-schema'
+} from '@/utils/field-layout'
+import { parseParamsSchema } from '@/utils/params-schema'
 
 const { t } = useI18n({ useScope: 'global' })
 

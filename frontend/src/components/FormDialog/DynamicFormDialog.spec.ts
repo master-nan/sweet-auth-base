@@ -1,40 +1,40 @@
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import type { OrganizationSelectorType } from 'src/types/organization-selector'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import type { OrganizationSelectorType } from '@/types/organization-selector'
 
 const loadDictsMock = vi.hoisted(() => vi.fn())
 const queryDictMock = vi.hoisted(() => vi.fn())
 const postMock = vi.hoisted(() => vi.fn())
 
-vi.mock('src/stores/dict', () => ({
+vi.mock('@/stores/dict', () => ({
   useDictStore: () => ({
     getDictOptions: () => [],
     loadDicts: loadDictsMock,
   }),
 }))
 
-vi.mock('src/stores/user', () => ({
+vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     menus: [],
   }),
 }))
 
-vi.mock('src/stores/loading', () => ({
+vi.mock('@/stores/loading', () => ({
   useLoadingStore: () => ({
     loading: false,
   }),
 }))
 
-vi.mock('src/api/services/sys-dict', () => ({
+vi.mock('@/api/services/sys-dict', () => ({
   useDictApi: () => ({
     queryDict: queryDictMock,
   }),
 }))
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {
     post: postMock,
   },
@@ -46,7 +46,7 @@ vi.mock('pinia', () => ({
   }),
 }))
 
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
 
 const FormDialogShellStub = defineComponent({
   name: 'FormDialogShell',

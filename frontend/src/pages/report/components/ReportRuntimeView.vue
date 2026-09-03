@@ -127,9 +127,9 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import TablePagination from 'components/Table/TablePagination.vue'
-import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
-import type { Report } from 'src/api/services/report'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
+import type { Report } from '@/api/services/report'
 import ReportSheetPreview from './ReportSheetPreview.vue'
 import { useReportRuntime } from '../composables/useReportRuntime'
 import { useReportExport } from '../composables/useReportExport'

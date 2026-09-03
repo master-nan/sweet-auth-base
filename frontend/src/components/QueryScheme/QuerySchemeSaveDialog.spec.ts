@@ -1,7 +1,7 @@
 import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
-import { QuerySchemeType } from 'src/modules/query-scheme/types'
+import { QuerySchemeType } from '@/modules/query-scheme/types'
 
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { sm: false } } }) }))
 import QuerySchemeSaveDialog from './QuerySchemeSaveDialog.vue'

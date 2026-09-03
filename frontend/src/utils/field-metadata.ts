@@ -1,10 +1,10 @@
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import type { TableField } from 'src/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import type { TableField } from '@/api/services/sys-table'
 import type {
   OrganizationSelectorFieldMetadata,
   OrganizationSelectorRuntimeConfig,
   OrganizationSelectorType,
-} from 'src/types/organization-selector'
+} from '@/types/organization-selector'
 
 export type FieldControlType =
   | 'input'

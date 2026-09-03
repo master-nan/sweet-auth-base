@@ -5,7 +5,7 @@ import {
   readUIPreferences,
   writeUIPreferences,
   type LayoutMode,
-} from 'src/utils/ui-preferences'
+} from '@/utils/ui-preferences'
 
 const { changeAlpha, getPaletteColor, lighten, luminosity } = colors
 const preferences = readUIPreferences()

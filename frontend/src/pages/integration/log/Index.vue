@@ -155,26 +155,26 @@ defineOptions({ name: 'integration_log' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps } from 'quasar'
 import { useRoute } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   useIntegrationApi,
   type IntegrationLogDetail,
   type IntegrationLogListItem,
   type IntegrationLogQuery,
-} from 'src/api/services/integration'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { formatRetryReason, formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
-import { countEffectiveQueryRules } from 'src/utils/query-state'
-import { ExpressionType } from 'src/types/enum'
+} from '@/api/services/integration'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { formatRetryReason, formatRuntimeDateTime } from '@/pages/integration/runtime-display'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
+import { countEffectiveQueryRules } from '@/utils/query-state'
+import { ExpressionType } from '@/types/enum'
 
 const { t } = useI18n({ useScope: 'global' })
 

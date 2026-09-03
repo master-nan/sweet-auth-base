@@ -1,12 +1,12 @@
-import { defineBoot } from '#q-app/wrappers'
-import { useRouterStore } from 'stores/permission'
-import { useUserStore } from 'stores/user'
+import { defineBoot } from '#q-app'
+import { useRouterStore } from '@/stores/permission'
+import { useUserStore } from '@/stores/user'
 import cloneDeep from 'lodash/cloneDeep'
-import { asyncRoutesChildren, asyncRootRoute } from 'src/router/routes'
-import constructionRouters from 'src/router/utils'
+import { asyncRoutesChildren, asyncRootRoute } from '@/router/routes'
+import constructionRouters from '@/router/utils'
 import type { RouteRecordRaw } from 'vue-router'
-import { useSysUserApi } from 'src/api/services/sys-user'
-import { useMenuApi, type Menu } from 'src/api/services/sys-menu'
+import { useSysUserApi } from '@/api/services/sys-user'
+import { useMenuApi, type Menu } from '@/api/services/sys-menu'
 import { LocalStorage } from 'quasar'
 
 function collectButtonCodes(menus: Menu[]): string[] {
@@ -51,7 +51,7 @@ export default defineBoot(({ router }) => {
   }
 
   // 设置全局路由守卫
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach(async (to) => {
     // 检查用户是否已登录
     const isLogin = userStore.isLogin
     const changePasswordPath = '/change-password'
@@ -59,90 +59,83 @@ export default defineBoot(({ router }) => {
     if (isLogin) {
       // 已登录用户不能访问登录页面
       if (to.path === '/login') {
-        next({ path: userStore.must_change_password ? changePasswordPath : '/admin/home' })
-        return
+        return { path: userStore.must_change_password ? changePasswordPath : '/admin/home' }
       }
 
       if (to.path === changePasswordPath) {
-        next()
         return
       }
 
       if (userStore.must_change_password) {
-        next({ path: changePasswordPath })
-        return
+        return { path: changePasswordPath }
       }
 
       // 如果已有用户信息和权限路由，直接放行
       if (userStore.getUserName !== '' && routerStore.getPermissionRoutes.length) {
-        next()
-      } else {
-        const sessionGeneration = userStore.session_generation
-        try {
-          // 如果没有用户信息，获取用户信息
-          if (userStore.getUserName === '') {
-            const res = await me()
-            if (sessionGeneration !== userStore.session_generation) {
-              next(false)
-              return
-            }
-            if (res.success) {
-              userStore.setUserInfo(res.data)
-            }
-            if (userStore.must_change_password) {
-              next({ path: changePasswordPath })
-              return
-            }
-          }
-          if (!userStore.menus.length || !userStore.menu_names.length) {
-            // 获取权限菜单，收集按钮编码和菜单名称
-            const menuRes = await menuApi.queryMyMenu()
-            if (sessionGeneration !== userStore.session_generation) {
-              next(false)
-              return
-            }
-            if (menuRes.success && menuRes.data) {
-              userStore.buttons = collectButtonCodes(menuRes.data)
-              userStore.menu_names = collectMenuNames(menuRes.data)
-              userStore.menus = menuRes.data
-            }
-          }
-          // 根据权限构建动态路由
-          const accessRoutes = cloneDeep(asyncRoutesChildren)
-          asyncRootRoute[0]!.children = constructionRouters(accessRoutes)
-          routerStore.setRoutes(asyncRootRoute)
-
-          // 动态添加路由
-          for (const item of asyncRootRoute) {
-            router.addRoute(item as RouteRecordRaw)
-          }
-
-          // 重新导航到目标路由
-          next({
-            ...to,
-            replace: true,
-          })
-        } catch (error) {
-          if (
-            (error instanceof Error && error.name === 'StaleSessionResponseError') ||
-            sessionGeneration !== userStore.session_generation
-          ) {
-            next(false)
-            return
-          }
-          console.error('路由权限初始化失败:', error)
-          next('/login')
-        }
+        return
       }
-    } else {
-      // 处理未登录用户的路由访问
-      if (to.path === '/login' || to.path === '/404') {
-        // 允许访问不需要权限的路由
-        next()
-      } else {
-        // 重定向到登录页
-        next({ path: '/login' })
+
+      const sessionGeneration = userStore.session_generation
+      try {
+        // 如果没有用户信息，获取用户信息
+        if (userStore.getUserName === '') {
+          const res = await me()
+          if (sessionGeneration !== userStore.session_generation) {
+            return false
+          }
+          if (res.success) {
+            userStore.setUserInfo(res.data)
+          }
+          if (userStore.must_change_password) {
+            return { path: changePasswordPath }
+          }
+        }
+        if (!userStore.menus.length || !userStore.menu_names.length) {
+          // 获取权限菜单，收集按钮编码和菜单名称
+          const menuRes = await menuApi.queryMyMenu()
+          if (sessionGeneration !== userStore.session_generation) {
+            return false
+          }
+          if (menuRes.success && menuRes.data) {
+            userStore.buttons = collectButtonCodes(menuRes.data)
+            userStore.menu_names = collectMenuNames(menuRes.data)
+            userStore.menus = menuRes.data
+          }
+        }
+        // 根据权限构建动态路由
+        const accessRoutes = cloneDeep(asyncRoutesChildren)
+        asyncRootRoute[0]!.children = constructionRouters(accessRoutes)
+        routerStore.setRoutes(asyncRootRoute)
+
+        // 动态添加路由
+        for (const item of asyncRootRoute) {
+          router.addRoute(item as RouteRecordRaw)
+        }
+
+        // 重新导航到目标路由
+        return {
+          ...to,
+          replace: true,
+        }
+      } catch (error) {
+        if (
+          (error instanceof Error && error.name === 'StaleSessionResponseError') ||
+          sessionGeneration !== userStore.session_generation
+        ) {
+          return false
+        }
+        console.error('路由权限初始化失败:', error)
+        return '/login'
       }
     }
+
+    // 处理未登录用户的路由访问
+    if (to.path === '/login' || to.path === '/404') {
+      // 允许访问不需要权限的路由
+      return
+    }
+
+    // 重定向到登录页
+    return { path: '/login' }
   })
 })

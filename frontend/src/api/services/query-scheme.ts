@@ -1,6 +1,6 @@
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
-import type { ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
+import type { ResponseData } from '@/types/global'
 import type {
   PersonalSchemeUpdate,
   PersonalSchemeWrite,
@@ -12,7 +12,7 @@ import type {
   QuerySchemeSummary,
   SharedSchemeUpdate,
   SharedSchemeWrite,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 export const useQuerySchemeApi = () => ({
   getScopeConfig: (scopeCode: string) =>

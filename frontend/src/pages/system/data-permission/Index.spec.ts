@@ -58,7 +58,7 @@ const permissionButtons = vi.hoisted(() => ({
   }>,
 }))
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {},
 }))
 
@@ -66,38 +66,38 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ meta: { icon: 'shield' } }),
 }))
 
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 
-vi.mock('src/components/Table/TablePagination.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({
   default: { template: '<div />' },
 }))
 
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
+vi.mock('@/components/Query/AdvancedQuery.vue', () => ({
   default: { template: '<div />' },
 }))
 
-vi.mock('src/api/services/data-permission-config', () => {
+vi.mock('@/api/services/data-permission-config', () => {
   return {
     useDataPermissionConfigApi: () => apiMocks,
   }
 })
 
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     top_buttons: computed(() => permissionButtons.top),
     line_buttons: computed(() => permissionButtons.line),
   }),
 }))
 
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({
     confirmAction: vi.fn(() => ({ onOk: vi.fn() })),
   }),
 }))
 
-vi.mock('src/api/services/sys-table', () => {
+vi.mock('@/api/services/sys-table', () => {
   return {
     useTableApi: () => ({
       queryTable: vi.fn().mockResolvedValue({ data: [], total: 0 }),
@@ -106,13 +106,13 @@ vi.mock('src/api/services/sys-table', () => {
   }
 })
 
-vi.mock('src/api/services/sys-role', () => ({
+vi.mock('@/api/services/sys-role', () => ({
   useRoleApi: () => ({
     queryRole: vi.fn().mockResolvedValue({ data: [], total: 0 }),
   }),
 }))
 
-vi.mock('src/api/services/sys-user', () => ({
+vi.mock('@/api/services/sys-user', () => ({
   useSysUserApi: () => ({
     queryUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
   }),

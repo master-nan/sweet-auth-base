@@ -1,12 +1,12 @@
 import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
-import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
-import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
+import { QuerySchemeBindingKind } from '@/modules/query-scheme/types'
 
-vi.mock('src/stores/dict', () => ({ useDictStore: () => ({ getDictLabel: () => '异常' }) }))
-vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+vi.mock('@/stores/dict', () => ({ useDictStore: () => ({ getDictLabel: () => '异常' }) }))
+vi.mock('@/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
 import QuerySchemePreview from './QuerySchemePreview.vue'
 
 const BadgeStub = defineComponent({ props: { label: String }, setup(props) { return () => h('span', props.label) } })

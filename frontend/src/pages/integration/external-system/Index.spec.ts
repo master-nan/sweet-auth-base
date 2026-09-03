@@ -32,26 +32,26 @@ vi.mock('quasar', () => ({
   useQuasar: () => ({ screen: { lt: { md: false } } }),
 }))
 
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: routerPush }) }))
 
-vi.mock('src/api/services/integration', () => ({
+vi.mock('@/api/services/integration', () => ({
   useIntegrationApi: () => apiMocks,
 }))
 
-vi.mock('src/composables/query-scheme-page', async () => {
-  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
+vi.mock('@/composables/query-scheme-page', async () => {
+  const { createQuerySchemePageStub } = await import('@/test/query-scheme-page-stub')
   return {
     useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
 })
 
-vi.mock('src/api/services/sys-table', () => ({
+vi.mock('@/api/services/sys-table', () => ({
   useTableApi: () => tableApiMocks,
 }))
 
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     top_buttons: computed(() => permissionButtons.top),
     line_buttons: computed(() => permissionButtons.line),
@@ -59,21 +59,21 @@ vi.mock('src/composables/page-buttons', () => ({
   }),
 }))
 
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({
     confirmAction: vi.fn(() => ({ onOk: vi.fn() })),
   }),
 }))
 
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 
-vi.mock('src/components/Table/TablePagination.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({
   default: { template: '<div />' },
 }))
 
-vi.mock('src/components/FormDialog/DynamicFormDialog.vue', () => ({
+vi.mock('@/components/FormDialog/DynamicFormDialog.vue', () => ({
   default: { template: '<div />' },
 }))
 

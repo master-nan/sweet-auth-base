@@ -14,22 +14,22 @@ const tableApi = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => api }))
-vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
-vi.mock('src/composables/query-scheme-page', async () => {
-  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => api }))
+vi.mock('@/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
+vi.mock('@/composables/query-scheme-page', async () => {
+  const { createQuerySchemePageStub } = await import('@/test/query-scheme-page-stub')
   return {
     useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
 })
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
-vi.mock('src/stores/loading', () => ({ useLoadingStore: () => ({ loading: false }) }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
+vi.mock('@/stores/loading', () => ({ useLoadingStore: () => ({ loading: false }) }))
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
-vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/FormDialog/FormDialogShell.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/FormDialog/FormDialogShell.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
 import Page from './Index.vue'

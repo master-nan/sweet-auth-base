@@ -96,14 +96,14 @@
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Route } from 'src/types/index'
+import type { Route } from '@/types/index'
 import { QMenu, openURL } from 'quasar'
-import { useThemeStore } from 'src/stores/theme'
-import { useAppStore } from 'src/stores/app'
-import { useUserStore } from 'src/stores/user'
-import { findMenuPathByTableCode } from 'src/utils/menu-context'
+import { useThemeStore } from '@/stores/theme'
+import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
+import { findMenuPathByTableCode } from '@/utils/menu-context'
 import { storeToRefs } from 'pinia'
-import { resolveRouteTitle } from 'src/utils/route-title'
+import { resolveRouteTitle } from '@/utils/route-title'
 
 defineOptions({ name: 'BaseMenuItem' })
 

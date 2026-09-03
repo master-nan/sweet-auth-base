@@ -1,11 +1,11 @@
-import { translate as t } from 'src/boot/i18n'
-import { defineBoot } from '#q-app/wrappers'
+import { translate as t } from '@/boot/i18n'
+import { defineBoot } from '#q-app'
 import axios, { type AxiosInstance } from 'axios'
 import type { InternalAxiosRequestConfig, AxiosRequestHeaders, AxiosResponse } from 'axios'
-import { isStaleSessionSnapshot, useUserStore } from 'src/stores/user'
+import { isStaleSessionSnapshot, useUserStore } from '@/stores/user'
 import { LocalStorage, Notify } from 'quasar'
-import type { ResponseData } from 'src/types/global'
-import { useLoadingStore } from 'src/stores/loading'
+import type { ResponseData } from '@/types/global'
+import { useLoadingStore } from '@/stores/loading'
 
 export interface HttpResponse<T = unknown> {
   total?: number

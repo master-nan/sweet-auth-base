@@ -585,18 +585,18 @@
 <script setup lang="ts">
 defineOptions({ name: 'generalization_page' })
 
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import MasterDetailPage from 'src/components/MasterDetail/MasterDetailPage.vue'
-import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import FileDisplay from 'src/components/FileUpload/FileDisplay.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import MasterDetailPage from '@/components/MasterDetail/MasterDetailPage.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import FileDisplay from '@/components/FileUpload/FileDisplay.vue'
 import {
   MasterDetailDisplayMode,
   resolveMasterDetailDisplayMode,
-} from 'src/components/MasterDetail/types'
+} from '@/components/MasterDetail/types'
 
 import { computed, ref, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
@@ -605,19 +605,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import Ajv from 'ajv'
 
-import type { Query } from 'src/types/global'
+import type { Query } from '@/types/global'
 import {
   useTableApi,
   type RuntimeTableMetadata,
   type Table,
   type TableField,
   type TableRelation,
-} from 'src/api/services/sys-table'
-import { useGeneralizationApi } from 'src/api/services/generalization'
-import { useLoadingStore } from 'src/stores/loading'
+} from '@/api/services/sys-table'
+import { useGeneralizationApi } from '@/api/services/generalization'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
-import { useDictStore } from 'src/stores/dict'
-import { useUserStore } from 'src/stores/user'
+import { useDictStore } from '@/stores/dict'
+import { useUserStore } from '@/stores/user'
 import {
   ExpressionType,
   SysFormOpenMode,
@@ -627,30 +627,30 @@ import {
   SysMenuButtonPosition,
   SysTableFieldInputType,
   SysTableRelationType,
-} from 'src/types/enum'
-import { useMenuApi, type MenuButton } from 'src/api/services/sys-menu'
+} from '@/types/enum'
+import { useMenuApi, type MenuButton } from '@/api/services/sys-menu'
 import {
   evaluateButtonDisabled,
   executeButtonAction,
   runBeforeHooks,
   runAfterHooks,
-} from 'src/utils/button-handlers'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
+} from '@/utils/button-handlers'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
 import {
   buildRelationLookups,
   buildColumnFormat,
   hydrateRelationLookups,
   type LookupMap,
-} from 'src/utils/column-format'
+} from '@/utils/column-format'
 import {
   countEffectiveQueryRules,
   hasEffectiveQueryRules,
   sanitizeQueryExpressions,
-} from 'src/utils/query-state'
-import { findMenuById, findMenuByTableCode, toPositiveMenuId } from 'src/utils/menu-context'
-import { isPageButton } from 'src/utils/menu-button'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { parseParamsSchema } from 'src/utils/params-schema'
+} from '@/utils/query-state'
+import { findMenuById, findMenuByTableCode, toPositiveMenuId } from '@/utils/menu-context'
+import { isPageButton } from '@/utils/menu-button'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { parseParamsSchema } from '@/utils/params-schema'
 
 const $q = useQuasar()
 const { confirmDanger } = useConfirmDialog($q)

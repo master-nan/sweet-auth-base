@@ -1,7 +1,7 @@
-import { ExpressionType, SysTableFieldType } from 'src/types/enum'
-import type { ExpressionGroup, Query, QueryRule } from 'src/types/global'
-import { ExpressionLogic } from 'src/types/enum'
-import type { QuerySchemeBinding, QuerySchemePayloadV1 } from 'src/modules/query-scheme/types'
+import { ExpressionType, SysTableFieldType } from '@/types/enum'
+import type { ExpressionGroup, Query, QueryRule } from '@/types/global'
+import { ExpressionLogic } from '@/types/enum'
+import type { QuerySchemeBinding, QuerySchemePayloadV1 } from '@/modules/query-scheme/types'
 
 const nullExpressionTypes = new Set<ExpressionType>([
   ExpressionType.IS_NULL,

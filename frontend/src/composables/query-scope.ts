@@ -1,10 +1,10 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { computed, ref, type MaybeRefOrGetter, toValue } from 'vue'
 import { useRoute } from 'vue-router'
-import { useUserStore } from 'src/stores/user'
-import { useQuerySchemeApi } from 'src/api/services/query-scheme'
-import type { Menu } from 'src/api/services/sys-menu'
-import type { QueryScopeConfig } from 'src/modules/query-scheme/types'
+import { useUserStore } from '@/stores/user'
+import { useQuerySchemeApi } from '@/api/services/query-scheme'
+import type { Menu } from '@/api/services/sys-menu'
+import type { QueryScopeConfig } from '@/modules/query-scheme/types'
 
 const findMenu = (menus: Menu[], routeName: string): Menu | undefined => {
   for (const menu of menus) {

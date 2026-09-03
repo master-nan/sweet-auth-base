@@ -20,9 +20,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useQuasar } from 'quasar'
-import { useConfigureStore } from 'stores/configure'
-import { createLoginPlatformAnimation } from 'src/components/Login/login-flow-animation'
-import { useLoginLottie } from 'src/components/Login/use-login-lottie'
+import { useConfigureStore } from '@/stores/configure'
+import { createLoginPlatformAnimation } from '@/components/Login/login-flow-animation'
+import { useLoginLottie } from '@/components/Login/use-login-lottie'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'LoginIllustration' })

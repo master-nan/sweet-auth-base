@@ -420,10 +420,10 @@ defineOptions({ name: 'system_menu' })
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import MenuRoutePreview from 'src/components/MenuPreview/MenuRoutePreview.vue'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useLoadingStore } from 'src/stores/loading'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import MenuRoutePreview from '@/components/MenuPreview/MenuRoutePreview.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
 import {
   useMenuApi,
@@ -432,8 +432,8 @@ import {
   type MenuCreateReq,
   type MenuButtonCreateReq,
   type MenuButtonUpdateReq,
-} from 'src/api/services/sys-menu'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
+} from '@/api/services/sys-menu'
+import { useTableApi, type TableField } from '@/api/services/sys-table'
 import {
   SysMenuButtonEventAction,
   SysMenuButtonEventActionMap,
@@ -441,14 +441,14 @@ import {
   SysMenuButtonPositionMap,
   SysTableFieldInputType,
   SysTableFieldType,
-} from 'src/types/enum'
-import type { Query } from 'src/types/global'
+} from '@/types/enum'
+import type { Query } from '@/types/global'
 import { useI18n } from 'vue-i18n'
-import { useDictStore } from 'src/stores/dict'
-import { useMasterDetailPageButtons } from 'src/composables/page-buttons'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { isApiPermission, isPageButton } from 'src/utils/menu-button'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useDictStore } from '@/stores/dict'
+import { useMasterDetailPageButtons } from '@/composables/page-buttons'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { isApiPermission, isPageButton } from '@/utils/menu-button'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
 
 const { t } = useI18n()
 

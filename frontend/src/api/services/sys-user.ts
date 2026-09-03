@@ -1,5 +1,5 @@
-import type { Basic, ResponseData, Query } from 'src/types/global'
-import { instance } from 'boot/axios'
+import type { Basic, ResponseData, Query } from '@/types/global'
+import { instance } from '@/boot/axios'
 
 export interface User extends Basic {
   user_name: string

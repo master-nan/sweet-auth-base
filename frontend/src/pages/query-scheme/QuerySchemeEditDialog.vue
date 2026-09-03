@@ -107,21 +107,21 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref, watch } from 'vue'
 import cloneDeep from 'lodash/cloneDeep'
 import { useQuasar } from 'quasar'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
-import RoleSelect from 'src/components/Select/RoleSelect.vue'
-import { useQuerySchemeApi } from 'src/api/services/query-scheme'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
-import { normalizeQuerySchemePayload } from 'src/utils/query-state'
-import { ExpressionLogic } from 'src/types/enum'
-import type { Query } from 'src/types/global'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
+import QuerySchemePreview from '@/components/QueryScheme/QuerySchemePreview.vue'
+import RoleSelect from '@/components/Select/RoleSelect.vue'
+import { useQuerySchemeApi } from '@/api/services/query-scheme'
+import { useTableApi, type TableField } from '@/api/services/sys-table'
+import { normalizeQuerySchemePayload } from '@/utils/query-state'
+import { ExpressionLogic } from '@/types/enum'
+import type { Query } from '@/types/global'
 import {
   QuerySchemeType,
   type QueryScopeConfig,
   type QuerySchemeBinding,
   type QuerySchemeDetail,
   type QuerySchemeType as SchemeType,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 const { t } = useI18n({ useScope: 'global' })
 

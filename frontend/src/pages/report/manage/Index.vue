@@ -265,22 +265,22 @@ import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'report_manage' })
 
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
-import type { Query } from 'src/types/global'
-import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
+import type { Query } from '@/types/global'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
 import {
   defaultReportSheet,
   useReportApi,
   type Report,
   type ReportStatus,
   type ReportKind,
-} from 'src/api/services/report'
-import { useLoadingStore } from 'src/stores/loading'
-import { usePageButtons } from 'src/composables/page-buttons'
+} from '@/api/services/report'
+import { useLoadingStore } from '@/stores/loading'
+import { usePageButtons } from '@/composables/page-buttons'
 import { storeToRefs } from 'pinia'
 import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
 import ReportVersionDialog from '../components/ReportVersionDialog.vue'

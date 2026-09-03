@@ -284,19 +284,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import type { Role } from 'src/api/services/sys-role'
-import type { Menu, MenuButton } from 'src/api/services/sys-menu'
-import { useMenuApi } from 'src/api/services/sys-menu'
+import type { Role } from '@/api/services/sys-role'
+import type { Menu, MenuButton } from '@/api/services/sys-menu'
+import { useMenuApi } from '@/api/services/sys-menu'
 import {
   SysMenuButtonEventAction,
   SysMenuButtonPosition,
   SysMenuButtonPositionMap,
-} from 'src/types/enum'
-import { type Query } from 'src/types/global'
+} from '@/types/enum'
+import { type Query } from '@/types/global'
 import { useI18n } from 'vue-i18n'
-import { useLoadingStore } from 'stores/loading'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
-import { isApiPermission, isPageButton } from 'src/utils/menu-button'
+import { isApiPermission, isPageButton } from '@/utils/menu-button'
 
 type ButtonGroup = {
   key: string

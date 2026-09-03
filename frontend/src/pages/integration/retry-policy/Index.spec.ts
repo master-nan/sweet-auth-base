@@ -25,38 +25,38 @@ const buttons = vi.hoisted(() => ({
   ],
 }))
 vi.mock('quasar', () => ({ useQuasar: () => ({ screen: { lt: { md: false } } }) }))
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ menus: [], buttons: [] }) }))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), currentRoute: { value: { query: {} } } }),
 }))
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
-vi.mock('src/composables/query-scheme-page', async () => {
-  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('@/composables/query-scheme-page', async () => {
+  const { createQuerySchemePageStub } = await import('@/test/query-scheme-page-stub')
   return {
     useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
 })
-vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     top_buttons: computed(() => buttons.top),
     line_buttons: computed(() => buttons.line),
     has_line_buttons: computed(() => true),
   }),
 }))
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({ confirmAction: vi.fn(() => ({ onOk: vi.fn() })) }),
 }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
-vi.mock('src/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/Table/TablePagination.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./RetryPolicyFormDialog.vue', () => ({ default: { template: '<div />' } }))
 vi.mock('./RetryPolicyDetailDialog.vue', () => ({ default: { template: '<div />' } }))
 
 import RetryPolicyPage from './Index.vue'
-import type { RetryPolicyListItem } from 'src/api/services/integration'
+import type { RetryPolicyListItem } from '@/api/services/integration'
 
 const SlotStub = defineComponent({
   setup(_, { slots }) {

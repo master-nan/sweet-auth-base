@@ -166,7 +166,7 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, reactive, ref, watch } from 'vue'
 import type { QForm } from 'quasar'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import type {
   RetryBackoffType,
   RetryErrorCategory,
@@ -174,7 +174,7 @@ import type {
   RetryJitterType,
   RetryPolicyCreateRequest,
   RetryPolicyDetail,
-} from 'src/api/services/integration'
+} from '@/api/services/integration'
 
 const { t } = useI18n({ useScope: 'global' })
 

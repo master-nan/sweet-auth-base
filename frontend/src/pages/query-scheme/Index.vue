@@ -201,19 +201,19 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import QuerySchemeDetailDrawer from './QuerySchemeDetailDrawer.vue'
 import QuerySchemeEditDialog from './QuerySchemeEditDialog.vue'
-import { useQuerySchemeApi } from 'src/api/services/query-scheme'
-import { collectQueryScopes } from 'src/composables/query-scope'
-import { QUERY_SCHEME_NAVIGATION_STATE_KEY } from 'src/composables/query-scheme-page'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useUserStore } from 'src/stores/user'
-import { hasGrantedActionCapability } from 'src/utils/menu-button'
-import type { TableColumn } from 'src/types/global'
+import { useQuerySchemeApi } from '@/api/services/query-scheme'
+import { collectQueryScopes } from '@/composables/query-scope'
+import { QUERY_SCHEME_NAVIGATION_STATE_KEY } from '@/composables/query-scheme-page'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { useUserStore } from '@/stores/user'
+import { hasGrantedActionCapability } from '@/utils/menu-button'
+import type { TableColumn } from '@/types/global'
 import {
   QUERY_SCHEME_TYPE_LABELS,
   QuerySchemeType,
@@ -222,14 +222,14 @@ import {
   type QuerySchemeListItem,
   type QuerySchemeType as SchemeType,
   type QuerySchemeValidationStatus as ValidationStatus,
-} from 'src/modules/query-scheme/types'
-import { notifyQuerySchemeDeleted } from 'src/modules/query-scheme/events'
+} from '@/modules/query-scheme/types'
+import { notifyQuerySchemeDeleted } from '@/modules/query-scheme/events'
 import {
   buildQuerySchemeCopyName,
   isValidQuerySchemeName,
   normalizeQuerySchemeName,
   truncateQuerySchemeName,
-} from 'src/modules/query-scheme/name'
+} from '@/modules/query-scheme/name'
 
 const $q = useQuasar()
 const api = useQuerySchemeApi()

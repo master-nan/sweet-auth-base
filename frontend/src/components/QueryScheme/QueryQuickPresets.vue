@@ -16,13 +16,13 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed } from 'vue'
-import { ExpressionLogic, ExpressionType } from 'src/types/enum'
+import { ExpressionLogic, ExpressionType } from '@/types/enum'
 import {
   QuerySchemeBindingKind,
   type QuerySchemePayloadV1,
   type QueryScopeConfig,
   type QueryScopeQuickPreset,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 const { t } = useI18n({ useScope: 'global' })
 

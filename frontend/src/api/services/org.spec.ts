@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const postMock = vi.hoisted(() => vi.fn())
 const getMock = vi.hoisted(() => vi.fn())
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {
     post: postMock,
     get: getMock,
@@ -32,7 +32,7 @@ import {
   querySyncBatches,
   querySyncRecords,
   type OrganizationSelectorType,
-} from 'src/api/services/org'
+} from '@/api/services/org'
 
 describe('organization options API', () => {
   beforeEach(() => {

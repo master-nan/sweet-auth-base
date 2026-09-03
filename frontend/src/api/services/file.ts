@@ -1,5 +1,5 @@
-import type { Basic, ResponseData } from 'src/types/global'
-import { instance } from 'boot/axios'
+import type { Basic, ResponseData } from '@/types/global'
+import { instance } from '@/boot/axios'
 
 export interface FileInfo extends Basic {
   file_name: string

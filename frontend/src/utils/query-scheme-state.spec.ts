@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
 import {
   normalizeQuerySchemePayload,
   normalizeQueryValueByFieldType,
   queryExpressionDepth,
 } from './query-state'
-import { QuerySchemeBindingKind } from 'src/modules/query-scheme/types'
+import { QuerySchemeBindingKind } from '@/modules/query-scheme/types'
 
 describe('query scheme expression modes', () => {
   it('detects schema depth three for read-only UI handling', () => {

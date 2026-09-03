@@ -1,5 +1,5 @@
-import { instance } from 'boot/axios'
-import type { ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import type { ResponseData } from '@/types/global'
 
 export interface UserSession {
   id: number

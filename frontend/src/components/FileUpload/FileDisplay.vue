@@ -58,8 +58,8 @@ import {
   type FileAccessMode,
   type FileBusinessContext,
   type FileInfo,
-} from 'src/api/services/file'
-import { parseFileIds } from 'src/utils/file-value'
+} from '@/api/services/file'
+import { parseFileIds } from '@/utils/file-value'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -68,7 +68,7 @@ type FilePreviewDialogExpose = {
 }
 
 const FilePreviewDialog = defineAsyncComponent(
-  () => import('src/components/FileUpload/FilePreviewDialog.vue'),
+  () => import('@/components/FileUpload/FilePreviewDialog.vue'),
 )
 
 interface FileDisplayProps {

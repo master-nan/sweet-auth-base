@@ -54,11 +54,11 @@ import { useI18n } from 'vue-i18n'
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Notify } from 'quasar'
-import { useSysUserApi } from 'src/api/services/sys-user'
-import { useConfigureStore } from 'src/stores/configure'
-import { useUserStore } from 'src/stores/user'
-import { useLoadingStore } from 'src/stores/loading'
-import { buildPasswordRules, passwordPolicyDescription } from 'src/utils/passwordPolicy'
+import { useSysUserApi } from '@/api/services/sys-user'
+import { useConfigureStore } from '@/stores/configure'
+import { useUserStore } from '@/stores/user'
+import { useLoadingStore } from '@/stores/loading'
+import { buildPasswordRules, passwordPolicyDescription } from '@/utils/passwordPolicy'
 
 const { t } = useI18n({ useScope: 'global' })
 

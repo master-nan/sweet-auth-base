@@ -149,8 +149,8 @@ import {
   type NotificationDetail,
   type NotificationLevel,
   type NotificationSummary,
-} from 'src/api/services/notification'
-import { useNotificationStore } from 'src/stores/notification'
+} from '@/api/services/notification'
+import { useNotificationStore } from '@/stores/notification'
 import { useI18n } from 'vue-i18n'
 
 const store = useNotificationStore()

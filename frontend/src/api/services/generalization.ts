@@ -1,6 +1,6 @@
-import { translate as t } from 'src/boot/i18n'
-import type { Query, ResponseData } from 'src/types/global'
-import { instance } from 'boot/axios'
+import { translate as t } from '@/boot/i18n'
+import type { Query, ResponseData } from '@/types/global'
+import { instance } from '@/boot/axios'
 import type { AxiosRequestConfig, AxiosResponse, Method } from 'axios'
 
 export interface GeneralizationListResult {

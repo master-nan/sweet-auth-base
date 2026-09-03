@@ -19,21 +19,21 @@ vi.mock('quasar', async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>()
   return { ...original, useQuasar: () => ({ notify, dialog }) }
 })
-vi.mock('src/api/services/development-verification', () => ({
+vi.mock('@/api/services/development-verification', () => ({
   useDevelopmentVerificationApi: () => ({
     statuses: statusesRequest,
     prepare: prepareRequest,
     cleanup: cleanupRequest,
   }),
 }))
-vi.mock('src/api/services/integration', () => ({
+vi.mock('@/api/services/integration', () => ({
   useIntegrationApi: () => ({
     queryExternalSystems,
     queryInterfaceDefinitions,
     createExecution,
   }),
 }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { name: 'BaseContent', template: '<div><slot /></div>' },
 }))
 

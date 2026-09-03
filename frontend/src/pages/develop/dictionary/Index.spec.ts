@@ -22,10 +22,10 @@ vi.mock('quasar', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return { ...actual, useQuasar: () => ({ dark: { isActive: false } }) }
 })
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/api/services/sys-dict', () => ({ useDictApi: () => dictApi }))
-vi.mock('src/stores/dict', () => ({ useDictStore: () => dictStore }))
-vi.mock('src/composables/runtime-table-metadata', async () => {
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/api/services/sys-dict', () => ({ useDictApi: () => dictApi }))
+vi.mock('@/stores/dict', () => ({ useDictStore: () => dictStore }))
+vi.mock('@/composables/runtime-table-metadata', async () => {
   const { ref } = await import('vue')
   return {
     useRuntimeTableMetadata: () => ({
@@ -35,7 +35,7 @@ vi.mock('src/composables/runtime-table-metadata', async () => {
     }),
   }
 })
-vi.mock('src/composables/page-buttons', async () => {
+vi.mock('@/composables/page-buttons', async () => {
   const { ref } = await import('vue')
   return {
     useMasterDetailPageButtons: () => ({
@@ -46,7 +46,7 @@ vi.mock('src/composables/page-buttons', async () => {
     }),
   }
 })
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({ confirmDanger: vi.fn(() => ({ onOk: vi.fn() })) }),
 }))
 

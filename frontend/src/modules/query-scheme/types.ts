@@ -1,5 +1,5 @@
-import { translate as t } from 'src/boot/i18n'
-import type { ExpressionGroup, Order, QuickQuery } from 'src/types/global'
+import { translate as t } from '@/boot/i18n'
+import type { ExpressionGroup, Order, QuickQuery } from '@/types/global'
 
 export const QuerySchemeType = {
   PERSONAL: 'PERSONAL',

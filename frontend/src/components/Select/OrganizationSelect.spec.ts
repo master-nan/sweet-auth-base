@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const queryOrganizationOptionsMock = vi.hoisted(() => vi.fn())
 
-vi.mock('src/api/services/org', () => ({
+vi.mock('@/api/services/org', () => ({
   queryOrganizationOptions: queryOrganizationOptionsMock,
 }))
 
-import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
-import type { OrganizationSelectorType } from 'src/api/services/org'
+import OrganizationSelect from '@/components/Select/OrganizationSelect.vue'
+import type { OrganizationSelectorType } from '@/api/services/org'
 
 const SweetSelectStub = defineComponent({
   name: 'SweetSelect',

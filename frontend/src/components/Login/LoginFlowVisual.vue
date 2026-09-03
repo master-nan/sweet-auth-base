@@ -3,8 +3,8 @@
 </template>
 
 <script lang="ts" setup>
-import { createLoginFlowAnimation } from 'src/components/Login/login-flow-animation'
-import { useLoginLottie } from 'src/components/Login/use-login-lottie'
+import { createLoginFlowAnimation } from '@/components/Login/login-flow-animation'
+import { useLoginLottie } from '@/components/Login/use-login-lottie'
 
 defineOptions({ name: 'LoginFlowVisual' })
 

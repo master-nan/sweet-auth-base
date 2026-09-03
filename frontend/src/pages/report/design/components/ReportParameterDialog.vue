@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import type { ReportParameterOperator, ReportParameterType } from 'src/api/services/report'
+import type { ReportParameterOperator, ReportParameterType } from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

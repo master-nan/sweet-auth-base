@@ -1,13 +1,13 @@
 import cloneDeep from 'lodash/cloneDeep'
 import { computed, ref, type Ref } from 'vue'
-import type { Query } from 'src/types/global'
+import type { Query } from '@/types/global'
 import type {
   QuerySchemeBinding,
   QuerySchemePayloadV1,
   QuerySchemeResolvedQuery,
   QuerySchemeSource,
-} from 'src/modules/query-scheme/types'
-import { normalizeQuerySchemePayload, serializeQuerySchemePayload } from 'src/utils/query-state'
+} from '@/modules/query-scheme/types'
+import { normalizeQuerySchemePayload, serializeQuerySchemePayload } from '@/utils/query-state'
 
 export interface TableQueryStateOptions<TQuery extends Query> {
   createInitialQuery: () => TQuery

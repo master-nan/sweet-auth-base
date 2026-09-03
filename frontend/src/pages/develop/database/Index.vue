@@ -838,10 +838,10 @@
 </template>
 <script setup lang="ts">
 defineOptions({ name: 'develop_database' })
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
@@ -857,9 +857,9 @@ import {
   type TableRelation,
   type TableRelationCreateReq,
   type TableRelationUpdateReq,
-} from 'src/api/services/sys-table'
-import type { Query } from 'src/types/global'
-import { primitiveText } from 'src/utils/primitive-text'
+} from '@/api/services/sys-table'
+import type { Query } from '@/types/global'
+import { primitiveText } from '@/utils/primitive-text'
 import {
   SysTableFieldCategory,
   SysTableFieldCategoryMap,
@@ -870,23 +870,23 @@ import {
   SysTableRelationType,
   SysTableRelationTypeMap,
   SysTableTypeMap,
-} from 'src/types/enum'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import DetailSectionNavigation from 'src/components/Detail/DetailSectionNavigation.vue'
-import type { DetailSectionNavigationItem } from 'src/components/Detail/types'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import { useLoadingStore } from 'src/stores/loading'
+} from '@/types/enum'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
+import DetailSectionNavigation from '@/components/Detail/DetailSectionNavigation.vue'
+import type { DetailSectionNavigationItem } from '@/components/Detail/types'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
 import cloneDeep from 'lodash/cloneDeep'
-import { useDictStore } from 'src/stores/dict'
-import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useMenuApi, type Menu, type MenuButton } from 'src/api/services/sys-menu'
-import { countEffectiveQueryRules, hasEffectiveQueryRules } from 'src/utils/query-state'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useDictStore } from '@/stores/dict'
+import { buildTableColumns, buildRelationLookups } from '@/utils/column-format'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useMenuApi, type Menu, type MenuButton } from '@/api/services/sys-menu'
+import { countEffectiveQueryRules, hasEffectiveQueryRules } from '@/utils/query-state'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { compactSelectionDisplay, compactSelectionTooltip } from '@/utils/select-display'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
 
 const loadingStore = useLoadingStore()
 const { loading } = storeToRefs(loadingStore)

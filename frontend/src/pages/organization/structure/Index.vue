@@ -194,11 +194,11 @@ defineOptions({ name: 'organization_structure' })
 
 import { computed, onMounted, ref } from 'vue'
 import { Dark, date } from 'quasar'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import OrganizationReadOnlyDetail from 'src/pages/organization/components/OrganizationReadOnlyDetail.vue'
-import type { OrganizationDetailGroup } from 'src/pages/organization/components/organization-read-only-detail'
-import OrganizationReadOnlyTree from 'src/pages/organization/components/OrganizationReadOnlyTree.vue'
-import type { OrganizationReadOnlyTreeNode } from 'src/pages/organization/components/organization-read-only-tree'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import OrganizationReadOnlyDetail from '@/pages/organization/components/OrganizationReadOnlyDetail.vue'
+import type { OrganizationDetailGroup } from '@/pages/organization/components/organization-read-only-detail'
+import OrganizationReadOnlyTree from '@/pages/organization/components/OrganizationReadOnlyTree.vue'
+import type { OrganizationReadOnlyTreeNode } from '@/pages/organization/components/organization-read-only-tree'
 import {
   getLegalEntityDetail,
   getLegalEntityTree,
@@ -210,8 +210,8 @@ import {
   type OrganizationStructure,
   type OrgUnitDetail,
   type StructureOrgTreeNode,
-} from 'src/api/services/org'
-import { useDictStore } from 'src/stores/dict'
+} from '@/api/services/org'
+import { useDictStore } from '@/stores/dict'
 
 const { t } = useI18n({ useScope: 'global' })
 

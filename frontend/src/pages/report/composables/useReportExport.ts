@@ -1,8 +1,8 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { useReportApi, type Report, type ReportExportReq } from 'src/api/services/report'
-import { downloadBlob } from 'src/utils/download'
+import { useReportApi, type Report, type ReportExportReq } from '@/api/services/report'
+import { downloadBlob } from '@/utils/download'
 
 type ReportExportOptions = {
   menuId?: number

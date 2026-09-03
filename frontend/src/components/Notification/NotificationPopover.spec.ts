@@ -19,8 +19,8 @@ const store = reactive({
   markAllRead: vi.fn(),
 })
 
-vi.mock('src/stores/notification', () => ({ useNotificationStore: () => store }))
-vi.mock('src/api/services/notification', () => ({
+vi.mock('@/stores/notification', () => ({ useNotificationStore: () => store }))
+vi.mock('@/api/services/notification', () => ({
   NOTIFICATION_CATEGORY_LABELS: {
     SYSTEM: '系统',
     BUSINESS: '业务',

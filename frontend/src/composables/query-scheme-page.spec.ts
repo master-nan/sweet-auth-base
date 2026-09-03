@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Query } from 'src/types/global'
+import type { Query } from '@/types/global'
 
 const notify = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
@@ -20,7 +20,7 @@ vi.mock('vue-router', () => ({
   useRoute: () => route,
   useRouter: () => ({ push }),
 }))
-vi.mock('src/composables/query-schemes', () => ({ useQuerySchemes: () => runtime }))
+vi.mock('@/composables/query-schemes', () => ({ useQuerySchemes: () => runtime }))
 
 import { useQuerySchemePage } from './query-scheme-page'
 

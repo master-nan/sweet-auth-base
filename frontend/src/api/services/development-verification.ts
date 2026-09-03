@@ -1,6 +1,6 @@
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
-import type { ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
+import type { ResponseData } from '@/types/global'
 
 export type VerificationSampleScenario =
   | 'data-permission'

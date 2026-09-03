@@ -31,8 +31,8 @@ import { useI18n } from 'vue-i18n'
 import { ref, shallowRef, onBeforeUnmount, watch, type PropType } from 'vue'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import type { IEditorConfig, IToolbarConfig, IDomEditor } from '@wangeditor/editor'
-import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
-import { hydrateRichTextFileUrls, serializeRichTextFileUrls } from 'src/utils/rich-text-files'
+import { useFileApi, type FileAccessMode, type FileInfo } from '@/api/services/file'
+import { hydrateRichTextFileUrls, serializeRichTextFileUrls } from '@/utils/rich-text-files'
 
 const { t } = useI18n({ useScope: 'global' })
 

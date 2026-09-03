@@ -1,4 +1,4 @@
-import type { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
+import type { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
 
 export interface Basic {
   id: number

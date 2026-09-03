@@ -178,8 +178,8 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
-import type { ReportDataset, ReportField, ReportParameter } from 'src/api/services/report'
-import { reportFieldIcon } from 'src/modules/report/sheet'
+import type { ReportDataset, ReportField, ReportParameter } from '@/api/services/report'
+import { reportFieldIcon } from '@/modules/report/sheet'
 
 const { t } = useI18n({ useScope: 'global' })
 

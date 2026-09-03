@@ -9,9 +9,9 @@ const api = vi.hoisted(() => ({
 }))
 const user = vi.hoisted(() => ({ isLogin: true, session_generation: 1 }))
 
-vi.mock('src/api/services/notification', () => ({ useNotificationApi: () => api }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => user }))
-vi.mock('src/boot/axios', () => ({
+vi.mock('@/api/services/notification', () => ({ useNotificationApi: () => api }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => user }))
+vi.mock('@/boot/axios', () => ({
   StaleSessionResponseError: class StaleSessionResponseError extends Error {},
 }))
 

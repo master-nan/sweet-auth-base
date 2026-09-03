@@ -36,12 +36,12 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useRouterStore } from 'src/stores/permission'
-import { useAppStore } from 'src/stores/app'
-import type { Route } from 'src/types/index'
+import { useRouterStore } from '@/stores/permission'
+import { useAppStore } from '@/stores/app'
+import type { Route } from '@/types/index'
 import BaseMenuItem from './BaseMenuItem.vue'
-import { resolveRouteTitle } from 'src/utils/route-title'
-import { primitiveText } from 'src/utils/primitive-text'
+import { resolveRouteTitle } from '@/utils/route-title'
+import { primitiveText } from '@/utils/primitive-text'
 
 defineOptions({ name: 'BaseMenu' })
 

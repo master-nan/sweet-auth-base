@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
 import {
   buildColumnFormat,
   buildRelationLookups,
   formatDateTime,
   hydrateRelationLookups,
   resolveRuntimeColumns,
-} from 'src/utils/column-format'
+} from '@/utils/column-format'
 
-vi.mock('src/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ menus: [] }) }))
-vi.mock('src/router', () => ({ Router: { currentRoute: { value: { name: '' } } } }))
+vi.mock('@/api/services/runtime-relation', () => ({ queryRuntimeRelationOptions: vi.fn() }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ menus: [] }) }))
+vi.mock('@/router', () => ({ Router: { currentRoute: { value: { name: '' } } } }))
 
 const field = (overrides: Partial<TableField>): TableField =>
   ({

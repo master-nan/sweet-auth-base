@@ -1,11 +1,11 @@
-import { defineBoot } from '#q-app/wrappers'
+import { defineBoot } from '#q-app'
 import { createI18n } from 'vue-i18n'
 import { Lang } from 'quasar'
 import enUS from 'quasar/lang/en-US'
 import zhCN from 'quasar/lang/zh-CN'
 
-import messages from 'src/i18n'
-import { readUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
+import messages from '@/i18n'
+import { readUIPreferences, type SupportedLocale } from '@/utils/ui-preferences'
 
 export type MessageLanguages = keyof typeof messages
 // 以当前中文资源定义消息Schema，其他语言必须保持相同键结构。

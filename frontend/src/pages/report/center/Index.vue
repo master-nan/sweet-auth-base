@@ -150,14 +150,14 @@ import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'report_center' })
 
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
-import type { Query } from 'src/types/global'
-import { ExpressionLogic, ExpressionType, SysTableFieldType } from 'src/types/enum'
-import { useReportApi, type Report, type ReportKind } from 'src/api/services/report'
-import { useLoadingStore } from 'src/stores/loading'
+import type { Query } from '@/types/global'
+import { ExpressionLogic, ExpressionType, SysTableFieldType } from '@/types/enum'
+import { useReportApi, type Report, type ReportKind } from '@/api/services/report'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
 import ReportRuntimeDialog from '../components/ReportRuntimeDialog.vue'
 

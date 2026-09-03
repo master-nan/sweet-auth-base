@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType, SysTableFieldTypeMap } from 'src/types/enum'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType, SysTableFieldTypeMap } from '@/types/enum'
 import {
   getFieldControlType,
   coerceFieldValue,
@@ -10,8 +10,8 @@ import {
   isNumericFieldType,
   parseLinkageConfig,
   resolveOrganizationSelectorConfig,
-} from 'src/utils/field-metadata'
-import type { OrganizationSelectorType } from 'src/types/organization-selector'
+} from '@/utils/field-metadata'
+import type { OrganizationSelectorType } from '@/types/organization-selector'
 
 const canonicalFieldTypes = [
   ['BigIntFieldType', SysTableFieldType.BIGINT],

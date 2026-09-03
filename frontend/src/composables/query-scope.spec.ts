@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const route = vi.hoisted(() => ({ name: '', meta: {} as Record<string, unknown> }))
 const user = vi.hoisted(() => ({ menus: [] as never[] }))
-vi.mock('src/api/services/query-scheme', () => ({ useQuerySchemeApi: () => ({}) }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => user }))
+vi.mock('@/api/services/query-scheme', () => ({ useQuerySchemeApi: () => ({}) }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => user }))
 vi.mock('vue-router', () => ({ useRoute: () => route }))
 import { collectQueryScopes, useQueryScope } from './query-scope'
 

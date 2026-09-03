@@ -40,7 +40,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 

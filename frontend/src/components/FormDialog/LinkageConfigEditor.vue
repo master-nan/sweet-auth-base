@@ -174,7 +174,7 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { decodeHtmlEntities, parseJsonSafe } from 'src/utils/field-metadata'
+import { decodeHtmlEntities, parseJsonSafe } from '@/utils/field-metadata'
 
 const { t } = useI18n({ useScope: 'global' })
 

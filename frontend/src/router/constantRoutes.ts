@@ -1,4 +1,4 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -8,7 +8,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'login',
     },
-    component: () => import('pages/Login.vue'),
+    component: () => import('@/pages/Login.vue'),
   },
   {
     path: '/change-password',
@@ -18,7 +18,7 @@ const routes: RouteRecordRaw[] = [
         return t('ui.changePassword')
       },
     },
-    component: () => import('pages/ChangePassword.vue'),
+    component: () => import('@/pages/ChangePassword.vue'),
   },
   {
     path: '/',
@@ -31,11 +31,11 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/404',
-    component: () => import('pages/ErrorNotFound.vue'),
+    component: () => import('@/pages/ErrorNotFound.vue'),
   },
   {
     path: '/:catchAll(.*)*',
-    component: () => import('pages/ErrorNotFound.vue'),
+    component: () => import('@/pages/ErrorNotFound.vue'),
   },
 ]
 

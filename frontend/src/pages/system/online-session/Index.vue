@@ -205,25 +205,25 @@ defineOptions({ name: 'system_online_session' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuasar, type QTableProps } from 'quasar'
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'components/Table/TableColumnSelector.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
-import SweetDateTimePicker from 'components/DateTime/SweetDateTimePicker.vue'
-import FormDialogShell from 'components/FormDialog/FormDialogShell.vue'
-import DetailFieldGrid from 'components/Detail/DetailFieldGrid.vue'
-import StatusChip from 'components/Display/StatusChip.vue'
-import type { DetailFieldItem } from 'components/Detail/types'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { downloadBlob, parseContentDispositionFilename } from 'src/utils/download'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import DetailFieldGrid from '@/components/Detail/DetailFieldGrid.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
+import type { DetailFieldItem } from '@/components/Detail/types'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { downloadBlob, parseContentDispositionFilename } from '@/utils/download'
 import {
   useUserSessionApi,
   type UserSession,
   type UserSessionQuery,
   type UserSessionStatusFilter,
-} from 'src/api/services/user-session'
+} from '@/api/services/user-session'
 
 const { t } = useI18n({ useScope: 'global' })
 

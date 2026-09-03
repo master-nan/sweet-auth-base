@@ -34,20 +34,20 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import cloneDeep from 'lodash/cloneDeep'
 import { useRoute, useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useGeneralizationApi } from 'src/api/services/generalization'
-import { useTableApi, type RuntimeTableMetadata, type TableField } from 'src/api/services/sys-table'
-import type { RouteData } from 'src/types'
-import { useUserStore } from 'src/stores/user'
-import { useTagViewStore } from 'src/stores/tagView'
-import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
-import { useLoadingStore } from 'src/stores/loading'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import { useGeneralizationApi } from '@/api/services/generalization'
+import { useTableApi, type RuntimeTableMetadata, type TableField } from '@/api/services/sys-table'
+import type { RouteData } from '@/types'
+import { useUserStore } from '@/stores/user'
+import { useTagViewStore } from '@/stores/tagView'
+import { useBreadcrumbsStore } from '@/stores/breadcrumbs'
+import { useLoadingStore } from '@/stores/loading'
 import {
   findMenuByTableCode,
   findMenuPathByTableCode,
   findMenuTrailById,
-} from 'src/utils/menu-context'
+} from '@/utils/menu-context'
 
 const { t } = useI18n({ useScope: 'global' })
 

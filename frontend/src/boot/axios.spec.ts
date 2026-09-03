@@ -12,7 +12,7 @@ const session = vi.hoisted(() => ({
 const loading = vi.hoisted(() => ({ setLoading: vi.fn() }))
 const notifications = vi.hoisted(() => ({ setDefaults: vi.fn(), create: vi.fn() }))
 
-vi.mock('#q-app/wrappers', () => ({ defineBoot: (factory: unknown) => factory }))
+vi.mock('#q-app', () => ({ defineBoot: (factory: unknown) => factory }))
 vi.mock('quasar', () => ({
   LocalStorage: {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -21,8 +21,8 @@ vi.mock('quasar', () => ({
   },
   Notify: notifications,
 }))
-vi.mock('src/stores/loading', () => ({ useLoadingStore: () => loading }))
-vi.mock('src/stores/user', () => ({
+vi.mock('@/stores/loading', () => ({ useLoadingStore: () => loading }))
+vi.mock('@/stores/user', () => ({
   isStaleSessionSnapshot: () => false,
   useUserStore: () => ({
     get getLoginToken() {

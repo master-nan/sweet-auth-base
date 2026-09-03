@@ -1,4 +1,4 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import {
@@ -11,7 +11,7 @@ import {
   type ReportPreviewRes,
   type ReportRuntimeConfig,
   type ReportSheetConfig,
-} from 'src/api/services/report'
+} from '@/api/services/report'
 
 export type ReportRuntimeFilterValue = string | number | Array<string | number> | null | undefined
 

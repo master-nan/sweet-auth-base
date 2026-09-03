@@ -187,38 +187,38 @@ import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'system_user' })
 
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
 
 import { computed, ref, watch, onMounted } from 'vue'
 import { copyToClipboard, type QTableProps, useQuasar } from 'quasar'
 
-import type { Query } from 'src/types/global'
+import type { Query } from '@/types/global'
 import {
   useSysUserApi,
   type User,
   type UserCreateReq,
   type UserUpdateReq,
-} from 'src/api/services/sys-user'
-import { useRoleApi, type Role } from 'src/api/services/sys-role'
+} from '@/api/services/sys-user'
+import { useRoleApi, type Role } from '@/api/services/sys-role'
 
-import { useDictStore } from 'src/stores/dict'
-import { buildTableColumns, buildRelationLookups } from 'src/utils/column-format'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { hasEffectiveQueryRules } from 'src/utils/query-state'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
+import { useDictStore } from '@/stores/dict'
+import { buildTableColumns, buildRelationLookups } from '@/utils/column-format'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { hasEffectiveQueryRules } from '@/utils/query-state'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
 import { useRouter } from 'vue-router'
-import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import { dispatchPageAction, type PageActionHandlers } from '@/utils/button-handlers'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

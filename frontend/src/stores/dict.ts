@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { useDictApi } from 'src/api/services/sys-dict'
+import { useDictApi } from '@/api/services/sys-dict'
 
 interface DictOption {
   label: string

@@ -118,7 +118,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import type { ReportDatasetJoinCondition, ReportDatasetJoinType } from 'src/api/services/report'
+import type { ReportDatasetJoinCondition, ReportDatasetJoinType } from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

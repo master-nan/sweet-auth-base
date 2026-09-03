@@ -1,5 +1,5 @@
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { SysMenuButtonDisplayMode, SysMenuButtonPosition } from 'src/types/enum'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { SysMenuButtonDisplayMode, SysMenuButtonPosition } from '@/types/enum'
 
 interface MenuButtonDisplayOptions {
   label?: string

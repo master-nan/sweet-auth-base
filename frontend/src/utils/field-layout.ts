@@ -1,5 +1,5 @@
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
 
 const normalizeSpan = (value: unknown, max: number) => {
   const num = Number(value)

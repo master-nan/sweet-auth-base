@@ -1,6 +1,6 @@
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
-import type { Basic, Query, ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
+import type { Basic, Query, ResponseData } from '@/types/global'
 
 export interface Dict extends Basic {
   dict_name: string

@@ -73,9 +73,9 @@
 import { computed, onUnmounted } from 'vue'
 import { LocalStorage } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
-import { useTagViewStore } from 'src/stores/tagView'
-import { useKeepAliveStore } from 'src/stores/keep-alive'
-import { useAppStore } from 'src/stores/app'
+import { useTagViewStore } from '@/stores/tagView'
+import { useKeepAliveStore } from '@/stores/keep-alive'
+import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

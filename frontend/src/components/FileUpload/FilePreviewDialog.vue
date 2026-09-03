@@ -86,7 +86,7 @@ import { computed, markRaw, ref, shallowRef, type Component } from 'vue'
 import { useQuasar } from 'quasar'
 import type { PreviewPlugin, PreviewToolbarOptions } from '@open-file-viewer/core'
 import '@open-file-viewer/core/style.css'
-import { useFileApi, type FileBusinessContext, type FileInfo } from 'src/api/services/file'
+import { useFileApi, type FileBusinessContext, type FileInfo } from '@/api/services/file'
 
 const { t } = useI18n({ useScope: 'global' })
 

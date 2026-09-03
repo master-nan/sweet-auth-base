@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() }))
-vi.mock('boot/axios', () => ({ instance: mocks }))
+vi.mock('@/boot/axios', () => ({ instance: mocks }))
 
 import { useQuerySchemeApi } from './query-scheme'
 

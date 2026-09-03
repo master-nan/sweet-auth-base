@@ -48,9 +48,9 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import { type SyncTaskDetail, useIntegrationApi } from 'src/api/services/integration'
-import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import { type SyncTaskDetail, useIntegrationApi } from '@/api/services/integration'
+import { formatRuntimeDateTime } from '@/pages/integration/runtime-display'
 
 const { t } = useI18n({ useScope: 'global' })
 const props = defineProps<{ modelValue: boolean; id: number }>()

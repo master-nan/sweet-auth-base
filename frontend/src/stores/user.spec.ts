@@ -20,7 +20,7 @@ vi.mock('quasar', () => ({
     set: (key: string, value: unknown) => storage.set(key, value),
   },
 }))
-vi.mock('src/router/index', () => ({ Router: navigation }))
+vi.mock('@/router/index', () => ({ Router: navigation }))
 vi.mock('./tagView', () => ({ useTagViewStore: () => tagView }))
 vi.mock('./configure', () => ({ useConfigureStore: () => configure }))
 vi.mock('./permission', () => ({ useRouterStore: () => permission }))
@@ -28,7 +28,7 @@ vi.mock('./keep-alive', () => ({ useKeepAliveStore: () => keepAlive }))
 vi.mock('./breadcrumbs', () => ({ useBreadcrumbsStore: () => breadcrumbs }))
 
 import { LocalStorage } from 'quasar'
-import { UI_PREFERENCES_KEY } from 'src/utils/ui-preferences'
+import { UI_PREFERENCES_KEY } from '@/utils/ui-preferences'
 import { isStaleSessionSnapshot, useUserStore } from './user'
 
 const unsignedToken = (subject: string, sessionID: string, tokenID: string) => {

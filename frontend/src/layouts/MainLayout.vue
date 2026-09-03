@@ -58,10 +58,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { storeToRefs } from 'pinia'
-import Drawer from 'src/components/Drawer/Drawer.vue'
-import Breadcrumbs from 'src/components/Breadcrumbs/Breadcrumbs.vue'
-import ToolbarItem from 'src/components/Toolbar/ToolbarItem.vue'
-import ThemeSetting from 'src/components/Setting/ThemeSetting.vue'
+import Drawer from '@/components/Drawer/Drawer.vue'
+import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs.vue'
+import ToolbarItem from '@/components/Toolbar/ToolbarItem.vue'
+import ThemeSetting from '@/components/Setting/ThemeSetting.vue'
 const drawerRef = ref<typeof Drawer | null>(null)
 const settingRef = ref<InstanceType<typeof ThemeSetting> | null>(null)
 const isDrawerOpen = ref<boolean>(false)
@@ -71,14 +71,14 @@ const toggleLeftDrawer = () => {
 const openThemeSettings = () => {
   settingRef.value?.toggleSettingPanel()
 }
-import { useAppStore } from 'src/stores/app'
-import { useKeepAliveStore } from 'src/stores/keep-alive'
-import { useThemeStore } from 'src/stores/theme'
-import { useConfigureStore } from 'stores/configure'
-import TagView from 'components/TagView/TagView.vue'
-import { useNotificationStore } from 'src/stores/notification'
-import { useUserStore } from 'src/stores/user'
-import { useSessionRuntimeStore } from 'src/stores/session-runtime'
+import { useAppStore } from '@/stores/app'
+import { useKeepAliveStore } from '@/stores/keep-alive'
+import { useThemeStore } from '@/stores/theme'
+import { useConfigureStore } from '@/stores/configure'
+import TagView from '@/components/TagView/TagView.vue'
+import { useNotificationStore } from '@/stores/notification'
+import { useUserStore } from '@/stores/user'
+import { useSessionRuntimeStore } from '@/stores/session-runtime'
 import { useI18n } from 'vue-i18n'
 
 const appStore = useAppStore()

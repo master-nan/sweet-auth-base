@@ -1,6 +1,6 @@
-import type { Menu } from 'src/api/services/sys-menu'
-import { SysDetailOpenMode } from 'src/types/enum'
-import { findMenuByName } from 'src/utils/menu-button'
+import type { Menu } from '@/api/services/sys-menu'
+import { SysDetailOpenMode } from '@/types/enum'
+import { findMenuByName } from '@/utils/menu-button'
 
 export type OrganizationDetailMode = 'dialog' | 'page'
 

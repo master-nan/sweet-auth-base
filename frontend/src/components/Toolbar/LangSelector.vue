@@ -23,8 +23,8 @@
 
 <script lang="ts" setup>
 import { useI18n } from 'vue-i18n'
-import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
-import { applyQuasarLanguage } from 'src/boot/i18n'
+import { writeUIPreferences, type SupportedLocale } from '@/utils/ui-preferences'
+import { applyQuasarLanguage } from '@/boot/i18n'
 
 defineOptions({ name: 'LangSelector' })
 

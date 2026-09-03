@@ -2,18 +2,18 @@ import { shallowMount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import DynamicFieldControl, {
   type DynamicFieldControlContext,
-} from 'src/components/FormDialog/DynamicFieldControl.vue'
-import JsonEditor from 'src/components/JsonEditor/JsonEditor.vue'
-import ArrayInput from 'src/components/JsonEditor/ArrayInput.vue'
-import KeyValueEditor from 'src/components/JsonEditor/KeyValueEditor.vue'
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
+} from '@/components/FormDialog/DynamicFieldControl.vue'
+import JsonEditor from '@/components/JsonEditor/JsonEditor.vue'
+import ArrayInput from '@/components/JsonEditor/ArrayInput.vue'
+import KeyValueEditor from '@/components/JsonEditor/KeyValueEditor.vue'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
 
-vi.mock('src/components/FileUpload/FileUpload.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Select/OrganizationSelect.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/FormDialog/LinkageConfigEditor.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/Cascader/CascaderSelect.vue', () => ({ default: { template: '<div />' } }))
-vi.mock('src/components/DateTime/SweetDateTimePicker.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/FileUpload/FileUpload.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/Select/OrganizationSelect.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/FormDialog/LinkageConfigEditor.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/Cascader/CascaderSelect.vue', () => ({ default: { template: '<div />' } }))
+vi.mock('@/components/DateTime/SweetDateTimePicker.vue', () => ({ default: { template: '<div />' } }))
 
 const field = {
   id: 1,

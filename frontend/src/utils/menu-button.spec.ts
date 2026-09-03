@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Menu, MenuButton } from 'src/api/services/sys-menu'
+import type { Menu, MenuButton } from '@/api/services/sys-menu'
 import { hasGrantedActionCapability, resolvePageButtons } from './menu-button'
 
 const pageButton = (overrides: Partial<MenuButton> = {}): MenuButton => ({

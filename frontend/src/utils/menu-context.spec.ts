@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Menu } from 'src/api/services/sys-menu'
+import type { Menu } from '@/api/services/sys-menu'
 import { findMenuPathByTableCode } from './menu-context'
 
 const menu = (value: Partial<Menu>): Menu =>

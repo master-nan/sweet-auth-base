@@ -44,9 +44,9 @@
 import { ref } from 'vue'
 import { useToggle } from '@vueuse/shared'
 import { useVModel } from '@vueuse/core'
-import ToolbarTitle from 'src/components/Toolbar/ToolbarTitle.vue'
-import BaseMenu from 'src/components/Menu/BaseMenu.vue'
-import { useAppStore } from 'src/stores/app'
+import ToolbarTitle from '@/components/Toolbar/ToolbarTitle.vue'
+import BaseMenu from '@/components/Menu/BaseMenu.vue'
+import { useAppStore } from '@/stores/app'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 

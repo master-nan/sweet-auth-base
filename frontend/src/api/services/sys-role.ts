@@ -1,5 +1,5 @@
-import type { Basic, Query, ResponseData } from 'src/types/global'
-import { instance } from 'boot/axios'
+import type { Basic, Query, ResponseData } from '@/types/global'
+import { instance } from '@/boot/axios'
 import type { MenuButton, Menu } from './sys-menu'
 import type { User } from './sys-user'
 

@@ -1,8 +1,8 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { date } from 'quasar'
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import type { Query } from 'src/types/global'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import type { Query } from '@/types/global'
 
 export const emptyOrganizationExpressions = () => [
   {

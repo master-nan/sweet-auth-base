@@ -2,7 +2,7 @@ import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import QueryQuickPresets from './QueryQuickPresets.vue'
-import { QuerySchemeBindingKind, type QuerySchemePayloadV1 } from 'src/modules/query-scheme/types'
+import { QuerySchemeBindingKind, type QuerySchemePayloadV1 } from '@/modules/query-scheme/types'
 
 const ButtonStub = defineComponent({ props: { label: String }, emits: ['click'], setup(props, { emit }) { return () => h('button', { onClick: () => emit('click') }, props.label) } })
 

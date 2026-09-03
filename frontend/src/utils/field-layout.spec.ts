@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TableField } from 'src/api/services/sys-table'
+import type { TableField } from '@/api/services/sys-table'
 import { isDetailFieldVisible } from './field-layout'
 
 describe('detail field visibility', () => {

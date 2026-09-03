@@ -1,7 +1,7 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { computed, onScopeDispose, ref } from 'vue'
-import { useQuerySchemeApi } from 'src/api/services/query-scheme'
-import { useQueryScope } from 'src/composables/query-scope'
+import { useQuerySchemeApi } from '@/api/services/query-scheme'
+import { useQueryScope } from '@/composables/query-scope'
 import {
   QuerySchemeType,
   QuerySchemeValidationStatus,
@@ -10,9 +10,9 @@ import {
   type QuerySchemePayloadV1,
   type QuerySchemeResolveResult,
   type QuerySchemeSummary,
-} from 'src/modules/query-scheme/types'
-import type { Query } from 'src/types/global'
-import { subscribeQuerySchemeDeleted } from 'src/modules/query-scheme/events'
+} from '@/modules/query-scheme/types'
+import type { Query } from '@/types/global'
+import { subscribeQuerySchemeDeleted } from '@/modules/query-scheme/events'
 
 export type SchemeAwareQueryState<TQuery extends Query> = {
   query: { value: TQuery }

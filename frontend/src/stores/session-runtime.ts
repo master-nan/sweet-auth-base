@@ -1,8 +1,8 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { defineStore } from 'pinia'
 import { Notify } from 'quasar'
-import { instance, refreshAccessToken } from 'src/boot/axios'
-import { useUserStore } from 'src/stores/user'
+import { instance, refreshAccessToken } from '@/boot/axios'
+import { useUserStore } from '@/stores/user'
 
 const heartbeatInterval = 60_000
 const reconnectDelay = 3_000

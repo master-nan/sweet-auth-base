@@ -77,11 +77,11 @@
 defineOptions({ name: 'ThemeSetting' })
 import { computed, ref } from 'vue'
 import { useToggle } from '@vueuse/shared'
-import { useThemeStore } from 'src/stores/theme'
-import { useAppStore } from 'src/stores/app'
+import { useThemeStore } from '@/stores/theme'
+import { useAppStore } from '@/stores/app'
 import DarkMode from '../Toolbar/DarkMode.vue'
 import { useI18n } from 'vue-i18n'
-import { DEFAULT_PRIMARY_COLOR, type LayoutMode } from 'src/utils/ui-preferences'
+import { DEFAULT_PRIMARY_COLOR, type LayoutMode } from '@/utils/ui-preferences'
 
 const { t } = useI18n()
 const openSettingPanel = ref<boolean>(false)

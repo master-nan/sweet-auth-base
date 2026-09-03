@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Menu } from 'src/api/services/sys-menu'
-import type { Route } from 'src/types'
+import type { Menu } from '@/api/services/sys-menu'
+import type { Route } from '@/types'
 
 const userStore = vi.hoisted(() => ({
   menu_names: [] as string[],
   menus: [] as Menu[],
 }))
 
-vi.mock('src/stores/user', () => ({
+vi.mock('@/stores/user', () => ({
   useUserStore: () => userStore,
 }))
 
-import { asyncRoutesChildren } from 'src/router/routes'
-import constructionRouters from 'src/router/utils'
+import { asyncRoutesChildren } from '@/router/routes'
+import constructionRouters from '@/router/utils'
 
 const integrationMenus = [
   {
@@ -29,7 +29,7 @@ const integrationMenus = [
         name: 'integration_external_system',
         title: '外部系统',
         path: 'external-system',
-        component: 'pages/integration/external-system/Index.vue',
+        component: 'src/pages/integration/external-system/Index.vue',
         page_type: 'fixed',
         is_hidden: false,
       },
@@ -38,7 +38,7 @@ const integrationMenus = [
         name: 'integration_interface_definition',
         title: '接口定义',
         path: 'interface-definition',
-        component: 'pages/integration/interface-definition/Index.vue',
+        component: 'src/pages/integration/interface-definition/Index.vue',
         page_type: 'fixed',
         is_hidden: false,
       },
@@ -47,7 +47,7 @@ const integrationMenus = [
         name: 'integration_credential',
         title: '集成凭证',
         path: 'credential',
-        component: 'pages/integration/credential/Index.vue',
+        component: 'src/pages/integration/credential/Index.vue',
         page_type: 'fixed',
         is_hidden: false,
       },
@@ -70,7 +70,7 @@ const reportMenus = [
         name: 'report_sales_summary',
         title: '销售汇总',
         path: 'report/runtime/sales-summary',
-        component: 'pages/report/runtime/ReportRuntimePage.vue',
+        component: 'src/pages/report/runtime/ReportRuntimePage.vue',
         page_type: 'report',
         table_code: 'sales_order',
         option: JSON.stringify({ report_id: 901, report_code: 'sales_summary' }),
@@ -174,7 +174,7 @@ describe('permission route construction', () => {
     userStore.menu_names = ['report']
     const menus = structuredClone(reportMenus)
     if (menus[0]?.children?.[0]) {
-      menus[0].children[0].component = 'pages/report-v2/runtime/ReportRuntimePage.vue'
+      menus[0].children[0].component = 'src/pages/report-v2/runtime/ReportRuntimePage.vue'
     }
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 

@@ -1,5 +1,5 @@
-import { translate as t } from 'src/boot/i18n'
-import { SysMasterDetailMode } from 'src/types/enum'
+import { translate as t } from '@/boot/i18n'
+import { SysMasterDetailMode } from '@/types/enum'
 
 export const MasterDetailDisplayMode = {
   SUMMARY: SysMasterDetailMode.SUMMARY,

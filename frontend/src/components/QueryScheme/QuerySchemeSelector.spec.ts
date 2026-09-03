@@ -7,7 +7,7 @@ import {
   QuerySchemeValidationStatus,
   type QuerySchemeSource,
   type QuerySchemeSummary,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 const SlotStub = defineComponent({
   setup(_, { slots }) {

@@ -467,12 +467,12 @@ import { useI18n } from 'vue-i18n'
 defineOptions({ name: 'develop_configure' })
 import { computed, nextTick, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import { type Configure, useBasicApi } from 'src/api/services/basic'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import { type Configure, useBasicApi } from '@/api/services/basic'
 import { useQuasar, type QForm } from 'quasar'
-import { useLoadingStore } from 'src/stores/loading'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
-import { useConfigureStore } from 'stores/configure'
+import { useConfigureStore } from '@/stores/configure'
 import {
   effectivePasswordPolicy,
   getPasswordPolicyPreset,
@@ -480,7 +480,7 @@ import {
   passwordPolicyDescription,
   passwordPolicyOptions,
   passwordPolicyRegexText,
-} from 'src/utils/passwordPolicy'
+} from '@/utils/passwordPolicy'
 
 const { t } = useI18n({ useScope: 'global' })
 

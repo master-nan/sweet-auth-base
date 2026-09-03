@@ -1,12 +1,12 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { defineStore } from 'pinia'
 import {
   useNotificationApi,
   type NotificationDetail,
   type NotificationSummary,
-} from 'src/api/services/notification'
-import { StaleSessionResponseError } from 'src/boot/axios'
-import { useUserStore } from 'src/stores/user'
+} from '@/api/services/notification'
+import { StaleSessionResponseError } from '@/boot/axios'
+import { useUserStore } from '@/stores/user'
 
 const pollingInterval = 60_000
 

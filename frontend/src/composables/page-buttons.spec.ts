@@ -53,12 +53,12 @@ const menus = vi.hoisted(() => [
   },
 ])
 
-vi.mock('src/stores/user', () => ({
+vi.mock('@/stores/user', () => ({
   useUserStore: () => ({ menus, buttons: ['demo_query', 'demo_metadata'] }),
 }))
 
 import { usePageButtons } from './page-buttons'
-import { i18n } from 'boot/i18n'
+import { i18n } from '@/boot/i18n'
 
 describe('usePageButtons capabilities', () => {
   afterEach(() => {

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useRuntimeTableMetadata } from './runtime-table-metadata'
-import type { RuntimeTableMetadata, TableField } from 'src/api/services/sys-table'
+import type { RuntimeTableMetadata, TableField } from '@/api/services/sys-table'
 import {
   SysDetailOpenMode,
   SysFormOpenMode,
   SysMasterDetailMode,
   SysTableType,
-} from 'src/types/enum'
+} from '@/types/enum'
 
-vi.mock('src/api/services/sys-table', () => ({
+vi.mock('@/api/services/sys-table', () => ({
   useTableApi: () => ({ queryRuntimeTableByCode: vi.fn() }),
 }))
 

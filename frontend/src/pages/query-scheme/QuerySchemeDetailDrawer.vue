@@ -105,17 +105,17 @@
 import { computed, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import { useQuerySchemeApi } from 'src/api/services/query-scheme'
-import { useTableApi, type TableField } from 'src/api/services/sys-table'
-import { useRoleApi, type Role } from 'src/api/services/sys-role'
-import StatusChip from 'src/components/Display/StatusChip.vue'
-import QuerySchemePreview from 'src/components/QueryScheme/QuerySchemePreview.vue'
+import { useQuerySchemeApi } from '@/api/services/query-scheme'
+import { useTableApi, type TableField } from '@/api/services/sys-table'
+import { useRoleApi, type Role } from '@/api/services/sys-role'
+import StatusChip from '@/components/Display/StatusChip.vue'
+import QuerySchemePreview from '@/components/QueryScheme/QuerySchemePreview.vue'
 import {
   QUERY_SCHEME_TYPE_LABELS,
   QuerySchemeType,
   QuerySchemeValidationStatus,
   type QuerySchemeDetail,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 const props = withDefaults(
   defineProps<{ modelValue: boolean; schemeId?: number; editable?: boolean }>(),

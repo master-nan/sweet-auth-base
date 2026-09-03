@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { assertControlledRuntimePath } from './generalization'
 
-vi.mock('boot/axios', () => ({ instance: { request: vi.fn() } }))
+vi.mock('@/boot/axios', () => ({ instance: { request: vi.fn() } }))
 
 describe('controlled runtime action path', () => {
   it('accepts only same-origin admin paths', () => {

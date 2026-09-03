@@ -327,7 +327,7 @@ import type {
   ReportDatasetJoin,
   ReportKind,
   ReportRuntimeDisplayMode,
-} from 'src/api/services/report'
+} from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

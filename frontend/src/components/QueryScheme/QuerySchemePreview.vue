@@ -45,19 +45,19 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { primitiveText } from 'src/utils/primitive-text'
+import { primitiveText } from '@/utils/primitive-text'
 
 import { computed, ref, watch } from 'vue'
-import { ExpressionLogic, ExpressionTypeMap } from 'src/types/enum'
-import { useDictStore } from 'src/stores/dict'
-import type { ExpressionGroup, QueryRule } from 'src/types/global'
-import type { TableField } from 'src/api/services/sys-table'
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+import { ExpressionLogic, ExpressionTypeMap } from '@/types/enum'
+import { useDictStore } from '@/stores/dict'
+import type { ExpressionGroup, QueryRule } from '@/types/global'
+import type { TableField } from '@/api/services/sys-table'
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
 import {
   QUERY_SCHEME_BINDING_LABELS,
   type QuerySchemeBinding,
   type QuerySchemePayloadV1,
-} from 'src/modules/query-scheme/types'
+} from '@/modules/query-scheme/types'
 
 const { t } = useI18n({ useScope: 'global' })
 

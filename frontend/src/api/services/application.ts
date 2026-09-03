@@ -1,6 +1,6 @@
-import type { Basic, Query, ResponseData } from 'src/types/global'
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
+import type { Basic, Query, ResponseData } from '@/types/global'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
 
 export interface Application extends Basic {
   name: string

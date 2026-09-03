@@ -30,8 +30,8 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, ref, watch } from 'vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import { type RetryPolicyDetail, useIntegrationApi } from 'src/api/services/integration'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import { type RetryPolicyDetail, useIntegrationApi } from '@/api/services/integration'
 
 const { t } = useI18n({ useScope: 'global' })
 

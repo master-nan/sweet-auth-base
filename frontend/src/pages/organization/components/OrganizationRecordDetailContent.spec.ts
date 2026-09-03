@@ -1,8 +1,8 @@
 import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { SysMenuButtonPosition } from 'src/types/enum'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { SysMenuButtonPosition } from '@/types/enum'
 import OrganizationRecordDetailContent from './OrganizationRecordDetailContent.vue'
 import OrganizationRecordDetailDialog from './OrganizationRecordDetailDialog.vue'
 

@@ -1,5 +1,5 @@
-import { translate as t } from 'src/boot/i18n'
-import type { Configure } from 'src/api/services/basic'
+import { translate as t } from '@/boot/i18n'
+import type { Configure } from '@/api/services/basic'
 
 export type PasswordRule = (val: unknown) => true | string
 

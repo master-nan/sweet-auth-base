@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { parseParamsSchema } from 'src/utils/params-schema'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import { parseParamsSchema } from '@/utils/params-schema'
 
 describe('parameter schema storage types', () => {
   it('maps JSON Schema numbers to exact Decimal metadata', () => {

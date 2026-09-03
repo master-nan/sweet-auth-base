@@ -179,26 +179,26 @@ defineOptions({ name: 'integration_sync_batch' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
 import {
   type IntegrationExecutionListItem,
   type SyncBatchDetail,
   type SyncBatchListItem,
   type SyncBatchQuery,
   useIntegrationApi,
-} from 'src/api/services/integration'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import { formatRuntimeDateTime } from 'src/pages/integration/runtime-display'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
-import { countEffectiveQueryRules } from 'src/utils/query-state'
+} from '@/api/services/integration'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import { formatRuntimeDateTime } from '@/pages/integration/runtime-display'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
+import { countEffectiveQueryRules } from '@/utils/query-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

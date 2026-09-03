@@ -1,7 +1,7 @@
 import { defineComponent, h, nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
+import { QuerySchemeType, QuerySchemeValidationStatus } from '@/modules/query-scheme/types'
 
 const api = vi.hoisted(() => ({
   getScopeConfig: vi.fn(),
@@ -9,9 +9,9 @@ const api = vi.hoisted(() => ({
   setSharedEnabled: vi.fn(),
 }))
 const tableApi = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
-vi.mock('src/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
-vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
-vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
+vi.mock('@/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
+vi.mock('@/api/services/sys-table', () => ({ useTableApi: () => tableApi }))
+vi.mock('@/components/Query/AdvancedQuery.vue', () => ({
   default: {
     name: 'AdvancedQuery',
     props: ['modelValue', 'queryModel', 'bindings', 'usage', 'title'],
@@ -25,10 +25,10 @@ vi.mock('src/components/Query/AdvancedQuery.vue', () => ({
     template: '<div />',
   },
 }))
-vi.mock('src/components/QueryScheme/QuerySchemePreview.vue', () => ({
+vi.mock('@/components/QueryScheme/QuerySchemePreview.vue', () => ({
   default: { name: 'QuerySchemePreview', props: ['payload', 'fields'], template: '<div />' },
 }))
-vi.mock('src/components/Select/RoleSelect.vue', () => ({
+vi.mock('@/components/Select/RoleSelect.vue', () => ({
   default: { name: 'RoleSelect', template: '<div />' },
 }))
 vi.mock('quasar', async (importOriginal: () => Promise<Record<string, unknown>>) => ({

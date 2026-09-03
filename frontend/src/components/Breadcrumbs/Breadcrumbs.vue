@@ -21,7 +21,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useBreadcrumbsStore } from 'src/stores/breadcrumbs'
+import { useBreadcrumbsStore } from '@/stores/breadcrumbs'
 
 defineOptions({ name: 'MyBreadcrumbs' })
 

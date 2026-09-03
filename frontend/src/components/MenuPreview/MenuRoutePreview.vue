@@ -25,7 +25,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'MenuRoutePreview' })
 import { ref, computed, watchEffect } from 'vue'
-import type { Menu } from 'src/api/services/sys-menu'
+import type { Menu } from '@/api/services/sys-menu'
 import { useI18n } from 'vue-i18n'
 import { useQuasar } from 'quasar'
 

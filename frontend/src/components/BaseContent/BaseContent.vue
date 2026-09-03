@@ -32,7 +32,7 @@
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { LocalStorage, QScrollArea } from 'quasar'
 import { useRoute } from 'vue-router'
-import { useThemeStore } from 'src/stores/theme'
+import { useThemeStore } from '@/stores/theme'
 import { storeToRefs } from 'pinia'
 
 defineOptions({ name: 'BaseContent' })

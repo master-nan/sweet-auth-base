@@ -1,5 +1,5 @@
-import layout from 'src/components/Layout/Layout.vue'
-import type { Route } from 'src/types/index'
+import layout from '@/components/Layout/Layout.vue'
+import type { Route } from '@/types/index'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -23,7 +23,7 @@ declare module 'vue-router' {
 
 const asyncRoutesChildren: Route[] = [
   {
-    component: () => import('pages/notification/Index.vue'),
+    component: () => import('@/pages/notification/Index.vue'),
     path: 'notifications',
     name: 'notification_center',
     meta: {
@@ -35,7 +35,7 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
-    component: () => import('pages/query-scheme/Index.vue'),
+    component: () => import('@/pages/query-scheme/Index.vue'),
     path: 'query-schemes',
     name: 'query_scheme_manager',
     meta: {
@@ -47,7 +47,7 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
-    component: () => import('pages/detail/RecordDetail.vue'),
+    component: () => import('@/pages/detail/RecordDetail.vue'),
     path: 'detail/:source/:table_code/:id',
     name: 'record_detail',
     meta: {
@@ -59,7 +59,7 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
-    component: () => import('pages/detail/RecordForm.vue'),
+    component: () => import('@/pages/detail/RecordForm.vue'),
     path: 'form/:mode/:table_code/:id?',
     name: 'record_form',
     meta: {
@@ -71,7 +71,7 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
-    component: () => import('pages/integration/execution/Detail.vue'),
+    component: () => import('@/pages/integration/execution/Detail.vue'),
     path: 'detail/integration/execution/:id',
     name: 'integration_execution_detail_page',
     meta: {
@@ -83,7 +83,7 @@ const asyncRoutesChildren: Route[] = [
     },
   },
   {
-    component: () => import('pages/dashboard/Dashboard.vue'),
+    component: () => import('@/pages/dashboard/Dashboard.vue'),
     path: 'home',
     name: 'home',
     meta: {
@@ -102,7 +102,7 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/system/application/Index.vue'),
+        component: () => import('@/pages/system/application/Index.vue'),
         path: 'application',
         name: 'system_application',
         meta: {
@@ -112,7 +112,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/sms/Index.vue'),
+        component: () => import('@/pages/system/sms/Index.vue'),
         path: 'sms',
         name: 'system_sms',
         meta: {
@@ -122,7 +122,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/menu/Index.vue'),
+        component: () => import('@/pages/system/menu/Index.vue'),
         path: 'menu',
         name: 'system_menu',
         meta: {
@@ -132,7 +132,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/role/Index.vue'),
+        component: () => import('@/pages/system/role/Index.vue'),
         path: 'role',
         name: 'system_role',
         meta: {
@@ -142,7 +142,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/user/Index.vue'),
+        component: () => import('@/pages/system/user/Index.vue'),
         path: 'user',
         name: 'system_user',
         meta: {
@@ -152,7 +152,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/data-permission/Index.vue'),
+        component: () => import('@/pages/system/data-permission/Index.vue'),
         path: 'data-permission',
         name: 'system_data_permission',
         meta: {
@@ -162,7 +162,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/online-session/Index.vue'),
+        component: () => import('@/pages/system/online-session/Index.vue'),
         path: 'online-session',
         name: 'system_online_session',
         meta: {
@@ -172,7 +172,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/system/audit/Index.vue'),
+        component: () => import('@/pages/system/audit/Index.vue'),
         path: 'audit',
         name: 'system_audit',
         meta: {
@@ -194,7 +194,7 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/develop/configure/Index.vue'),
+        component: () => import('@/pages/develop/configure/Index.vue'),
         path: 'configure',
         name: 'develop_configure',
         meta: {
@@ -204,7 +204,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       // {
-      //   component: () => import('pages/develop/generalization/Index.vue'),
+      //   component: () => import('@/pages/develop/generalization/Index.vue'),
       //   path: 'generalization/:table_code',
       //   name: 'develop_generalization',
       //   meta: {
@@ -214,7 +214,7 @@ const asyncRoutesChildren: Route[] = [
       //   },
       // },
       {
-        component: () => import('pages/develop/database/Index.vue'),
+        component: () => import('@/pages/develop/database/Index.vue'),
         path: 'database',
         name: 'develop_database',
         meta: {
@@ -224,7 +224,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/develop/dictionary/Index.vue'),
+        component: () => import('@/pages/develop/dictionary/Index.vue'),
         path: 'dictionary',
         name: 'develop_dictionary',
         meta: {
@@ -234,7 +234,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/develop/verification/Index.vue'),
+        component: () => import('@/pages/develop/verification/Index.vue'),
         path: 'verification',
         name: 'develop_verification',
         meta: {
@@ -256,7 +256,7 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/organization/structure/Index.vue'),
+        component: () => import('@/pages/organization/structure/Index.vue'),
         path: 'structure',
         name: 'organization_structure',
         meta: {
@@ -266,7 +266,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/organization/employee/Index.vue'),
+        component: () => import('@/pages/organization/employee/Index.vue'),
         path: 'employee',
         name: 'organization_employee',
         meta: {
@@ -276,7 +276,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/organization/position/Index.vue'),
+        component: () => import('@/pages/organization/position/Index.vue'),
         path: 'position',
         name: 'organization_position',
         meta: {
@@ -286,7 +286,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/organization/sync-batch/Index.vue'),
+        component: () => import('@/pages/organization/sync-batch/Index.vue'),
         path: 'sync-batch',
         name: 'organization_sync_batch',
         meta: {
@@ -296,7 +296,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/organization/sync-error/Index.vue'),
+        component: () => import('@/pages/organization/sync-error/Index.vue'),
         path: 'sync-error',
         name: 'organization_sync_error',
         meta: {
@@ -318,7 +318,7 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/integration/external-system/Index.vue'),
+        component: () => import('@/pages/integration/external-system/Index.vue'),
         path: 'external-system',
         name: 'integration_external_system',
         meta: {
@@ -328,7 +328,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/interface-definition/Index.vue'),
+        component: () => import('@/pages/integration/interface-definition/Index.vue'),
         path: 'interface-definition',
         name: 'integration_interface_definition',
         meta: {
@@ -338,7 +338,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/credential/Index.vue'),
+        component: () => import('@/pages/integration/credential/Index.vue'),
         path: 'credential',
         name: 'integration_credential',
         meta: {
@@ -348,7 +348,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/retry-policy/Index.vue'),
+        component: () => import('@/pages/integration/retry-policy/Index.vue'),
         path: 'retry-policy',
         name: 'integration_retry_policy',
         meta: {
@@ -358,7 +358,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/sync-task/Index.vue'),
+        component: () => import('@/pages/integration/sync-task/Index.vue'),
         path: 'sync-task',
         name: 'integration_sync_task',
         meta: {
@@ -368,7 +368,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/sync-batch/Index.vue'),
+        component: () => import('@/pages/integration/sync-batch/Index.vue'),
         path: 'sync-batch',
         name: 'integration_sync_batch',
         meta: {
@@ -378,7 +378,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/execution/Index.vue'),
+        component: () => import('@/pages/integration/execution/Index.vue'),
         path: 'execution',
         name: 'integration_execution',
         meta: {
@@ -388,7 +388,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/integration/log/Index.vue'),
+        component: () => import('@/pages/integration/log/Index.vue'),
         path: 'log',
         name: 'integration_log',
         meta: {
@@ -410,7 +410,7 @@ const asyncRoutesChildren: Route[] = [
     },
     children: [
       {
-        component: () => import('pages/report/center/Index.vue'),
+        component: () => import('@/pages/report/center/Index.vue'),
         path: 'center',
         name: 'report_center',
         meta: {
@@ -420,7 +420,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/report/manage/Index.vue'),
+        component: () => import('@/pages/report/manage/Index.vue'),
         path: 'manage',
         name: 'report_manage',
         meta: {
@@ -430,7 +430,7 @@ const asyncRoutesChildren: Route[] = [
         },
       },
       {
-        component: () => import('pages/report/design/Index.vue'),
+        component: () => import('@/pages/report/design/Index.vue'),
         path: 'design',
         name: 'report_design',
         meta: {
@@ -448,7 +448,7 @@ const asyncRoutesChildren: Route[] = [
 
 const asyncRootRoute: Route[] = [
   {
-    component: () => import('layouts/MainLayout.vue'),
+    component: () => import('@/layouts/MainLayout.vue'),
     path: '/admin',
     name: 'admin',
     redirect: '/admin/home',

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import type { RouteLocationNormalized } from 'vue-router'
-import { Router as router } from 'src/router/index'
+import { Router as router } from '@/router/index'
 import { LocalStorage } from 'quasar'
-import type { RouteData } from 'src/types'
-import { useUserStore } from 'stores/user'
+import type { RouteData } from '@/types'
+import { useUserStore } from '@/stores/user'
 enum removeType {
   Right,
   Left,

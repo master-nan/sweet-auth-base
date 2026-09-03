@@ -271,15 +271,15 @@ defineOptions({ name: 'develop_verification_page' })
 import { computed, onMounted, ref } from 'vue'
 import { copyToClipboard, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   useDevelopmentVerificationApi,
   type VerificationSampleAccount,
   type VerificationSampleScenario,
   type VerificationSampleStatus,
-} from 'src/api/services/development-verification'
-import { useIntegrationApi } from 'src/api/services/integration'
+} from '@/api/services/development-verification'
+import { useIntegrationApi } from '@/api/services/integration'
 
 const { t } = useI18n({ useScope: 'global' })
 

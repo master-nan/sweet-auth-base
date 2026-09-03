@@ -1,5 +1,5 @@
-import { instance } from 'boot/axios'
-import type { Basic, Query, ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import type { Basic, Query, ResponseData } from '@/types/global'
 
 export type DataPermissionResourceType = 'low_code_table' | 'business_service' | 'report'
 export type DataPermissionBindingType = 'metadata_field' | 'registered_field'

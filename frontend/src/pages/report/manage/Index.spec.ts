@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ExpressionLogic, ExpressionType } from 'src/types/enum'
+import { ExpressionLogic, ExpressionType } from '@/types/enum'
 
 const permissionCodes = vi.hoisted(() => [] as string[])
 const reportApi = vi.hoisted(() => ({
@@ -17,13 +17,13 @@ vi.mock('quasar', () => ({
   }),
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('src/api/services/report', () => ({
+vi.mock('@/api/services/report', () => ({
   defaultReportSheet: () => ({}),
   useReportApi: () => reportApi,
 }))
-vi.mock('src/stores/loading', () => ({ useLoadingStore: () => ({ loading: ref(false) }) }))
+vi.mock('@/stores/loading', () => ({ useLoadingStore: () => ({ loading: ref(false) }) }))
 vi.mock('pinia', () => ({ storeToRefs: (store: { loading: unknown }) => store }))
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     hasGrantedCapability: (code: string) => permissionCodes.includes(code),
   }),
@@ -31,10 +31,10 @@ vi.mock('src/composables/page-buttons', () => ({
 vi.mock('../composables/useReportExport', () => ({
   useReportExport: () => ({ exportingReportId: ref(null), exportReportRow: vi.fn() }),
 }))
-vi.mock('components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
-vi.mock('components/Table/TablePagination.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({
   default: { template: '<div />' },
 }))
 vi.mock('../components/ReportRuntimeDialog.vue', () => ({

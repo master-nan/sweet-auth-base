@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('quasar', () => ({}))
 
 import RetryPolicyFormDialog from './RetryPolicyFormDialog.vue'
-import type { RetryPolicyDetail } from 'src/api/services/integration'
+import type { RetryPolicyDetail } from '@/api/services/integration'
 
 const FieldStub = defineComponent({
   props: { label: String, modelValue: [String, Number, Boolean, Array], rules: Array },

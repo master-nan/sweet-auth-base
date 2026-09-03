@@ -9,11 +9,11 @@ const permissionCodes = vi.hoisted(() => [] as string[])
 const tableApiMocks = vi.hoisted(() => ({ queryRuntimeTableByCode: vi.fn() }))
 const schemeMocks = vi.hoisted(() => ({ initialize: vi.fn() }))
 
-vi.mock('boot/axios', () => ({ instance: {} }))
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
-vi.mock('src/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
-vi.mock('src/composables/query-scheme-page', async () => {
-  const { createQuerySchemePageStub } = await import('src/test/query-scheme-page-stub')
+vi.mock('@/boot/axios', () => ({ instance: {} }))
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('@/api/services/sys-table', () => ({ useTableApi: () => tableApiMocks }))
+vi.mock('@/composables/query-scheme-page', async () => {
+  const { createQuerySchemePageStub } = await import('@/test/query-scheme-page-stub')
   return {
     useQuerySchemePage: () => createQuerySchemePageStub(schemeMocks.initialize),
   }
@@ -21,18 +21,18 @@ vi.mock('src/composables/query-scheme-page', async () => {
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: { execution_id: '51', log_id: '91' } }),
 }))
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     line_buttons: computed(() => detailButtons),
     top_buttons: computed(() => []),
     hasGrantedCapability: (code: string) => permissionCodes.includes(code),
   }),
 }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: { template: '<div><slot /></div>' },
 }))
-vi.mock('src/components/Table/TablePagination.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({
   default: { template: '<div />' },
 }))
 

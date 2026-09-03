@@ -9,13 +9,13 @@ const apiMocks = vi.hoisted(() => ({
 const permissionCodes = vi.hoisted(() => [] as string[])
 const routerPush = vi.hoisted(() => vi.fn())
 
-vi.mock('src/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
+vi.mock('@/api/services/integration', () => ({ useIntegrationApi: () => apiMocks }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ buttons: permissionCodes }) }))
 vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { id: '51' } }),
   useRouter: () => ({ push: routerPush, back: vi.fn() }),
 }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: {
     name: 'BaseContent',
     props: { scrollable: Boolean },

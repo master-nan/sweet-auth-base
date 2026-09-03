@@ -2,14 +2,14 @@ import { defineComponent, h, ref } from 'vue'
 import { shallowMount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import QuerySchemeControls from './QuerySchemeControls.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
-import QuerySchemeSelector from 'src/components/QueryScheme/QuerySchemeSelector.vue'
-import type { QuerySchemePageController } from 'src/composables/query-scheme-page'
-import type { TableQueryState } from 'src/composables/table-query-state'
-import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
-import type { Query } from 'src/types/global'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
+import QuerySchemeSelector from '@/components/QueryScheme/QuerySchemeSelector.vue'
+import type { QuerySchemePageController } from '@/composables/query-scheme-page'
+import type { TableQueryState } from '@/composables/table-query-state'
+import { QuerySchemeType, QuerySchemeValidationStatus } from '@/modules/query-scheme/types'
+import type { Query } from '@/types/global'
 
-vi.mock('src/boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: { get: vi.fn(), post: vi.fn() },
 }))
 

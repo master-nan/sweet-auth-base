@@ -147,20 +147,20 @@ import { useI18n } from 'vue-i18n'
 
 import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
 import { QForm } from 'quasar'
-import { type TableField } from 'src/api/services/sys-table'
-import { type MenuButton } from 'src/api/services/sys-menu'
-import { SysMenuButtonPosition } from 'src/types/enum'
-import { SysTableFieldType, SysTableFieldInputType } from 'src/types/enum'
-import { useDictStore } from 'src/stores/dict'
-import { useDictApi } from 'src/api/services/sys-dict'
-import { queryRuntimeRelationOptions } from 'src/api/services/runtime-relation'
+import { type TableField } from '@/api/services/sys-table'
+import { type MenuButton } from '@/api/services/sys-menu'
+import { SysMenuButtonPosition } from '@/types/enum'
+import { SysTableFieldType, SysTableFieldInputType } from '@/types/enum'
+import { useDictStore } from '@/stores/dict'
+import { useDictApi } from '@/api/services/sys-dict'
+import { queryRuntimeRelationOptions } from '@/api/services/runtime-relation'
 
-import { useLoadingStore } from 'src/stores/loading'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
 import DynamicFieldControl, {
   type DynamicFieldControlContext,
-} from 'src/components/FormDialog/DynamicFieldControl.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+} from '@/components/FormDialog/DynamicFieldControl.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import {
   coerceFieldValue,
   coerceDictOptions,
@@ -176,9 +176,9 @@ import {
   parseLinkageConfig,
   resolveOrganizationSelectorConfig,
   selectLikeInputTypes,
-} from 'src/utils/field-metadata'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { getFieldFormGridClass } from 'src/utils/field-layout'
+} from '@/utils/field-metadata'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { getFieldFormGridClass } from '@/utils/field-layout'
 
 const { t } = useI18n({ useScope: 'global' })
 

@@ -1,4 +1,4 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 export const QUERY_SCHEME_NAME_MAX_CODE_POINTS = 64
 
 export const querySchemeNameLength = (value: string) => Array.from(value).length

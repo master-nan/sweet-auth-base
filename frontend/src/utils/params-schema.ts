@@ -1,6 +1,6 @@
-import type { TableField } from 'src/api/services/sys-table'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { primitiveText } from 'src/utils/primitive-text'
+import type { TableField } from '@/api/services/sys-table'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import { primitiveText } from '@/utils/primitive-text'
 
 type ParamOption = {
   label: string

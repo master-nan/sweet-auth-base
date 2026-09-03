@@ -200,13 +200,13 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, onMounted, reactive, ref } from 'vue'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import { useUserStore } from 'src/stores/user'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { queryOrganizationOptions, type OrganizationSelectorType } from 'src/api/services/org'
-import { useUserSessionApi } from 'src/api/services/user-session'
-import { useIntegrationApi } from 'src/api/services/integration'
-import { useAccessLogApi, type AccessLog } from 'src/api/services/access-log'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import { useUserStore } from '@/stores/user'
+import { usePageButtons } from '@/composables/page-buttons'
+import { queryOrganizationOptions, type OrganizationSelectorType } from '@/api/services/org'
+import { useUserSessionApi } from '@/api/services/user-session'
+import { useIntegrationApi } from '@/api/services/integration'
+import { useAccessLogApi, type AccessLog } from '@/api/services/access-log'
 
 const { t } = useI18n({ useScope: 'global' })
 

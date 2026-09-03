@@ -1,6 +1,6 @@
-import { instance } from 'boot/axios'
-import type { Query, ResponseData } from 'src/types/global'
-import { localLoadingRequestConfig } from 'src/api/request-config'
+import { instance } from '@/boot/axios'
+import type { Query, ResponseData } from '@/types/global'
+import { localLoadingRequestConfig } from '@/api/request-config'
 
 export type ExternalSystemStatus = 'draft' | 'enabled' | 'disabled'
 export type ExternalSystemType = 'hr' | 'erp' | 'tms' | 'wms' | 'other'

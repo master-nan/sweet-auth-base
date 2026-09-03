@@ -311,12 +311,12 @@
 import { useI18n } from 'vue-i18n'
 
 import { ref, toRefs, watch } from 'vue'
-import type { QueryRule } from 'src/types/global'
-import { SysTableFieldInputTypeMap, SysTableFieldTypeMap } from 'src/types/enum'
-import type { OrganizationSelectorRuntimeConfig } from 'src/types/organization-selector'
-import { compactSelectionDisplay, compactSelectionTooltip } from 'src/utils/select-display'
-import OrganizationSelect from 'src/components/Select/OrganizationSelect.vue'
-import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
+import type { QueryRule } from '@/types/global'
+import { SysTableFieldInputTypeMap, SysTableFieldTypeMap } from '@/types/enum'
+import type { OrganizationSelectorRuntimeConfig } from '@/types/organization-selector'
+import { compactSelectionDisplay, compactSelectionTooltip } from '@/utils/select-display'
+import OrganizationSelect from '@/components/Select/OrganizationSelect.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 

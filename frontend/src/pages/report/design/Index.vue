@@ -315,7 +315,7 @@ import {
   type ReportSaveReq,
   type ReportSheetCell,
   type ReportSheetConfig,
-} from 'src/api/services/report'
+} from '@/api/services/report'
 import ReportDesignerTopbar from './components/ReportDesignerTopbar.vue'
 import ReportDatasetDialog from './components/ReportDatasetDialog.vue'
 import ReportInspectorPanel from './components/ReportInspectorPanel.vue'
@@ -334,7 +334,7 @@ import {
   reportParameterOperatorOptions,
   reportParameterTypeOptions,
   reportRuntimeDisplayOptions,
-} from 'src/modules/report/options'
+} from '@/modules/report/options'
 import {
   buildReportLocalPreview,
   collectReportUsedFields,
@@ -346,12 +346,12 @@ import {
   reportSheetCellAt,
   reportValidateFormula,
   type ReportSheetRange,
-} from 'src/modules/report/sheet'
+} from '@/modules/report/sheet'
 import {
   hasReportCellConfig,
   normalizeReportSheet,
   reportParameterDefaultsForField,
-} from 'src/modules/report/schema'
+} from '@/modules/report/schema'
 
 const { t } = useI18n({ useScope: 'global' })
 

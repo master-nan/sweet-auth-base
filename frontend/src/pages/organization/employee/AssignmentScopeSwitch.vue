@@ -26,7 +26,7 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed } from 'vue'
-import type { AssignmentTimeScope } from 'src/api/services/org'
+import type { AssignmentTimeScope } from '@/api/services/org'
 
 const { t } = useI18n({ useScope: 'global' })
 

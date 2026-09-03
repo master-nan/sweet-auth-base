@@ -116,23 +116,23 @@ defineOptions({ name: 'organization_sync_batch' })
 import { computed, onMounted, ref, watch } from 'vue'
 import type { QTableProps } from 'quasar'
 import { useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   getSyncBatchError,
   querySyncBatches,
   type SyncBatchListItem,
   type SyncBatchQueryRequest,
-} from 'src/api/services/org'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import OrganizationRecordDetailDialog from 'src/pages/organization/components/OrganizationRecordDetailDialog.vue'
-import type { OrganizationDetailItem } from 'src/pages/organization/components/organization-record-detail'
+} from '@/api/services/org'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import OrganizationRecordDetailDialog from '@/pages/organization/components/OrganizationRecordDetailDialog.vue'
+import type { OrganizationDetailItem } from '@/pages/organization/components/organization-record-detail'
 import {
   createOrganizationField,
   createOrganizationQuery,
@@ -140,12 +140,12 @@ import {
   formatOrganizationValue,
   organizationSyncObjectLabel,
   organizationStatusColor,
-} from 'src/pages/organization/organization-list-page'
-import { buildOrganizationDetailRoute } from 'src/pages/organization/organization-detail-route'
-import { useDictStore } from 'src/stores/dict'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
+} from '@/pages/organization/organization-list-page'
+import { buildOrganizationDetailRoute } from '@/pages/organization/organization-detail-route'
+import { useDictStore } from '@/stores/dict'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

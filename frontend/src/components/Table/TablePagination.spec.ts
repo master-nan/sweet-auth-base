@@ -2,7 +2,7 @@ import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import TablePagination from './TablePagination.vue'
-import { testI18n } from 'src/test/setup'
+import { testI18n } from '@/test/setup'
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,

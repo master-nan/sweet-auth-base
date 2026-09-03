@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import type { Query } from 'src/types/global'
-import { QuerySchemeBindingKind, QuerySchemeType } from 'src/modules/query-scheme/types'
+import { useTableQueryState } from '@/composables/table-query-state'
+import type { Query } from '@/types/global'
+import { QuerySchemeBindingKind, QuerySchemeType } from '@/modules/query-scheme/types'
 
 const createQuery = (): Query => ({
   page: 3,

@@ -4,7 +4,7 @@ const postMock = vi.hoisted(() => vi.fn())
 const getMock = vi.hoisted(() => vi.fn())
 const putMock = vi.hoisted(() => vi.fn())
 
-vi.mock('boot/axios', () => ({
+vi.mock('@/boot/axios', () => ({
   instance: {
     post: postMock,
     get: getMock,
@@ -12,7 +12,7 @@ vi.mock('boot/axios', () => ({
   },
 }))
 
-import { useIntegrationApi } from 'src/api/services/integration'
+import { useIntegrationApi } from '@/api/services/integration'
 
 describe('external system API', () => {
   beforeEach(() => {

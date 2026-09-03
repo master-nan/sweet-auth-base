@@ -301,9 +301,9 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import cloneDeep from 'lodash/cloneDeep'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import AdvancedQuery from 'src/components/Query/AdvancedQuery.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
 import DataPermissionConfigDialog from './components/DataPermissionConfigDialog.vue'
 import DataPermissionDetailDialog from './components/DataPermissionDetailDialog.vue'
 import {
@@ -316,15 +316,15 @@ import {
   type DataResource,
   type ValidationResult,
   useDataPermissionConfigApi,
-} from 'src/api/services/data-permission-config'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import type { TableField } from 'src/api/services/sys-table'
-import type { Query } from 'src/types/global'
-import { SysTableFieldInputType, SysTableFieldType } from 'src/types/enum'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { countEffectiveQueryRules } from 'src/utils/query-state'
+} from '@/api/services/data-permission-config'
+import type { MenuButton } from '@/api/services/sys-menu'
+import type { TableField } from '@/api/services/sys-table'
+import type { Query } from '@/types/global'
+import { SysTableFieldInputType, SysTableFieldType } from '@/types/enum'
+import { usePageButtons } from '@/composables/page-buttons'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { countEffectiveQueryRules } from '@/utils/query-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

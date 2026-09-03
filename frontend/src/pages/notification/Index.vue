@@ -225,10 +225,10 @@ defineOptions({ name: 'notification_center' })
 import { onMounted, ref, watch } from 'vue'
 import { date, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
 import {
   NOTIFICATION_CATEGORY_LABELS,
   NOTIFICATION_LEVEL_COLORS,
@@ -238,9 +238,9 @@ import {
   type NotificationLevel,
   type NotificationReadStatus,
   type NotificationSummary,
-} from 'src/api/services/notification'
-import { useNotificationStore } from 'src/stores/notification'
-import type { TableColumn } from 'src/types/global'
+} from '@/api/services/notification'
+import { useNotificationStore } from '@/stores/notification'
+import type { TableColumn } from '@/types/global'
 
 const { t } = useI18n({ useScope: 'global' })
 

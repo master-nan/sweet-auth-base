@@ -125,12 +125,12 @@ defineOptions({ name: 'integration_retry_policy' })
 
 import { onMounted, ref, watch, computed } from 'vue'
 import { useQuasar } from 'quasar'
-import BaseContent from 'src/components/BaseContent/BaseContent.vue'
-import TablePagination from 'src/components/Table/TablePagination.vue'
-import StandardTableToolbar from 'src/components/Table/StandardTableToolbar.vue'
-import TableColumnSelector from 'src/components/Table/TableColumnSelector.vue'
-import StatusChip from 'src/components/Display/StatusChip.vue'
-import QuerySchemeControls from 'src/components/QueryScheme/QuerySchemeControls.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
+import TableColumnSelector from '@/components/Table/TableColumnSelector.vue'
+import StatusChip from '@/components/Display/StatusChip.vue'
+import QuerySchemeControls from '@/components/QueryScheme/QuerySchemeControls.vue'
 import RetryPolicyFormDialog, { type RetryPolicyFormValue } from './RetryPolicyFormDialog.vue'
 import RetryPolicyDetailDialog from './RetryPolicyDetailDialog.vue'
 import {
@@ -142,19 +142,19 @@ import {
   type RetryBackoffType,
   type RetryPolicyUpdateRequest,
   useIntegrationApi,
-} from 'src/api/services/integration'
-import { usePageButtons } from 'src/composables/page-buttons'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useTableQueryState } from 'src/composables/table-query-state'
-import { useQuerySchemePage } from 'src/composables/query-scheme-page'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import type { TableColumn } from 'src/types/global'
-import { countEffectiveQueryRules } from 'src/utils/query-state'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { resolveRuntimeColumns } from 'src/utils/column-format'
-import { dispatchPageAction, type PageActionHandlers } from 'src/utils/button-handlers'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
+} from '@/api/services/integration'
+import { usePageButtons } from '@/composables/page-buttons'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useTableQueryState } from '@/composables/table-query-state'
+import { useQuerySchemePage } from '@/composables/query-scheme-page'
+import type { MenuButton } from '@/api/services/sys-menu'
+import type { TableColumn } from '@/types/global'
+import { countEffectiveQueryRules } from '@/utils/query-state'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { resolveRuntimeColumns } from '@/utils/column-format'
+import { dispatchPageAction, type PageActionHandlers } from '@/utils/button-handlers'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

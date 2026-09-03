@@ -42,7 +42,7 @@ import type {
   ReportPreviewRes,
   ReportSheetCell,
   ReportSheetConfig,
-} from 'src/api/services/report'
+} from '@/api/services/report'
 import {
   reportEvaluateFormula,
   reportRuntimeAggregateValue,
@@ -55,7 +55,7 @@ import {
   type ReportFormulaCellReference,
   type ReportFormulaError,
   type ReportFormulaResult,
-} from 'src/modules/report/sheet'
+} from '@/modules/report/sheet'
 
 const { t } = useI18n({ useScope: 'global' })
 

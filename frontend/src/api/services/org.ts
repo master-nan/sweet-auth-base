@@ -1,5 +1,5 @@
-import { instance } from 'boot/axios'
-import type { Query, ResponseData } from 'src/types/global'
+import { instance } from '@/boot/axios'
+import type { Query, ResponseData } from '@/types/global'
 
 export type OrganizationSelectorType = 'legal_entity' | 'org_unit' | 'employee' | 'position'
 

@@ -1,6 +1,6 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import { defineStore } from 'pinia'
-import { useBasicApi } from 'src/api/services/basic'
+import { useBasicApi } from '@/api/services/basic'
 
 let inflightFetch: Promise<void> | null = null
 

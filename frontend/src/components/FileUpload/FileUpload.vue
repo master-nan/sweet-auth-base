@@ -103,10 +103,10 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { useFileApi, type FileAccessMode, type FileInfo } from 'src/api/services/file'
+import { useFileApi, type FileAccessMode, type FileInfo } from '@/api/services/file'
 import { Notify } from 'quasar'
 import SparkMD5 from 'spark-md5'
-import { parseFileIds } from 'src/utils/file-value'
+import { parseFileIds } from '@/utils/file-value'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -115,7 +115,7 @@ type FilePreviewDialogExpose = {
 }
 
 const FilePreviewDialog = defineAsyncComponent(
-  () => import('src/components/FileUpload/FilePreviewDialog.vue'),
+  () => import('@/components/FileUpload/FilePreviewDialog.vue'),
 )
 
 interface FileUploadProps {

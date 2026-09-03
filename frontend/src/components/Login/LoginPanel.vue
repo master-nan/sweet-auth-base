@@ -126,10 +126,10 @@
 <script lang="ts" setup>
 import { computed, ref, onMounted } from 'vue'
 import { useVModels } from '@vueuse/core'
-import { useBasicApi } from 'src/api/services/basic'
+import { useBasicApi } from '@/api/services/basic'
 import { QForm } from 'quasar'
-import LoginFlowVisual from 'src/components/Login/LoginFlowVisual.vue'
-import { useConfigureStore } from 'stores/configure'
+import LoginFlowVisual from '@/components/Login/LoginFlowVisual.vue'
+import { useConfigureStore } from '@/stores/configure'
 import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'MyLogin' })

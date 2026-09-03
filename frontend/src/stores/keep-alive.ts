@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { type RouteData } from 'src/types/index'
+import { type RouteData } from '@/types/index'
 
 export const useKeepAliveStore = defineStore('keepAlive', {
   state: () => ({

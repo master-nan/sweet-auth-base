@@ -9,10 +9,10 @@ const apiMocks = vi.hoisted(() => ({
 }))
 const permissions = vi.hoisted(() => ({ values: ['organization_sync_error_query'] }))
 
-vi.mock('src/api/services/org', () => apiMocks)
-vi.mock('src/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
+vi.mock('@/api/services/org', () => apiMocks)
+vi.mock('@/stores/user', () => ({ useUserStore: () => ({ buttons: permissions.values }) }))
 
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({
     record_detail_top_buttons: { value: [] },
     record_detail_bottom_buttons: { value: [] },
@@ -20,7 +20,7 @@ vi.mock('src/composables/page-buttons', () => ({
   }),
 }))
 
-vi.mock('src/stores/dict', () => ({
+vi.mock('@/stores/dict', () => ({
   useDictStore: () => ({
     loadDicts: vi.fn().mockResolvedValue(undefined),
     getDictLabel: (_code: string, value: unknown) =>

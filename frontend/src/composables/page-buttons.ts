@@ -1,14 +1,14 @@
 import { computed } from 'vue'
-import { translate } from 'boot/i18n'
-import { useUserStore } from 'src/stores/user'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { SysMenuButtonPosition } from 'src/types/enum'
+import { translate } from '@/boot/i18n'
+import { useUserStore } from '@/stores/user'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { SysMenuButtonPosition } from '@/types/enum'
 import {
   findButtonActionCapability,
   findButtonCapability,
   resolvePageButtons,
-} from 'src/utils/menu-button'
-import { resolveMenuButtonLabel } from 'src/utils/menu-button-display'
+} from '@/utils/menu-button'
+import { resolveMenuButtonLabel } from '@/utils/menu-button-display'
 
 export function usePageButtons(route_name: string) {
   const userStore = useUserStore()

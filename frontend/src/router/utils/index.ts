@@ -1,7 +1,7 @@
-import { useUserStore } from 'src/stores/user'
-import { type Route } from 'src/types/index'
-import layout from 'src/components/Layout/Layout.vue'
-import type { Menu } from 'src/api/services/sys-menu'
+import { useUserStore } from '@/stores/user'
+import { type Route } from '@/types/index'
+import layout from '@/components/Layout/Layout.vue'
+import type { Menu } from '@/api/services/sys-menu'
 
 export default function constructionRouters(router: Route[], backendMenus?: Menu[]) {
   const userStore = useUserStore()
@@ -37,13 +37,13 @@ export default function constructionRouters(router: Route[], backendMenus?: Menu
   })
 }
 
-const reportRuntimeComponent = 'pages/report/runtime/ReportRuntimePage.vue'
+const reportRuntimeComponent = 'src/pages/report/runtime/ReportRuntimePage.vue'
 
 const componentMap: Record<string, any> = {
   'src/components/Layout/Layout.vue': layout,
-  'pages/develop/generalization/Index.vue': () => import('pages/develop/generalization/Index.vue'),
-  'pages/system/data-permission/Index.vue': () => import('pages/system/data-permission/Index.vue'),
-  [reportRuntimeComponent]: () => import('pages/report/runtime/ReportRuntimePage.vue'),
+  'src/pages/develop/generalization/Index.vue': () => import('@/pages/develop/generalization/Index.vue'),
+  'src/pages/system/data-permission/Index.vue': () => import('@/pages/system/data-permission/Index.vue'),
+  [reportRuntimeComponent]: () => import('@/pages/report/runtime/ReportRuntimePage.vue'),
 }
 
 type ReportMenuOption = {

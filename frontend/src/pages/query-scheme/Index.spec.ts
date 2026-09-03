@@ -1,7 +1,7 @@
 import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { QuerySchemeType, QuerySchemeValidationStatus } from 'src/modules/query-scheme/types'
+import { QuerySchemeType, QuerySchemeValidationStatus } from '@/modules/query-scheme/types'
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -34,9 +34,9 @@ const quasar = vi.hoisted(() => ({
 }))
 const router = vi.hoisted(() => ({ push: vi.fn() }))
 
-vi.mock('src/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
-vi.mock('src/stores/user', () => ({ useUserStore: () => user }))
-vi.mock('src/composables/query-scope', () => ({
+vi.mock('@/api/services/query-scheme', () => ({ useQuerySchemeApi: () => api }))
+vi.mock('@/stores/user', () => ({ useUserStore: () => user }))
+vi.mock('@/composables/query-scope', () => ({
   collectQueryScopes: () => [
     {
       scope_code: 'system.user.list',
@@ -45,7 +45,7 @@ vi.mock('src/composables/query-scope', () => ({
     },
   ],
 }))
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({
     confirmAction: () => ({ onOk: vi.fn() }),
     confirmDanger: () => ({ onOk: vi.fn() }),

@@ -250,10 +250,10 @@
 import { useI18n } from 'vue-i18n'
 
 defineOptions({ name: 'develop_dictionary' })
-import BaseContent from 'components/BaseContent/BaseContent.vue'
-import MasterDetailPage from 'components/MasterDetail/MasterDetailPage.vue'
-import TablePagination from 'components/Table/TablePagination.vue'
-import StandardTableToolbar from 'components/Table/StandardTableToolbar.vue'
+import BaseContent from '@/components/BaseContent/BaseContent.vue'
+import MasterDetailPage from '@/components/MasterDetail/MasterDetailPage.vue'
+import TablePagination from '@/components/Table/TablePagination.vue'
+import StandardTableToolbar from '@/components/Table/StandardTableToolbar.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { type QTableProps, useQuasar } from 'quasar'
 import {
@@ -261,20 +261,20 @@ import {
   useDictApi,
   type Dict,
   type DictItem,
-} from 'src/api/services/sys-dict'
-import type { Query } from 'src/types/global'
-import DynamicFormDialog from 'src/components/FormDialog/DynamicFormDialog.vue'
-import { useRuntimeTableMetadata } from 'src/composables/runtime-table-metadata'
-import { useTableQueryState } from 'src/composables/table-query-state'
+} from '@/api/services/sys-dict'
+import type { Query } from '@/types/global'
+import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import { useRuntimeTableMetadata } from '@/composables/runtime-table-metadata'
+import { useTableQueryState } from '@/composables/table-query-state'
 import cloneDeep from 'lodash/cloneDeep'
-import { useDictStore } from 'src/stores/dict'
-import { buildTableColumns } from 'src/utils/column-format'
-import { useMasterDetailPageButtons } from 'src/composables/page-buttons'
-import type { MenuButton } from 'src/api/services/sys-menu'
-import { menuButtonDisplayProps } from 'src/utils/menu-button-display'
-import { SysMasterDetailMode } from 'src/types/enum'
-import { useConfirmDialog } from 'src/composables/confirm-dialog'
-import { resolveTableEmptyMessage } from 'src/utils/table-state'
+import { useDictStore } from '@/stores/dict'
+import { buildTableColumns } from '@/utils/column-format'
+import { useMasterDetailPageButtons } from '@/composables/page-buttons'
+import type { MenuButton } from '@/api/services/sys-menu'
+import { menuButtonDisplayProps } from '@/utils/menu-button-display'
+import { SysMasterDetailMode } from '@/types/enum'
+import { useConfirmDialog } from '@/composables/confirm-dialog'
+import { resolveTableEmptyMessage } from '@/utils/table-state'
 
 const { t } = useI18n({ useScope: 'global' })
 

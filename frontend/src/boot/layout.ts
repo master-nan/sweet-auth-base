@@ -1,12 +1,12 @@
-import { defineBoot } from '#q-app/wrappers'
-import { useTagViewStore } from 'stores/tagView'
-import { useBreadcrumbsStore } from 'stores/breadcrumbs'
-import { useKeepAliveStore } from 'stores/keep-alive'
-import { useConfigureStore } from 'stores/configure'
+import { defineBoot } from '#q-app'
+import { useTagViewStore } from '@/stores/tagView'
+import { useBreadcrumbsStore } from '@/stores/breadcrumbs'
+import { useKeepAliveStore } from '@/stores/keep-alive'
+import { useConfigureStore } from '@/stores/configure'
 import { LocalStorage, LoadingBar } from 'quasar'
 import type { RouteLocationNormalized } from 'vue-router'
-import constantRoutes from 'src/router/constantRoutes'
-import type { RouteData } from 'src/types'
+import constantRoutes from '@/router/constantRoutes'
+import type { RouteData } from '@/types'
 
 export default defineBoot(async ({ router }) => {
   const tagViewStore = useTagViewStore()

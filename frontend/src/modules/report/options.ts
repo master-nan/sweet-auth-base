@@ -1,4 +1,4 @@
-import { translate as t } from 'src/boot/i18n'
+import { translate as t } from '@/boot/i18n'
 import type {
   ReportCellBindingType,
   ReportDatasetJoinType,

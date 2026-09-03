@@ -1,4 +1,4 @@
-import type { FileAccessMode } from 'src/api/services/file'
+import type { FileAccessMode } from '@/api/services/file'
 
 type FileAccessResolver = (uuid: string, mode: FileAccessMode) => Promise<string | undefined>
 

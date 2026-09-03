@@ -5,9 +5,9 @@ import { useConfigureStore } from './configure'
 import { useRouterStore } from './permission'
 import { useKeepAliveStore } from './keep-alive'
 import { useBreadcrumbsStore } from './breadcrumbs'
-import { Router as router } from 'src/router/index'
-import type { Role } from 'src/api/services/sys-role'
-import type { Menu } from 'src/api/services/sys-menu'
+import { Router as router } from '@/router/index'
+import type { Role } from '@/api/services/sys-role'
+import type { Menu } from '@/api/services/sys-menu'
 
 const authSessionStorageKeys = [
   'access_token',

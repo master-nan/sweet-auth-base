@@ -20,7 +20,7 @@ vi.mock('quasar', () => ({
   date: { formatDate: (value: string) => value },
 }))
 vi.mock('vue-router', () => ({ useRouter: () => router }))
-vi.mock('src/api/services/notification', () => ({
+vi.mock('@/api/services/notification', () => ({
   NOTIFICATION_CATEGORY_LABELS: {
     SYSTEM: '系统',
     BUSINESS: '业务',
@@ -37,8 +37,8 @@ vi.mock('src/api/services/notification', () => ({
   },
   useNotificationApi: () => api,
 }))
-vi.mock('src/stores/notification', () => ({ useNotificationStore: () => store }))
-vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
+vi.mock('@/stores/notification', () => ({ useNotificationStore: () => store }))
+vi.mock('@/components/BaseContent/BaseContent.vue', () => ({
   default: defineComponent({
     name: 'BaseContent',
     setup(_, { slots }) {
@@ -46,7 +46,7 @@ vi.mock('src/components/BaseContent/BaseContent.vue', () => ({
     },
   }),
 }))
-vi.mock('src/components/Table/StandardTableToolbar.vue', () => ({
+vi.mock('@/components/Table/StandardTableToolbar.vue', () => ({
   default: defineComponent({
     name: 'StandardTableToolbar',
     emits: ['refresh'],
@@ -55,7 +55,7 @@ vi.mock('src/components/Table/StandardTableToolbar.vue', () => ({
     },
   }),
 }))
-vi.mock('src/components/Table/TablePagination.vue', () => ({
+vi.mock('@/components/Table/TablePagination.vue', () => ({
   default: defineComponent({
     name: 'TablePagination',
     props: ['page', 'pageSize', 'total'],
@@ -63,7 +63,7 @@ vi.mock('src/components/Table/TablePagination.vue', () => ({
     template: '<div data-pagination />',
   }),
 }))
-vi.mock('src/components/Display/StatusChip.vue', () => ({
+vi.mock('@/components/Display/StatusChip.vue', () => ({
   default: defineComponent({
     name: 'StatusChip',
     props: ['label'],

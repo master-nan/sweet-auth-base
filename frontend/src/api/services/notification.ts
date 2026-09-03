@@ -1,7 +1,7 @@
-import { translate as t } from 'src/boot/i18n'
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
-import type { ResponseData } from 'src/types/global'
+import { translate as t } from '@/boot/i18n'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
+import type { ResponseData } from '@/types/global'
 
 export type NotificationCategory =
   | 'SYSTEM'

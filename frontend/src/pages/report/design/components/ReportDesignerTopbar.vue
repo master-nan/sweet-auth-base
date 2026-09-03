@@ -95,7 +95,7 @@
 import { useI18n } from 'vue-i18n'
 
 import { computed } from 'vue'
-import type { ReportStatus } from 'src/api/services/report'
+import type { ReportStatus } from '@/api/services/report'
 
 const { t } = useI18n({ useScope: 'global' })
 

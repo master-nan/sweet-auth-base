@@ -1,4 +1,4 @@
-import type { Menu } from 'src/api/services/sys-menu'
+import type { Menu } from '@/api/services/sys-menu'
 
 export const toPositiveMenuId = (raw: unknown) => {
   const value = Array.isArray(raw) ? raw[0] : raw

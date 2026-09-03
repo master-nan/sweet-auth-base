@@ -14,15 +14,15 @@ vi.mock('quasar', async (importOriginal) => ({
   ...(await importOriginal<typeof Quasar>()),
   useQuasar: () => ({ notify: vi.fn() }),
 }))
-vi.mock('src/api/services/user-session', () => ({ useUserSessionApi: () => api }))
-vi.mock('src/composables/page-buttons', () => ({
+vi.mock('@/api/services/user-session', () => ({ useUserSessionApi: () => api }))
+vi.mock('@/composables/page-buttons', () => ({
   usePageButtons: () => ({ line_buttons: [], top_buttons: [] }),
 }))
-vi.mock('src/composables/confirm-dialog', () => ({
+vi.mock('@/composables/confirm-dialog', () => ({
   useConfirmDialog: () => ({ confirmWithReason: vi.fn() }),
 }))
-vi.mock('src/utils/menu-button-display', () => ({ menuButtonDisplayProps: () => ({}) }))
-vi.mock('src/utils/download', () => ({
+vi.mock('@/utils/menu-button-display', () => ({ menuButtonDisplayProps: () => ({}) }))
+vi.mock('@/utils/download', () => ({
   downloadBlob: vi.fn(),
   parseContentDispositionFilename: vi.fn(),
 }))

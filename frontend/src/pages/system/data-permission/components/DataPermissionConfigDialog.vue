@@ -444,8 +444,8 @@ import { useI18n } from 'vue-i18n'
 
 import { computed, nextTick, ref, watch } from 'vue'
 import { type QForm, useQuasar } from 'quasar'
-import SweetDateTimePicker from 'src/components/DateTime/SweetDateTimePicker.vue'
-import FormDialogShell from 'src/components/FormDialog/FormDialogShell.vue'
+import SweetDateTimePicker from '@/components/DateTime/SweetDateTimePicker.vue'
+import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import {
   type DataGrant,
   type DataGrantSaveReq,
@@ -462,11 +462,11 @@ import {
   type DataResource,
   type DataResourceSaveReq,
   useDataPermissionConfigApi,
-} from 'src/api/services/data-permission-config'
-import { useTableApi, type Table, type TableField } from 'src/api/services/sys-table'
-import { useRoleApi, type Role } from 'src/api/services/sys-role'
-import { useSysUserApi, type User } from 'src/api/services/sys-user'
-import type { Query } from 'src/types/global'
+} from '@/api/services/data-permission-config'
+import { useTableApi, type Table, type TableField } from '@/api/services/sys-table'
+import { useRoleApi, type Role } from '@/api/services/sys-role'
+import { useSysUserApi, type User } from '@/api/services/sys-user'
+import type { Query } from '@/types/global'
 
 const { t } = useI18n({ useScope: 'global' })
 

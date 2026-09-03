@@ -71,19 +71,19 @@
 </template>
 
 <script setup lang="ts">
-import type { SignInReq } from 'src/api/services/basic'
-import { useBasicApi } from 'src/api/services/basic'
+import type { SignInReq } from '@/api/services/basic'
+import { useBasicApi } from '@/api/services/basic'
 import { computed, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from 'src/stores/user'
+import { useUserStore } from '@/stores/user'
 import { useQuasar } from 'quasar'
 import { useI18n } from 'vue-i18n'
-import { writeUIPreferences, type SupportedLocale } from 'src/utils/ui-preferences'
-import { applyQuasarLanguage } from 'src/boot/i18n'
-import LoginIllustration from 'src/components/Login/LoginIllustration.vue'
-import LoginPanel from 'src/components/Login/LoginPanel.vue'
-import DarkMode from 'src/components/Toolbar/DarkMode.vue'
-import { useLoadingStore } from 'stores/loading'
+import { writeUIPreferences, type SupportedLocale } from '@/utils/ui-preferences'
+import { applyQuasarLanguage } from '@/boot/i18n'
+import LoginIllustration from '@/components/Login/LoginIllustration.vue'
+import LoginPanel from '@/components/Login/LoginPanel.vue'
+import DarkMode from '@/components/Toolbar/DarkMode.vue'
+import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
 
 const $q = useQuasar()

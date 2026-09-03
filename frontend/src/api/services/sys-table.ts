@@ -1,7 +1,7 @@
-import { instance } from 'boot/axios'
-import { localLoadingRequestConfig } from 'src/api/request-config'
+import { instance } from '@/boot/axios'
+import { localLoadingRequestConfig } from '@/api/request-config'
 // import qs from 'qs'
-import type { Basic, Query, ResponseData } from 'src/types/global'
+import type { Basic, Query, ResponseData } from '@/types/global'
 import type {
   ExpressionType,
   SysTableFieldType,
@@ -11,7 +11,7 @@ import type {
   SysMasterDetailMode,
   SysFormOpenMode,
   SysDetailOpenMode,
-} from 'src/types/enum'
+} from '@/types/enum'
 
 export type TableFieldLogicalType =
   | 'plain'

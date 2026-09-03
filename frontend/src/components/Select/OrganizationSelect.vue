@@ -43,8 +43,8 @@ import {
   queryOrganizationOptions,
   type OrganizationSelectorOption,
   type OrganizationSelectorType,
-} from 'src/api/services/org'
-import SweetSelect from 'src/components/Select/SweetSelect.vue'
+} from '@/api/services/org'
+import SweetSelect from '@/components/Select/SweetSelect.vue'
 
 const { t } = useI18n({ useScope: 'global' })
 
