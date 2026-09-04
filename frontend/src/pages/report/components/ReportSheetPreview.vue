@@ -516,15 +516,12 @@ function univerBorder(value: unknown, side: 't' | 'r' | 'b' | 'l') {
   display: grid;
   margin-inline: auto;
   background: #fff;
-  outline: 1px solid #dfe5f2;
   box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
 }
 
 .report-sheet-preview__cell {
   min-height: 0;
   padding: 8px 10px;
-  border-right: 1px solid #dfe5f2;
-  border-bottom: 1px solid #dfe5f2;
   color: #172033;
   white-space: nowrap;
   overflow: hidden;

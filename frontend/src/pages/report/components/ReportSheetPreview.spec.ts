@@ -35,6 +35,39 @@ describe('ReportSheetPreview', () => {
     ])
     expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('180px 96px')
     expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('54px')
+    expect(wrapper.find('.report-sheet-preview__cell').attributes('style')).not.toContain('border')
+  })
+
+  it('renders only borders explicitly configured in the report', () => {
+    const sheet = createBlankReportSheet(2, 2)
+    sheet.cells = [
+      {
+        id: makeReportCellId(1, 1),
+        row: 1,
+        col: 1,
+        value: '显式边框',
+        style: {
+          univer: {
+            bd: {
+              b: { s: 1, cl: { rgb: '#112233' } },
+            },
+          },
+        },
+      },
+    ]
+
+    const wrapper = mount(ReportSheetPreview, {
+      props: {
+        sheet,
+        datasets: [],
+        previewData: { columns: [], rows: [], total: 0 },
+      },
+    })
+
+    const style = wrapper.find('.report-sheet-preview__cell').attributes('style')
+    expect(style).toContain('border-bottom-width: 1px')
+    expect(style).toContain('border-bottom-style: solid')
+    expect(style).toContain('border-bottom-color: #112233')
   })
 
   it('renders a subtotal for each data group and one global total', () => {
