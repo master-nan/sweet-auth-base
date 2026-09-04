@@ -35,7 +35,9 @@ describe('ReportSheetPreview', () => {
     ])
     expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('180px 96px')
     expect(wrapper.find('.report-sheet-preview__grid').attributes('style')).toContain('54px')
-    expect(wrapper.find('.report-sheet-preview__cell').attributes('style')).not.toContain('border')
+    const defaultCellStyle = wrapper.find('.report-sheet-preview__cell').attributes('style')
+    expect(defaultCellStyle).not.toContain('border')
+    expect(defaultCellStyle).toContain('font-weight: 400')
   })
 
   it('renders only borders explicitly configured in the report', () => {

@@ -234,7 +234,7 @@ async function exportCurrentRuntime() {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: #eef2f7;
+  background: #fff;
 }
 
 .runtime-head {
@@ -290,29 +290,33 @@ async function exportCurrentRuntime() {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
   overflow: hidden;
-  padding: 18px 20px 14px;
-  background: #eef2f7;
+  background: #fff;
 }
 
 .runtime-body :deep(.report-sheet-preview) {
   min-height: 0;
   flex: 1;
-  border-radius: 4px;
+  border: 0;
+  border-radius: 0;
 }
 
 .runtime-body :deep(.report-sheet-preview__scroll) {
   height: 100%;
   max-height: none;
-  padding: 28px;
+  padding: 32px 40px;
+  background: #fff;
 }
 
 .runtime-pagination {
   display: flex;
+  min-height: 58px;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  padding: 10px 20px;
+  border-top: 1px solid #dfe5f2;
+  background: #fff;
   color: #71809a;
 }
 
@@ -323,8 +327,14 @@ body.body--dark {
   }
 
   .runtime-head,
-  .runtime-filters {
+  .runtime-filters,
+  .runtime-pagination {
     border-color: var(--app-dark-border);
+    background: var(--app-dark-surface);
+  }
+
+  .runtime-body :deep(.report-sheet-preview__scroll),
+  .runtime-body :deep(.report-sheet-preview__grid) {
     background: var(--app-dark-surface);
   }
 

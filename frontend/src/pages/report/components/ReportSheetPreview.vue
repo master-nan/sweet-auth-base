@@ -446,7 +446,7 @@ function cellStyle(cell: ReportSheetCell) {
     textAlign: align,
     justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
     alignItems: verticalAlign === 1 ? 'flex-start' : verticalAlign === 3 ? 'flex-end' : 'center',
-    fontWeight: style.bold ? 800 : 500,
+    fontWeight: style.bold ? 800 : 400,
     fontStyle: style.italic ? 'italic' : 'normal',
     fontFamily: typeof univer.ff === 'string' ? univer.ff : undefined,
     fontSize: typeof univer.fs === 'number' ? `${univer.fs}pt` : undefined,
@@ -516,7 +516,6 @@ function univerBorder(value: unknown, side: 't' | 'r' | 'b' | 'l') {
   display: grid;
   margin-inline: auto;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
 }
 
 .report-sheet-preview__cell {
