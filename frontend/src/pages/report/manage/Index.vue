@@ -816,7 +816,7 @@ watch(
 .report-manage-page {
   height: 100%;
   min-height: 0;
-  padding: 8px 8px 0;
+  padding: 8px;
   overflow: hidden;
 }
 
@@ -824,8 +824,7 @@ watch(
   height: 100%;
   min-height: 0;
   border: 1px solid #dfe5f2;
-  border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   background: #fff;
   overflow: hidden;
 }
