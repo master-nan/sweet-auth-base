@@ -85,13 +85,13 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
     const col = Number(cell.col)
     if (!Number.isInteger(row) || !Number.isInteger(col)) return
     if (row < 1 || row > rows || col < 1 || col > cols) return
-    const next = {
+    const next = normalizeLegacyBindingPresentation({
       ...cell,
       id: cell.id || makeReportCellId(row, col),
       row,
       col,
       value: cell.value || '',
-    }
+    })
     if (hasReportCellConfig(next)) incoming.set(makeReportCellId(row, col), next)
   })
   blank.cells = [...incoming.values()].sort((a, b) => a.row - b.row || a.col - b.col)
@@ -106,6 +106,24 @@ export const normalizeReportSheet = (sheet?: Partial<ReportSheetConfig>): Report
   blank.column_widths = normalizeSheetSizes(sheet?.column_widths, cols, 64, 360)
   blank.row_heights = normalizeSheetSizes(sheet?.row_heights, rows, 28, 160)
   return blank
+}
+
+const normalizeLegacyBindingPresentation = (cell: ReportSheetCell): ReportSheetCell => {
+  if (
+    !cell.binding ||
+    cell.binding.type === 'static' ||
+    cell.style?.color?.toLowerCase() !== '#6d5dfc' ||
+    cell.style.bold !== true
+  ) {
+    return cell
+  }
+  const style = { ...cell.style }
+  delete style.color
+  delete style.bold
+  return {
+    ...cell,
+    style: Object.keys(style).length ? style : undefined,
+  }
 }
 
 const normalizeSheetSizes = (

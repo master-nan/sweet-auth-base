@@ -22,6 +22,8 @@ export const useTagViewStore = defineStore('tagView', {
 
   actions: {
     addTagView(to: RouteLocationNormalized) {
+      if (to.meta.fullscreen === true) return
+
       const routeTitle = resolveRouteTitle(to)
       const tag: RouteData = {
         title: routeTitle,
@@ -78,6 +80,11 @@ export const useTagViewStore = defineStore('tagView', {
       if (index !== -1) {
         removeATagView(this, index)
       }
+    },
+
+    forgetTagView(fullPath: string) {
+      this.tagView = this.tagView.filter((item) => item.fullPath !== fullPath)
+      LocalStorage.set('tagView', this.tagView)
     },
 
     removeTagViewAt(index: number) {

@@ -439,7 +439,7 @@ const asyncRoutesChildren: Route[] = [
           keepAlive: false,
           isHidden: true,
           fullscreen: true,
-          showTag: true,
+          showTag: false,
         },
       },
     ],

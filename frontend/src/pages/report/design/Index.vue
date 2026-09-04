@@ -352,6 +352,7 @@ import {
   normalizeReportSheet,
   reportParameterDefaultsForField,
 } from '@/modules/report/schema'
+import { useTagViewStore } from '@/stores/tagView'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -359,6 +360,7 @@ const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const reportApi = useReportApi()
+const tagViewStore = useTagViewStore()
 
 const reportId = computed(() => Number(route.query.id || 0))
 const saving = ref(false)
@@ -613,6 +615,7 @@ const activeCellAlign = computed<'left' | 'center' | 'right'>({
   set: (value) => patchCellStyle({ align: value }),
 })
 onMounted(async () => {
+  tagViewStore.forgetTagView(route.fullPath)
   try {
     await loadDataSources()
     await loadReport()
@@ -1022,7 +1025,6 @@ function bindCell(
       dataset_id: dataset.id,
       field: field.code,
     },
-    style: { ...cellAt(row, col).style, color: '#6d5dfc', bold: true },
   })
   markDetailRow(row)
   selectedCellId.value = reportCellId(row, col)
@@ -2086,7 +2088,6 @@ function goBack() {
 .report-designer-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 2500;
   display: grid;
   grid-template-rows: 72px minmax(0, 1fr) 30px;
   background: #f6f8fc;

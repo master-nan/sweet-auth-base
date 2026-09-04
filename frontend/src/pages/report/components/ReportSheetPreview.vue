@@ -506,7 +506,7 @@ function univerBorder(value: unknown, side: 't' | 'r' | 'b' | 'l') {
 .report-sheet-preview__scroll {
   max-height: min(62vh, 720px);
   padding: 18px;
-  background: #f6f8fc;
+  background: #eef2f7;
   overflow: auto;
 }
 
@@ -514,8 +514,10 @@ function univerBorder(value: unknown, side: 't' | 'r' | 'b' | 'l') {
   width: max-content;
   min-width: max-content;
   display: grid;
+  margin-inline: auto;
   background: #fff;
-  box-shadow: 0 1px 4px rgba(23, 32, 51, 0.08);
+  outline: 1px solid #dfe5f2;
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
 }
 
 .report-sheet-preview__cell {

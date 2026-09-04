@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createBlankReportSheet, makeReportCellId } from './schema'
+import { createBlankReportSheet, makeReportCellId, normalizeReportSheet } from './schema'
 import {
   copyReportUniverCellMetadata,
   getReportUniverFillSourceIndex,
@@ -80,6 +80,32 @@ describe('report Univer snapshot adapter', () => {
       field: 'name',
     })
     expect(univerSnapshotToReportSheet(snapshot).cells[0]?.binding?.type).toBe('group')
+  })
+
+  it('removes the obsolete binding highlight without changing user formatting', () => {
+    const sheet = createBlankReportSheet()
+    sheet.cells = [
+      {
+        id: makeReportCellId(2, 1),
+        row: 2,
+        col: 1,
+        value: '客户.S(名称)',
+        binding: { type: 'field', dataset_id: 'customer', field: 'name' },
+        style: { bold: true, color: '#6d5dfc', align: 'center' },
+      },
+      {
+        id: makeReportCellId(2, 2),
+        row: 2,
+        col: 2,
+        value: '重点客户',
+        style: { bold: true, color: '#6d5dfc' },
+      },
+    ]
+
+    const normalized = normalizeReportSheet(sheet)
+
+    expect(normalized.cells[0]?.style).toEqual({ align: 'center' })
+    expect(normalized.cells[1]?.style).toEqual({ bold: true, color: '#6d5dfc' })
   })
 
   it('keeps row roles attached to rows when Univer shifts row data', () => {

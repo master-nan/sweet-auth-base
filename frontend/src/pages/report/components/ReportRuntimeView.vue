@@ -30,7 +30,6 @@
       />
       <q-btn v-if="showClose" flat round icon="close" @click="$emit('close')" />
     </div>
-    <q-separator />
     <div class="runtime-filters">
       <q-input
         v-model="runtimeKeyword"
@@ -231,23 +230,37 @@ async function exportCurrentRuntime() {
 <style scoped lang="scss">
 .runtime-view {
   display: flex;
+  height: 100%;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  background: #eef2f7;
 }
 
-.runtime-head,
+.runtime-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 72px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #dfe5f2;
+  background: #fff;
+}
+
 .runtime-filters {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #dfe5f2;
+  background: #fff;
 }
 
 .report-title {
   color: #172033;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
 }
 
@@ -277,9 +290,22 @@ async function exportCurrentRuntime() {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
-  overflow: auto;
-  padding: 16px;
+  gap: 12px;
+  overflow: hidden;
+  padding: 18px 20px 14px;
+  background: #eef2f7;
+}
+
+.runtime-body :deep(.report-sheet-preview) {
+  min-height: 0;
+  flex: 1;
+  border-radius: 4px;
+}
+
+.runtime-body :deep(.report-sheet-preview__scroll) {
+  height: 100%;
+  max-height: none;
+  padding: 28px;
 }
 
 .runtime-pagination {
@@ -291,6 +317,17 @@ async function exportCurrentRuntime() {
 }
 
 body.body--dark {
+  .runtime-view,
+  .runtime-body {
+    background: var(--app-dark-page);
+  }
+
+  .runtime-head,
+  .runtime-filters {
+    border-color: var(--app-dark-border);
+    background: var(--app-dark-surface);
+  }
+
   .report-title {
     color: #f4f6fb;
   }

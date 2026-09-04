@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm report-manage-page">
+  <base-content class="report-manage-page">
     <div class="report-workspace">
       <section class="report-main-grid">
         <aside class="category-panel">
@@ -814,13 +814,18 @@ watch(
 
 <style scoped lang="scss">
 .report-manage-page {
+  height: 100%;
   min-height: 0;
+  padding: 8px 8px 0;
+  overflow: hidden;
 }
 
 .report-workspace {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   border: 1px solid #dfe5f2;
-  border-radius: 8px;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
   background: #fff;
   overflow: hidden;
 }
@@ -838,7 +843,8 @@ watch(
 }
 
 .report-main-grid {
-  min-height: calc(100vh - 176px);
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
 }
@@ -896,6 +902,7 @@ watch(
 
 .report-list-panel {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -915,6 +922,7 @@ watch(
 }
 
 .report-table {
+  min-height: 0;
   flex: 1;
 }
 
