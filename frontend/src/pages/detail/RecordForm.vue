@@ -1,6 +1,7 @@
 <template>
   <base-content class="q-pa-sm record-form-page">
     <dynamic-form-dialog
+      v-if="initialized && !loadError"
       v-model="formVisible"
       embedded
       :edit-data="editData"
@@ -10,7 +11,17 @@
       :table-code="tableCode"
       :submit-btn-text="submitText"
       @submit="handleSubmit"
-    />
+    >
+      <template v-if="hasDetails" #custom-fields>
+        <document-details
+          ref="detailEditor"
+          :relations="table?.table_relations || []"
+          :table-code="tableCode"
+          :master-id="mode === 'edit' ? recordId : 0"
+          :menu-id="resolvedMenuId"
+        />
+      </template>
+    </dynamic-form-dialog>
 
     <q-inner-loading :showing="loading">
       <q-spinner color="primary" size="42px" />
@@ -32,7 +43,11 @@ defineOptions({ name: 'record_form_page' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useQuasar } from 'quasar'
+import DocumentDetails from './DocumentDetails.vue'
+import { documentRelations } from './document-lines'
 import cloneDeep from 'lodash/cloneDeep'
+import isEqual from 'lodash/isEqual'
 import { useRoute, useRouter } from 'vue-router'
 import BaseContent from '@/components/BaseContent/BaseContent.vue'
 import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
@@ -63,12 +78,18 @@ const { loading } = storeToRefs(loadingStore)
 const tableApi = useTableApi()
 const generalizationApi = useGeneralizationApi()
 
+const $q = useQuasar()
+const detailEditor = ref<InstanceType<typeof DocumentDetails>>()
+const saving = ref(false),
+  initialized = ref(false)
 const loadError = ref('')
 const formVisible = ref(true)
 const table = ref<RuntimeTableMetadata | null>(null)
 const tableFields = ref<TableField[]>([])
 const editData = ref<Record<string, any> | null>(null)
+let originalHeader: Record<string, any> = {}
 
+const hasDetails = computed(() => documentRelations(table.value?.table_relations).length > 0)
 const mode = computed<FormMode>(() => {
   const value = String(route.params.mode || 'create')
   return value === 'edit' || value === 'copy' ? value : 'create'
@@ -157,7 +178,10 @@ function buildFormBreadcrumbs(title: string): RouteData[] {
   ]
 }
 
+let formRequest = 0
 async function loadForm() {
+  const request = ++formRequest
+  initialized.value = false
   if (!tableCode.value) {
     loadError.value = t('ui.couldNotOpenFormWithoutTableEncoding')
     return
@@ -172,6 +196,7 @@ async function loadForm() {
     if (!tableRes.success || !tableRes.data) {
       throw new Error(tableRes.message || t('ui.tableMetadataDoesNotExist'))
     }
+    if (request !== formRequest) return
     table.value = tableRes.data
     tableFields.value = tableRes.data.table_fields || []
     syncPageChromeTitle()
@@ -181,9 +206,13 @@ async function loadForm() {
         throw new Error(t('ui.missingLogIdUnableToLoadFormData'))
       }
       const row = await loadRecord(recordId.value)
+      if (request !== formRequest) return
+      originalHeader = hasDetails.value && mode.value === 'edit' ? cloneDeep(row) : {}
       editData.value = mode.value === 'copy' ? stripRecordIdentity(row) : row
     }
+    initialized.value = true
   } catch (error) {
+    if (request !== formRequest) return
     const message = error instanceof Error ? error.message : t('ui.formLoadingFailed')
     loadError.value = message
   }
@@ -226,23 +255,46 @@ async function handleSubmit(formPayload: {
   isEdit: boolean
   id?: number
 }) {
-  if (!tableCode.value) return
-  const result =
-    mode.value === 'edit' && recordId.value
-      ? await generalizationApi.updateGeneralization({
-          id: recordId.value,
-          table_code: tableCode.value,
-          data: formPayload.data,
-          menu_id: resolvedMenuId.value,
-        })
-      : await generalizationApi.createGeneralization({
-          table_code: tableCode.value,
-          data: formPayload.data,
-          menu_id: resolvedMenuId.value,
-        })
+  if (!tableCode.value || !initialized.value || loadError.value || saving.value) return
+  saving.value = true
+  try {
+    if (hasDetails.value && !detailEditor.value) throw new Error(t('document.notReady'))
+    const details = hasDetails.value ? { details: detailEditor.value!.changes() } : {}
+    const result =
+      mode.value === 'edit' && recordId.value
+        ? await generalizationApi.updateGeneralization({
+            ...details,
+            id: recordId.value,
+            table_code: tableCode.value,
+            data: hasDetails.value
+              ? Object.fromEntries(
+                  tableFields.value
+                    .filter(
+                      (f) =>
+                        f.is_update_show &&
+                        !f.system_managed &&
+                        !isEqual(formPayload.data[f.field_code], originalHeader[f.field_code]),
+                    )
+                    .map((f) => [f.field_code, formPayload.data[f.field_code]]),
+                )
+              : formPayload.data,
+            menu_id: resolvedMenuId.value,
+          })
+        : await generalizationApi.createGeneralization({
+            ...details,
+            table_code: tableCode.value,
+            data: formPayload.data,
+            menu_id: resolvedMenuId.value,
+          })
 
-  if (result.success) {
-    goBackToList()
+    if (result.success) goBackToList()
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: error instanceof Error ? error.message : t('ui.formLoadingFailed'),
+    })
+  } finally {
+    saving.value = false
   }
 }
 

@@ -116,6 +116,10 @@ type RuntimeRelationOptionsReq struct {
 }
 
 type TableRelationCreateReq struct {
+	DocumentTab    string                    `json:"document_tab"`
+	QuantityField  string                    `json:"quantity_field"`
+	PriceField     string                    `json:"price_field"`
+	AmountField    string                    `json:"amount_field"`
 	TableId        int                       `json:"table_id" binding:"required"`
 	RelatedTableId int                       `json:"related_table_id" binding:"required"` // 关联的表的Id
 	ReferenceKey   string                    `json:"reference_key" binding:"required"`    // 主表对应字段
@@ -125,6 +129,10 @@ type TableRelationCreateReq struct {
 }
 
 type TableRelationUpdateReq struct {
+	DocumentTab    string                    `json:"document_tab"`
+	QuantityField  string                    `json:"quantity_field"`
+	PriceField     string                    `json:"price_field"`
+	AmountField    string                    `json:"amount_field"`
 	Id             int                       `json:"id" binding:"required"`
 	TableId        int                       `json:"table_id" binding:"required"`
 	RelatedTableId int                       `json:"related_table_id" binding:"required"` // 关联的表的Id

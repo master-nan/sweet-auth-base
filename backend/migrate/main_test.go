@@ -119,6 +119,7 @@ func TestMigrationStepsRegistersPlatformBaselineOrder(t *testing.T) {
 		"metadata_column_comments",
 		"unify_report_runtime_component",
 		"purge_historical_report_records",
+		"document_detail_tabs",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("migration steps = %#v, want %#v", got, want)

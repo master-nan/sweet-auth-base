@@ -172,22 +172,32 @@ func (gs *GeneralizationService) GetByIdWithDataPermission(
 }
 
 func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTable, data map[string]interface{}) error {
+	_, err := gs.createRow(ctx, table, data, nil)
+	return err
+}
+
+func (gs *GeneralizationService) createRow(ctx context.Context, table model.SysTable, data, linked map[string]interface{}) (int, error) {
 	if isProtectedTable(table.TableCode) {
-		return error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
+		return 0, error2.NewValidationError(fmt.Sprintf("表 %s 为受保护的系统表，不允许通过通用接口操作", table.TableCode))
 	}
 	filtered := filterDataByFields(table, data, true)
+	for key, value := range linked {
+		filtered[key] = value
+	}
 	applyDefaultValues(table, filtered)
 	if err := validateDataByBindings(table, filtered, true); err != nil {
-		return err
+		return 0, err
 	}
 	normalizeDataByFieldTypes(table, filtered)
 	// 生成雪花ID
+	var recordID int
 	if utils.HasTableField(table, "id") {
 		id, err := gs.sf.GenerateUniqueID()
 		if err != nil {
-			return err
+			return 0, err
 		}
-		filtered["id"] = int(id)
+		recordID = int(id)
+		filtered["id"] = recordID
 	}
 	// 填充审计字段
 	now := model.Now()
@@ -195,11 +205,11 @@ func (gs *GeneralizationService) Create(ctx context.Context, table model.SysTabl
 	setIfFieldExists(table, filtered, "gmt_modify", now)
 	userID, err := generalizationActorID(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	setIfFieldExists(table, filtered, "gmt_create_user", userID)
 	setIfFieldExists(table, filtered, "gmt_modify_user", userID)
-	return gs.generalizationRepo.Create(ctx, table, filtered)
+	return recordID, gs.generalizationRepo.Create(ctx, table, filtered)
 }
 
 func (gs *GeneralizationService) UpdateWithDataPermission(

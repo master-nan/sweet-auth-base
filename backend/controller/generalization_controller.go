@@ -210,7 +210,71 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 		_ = ctx.Error(err)
 		return
 	}
+	if raw, exists := ctx.GetQuery("relation_id"); exists {
+		relationID, parseErr := strconv.Atoi(raw)
+		if parseErr != nil || relationID <= 0 {
+			_ = ctx.Error(myerrors.ErrParamInvalid)
+			return
+		}
+		section, err := gc.generalizationService.ResolveDocumentSection(ctx.Request.Context(), table, relationID)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		if _, err = gc.resolveLowCodeMenuIdByActions(ctx, section.Table.TableCode, enum.ButtonActionDetail, enum.ButtonActionUpdate); err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		rows, err := gc.generalizationService.ReadDocumentRows(ctx.Request.Context(), section, data)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		resp.SetData(rows)
+		return
+	}
 	resp.SetData(data)
+}
+
+func (gc *GeneralizationController) saveDocument(ctx *gin.Context, resp *response.Response, master model.SysTable, id int, data map[string]interface{}, changes []request.DocumentChanges) {
+	sections := make([]service.DocumentSection, 0, len(changes))
+	seen := map[int]bool{}
+	for _, change := range changes {
+		if seen[change.RelationID] || (id == 0 && len(change.Updated)+len(change.Deleted) > 0) {
+			_ = ctx.Error(myerrors.ErrParamInvalid)
+			return
+		}
+		seen[change.RelationID] = true
+		section, err := gc.generalizationService.ResolveDocumentSection(ctx.Request.Context(), master, change.RelationID)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		var menuID int
+		for _, op := range []struct {
+			action enum.SysMenuButtonEventAction
+			count  int
+		}{
+			{enum.ButtonActionCreate, len(change.Added)}, {enum.ButtonActionUpdate, len(change.Updated)}, {enum.ButtonActionDelete, len(change.Deleted)},
+		} {
+			if op.count == 0 {
+				continue
+			}
+			menuID, err = gc.resolveLowCodeMenuId(ctx, menuID, section.Table.TableCode, op.action)
+			if err != nil {
+				_ = ctx.Error(err)
+				return
+			}
+		}
+		section.Changes = change
+		sections = append(sections, section)
+	}
+	result, err := gc.generalizationService.SaveDocument(ctx.Request.Context(), master, id, data, sections)
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+	resp.SetData(result)
 }
 
 // Create 通用新增
@@ -238,6 +302,10 @@ func (gc *GeneralizationController) Create(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
+	if data.Details != nil {
+		gc.saveDocument(ctx, resp, table, 0, data.Data, data.Details)
+		return
+	}
 	if err := gc.generalizationService.Create(ctx.Request.Context(), table, data.Data); err != nil {
 		_ = ctx.Error(err)
 		return
@@ -269,6 +337,10 @@ func (gc *GeneralizationController) Update(ctx *gin.Context) {
 		return
 	}
 	data.MenuId = menuId
+	if data.Details != nil {
+		gc.saveDocument(ctx, resp, table, data.Id, data.Data, data.Details)
+		return
+	}
 	if err := gc.generalizationService.UpdateWithDataPermission(
 		ctx.Request.Context(),
 		table,

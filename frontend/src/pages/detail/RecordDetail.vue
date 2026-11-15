@@ -136,6 +136,7 @@
         </q-list>
       </section>
 
+      <document-details v-if="table?.table_relations?.length" :relations="table.table_relations" :table-code="tableCode" :master-id="recordId" :menu-id="resolveDetailMenuId()" readonly />
       <section
         v-if="detailBottomButtons.length"
         class="detail-page-section record-detail-action-panel"
@@ -169,6 +170,7 @@ defineOptions({ name: 'record_detail_page' })
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import DocumentDetails from './DocumentDetails.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import BaseContent from '@/components/BaseContent/BaseContent.vue'

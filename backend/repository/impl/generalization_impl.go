@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GeneralizationRepositoryImpl struct {
@@ -238,6 +239,31 @@ func (g *GeneralizationRepositoryImpl) BatchHardDeleteWithPermission(
 		return false, nil
 	}
 	return true, nil
+}
+
+func (g *GeneralizationRepositoryImpl) WithDocumentDB(tx *gorm.DB) repository.DocumentRepository {
+	return &GeneralizationRepositoryImpl{db: tx}
+}
+
+func (g *GeneralizationRepositoryImpl) DocumentRows(ctx context.Context, table model.SysTable, key string, value interface{}, permission repository.GeneralizationPermission) ([]map[string]interface{}, error) {
+	query, err := util.ApplyGeneralizationPermission(activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table), permission, table)
+	if err != nil {
+		return nil, err
+	}
+	rows := []map[string]interface{}{}
+	err = query.Select(strings.Join(detailSelectParts(table), ",")).Where(map[string]interface{}{key: value}).Order("id ASC").Find(&rows).Error
+	for i := range rows {
+		rows[i] = normalizeGeneralizationRecord(rows[i])
+	}
+	return rows, err
+}
+
+func (g *GeneralizationRepositoryImpl) LockDocumentRow(ctx context.Context, table model.SysTable, id int, match map[string]interface{}, permission repository.GeneralizationPermission) (map[string]interface{}, error) {
+	query, err := util.ApplyGeneralizationPermission(activeRowQuery(g.db.WithContext(ctx).Table(table.TableCode), table), permission, table)
+	if err != nil {
+		return nil, err
+	}
+	return g.getByIdWithQuery(query.Where(match).Clauses(clause.Locking{Strength: "UPDATE"}), table, id)
 }
 
 func activeRowQuery(db *gorm.DB, table model.SysTable) *gorm.DB {

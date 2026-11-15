@@ -2,6 +2,22 @@ import ui from './ui'
 
 export default {
   ui,
+  document: {
+    tab: 'Document tab name',
+    tabHint: 'Leave blank to exclude from document forms',
+    qty: 'Quantity field',
+    price: 'Unit price field',
+    amount: 'Amount field',
+    newRow: 'Add line',
+    delRow: 'Remove line',
+    qtyTotal: 'Total quantity',
+    amountTotal: 'Total amount',
+    total: 'Document total',
+    empty: 'No lines',
+    notReady: 'Wait until all lines are loaded before saving',
+    failed: 'Could not load document lines',
+    lines: '{count} lines',
+  },
   router: {
     home: 'Home',
     table: 'Table',

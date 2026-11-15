@@ -25,6 +25,7 @@
     "@univerjs/presets": "0.25.1",
     "@univerjs/sheets-ui": "0.25.1",
     "@vueuse/core": "^14.4.0",
+    "decimal.js": "^10.6.0",
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-vue": "^5.1.12",
     "ajv": "^8.20.0",

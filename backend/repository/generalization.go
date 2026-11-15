@@ -35,6 +35,14 @@ type GeneralizationRepository interface {
 	HardDelete(context.Context, model.SysTable, int) error
 }
 
+type DocumentRepository interface {
+	GeneralizationRepository
+	GeneralizationPermissionRepository
+	WithDocumentDB(*gorm.DB) DocumentRepository
+	DocumentRows(context.Context, model.SysTable, string, interface{}, GeneralizationPermission) ([]map[string]interface{}, error)
+	LockDocumentRow(context.Context, model.SysTable, int, map[string]interface{}, GeneralizationPermission) (map[string]interface{}, error)
+}
+
 type GeneralizationPermissionRepository interface {
 	DBWithContext(context.Context) *gorm.DB
 	QueryWithPermission(context.Context, *request.Basic, model.SysTable, GeneralizationPermission) (GeneralizationListResult, error)

@@ -70,6 +70,10 @@ func tableListResponse(data model.SysTable) response.SysTableListRes {
 
 func tableRelationResponse(data model.SysTableRelation) response.SysTableRelationRes {
 	return response.SysTableRelationRes{
+		DocumentTab:    data.DocumentTab,
+		QuantityField:  data.QuantityField,
+		PriceField:     data.PriceField,
+		AmountField:    data.AmountField,
 		BasicRes:       response.NewBasicRes(data.Basic),
 		TableId:        data.TableId,
 		RelatedTableId: data.RelatedTableId,
@@ -126,7 +130,18 @@ func (s *MetadataRuntimeService) GetTableResponse(
 	if err != nil {
 		return response.RuntimeTableMetadataRes{}, err
 	}
-	return runtimeTableMetadataResponse(data), nil
+	result := runtimeTableMetadataResponse(data)
+	for i, relation := range result.TableRelations {
+		if relation.DocumentTab == "" {
+			continue
+		}
+		child, err := s.GetTableByID(ctx, relation.RelatedTableId)
+		if err != nil {
+			return response.RuntimeTableMetadataRes{}, err
+		}
+		result.TableRelations[i].RelatedTableCode = child.Code
+	}
+	return result, nil
 }
 
 func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.RuntimeTableMetadataRes {
@@ -165,7 +180,11 @@ func runtimeTableMetadataResponse(data platformmetadata.TableMetadata) response.
 	relations := make([]response.RuntimeRelationRes, 0, len(data.Relations))
 	for _, relation := range data.Relations {
 		relations = append(relations, response.RuntimeRelationRes{
-			Id: relation.ID, TableId: relation.TableID, RelatedTableId: relation.RelatedTableID,
+			DocumentTab:   relation.DocumentTab,
+			QuantityField: relation.QuantityField,
+			PriceField:    relation.PriceField,
+			AmountField:   relation.AmountField,
+			Id:            relation.ID, TableId: relation.TableID, RelatedTableId: relation.RelatedTableID,
 			ReferenceKey: relation.ReferenceKey, ForeignKey: relation.ForeignKey,
 			RelationType: relation.RelationType, ManyTableCode: relation.ManyTableCode,
 		})

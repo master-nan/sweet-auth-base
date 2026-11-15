@@ -1042,7 +1042,7 @@ func (s *SysTableService) CreateTableRelation(ctx context.Context, req request.T
 	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
 		return err
 	}
-	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey); err != nil {
+	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey, req.RelationType, req.DocumentTab, req.QuantityField, req.PriceField, req.AmountField); err != nil {
 		return err
 	}
 	err = RunInTransaction(ctx, s.sysTableRepo.DBWithContext(ctx), func(tx *gorm.DB) error {
@@ -1135,7 +1135,7 @@ func (s *SysTableService) UpdateTableRelation(ctx context.Context, req request.T
 	if err = validateMetadataRelation(req.RelationType, req.ManyTableCode); err != nil {
 		return err
 	}
-	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey); err != nil {
+	if err = s.validatePhysicalRelationFields(ctx, req.TableId, req.RelatedTableId, req.ReferenceKey, req.ForeignKey, req.RelationType, req.DocumentTab, req.QuantityField, req.PriceField, req.AmountField); err != nil {
 		return err
 	}
 
@@ -1180,7 +1180,7 @@ func validateMetadataRelation(relationType enum.SysTableRelationType, manyTableC
 func (s *SysTableService) validatePhysicalRelationFields(
 	ctx context.Context,
 	tableID, relatedTableID int,
-	referenceKey, foreignKey string,
+	referenceKey, foreignKey string, relationType enum.SysTableRelationType, tab, quantity, price, amount string,
 ) error {
 	mainTable, err := s.sysTableRepo.GetTableById(ctx, tableID)
 	if err != nil {
@@ -1194,6 +1194,32 @@ func (s *SysTableService) validatePhysicalRelationFields(
 	foreignField, foreignOK := tableFieldByCode(relatedTable.TableFields)[foreignKey]
 	if !referenceOK || !foreignOK {
 		return myerrors.NewValidationError("关系两端字段必须存在")
+	}
+	if tab != "" {
+		usable := func(f model.SysTableField) bool {
+			return f.State && f.FieldCategory != enum.CalculatedField && f.FieldCategory != enum.VirtualField && !security.IsSensitiveFieldName(f.FieldCode)
+		}
+		if relationType != enum.OneToMany || strings.TrimSpace(tab) == "" || !usable(referenceField) || !usable(foreignField) || !relationValueFieldUnique(mainTable, referenceField) || security.IsManagedMetadataField(foreignKey) {
+			return myerrors.NewValidationError("单据明细需要一对多关系、唯一主表字段和可写的子表关联字段")
+		}
+		if price != "" && (quantity == "" || amount != "") {
+			return myerrors.NewValidationError("按单价汇总需要数量字段，且不能同时设置行金额字段")
+		}
+		fields := tableFieldByCode(relatedTable.TableFields)
+		for _, code := range []string{quantity, price, amount} {
+			if code == "" {
+				continue
+			}
+			field, ok := fields[code]
+			if !ok || !usable(field) || code == foreignKey || security.IsManagedMetadataField(code) {
+				return myerrors.NewValidationError("汇总字段必须是有效的业务数字字段")
+			}
+			switch field.FieldType {
+			case enum.BigIntFieldType, enum.IntFieldType, enum.SmallIntFieldType, enum.DecimalFieldType:
+			default:
+				return myerrors.NewValidationError("汇总字段必须为数值类型")
+			}
+		}
 	}
 	if !platformmetadata.StorageTypesCompatible(referenceField.FieldType, foreignField.FieldType) {
 		return myerrors.NewValidationError("关系两端字段类型不兼容")

@@ -807,7 +807,9 @@ const formDialogTitle = computed(() => {
   return currentEditData.value?.id ? t('ui.editData') : t('ui.addData')
 })
 
+const hasDocumentTabs = computed(() => currentTable.value?.table_relations?.some(r => r.relation_type === SysTableRelationType.ONE_TO_MANY && r.document_tab?.trim()))
 const activeMasterRelation = computed<TableRelation | null>(() => {
+  if (hasDocumentTabs.value) return null
   const relation = currentTable.value?.table_relations?.find((item) => {
     return (
       item.relation_type === SysTableRelationType.ONE_TO_MANY &&
@@ -1261,6 +1263,7 @@ const openEditDialog = (row: Record<string, any>) => {
 }
 
 const shouldOpenRecordFormPage = (mode: 'create' | 'edit' | 'copy') => {
+  if (hasDocumentTabs.value) return true
   const openMode = currentTable.value?.form_open_mode || SysFormOpenMode.AUTO
   if (openMode === SysFormOpenMode.PAGE) return true
   if (openMode === SysFormOpenMode.DIALOG) return false
@@ -1283,6 +1286,7 @@ const shouldOpenRecordFormPage = (mode: 'create' | 'edit' | 'copy') => {
 }
 
 const shouldOpenRecordDetailPage = () => {
+  if (hasDocumentTabs.value) return true
   const openMode = currentTable.value?.detail_open_mode || SysDetailOpenMode.AUTO
   return openMode !== SysDetailOpenMode.DIALOG
 }

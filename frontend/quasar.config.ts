@@ -122,6 +122,7 @@ export default defineConfig((ctx) => {
     devServer: {
       // https: true,
       port: 8008,
+      proxy: { '/sweet_admin': { target: 'http://127.0.0.1:9009', changeOrigin: true } },
       open: true, // opens browser window automatically
     },
 

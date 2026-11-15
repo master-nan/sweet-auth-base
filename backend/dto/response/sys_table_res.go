@@ -43,6 +43,10 @@ type SysTableFieldDetailRes struct {
 }
 
 type SysTableRelationRes struct {
+	DocumentTab   string `json:"document_tab"`
+	QuantityField string `json:"quantity_field"`
+	PriceField    string `json:"price_field"`
+	AmountField   string `json:"amount_field"`
 	BasicRes
 	TableId        int                       `json:"table_id"`
 	RelatedTableId int                       `json:"related_table_id"`
@@ -149,11 +153,16 @@ type RuntimeRelationOptionRes struct {
 }
 
 type RuntimeRelationRes struct {
-	Id             int                       `json:"id"`
-	TableId        int                       `json:"table_id"`
-	RelatedTableId int                       `json:"related_table_id"`
-	ReferenceKey   string                    `json:"reference_key"`
-	ForeignKey     string                    `json:"foreign_key"`
-	RelationType   enum.SysTableRelationType `json:"relation_type"`
-	ManyTableCode  string                    `json:"many_table_code"`
+	DocumentTab      string                    `json:"document_tab"`
+	QuantityField    string                    `json:"quantity_field"`
+	PriceField       string                    `json:"price_field"`
+	AmountField      string                    `json:"amount_field"`
+	RelatedTableCode string                    `json:"related_table_code,omitempty"`
+	Id               int                       `json:"id"`
+	TableId          int                       `json:"table_id"`
+	RelatedTableId   int                       `json:"related_table_id"`
+	ReferenceKey     string                    `json:"reference_key"`
+	ForeignKey       string                    `json:"foreign_key"`
+	RelationType     enum.SysTableRelationType `json:"relation_type"`
+	ManyTableCode    string                    `json:"many_table_code"`
 }

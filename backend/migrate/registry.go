@@ -55,6 +55,7 @@ func migrationSteps() []migrationStep {
 		syncMetadataColumnComments,
 		unifyReportRuntimeComponent,
 		purgeHistoricalReportRecords,
+		addDocumentTabFields,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -71,6 +72,18 @@ func migrationSteps() []migrationStep {
 		})
 	}
 	return steps
+}
+
+func addDocumentTabFields(db *gorm.DB) error {
+	migrator := db.Migrator()
+	for _, field := range []string{"DocumentTab", "QuantityField", "PriceField", "AmountField"} {
+		if !migrator.HasColumn(&model.SysTableRelation{}, field) {
+			if err := migrator.AddColumn(&model.SysTableRelation{}, field); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func migrateUserSessionSchema(db *gorm.DB) error {

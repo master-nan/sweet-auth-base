@@ -2,6 +2,22 @@ import ui from './ui'
 
 export default {
   ui,
+  document: {
+    tab: '单据页签名称',
+    tabHint: '留空不作为单据明细',
+    qty: '数量字段',
+    price: '单价字段',
+    amount: '金额字段',
+    newRow: '增加明细',
+    delRow: '删除明细',
+    qtyTotal: '数量合计',
+    amountTotal: '金额合计',
+    total: '整单合计',
+    empty: '暂无明细',
+    notReady: '明细尚未加载完成，请稍后再保存',
+    failed: '明细加载失败',
+    lines: '{count} 行',
+  },
   router: {
     home: '首页',
     table: '表格',

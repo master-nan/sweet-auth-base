@@ -215,6 +215,10 @@ type SysTableIndexField struct {
 }
 
 type SysTableRelation struct {
+	DocumentTab   string `gorm:"size:128;comment:单据明细页签" json:"document_tab"`
+	QuantityField string `gorm:"size:128;comment:数量字段" json:"quantity_field"`
+	PriceField    string `gorm:"size:128;comment:单价字段" json:"price_field"`
+	AmountField   string `gorm:"size:128;comment:金额字段" json:"amount_field"`
 	Basic
 	TableId        int                       `gorm:"index;comment:主表Id" json:"table_id"`
 	RelatedTableId int                       `gorm:"index;comment:关联表Id" json:"related_table_id"` // 关联的表的Id

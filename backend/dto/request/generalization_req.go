@@ -10,6 +10,7 @@ package request
 // table_code 必填
 // data 必填
 type GeneralizationCreateReq struct {
+	Details   []DocumentChanges      `json:"details"`
 	TableCode string                 `json:"table_code" binding:"required"`
 	Data      map[string]interface{} `json:"data" binding:"required"`
 	MenuId    int                    `json:"menu_id"`
@@ -20,6 +21,7 @@ type GeneralizationCreateReq struct {
 // table_code 必填
 // data 必填
 type GeneralizationUpdateReq struct {
+	Details   []DocumentChanges      `json:"details"`
 	Id        int                    `json:"id" binding:"required"`
 	TableCode string                 `json:"table_code" binding:"required"`
 	Data      map[string]interface{} `json:"data" binding:"required"`
@@ -29,6 +31,18 @@ type GeneralizationUpdateReq struct {
 // GeneralizationDeleteReq 通用删除请求
 // id 必填
 // table_code 必填
+type DocumentChanges struct {
+	RelationID int                      `json:"relation_id" binding:"required"`
+	Added      []map[string]interface{} `json:"added"`
+	Updated    []DocumentUpdate         `json:"updated"`
+	Deleted    []int                    `json:"deleted"`
+}
+
+type DocumentUpdate struct {
+	ID   int                    `json:"id"`
+	Data map[string]interface{} `json:"data"`
+}
+
 type GeneralizationDeleteReq struct {
 	Id        int    `json:"id" binding:"required"`
 	TableCode string `json:"table_code" binding:"required"`

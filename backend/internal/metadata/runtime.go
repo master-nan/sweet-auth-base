@@ -90,6 +90,10 @@ type RelationDisplayMetadata struct {
 
 // RelationMetadata 是运行时可见的表关系投影，不暴露管理和DDL内部状态。
 type RelationMetadata struct {
+	DocumentTab    string `json:"document_tab"`
+	QuantityField  string `json:"quantity_field"`
+	PriceField     string `json:"price_field"`
+	AmountField    string `json:"amount_field"`
 	ID             int
 	TableID        int
 	RelatedTableID int
@@ -150,6 +154,10 @@ func ProjectTable(source model.SysTable) TableMetadata {
 			continue
 		}
 		result.Relations = append(result.Relations, RelationMetadata{
+			DocumentTab:    relation.DocumentTab,
+			QuantityField:  relation.QuantityField,
+			PriceField:     relation.PriceField,
+			AmountField:    relation.AmountField,
 			ID:             relation.Id,
 			TableID:        relation.TableId,
 			RelatedTableID: relation.RelatedTableId,
@@ -295,6 +303,10 @@ func (table TableMetadata) QueryModel() model.SysTable {
 	}
 	for _, relation := range table.Relations {
 		result.TableRelations = append(result.TableRelations, model.SysTableRelation{
+			DocumentTab:    relation.DocumentTab,
+			QuantityField:  relation.QuantityField,
+			PriceField:     relation.PriceField,
+			AmountField:    relation.AmountField,
 			Basic:          model.Basic{Id: relation.ID, State: true},
 			TableId:        relation.TableID,
 			RelatedTableId: relation.RelatedTableID,

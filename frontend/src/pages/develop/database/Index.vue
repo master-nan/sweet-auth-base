@@ -741,6 +741,7 @@
           <div class="metadata-form-grid">
             <q-select
               v-model="relationForm.related_table_id"
+              @update:model-value="resetChildFieldSelection"
               class="metadata-form-wide"
               :options="tableOptions"
               :label="t('ui.relatedTable')"
@@ -784,6 +785,17 @@
               maxlength="64"
               :disable="relationForm.relation_type !== SysTableRelationType.MANY_TO_MANY"
             />
+            <template v-if="relationForm.relation_type === SysTableRelationType.ONE_TO_MANY">
+              <q-input v-model="relationForm.document_tab" :label="t('document.tab')" :hint="t('document.tabHint')" outlined dense maxlength="64" />
+              <template v-if="relationForm.document_tab.trim()">
+                <q-select v-model="relationForm.quantity_field" :label="t('document.qty')" :options="numericChildFields"
+                  clearable emit-value map-options outlined dense
+                  @update:model-value="value => { if (!value) relationForm.price_field = '' }"
+                />
+                <q-select v-model="relationForm.price_field" :label="t('document.price')" :options="numericChildFields" :disable="!!relationForm.amount_field || !relationForm.quantity_field" clearable emit-value map-options outlined dense />
+                <q-select v-model="relationForm.amount_field" :label="t('document.amount')" :options="numericChildFields" :disable="!!relationForm.price_field" clearable emit-value map-options outlined dense />
+              </template>
+            </template>
           </div>
         </section>
       </div>
@@ -1016,6 +1028,7 @@ const relationForm = ref({
   foreign_key: '',
   relation_type: SysTableRelationType.ONE_TO_ONE,
   many_table_code: '',
+  document_tab: '', quantity_field: '', price_field: '', amount_field: '',
 })
 
 const DB_IDENTIFIER_MAX_LENGTH = 64
@@ -1169,12 +1182,21 @@ const currentTableFieldOptions = computed(() => {
   }))
 })
 
+function resetChildFieldSelection() {
+  Object.assign(relationForm.value, { foreign_key: '', quantity_field: '', price_field: '', amount_field: '' })
+  relatedTableFields.value = []
+}
+
 const relatedTableFieldOptions = computed(() => {
   return relatedTableFields.value.map((field) => ({
     label: `${field.field_name} (${field.field_code})`,
     value: field.field_code,
   }))
 })
+
+const numericChildFields = computed(() => relatedTableFields.value
+  .filter(f => !f.system_managed && f.field_code !== relationForm.value.foreign_key && [SysTableFieldType.BIGINT, SysTableFieldType.INT, SysTableFieldType.SMALLINT, SysTableFieldType.DECIMAL].includes(f.field_type))
+  .map(f => ({ label: f.field_name, value: f.field_code })))
 
 const relationTypeOptions = computed(() => {
   const rtField = relationFieldMeta.value.find((f) => f.field_code === 'relation_type')
@@ -2034,7 +2056,7 @@ const fetchAllTables = async () => {
 
 const fetchRelatedTableFields = async (tableId: number) => {
   const res = await tableApi.queryTableFieldsByTableId(tableId)
-  relatedTableFields.value = Array.isArray(res.data) ? res.data : []
+  if (relationForm.value.related_table_id === tableId) relatedTableFields.value = Array.isArray(res.data) ? res.data : []
 }
 
 const fetchFieldsByTableId = async (tableId: number) => {
@@ -2575,6 +2597,7 @@ const resetRelationForm = () => {
     foreign_key: '',
     relation_type: SysTableRelationType.ONE_TO_ONE,
     many_table_code: '',
+    document_tab: '', quantity_field: '', price_field: '', amount_field: '',
   }
 }
 
@@ -2593,6 +2616,10 @@ const openEditRelationDialog = async (row: TableRelation) => {
     foreign_key: row.foreign_key,
     relation_type: row.relation_type,
     many_table_code: row.many_table_code || '',
+    document_tab: row.document_tab || '',
+    quantity_field: row.quantity_field || '',
+    price_field: row.price_field || '',
+    amount_field: row.amount_field || '',
   }
   if (row.related_table_id) {
     await fetchRelatedTableFields(row.related_table_id)
@@ -2605,6 +2632,14 @@ const handleRelationFormSubmit = async () => {
   const referenceKey = relationForm.value.reference_key.trim()
   const foreignKey = relationForm.value.foreign_key.trim()
   const manyTableCode = relationForm.value.many_table_code.trim()
+  const form = relationForm.value
+  const tab = form.relation_type === SysTableRelationType.ONE_TO_MANY ? form.document_tab.trim() : ''
+  const documentSettings = {
+    document_tab: tab,
+    quantity_field: tab ? form.quantity_field || '' : '',
+    price_field: tab ? form.price_field || '' : '',
+    amount_field: tab ? form.amount_field || '' : '',
+  }
   if (!relationForm.value.related_table_id) {
     $q.notify({
       type: 'warning',
@@ -2647,6 +2682,7 @@ const handleRelationFormSubmit = async () => {
 
   if (currentEditRelation.value?.id) {
     const req: TableRelationUpdateReq = {
+      ...documentSettings,
       id: currentEditRelation.value.id,
       table_id: currentTable.value.id,
       related_table_id: relationForm.value.related_table_id,
@@ -2662,6 +2698,7 @@ const handleRelationFormSubmit = async () => {
     }
   } else {
     const req: TableRelationCreateReq = {
+      ...documentSettings,
       table_id: currentTable.value.id,
       related_table_id: relationForm.value.related_table_id,
       reference_key: referenceKey,

@@ -1,5 +1,18 @@
 <template>
+  <tr v-if="inlineRow">
+    <slot name="line-number" />
+    <td v-for="field in fields" :key="field.field_code">
+      <dynamic-field-control
+        v-if="!readonly && (isEdit ? field.is_update_show : field.is_insert_show)"
+        v-model="formData[field.field_code]"
+        v-bind="controlProps(field)"
+      />
+      <slot v-else name="line-value" :field="field" :value="formData[field.field_code]" />
+    </td>
+    <slot name="line-actions" />
+  </tr>
   <form-dialog-shell
+    v-else
     v-model="show"
     :title="displayTitle"
     :subtitle="dialogSubtitle"
@@ -20,7 +33,7 @@
       </div>
 
       <!-- 表单内容 -->
-      <q-form v-else ref="formRef" @submit="submitForm" class="q-gutter-md">
+      <q-form v-else ref="formRef" @submit="submitForm" @validation-error="revealInvalidField" class="q-gutter-md">
         <!-- 表单顶部按钮 -->
         <div v-if="!isReadonly && formTopButtons.length" class="row q-gutter-xs q-mb-sm">
           <q-btn
@@ -58,23 +71,7 @@
                 :key="field.field_code"
                 :class="getFieldColClass(field)"
               >
-                <dynamic-field-control
-                  v-model="formData[field.field_code]"
-                  :field="field"
-                  :context="getFieldControlContext(field)"
-                  @field-input="handleFieldInput(field.field_code)"
-                  @touched="markTouched(field.field_code)"
-                  @organization-change="updateOrganizationSelectorValue(field, $event)"
-                  @number-change="updateNumberFieldValue(field, $event)"
-                  @number-step="adjustNumberField(field, $event)"
-                  @number-keydown="(direction, event) => handleNumberArrow(field, direction, event)"
-                  @dict-filter="filterDictCodeOptions"
-                  @relation-filter="
-                    (text, update, abort) => filterRelationSelect(field, text, update, abort)
-                  "
-                  @relation-preload="preloadRelationSelect(field)"
-                  @relation-load-more="loadMoreRelationSelect(field, $event)"
-                />
+                <dynamic-field-control v-model="formData[field.field_code]" v-bind="controlProps(field)" />
               </div>
             </div>
           </section>
@@ -147,6 +144,7 @@ import { useI18n } from 'vue-i18n'
 
 import { ref, computed, watch, onMounted, nextTick, type PropType } from 'vue'
 import { QForm } from 'quasar'
+
 import { type TableField } from '@/api/services/sys-table'
 import { type MenuButton } from '@/api/services/sys-menu'
 import { SysMenuButtonPosition } from '@/types/enum'
@@ -196,6 +194,7 @@ type FieldGroup = {
 }
 
 const props = defineProps({
+  inlineRow: { type: Object as PropType<BaseEntity>, default: null },
   modelValue: {
     type: Boolean,
     default: false,
@@ -264,11 +263,15 @@ const show = computed({
 })
 const loadingData = ref(false)
 const controlResetVersion = ref(0)
-const isEdit = computed(() => !!props.editData?.id)
+const isEdit = computed(() => Boolean(props.inlineRow?.id || props.editData?.id))
 const isReadonly = computed(() => props.readonly)
 const currentRecordId = computed(() => Number(formData.value.id || props.editData?.id || 0))
 const formRef = ref<QForm>()
-const formData = ref<Record<string, any>>({})
+const localData = ref<Record<string, any>>({})
+const formData = computed({
+  get: () => props.inlineRow || localData.value,
+  set: value => { localData.value = value },
+})
 const validationActive = ref(false)
 const isInitializing = ref(false)
 const lazyRulesValue = computed(() => (validationActive.value ? false : 'ondemand'))
@@ -1107,6 +1110,7 @@ const shouldHideContent = (field: TableField) => {
 
 // 初始化表单数据
 const initFormData = () => {
+  if (props.inlineRow) return
   controlResetVersion.value += 1
   loadingData.value = true
   if (isEdit.value && props.editData) {
@@ -1281,7 +1285,7 @@ const buildFieldRules = (field: TableField) => {
     return found ? found.slice(name.length + 1) : ''
   }
 
-  const shouldSkip = () => !validationActive.value && !touchedMap.value[field.field_code]
+  const shouldSkip = () => !props.inlineRow && !validationActive.value && !touchedMap.value[field.field_code]
 
   // 必填验证（可空字段不强制必填）
   if (!field.is_null) {
@@ -1608,6 +1612,29 @@ const getFieldControlContext = (field: TableField): DynamicFieldControlContext =
   file: getFileUploadConfig(field),
   fieldRef: setFieldRef(field.field_code),
 })
+
+function controlProps(field: TableField) {
+  return {
+    field, context: getFieldControlContext(field),
+    onFieldInput: () => handleFieldInput(field.field_code),
+    onTouched: () => markTouched(field.field_code),
+    onOrganizationChange: (value: unknown) => updateOrganizationSelectorValue(field, value),
+    onNumberChange: (value: string | number | null) => updateNumberFieldValue(field, value),
+    onNumberStep: (direction: 1 | -1) => adjustNumberField(field, direction),
+    onNumberKeydown: (direction: 1 | -1, event: KeyboardEvent) => handleNumberArrow(field, direction, event),
+    onDictFilter: filterDictCodeOptions,
+    onRelationFilter: (text: string, update: (cb: () => void) => void, abort: () => void) => filterRelationSelect(field, text, update, abort),
+    onRelationPreload: () => preloadRelationSelect(field),
+    onRelationLoadMore: (details: {to?: number}) => loadMoreRelationSelect(field, details),
+  }
+}
+function revealInvalidField(component: unknown) {
+  const field = component as { $el?: Element; focus?: () => void } | null
+  const cell = field?.$el?.closest?.('[data-document-section]')
+  if (!cell) return
+  cell.dispatchEvent(new Event('document-invalid'))
+  void nextTick(() => field?.focus?.())
+}
 
 // 提交表单
 const submitForm = async () => {

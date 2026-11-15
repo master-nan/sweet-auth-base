@@ -106,7 +106,15 @@ export interface TableIndexUpdateReq extends TableIndexCreateReq {
   id: number
 }
 
-export interface TableRelation extends Basic {
+export interface DocumentTabSettings {
+  document_tab?: string
+  quantity_field?: string
+  price_field?: string
+  amount_field?: string
+}
+
+export interface TableRelation extends Basic, DocumentTabSettings {
+  related_table_code?: string
   table_id: number
   related_table_id: number
   reference_key: string
@@ -115,7 +123,7 @@ export interface TableRelation extends Basic {
   many_table_code: string
 }
 
-export interface TableRelationCreateReq {
+export interface TableRelationCreateReq extends DocumentTabSettings {
   table_id: number
   related_table_id: number
   reference_key: string

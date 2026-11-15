@@ -8,13 +8,22 @@ export interface GeneralizationListResult {
   total: number
 }
 
+export interface DocumentChanges {
+  relation_id: number
+  added: Record<string, any>[]
+  updated: { id: number; data: Record<string, any> }[]
+  deleted: number[]
+}
+
 export interface GeneralizationCreateReq {
+  details?: DocumentChanges[]
   table_code: string
   data: Record<string, any>
   menu_id?: number
 }
 
 export interface GeneralizationUpdateReq {
+  details?: DocumentChanges[]
   id: number
   table_code: string
   data: Record<string, any>
@@ -88,9 +97,10 @@ export const useGeneralizationApi = () => {
       ...params,
     }
     return instance
-      .post<
-        ResponseData<Array<Record<string, any>>>
-      >(`/admin/generalization/query/code/${tableCode}`, data)
+      .post<ResponseData<Array<Record<string, any>>>>(
+        `/admin/generalization/query/code/${tableCode}`,
+        data,
+      )
       .then((res) => res.data)
   }
 
@@ -104,6 +114,19 @@ export const useGeneralizationApi = () => {
       )
       .then((res) => res.data)
   }
+
+  const getDocumentRows = async (
+    tableCode: string,
+    id: number,
+    relationId: number,
+    menuId: number,
+  ) =>
+    instance
+      .get<ResponseData<Record<string, any>[]>>(
+        `/admin/generalization/detail/code/${tableCode}/${id}`,
+        { params: { relation_id: relationId, menu_id: menuId } },
+      )
+      .then((res) => res.data)
 
   const createGeneralization = async (req: GeneralizationCreateReq) => {
     return instance.post<ResponseData<boolean>>('/admin/generalization/create', req).then((res) => {
@@ -127,6 +150,7 @@ export const useGeneralizationApi = () => {
 
   return {
     queryGeneralizationByCode,
+    getDocumentRows,
     getGeneralizationDetailByCode,
     createGeneralization,
     updateGeneralization,
