@@ -84,6 +84,12 @@ func validateMetadataFieldDefinition(field *model.SysTableField, sequence int) e
 			return myerrors.NewValidationError("受保护字段不能用于列表、写入或查询元数据")
 		}
 	}
+	if security.IsSensitiveFieldName(field.FieldCode) && field.DetailVisible != nil && *field.DetailVisible {
+		return myerrors.NewValidationError("受保护字段不能用于详情展示")
+	}
+	if field.IsInsertShow && field.IsInsertReadonly && !field.IsNull && strings.TrimSpace(utils.StringValue(field.DefaultValue)) == "" {
+		return myerrors.NewValidationError("新增只读的必填字段必须设置默认值")
+	}
 	if field.IsQuickSearch || field.IsAdvancedSearch {
 		if category != enum.NormalField || field.IsPrimaryKey || expression != "" ||
 			field.InputType == enum.FilePickerInputType || field.InputType == enum.RichTextInputType {

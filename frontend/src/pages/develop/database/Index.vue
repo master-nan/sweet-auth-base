@@ -635,7 +635,11 @@
       :table-code="currentTable?.table_code || ''"
       :submit-btn-text="currentEditField?.id ? t('ui.save') : t('ui.createRecord')"
       @submit="handleFieldFormSubmit"
-    />
+    >
+      <template #custom-fields="{ formData }">
+        <field-scene-settings :draft="formData" @patch="Object.assign(formData, $event)" />
+      </template>
+    </dynamic-form-dialog>
 
     <form-dialog-shell
       v-model="showIndexFormDialog"
@@ -887,6 +891,8 @@ import AdvancedQuery from '@/components/Query/AdvancedQuery.vue'
 import DetailSectionNavigation from '@/components/Detail/DetailSectionNavigation.vue'
 import type { DetailSectionNavigationItem } from '@/components/Detail/types'
 import DynamicFormDialog from '@/components/FormDialog/DynamicFormDialog.vue'
+import FieldSceneSettings from './FieldSceneSettings.vue'
+import { isDetailFieldVisible } from '@/utils/field-layout'
 import FormDialogShell from '@/components/FormDialog/FormDialogShell.vue'
 import { useLoadingStore } from '@/stores/loading'
 import { storeToRefs } from 'pinia'
@@ -1396,17 +1402,18 @@ const fieldDisplayTags = (field: TableField): StructureTag[] => {
   if (field.is_insert_show)
     tags.push({
       get label() {
-        return t('ui.create')
+        return t(field.is_insert_readonly ? 'document.insertReadonly' : 'ui.create')
       },
       tone: 'ok',
     })
   if (field.is_update_show)
     tags.push({
       get label() {
-        return t('ui.edit')
+        return t(field.is_update_readonly ? 'document.updateReadonly' : 'ui.edit')
       },
       tone: 'ok',
     })
+  if (isDetailFieldVisible(field)) tags.push({ label: t('document.detailVisible'), tone: 'blue' })
   return tags.length > 0
     ? tags
     : [
@@ -2002,7 +2009,8 @@ const buildFieldLayoutMetaField = (
   }) as TableField
 
 const ensureFieldLayoutFormFields = (fields: TableField[]) => {
-  const result = fields.filter((field) => field.is_insert_show || field.is_update_show)
+  const sceneControls = new Set(['is_list_show', 'detail_visible', 'is_insert_show', 'is_update_show', 'is_insert_readonly', 'is_update_readonly'])
+  const result = fields.filter((field) => !sceneControls.has(field.field_code) && (field.is_insert_show || field.is_update_show))
   const codes = new Set(result.map((field) => field.field_code))
   const base = fields[0]
 
@@ -2352,6 +2360,12 @@ const openEditFieldDialog = (row: TableField) => {
   showFieldFormDialog.value = true
 }
 
+const fieldSceneOverrides = (field: Partial<TableField>) => ({
+  ...(field.detail_visible != null && { detail_visible: field.detail_visible }),
+  ...(field.is_insert_readonly != null && { is_insert_readonly: field.is_insert_readonly }),
+  ...(field.is_update_readonly != null && { is_update_readonly: field.is_update_readonly }),
+})
+
 const confirmDeleteField = (row: TableField) => {
   confirmDanger({
     get message() {
@@ -2430,6 +2444,7 @@ const handleFieldFormSubmit = async (formPayload: {
       is_list_show: formPayload.data.is_list_show ?? true,
       is_insert_show: formPayload.data.is_insert_show ?? true,
       is_update_show: formPayload.data.is_update_show ?? true,
+      ...fieldSceneOverrides(formPayload.data),
       sequence: toNumber(formPayload.data.sequence, 0),
       original_field_id: toNumber(formPayload.data.original_field_id, 0),
       binding: formPayload.data.binding ?? '',
@@ -2469,6 +2484,7 @@ const handleFieldFormSubmit = async (formPayload: {
       is_list_show: formPayload.data.is_list_show ?? true,
       is_insert_show: formPayload.data.is_insert_show ?? true,
       is_update_show: formPayload.data.is_update_show ?? true,
+      ...fieldSceneOverrides(formPayload.data),
       sequence: toNumber(formPayload.data.sequence, 0),
       original_field_id: toNumber(formPayload.data.original_field_id, 0),
       binding: formPayload.data.binding ?? '',
@@ -2763,6 +2779,7 @@ const buildFieldUpdateReq = (
     is_list_show: field.is_list_show ?? true,
     is_insert_show: field.is_insert_show ?? true,
     is_update_show: field.is_update_show ?? true,
+    ...fieldSceneOverrides(field),
     sequence: toNumber(field.sequence, 0),
     original_field_id: toNumber(field.original_field_id, 0),
     binding: field.binding ?? '',

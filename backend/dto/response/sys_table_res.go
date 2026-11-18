@@ -29,6 +29,9 @@ type SysTableFieldListRes struct {
 	IsListShow         bool                            `json:"is_list_show"`
 	IsInsertShow       bool                            `json:"is_insert_show"`
 	IsUpdateShow       bool                            `json:"is_update_show"`
+	DetailVisible      *bool                           `json:"detail_visible"`
+	IsInsertReadonly   bool                            `json:"is_insert_readonly"`
+	IsUpdateReadonly   bool                            `json:"is_update_readonly"`
 	Sequence           uint8                           `json:"sequence"`
 	OriginalFieldId    int                             `json:"original_field_id"`
 	Binding            string                          `json:"binding"`
@@ -128,6 +131,8 @@ type RuntimeFieldMetadataRes struct {
 	IsNull             bool                            `json:"is_null"`
 	IsListShow         bool                            `json:"is_list_show"`
 	DetailVisible      bool                            `json:"detail_visible"`
+	IsInsertReadonly   bool                            `json:"is_insert_readonly"`
+	IsUpdateReadonly   bool                            `json:"is_update_readonly"`
 	IsInsertShow       bool                            `json:"is_insert_show"`
 	IsUpdateShow       bool                            `json:"is_update_show"`
 	Sequence           uint8                           `json:"sequence"`

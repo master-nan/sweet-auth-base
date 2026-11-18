@@ -69,9 +69,11 @@ export interface TableField extends Basic {
   is_sort: boolean
   is_null: boolean
   is_list_show: boolean
-  detail_visible?: boolean
+  detail_visible?: boolean | null
   is_insert_show: boolean
   is_update_show: boolean
+  is_insert_readonly?: boolean
+  is_update_readonly?: boolean
   sequence: number
   original_field_id: number
   binding: string
@@ -214,6 +216,9 @@ export interface TableFieldCreateReq {
   is_list_show: boolean
   is_insert_show: boolean
   is_update_show: boolean
+  detail_visible?: boolean | null
+  is_insert_readonly?: boolean
+  is_update_readonly?: boolean
   sequence: number
   original_field_id: number
   binding: string
@@ -248,6 +253,9 @@ export interface TableFieldUpdateReq {
   is_list_show: boolean
   is_insert_show: boolean
   is_update_show: boolean
+  detail_visible?: boolean | null
+  is_insert_readonly?: boolean
+  is_update_readonly?: boolean
   sequence: number
   original_field_id: number
   binding: string

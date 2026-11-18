@@ -120,11 +120,12 @@ export const useGeneralizationApi = () => {
     id: number,
     relationId: number,
     menuId: number,
+    scene: 'detail' | 'update',
   ) =>
     instance
       .get<ResponseData<Record<string, any>[]>>(
         `/admin/generalization/detail/code/${tableCode}/${id}`,
-        { params: { relation_id: relationId, menu_id: menuId } },
+        { params: { relation_id: relationId, menu_id: menuId, scene } },
       )
       .then((res) => res.data)
 

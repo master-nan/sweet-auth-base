@@ -43,6 +43,7 @@ var catalog = []Definition{
 	{Version: 25, Key: "unify_report_runtime_component", Contract: "v1|unify-report-runtime-component|report-menu-component|remove-v2-runtime", Checksum: "1aae2d369d5459ea872516d42d25cd134cadec41cc11a1340cd06047fe2340b2"},
 	{Version: 26, Key: "purge_historical_report_records", Contract: "v1|purge-historical-report-records|definitions-versions-execution-logs|published-menu-permissions", Checksum: "b03c83135984eb46a0fe6737713eb3bfba5fd187d4f1481e2acb99f93550e33a"},
 	{Version: 27, Key: "document_detail_tabs", Contract: "v1|document-detail-tabs|quantity-price-amount", Checksum: "0d21ba385e943a21450c78d632810601402a288cc02c235562a8e11caee4ca91"},
+	{Version: 28, Key: "document_field_scenes", Contract: "v1|document-field-scenes|detail-visibility|insert-update-readonly|keep-standalone-detail", Checksum: "13e3ba4eecd084f47ab3795ebe3a6be7e7aa19414035d339929aefad84907ca7"},
 }
 
 var managedTables = []string{

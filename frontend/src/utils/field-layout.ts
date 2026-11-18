@@ -63,7 +63,20 @@ export const getFieldDetailSpan = (field: TableField) => {
   }
 }
 
-export const isDetailFieldVisible = (field: TableField) => field.detail_visible !== false
+type SceneFlags = Pick<TableField, 'detail_visible' | 'is_insert_show' | 'is_update_show' | 'is_insert_readonly' | 'is_update_readonly'>
+
+export const isDetailFieldVisible = (field: SceneFlags) =>
+  field.detail_visible ?? (field.is_insert_show || field.is_update_show)
+
+export type FieldScene = 'insert' | 'update' | 'detail'
+
+export function fieldAccess(field: SceneFlags, scene: FieldScene, readonly = false) {
+  if (scene === 'detail') return isDetailFieldVisible(field) ? 'readonly' : 'hidden'
+  const insert = scene === 'insert'
+  if (!(insert ? field.is_insert_show : field.is_update_show)) return 'hidden'
+  return readonly || (insert ? field.is_insert_readonly : field.is_update_readonly)
+    ? 'readonly' : 'editable'
+}
 
 export const getFieldFormGridClass = (field: TableField) =>
   getFieldFormSpan(field) >= 2 ? 'col-12' : 'col-12 col-sm-6'

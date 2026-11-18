@@ -493,13 +493,6 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 		Expression:         optionalMetadataString(req.Expression),
 		LinkageConfig:      optionalMetadataString(req.LinkageConfig),
 	}
-	if err = validateMetadataFieldDefinition(&candidate, req.Sequence); err != nil {
-		return err
-	}
-	req.NumericPrecision = candidate.NumericPrecision
-	req.NumericScale = candidate.NumericScale
-	req.LogicalType = candidate.LogicalType
-	req.DisplayFormat = candidate.DisplayFormat
 	table, err := s.GetTableById(req.TableId)
 	if err != nil {
 		return err
@@ -511,9 +504,6 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 		}
 		req.LinkageConfig = linkageConfig
 		candidate.LinkageConfig = optionalMetadataString(linkageConfig)
-		if err = s.validateRelationDisplayContract(candidate, table); err != nil {
-			return err
-		}
 		fields, e := s.GetTableFieldsByTableId(req.TableId)
 		if e != nil {
 			return e
@@ -530,6 +520,31 @@ func (s *SysTableService) UpdateTableField(ctx context.Context, req request.Tabl
 				break
 			}
 		}
+		if data.Id == 0 {
+			return myerrors.NewValidationError("字段不属于当前表")
+		}
+		if req.DetailVisible == nil {
+			req.DetailVisible = data.DetailVisible
+		}
+		if req.IsInsertReadonly == nil {
+			req.IsInsertReadonly = &data.IsInsertReadonly
+		}
+		if req.IsUpdateReadonly == nil {
+			req.IsUpdateReadonly = &data.IsUpdateReadonly
+		}
+		candidate.DetailVisible = req.DetailVisible
+		candidate.IsInsertReadonly = *req.IsInsertReadonly
+		candidate.IsUpdateReadonly = *req.IsUpdateReadonly
+		if err = validateMetadataFieldDefinition(&candidate, req.Sequence); err != nil {
+			return err
+		}
+		if err = s.validateRelationDisplayContract(candidate, table); err != nil {
+			return err
+		}
+		req.NumericPrecision = candidate.NumericPrecision
+		req.NumericScale = candidate.NumericScale
+		req.LogicalType = candidate.LogicalType
+		req.DisplayFormat = candidate.DisplayFormat
 		if table.TableType == enum.View {
 			existingDefault := ""
 			if data.DefaultValue != nil {

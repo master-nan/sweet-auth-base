@@ -69,7 +69,7 @@
   <q-select
     v-else-if="context.role === 'dict-code'"
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     outlined
     dense
     clearable
@@ -80,7 +80,6 @@
     input-debounce="0"
     :options="context.dictCodeOptions"
     :rules="context.rules"
-    :hint="context.hint"
     :disable="context.readonly"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
@@ -93,14 +92,13 @@
   <q-input
     v-else-if="context.controlType === 'input'"
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :placeholder="context.placeholder"
     outlined
     dense
     :disable="context.readonly || field.field_code === 'id'"
     :maxlength="context.maxLength"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     :type="passwordHidden ? 'password' : 'text'"
@@ -121,7 +119,7 @@
     v-else-if="context.controlType === 'number'"
     :model-value="value"
     class="number-input-field"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :placeholder="context.placeholder"
     outlined
     dense
@@ -129,7 +127,6 @@
     :inputmode="context.numberInputMode"
     :disable="context.readonly"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     @focus="notifyTouched"
@@ -138,7 +135,7 @@
     @keydown.down="emit('number-keydown', -1, $event)"
     @update:model-value="emit('number-change', $event)"
   >
-    <template v-if="!context.exactDecimal" #append>
+    <template v-if="!inline && !context.exactDecimal" #append>
       <div class="number-input-field__actions">
         <q-btn
           flat
@@ -171,14 +168,13 @@
   <q-input
     v-else-if="context.controlType === 'textarea'"
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :placeholder="context.placeholder"
     outlined
     type="textarea"
     autogrow
     :disable="context.readonly"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     @focus="notifyTouched"
@@ -189,7 +185,7 @@
   <q-select
     v-else-if="context.controlType === 'select'"
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :placeholder="context.placeholder"
     outlined
     dense
@@ -203,7 +199,6 @@
     input-debounce="250"
     :loading="context.relationLoading"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     @filter="(text, update, abort) => emit('relation-filter', text, update, abort)"
@@ -236,8 +231,9 @@
   </q-select>
 
   <div v-else-if="context.controlType === 'boolean'" class="boolean-toggle-field">
-    <div class="boolean-toggle-field__label">{{ field.field_name }}</div>
+    <div v-if="!inline" class="boolean-toggle-field__label">{{ field.field_name }}</div>
     <q-btn-toggle
+      :aria-label="field.field_name"
       v-model="value"
       :options="context.booleanOptions"
       dense
@@ -254,11 +250,10 @@
   <sweet-date-time-picker
     v-else-if="dateTimeControl"
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :type="dateTimeControl"
     :disable="context.readonly"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     @change="notifyInput"
@@ -297,13 +292,12 @@
   <q-input
     v-else
     v-model="value"
-    :label="field.field_name"
+    v-bind="inputCaption"
     :placeholder="context.placeholder"
     outlined
     dense
     :disable="context.readonly"
     :rules="context.rules"
-    :hint="context.hint"
     :lazy-rules="context.lazyRules"
     :ref="context.fieldRef"
     @focus="notifyTouched"
@@ -368,10 +362,14 @@ export interface DynamicFieldControlContext {
 }
 
 const props = defineProps<{
+  inline?: boolean
   field: TableField
   modelValue: any
   context: DynamicFieldControlContext
 }>()
+const inputCaption = computed(() => props.inline
+  ? { 'aria-label': props.field.field_name, hideBottomSpace: true, ...(props.context.hint ? { hint: props.context.hint } : {}) }
+  : { label: props.field.field_name, hint: props.context.hint })
 
 const emit = defineEmits<{
   'update:modelValue': [value: any]

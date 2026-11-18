@@ -1,5 +1,5 @@
 <template>
-  <base-content class="q-pa-sm record-form-page">
+  <base-content class="q-pa-sm record-form-page" :class="{ 'is-document': hasDetails }">
     <dynamic-form-dialog
       v-if="initialized && !loadError"
       v-model="formVisible"
@@ -10,6 +10,7 @@
       :menu-id="resolvedMenuId"
       :table-code="tableCode"
       :submit-btn-text="submitText"
+      :fields-heading="hasDetails ? t('ui.basicInfo') : ''"
       @submit="handleSubmit"
     >
       <template v-if="hasDetails" #custom-fields>
@@ -46,6 +47,7 @@ import { storeToRefs } from 'pinia'
 import { useQuasar } from 'quasar'
 import DocumentDetails from './DocumentDetails.vue'
 import { documentRelations } from './document-lines'
+import { fieldAccess } from '@/utils/field-layout'
 import cloneDeep from 'lodash/cloneDeep'
 import isEqual from 'lodash/isEqual'
 import { useRoute, useRouter } from 'vue-router'
@@ -108,7 +110,7 @@ const pageTitle = computed(() => {
   return t('ui.addNamedRecordTitle', { tableName: tableName })
 })
 
-const submitText = computed(() => (mode.value === 'edit' ? t('ui.save') : t('ui.createRecord')))
+const submitText = computed(() => hasDetails.value ? t('document.save') : mode.value === 'edit' ? t('ui.save') : t('ui.createRecord'))
 const sourceListPath = computed(() => {
   return (
     findMenuPathByTableCode(userStore.menus, tableCode.value) ||
@@ -271,7 +273,8 @@ async function handleSubmit(formPayload: {
                   tableFields.value
                     .filter(
                       (f) =>
-                        f.is_update_show &&
+                        fieldAccess(f, 'update') === 'editable' &&
+                        Object.hasOwn(formPayload.data, f.field_code) &&
                         !f.system_managed &&
                         !isEqual(formPayload.data[f.field_code], originalHeader[f.field_code]),
                     )
@@ -331,5 +334,20 @@ function goBackToList() {
   margin-top: 10px;
   color: $negative;
   background: rgba($negative, 0.08);
+}
+.record-form-page.is-document {
+  --document-gutter: 20px;
+  background: var(--app-surface-muted);
+  :deep(.form-dialog-shell--embedded) { border: 1px solid var(--app-border); border-radius: 6px; }
+  :deep(.form-dialog-shell__body) { background: var(--app-surface); }
+  :deep(.form-dialog-shell__main) { padding: 0; }
+  :deep(.form-dialog-shell__mark) { background: var(--q-primary); box-shadow: none; }
+  :deep(.form-dialog-shell__submit) { border-radius: 4px; box-shadow: none; }
+}
+@media (max-width: 600px) {
+  .record-form-page.is-document { --document-gutter: 12px; }
+}
+@media (pointer: coarse) {
+  .record-form-page.is-document :deep(.form-dialog-shell__footer .q-btn) { min-height: 44px; }
 }
 </style>

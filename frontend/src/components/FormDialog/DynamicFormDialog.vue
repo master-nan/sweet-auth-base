@@ -1,13 +1,15 @@
 <template>
   <tr v-if="inlineRow">
     <slot name="line-number" />
-    <td v-for="field in fields" :key="field.field_code">
+    <td v-for="field in fields" :key="field.field_code" :data-field="field.field_code"
+      :class="{ numeric: getFieldInputType(field) === 'number', 'line-readonly': access(field) === 'readonly' }">
       <dynamic-field-control
-        v-if="!readonly && (isEdit ? field.is_update_show : field.is_insert_show)"
+        v-if="access(field) === 'editable'"
         v-model="formData[field.field_code]"
+        inline
         v-bind="controlProps(field)"
       />
-      <slot v-else name="line-value" :field="field" :value="formData[field.field_code]" />
+      <slot v-else-if="access(field) === 'readonly'" name="line-value" :field="field" :value="formData[field.field_code]" />
     </td>
     <slot name="line-actions" />
   </tr>
@@ -15,7 +17,7 @@
     v-else
     v-model="show"
     :title="displayTitle"
-    :subtitle="dialogSubtitle"
+    :subtitle="fieldsHeading ? '' : dialogSubtitle"
     :submit-text="displaySubmitText"
     :loading="loading"
     :readonly="isReadonly"
@@ -33,7 +35,8 @@
       </div>
 
       <!-- 表单内容 -->
-      <q-form v-else ref="formRef" @submit="submitForm" @validation-error="revealInvalidField" class="q-gutter-md">
+      <q-form v-else ref="formRef" @submit="submitForm" @validation-error="revealInvalidField"
+        :class="fieldsHeading ? 'document-form' : 'q-gutter-md'">
         <!-- 表单顶部按钮 -->
         <div v-if="!isReadonly && formTopButtons.length" class="row q-gutter-xs q-mb-sm">
           <q-btn
@@ -53,8 +56,17 @@
 
         <!-- 表单字段 -->
         <div v-else class="dynamic-form-sections" :class="{ 'is-simple': !isFieldMetadataForm }">
+          <div v-if="fieldsHeading" class="form-fields-heading">
+            <h3><q-icon name="article" />{{ fieldsHeading }}</h3>
+            <span v-if="!headerOpen" class="form-heading-summary">{{ headerSummary }}</span>
+            <q-btn flat dense round type="button" :icon="headerOpen ? 'expand_less' : 'expand_more'"
+              :aria-label="t('document.toggleHeader')" :aria-expanded="headerOpen" @click="headerOpen = !headerOpen">
+              <q-tooltip>{{ t('document.toggleHeader') }}</q-tooltip>
+            </q-btn>
+          </div>
           <section
             v-for="group in displayFieldGroups"
+            v-show="!fieldsHeading || headerOpen"
             :key="group.key"
             class="dynamic-form-section"
           >
@@ -176,7 +188,7 @@ import {
   selectLikeInputTypes,
 } from '@/utils/field-metadata'
 import { menuButtonDisplayProps } from '@/utils/menu-button-display'
-import { getFieldFormGridClass } from '@/utils/field-layout'
+import { fieldAccess, getFieldFormGridClass, type FieldScene } from '@/utils/field-layout'
 
 const { t } = useI18n({ useScope: 'global' })
 
@@ -194,7 +206,9 @@ type FieldGroup = {
 }
 
 const props = defineProps({
+  fieldsHeading: String,
   inlineRow: { type: Object as PropType<BaseEntity>, default: null },
+  inlineScene: String as PropType<FieldScene>,
   modelValue: {
     type: Boolean,
     default: false,
@@ -265,8 +279,11 @@ const loadingData = ref(false)
 const controlResetVersion = ref(0)
 const isEdit = computed(() => Boolean(props.inlineRow?.id || props.editData?.id))
 const isReadonly = computed(() => props.readonly)
+const access = (field: TableField) =>
+  fieldAccess(field, props.inlineScene ?? (isEdit.value ? 'update' : 'insert'), isReadonly.value)
 const currentRecordId = computed(() => Number(formData.value.id || props.editData?.id || 0))
 const formRef = ref<QForm>()
+const headerOpen = ref(true)
 const localData = ref<Record<string, any>>({})
 const formData = computed({
   get: () => props.inlineRow || localData.value,
@@ -357,7 +374,7 @@ const normalizeBooleanFormValue = (value: unknown, fallback = false): boolean =>
 
 const normalizeBooleanFormFields = () => {
   props.fields.forEach((field) => {
-    if (isEdit.value ? !field.is_update_show : !field.is_insert_show) return
+    if (access(field) !== 'editable') return
     if (!isBooleanFieldMetadata(field)) return
     const fallback = defaultValueForField(field) === true
     formData.value[field.field_code] = normalizeBooleanFormValue(
@@ -402,6 +419,7 @@ const updateOrganizationSelectorValue = (field: TableField, value: unknown) => {
 
 const normalizeOrganizationSelectorFormFields = () => {
   props.fields.forEach((field) => {
+    if (access(field) !== 'editable') return
     const config = getOrganizationSelectorConfig(field)
     if (!config) return
     formData.value[field.field_code] = normalizeOrganizationSelectorValue(
@@ -501,9 +519,7 @@ const applyFieldMetadataInputLinkage = (changedCode: string) => {
 
 // 获取当前需要显示的字段（根据编辑或新增模式）
 const displayFields = computed(() => {
-  const baseFields = isEdit.value
-    ? props.fields.filter((field) => field.is_update_show)
-    : props.fields.filter((field) => field.is_insert_show)
+  const baseFields = props.fields.filter((field) => access(field) !== 'hidden')
 
   // 字段类型联动：根据当前表单的 field_type 隐藏长度相关字段
   const fieldType = formData.value.field_type
@@ -655,7 +671,7 @@ const filledFieldCount = computed(
 
 const missingRequiredFields = computed(() =>
   displayFields.value.filter(
-    (field) => !field.is_null && !isFilledValue(formData.value[field.field_code]),
+    (field) => access(field) === 'editable' && !field.is_null && !isFilledValue(formData.value[field.field_code]),
   ),
 )
 
@@ -670,6 +686,10 @@ const resolveFieldDisplayValue = (field: TableField) => {
   if (typeof value === 'object') return t('ui.configured')
   return String(value)
 }
+
+const headerSummary = computed(() => displayFields.value
+  .filter(f => !shouldHideContent(f) && f.input_type === SysTableFieldInputType.INPUT && isFilledValue(formData.value[f.field_code]))
+  .slice(0, 2).map(resolveFieldDisplayValue).join(' / '))
 
 const previewItems = computed(() =>
   displayFields.value.slice(0, 6).map((field) => ({
@@ -1043,7 +1063,7 @@ let prevFilterSnapshot: Record<string, any> = {}
 /** 收集所有联动字段的 filterMapping 中引用的源字段名 */
 const collectFilterSourceFields = (): Set<string> => {
   const sources = new Set<string>()
-  props.fields.forEach((field) => {
+  displayFields.value.forEach((field) => {
     const mapping = parseLinkageConfig(field)?.filterMapping || {}
     Object.values(mapping).forEach((src) => {
       if (typeof src === 'string') sources.add(src)
@@ -1063,10 +1083,10 @@ const refreshLinkageOptions = async (forceAll = false) => {
   linkageRefreshing.value = true
   try {
     if (forceAll) {
-      await Promise.all(props.fields.map((field) => resolveFieldOptions(field)))
+      await Promise.all(displayFields.value.map((field) => resolveFieldOptions(field)))
     } else {
       // 只刷新有 filterMapping 依赖的字段
-      const fieldsToRefresh = props.fields.filter((f) => hasFilterDependency(f))
+      const fieldsToRefresh = displayFields.value.filter((f) => hasFilterDependency(f))
       if (fieldsToRefresh.length > 0) {
         await Promise.all(fieldsToRefresh.map((field) => resolveFieldOptions(field)))
       }
@@ -1223,7 +1243,7 @@ const getFileUploadConfig = (field: TableField): FileUploadFieldConfig => {
 }
 
 const adjustNumberField = (field: TableField, direction: 1 | -1) => {
-  if (isReadonly.value || isExactDecimalFieldType(field.field_type)) return
+  if (access(field) !== 'editable' || isExactDecimalFieldType(field.field_type)) return
 
   const code = field.field_code
   const currentValue = Number(formData.value[code])
@@ -1541,7 +1561,7 @@ const loadDictCodeOptions = async () => {
 const preloadDictionaries = async () => {
   const dictCodes = new Set<string>()
   // 收集所有需要的字典代码
-  props.fields.forEach((field) => {
+  displayFields.value.forEach((field) => {
     if (field.dict_code && !getOrganizationSelectorConfig(field)) {
       dictCodes.add(field.dict_code)
     }
@@ -1584,13 +1604,13 @@ const getFieldControlContext = (field: TableField): DynamicFieldControlContext =
       ? 'dict-code'
       : 'standard',
   controlType: getFieldInputType(field),
-  readonly: isReadonly.value,
+  readonly: access(field) !== 'editable',
   tableCode: props.tableCode,
   menuId: props.menuId,
   rowId: currentRecordId.value,
   lazyRules: lazyRulesValue.value,
   organization: getOrganizationSelectorConfig(field),
-  rules: getFieldRules(field),
+  rules: access(field) === 'editable' ? getFieldRules(field) : [],
   hint: getFieldHint(field),
   placeholder: getFieldPlaceholder(field),
   options:
@@ -1631,8 +1651,9 @@ function controlProps(field: TableField) {
 function revealInvalidField(component: unknown) {
   const field = component as { $el?: Element; focus?: () => void } | null
   const cell = field?.$el?.closest?.('[data-document-section]')
-  if (!cell) return
-  cell.dispatchEvent(new Event('document-invalid'))
+  if (cell) cell.dispatchEvent(new Event('document-invalid'))
+  else if (props.fieldsHeading) headerOpen.value = true
+  else return
   void nextTick(() => field?.focus?.())
 }
 
@@ -1661,8 +1682,14 @@ const submitForm = async () => {
   }
   normalizeBooleanFormFields()
   // 通过事件发射表单数据，让父组件决定如何处理
+  const data = { ...formData.value }
+  for (const field of props.fields) {
+    if (field.is_insert_readonly || field.is_update_readonly) {
+      if (access(field) !== 'editable') delete data[field.field_code]
+    }
+  }
   emit('submit', {
-    data: formData.value,
+    data,
     isEdit: isEdit.value,
     id: isEdit.value && props.editData ? props.editData.id : undefined,
   })
@@ -1755,6 +1782,36 @@ onMounted(() => {
   display: grid;
   gap: 12px;
 }
+.form-fields-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding-inline: var(--document-gutter, 16px);
+}
+.form-fields-heading h3 {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--app-text-strong);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.form-fields-heading h3 .q-icon {
+  font-size: 18px;
+  color: var(--q-primary);
+}
+.form-heading-summary {
+  flex: 1; min-width: 0; margin-inline: 12px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 13px; color: var(--app-text-muted);
+}
+@media (pointer: coarse) {
+  .form-fields-heading .q-btn { min-width: 44px; min-height: 44px; }
+}
 
 .dynamic-form-sections.is-simple {
   display: block;
@@ -1772,6 +1829,12 @@ onMounted(() => {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+.document-form .dynamic-form-sections .dynamic-form-section {
+  padding: 2px var(--document-gutter, 16px) 18px;
+}
+.document-form .dynamic-form-section :deep(.q-field--with-bottom:not(.q-field--error):not(:has(.q-field__messages > div))) {
+  padding-bottom: 0;
 }
 
 .dynamic-form-section__head {

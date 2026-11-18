@@ -221,11 +221,23 @@ func (gc *GeneralizationController) DetailByCode(ctx *gin.Context) {
 			_ = ctx.Error(err)
 			return
 		}
-		if _, err = gc.resolveLowCodeMenuIdByActions(ctx, section.Table.TableCode, enum.ButtonActionDetail, enum.ButtonActionUpdate); err != nil {
+		scene := ctx.DefaultQuery("scene", "detail")
+		if scene != "detail" && scene != "update" {
+			_ = ctx.Error(myerrors.ErrParamInvalid)
+			return
+		}
+		if scene == "update" {
+			if _, err = gc.resolveLowCodeMenuId(ctx, requestedMenuId, table.TableCode, enum.ButtonActionUpdate); err == nil {
+				_, err = gc.resolveLowCodeMenuIdByActions(ctx, section.Table.TableCode, enum.ButtonActionUpdate)
+			}
+		} else {
+			_, err = gc.resolveLowCodeMenuIdByActions(ctx, section.Table.TableCode, enum.ButtonActionDetail, enum.ButtonActionUpdate)
+		}
+		if err != nil {
 			_ = ctx.Error(err)
 			return
 		}
-		rows, err := gc.generalizationService.ReadDocumentRows(ctx.Request.Context(), section, data)
+		rows, err := gc.generalizationService.ReadDocumentRows(ctx.Request.Context(), section, data, scene == "update")
 		if err != nil {
 			_ = ctx.Error(err)
 			return

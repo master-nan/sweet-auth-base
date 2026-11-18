@@ -2,7 +2,9 @@ package main
 
 import (
 	"backend/config"
+	"backend/enum"
 	migrationstate "backend/internal/migration"
+	"backend/internal/security"
 	"backend/internal/utils"
 	"backend/model"
 	"context"
@@ -56,6 +58,7 @@ func migrationSteps() []migrationStep {
 		unifyReportRuntimeComponent,
 		purgeHistoricalReportRecords,
 		addDocumentTabFields,
+		addDocumentFieldScenes,
 	}
 	definitions := migrationstate.Catalog()
 	if len(definitions) != len(runners) {
@@ -84,6 +87,38 @@ func addDocumentTabFields(db *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+func addDocumentFieldScenes(db *gorm.DB) error {
+	m := db.Migrator()
+	for _, key := range []string{"DetailVisible", "IsInsertReadonly", "IsUpdateReadonly"} {
+		if !m.HasColumn(&model.SysTableField{}, key) {
+			if err := m.AddColumn(&model.SysTableField{}, key); err != nil {
+				return err
+			}
+		}
+	}
+	// Existing standalone read-only pages used to display all ordinary fields in detail.
+	// Document lines without an explicit setting inherit their form fields, never list columns.
+	children := db.Model(&model.SysTableRelation{}).Select("related_table_id").
+		Where("relation_type = ? AND TRIM(document_tab) <> '' AND state = ?", enum.OneToMany, true)
+	candidates := func() *gorm.DB {
+		return db.Model(&model.SysTableField{}).Where("detail_visible IS NULL AND NOT is_insert_show AND NOT is_update_show AND table_id NOT IN (?)", children)
+	}
+	var names []string
+	if err := candidates().Distinct().Pluck("field_code", &names).Error; err != nil {
+		return err
+	}
+	ordinary := make([]string, 0, len(names))
+	for _, name := range names {
+		if !security.IsSensitiveFieldName(name) && !security.IsManagedMetadataField(name) {
+			ordinary = append(ordinary, name)
+		}
+	}
+	if len(ordinary) == 0 {
+		return nil
+	}
+	return candidates().Where("field_code IN ?", ordinary).UpdateColumn("detail_visible", true).Error
 }
 
 func migrateUserSessionSchema(db *gorm.DB) error {

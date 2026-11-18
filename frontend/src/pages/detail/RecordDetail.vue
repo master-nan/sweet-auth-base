@@ -12,6 +12,7 @@
 
   <detail-page-shell
     v-else
+    :class="{ 'record-detail-document': documentTabs.length }"
     :title="pageTitle"
     :icon="sourceIcon"
     :loading="loading"
@@ -67,13 +68,17 @@
 
     <template v-if="record">
       <section class="detail-page-section">
-        <div class="detail-page-section__head">
+        <div class="detail-page-section__head" :class="{ 'document-master-heading': documentTabs.length }">
           <div>
             <h3>{{ t('ui.basicInfo') }}</h3>
           </div>
+          <q-btn v-if="documentTabs.length" flat dense round :icon="headerOpen ? 'expand_less' : 'expand_more'"
+            :aria-expanded="headerOpen" :aria-label="t('document.toggleHeader')" @click="headerOpen = !headerOpen">
+            <q-tooltip>{{ t('document.toggleHeader') }}</q-tooltip>
+          </q-btn>
         </div>
 
-        <div class="record-detail-field-grid">
+        <div v-show="headerOpen || !documentTabs.length" class="record-detail-field-grid">
           <article
             v-for="field in compactFields"
             :key="field.key"
@@ -136,7 +141,7 @@
         </q-list>
       </section>
 
-      <document-details v-if="table?.table_relations?.length" :relations="table.table_relations" :table-code="tableCode" :master-id="recordId" :menu-id="resolveDetailMenuId()" readonly />
+      <document-details v-if="documentTabs.length" :relations="documentTabs" :table-code="tableCode" :master-id="recordId" :menu-id="resolveDetailMenuId()" readonly />
       <section
         v-if="detailBottomButtons.length"
         class="detail-page-section record-detail-action-panel"
@@ -171,6 +176,7 @@ defineOptions({ name: 'record_detail_page' })
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import DocumentDetails from './DocumentDetails.vue'
+import { documentRelations } from './document-lines'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import BaseContent from '@/components/BaseContent/BaseContent.vue'
@@ -263,6 +269,8 @@ const { loading } = storeToRefs(loadingStore)
 const loadError = ref('')
 const record = ref<Record<string, any> | null>(null)
 const table = ref<RuntimeTableMetadata | null>(null)
+const documentTabs = computed(() => documentRelations(table.value?.table_relations))
+const headerOpen = ref(true)
 const tableFields = ref<TableField[]>([])
 const relationLookups = ref<Record<string, LookupMap>>({})
 const richTextHtmlMap = ref<Record<string, string>>({})
@@ -789,6 +797,7 @@ function handleParamsSubmit(formPayload: { data: Record<string, any> }) {
 }
 
 async function loadDetail() {
+  headerOpen.value = true
   if (!canLoadRecordDetail.value) return
   if (isOrganizationSyncBatch.value) return
   if (!recordId.value || !tableCode.value) {
@@ -970,6 +979,31 @@ watch(
 </script>
 
 <style scoped lang="scss">
+.record-detail-document {
+  --document-gutter: 20px;
+  :deep(.detail-page-shell__content) {
+    gap: 0;
+    max-width: none;
+    border: 1px solid var(--app-border);
+    background: var(--app-surface);
+  }
+  :deep(.detail-page-section), :deep(.detail-page-shell__header) {
+    border: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--app-border);
+    box-shadow: none;
+  }
+  :deep(.detail-page-section) { padding: 16px var(--document-gutter); }
+  :deep(.detail-page-section h3) { font-size: 15px; }
+  .document-master-heading { justify-content: space-between; }
+  .document-master-heading:has([aria-expanded=false]) { margin-bottom: 0; }
+}
+@media (max-width: 600px) {
+  .record-detail-document { --document-gutter: 12px; }
+}
+@media (pointer: coarse) {
+  .record-detail-document .document-master-heading .q-btn { min-width: 44px; min-height: 44px; }
+}
 .record-detail-field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));

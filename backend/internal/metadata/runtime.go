@@ -67,6 +67,8 @@ type FieldMetadata struct {
 	Nullable           bool
 	ListVisible        bool
 	DetailVisible      bool
+	InsertReadonly     bool
+	UpdateReadonly     bool
 	InsertVisible      bool
 	UpdateVisible      bool
 	Sequence           uint8
@@ -188,6 +190,13 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		}
 	}
 	managed := security.IsManagedMetadataField(source.FieldCode)
+	detail := source.IsInsertShow || source.IsUpdateShow
+	if managed {
+		detail = source.IsListShow
+	}
+	if source.DetailVisible != nil {
+		detail = *source.DetailVisible
+	}
 	return FieldMetadata{
 		ID:                 source.Id,
 		TableID:            source.TableId,
@@ -213,7 +222,9 @@ func ProjectField(source model.SysTableField) (FieldMetadata, bool) {
 		Sortable:           source.IsSort,
 		Nullable:           source.IsNull,
 		ListVisible:        source.IsListShow && !managed,
-		DetailVisible:      !managed || source.IsListShow,
+		DetailVisible:      detail,
+		InsertReadonly:     source.IsInsertReadonly && source.IsInsertShow && !managed,
+		UpdateReadonly:     source.IsUpdateReadonly && source.IsUpdateShow && !managed,
 		InsertVisible:      source.IsInsertShow && !managed,
 		UpdateVisible:      source.IsUpdateShow && !managed,
 		Sequence:           source.Sequence,
@@ -293,6 +304,9 @@ func (table TableMetadata) QueryModel() model.SysTable {
 			IsListShow:         field.ListVisible,
 			IsInsertShow:       field.InsertVisible,
 			IsUpdateShow:       field.UpdateVisible,
+			DetailVisible:      &field.DetailVisible,
+			IsInsertReadonly:   field.InsertReadonly,
+			IsUpdateReadonly:   field.UpdateReadonly,
 			Sequence:           field.Sequence,
 			OriginalFieldId:    field.OriginalFieldID,
 			Binding:            field.Binding,

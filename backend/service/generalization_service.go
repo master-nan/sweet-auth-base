@@ -480,10 +480,10 @@ func filterDataByFields(table model.SysTable, data map[string]interface{}, isCre
 		if isManagedField(field.FieldCode) {
 			continue
 		}
-		if isCreate && !field.IsInsertShow {
+		if isCreate && (!field.IsInsertShow || field.IsInsertReadonly) {
 			continue
 		}
-		if !isCreate && !field.IsUpdateShow {
+		if !isCreate && (!field.IsUpdateShow || field.IsUpdateReadonly) {
 			continue
 		}
 		allowed[field.FieldCode] = field

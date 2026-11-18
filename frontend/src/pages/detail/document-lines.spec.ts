@@ -109,27 +109,22 @@ describe('lineChanges', () => {
 })
 
 describe('documentTotals', () => {
-  it('updates exact totals across tabs as draft rows change, without saving', () => {
+  it('按各自的字段映射精确汇总，分别响应明细的增删改', () => {
     const goods = reactive(draftLines([{ id: 7, units: '0.3', price: '0.2' }]))
     const fees = reactive(
       draftLines([{ id: 8, count: '2', rate: '7', charge: '9007199254740993.001' }]),
     )
-    const totals = computed(() =>
-      documentTotals([
-        { relation: { quantity_field: 'units', price_field: 'price' }, lines: goods.lines },
-        {
-          relation: { quantity_field: 'count', price_field: 'rate', amount_field: 'charge' },
-          lines: fees.lines,
-        },
-      ]),
-    )
+    const totals = computed(() => documentTotals({ quantity_field: 'units', price_field: 'price' }, goods.lines))
+    const charges = computed(() => documentTotals({ quantity_field: 'count', price_field: 'rate', amount_field: 'charge' }, fees.lines))
 
-    expect(totals.value).toEqual({ quantity: '2.3', amount: '9007199254740993.061' })
+    expect(totals.value).toEqual({ quantity: '0.3', amount: '0.06' })
+    expect(charges.value).toEqual({ quantity: '2', amount: '9007199254740993.001' })
     goods.lines[0]!.data.units = '0.35'
-    expect(totals.value).toEqual({ quantity: '2.35', amount: '9007199254740993.071' })
+    expect(totals.value).toEqual({ quantity: '0.35', amount: '0.07' })
     goods.lines.push({ key: 'new-item', data: { units: '0.05', price: '0.2' } })
-    expect(totals.value).toEqual({ quantity: '2.4', amount: '9007199254740993.081' })
+    expect(totals.value).toEqual({ quantity: '0.4', amount: '0.08' })
     fees.lines.splice(0, 1)
+    expect(charges.value).toEqual({ quantity: '0', amount: '0.00' })
     expect(totals.value).toEqual({ quantity: '0.4', amount: '0.08' })
     goods.lines.splice(0)
     expect(totals.value).toEqual({ quantity: '0', amount: '0.00' })

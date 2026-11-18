@@ -191,6 +191,9 @@ type SysTableField struct {
 	IsListShow         bool                            `gorm:"default:true;comment:是否列表显示" json:"is_list_show"`
 	IsInsertShow       bool                            `gorm:"default:true;comment:是否新增显示" json:"is_insert_show"`
 	IsUpdateShow       bool                            `gorm:"default:true;comment:是否更新显示" json:"is_update_show"`
+	DetailVisible      *bool                           `gorm:"comment:详情显示" json:"detail_visible"`
+	IsInsertReadonly   bool                            `gorm:"not null;default:false;comment:新增只读" json:"is_insert_readonly"`
+	IsUpdateReadonly   bool                            `gorm:"not null;default:false;comment:编辑只读" json:"is_update_readonly"`
 	Sequence           uint8                           `gorm:"comment:排序;type:smallint" binding:"required" json:"sequence"`
 	OriginalFieldId    int                             `gorm:"comment:原字段Id" json:"original_field_id"`
 	Binding            string                          `gorm:"size:256;comment:验证器" json:"binding"`        // 用于存储绑定规则

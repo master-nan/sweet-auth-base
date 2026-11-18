@@ -62,12 +62,15 @@ type TableFieldCreateReq struct {
 	IsListShow         bool                            `json:"is_list_show"`                  // 是否列表显示
 	IsInsertShow       bool                            `json:"is_insert_show"`                // 是否新增显示
 	IsUpdateShow       bool                            `json:"is_update_show"`                // 是否更新显示
-	Sequence           int                             `json:"sequence" binding:"required"`   // 排序
-	Binding            string                          `json:"binding"`                       // 校验规则
-	OriginalFieldId    int                             `json:"original_field_id"`             // 原字段Id
-	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`                // 字段类别
-	Expression         string                          `json:"expression"`                    // 计算字段表达式
-	LinkageConfig      string                          `json:"linkage_config"`                // 联动配置
+	DetailVisible      *bool                           `json:"detail_visible"`
+	IsInsertReadonly   bool                            `json:"is_insert_readonly"`
+	IsUpdateReadonly   bool                            `json:"is_update_readonly"`
+	Sequence           int                             `json:"sequence" binding:"required"` // 排序
+	Binding            string                          `json:"binding"`                     // 校验规则
+	OriginalFieldId    int                             `json:"original_field_id"`           // 原字段Id
+	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`              // 字段类别
+	Expression         string                          `json:"expression"`                  // 计算字段表达式
+	LinkageConfig      string                          `json:"linkage_config"`              // 联动配置
 
 }
 
@@ -98,12 +101,15 @@ type TableFieldUpdateReq struct {
 	IsListShow         bool                            `json:"is_list_show"`                  // 是否列表显示
 	IsInsertShow       bool                            `json:"is_insert_show"`                // 是否新增显示
 	IsUpdateShow       bool                            `json:"is_update_show"`                // 是否更新显示
-	Sequence           int                             `json:"sequence"`                      // 排序
-	Binding            string                          `json:"binding"`                       // 校验规则
-	OriginalFieldId    int                             `json:"original_field_id"`             // 原字段Id
-	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`                // 字段类别
-	Expression         string                          `json:"expression"`                    // 计算字段表达式
-	LinkageConfig      string                          `json:"linkage_config"`                // 联动配置
+	DetailVisible      *bool                           `json:"detail_visible"`
+	IsInsertReadonly   *bool                           `json:"is_insert_readonly"`
+	IsUpdateReadonly   *bool                           `json:"is_update_readonly"`
+	Sequence           int                             `json:"sequence"`          // 排序
+	Binding            string                          `json:"binding"`           // 校验规则
+	OriginalFieldId    int                             `json:"original_field_id"` // 原字段Id
+	FieldCategory      enum.SysTableFieldCategory      `json:"field_category"`    // 字段类别
+	Expression         string                          `json:"expression"`        // 计算字段表达式
+	LinkageConfig      string                          `json:"linkage_config"`    // 联动配置
 }
 
 type RuntimeRelationOptionsReq struct {

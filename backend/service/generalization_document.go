@@ -4,6 +4,7 @@ import (
 	"backend/dto/request"
 	"backend/enum"
 	myerrors "backend/internal/errors"
+	"backend/internal/security"
 	"backend/model"
 	"backend/repository"
 	"context"
@@ -33,7 +34,7 @@ func (gs *GeneralizationService) ResolveDocumentSection(ctx context.Context, mas
 	return DocumentSection{}, myerrors.NewValidationError("单据明细关系无效，请刷新页面")
 }
 
-func (gs *GeneralizationService) ReadDocumentRows(ctx context.Context, section DocumentSection, master map[string]interface{}) ([]map[string]interface{}, error) {
+func (gs *GeneralizationService) ReadDocumentRows(ctx context.Context, section DocumentSection, master map[string]interface{}, forUpdate bool) ([]map[string]interface{}, error) {
 	repo, ok := gs.generalizationRepo.(repository.DocumentRepository)
 	if !ok {
 		return nil, myerrors.ErrDataPermissionRuntimeFailed
@@ -46,7 +47,27 @@ func (gs *GeneralizationService) ReadDocumentRows(ctx context.Context, section D
 	if err != nil {
 		return nil, err
 	}
-	return repo.DocumentRows(ctx, section.Table, section.Relation.ForeignKey, value, access)
+	rows, err := repo.DocumentRows(ctx, section.Table, section.Relation.ForeignKey, value, access)
+	if err != nil {
+		return nil, err
+	}
+	visible := map[string]bool{"id": true}
+	for _, f := range section.Table.TableFields {
+		if f.FieldCode == section.Relation.ForeignKey || f.IsPrimaryKey || security.IsManagedMetadataField(f.FieldCode) || security.IsSensitiveFieldName(f.FieldCode) {
+			continue
+		}
+		if forUpdate {
+			visible[f.FieldCode] = f.IsUpdateShow
+		} else if f.DetailVisible != nil {
+			visible[f.FieldCode] = *f.DetailVisible
+		} else {
+			visible[f.FieldCode] = f.IsInsertShow || f.IsUpdateShow
+		}
+	}
+	for _, row := range rows {
+		maps.DeleteFunc(row, func(k string, _ any) bool { return !visible[k] })
+	}
+	return rows, nil
 }
 
 func (gs *GeneralizationService) SaveDocument(ctx context.Context, table model.SysTable, id int, data map[string]interface{}, sections []DocumentSection) (int, error) {

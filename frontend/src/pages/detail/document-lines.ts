@@ -60,19 +60,17 @@ function numeric(value: unknown) {
   return new Exact(text)
 }
 
-export function documentTotals(groups: { relation: DocumentTabSettings; lines: DocumentLine[] }[]) {
+export function documentTotals(relation: DocumentTabSettings, lines: DocumentLine[]) {
   let quantity = new Exact(0),
     amount = new Exact(0)
-  for (const { relation, lines } of groups) {
-    for (const { data } of lines) {
-      const qty = numeric(data[relation.quantity_field || ''])
-      quantity = quantity.plus(qty)
-      amount = amount.plus(
-        relation.amount_field
-          ? numeric(data[relation.amount_field])
-          : qty.times(numeric(data[relation.price_field || ''])),
-      )
-    }
+  for (const { data } of lines) {
+    const qty = numeric(data[relation.quantity_field || ''])
+    quantity = quantity.plus(qty)
+    amount = amount.plus(
+      relation.amount_field
+        ? numeric(data[relation.amount_field])
+        : qty.times(numeric(data[relation.price_field || ''])),
+    )
   }
   return {
     quantity: quantity.toFixed(),

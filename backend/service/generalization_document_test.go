@@ -34,11 +34,11 @@ func TestGeneralizationSaveDocument(t *testing.T) {
 				f := newDocumentFixture(t, engine.open(t))
 				f.seedTwoDocuments(t)
 				master := map[string]any{"id": 10}
-				rows, err := f.svc.ReadDocumentRows(f.ctx, f.lines, master)
+				rows, err := f.svc.ReadDocumentRows(f.ctx, f.lines, master, false)
 				if err != nil || len(rows) != 2 || rows[0]["label"] != "one" || rows[1]["label"] != "two" {
 					t.Fatalf("read goods: rows=%v err=%v", rows, err)
 				}
-				fees, err := f.svc.ReadDocumentRows(f.ctx, f.fees, master)
+				fees, err := f.svc.ReadDocumentRows(f.ctx, f.fees, master, false)
 				if err != nil || len(fees) != 0 {
 					t.Fatalf("read fees: rows=%v err=%v", fees, err)
 				}

@@ -1373,6 +1373,9 @@ func migrationTableFieldCreateMap(field model.SysTableField) map[string]interfac
 		"is_list_show":         field.IsListShow,
 		"is_insert_show":       field.IsInsertShow,
 		"is_update_show":       field.IsUpdateShow,
+		"detail_visible":       field.DetailVisible,
+		"is_insert_readonly":   field.IsInsertReadonly,
+		"is_update_readonly":   field.IsUpdateReadonly,
 		"sequence":             field.Sequence,
 		"original_field_id":    field.OriginalFieldId,
 		"binding":              field.Binding,
@@ -2274,6 +2277,10 @@ func systemColumnToTableField(tableCode string, column gorm.ColumnType, sequence
 	applyIntegrationExecutionFieldDefaults(tableCode, &field)
 	applyIntegrationLogFieldDefaults(tableCode, &field)
 	applyReportDefinitionFieldDefaults(tableCode, &field)
+	if !field.IsInsertShow && !field.IsUpdateShow && !security.IsManagedMetadataField(field.FieldCode) && !security.IsSensitiveFieldName(field.FieldCode) {
+		visible := true
+		field.DetailVisible = &visible
+	}
 	return field, nil
 }
 
@@ -2788,6 +2795,9 @@ var systemFieldDisplayNameMap = map[string]string{
 	"input_type":            "输入类型",
 	"form_span":             "表单列宽",
 	"detail_span":           "详情列宽",
+	"detail_visible":        "详情显示",
+	"is_insert_readonly":    "新增只读",
+	"is_update_readonly":    "编辑只读",
 	"default_value":         "默认值",
 	"dict_code":             "字典编码",
 	"is_primary_key":        "是否主键",
