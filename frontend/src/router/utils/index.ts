@@ -195,12 +195,18 @@ function reportMenuRoutePath(path: string) {
   return `/admin/${normalized}`
 }
 
-function menuToLowCodeRoute(menu: Menu): Route {
+function menuToLowCodeRoute(menu: Menu): Route | null {
   const tableCode = menu.table_code || ''
+  const componentPath = menu.component.startsWith('src/') ? menu.component : `src/${menu.component}`
+  const component = componentMap[componentPath]
+  if (!component) {
+    console.warn('通用页面组件未注册，已跳过菜单:', menu.name, menu.component)
+    return null
+  }
   return {
     path: menu.path,
     name: menu.name,
-    component: componentMap[menu.component],
+    component,
     meta: {
       title: menu.title,
       ...(menu.icon ? { icon: menu.icon } : {}),

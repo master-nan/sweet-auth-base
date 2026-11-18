@@ -111,6 +111,32 @@ describe('permission route construction', () => {
     userStore.menus = []
   })
 
+  it('loads the same list component for published and src-prefixed low-code menu paths', () => {
+    const codes = ['tms_company', 'tms_waybill', 'tms_vehicle', 'other_table']
+    const menus = [{
+      name: 'tms_demo',
+      path: 'tms-demo',
+      page_type: 'directory',
+      component: 'src/components/Layout/Layout.vue',
+      children: codes.map((code, index) => ({
+        id: index + 1,
+        name: `lowcode_${code}`,
+        path: code,
+        page_type: 'low_code',
+        table_code: code,
+        component: index < 3 ? 'pages/develop/generalization/Index.vue' : 'src/pages/develop/generalization/Index.vue',
+      })),
+    }] as Menu[]
+    const children = constructionRouters([], menus)[0]?.children
+    expect(children).toHaveLength(codes.length)
+    for (const [index, code] of codes.entries()) {
+      const route = children?.[index]
+      expect(route?.component).toEqual(expect.any(Function))
+      expect(route?.component).toBe(children?.[3]?.component)
+      expect(route?.meta).toMatchObject({ menuId: index + 1, tableCode: code })
+    }
+  })
+
   it('renders only Integration pages returned by the backend permission menu', () => {
     userStore.menu_names = ['integration', 'integration_external_system']
 
